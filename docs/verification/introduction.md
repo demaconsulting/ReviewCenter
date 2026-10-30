@@ -74,6 +74,7 @@ This document covers the verification design for the following software items:
     - **AuditService** — recording, reading, and verification of the audit trail
     - **ProjectService** — project rules
     - **EvidenceSettingsService** — evidence settings rules
+    - **ProjectChecklistService** — per-project checklist definition rules
     - **ReviewService** — review rules
     - **ThreadService** — review comment rules
     - **ChecklistService** — review checklist rules, default checklist, and progress

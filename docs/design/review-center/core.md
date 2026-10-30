@@ -11,12 +11,13 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains twenty-one units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains twenty-two units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
 for projects and their members; `EvidenceSettingsService`, the rules for the per-project evidence settings (anonymous
-access to the evidence and the content of the attestation PDFs); `ReviewService`, the rules for reviews;
+access to the evidence and the content of the attestation PDFs); `ProjectChecklistService`, the rules for the checklist
+that a project gives to its new reviews; `ReviewService`, the rules for reviews;
 `ThreadService`, the rules for review comments;
 `ChecklistService`, the rules for the review checklist; `UserService`, the rules for users, including the accounts that
 sign in with an external identity provider; `SigningService`, the
@@ -59,7 +60,8 @@ supporting types, documented with the unit that owns them.
 
 ### Interfaces
 
-**ProjectAccess, ProjectService, EvidenceSettingsService, ReviewService, ThreadService, ChecklistService, UserService,
+**ProjectAccess, ProjectService, EvidenceSettingsService, ProjectChecklistService, ReviewService, ThreadService,
+ChecklistService, UserService,
 SigningService, and
 PersonalAccessTokenService**: The operations
 used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsystem.
@@ -76,7 +78,11 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   admin is refused for a project admin; a failed add is throttled and audited); read and change the evidence settings of
   a project (system administrators and the project admins of that project only; a change names the settings it started
   from and is refused with `RecordChanged` when another change came first, and is audited with its changed keys), and
-  read them without an actor for the services that apply them; create a draft review from uploaded
+  read them without an actor for the services that apply them; read the checklist definition of a project (the built-in
+  default when it has none) and replace or reset it (system administrators and the project admins of that project only,
+  never through an API token; the text must pass the strict validation, a changed wording needs a new version label, and
+  a change names the hash it started from and is refused with `RecordChanged` when another change came first); create a
+  draft review from uploaded
   files, or from the files
   that changed between an optional baseline revision and a head revision of a registered repository of the same
   project, restricted by a
@@ -134,8 +140,10 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   admin remains, checked inside the transaction); and change the evidence settings of a project by compare-and-set
   (`UpdateEvidenceSettingsAsync`: the new settings are stored only if the stored ones still equal the expected ones,
   and the project and its settings are read with every project), and change the "require independent reviewers" setting
-  of a project by compare-and-set in the same way (`UpdateRequireIndependentReviewersAsync`). Every operation that
-  changes data takes an
+  of a project by compare-and-set in the same way (`UpdateRequireIndependentReviewersAsync`), and change the checklist
+  definition of a project by compare-and-set on the hash of the stored text (`UpdateChecklistDefinitionAsync`: the new
+  text, or none for the built-in default, is stored only if the stored text still has the expected hash). Every operation
+  that changes data takes an
   `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
   same transaction.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
@@ -152,7 +160,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   `false`, which the service reports as `MembershipNotFound`. A change of the evidence settings whose expected settings
   are no longer stored, or of a project that does not exist, returns `false` and stores nothing. The
   `EvidenceSettingsService` refuses an unknown project with `ProjectNotFound` before it calls the store, so for it the
-  `false` means that the expected settings were changed meanwhile, and it reports that as `RecordChanged`.
+  `false` means that the expected settings were changed meanwhile, and it reports that as `RecordChanged`. A change of
+  the checklist definition whose expected hash is no longer the hash of the stored text, or of a project that does not
+  exist, returns `false` and stores nothing; `ProjectChecklistService` reports it as `RecordChanged` in the same way.
 
 **IUserStore**: The store interface the subsystem requires for users.
 
@@ -400,9 +410,11 @@ message and keep the entered values, and there is a single, easily tested path f
 | `TotpEnrollmentExpired` | The setup was started more than 15 minutes ago |
 | `TotpSecretUnreadable` | A stored secret cannot be decrypted, for example after the key ring changed |
 
-The checklist of a review is the copy of the default checklist that the review received when it was created, so
-changing the default never changes an existing review (see `ChecklistService`). The name saved with an answer or
-section decision is the display name of the signed-in user, saved together with the user name, like the author of a
+The checklist of a review is the copy of the checklist of its project (the built-in default checklist when the project has
+none) that the review received when it was created, so changing the default, or the checklist of the project, never
+changes an existing review (see `ChecklistService`, `ProjectChecklistService`, and `ReviewService`). The name saved
+with an answer or section decision is the display name of the signed-in user, saved together with the user name,
+like the author of a
 comment. The earlier rules for a free text author or name no longer exist, because nobody types an author. The
 checklist snapshot, section states, and answers are part of the record that a signature binds to, so they are read
 together with the threads (see `RecordDigest`).

@@ -60,6 +60,7 @@ flowchart TD
         Fingerprint
         ProjectService
         EvidenceSettingsService
+        ProjectChecklistService
         ReviewService
         ThreadService
         ChecklistService
@@ -135,6 +136,7 @@ flowchart TD
     ServerHost --> ReauthProofStore
     ServerHost --> ProjectService
     ServerHost --> EvidenceSettingsService
+    ServerHost --> ProjectChecklistService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
     ServerHost --> ChecklistService

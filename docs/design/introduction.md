@@ -92,7 +92,8 @@ The ReviewCenter system is divided as follows:
   users, personal access tokens, second factor enrollments, reviewer signatures, the hash-chained audit trail, and the
   registry of git
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
-  ProjectService, EvidenceSettingsService, ReviewService, ThreadService, ChecklistService, UserService,
+  ProjectService, EvidenceSettingsService, ProjectChecklistService, ReviewService, ThreadService, ChecklistService,
+  UserService,
   PersonalAccessTokenService,
   SigningService, ReauthProofStore, TotpService, TotpChallengeStore, RepositoryService, SelectionMatcher,
   RevisionValidator, ReviewPlanner, and LineDiff

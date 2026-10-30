@@ -4,8 +4,8 @@
 
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
 `UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`,
-`ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, `TotpStoreTests.cs`, and
-`DatabaseSetupTests.cs`, which
+`ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, `ProjectChecklistStoreTests.cs`,
+`TotpStoreTests.cs`, and `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
 private temporary folder. No mocking or in-memory substitute is applied. Each test uses its own database file.
@@ -40,6 +40,8 @@ be loadable on the test platform.
   refuses a row for an unknown project.
 - The seven evidence settings columns of a project are created with the default settings as their defaults, so a new
   project reads back with the defaults, and a changed setting is stored and read back from its own column.
+- The `ChecklistDefinition` column of a project is created as nullable text with no length limit: a new project reads
+  back with none, and a definition of the full size limit is stored and read back unchanged.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
@@ -172,6 +174,13 @@ hash, the creation, the expiry, the last use, and the revocation, and none for t
 tested by `ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns`, defined in
 `PersonalAccessTokenStoreTests.cs`. The display id is not unique at the database (it is only a label that is shown); the
 hash alone identifies a token.
+
+**Checklist definition column**: A project added without a definition reads back with none, and one added with a
+definition reads it back unchanged, which is tested by
+`ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven`; a text of the full size limit with
+non-ASCII characters is stored in the unbounded column and read back unchanged by the read and by the listing, which is
+tested by `ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn`. Both tests are defined in
+`ProjectChecklistStoreTests.cs` and described with the `ReviewStore` unit.
 
 **Second factor tables**: The `UserTotps` and `TotpRecoveryCodes` tables are exercised by the tests of `TotpStore` in
 `TotpStoreTests.cs` over a real database file. The unique index on the user and the recovery code hash refuses a

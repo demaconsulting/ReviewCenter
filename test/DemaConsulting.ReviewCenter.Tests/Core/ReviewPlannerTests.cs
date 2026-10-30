@@ -323,6 +323,31 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
+    ///     Test that a review filed from a plan freezes the checklist of the project, which is the same path as a
+    ///     review created from a repository, and that a project without a checklist of its own gets the default.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview()
+    {
+        // Arrange: a project with its own checklist
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var checklists = TestServices.ProjectChecklists(f.Store);
+        var custom = new ChecklistDefinition(
+            "plan-1", [new ChecklistSection("p", "Plan", string.Empty, [new ChecklistItem("p-01", "Planned check")])]);
+        Assert.True(await checklists.SetAsync(
+            _actor, f.ProjectId, ProjectChecklistService.HashOf(null), custom.ToJson(), cancellationToken));
+
+        // Act: file the review of a set from a plan
+        await FileAsync(f, H1, "core");
+
+        // Assert: the review has the project's checklist
+        var review = f.Store.Reviews.Single();
+        Assert.Equal("plan-1", review.Checklist!.Version);
+        Assert.Equal(custom.ToJson(), review.Checklist.Definition);
+    }
+
+    /// <summary>
     ///     Test that last-reviewed mode makes a full review for a set that has only an unsigned review.
     /// </summary>
     [Fact]

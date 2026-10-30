@@ -152,6 +152,28 @@ sections:
           - ReviewService_CreateFromRepositoryAsync_RepositoryChangesLater_ReviewIsUnaffected
           - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
 
+      - id: ReviewCenter-ReviewService-ProjectChecklist
+        title: >-
+          The ReviewService class shall give every review it creates, from uploaded files and from a repository or
+          a review plan alike, a frozen copy of the checklist of the project, validated at that moment, or of the
+          built-in default checklist when the project has none, shall refuse to create the review, storing nothing,
+          with the ChecklistDefinitionInvalid rule when the stored definition of the project cannot be read or
+          is not valid, never falling back to the default, and shall leave the checklist, and so the record digest,
+          of every review that exists unchanged when the checklist of the project changes later, whether the review
+          is approved or not.
+        justification: |
+          The checklist of a project is the standard its reviews are answered against, so a review must carry the
+          wording that was in force when it was created. A silent fallback to the default would let a review be
+          answered against a standard the project did not choose, and a later edit that reached an existing review
+          would change what the reviewers answered and what a signature covers.
+        tests:
+          - ReviewService_Create_ProjectChecklist_IsFrozenAtBothCreatePaths
+          - ReviewService_Create_NoProjectChecklist_FreezesTheDefaultAtBothCreatePaths
+          - ReviewService_Create_UnusableProjectChecklist_FailsClosed
+          - ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected
+          - ReviewService_ProjectChecklistChangedLater_ApprovedReviewIsUnaffected
+          - ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview
+
       - id: ReviewCenter-ReviewService-NothingToReview
         title: >-
           The ReviewService class shall refuse to create a review from a repository when no changed file matches

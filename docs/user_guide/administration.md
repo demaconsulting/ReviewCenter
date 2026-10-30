@@ -371,7 +371,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Signing   | `signature.reauth-failed` (a wrong password, or a missing confirmation at a provider)|
 | Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
 | Project   | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
-| Evidence  | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
+| Project   | `project.checklist-changed` (the checklist of a project was replaced or reset)       |
 | Project   | `project.independent-reviewers-changed` (the independence rule was switched)         |
 | Reopening | `review.reopened` (an administrator reopened an approved review)                     |
 | Tokens    | `token.created`, `token.revoked`                                                     |

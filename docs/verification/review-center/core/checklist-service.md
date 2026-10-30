@@ -3,8 +3,9 @@
 #### Verification Approach
 
 `ChecklistService`, the `DefaultChecklist` definition, and the progress rules of `ChecklistState` are verified with
-unit tests defined in `ChecklistServiceTests.cs`. The service is exercised over an in-memory fake store and the
-project-access double `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess`
+unit tests defined in `ChecklistServiceTests.cs`, and the strict validation of a definition (`ChecklistValidator`) with
+the unit tests in `ChecklistValidatorTests.cs`, which need no store. The service is exercised over an in-memory fake
+store and the project-access double `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess`
 unit), so each
 test creates its own review and reads the stored result back. The freeze at review creation is verified in
 `ReviewServiceTests.cs`. The real database is covered by the `Storage` subsystem.
@@ -17,10 +18,14 @@ N/A - standard test environment.
 
 - All unit tests pass with zero failures.
 - The default checklist has the 14 sections and 58 items of the review template, in order, with unique ids that
-  start with the id of their section, and it survives a JSON round trip; a definition that is read from JSON but is
-  incomplete is rejected with a `JsonException`.
-- A review's checklist is the snapshot stored when the review was created; a later change to the default does not
-  change it, and an unknown review has no checklist.
+  start with the id of their section, it survives a JSON round trip, and it passes the strict validation; a definition
+  that is read from JSON but is incomplete is rejected with a `JsonException`.
+- The strict validation accepts a definition only when it is valid JSON of at most 256 KiB, with a version of 1 to 64
+  characters, 1 to 50 sections, 1 to 500 checks, no empty section, identifiers of 1 to 32 allowed characters that are
+  unique across the definition, titles of at most 200, wording of at most 1000, and a hint of at most 500 characters;
+  it reports every violation with its path and never throws for bad content.
+- A review's checklist is the snapshot stored when the review was created; a later change to the default or to the
+  checklist of the project does not change it, and an unknown review has no checklist.
 - A section marked as not applicable needs a reason, which is stored trimmed; marking it applicable again clears the
   reason; an unknown section is refused.
 - A Pass is stored without a justification; a Fail or N/A needs one; a justification is trimmed and limited to 2000
@@ -151,3 +156,72 @@ applicability of a section is changed; the entries `checklist.answered` and `che
 the check or section and the outcome, and a justification appears only as an eight-character digest prefix. This
 scenario is tested by `ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification`, which is defined
 in `AuditEventTests.cs`.
+
+**ChecklistValidator_Validate_DefaultChecklist_IsValid**: The built-in default checklist is checked; it has no error.
+This scenario is tested by `ChecklistValidator_Validate_DefaultChecklist_IsValid`.
+
+**ChecklistValidator_Validate_SmallDefinition_IsValid**: A one-section, one-check definition is checked; it is valid.
+This scenario is tested by `ChecklistValidator_Validate_SmallDefinition_IsValid`.
+
+**ChecklistValidator_Validate_EmptyText_GivesOneError**: A theory over a missing, an empty, and a white-space text; each
+gives one error for the text as a whole. This scenario is tested by `ChecklistValidator_Validate_EmptyText_GivesOneError`.
+
+**ChecklistValidator_Validate_BadJson_GivesOneError**: A theory over text that is not JSON or not a definition; each
+gives one error and no exception. This scenario is tested by `ChecklistValidator_Validate_BadJson_GivesOneError`.
+
+**ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes**: A text of exactly the size limit is accepted by the size
+rule; one byte more gives the size error alone, without being parsed. This scenario is tested by
+`ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes`.
+
+**ChecklistValidator_Validate_Version_BoundariesAndPresence**: A 64-character version is accepted; a 65-character, an
+empty, and a missing version are each refused at the path `version`. This scenario is tested by
+`ChecklistValidator_Validate_Version_BoundariesAndPresence`.
+
+**ChecklistValidator_Validate_NoSections_IsRefused**: A definition with no sections is refused at the path `sections`.
+This scenario is tested by `ChecklistValidator_Validate_NoSections_IsRefused`.
+
+**ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections**: Fifty sections are accepted and fifty-one are
+refused. This scenario is tested by `ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections`.
+
+**ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems**: Five hundred checks in all are accepted and five hundred
+and one are refused. This scenario is tested by `ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems`.
+
+**ChecklistValidator_Validate_EmptySection_IsRefused**: A section without checks is refused at the path of its items.
+This scenario is tested by `ChecklistValidator_Validate_EmptySection_IsRefused`.
+
+**ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters**: A theory over identifiers, each used as a section
+identifier and as a check identifier: letters, digits, dots, underscores, and hyphens that start with a letter or digit
+are accepted; a leading hyphen, dot, or underscore, a space, a slash, a colon, a non-ASCII letter, and a line break are
+refused. This scenario is tested by
+`ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters`.
+
+**ChecklistValidator_Validate_IdLength_LimitsAtMaxIdLength**: An identifier of 32 characters is accepted; one of 33
+characters and a missing identifier are refused. This scenario is tested by `ChecklistValidator_Validate_IdLength_LimitsAtMaxIdLength`.
+
+**ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse**: A check identifier repeated in another section or
+in the same section, a check that repeats a section identifier, a repeated section identifier, and an identifier that
+differs only in case are each reported at the later use, with the path of that value. This scenario is tested by
+`ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse`.
+
+**ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence**: Titles of 200, check wording of 1000, and a hint
+of 500 characters are accepted; one more character, an empty value, or a missing value is refused, each with its path.
+This scenario is tested by `ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence`.
+
+**ChecklistValidator_Validate_NullEntries_AreReported**: A missing section entry, a missing list of checks, and a missing
+check entry are each reported with their path instead of failing. This scenario is tested by
+`ChecklistValidator_Validate_NullEntries_AreReported`.
+
+**ChecklistValidator_Validate_ManyProblems_AreAllReportedTogether**: A definition with several different problems is
+checked once; every problem is in the result, each with its path. This scenario is tested by
+`ChecklistValidator_Validate_ManyProblems_AreAllReportedTogether`.
+
+**ChecklistValidator_Validate_MemberNamesInAnyCase_AreRead**: A definition written with upper-case member names (as
+`ToJson` writes them) is read and valid. This scenario is tested by
+`ChecklistValidator_Validate_MemberNamesInAnyCase_AreRead`.
+
+**ChecklistValidator_ParseOrThrow_Invalid_ThrowsWithPathsAndAtMostTenErrors**: An invalid definition with more than ten
+errors raises `ChecklistDefinitionInvalid`; the message lists ten errors with their paths and says how many more there
+are. This scenario is tested by `ChecklistValidator_ParseOrThrow_Invalid_ThrowsWithPathsAndAtMostTenErrors`.
+
+**ChecklistValidationError_ToString_IsPathAndMessage**: An error is written as its path, a colon, and its message. This
+scenario is tested by `ChecklistValidationError_ToString_IsPathAndMessage`.

@@ -108,6 +108,47 @@ public static class ReviewLimits
     public const int MaxReviewSets = 500;
 
     /// <summary>
+    ///     The largest accepted checklist definition (the JSON text of a project's checklist), in bytes (256 KiB).
+    /// </summary>
+    public const long MaxChecklistBytes = 256L * 1024;
+
+    /// <summary>
+    ///     The largest accepted number of sections in one checklist definition.
+    /// </summary>
+    public const int MaxChecklistSections = 50;
+
+    /// <summary>
+    ///     The largest accepted number of checks (items) in one checklist definition, over all its sections.
+    /// </summary>
+    public const int MaxChecklistItems = 500;
+
+    /// <summary>
+    ///     The longest accepted checklist version label, in characters; it is the length of the stored column.
+    /// </summary>
+    public const int MaxChecklistVersionLength = 64;
+
+    /// <summary>
+    ///     The longest accepted section or check identifier of a checklist definition, in characters; it is the
+    ///     length of the stored answer and section-state columns.
+    /// </summary>
+    public const int MaxChecklistIdLength = 32;
+
+    /// <summary>
+    ///     The longest accepted section title of a checklist definition, in characters.
+    /// </summary>
+    public const int MaxChecklistTitleLength = 200;
+
+    /// <summary>
+    ///     The longest accepted wording of one check of a checklist definition, in characters.
+    /// </summary>
+    public const int MaxChecklistItemTextLength = 1000;
+
+    /// <summary>
+    ///     The longest accepted section applicability hint of a checklist definition, in characters.
+    /// </summary>
+    public const int MaxChecklistHintLength = 500;
+
+    /// <summary>
     ///     The longest stored comment author name (the display name at the time), in characters.
     /// </summary>
     public const int MaxAuthorLength = 100;

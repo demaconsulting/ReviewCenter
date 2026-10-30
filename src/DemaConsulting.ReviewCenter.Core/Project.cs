@@ -68,4 +68,17 @@ public sealed class Project
     ///     commits of the reviewed files are not matched. See <see cref="SigningService"/> for where it is enforced.
     /// </remarks>
     public bool RequireIndependentReviewers { get; init; } = true;
+
+    /// <summary>
+    ///     Gets the checklist definition of the project as JSON (the text <see cref="ChecklistDefinition.ToJson"/>
+    ///     writes); <c>null</c> when the project uses the built-in <see cref="DefaultChecklist"/>.
+    /// </summary>
+    /// <remarks>
+    ///     A stored value has passed <see cref="ChecklistValidator"/> when it was set by
+    ///     <see cref="ProjectChecklistService"/>. The version label is the <c>Version</c> of the definition itself; it
+    ///     is not kept in a second column, so the label and the wording cannot disagree. Every new review copies the
+    ///     definition that is current at its creation (see <see cref="ReviewChecklist"/>); changing it later never
+    ///     alters an existing review.
+    /// </remarks>
+    public string? ChecklistDefinition { get; init; }
 }

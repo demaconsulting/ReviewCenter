@@ -121,7 +121,8 @@ internal sealed class FakeReviewStore : IReviewStore
             Description = project.Description,
             Created = project.Created,
             Evidence = project.Evidence,
-            RequireIndependentReviewers = project.RequireIndependentReviewers
+            RequireIndependentReviewers = project.RequireIndependentReviewers,
+            ChecklistDefinition = project.ChecklistDefinition
         };
         _projects.Add(stored);
         Audits.Add(audit(stored));
@@ -151,7 +152,8 @@ internal sealed class FakeReviewStore : IReviewStore
             Description = old.Description,
             Created = old.Created,
             Evidence = old.Evidence,
-            RequireIndependentReviewers = updated
+            RequireIndependentReviewers = updated,
+            ChecklistDefinition = old.ChecklistDefinition
         };
         Audits.Add(audit);
         return Task.FromResult(true);
@@ -214,7 +216,39 @@ internal sealed class FakeReviewStore : IReviewStore
             Description = old.Description,
             Created = old.Created,
             Evidence = updated,
-            RequireIndependentReviewers = old.RequireIndependentReviewers
+            RequireIndependentReviewers = old.RequireIndependentReviewers,
+            ChecklistDefinition = old.ChecklistDefinition
+        };
+        Audits.Add(audit);
+        return Task.FromResult(true);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> UpdateChecklistDefinitionAsync(
+        int projectId,
+        string expectedHash,
+        string? definitionJson,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        // Like the real store: compare the hash of the stored text and set in one step; a lost race or an unknown
+        // project changes nothing
+        var index = _projects.FindIndex(p => p.Id == projectId);
+        if (index < 0 || ProjectChecklistService.HashOf(_projects[index].ChecklistDefinition) != expectedHash)
+        {
+            return Task.FromResult(false);
+        }
+
+        var old = _projects[index];
+        _projects[index] = new Project
+        {
+            Id = old.Id,
+            Name = old.Name,
+            Description = old.Description,
+            Created = old.Created,
+            Evidence = old.Evidence,
+            RequireIndependentReviewers = old.RequireIndependentReviewers,
+            ChecklistDefinition = definitionJson
         };
         Audits.Add(audit);
         return Task.FromResult(true);
