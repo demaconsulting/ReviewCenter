@@ -14,8 +14,10 @@ Know the hard rules first, because the practices build on them. A review can be 
 
 Signing asks the signer to confirm their identity again (the password, or a fresh sign-in at the identity provider),
 and a signature covers the whole record as it was at that moment. Any later change to the record, such as a new comment
-or a changed answer, makes the signatures out of date, and the review goes back to In review. Nothing else is enforced:
-who writes a comment, who resolves it, how it is worded, and who the reviewers are is up to the team.
+or a changed answer, makes the signatures out of date, and the review goes back to In review. The product also
+constrains the reviewers: a slot holds only enabled members of the project, a person can be in only one slot, and only
+the primary or the alternate of a slot can sign it. See the Reviewing and Administration chapters for the rules the
+product enforces. Everything else is up to the team: who writes a comment, who resolves it, and how it is worded.
 
 ## Answering the Checklist
 
@@ -107,8 +109,8 @@ the primary may be away, so that a signature does not wait for one person. Choos
 because the signature records the role (primary or alternate) of the person who signed, and the alternate carries the
 same responsibility. Agree in the team who signs when both are available; usually it is the primary. A person can be in
 only one slot of a review, and a signed slot cannot be changed, so decide the reviewers before the first signature.
-Today the product does not stop the author of the change from being a reviewer, so keep the author out of the slots as
-a convention.
+Whether the author of a change may also be a reviewer is a question of the product's rules and of your own process: see
+the Reviewing and Administration chapters, and keep your team's rule consistent with what the product enforces.
 
 ## Signing Hygiene
 
@@ -125,4 +127,6 @@ a convention.
 ## Project Settings
 
 Project administrators decide what the attestation PDFs contain and whether evidence can be read without signing in.
-Check those settings before the first review is signed; see Evidence Settings in the Administration chapter.
+Check those settings before evidence is shared or downloaded: an attestation PDF is generated on each download and is
+not stored, so the settings in effect at that moment decide what it contains. See Evidence Settings in the
+Administration chapter.
