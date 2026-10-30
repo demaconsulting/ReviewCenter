@@ -1,8 +1,9 @@
 # Review Practices
 
-This chapter suggests good practices for running a review in ReviewCenter. Each practice says why it helps. Most of
-them rest on what the product does today, and the *Reviewing* chapter describes that in full. Where a practice is only
-a convention that the product neither supports nor enforces, the text says so. Adapt them to your own process.
+This chapter gives suggested practices for running a review in ReviewCenter. Each practice says why it helps. What the
+product enforces is described in *What the Product Enforces* below and in the *Reviewing* and *Administration* chapters;
+everything else in this chapter is guidance or team convention that the product neither supports nor checks. Adapt it
+to your own process.
 
 ## What the Product Enforces
 
