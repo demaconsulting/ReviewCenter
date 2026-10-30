@@ -1590,14 +1590,21 @@ public class SigningServiceTests
             rules.Add(failure.Rule);
         }
 
-        // Act: the cause is removed, and the primary reviewer signs with the right password
+        // Act: the cause is removed, and the signer who was refused signs with the right password
         if (thread is not null)
         {
             await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, cancellationToken);
         }
 
+        if (scenario == "notReviewer")
+        {
+            // dee becomes the primary reviewer of the still unsigned slot
+            await fixture.Signing.UpdateSlotAsync(
+                Cyd, fixture.ProjectId, "rev-1", slot.Id, fixture.Ids["dee"], null, cancellationToken);
+        }
+
         var signature = await fixture.Signing.SignAsync(
-            TestActors.Ann,
+            signer,
             fixture.ProjectId,
             "rev-1",
             slot.Id,
@@ -1605,9 +1612,9 @@ public class SigningServiceTests
             Password,
             cancellationToken);
 
-        // Assert: the real reason every time, no lockout, and the signature is stored
+        // Assert: the real reason every time, no lockout, and the signature of the refused signer is stored
         Assert.All(rules, rule => Assert.Equal(expected, rule));
-        Assert.Equal(fixture.Ids["ann"], signature.UserId);
+        Assert.Equal(fixture.Ids[scenario == "notReviewer" ? "dee" : "ann"], signature.UserId);
     }
 
     /// <summary>
