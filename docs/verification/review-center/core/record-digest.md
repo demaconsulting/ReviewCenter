@@ -150,9 +150,12 @@ versus the shorter path with the kind and the baseline hash, and a checklist sec
 versus a title with a real item. Each pair gives different digests and different canonical texts; the test fails when
 the length prefix is removed. This scenario is tested by `RecordDigest_Compute_TextWithDelimiters_DoesNotCollide`.
 
-**RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide**: Records whose justification and answerer split the same
-characters in different places, and records with an empty justification or an empty answerer, all give different
-digests. This scenario is tested by `RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide`.
+**RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide**: Two pairs of records that would have the same text if
+strings were written without their length: an empty justification with the answerer "a b" versus the justification
+" a" (a leading space) with the answerer "b", and the justification "a b" with an empty answerer versus "a" with the
+answerer "b " (a trailing space).
+Each pair gives different digests; the test fails when the length prefix is removed. This scenario is tested by
+`RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide`.
 
 **RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest**: A record with a reopen count of 0 has the same canonical text
 (no `reopens` line) and the same digest as the known values of the records that were fixed before reopening existed:

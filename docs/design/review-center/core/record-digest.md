@@ -111,10 +111,12 @@ Notation and rules:
 - The header line holds the format version. Any change to this format, to what is covered, or to the way a value is
   written that alters the digest of an existing record must change the version, because it makes all earlier
   signatures out of date.
-- **Preconditions of the claims above**: (1) The order independence holds for lists whose sort keys are unique. They
-  are in a stored record: the store keys answers by check id, section states by section id, and files (and so changes)
-  by path within a review, and the checklist definition requires unique section and check identifiers. The sort is
-  stable, so records that broke this would be written in the order they were given. (2) The text is hashed as UTF-8.
+- **Preconditions of the claims above**: (1) The order independence holds for lists whose sort keys are unique; this is
+  an assumption about the input, not something the digest enforces. The keys are unique in a stored record, because the
+  store keys answers by check id, section states by section id, and files (and so changes) by path within a review, and
+  a checklist definition is expected to use unique section and check identifiers (`ChecklistDefinition.FromJson` does
+  not reject duplicates, so a definition with duplicates is outside the claim). The sort is stable, so input that broke
+  this would be written in the order it was given. (2) The text is hashed as UTF-8.
   A lone (unpaired) UTF-16 surrogate, which is malformed text and not valid user input, is encoded as U+FFFD, so two
   strings that differ only in such characters (for example `"\uD800"` and `"\uD801"`, which also have the same length)
   give the same digest. A strict encoding would instead make the digest throw for such a record, and any other
@@ -209,8 +211,8 @@ for lines 1 to 2, `Open`, created at the UTC time 2025-03-04 05:06:07 (ticks `63
 comment by `Ann` (`ann`) with the text `Please fix` at the same time. With the side `Head` the digest is
 `fe1a3eea5aab9f90922ebdea3caa92b637333d4f082eb7a80b44eb1335acc896`, and with the side `Baseline` (written
 `8:Baseline`) it is `68acc67bebb0c5decad4669037cc3f7618844cf0e59919cb911aef79e525cf0d`. A last vector covers the less
-common values: a
-repository review (repository 7, baseline none, the commits above, selection `**/*`, no review-set) with one added file
+common values: a repository review (repository 7, the baseline `aaaa...` and the head `bbbb...` as above, selection
+`**/*`, no review-set) with one added file
 `c.txt` (no baseline hash, head hash `hs3`), one answer (check `REQ-01`, outcome `NotApplicable`, the empty
 justification, answered by `Bob` / `bob`), and one thread on `a.txt` (head side, no lines, `Resolved`, created at the
 time T above) with the comment by `Bob` (`bob`) with the text `Done` one hour after T. Its canonical text is

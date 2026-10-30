@@ -56,7 +56,8 @@ sections:
           The RecordDigest class shall cover the checklist the review was created with in the canonical text: its
           version and, sorted by identifier, the identifier and title of every section and the identifier and
           question wording of every check (none for a review without a checklist), and shall give a different
-          digest when any of them changes, and the same digest whatever order the definition lists them in.
+          digest when any of them changes, and the same digest whatever order the definition lists them in (assuming
+          the identifiers of its sections and checks are unique).
         justification: |
           A signed answer only has meaning together with the question it answers. If the wording were not covered,
           a signature would not show which question the reviewer vouched for.
@@ -105,7 +106,7 @@ sections:
         justification: |
           The digest describes the review, not how it is stored. Without this, reading the record in another order,
           or recording the default of a section, would wrongly invalidate signatures. The order holds for lists whose
-          keys are unique, as they are in the store.
+          keys are unique, which is assumed of the input: the store keeps them unique.
         tests:
           - RecordDigest_Compute_ReorderedAndRenumbered_SameDigest
           - RecordDigest_Compute_ApplicableSection_NotCovered

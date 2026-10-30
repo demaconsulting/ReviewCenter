@@ -64,9 +64,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <c>-</c>, so no text can imitate a delimiter; numbers use the invariant culture and times are written as
 ///     UTC ticks. All sorting is ordinal. The class is stateless and thread-safe.
 ///     <para>
-///         Two preconditions bound the claims above. Order independence holds because the keys of the sorted
-///         lists (check id, section id, change path, and the ids inside the checklist definition) are unique, which the
-///         store's keys and the definition's own rule guarantee; with duplicate keys the stable sort would keep the
+///         Two preconditions bound the claims above. Order independence assumes that the keys of the sorted
+///         lists (check id, section id, change path, and the section and check ids inside the checklist definition)
+///         are unique; the digest does not enforce this. The store's keys guarantee it for answers, section states and
+///         changes, and a checklist definition is expected to hold unique ids (<see cref="ChecklistDefinition.FromJson"/>
+///         does not reject duplicates); with duplicate keys the stable sort would keep the
 ///         input order. And the text is hashed as UTF-8, where a lone UTF-16 surrogate (malformed text that valid
 ///         user input does not contain) is replaced by U+FFFD, so two strings that differ only in such characters
 ///         give the same digest; this is accepted rather than changing the digest of any record.

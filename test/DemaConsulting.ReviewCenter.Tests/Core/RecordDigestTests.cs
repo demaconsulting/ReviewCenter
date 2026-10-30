@@ -966,30 +966,29 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Test that adjacent values of different records cannot run together: two records whose values only
-    ///     differ in where one value ends and the next begins give different digests, also when a value is empty.
+    ///     Test that values with whitespace and empty values cannot run together: each pair below would give the
+    ///     same text if strings were written without their length (values joined by a space), so only the length
+    ///     prefix keeps their digests apart.
     /// </summary>
     [Fact]
     public void RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide()
     {
-        // Arrange: justification and answerer written with the boundary in different places, an empty
-        // justification, and an empty answerer with a justification that is the same text
-        var splitLeft = Record(answers: [AnswerWithNames("ab", "c", "u")]);
-        var splitRight = Record(answers: [AnswerWithNames("a", "bc", "u")]);
-        var emptyJustification = Record(answers: [AnswerWithNames(string.Empty, "Ann", "ann")]);
-        var emptyAnswerer = Record(answers: [AnswerWithNames("Ann", string.Empty, "ann")]);
+        // Arrange: an empty justification and an answerer "a b" versus the justification " a" and the answerer "b",
+        // and an answerer that is empty versus one that ends in a space
+        var emptyJustification = Record(answers: [AnswerWithNames(string.Empty, "a b", "u")]);
+        var leadingSpace = Record(answers: [AnswerWithNames(" a", "b", "u")]);
+        var emptyAnswerer = Record(answers: [AnswerWithNames("a b", string.Empty, "u")]);
+        var trailingSpace = Record(answers: [AnswerWithNames("a", "b ", "u")]);
 
         // Act: compute the digests
-        var digests = new[]
-        {
-            RecordDigest.Compute(splitLeft),
-            RecordDigest.Compute(splitRight),
-            RecordDigest.Compute(emptyJustification),
-            RecordDigest.Compute(emptyAnswerer)
-        };
+        var first = RecordDigest.Compute(emptyJustification);
+        var second = RecordDigest.Compute(leadingSpace);
+        var third = RecordDigest.Compute(emptyAnswerer);
+        var fourth = RecordDigest.Compute(trailingSpace);
 
-        // Assert: all four differ
-        Assert.Equal(4, digests.Distinct().Count());
+        // Assert: each pair differs
+        Assert.NotEqual(first, second);
+        Assert.NotEqual(third, fourth);
     }
 
     /// <summary>
