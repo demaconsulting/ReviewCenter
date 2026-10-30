@@ -77,4 +77,20 @@ public class ControlChannelTests
         // Act and assert: nothing answers
         Assert.False(await ControlChannel.IsAnsweringAsync(port));
     }
+
+    /// <summary>
+    ///     Test that the control file path comes from the environment variable when it is set, and from the temporary
+    ///     folder otherwise.
+    /// </summary>
+    [Fact]
+    public void ControlChannel_ResolveControlFile_VariableSetOrBlank_ChoosesPath()
+    {
+        // Arrange: a configured path
+        var configured = Path.Combine(Path.GetTempPath(), "session-b.json");
+
+        // Act and assert: the variable wins; null and blank fall back to the well-known file
+        Assert.Equal(configured, ControlChannel.ResolveControlFile(configured));
+        Assert.Equal(Path.Combine(Path.GetTempPath(), "reviewcenter-puppet.json"), ControlChannel.ResolveControlFile(null));
+        Assert.Equal(Path.Combine(Path.GetTempPath(), "reviewcenter-puppet.json"), ControlChannel.ResolveControlFile("  "));
+    }
 }

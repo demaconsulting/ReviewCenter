@@ -13,11 +13,14 @@ sections:
           - id: ReviewCenterPuppet-ControlChannel-Protocol
             title: >-
               The ControlChannel unit shall carry one JSON request line and one JSON response line per
-              connection over loopback TCP, and shall treat a control file whose port does not answer a ping
-              as stale.
+              connection over loopback TCP, shall treat a control file whose port does not answer a ping
+              as stale, and shall take the control file path from the environment variable
+              `REVIEWCENTER_PUPPET_CONTROL_FILE` when it is set.
             justification: |
               One short connection per command keeps the protocol trivial, and the ping lets a later start
-              replace the control file that a killed daemon left behind instead of refusing to run.
+              replace the control file that a killed daemon left behind instead of refusing to run. A path
+              from the environment lets separate agent sessions each run their own Puppet.
             tests:
               - ControlChannel_SendAsync_RoundTrip_DeliversRequestAndResponse
               - ControlChannel_IsAnsweringAsync_StaleControlFile_ReturnsFalse
+              - ControlChannel_ResolveControlFile_VariableSetOrBlank_ChoosesPath

@@ -12,7 +12,7 @@ and prints the result. The hidden verb `daemon` runs `BrowserDaemon` in the same
 
 **Command table**: one entry per command with its usage text, the minimum and maximum number of positional
 arguments, and the options it accepts. It drives both validation and `--help`. Flags (`--full`, `--headed`) take no
-value; every other option takes one.
+value; every other option takes one. Every command also accepts `--control-file <path>`, which is not listed per entry.
 
 **Exit codes**: 0 the command worked; 1 it failed (including `start` when Puppet is already running or the daemon
 could not start); 2 a usage error, Puppet is not running, or the daemon process could not be spawned.

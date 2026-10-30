@@ -38,7 +38,7 @@ public class PuppetProgramTests
         var wait = PuppetProgram.ParseCommand(["wait", "text=Saved", "--timeout", "1500"]);
         var shot = PuppetProgram.ParseCommand(["screenshot", "shot.png", "--full", "--selector", "projects-link"]);
         var theme = PuppetProgram.ParseCommand(["theme", "dark"]);
-        var start = PuppetProgram.ParseCommand(["start", "--url", "http://127.0.0.1:5199/", "--viewport", "390x800", "--headed"]);
+        var start = PuppetProgram.ParseCommand(["start", "--url", "http://127.0.0.1:5199/", "--viewport", "390x800", "--headed", "--control-file", "session-a.json"]);
 
         // Assert: arguments and options are split, files are absolute, and the start URL loses its trailing slash
         Assert.Equal("goto", go.Command);
@@ -51,6 +51,7 @@ public class PuppetProgramTests
         Assert.Equal(["dark"], theme.Args);
         Assert.Equal("http://127.0.0.1:5199", start.Options["url"]);
         Assert.Equal(("390x800", "true"), (start.Options["viewport"], start.Options["headed"]));
+        Assert.Equal("session-a.json", start.Options["control-file"]);
     }
 
     /// <summary>
