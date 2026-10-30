@@ -24,12 +24,13 @@ sections:
       - id: ReviewCenter-AuditCommand-Errors
         title: >-
           The AuditCommand class shall report a database file that does not exist, and a database that cannot be
-          read, as an error with exit code 1, without creating the missing file or its folder, and shall reject a
-          null context.
+          read, as an error with exit code 1, opening the database read-only so that neither the file nor its folder
+          can be created (also not for a file URI that asks for creation), and shall reject a null context.
         justification: |
           A check that cannot run must not look like a check that passed, and a wrong path must not leave a new empty
-          database behind.
+          database behind, not even when the file disappears between the check and the open.
         tests:
           - AuditCommand_Run_MissingDatabase_ReportsErrorAndCreatesNothing
+          - AuditCommand_Run_MissingFileUriWithCreateMode_ReportsErrorAndCreatesNothing
           - AuditCommand_Run_UnreadableDatabase_ReportsErrorWithExitCodeOne
           - AuditCommand_Run_NullContext_ThrowsArgumentNullException

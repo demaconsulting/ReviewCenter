@@ -270,6 +270,40 @@ public class DatabaseSetupTests
     }
 
     /// <summary>
+    ///     Test that the read-only connection string forces the read-only mode, keeps the data source, and that opening
+    ///     it for a missing file fails without creating the file.
+    /// </summary>
+    [Fact]
+    public void DatabaseSetup_ResolveReadOnlyConnectionString_MissingFile_IsReadOnlyAndNeverCreates()
+    {
+        // Arrange: a connection string that asks for creation, for a file in an existing folder
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        var file = Path.Combine(folder, "db.sqlite");
+        var options = new DatabaseOptions { ConnectionString = $"Data Source={file};Mode=ReadWriteCreate;Pooling=False" };
+
+        try
+        {
+            // Act
+            var resolved = DatabaseSetup.ResolveReadOnlyConnectionString(options);
+            var builder = new SqliteConnectionStringBuilder(resolved);
+            using var connection = new SqliteConnection(resolved);
+
+            // Assert: read-only, same file, and the open fails instead of creating the file
+            Assert.Equal(SqliteOpenMode.ReadOnly, builder.Mode);
+            Assert.Equal(file, builder.DataSource);
+            Assert.Throws<SqliteException>(connection.Open);
+            Assert.False(File.Exists(file));
+            Assert.Throws<InvalidOperationException>(() => DatabaseSetup.ResolveReadOnlyConnectionString(
+                new DatabaseOptions { Provider = "Oracle", ConnectionString = file }));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
     ///     Test that an unsupported provider is rejected before any file is created.
     /// </summary>
     [Fact]

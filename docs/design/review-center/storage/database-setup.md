@@ -57,12 +57,23 @@ gets its own empty database, so the schema created at startup would be missing f
 
 - *Parameters*: `DatabaseOptions options`.
 - *Returns*: `string?` — the full path of the database file when the file does not exist; `null` when it exists, or
-  when the data source is a `file:` URI (which is not checked).
+  when the data source is a `file:` URI (which is not checked; the read-only connection refuses a missing one).
 - *Preconditions*: `options` is not null.
 - *Postconditions*: Nothing is created: no file, no folder.
 - *Notes*: Checks the provider first and resolves the connection string, so an unsupported provider or an in-memory
   database raises `InvalidOperationException` as for `EnsureCreated`. `AuditCommand` uses it to refuse a wrong path
   instead of creating an empty database.
+
+**ResolveReadOnlyConnectionString**: Gives the connection string of the configured database with the open mode forced
+to `ReadOnly`.
+
+- *Parameters*: `DatabaseOptions options`.
+- *Returns*: `string` — a full SQLite connection string whose mode is read-only.
+- *Preconditions*: `options` is not null.
+- *Postconditions*: Nothing is created or opened.
+- *Notes*: Same provider and in-memory checks as `TryGetMissingDatabaseFile`. A read-only open can never create the
+  file, and SQLite refuses a `file:` URI parameter such as `mode=rwc` that asks for more than the open flags allow.
+  `AuditCommand` uses it, which closes the gap between the existence check and the open.
 
 **EnsureCreated**: Creates the database when it is new.
 

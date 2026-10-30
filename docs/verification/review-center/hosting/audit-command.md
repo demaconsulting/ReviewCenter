@@ -22,7 +22,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - An intact trail is reported as "Audit chain intact: N entries" with exit code 0, an empty trail as intact with zero
   entries.
 - An edited entry is reported by its sequence and a deleted entry as a broken chain, each with exit code 1.
-- A database file that does not exist is reported as an error with exit code 1 and nothing is created; a database that
+- A database file that does not exist, also one named by a `file:` URI that asks for creation, is reported as an error
+  with exit code 1 and nothing is created; a database that
   cannot be read is reported as an error with exit code 1.
 - A null context is rejected with an `ArgumentNullException`.
 
@@ -48,6 +49,12 @@ the chain is broken and the exit code is 1. This scenario is tested by
 folder that does not exist either; the output says that the database file does not exist and the exit code is 1.
 Neither the file nor the folder is created. This scenario is tested by
 `AuditCommand_Run_MissingDatabase_ReportsErrorAndCreatesNothing`.
+
+**AuditCommand_Run_MissingFileUriWithCreateMode_ReportsErrorAndCreatesNothing**: The database is named by a `file:` URI
+with `mode=rwc` (which asks SQLite to create it) to a file that does not exist in an existing folder; the exit code is
+1, no "intact" is printed, and neither the file nor any other entry is created in the folder, because the command opens
+the database read-only. This scenario is tested by
+`AuditCommand_Run_MissingFileUriWithCreateMode_ReportsErrorAndCreatesNothing`.
 
 **AuditCommand_Run_UnreadableDatabase_ReportsErrorWithExitCodeOne**: The database file exists but is not a database (it
 holds text); the output says the trail could not be read and the exit code is 1. This scenario is tested by

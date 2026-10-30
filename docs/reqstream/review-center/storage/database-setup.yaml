@@ -50,14 +50,16 @@ sections:
       - id: ReviewCenter-DatabaseSetup-Create
         title: >-
           The DatabaseSetup class shall create the database folder, file, and tables when they do not exist, and shall
-          tell without creating anything whether the configured database file is missing.
+          tell without creating anything whether the configured database file is missing, and shall give the connection
+          string of the database with the open mode forced to read-only.
         justification: |
           A new installation must work on first start without manual database setup, while a command that only reads
-          the data (the audit check) must be able to tell that the file is not there instead of creating an empty
-          database.
+          the data (the audit check) must be able to tell that the file is not there, and must open it in a way that
+          cannot create it, instead of creating an empty database.
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
           - DatabaseSetup_TryGetMissingDatabaseFile_MissingExistingAndUnsupported_ReportsWithoutCreating
+          - DatabaseSetup_ResolveReadOnlyConnectionString_MissingFile_IsReadOnlyAndNeverCreates
 
       - id: ReviewCenter-DatabaseSetup-DataDirectory
         title: >-

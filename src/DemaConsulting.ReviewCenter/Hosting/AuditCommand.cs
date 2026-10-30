@@ -51,7 +51,8 @@ internal static class AuditCommand
     /// <remarks>
     ///     An intact chain prints <c>Audit chain intact: N entries</c>. A broken chain, a database file that does not
     ///     exist, and a database that cannot be opened are reported with <see cref="Context.WriteError"/>, which makes
-    ///     the exit code 1. Side effects: none; the command never creates the database or its folder.
+    ///     the exit code 1. Side effects: none; the database is opened read-only, so the command never creates the
+    ///     database or its folder, not even when the file disappears while the command runs.
     /// </remarks>
     public static void Run(Context context, Action<ConfigurationManager>? configure = null)
     {
@@ -69,6 +70,10 @@ internal static class AuditCommand
         builder.Logging.ClearProviders();
         ServerHost.AddServices(builder.Services, builder.Configuration);
 
+        // The verification opens the database READ-ONLY, so the open itself can never create a file, whatever happens
+        // to the file after the check below (also for a "file:" URI such as "...?mode=rwc")
+        builder.Services.PostConfigure<DatabaseOptions>(options =>
+            options.ConnectionString = DatabaseSetup.ResolveReadOnlyConnectionString(options));
         try
         {
             using var host = builder.Build();

@@ -39,7 +39,12 @@ and environment variables (for example `Database__ConnectionString`) and the sam
 (`ServerHost.AddServices`), with the host logging switched off because the command reports through the context. It first
 asks `DatabaseSetup.TryGetMissingDatabaseFile` whether the configured database file exists and, when it does not,
 reports the error and stops: the command never creates a database, so a wrong path cannot leave an empty database that
-would be reported as an intact trail. It then calls `AuditService.VerifyAsync`, which streams the trail in batches (see
+would be reported as an intact trail. That check alone would be racy (the file could vanish before the open) and does
+not look at a `file:` URI, so the command also replaces the connection string of the database options with
+`DatabaseSetup.ResolveReadOnlyConnectionString` (a `PostConfigure` of `DatabaseOptions`): the open is read-only, so
+it can never create the file, and a missing file, also one named by a URI such as `file:/tmp/x.db?mode=rwc`, makes the
+open fail with a database error that is reported with exit code 1. It then calls `AuditService.VerifyAsync`, which
+streams the trail in batches (see
 `AuditService`); an existing database with an empty trail is intact. A database created before the
 audit trail existed has no `AuditEntries` table and must be deleted and created again (see the `Storage` design).
 
@@ -60,7 +65,8 @@ context is rejected with `ArgumentNullException`.
 
 - **Context** — receives the results and errors.
 - **ServerHost** — `AddServices` registers the persistence and the Core services for the command.
-- **DatabaseSetup** — tells whether the configured database file is missing (`TryGetMissingDatabaseFile`).
+- **DatabaseSetup** — tells whether the configured database file is missing (`TryGetMissingDatabaseFile`) and gives
+  the read-only connection string (`ResolveReadOnlyConnectionString`).
 - **AuditService** — verifies the chain.
 - **ASP.NET Core shared framework** — `Host.CreateApplicationBuilder` for the configuration and the services.
 - **Entity Framework Core** — the database context factory registration.
@@ -69,4 +75,4 @@ context is rejected with `ArgumentNullException`.
 
 - **Program** — calls `Run` when the `audit verify` verb is present.
 - **Tests** — call `Run` with a temporary database that is intact, empty, edited, or missing an entry, with a database
-  file that does not exist, and with an unreadable database.
+  file that does not exist, with a `file:` URI that asks for creation, and with an unreadable database.

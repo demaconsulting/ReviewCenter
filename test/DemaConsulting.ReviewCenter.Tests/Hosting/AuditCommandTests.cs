@@ -76,6 +76,36 @@ public class AuditCommandTests
     }
 
     /// <summary>
+    ///     Test that a <c>file:</c> URI that asks for creation (<c>mode=rwc</c>) to a missing file is refused, and that
+    ///     nothing is created.
+    /// </summary>
+    [Fact]
+    public void AuditCommand_Run_MissingFileUriWithCreateMode_ReportsErrorAndCreatesNothing()
+    {
+        // Arrange: a file: URI to a database in an existing folder that does not exist yet, which asks to create it
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var path = Path.Combine(folder, "missing.db");
+            var uri = "file:" + path.Replace('\\', '/') + "?mode=rwc";
+
+            // Act
+            var (exitCode, output) = Verify($"Data Source={uri};Pooling=False");
+
+            // Assert: an error, no "intact", and no file (and nothing else) was created
+            Assert.Equal(1, exitCode);
+            Assert.DoesNotContain("intact", output, StringComparison.Ordinal);
+            Assert.False(File.Exists(path), "The command must never create the database");
+            Assert.Empty(Directory.GetFileSystemEntries(folder));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
     ///     Test that a database file that does not exist is reported as an error, and that nothing is created.
     /// </summary>
     [Fact]

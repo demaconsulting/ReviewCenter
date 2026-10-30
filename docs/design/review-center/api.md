@@ -177,8 +177,9 @@ token ever existed. The reason is
 recorded in the audit trail without the value of the token, as an event that is coalesced per client address, so that
 a script with a wrong token does not flood the trail. Attempts are counted by the same in-memory throttle as the web
 sign-in, against the limit of the client address only (20 in 300 seconds by default; there is no per-name counter), so a
-flood of wrong tokens answers 429 with a `Retry-After` header without locking out any user. The address counter is
-shared with the web sign-in from the same address.
+flood of wrong tokens answers 429 with a `Retry-After` header. This does not lock the account of any user, but the
+address counter is shared with the web sign-in from the same address, so sign-in and API calls from that address are
+throttled for the rest of the window.
 
 **Errors**: Every failure of the endpoints is `application/problem+json`, so that a program can read the status and the
 message in one way. A broken domain rule is mapped to one status in one place (`ApiProblems.StatusOf`): not found

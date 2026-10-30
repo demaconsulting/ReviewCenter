@@ -213,7 +213,8 @@ internal static class DatabaseSetup
     /// <param name="options">The configured options. Must not be null.</param>
     /// <returns>
     ///     The absolute path of the missing database file, or <c>null</c> when the file exists or the data source
-    ///     is not a plain file (a <c>file:</c> URI is not checked).
+    ///     is not a plain file. A <c>file:</c> URI is not checked here: it is refused or opened by the read-only
+    ///     connection of <see cref="ResolveReadOnlyConnectionString"/>, which never creates it.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
@@ -236,6 +237,32 @@ internal static class DatabaseSetup
 
         var path = Path.GetFullPath(dataSource);
         return File.Exists(path) ? null : path;
+    }
+
+    /// <summary>
+    ///     Gets the connection string of the configured SQLite database with the open mode forced to read-only.
+    /// </summary>
+    /// <param name="options">The configured options. Must not be null.</param>
+    /// <returns>A full SQLite connection string whose mode is <c>ReadOnly</c>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the provider is not supported or the connection string selects an in-memory database.
+    /// </exception>
+    /// <remarks>
+    ///     A read-only open can never create the file, so a command that only reads an existing database stays safe
+    ///     even when the file is deleted between a check and the open. This also holds for a <c>file:</c> URI: SQLite
+    ///     refuses a URI parameter such as <c>mode=rwc</c> that asks for more than the open flags allow, and the
+    ///     open fails instead of creating the database. Side effects: none.
+    /// </remarks>
+    internal static string ResolveReadOnlyConnectionString(DatabaseOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        RequireSupportedProvider(options);
+        return new SqliteConnectionStringBuilder(ResolveConnectionString(options))
+        {
+            Mode = SqliteOpenMode.ReadOnly
+        }.ToString();
     }
 
     /// <summary>
