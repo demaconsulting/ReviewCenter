@@ -3,262 +3,37 @@
 #
 # PURPOSE:
 # - Define system-level requirements describing what end-users need the tool to provide
-# - These requirements capture the externally visible behavior of the complete system
+# - These requirements capture the externally visible promises of the complete system, the ones a regulated
+#   user relies on and every later formal review is checked against
 # - System requirements are validated through integration tests: the xUnit tests run the published
-#   dotnet DLL end-to-end, and CI runs the self-validation of the published self-contained
-#   executable (extracted from its release archive) on each supported platform, which produces the
-#   platform evidence in platform-requirements.yaml
+#   dotnet DLL end-to-end, subsystem tests run the real services over a real database, and CI runs the
+#   self-validation of the published self-contained executable (extracted from its release archive) on each
+#   supported platform, which produces the platform evidence in platform-requirements.yaml
+#
+# ORGANIZATION:
+# - The requirements sit in one section, as the standard prescribes, and are grouped by theme with the
+#   banner comments below: Review content, Review activity, Review integrity and signing, Evidence and
+#   audit, Access and identity, Git and content sources, Automation, Operation and qualification
+# - Every requirement states an outcome that can be verified, not a feature, and its justification gives
+#   the regulatory reason (traceability, independence of review, integrity of evidence)
 
 sections:
   - title: System-Level Requirements
     requirements:
-      - id: ReviewCenter-System-Version
-        title: The tool shall display version information when the version flag is provided.
-        tags: [system]
-        justification: |
-          Users need to quickly identify the version of the tool they are using for
-          troubleshooting and compatibility verification. The version display must
-          work from a standard dotnet invocation without additional configuration.
-        children:
-          - ReviewCenter-Program-Version
-          - ReviewCenter-Cli-Version
-        tests:
-          - ReviewCenter_VersionFlag_Provided_OutputsVersion
-
-      - id: ReviewCenter-System-Help
-        title: The tool shall display usage information when the help flag is provided.
-        tags: [system]
-        justification: |
-          Users need access to command-line usage documentation without requiring
-          external resources. Help output must be accessible from a standard dotnet
-          invocation and must list the available options so that users can self-serve.
-        children:
-          - ReviewCenter-Program-Help
-          - ReviewCenter-Cli-Help
-        tests:
-          - ReviewCenter_HelpFlag_Provided_OutputsUsageInformation
-
-      - id: ReviewCenter-System-Validate
-        title: The tool shall execute self-validation tests when the validate flag is provided.
-        tags: [system]
-        justification: |
-          Regulated environments require tool qualification evidence to demonstrate
-          that the tool functions correctly in its deployment environment before it
-          is used to generate compliance artifacts. The validation mode exercises
-          the real behaviors the tool relies on (git, a complete review workflow, the
-          fingerprint, password hashing, the second factor codes, the audit chain, the signed attestation and
-          the web host), in a hermetic way that never touches the configured database,
-          and produces a structured test result file, providing the qualification
-          evidence required by quality management systems. `--check-config` adds an
-          opt-in, read-only check of the configured database.
-        children:
-          - ReviewCenter-Program-Validate
-          - ReviewCenter-Cli-Validate
-          - ReviewCenter-Cli-CheckConfig
-          - ReviewCenter-SelfTest-Qualification
-          - ReviewCenter-SelfTest-Hermetic
-        tests:
-          - ReviewCenter_ValidateFlag_Provided_RunsValidation
-
-      - id: ReviewCenter-System-Silent
-        title: The tool shall suppress console output when the silent flag is provided.
-        tags: [system]
-        justification: |
-          Enables automated scripts and CI/CD pipelines to run the tool without
-          cluttering output logs when only the exit code is needed.
-        children:
-          - ReviewCenter-Cli-Silent
-        tests:
-          - ReviewCenter_SilentFlag_Provided_SuppressesOutput
-
-      - id: ReviewCenter-System-Log
-        title: The tool shall write output to a log file when the log flag is provided.
-        tags: [system]
-        justification: |
-          Provides persistent logging for debugging and compliance audit trails.
-          Log files enable post-run inspection of tool output without requiring
-          console capture.
-        children:
-          - ReviewCenter-Cli-Log
-        tests:
-          - ReviewCenter_LogFlag_Provided_WritesOutputToFile
-
-      - id: ReviewCenter-System-ErrorHandling
-        title: The tool shall return a non-zero exit code for unrecognized arguments.
-        tags: [system]
-        justification: |
-          A non-zero exit code enables CI/CD pipelines to detect and
-          surface misconfiguration failures automatically.
-        children:
-          - ReviewCenter-Program-ExitCode
-          - ReviewCenter-Cli-ExitCode
-        tests:
-          - ReviewCenter_UnknownArgument_Provided_ReturnsError
-
-      - id: ReviewCenter-System-ErrorMessage
-        title: The tool shall report an error message for unrecognized arguments.
-        tags: [system]
-        justification: |
-          Clear feedback for unrecognized arguments helps users quickly correct
-          mistakes and prevents silent misconfiguration.
-        children:
-          - ReviewCenter-Cli-InvalidArgs
-          - ReviewCenter-Cli-ErrorOutput
-        tests:
-          - ReviewCenter_UnknownArgument_Provided_ReturnsError
-
-      - id: ReviewCenter-System-Results
-        title: >-
-          The tool shall write self-validation results to a standard test result
-          file when the `--results` flag is provided.
-        tags: [system]
-        justification: |
-          Enables integration with CI/CD systems that expect standard test result formats.
-          TRX format is compatible with MSTest; JUnit XML is compatible with many CI tools.
-        children:
-          - ReviewCenter-Cli-Results
-          - ReviewCenter-SelfTest-ResultsOutput
-        tests:
-          - SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults
-          - ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile
-
-      - id: ReviewCenter-System-Depth
-        title: The tool shall adjust the heading depth of validation output when the `--depth` flag is provided.
-        tags: [system]
-        justification: |
-          Enables validation output to be embedded within larger markdown documents at
-          the appropriate heading level, supporting documentation workflows that combine
-          multiple reports.
-        children:
-          - ReviewCenter-Cli-Depth
-        tests:
-          - ReviewCenter_ValidateFlag_Provided_RunsValidation
-          - ReviewCenter_ValidateWithDepth_DepthThree_OutputsCorrectHeadingLevel
-
-      - id: ReviewCenter-System-ValidateFailure
-        title: >-
-          The tool shall return a non-zero exit code when the results file has an unsupported extension.
-        tags: [system]
-        justification: |
-          A non-zero exit code when the requested results file cannot be produced in a supported
-          format enables CI/CD pipelines to detect and surface output errors automatically,
-          preventing silent loss of validation evidence in compliance-critical workflows.
-        children:
-          - ReviewCenter-SelfTest-InvalidExtension
-        tests:
-          - SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile
-
-      - id: ReviewCenter-System-DefaultBehavior
-        title: The tool shall display a banner then run the default tool logic when invoked without any action flags.
-        tags: [system]
-        justification: |
-          When a user invokes the tool without any recognized action flag, the tool shall
-          display a banner identifying itself and run its primary logic so that the
-          invocation is never silently empty.
-        children:
-          - ReviewCenter-Cli-ArgumentParsing
-          - ReviewCenter-Cli-OutputChannels
-        tests:
-          - ReviewCenter_NoArguments_Invoked_DisplaysBanner
-
-      - id: ReviewCenter-System-ResultAlias
-        title: The tool shall accept `--result` as a legacy alias for `--results`.
-        tags: [system]
-        justification: |
-          Backward compatibility with scripts that use the earlier `--result` spelling
-          prevents breakage when upgrading to newer tool versions.
-        children:
-          - ReviewCenter-Cli-ResultAlias
-        tests:
-          - ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile
-
-      - id: ReviewCenter-System-Serve
-        title: The tool shall run the ReviewCenter web server until it is stopped when the serve verb is provided.
-        tags: [system]
-        justification: |
-          ReviewCenter is delivered as a web service. Operators need a single command that
-          starts the service in the foreground, keeps it running for users, and stops it
-          cleanly on request, so that it can be run under a process supervisor, a container,
-          or by a developer. Operators also need start-up and request activity written as
-          structured log entries so that the running service can be monitored and audited.
-        children:
-          - ReviewCenter-Program-Serve
-          - ReviewCenter-Cli-Serve
-          - ReviewCenter-Hosting-Logging
-        tests:
-          - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
-          - ReviewCenter_ServeVerb_Started_LogsStartupEntryWithListenUrl
-          - ubuntu@ReviewCenter_ServeVerb_TerminationRequested_StopsGracefullyWithExitCodeZero
-
-      - id: ReviewCenter-System-ServeUrls
-        title: >-
-          The tool shall listen on the URL given by the `--urls` option when the serve verb is
-          provided, and shall report an error and return a non-zero exit code when `--urls` is
-          given without the serve verb or the requested address cannot be used.
-        tags: [system]
-        justification: |
-          Operators must choose the address and port the service listens on so that it can
-          coexist with other services and sit behind a reverse proxy. Rejecting a misplaced
-          option or an unusable address with a clear error prevents a mistyped command from
-          silently starting nothing, or something other than what was requested.
-        children:
-          - ReviewCenter-Cli-Urls
-        tests:
-          - ReviewCenter_ServeWithUrls_PortSpecified_ListensOnRequestedPort
-          - ReviewCenter_UrlsWithoutServe_Provided_ReturnsError
-          - ReviewCenter_ServeVerb_PortInUse_ReturnsError
-
-      - id: ReviewCenter-System-HomePage
-        title: >-
-          The tool shall serve a home page titled ReviewCenter at the root URL of the web server,
-          showing the product name and tagline.
-        tags: [system]
-        justification: |
-          The home page is the entry point of the web user interface. It proves that pages are
-          delivered to a browser, including the client script the interactive pages depend on.
-        children:
-          - ReviewCenter-Web-HomePage
-          - ReviewCenter-Web-Interactive
-        tests:
-          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
-
-      - id: ReviewCenter-System-HelpPages
-        title: >-
-          The tool shall serve an About page and its built-in Help pages to every visitor of the web server,
-          including one who is not signed in.
-        tags: [system]
-        justification: |
-          Users must be able to learn what the product does, which version runs, and how to use it before they can
-          sign in, and without an administrator handing out documents.
-        children:
-          - ReviewCenter-Web-Help
-        tests:
-          - ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn
-
-      - id: ReviewCenter-System-Health
-        title: >-
-          The tool shall answer requests for the /health URL of the web server with HTTP status
-          200 and the text Healthy while the server is running.
-        tags: [system]
-        justification: |
-          Reverse proxies, container orchestrators, monitoring tools, and test tooling need a
-          simple, unauthenticated way to find out whether the service is up and ready to
-          accept requests.
-        children:
-          - ReviewCenter-Hosting-Health
-        tests:
-          - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
+      # ----------------------------------------------------------------------------------------------
+      # Review content: what is reviewed, and against what
+      # ----------------------------------------------------------------------------------------------
 
       - id: ReviewCenter-System-Projects
         title: >-
-          The tool shall serve a projects page at /projects that lists the projects and offers a form to create
-          a project, and a page for each project that shows its reviews, to a signed-in user, and shall send a
-          request without a signed-in user to the login page.
+          The tool shall organize reviews in projects that a signed-in user can find, with a projects page that
+          lists the projects the user may see and a page for each project that shows its reviews, only a system
+          administrator creating a project, and a request without a signed-in user sent to the login page.
         tags: [system]
         justification: |
-          Reviews are organized in projects, so users need to create projects and find them again before they
-          can review anything. The page must work against the database of the running server, not only in
-          isolation.
+          Reviews of different bodies of work must be kept apart so that each can be found, assigned, and
+          protected on its own. The pages must work against the database of the running server, not only in
+          isolation, and an unidentified visitor must never be shown a project.
         children:
           - ReviewCenter-Web-Projects
           - ReviewCenter-Core-Projects
@@ -267,14 +42,17 @@ sections:
 
       - id: ReviewCenter-System-Reviews
         title: >-
-          The tool shall let a user create a draft review in a project from uploaded files, keeping every file
-          byte for byte within defined upload limits, and shall show the review with its content fingerprint,
-          its files, and the content of a selected file.
+          The tool shall let a user create a draft review in a project from uploaded files, keeping every file byte
+          for byte within defined upload limits, and shall identify the reviewed content by a fingerprint
+          calculated like the ReviewMark fingerprint, showing the review with its fingerprint, its files, and the
+          content of a selected file.
         tags: [system]
         justification: |
-          Formal review starts from a fixed snapshot of the files under review. The fingerprint, calculated like
-          the ReviewMark fingerprint, identifies that snapshot and lets reviewers show that the content they
-          reviewed is the content that was submitted. Upload limits keep the service responsive.
+          Formal review starts from a fixed snapshot of the files under review. The fingerprint identifies that
+          snapshot independent of file names and order, and lets reviewers and auditors show that the content they
+          reviewed is the content that was submitted (21 CFR Part 11 section 11.10(a), accuracy and completeness
+          of records). Calculating it like ReviewMark does ties the review to the file set that the
+          configuration of the repository names. Upload limits keep the service responsive.
         children:
           - ReviewCenter-Web-Reviews
           - ReviewCenter-Core-Reviews
@@ -283,56 +61,93 @@ sections:
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
 
-      - id: ReviewCenter-System-Persistence
+      - id: ReviewCenter-System-GitReviews
         title: >-
-          The tool shall keep projects and reviews in the database named by the Database settings, creating the
-          database on first start, so that the data is still there after the server is restarted.
+          The tool shall create a review from the files that changed between an optional baseline revision and a
+          head revision of a registered git repository and match a selection, refuse to create it when no file
+          matches, keep the content of the changed files and the resolved commits unchanged in the review whatever
+          happens to the repository later, and let reviewers compare each modified file with its baseline version
+          side by side, in plain words when a comparison cannot be shown.
         tags: [system]
         justification: |
-          Review records must outlive the server process. Operators must be able to choose where the data lives,
-          and a new installation must work without manual database setup.
+          The product exists to review changes to source code, and a change is reviewed against what it replaces.
+          Comparison with an earlier revision shows reviewers exactly what changed so that changed lines do not
+          escape review, and freezing the baseline and head content means the review stays evidence of what was
+          examined even when the repository moves on, is rewritten, or is deleted.
         children:
-          - ReviewCenter-Hosting-Database
-          - ReviewCenter-Storage-Persistence
-          - ReviewCenter-Storage-Integrity
-          - ReviewCenter-Storage-Configuration
+          - ReviewCenter-Core-RepositoryReviews
+          - ReviewCenter-Storage-RepositoryReviews
+          - ReviewCenter-Web-RepositoryReviews
+          - ReviewCenter-Core-Diff
+          - ReviewCenter-Web-DiffReview
         tests:
-          - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
-          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+          - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
+          - NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
+          - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-System-PlanReviews
+        title: >-
+          The tool shall plan the reviews that a head revision of a registered git repository needs from the
+          review-sets that the repository defines in its ReviewMark configuration file, as a full review or as the
+          changes since the last signed review of each set, fall back to a full review when that baseline cannot be
+          trusted, skip sets that are already filed or have nothing to review, create the picked reviews with the
+          same rules as a review made by hand, and bind the review-set into the digest that a signature covers.
+        tags: [system]
+        justification: |
+          A repository already states which files are reviewed together. Planning from that statement saves the
+          author from typing every selection by hand, and recording the set keeps each later review of the set
+          linked to the last one, so that changed files do not escape review and the evidence index can name the
+          review-set that each signed review covers.
+        children:
+          - ReviewCenter-Core-PlanReviews
+          - ReviewCenter-ContentSources-ReviewSets
+          - ReviewCenter-Hosting-PlannerServices
+          - ReviewCenter-Web-PlanReviews
+        tests:
+          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
+
+      # ----------------------------------------------------------------------------------------------
+      # Review activity: the discussion and the checklist
+      # ----------------------------------------------------------------------------------------------
 
       - id: ReviewCenter-System-Comments
         title: >-
-          The tool shall let a user start a comment thread on a file of a review, anchored to the whole file or
-          to a range of lines, with a text, let a signed-in user reply to a thread, resolve and reopen
-          it, and show the number of open and resolved threads of the review and of open threads per file,
-          keeping every thread and comment, with the user who wrote it, in the database across restarts without
-          ever changing or deleting a posted comment.
+          The tool shall let a signed-in user start a comment thread on a file of a review, anchored to the whole
+          file or to a range of lines, including a line of either side of a comparison, reply to a thread, resolve
+          and reopen it, and open a thread by a link that survives sign-in, showing the number of open and
+          resolved threads of the review and of open threads per file, keeping every thread and comment across
+          restarts, in order, without ever changing or deleting a posted comment.
         tags: [system]
         justification: |
-          Review comments are the substance of a review. Comments that cannot be edited or deleted make the
-          discussion a trustworthy record, and the author of each comment is the signed-in user, so it is known
-          who said what.
+          Review comments are the substance of a review. Anchoring each one to the code it concerns makes the
+          finding traceable to the exact content, and comments that cannot be edited or deleted make the
+          discussion a trustworthy record (21 CFR Part 11 section 11.10(e), records that are not obscured by later
+          changes).
         children:
           - ReviewCenter-Web-Comments
           - ReviewCenter-Web-DiffReview
           - ReviewCenter-Web-DeepLinks
           - ReviewCenter-Core-Threads
-          - ReviewCenter-Core-Diff
           - ReviewCenter-Storage-Threads
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+          - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
+          - SignIn_DeepLink_SignedOut_ReturnsToTheSameLinkAfterLogin
 
       - id: ReviewCenter-System-Checklist
         title: >-
-          The tool shall give every review a checklist that follows the Continuous Compliance review template,
-          let a user answer each check Pass, Fail, or N/A with a justification where required, mark a section
-          as not applicable with a reason, and see what is left to do, keeping the answers in the database
-          across restarts, with a review keeping the checklist it was created with.
+          The tool shall give every review a checklist that follows the Continuous Compliance review template, with
+          a review keeping the checklist it was created with, let a user answer each check Pass, Fail, or N/A with a
+          justification where required, mark a section as not applicable with a reason, see what is left to do, and
+          keep the answers in the database across restarts.
         tags: [system]
         justification: |
-          The checklist is how a formal review shows what was examined. A reviewer must see at a glance what is
-          unanswered and be led to the next check. Each answer is saved with the signed-in user who gave it.
+          The checklist is how a formal review shows what was examined against a defined standard. Freezing the
+          wording at creation means a later change of the template cannot alter what the reviewers answered. A
+          reviewer must see at a glance what is unanswered and be led to the next check, and every N/A needs a
+          stated reason so that skipped checks are explained and not silent.
         children:
           - ReviewCenter-Web-Checklist
           - ReviewCenter-Core-Checklist
@@ -340,19 +155,39 @@ sections:
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
+          - ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot
+
+      - id: ReviewCenter-System-Author
+        title: >-
+          The tool shall record the signed-in user, by user name and display name, as the author of every
+          comment, the person of every checklist answer, and the person of every change of section
+          applicability, without letting a user enter or change that name.
+        tags: [system]
+        justification: |
+          A review record is only evidence when it says who did what (21 CFR Part 11 section 11.10(e) and
+          section 11.50, signature manifestations). Taking the name from the signed-in user, and never from a
+          form field, means nobody can act in the name of somebody else.
+        children:
+          - ReviewCenter-Identity-Actor
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+          - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
+
+      # ----------------------------------------------------------------------------------------------
+      # Review integrity and signing: independence, fresh authentication, binding, immutability
+      # ----------------------------------------------------------------------------------------------
 
       - id: ReviewCenter-System-Signatures
         title: >-
-          The tool shall let reviewers be named for a review in slots with a primary reviewer and an optional
-          alternate, let a named reviewer sign the review when nothing blocks it by confirming the password again,
-          keep every signature in the database across restarts, and show on the review and in the list of reviews
-          whether it is Approved or In review, where a review is approved only while every slot has signed the
-          record as it is now.
+          The tool shall approve a review only while every named reviewer slot has signed the record as it is now,
+          show on the review and in the list of reviews whether it is Approved or In review, and keep every
+          signature in the database across restarts.
         tags: [system]
         justification: |
-          A formal review ends with the approval of the named reviewers. The approval must be tied to the exact
-          record that was reviewed, so that a later change to the checklist answers or the discussion cannot
-          leave an approval standing for content nobody approved.
+          A formal review ends with the approval of the named reviewers. Approval must be a state that the tool
+          derives from the signatures and the current record, never a flag that somebody sets, so that what the
+          user sees as Approved is what the reviewers signed (21 CFR Part 11 section 11.50 and section 11.70,
+          signed records and signature linking).
         children:
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Core-Signatures
@@ -360,6 +195,279 @@ sections:
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
+
+      - id: ReviewCenter-System-ReviewerIndependence
+        title: >-
+          The tool shall let a review be signed only by the people that were named for it in reviewer slots, each a
+          primary reviewer with an optional alternate, each person in one slot only and only a member of the
+          project, shall never let an API token sign a review or arrange its reviewers, shall refuse to sign while
+          an unanswered check, a Fail answer, or an open thread blocks the review, and shall keep a signed slot
+          from being changed or removed.
+        tags: [system]
+        justification: |
+          A review is independent only when the people who approve it are fixed beforehand, are distinct, and
+          cannot be replaced after they have signed. Naming an alternate lets a review go on when the primary
+          reviewer is away without opening the review to anybody else. A person outside the project, or a script
+          holding a token, must never be able to supply a signature that stands for human judgement. Blocking
+          unfinished work stops an approval of a review nobody finished (EU GMP Annex 11 clause 12, security;
+          21 CFR Part 11 section 11.10(d), limiting access to authorized individuals). The tool does not decide
+          who may be named, and does not forbid the author of the content from signing: that rule is left to the
+          project that names the slots.
+        children:
+          - ReviewCenter-Core-Signatures
+          - ReviewCenter-Web-Signatures
+          - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Api-Isolation
+        tests:
+          - SigningService_AddSlotAsync_SameUserTwice_ThrowsSlotUserInvalid
+          - SigningService_AddSlotAsync_UserInOtherSlot_ThrowsSlotUserInvalid
+          - SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid
+          - SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed
+          - SigningService_SignAsync_NotAMember_IsRefused
+          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+          - SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused
+          - SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned
+          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
+          - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
+          - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
+          - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign
+          - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
+
+      - id: ReviewCenter-System-SignatureReauthentication
+        title: >-
+          The tool shall make a signature only after the signer has proved who they are again for that signature,
+          with the password of the account and, for an account with a second factor, a fresh code, or, for an
+          account that signs in with an OpenID Connect provider, a fresh sign-in at the provider as the same person
+          that is good for one signature only and fails closed, and shall refuse a signature, record the failed
+          attempt in the audit trail without the secret, and count it toward the lockout when the proof is wrong.
+        tags: [system]
+        justification: |
+          A session that was left open, or a stolen cookie, must not be enough to sign in somebody else's name. A
+          signature is a legally significant act, so the signer re-authenticates for each one, with all the
+          components of the electronic signature (21 CFR Part 11 section 11.200(a), signature components and
+          controls; section 11.300, controls for identification codes and passwords; EU GMP Annex 11 clause 14).
+          Counting a wrong proof toward the lockout stops the signature step from becoming a way to guess the
+          password, and a proof that works for one signature only stops one confirmation from signing twice.
+        children:
+          - ReviewCenter-Core-Signatures
+          - ReviewCenter-Web-Signatures
+          - ReviewCenter-Identity-OidcSignIn
+          - ReviewCenter-Core-TotpSecondFactor
+          - ReviewCenter-Web-TotpSecondFactor
+          - ReviewCenter-Core-AuditTrail
+        tests:
+          - SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed
+          - SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin
+          - SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword
+          - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+          - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
+          - ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+
+      - id: ReviewCenter-System-SignatureBinding
+        title: >-
+          The tool shall bind every signature to the exact record that the signer reviewed, by a digest of the
+          content fingerprint, the checklist wording and answers with who answered, every thread and comment in
+          order, and the git source, commits, selection, changes, and review-set, and shall refuse a signature
+          when the record has changed since the page of the signer was drawn.
+        tags: [system]
+        justification: |
+          A signature is worth only what it covers. Binding it to a digest of everything the reviewer saw, and
+          refusing a signature over a record that moved while the signer was reading, means the signer is never
+          made to approve something different from what they examined. It links the signature to its record in a
+          way that cannot be moved to another record (21 CFR Part 11 section 11.70, signature/record linking;
+          EU GMP Annex 11 clause 14).
+        children:
+          - ReviewCenter-Core-Signatures
+          - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Web-Signatures
+          - ReviewCenter-Core-Fingerprint
+          - ReviewCenter-Core-RepositoryReviews
+          - ReviewCenter-Core-PlanReviews
+        tests:
+          - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
+          - SigningService_SignAsync_StaleExpectedDigest_ThrowsRecordChanged
+          - ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused
+          - ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+          - RecordDigest_Compute_SourceChange_ChangesDigest
+          - RecordDigest_Compute_ChecklistWordingChange_ChangesDigest
+          - RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot
+          - RecordDigest_Compute_CommentOrder_ChangesDigest
+
+      - id: ReviewCenter-System-RecordImmutability
+        title: >-
+          The tool shall keep the reviewed content, the baseline, the checklist wording, every posted comment,
+          every signature, and every audit entry unchanged once they are stored, never offer a way to edit or
+          delete them, and show a review as In review again, with its signatures kept as history, as soon as the
+          record changes after it was signed, so that an approval never stands for a record that nobody signed.
+        tags: [system]
+        justification: |
+          Evidence is trusted only when it cannot be rewritten afterwards. Content, comments, signatures, and audit
+          entries are stored so that they can only be added to, and a change of what is still open to change, the
+          checklist answers or a new comment, cannot leave the old approval standing, because the digest of the
+          record no longer matches the signatures (21 CFR Part 11 section 11.10(c), protection of records, and
+          section 11.10(e), audit trails that do not obscure earlier entries). The tool does not lock a review
+          against further work after approval: it makes the approval out of date instead, which the reviewers
+          can see and sign again.
+        children:
+          - ReviewCenter-Core-Reviews
+          - ReviewCenter-Core-RepositoryReviews
+          - ReviewCenter-Storage-RepositoryReviews
+          - ReviewCenter-Core-Checklist
+          - ReviewCenter-Storage-Checklist
+          - ReviewCenter-Core-Threads
+          - ReviewCenter-Storage-Threads
+          - ReviewCenter-Core-Signatures
+          - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Core-AuditTrail
+          - ReviewCenter-Storage-AuditTrail
+          - ReviewCenter-Storage-Persistence
+        tests:
+          - AuditStore_PublicSurface_OffersNoUpdateOrDelete
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+          - ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder
+          - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
+          - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
+          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
+          - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
+          - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+
+      # ----------------------------------------------------------------------------------------------
+      # Evidence and audit: the history, its verification, and the portable proof
+      # ----------------------------------------------------------------------------------------------
+
+      - id: ReviewCenter-System-AuditTrail
+        title: >-
+          The tool shall make tampering with its history detectable, by recording every change of projects, reviews,
+          comments, checklists, reviewer slots, signatures, and users, and every sign-in, sign-out, failed sign-in,
+          attempt on a locked account, refusal by the sign-in throttle, failed re-authentication for a signature,
+          and lockout, in an audit trail in the database that names the time, the person, the action, and a short
+          detail, never records a password or the text of a comment or a justification, records repeated sign-in
+          failures of one kind at most once per minute, and chains the entries by hashes so that an edit, a
+          deletion, an insertion, or a reordering in the middle of the history can be detected.
+        tags: [system]
+        justification: |
+          A review record is only evidence when its history can be checked (21 CFR Part 11 section 11.10(e),
+          secure, computer-generated, time-stamped audit trails; EU GMP Annex 11 clause 9). Each change is stored
+          together with its audit entry, so that both exist or neither does, and the chain detects changes of the
+          middle of the history. It does not detect the removal of the newest entries or a complete rewrite by
+          someone with write access to the database, unless the head hash was recorded elsewhere; this version has
+          no external anchoring, and that limit is stated to the user.
+        children:
+          - ReviewCenter-Core-AuditTrail
+          - ReviewCenter-Storage-AuditTrail
+          - ReviewCenter-Identity-AuditTrail
+        tests:
+          - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
+          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
+          - AuditStore_PublicSurface_OffersNoUpdateOrDelete
+          - AuditChain_Verify_EditedEntry_ReportsThatEntry
+          - AuditChain_Verify_DeletedEntry_ReportsTheMissingSequence
+          - AuditChain_Verify_ReorderedEntries_ReportsFirstOutOfOrderSequence
+          - AuditChain_Verify_InsertedEntry_IsDetected
+
+      - id: ReviewCenter-System-AuditVerify
+        title: >-
+          The tool shall let a system administrator verify the hash chain of the audit trail on request, from the
+          audit page and from the command line with the audit verify verb, reporting an intact chain with the number
+          of entries (and on the page the head hash) and a broken chain with the first broken entry, returning exit
+          code 0 for an intact chain and 1 for a broken chain or an unreadable database, and shall show every user
+          who may view a project the audit entries of a review of that project, and a system administrator alone
+          the whole trail, in pages of 50 entries, newest first, with all text shown as plain text.
+        tags: [system]
+        justification: |
+          Verification is how tampering is found, and an audit trail that nobody can read or check does not protect
+          anyone. The command line lets scripts and scheduled jobs check the trail, and the head hash lets a system
+          administrator record the state of the trail outside the database. Participants need to see who did what
+          and when for the reviews they may see, while the whole trail names every user and action and so is
+          limited to system administrators (21 CFR Part 11 section 11.10(e), audit trail available for review and
+          copying by the agency).
+        children:
+          - ReviewCenter-Program-AuditVerify
+          - ReviewCenter-Cli-AuditVerify
+          - ReviewCenter-Hosting-AuditVerify
+          - ReviewCenter-Web-AuditPage
+          - ReviewCenter-Web-AuditHistory
+        tests:
+          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
+          - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
+          - AuditCommand_Run_DeletedEntry_ReportsBrokenChainWithExitCodeOne
+          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
+          - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
+          - AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries
+
+      - id: ReviewCenter-System-Attestation
+        title: >-
+          The tool shall let a signed-in user download, for a review that every reviewer slot has signed, a PDF
+          attestation that is digitally signed by the server with a key that is never exported (a self-signed key
+          that the server creates, or a certificate from a certificate store that an operator names), that states
+          the content, the checklist, the threads, the sign-offs, and the head of the audit trail, as far as the
+          evidence settings of the project allow, that says what the signature proves and does not prove and which
+          kind of key signed it, that shows any later change of its content, that is refused for a review that is
+          not approved or changed since it was signed, and whose release is recorded in the audit trail.
+        tags: [system]
+        justification: |
+          Approval inside a tool is of little use to an auditor who does not have access to it. A signed, portable
+          document that is honest about what it proves lets the approval be filed and checked elsewhere
+          (21 CFR Part 11 section 11.10(b), accurate and complete copies in human-readable form, and section
+          11.50). It adds integrity and the origin of the server key to the in-record signatures that identify the
+          reviewers, and the project decides how much of the review the document may reveal.
+        children:
+          - ReviewCenter-Evidence-Document
+          - ReviewCenter-Evidence-Signature
+          - ReviewCenter-Evidence-Key
+          - ReviewCenter-Evidence-Honesty
+          - ReviewCenter-Evidence-Release
+          - ReviewCenter-Evidence-ContentSettings
+          - ReviewCenter-Core-EvidenceSettings
+          - ReviewCenter-Storage-EvidenceSettings
+          - ReviewCenter-Web-EvidenceSettings
+          - ReviewCenter-Hosting-AttestationServices
+          - ReviewCenter-Hosting-AttestationKeyFailure
+          - ReviewCenter-Web-Attestation
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+          - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
+          - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
+          - AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies
+          - AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved
+
+      - id: ReviewCenter-System-EvidenceIndex
+        title: >-
+          The tool shall list the completed reviews of a project that were planned from a review-set in an evidence
+          index in the format that ReviewMark reads, naming for each the review-set id, the fingerprint of the files,
+          the date of the latest signature, the result, and the address of the attestation, shall leave out a review
+          that is incomplete, changed since it was signed, or has no review-set id, shall give the same index for the
+          same reviews, and may open the index and the attestation PDFs of a project to a client without credentials
+          only by a setting of the project that is off by default.
+        tags: [system]
+        justification: |
+          The evidence that a review was done must reach the place where the compliance of a release is judged. An
+          index in the format that ReviewMark reads lets the release pipeline check that every review-set has a
+          signed review of the current fingerprint, and listing only reviews that are complete and current stops a
+          stale approval from satisfying it. Opening the evidence to a client without credentials is a decision
+          about confidentiality, so it is a setting of each project, off by default, limited to the two documents,
+          and rate-limited by address.
+        children:
+          - ReviewCenter-Evidence-Index
+          - ReviewCenter-Evidence-Visibility
+          - ReviewCenter-Api-EvidenceJourney
+          - ReviewCenter-Api-AnonymousEvidence
+        tests:
+          - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
+          - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
+          - EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed
+          - EvidenceIndexService_Build_IncompleteReview_IsNotListed
+          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+          - AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject
+          - AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed
+
+      # ----------------------------------------------------------------------------------------------
+      # Access and identity: who may act, and who may see
+      # ----------------------------------------------------------------------------------------------
 
       - id: ReviewCenter-System-Login
         title: >-
@@ -371,13 +479,13 @@ sections:
           disabled, removed, or changed, within the configured number of seconds for an open page.
         tags: [system]
         justification: |
-          Review actions are only trustworthy when they are attributable, which needs a verified identity. A
-          local account with a password needs no external service, and one answer for every failure does not
-          help someone who is guessing user names. A limit per client address makes guessing slow without
-          depending on whether the account exists. Disabling a user or changing the system administrator right must
-          also stop a page that
-          the user already has open, not only the next request, so open pages re-check the user at a configurable
-          interval.
+          Review actions are only trustworthy when they are attributable, which needs a verified identity (21 CFR
+          Part 11 section 11.10(d) and (g), authority checks and limiting access to authorized individuals). A
+          local account with a password needs no external service, and one answer for every failure does not help
+          someone who is guessing user names. A limit per client address makes guessing slow without depending on
+          whether the account exists. Disabling a user or changing the system administrator right must also stop a
+          page that the user already has open, not only the next request, so open pages re-check the user at a
+          configurable interval.
         children:
           - ReviewCenter-Identity-Login
           - ReviewCenter-Identity-Throttle
@@ -394,15 +502,15 @@ sections:
           The tool shall, when an administrator turns it on, let a user sign in with an account at an OpenID Connect
           provider beside the local sign-in, create the account of a new person without any right, find it again by
           the issuer and the subject only, never link it to a local account, never give it a password, refuse a
-          disabled account, accept the return address of a sign-in only when it is on this server, check the settings
-          when it starts, and let the person confirm a signature by signing in again at the provider, once, with a
-          time of sign-in that is fresh, as the same person, failing closed.
+          disabled account, accept the return address of a sign-in only when it is on this server, check the
+          settings when it starts, and let the person confirm a signature by signing in again at the provider,
+          once, with a time of sign-in that is fresh, as the same person, failing closed.
         tags: [system]
         justification: |
           Organizations already manage their people and their passwords at an identity provider. Using it avoids a
           second set of passwords, while the rules that the account has no rights of its own, is never joined to
-          another account by a name, and must prove the same person again for every signature keep what the provider
-          says from giving anybody more than the administrators of the review tool give.
+          another account by a name, and must prove the same person again for every signature keep what the
+          provider says from giving anybody more than the administrators of the review tool give.
         children:
           - ReviewCenter-Identity-OidcSignIn
           - ReviewCenter-Core-ExternalIdentity
@@ -418,16 +526,17 @@ sections:
       - id: ReviewCenter-System-TotpSecondFactor
         title: >-
           The tool shall let a user of a local account turn on a second factor, a code of an authenticator app, and
-          then ask for a fresh code after the password at every sign-in and every signature, accept each code only once,
-          give ten recovery codes that get the person back in but cannot sign, count wrong codes toward the lockout of
-          wrong passwords, let the user turn it off and a system administrator reset it for a person who lost the phone,
-          record each change in the audit trail, keep the secret encrypted, and leave the sign-in with a provider and
-          the API tokens as they were.
+          then ask for a fresh code after the password at every sign-in and every signature, accept each code only
+          once, give ten recovery codes that get the person back in but cannot sign, count wrong codes toward the
+          lockout of wrong passwords, let the user turn it off and a system administrator reset it for a person who
+          lost the phone, record each change in the audit trail, keep the secret encrypted, and leave the sign-in
+          with a provider and the API tokens as they were.
         tags: [system]
         justification: |
           A password that is guessed, reused, or phished must not be enough to sign in as a person or to put a
-          signature in their name. A code of a phone that changes every thirty seconds is the cheapest second proof, and
-          the rules about replay, lockout, and recovery keep it from becoming a new weak point.
+          signature in their name (21 CFR Part 11 section 11.300, two distinct identification components). A code
+          of a phone that changes every thirty seconds is the cheapest second proof, and the rules about replay,
+          lockout, and recovery keep it from becoming a new weak point.
         children:
           - ReviewCenter-Identity-TotpSecondFactor
           - ReviewCenter-Core-TotpSecondFactor
@@ -438,6 +547,7 @@ sections:
           - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
           - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
           - TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds
+
       - id: ReviewCenter-System-Authorization
         title: >-
           The tool shall send a request without a signed-in user for a project, review, checklist, account, or
@@ -446,7 +556,8 @@ sections:
         tags: [system]
         justification: |
           Review data must only be read and changed by identified people, while the health probe and the login
-          page must work without signing in. Only system administrators may manage users.
+          page must work without signing in. Only system administrators may manage users (21 CFR Part 11 section
+          11.10(d), limiting system access to authorized individuals).
         children:
           - ReviewCenter-Identity-Authorization
           - ReviewCenter-Hosting-Authentication
@@ -456,23 +567,19 @@ sections:
 
       - id: ReviewCenter-System-ProjectAccess
         title: >-
-          The tool shall let a user see and use a project, with its reviews, files, comments, signatures, attestation,
-          evidence index, repositories, and history, only when the user is a member of the project or a system
-          administrator, answer a request of any other user, in the web pages and in the API, as it answers for a
-          project that does not exist, list only the projects the user may see, give the API token of a user exactly
-          the access of its owner, and let a change of a membership or of the system administrator right take effect
-          with the next request; and let a system administrator or a project admin of a project manage its members,
-          adding an existing user only by the exact user name or creating an account only as part of adding it to the
-          project, with a temporary password that must be replaced at the first sign-in, and never leaving a project
-          without a project admin except by a system administrator.
+          The tool shall let a user see and use a project, with its reviews, files, comments, signatures,
+          attestation, evidence index, repositories, and history, only when the user is a member of the project or
+          a system administrator, answer a request of any other user, in the web pages and in the API, as it
+          answers for a project that does not exist, list only the projects the user may see, give the API token of
+          a user exactly the access of its owner, and let a change of a membership or of the system administrator
+          right take effect with the next request.
         tags: [system]
         justification: |
-          A project may hold confidential work. Deciding visibility in one place, and answering a user who may not see
-          a project exactly as for a project that does not exist, keeps the existence of a project from leaking
-          through a page, an API route, or a download. The memberships are read at every request so that taking access
-          away works at once, also for a token that was handed out earlier. The people who run a project must be
-          able to manage its members without a system administrator, but not to browse the users of the installation,
-          and a project must not be left without anybody who can manage it.
+          A project may hold confidential work. Deciding visibility in one place, and answering a user who may not
+          see a project exactly as for a project that does not exist, keeps the existence of a project from
+          leaking through a page, an API route, or a download (21 CFR Part 11 section 11.10(d); EU GMP Annex 11
+          clause 12). The memberships are read at every request so that taking access away works at once, also for
+          a token that was handed out earlier.
         children:
           - ReviewCenter-Core-ProjectAccess
           - ReviewCenter-ProjectAccess-Visibility
@@ -492,19 +599,44 @@ sections:
           - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
           - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
 
+      - id: ReviewCenter-System-ProjectMembers
+        title: >-
+          The tool shall let a system administrator or a project admin of a project manage its members, as a project
+          admin or a member, adding an existing user only by the exact user name, with no list of users, or creating
+          an account only as part of adding it to the project, with a temporary password that must be replaced at
+          the first sign-in, and shall never leave a project without a project admin except by a system
+          administrator.
+        tags: [system]
+        justification: |
+          Independence of review depends on who is in the project. The people who run a project must be able to
+          manage its members without a system administrator, but not to browse the users of the installation, and a
+          project must not be left without anybody who can manage it. A temporary password that the person must
+          replace keeps the person who created the account from knowing the password that is used to sign.
+        children:
+          - ReviewCenter-Core-ProjectAccess
+          - ReviewCenter-Web-ProjectAccess
+          - ReviewCenter-Storage-Memberships
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
+          - ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds
+          - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
+          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
+          - AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice
+
       - id: ReviewCenter-System-Users
         title: >-
           The tool shall let a system administrator list the users and create a user, make a user a system
-          administrator or an ordinary user, enable and disable a user, and set a password, let every user change the
-          own
-          password, require a password of 12 to 128 characters, lock a user out for 5 minutes after 5 failed
-          sign-ins in a row, never disable or demote the last enabled system administrator, and keep the users, with
-          only a hash of the password, in the database across restarts.
+          administrator or an ordinary user, enable and disable a user, and set a password, let every user change
+          the own password, require a password of 12 to 128 characters, lock a user out for 5 minutes after 5
+          failed sign-ins in a row, never disable or demote the last enabled system administrator, and keep the
+          users, with only a hash of the password, in the database across restarts.
         tags: [system]
         justification: |
-          Users are the accountable parties of a review. A password policy and a lockout make guessing hard,
-          the rule for the last system administrator keeps the system manageable, and a password hash means a copy of
-          the database does not reveal the passwords.
+          Users are the accountable parties of a review. A password policy and a lockout make guessing hard (21
+          CFR Part 11 section 11.300(d), safeguards against unauthorized use), the rule for the last system
+          administrator keeps the system manageable, and a password hash means a copy of the database does not
+          reveal the passwords.
         children:
           - ReviewCenter-Core-Users
           - ReviewCenter-Storage-Users
@@ -516,16 +648,15 @@ sections:
       - id: ReviewCenter-System-UserAdd
         title: >-
           The tool shall create a user in the database when the user add verb is provided with a user name, a
-          display name, and an optional --system-admin switch (an ordinary user by default), taking the password from
-          the
-          REVIEWCENTER_PASSWORD environment variable, the first line of redirected standard input, or a prompt,
-          never from the command line, and shall report an error with a non-zero exit code when the user cannot
-          be created.
+          display name, and an optional --system-admin switch (an ordinary user by default), taking the password
+          from the REVIEWCENTER_PASSWORD environment variable, the first line of redirected standard input, or a
+          prompt, never from the command line, and shall report an error with a non-zero exit code when the user
+          cannot be created.
         tags: [system]
         justification: |
           The first system administrator must exist before anybody can sign in or create a project. A password on
-          the command line would
-          be visible to other processes and kept in shell history, so it is never accepted there.
+          the command line would be visible to other processes and kept in shell history, so it is never accepted
+          there.
         children:
           - ReviewCenter-Program-UserAdd
           - ReviewCenter-Cli-UserAdd
@@ -534,112 +665,16 @@ sections:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
           - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
 
-      - id: ReviewCenter-System-Author
-        title: >-
-          The tool shall record the signed-in user, by user name and display name, as the author of every
-          comment, the person of every checklist answer, and the person of every change of section
-          applicability, without letting a user enter or change that name.
-        tags: [system]
-        justification: |
-          A review record is only evidence when it says who did what. Taking the name from the signed-in user,
-          and never from a form field, means nobody can act in the name of somebody else.
-        children:
-          - ReviewCenter-Identity-Actor
-        tests:
-          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
-          - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
-
-      - id: ReviewCenter-System-DatabaseFailure
-        title: >-
-          The tool shall report an error and return a non-zero exit code, without serving requests, when the
-          Database settings cannot be used.
-        tags: [system]
-        justification: |
-          Starting with a database that cannot be used would fail on the first request. Failing at start-up with
-          a clear message lets the operator correct the setting.
-        children:
-          - ReviewCenter-Hosting-DatabaseFailure
-        tests:
-          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
-
-      - id: ReviewCenter-System-TestIds
-        title: >-
-          The tool shall give every interactive element of its web pages a stable data-testid attribute, so that
-          automated tests and the Puppet tool can address it.
-        tags: [system]
-        justification: |
-          The web interface is verified and driven by automation. Addressing elements by stable identifiers,
-          rather than by text or layout, keeps that automation working as the pages evolve.
-        children:
-          - ReviewCenter-Web-TestIds
-        tests:
-          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
-          - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
-
-      - id: ReviewCenter-System-AuditTrail
-        title: >-
-          The tool shall record every change of projects, reviews, comments, checklists, reviewer slots,
-          signatures, and users, and every sign-in, sign-out, failed sign-in, attempt on a locked account, refusal
-          by the sign-in throttle, failed re-authentication for a signature, and lockout, in an audit trail in the
-          database, naming the time, the person, the action, and a short detail, without ever recording a password
-          or the text of a comment or a justification, recording repeated sign-in failures of one kind at most once
-          per minute, and chaining the entries by hashes so that an edit, a
-          deletion, an insertion, or a reordering in the middle of the history can be detected.
-        tags: [system]
-        justification: |
-          A review record is only evidence when its history can be checked. The chain detects changes of the
-          middle of the history, but it does not detect the removal of the newest entries or a complete rewrite by
-          someone with write access to the database, unless the head hash was recorded elsewhere; this version has
-          no external anchoring, and that limit is stated to the user.
-        children:
-          - ReviewCenter-Core-AuditTrail
-          - ReviewCenter-Storage-AuditTrail
-          - ReviewCenter-Identity-AuditTrail
-        tests:
-          - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
-          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
-
-      - id: ReviewCenter-System-AuditHistory
-        title: >-
-          The tool shall show every user who may view a project the audit entries of a review of that project, and
-          shall show system administrators alone the whole audit trail, in pages of 50 entries, newest first, with
-          all text shown as plain text.
-        tags: [system]
-        justification: |
-          Participants and administrators need to see who did what and when. The whole trail names every user and
-          action, so it is limited to system administrators.
-        children:
-          - ReviewCenter-Web-AuditHistory
-          - ReviewCenter-Web-AuditPage
-        tests:
-          - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
-          - AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries
-
-      - id: ReviewCenter-System-AuditVerify
-        title: >-
-          The tool shall verify the hash chain of the audit trail on request, from the audit page for a system
-          administrator and from the command line with the audit verify verb, reporting an intact chain with the
-          number of entries (and on the page the head hash) and a broken chain with the first broken entry,
-          and shall return exit code 0 for an intact chain and 1 for a broken chain or an unreadable database.
-        tags: [system]
-        justification: |
-          Verification is how tampering is found. The command line lets scripts and scheduled jobs check the
-          trail, and the head hash lets a system administrator record the state of the trail outside the database.
-        children:
-          - ReviewCenter-Program-AuditVerify
-          - ReviewCenter-Cli-AuditVerify
-          - ReviewCenter-Hosting-AuditVerify
-          - ReviewCenter-Web-AuditPage
-        tests:
-          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
-          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
+      # ----------------------------------------------------------------------------------------------
+      # Git and content sources: where the reviewed code comes from
+      # ----------------------------------------------------------------------------------------------
 
       - id: ReviewCenter-System-GitRepositories
         title: >-
           The tool shall let a project administrator or a system administrator, and nobody else, register git
           repositories in a project by name and location, with an optional user name and token, change them, and
-          disable and enable them, keep them across restarts, keep each repository to its one project, and offer only
-          the names of the enabled repositories of a project to the members of that project.
+          disable and enable them, keep them across restarts, keep each repository to its one project, and offer
+          only the names of the enabled repositories of a project to the members of that project.
         tags: [system]
         justification: |
           Reviews are made from source code in git repositories. The registrations decide which repositories the
@@ -660,8 +695,8 @@ sections:
           The tool shall read the source code of a registered repository through the git program installed on the
           server, without a shell, keeping a bare mirror of each repository, check that a revision exists, list the
           files of a revision and the files that changed against an earlier revision (a rename being a deletion and
-          an addition), skip symbolic links and submodules, enforce size limits, and report a missing git program, an
-          unknown revision, a failed authentication, and a timeout as clear errors.
+          an addition), skip symbolic links and submodules, enforce size limits, and report a missing git program,
+          an unknown revision, a failed authentication, and a timeout as clear errors.
         tags: [system]
         justification: |
           Formal reviews compare file sets with earlier revisions. Using the installed git keeps the behavior the
@@ -683,13 +718,13 @@ sections:
 
       - id: ReviewCenter-System-Credentials
         title: >-
-          The tool shall keep the access tokens of repositories only encrypted with a key ring that survives restarts,
-          hand a token to git only through the environment of the git process, never in its arguments, the logs, the
-          pages, or the audit trail, and refuse to start when the key ring cannot be saved.
+          The tool shall keep the access tokens of repositories only encrypted with a key ring that survives
+          restarts, hand a token to git only through the environment of the git process, never in its arguments,
+          the logs, the pages, or the audit trail, and refuse to start when the key ring cannot be saved.
         tags: [system]
         justification: |
-          A token gives access to source code. It must not be readable in a copy of the database, in a process list,
-          in a log, or on a page, and the keys must not be lost silently at a restart.
+          A token gives access to source code. It must not be readable in a copy of the database, in a process
+          list, in a log, or on a page, and the keys must not be lost silently at a restart.
         children:
           - ReviewCenter-ContentSources-Credentials
           - ReviewCenter-Hosting-KeyRingFailure
@@ -697,76 +732,9 @@ sections:
           - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
           - ServerHost_Restart_KeyRingPersisted_TokenStaysReadable
 
-      - id: ReviewCenter-System-GitReviews
-        title: >-
-          The tool shall create a review from the files that changed between an optional baseline revision and a head
-          revision of a registered git repository and match a selection, refuse to create it when no file matches,
-          keep the content of the changed files and the resolved commits unchanged in the review whatever happens to
-          the repository later, show each file's change kind and, for a modified file, the Head and Baseline versions,
-          and bind the repository, the commits, the selection, and every change into the digest that a signature
-          covers.
-        tags: [system]
-        justification: |
-          The product exists to review changes to source code. A review that followed the repository, or a signature
-          that did not cover what was selected, would not be evidence of what was approved.
-        children:
-          - ReviewCenter-Core-RepositoryReviews
-          - ReviewCenter-Storage-RepositoryReviews
-          - ReviewCenter-Web-RepositoryReviews
-        tests:
-          - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
-          - NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
-
-      - id: ReviewCenter-System-PlanReviews
-        title: >-
-          The tool shall plan the reviews that a head revision of a registered git repository needs from the review-sets
-          that the repository defines in its ReviewMark configuration file, as a full review or as the changes since the
-          last signed review of each set, fall back to a full review when that baseline cannot be trusted, skip sets
-          that are already filed or have nothing to review, create the picked reviews with the same rules as a review
-          made by hand, and bind the review-set into the digest that a signature covers.
-        tags: [system]
-        justification: |
-          A repository already states which files are reviewed together. Planning from that statement saves the author
-          from typing every selection by hand, and recording the set keeps each later review of the set linked to the
-          last one, so that changed files do not escape review.
-        children:
-          - ReviewCenter-Core-PlanReviews
-          - ReviewCenter-ContentSources-ReviewSets
-          - ReviewCenter-Hosting-PlannerServices
-          - ReviewCenter-Web-PlanReviews
-        tests:
-          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
-
-      - id: ReviewCenter-System-Attestation
-        title: >-
-          The tool shall let a signed-in user download, for a review that every reviewer slot has signed, a PDF
-          attestation of the review that is digitally signed by the server with an RSA or an ECDSA key (a self-signed
-          key that the server creates, or a certificate from a certificate store that an operator names), that states
-          the content, the checklist, the threads, the sign-offs, and the head of the audit trail, that says what the
-          signature proves and does not prove and which kind of key signed it, that is refused for a review that is not
-          approved, and whose release is recorded in the audit trail.
-        tags: [system]
-        justification: |
-          Approval inside a tool is of little use to an auditor who does not have access to it. A signed, portable
-          document that is honest about what it proves lets the approval be filed and checked elsewhere. It adds
-          integrity and the origin of the server key to the in-record signatures that identify the reviewers.
-        children:
-          - ReviewCenter-Evidence-Document
-          - ReviewCenter-Evidence-Signature
-          - ReviewCenter-Evidence-Key
-          - ReviewCenter-Evidence-Honesty
-          - ReviewCenter-Evidence-Release
-          - ReviewCenter-Evidence-ContentSettings
-          - ReviewCenter-Core-EvidenceSettings
-          - ReviewCenter-Storage-EvidenceSettings
-          - ReviewCenter-Web-EvidenceSettings
-          - ReviewCenter-Hosting-AttestationServices
-          - ReviewCenter-Hosting-AttestationKeyFailure
-          - ReviewCenter-Web-Attestation
-        tests:
-          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
-          - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
-          - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
+      # ----------------------------------------------------------------------------------------------
+      # Automation: pipelines and tests
+      # ----------------------------------------------------------------------------------------------
 
       - id: ReviewCenter-System-PersonalAccessTokens
         title: >-
@@ -778,8 +746,9 @@ sections:
         tags: [system]
         justification: |
           Pipelines and scripts that file reviews need a credential that is not a password, that is easy to hand
-          out and to take back, and that gives away little if it leaks. A token that expires, can be revoked at once,
-          is audited, and is stored only as a hash limits the harm of a leak and keeps every action attributable.
+          out and to take back, and that gives away little if it leaks. A token that expires, can be revoked at
+          once, is audited, and is stored only as a hash limits the harm of a leak and keeps every action
+          attributable.
         children:
           - ReviewCenter-Core-AccessTokens
           - ReviewCenter-Storage-AccessTokens
@@ -795,25 +764,21 @@ sections:
           The tool shall offer an HTTP API under /api, described by an OpenAPI document, with which a client that
           sends a personal access token can list the projects its owner may see and the reviews of those projects,
           read a review, create a review draft from files or from the changes of a repository, download the
-          attestation of a signed review, and read the evidence
-          index of a project in the form that ReviewMark reads (with a token sent as a bearer token or as the
-          password of HTTP Basic credentials), with the same rules as the web pages, but shall not let a token sign a
-          review, arrange the reviewers, or open a web page, and shall answer a request for a project that its owner
-          may not see as for a project that does not exist. A project may open its evidence index and its attestation
-          PDFs, and nothing else, to a client without a token.
+          attestation of a signed review, and read the evidence index of a project in the form that ReviewMark reads
+          (with a token sent as a bearer token or as the password of HTTP Basic credentials), with the same rules as
+          the web pages, but shall not let a token sign a review, arrange the reviewers, or open a web page, and
+          shall answer a request for a project that its owner may not see as for a project that does not exist.
         tags: [system]
         justification: |
-          Creating a draft for every pull request from a pipeline and filing the attestation of a signed review with
-          the release take the manual work out of the process. The people stay the only ones who sign, so that a
-          signature still proves that a person was there.
+          Creating a draft for every pull request from a pipeline and filing the attestation of a signed review
+          with the release take the manual work out of the process. The people stay the only ones who sign, so that
+          a signature still proves that a person was there.
         children:
           - ReviewCenter-Api-ReviewJourney
           - ReviewCenter-Api-Isolation
           - ReviewCenter-Api-Document
           - ReviewCenter-Api-EvidenceJourney
-          - ReviewCenter-Evidence-Index
           - ReviewCenter-Api-ProjectAccess
-          - ReviewCenter-Api-AnonymousEvidence
           - ReviewCenter-Hosting-ApiServices
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
@@ -821,3 +786,164 @@ sections:
           - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
           - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign
           - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+
+      - id: ReviewCenter-System-TestIds
+        title: >-
+          The tool shall give every interactive element of its web pages a stable data-testid attribute, so that
+          automated tests and the Puppet tool can address it.
+        tags: [system]
+        justification: |
+          The web interface is verified and driven by automation. Addressing elements by stable identifiers,
+          rather than by text or layout, keeps that automation working as the pages evolve.
+        children:
+          - ReviewCenter-Web-TestIds
+        tests:
+          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
+          - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
+
+      # ----------------------------------------------------------------------------------------------
+      # Operation and qualification: running, configuring, and qualifying the tool
+      # ----------------------------------------------------------------------------------------------
+
+      - id: ReviewCenter-System-CommandLine
+        title: >-
+          The tool shall be operable from the command line in a way that scripts and pipelines can rely on, by
+          showing its version and its usage on request, showing a banner when no action is requested, suppressing
+          console output when asked to be silent, writing its output to a log file when asked, and reporting an error
+          message with a non-zero exit code for an unrecognized argument, an exit code of zero meaning success.
+        tags: [system]
+        justification: |
+          The tool runs under supervisors, containers, and pipelines as often as in a shell. A version that can
+          always be read identifies the release that produced a record (EU GMP Annex 11 clause 4, validation), usage
+          output lets operators help themselves, a log file keeps a record of a run, and a reliable exit code
+          lets a pipeline surface a misconfiguration instead of carrying on with it.
+        children:
+          - ReviewCenter-Program-Version
+          - ReviewCenter-Cli-Version
+          - ReviewCenter-Program-Help
+          - ReviewCenter-Cli-Help
+          - ReviewCenter-Cli-Silent
+          - ReviewCenter-Cli-Log
+          - ReviewCenter-Program-ExitCode
+          - ReviewCenter-Cli-ExitCode
+          - ReviewCenter-Cli-InvalidArgs
+          - ReviewCenter-Cli-ErrorOutput
+          - ReviewCenter-Cli-ArgumentParsing
+          - ReviewCenter-Cli-OutputChannels
+        tests:
+          - ReviewCenter_VersionFlag_Provided_OutputsVersion
+          - ReviewCenter_HelpFlag_Provided_OutputsUsageInformation
+          - ReviewCenter_NoArguments_Invoked_DisplaysBanner
+          - ReviewCenter_SilentFlag_Provided_SuppressesOutput
+          - ReviewCenter_LogFlag_Provided_WritesOutputToFile
+          - ReviewCenter_UnknownArgument_Provided_ReturnsError
+
+      - id: ReviewCenter-System-Qualification
+        title: >-
+          The tool shall qualify itself in its deployment environment when the validate flag is provided, by
+          exercising the behaviors it relies on (git, a complete review workflow, the fingerprint, password hashing,
+          the second factor codes, the audit chain, the signed attestation, and the web host) in a hermetic way that
+          never touches the configured database, writing the outcome to a TRX or JUnit result file chosen by the
+          `--results` flag (with `--result` as a legacy alias) at a heading depth chosen by the `--depth` flag, and
+          returning a non-zero exit code when the validation fails or the result file cannot be written in a
+          supported format, with an opt-in, read-only check of the configured database by `--check-config`.
+        tags: [system]
+        justification: |
+          Regulated environments require qualification evidence to show that the tool functions correctly in its
+          deployment environment before it is used to produce compliance artifacts (21 CFR Part 11 section
+          11.10(a), validation; EU GMP Annex 11 clause 4). The validation exercises the real behaviors that the
+          integrity guarantees rest on, never the data of the installation, and produces a standard result file that
+          quality systems can file. The same self-validation run on each supported platform is the evidence for
+          the platform requirements. A silent loss of the evidence, such as an unsupported result file format, must
+          fail the run.
+        children:
+          - ReviewCenter-Program-Validate
+          - ReviewCenter-Cli-Validate
+          - ReviewCenter-Cli-CheckConfig
+          - ReviewCenter-Cli-Results
+          - ReviewCenter-Cli-Depth
+          - ReviewCenter-Cli-ResultAlias
+          - ReviewCenter-SelfTest-Qualification
+          - ReviewCenter-SelfTest-Hermetic
+          - ReviewCenter-SelfTest-ResultsOutput
+          - ReviewCenter-SelfTest-InvalidExtension
+        tests:
+          - ReviewCenter_ValidateFlag_Provided_RunsValidation
+          - ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile
+          - ReviewCenter_ValidateWithDepth_DepthThree_OutputsCorrectHeadingLevel
+          - ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile
+          - SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults
+          - SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile
+
+      - id: ReviewCenter-System-Serve
+        title: >-
+          The tool shall run the ReviewCenter web server until it is stopped when the serve verb is provided,
+          listening on the URL given by the `--urls` option, reporting an error and a non-zero exit code when
+          `--urls` is given without the serve verb or the requested address cannot be used, answering requests for
+          the /health URL with HTTP status 200 and the text Healthy while it runs, stopping cleanly on request, and
+          writing start-up and request activity as structured log entries.
+        tags: [system]
+        justification: |
+          ReviewCenter is delivered as a web service. Operators need a single command that starts the service in
+          the foreground, lets them choose the address and port so that it can coexist with other services and sit
+          behind a reverse proxy, and stops it cleanly, so that it can be run under a process supervisor, a
+          container, or by a developer. A health URL gives reverse proxies, orchestrators, and monitoring a simple,
+          unauthenticated way to find out whether it is up, and structured log entries let the running service be
+          monitored and audited. Rejecting a misplaced option or an unusable address prevents a mistyped command
+          from silently starting nothing, or something other than what was requested.
+        children:
+          - ReviewCenter-Program-Serve
+          - ReviewCenter-Cli-Serve
+          - ReviewCenter-Cli-Urls
+          - ReviewCenter-Hosting-Health
+          - ReviewCenter-Hosting-Logging
+        tests:
+          - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
+          - ReviewCenter_ServeVerb_Started_LogsStartupEntryWithListenUrl
+          - ubuntu@ReviewCenter_ServeVerb_TerminationRequested_StopsGracefullyWithExitCodeZero
+          - ReviewCenter_ServeWithUrls_PortSpecified_ListensOnRequestedPort
+          - ReviewCenter_UrlsWithoutServe_Provided_ReturnsError
+          - ReviewCenter_ServeVerb_PortInUse_ReturnsError
+
+      - id: ReviewCenter-System-WebInterface
+        title: >-
+          The tool shall serve a home page titled ReviewCenter at the root URL of the web server, showing the
+          product name and tagline, with the client script that its interactive pages depend on, and shall serve an
+          About page and its built-in Help pages to every visitor, including one who is not signed in.
+        tags: [system]
+        justification: |
+          The home page is the entry point of the web user interface, and proves that pages are delivered to a
+          browser, including the client script the interactive pages depend on. Users must be able to learn what
+          the product does, which version runs, and how to use it before they can sign in, and without an
+          administrator handing out documents (EU GMP Annex 11 clause 2, personnel who are trained to use it).
+        children:
+          - ReviewCenter-Web-HomePage
+          - ReviewCenter-Web-Interactive
+          - ReviewCenter-Web-Help
+        tests:
+          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
+          - ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn
+
+      - id: ReviewCenter-System-Persistence
+        title: >-
+          The tool shall keep all its records in the database named by the Database settings, creating the
+          database on first start, so that the data is still there after the server is restarted, and shall report
+          an error and return a non-zero exit code, without serving requests, when the Database settings cannot be
+          used.
+        tags: [system]
+        justification: |
+          Review records must outlive the server process, and the operator must be able to choose where the data
+          lives so that it can be backed up and protected like any other record (21 CFR Part 11 section 11.10(c),
+          protection of records to enable their accurate and ready retrieval). A new installation must work
+          without manual database setup. Starting with a database that cannot be used would fail on the first
+          request, so failing at start-up with a clear message lets the operator correct the setting.
+        children:
+          - ReviewCenter-Hosting-Database
+          - ReviewCenter-Hosting-DatabaseFailure
+          - ReviewCenter-Storage-Persistence
+          - ReviewCenter-Storage-Integrity
+          - ReviewCenter-Storage-Configuration
+        tests:
+          - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
+          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne

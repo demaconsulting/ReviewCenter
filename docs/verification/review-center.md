@@ -75,6 +75,17 @@ loopback TCP ports.
 - Reviewer slots and signatures are presented by the review and project pages: a review is Approved only while every
   slot has a signature of the current record, a change of the record makes a signature out of date, and slots and
   signatures are kept after the database is reopened.
+- A review is signed only by a member of the project who is named in a reviewer slot (one person in one slot, never an
+  API token), not while an unanswered check, a Fail answer, or an open thread blocks it, and a signed slot cannot be
+  changed or removed (`ReviewCenter-System-ReviewerIndependence`).
+- A signature needs a fresh proof of the signer for that signature: the password, a fresh code for an account with a
+  second factor, or one fresh sign-in at the provider; a wrong proof is refused, audited without the secret, and
+  counted toward the lockout (`ReviewCenter-System-SignatureReauthentication`).
+- A signature is bound to the digest of the content fingerprint, the checklist, the comments, and the git context, and
+  is refused when the record changed since the signer's page was drawn (`ReviewCenter-System-SignatureBinding`).
+- Stored content, comments, signatures, and audit entries are never edited or deleted, and a change of the record
+  after a signature makes the review In review again; the tool does not lock the review against further work
+  (`ReviewCenter-System-RecordImmutability`).
 - Every change of data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an audit trail whose
   entries are chained by hashes, and the change and its entry are stored together; the entries never contain a password
   or the text of a comment or justification.
@@ -158,7 +169,7 @@ legacy `--result <path>.xml` alias; a results file was created at the specified 
 exited with code 0. This scenario is tested by
 `ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile`.
 
-The unsupported results extension (requirement `ReviewCenter-System-ValidateFailure`) is verified
+The unsupported results extension (part of requirement `ReviewCenter-System-Qualification`) is verified
 at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile`, which runs
 `Validation.Run` with stand-in checks, instead of a process run that would repeat the real
