@@ -83,8 +83,7 @@ sections:
         tests:
           - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
           - NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
-          - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
-          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+          - PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
 
       - id: ReviewCenter-System-PlanReviews
         title: >-
@@ -133,8 +132,8 @@ sections:
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
-          - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
-          - SignIn_DeepLink_SignedOut_ReturnsToTheSameLinkAfterLogin
+          - PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
+          - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
       - id: ReviewCenter-System-Checklist
         title: >-
@@ -155,7 +154,7 @@ sections:
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
-          - ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot
+          - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
 
       - id: ReviewCenter-System-Author
         title: >-
@@ -195,14 +194,16 @@ sections:
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
+          - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
+          - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
       - id: ReviewCenter-System-ReviewerIndependence
         title: >-
-          The tool shall let a review be signed only by the people that were named for it in reviewer slots, each a
-          primary reviewer with an optional alternate, each person in one slot only and only a member of the
-          project, shall never let an API token sign a review or arrange its reviewers, shall refuse to sign while
-          an unanswered check, a Fail answer, or an open thread blocks the review, and shall keep a signed slot
-          from being changed or removed.
+          The tool shall have the reviewers of a review named beforehand in reviewer slots, each a primary reviewer
+          with an optional alternate, offering only members of the project and putting each person in one slot
+          only, shall never let an API token sign a review or arrange its reviewers, shall offer no way to sign
+          while an unanswered check, a Fail answer, or an open thread blocks the review, and shall offer no way to
+          change or remove a slot that holds a signature.
         tags: [system]
         justification: |
           A review is independent only when the people who approve it are fixed beforehand, are distinct, and
@@ -212,34 +213,25 @@ sections:
           unfinished work stops an approval of a review nobody finished (EU GMP Annex 11 clause 12, security;
           21 CFR Part 11 section 11.10(d), limiting access to authorized individuals). The tool does not decide
           who may be named, and does not forbid the author of the content from signing: that rule is left to the
-          project that names the slots.
+          project that names the slots. The system tests drive the web interface and the API of a running server:
+          the refusal of a non-member by the server itself, and of every other person than the slot holders, is
+          verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Storage-Signatures
           - ReviewCenter-Api-Isolation
         tests:
-          - SigningService_AddSlotAsync_SameUserTwice_ThrowsSlotUserInvalid
-          - SigningService_AddSlotAsync_UserInOtherSlot_ThrowsSlotUserInvalid
-          - SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid
-          - SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed
-          - SigningService_SignAsync_NotAMember_IsRefused
-          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
-          - SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused
-          - SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned
-          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
-          - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
-          - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
-          - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign
-          - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
+          - ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers
+          - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
+          - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
       - id: ReviewCenter-System-SignatureReauthentication
         title: >-
           The tool shall make a signature only after the signer has proved who they are again for that signature,
-          with the password of the account and, for an account with a second factor, a fresh code, or, for an
-          account that signs in with an OpenID Connect provider, a fresh sign-in at the provider as the same person
-          that is good for one signature only and fails closed, and shall refuse a signature, record the failed
-          attempt in the audit trail without the secret, and count it toward the lockout when the proof is wrong.
+          with the password of the account (and the further proofs of the second factor or the identity provider
+          that the child requirements state), and shall refuse a signature and record the failed attempt in the
+          audit trail without the secret when the proof is wrong.
         tags: [system]
         justification: |
           A session that was left open, or a stolen cookie, must not be enough to sign in somebody else's name. A
@@ -247,7 +239,9 @@ sections:
           components of the electronic signature (21 CFR Part 11 section 11.200(a), signature components and
           controls; section 11.300, controls for identification codes and passwords; EU GMP Annex 11 clause 14).
           Counting a wrong proof toward the lockout stops the signature step from becoming a way to guess the
-          password, and a proof that works for one signature only stops one confirmation from signing twice.
+          password, and a proof that works for one signature only stops one confirmation from signing twice; the
+          system tests drive the password proof in a real browser, and the lockout, the second factor, and the
+          OpenID Connect proof are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Web-Signatures
@@ -256,29 +250,23 @@ sections:
           - ReviewCenter-Web-TotpSecondFactor
           - ReviewCenter-Core-AuditTrail
         tests:
-          - SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed
-          - SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin
-          - SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword
-          - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
-          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
-          - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
-          - ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing
-          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
-          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
 
       - id: ReviewCenter-System-SignatureBinding
         title: >-
-          The tool shall bind every signature to the exact record that the signer reviewed, by a digest of the
-          content fingerprint, the checklist wording and answers with who answered, every thread and comment in
-          order, and the git source, commits, selection, changes, and review-set, and shall refuse a signature
-          when the record has changed since the page of the signer was drawn.
+          The tool shall bind every signature to the exact record that the signer reviewed, by a digest that covers
+          the content fingerprint, the checklist with who answered, every thread and comment, and the git source of
+          the review, so that a change of any of them ends the approval, and shall refuse a signature when the
+          record has changed since the page of the signer was drawn.
         tags: [system]
         justification: |
           A signature is worth only what it covers. Binding it to a digest of everything the reviewer saw, and
           refusing a signature over a record that moved while the signer was reading, means the signer is never
           made to approve something different from what they examined. It links the signature to its record in a
           way that cannot be moved to another record (21 CFR Part 11 section 11.70, signature/record linking;
-          EU GMP Annex 11 clause 14).
+          EU GMP Annex 11 clause 14). The system tests change the checklist and add a comment against a running
+          server; that each part of the digest (wording, who answered, order of comments, source, commits, selection,
+          changes, review-set) moves it is verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Storage-Signatures
@@ -287,22 +275,16 @@ sections:
           - ReviewCenter-Core-RepositoryReviews
           - ReviewCenter-Core-PlanReviews
         tests:
-          - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
-          - SigningService_SignAsync_StaleExpectedDigest_ThrowsRecordChanged
-          - ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused
-          - ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing
-          - RecordDigest_Compute_CoveredChange_ChangesDigest
-          - RecordDigest_Compute_SourceChange_ChangesDigest
-          - RecordDigest_Compute_ChecklistWordingChange_ChangesDigest
-          - RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot
-          - RecordDigest_Compute_CommentOrder_ChangesDigest
+          - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
+          - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
       - id: ReviewCenter-System-RecordImmutability
         title: >-
-          The tool shall keep the reviewed content, the baseline, the checklist wording, every posted comment,
-          every signature, and every audit entry unchanged once they are stored, never offer a way to edit or
-          delete them, and show a review as In review again, with its signatures kept as history, as soon as the
-          record changes after it was signed, so that an approval never stands for a record that nobody signed.
+          The tool shall keep the reviewed content, every posted comment, and every signature as they were stored,
+          offer no way to edit or delete a posted comment or to change or remove a signature, show a review as In
+          review again, with its signatures kept as history, as soon as the record changes after it was signed, so
+          that an approval never stands for a record that nobody signed, and let an edit of a stored audit entry
+          be found by the verification of the audit trail.
         tags: [system]
         justification: |
           Evidence is trusted only when it cannot be rewritten afterwards. Content, comments, signatures, and audit
@@ -311,7 +293,9 @@ sections:
           record no longer matches the signatures (21 CFR Part 11 section 11.10(c), protection of records, and
           section 11.10(e), audit trails that do not obscure earlier entries). The tool does not lock a review
           against further work after approval: it makes the approval out of date instead, which the reviewers
-          can see and sign again.
+          can see and sign again. The system tests drive a running server and a real database; that the stored
+          baseline, the checklist wording, and the audit entries are never updated by the code, and that the
+          database itself refuses to remove a signed slot, are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-Reviews
           - ReviewCenter-Core-RepositoryReviews
@@ -326,14 +310,8 @@ sections:
           - ReviewCenter-Storage-AuditTrail
           - ReviewCenter-Storage-Persistence
         tests:
-          - AuditStore_PublicSurface_OffersNoUpdateOrDelete
-          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
-          - ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder
-          - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
-          - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
-          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
-          - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
-          - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+          - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
+          - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
 
       # ----------------------------------------------------------------------------------------------
       # Evidence and audit: the history, its verification, and the portable proof
@@ -345,9 +323,8 @@ sections:
           comments, checklists, reviewer slots, signatures, and users, and every sign-in, sign-out, failed sign-in,
           attempt on a locked account, refusal by the sign-in throttle, failed re-authentication for a signature,
           and lockout, in an audit trail in the database that names the time, the person, the action, and a short
-          detail, never records a password or the text of a comment or a justification, records repeated sign-in
-          failures of one kind at most once per minute, and chains the entries by hashes so that an edit, a
-          deletion, an insertion, or a reordering in the middle of the history can be detected.
+          detail, never records a password, and chains the entries by hashes so that an edit, a deletion, an
+          insertion, or a reordering in the middle of the history can be detected.
         tags: [system]
         justification: |
           A review record is only evidence when its history can be checked (21 CFR Part 11 section 11.10(e),
@@ -355,28 +332,24 @@ sections:
           together with its audit entry, so that both exist or neither does, and the chain detects changes of the
           middle of the history. It does not detect the removal of the newest entries or a complete rewrite by
           someone with write access to the database, unless the head hash was recorded elsewhere; this version has
-          no external anchoring, and that limit is stated to the user.
+          no external anchoring, and that limit is stated to the user. The system tests drive a running server and
+          a real database with an edit made behind its back; the other kinds of break, the once-a-minute limit of
+          repeated failures, and the omission of comment texts are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-AuditTrail
           - ReviewCenter-Storage-AuditTrail
           - ReviewCenter-Identity-AuditTrail
         tests:
-          - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
-          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
-          - AuditStore_PublicSurface_OffersNoUpdateOrDelete
-          - AuditChain_Verify_EditedEntry_ReportsThatEntry
-          - AuditChain_Verify_DeletedEntry_ReportsTheMissingSequence
-          - AuditChain_Verify_ReorderedEntries_ReportsFirstOutOfOrderSequence
-          - AuditChain_Verify_InsertedEntry_IsDetected
+          - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
+          - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
 
       - id: ReviewCenter-System-AuditVerify
         title: >-
           The tool shall let a system administrator verify the hash chain of the audit trail on request, from the
           audit page and from the command line with the audit verify verb, reporting an intact chain with the number
           of entries (and on the page the head hash) and a broken chain with the first broken entry, returning exit
-          code 0 for an intact chain and 1 for a broken chain or an unreadable database, and shall show every user
-          who may view a project the audit entries of a review of that project, and a system administrator alone
-          the whole trail, in pages of 50 entries, newest first, with all text shown as plain text.
+          code 0 for an intact chain and 1 for a broken chain or an unreadable database, and shall show a system
+          administrator the audit trail on the audit page.
         tags: [system]
         justification: |
           Verification is how tampering is found, and an audit trail that nobody can read or check does not protect
@@ -384,7 +357,10 @@ sections:
           administrator record the state of the trail outside the database. Participants need to see who did what
           and when for the reviews they may see, while the whole trail names every user and action and so is
           limited to system administrators (21 CFR Part 11 section 11.10(e), audit trail available for review and
-          copying by the agency).
+          copying by the agency). The system tests verify the chain from the audit page and by the verb on a
+          database that was edited behind the server; the history of one review that every participant may see, the
+          paging of 50, the refusal of the whole trail to anybody but a system administrator, and the exit code
+          for an unreadable database are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Program-AuditVerify
           - ReviewCenter-Cli-AuditVerify
@@ -392,29 +368,26 @@ sections:
           - ReviewCenter-Web-AuditPage
           - ReviewCenter-Web-AuditHistory
         tests:
-          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
-          - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
-          - AuditCommand_Run_DeletedEntry_ReportsBrokenChainWithExitCodeOne
-          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
-          - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
-          - AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries
+          - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
+          - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
 
       - id: ReviewCenter-System-Attestation
         title: >-
           The tool shall let a signed-in user download, for a review that every reviewer slot has signed, a PDF
-          attestation that is digitally signed by the server with a key that is never exported (a self-signed key
-          that the server creates, or a certificate from a certificate store that an operator names), that states
-          the content, the checklist, the threads, the sign-offs, and the head of the audit trail, as far as the
-          evidence settings of the project allow, that says what the signature proves and does not prove and which
-          kind of key signed it, that shows any later change of its content, that is refused for a review that is
-          not approved or changed since it was signed, and whose release is recorded in the audit trail.
+          attestation that is digitally signed by the server with a key that is never exported, that states the
+          content, the checklist, the threads, the sign-offs, and the head of the audit trail, as far as the
+          evidence settings of the project allow, and that is refused for a review that is not approved or changed
+          since it was signed.
         tags: [system]
         justification: |
           Approval inside a tool is of little use to an auditor who does not have access to it. A signed, portable
           document that is honest about what it proves lets the approval be filed and checked elsewhere
           (21 CFR Part 11 section 11.10(b), accurate and complete copies in human-readable form, and section
           11.50). It adds integrity and the origin of the server key to the in-record signatures that identify the
-          reviewers, and the project decides how much of the review the document may reveal.
+          reviewers, and the project decides how much of the review the document may reveal. The system tests
+          download the signed PDF from a running server and see it refused before the signature and after a later
+          change; the kinds of key, the statement of what the signature proves and does not prove, the shown change
+          of the content, and the audit entry of the release are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Evidence-Document
           - ReviewCenter-Evidence-Signature
@@ -432,17 +405,15 @@ sections:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
           - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
           - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
-          - AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies
-          - AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved
+          - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
       - id: ReviewCenter-System-EvidenceIndex
         title: >-
           The tool shall list the completed reviews of a project that were planned from a review-set in an evidence
           index in the format that ReviewMark reads, naming for each the review-set id, the fingerprint of the files,
-          the date of the latest signature, the result, and the address of the attestation, shall leave out a review
-          that is incomplete, changed since it was signed, or has no review-set id, shall give the same index for the
-          same reviews, and may open the index and the attestation PDFs of a project to a client without credentials
-          only by a setting of the project that is off by default.
+          and the result, shall leave out a review that is incomplete or changed since it was signed, and shall
+          keep the index and the attestation PDFs of a project closed to a client without credentials unless a
+          setting of the project, which is off by default, opens them.
         tags: [system]
         justification: |
           The evidence that a review was done must reach the place where the compliance of a release is judged. An
@@ -450,20 +421,17 @@ sections:
           signed review of the current fingerprint, and listing only reviews that are complete and current stops a
           stale approval from satisfying it. Opening the evidence to a client without credentials is a decision
           about confidentiality, so it is a setting of each project, off by default, limited to the two documents,
-          and rate-limited by address.
+          and rate-limited by address. The system tests read the index with a token from a running server, before
+          the signature and after a later change, and as a client without credentials; the date, the address of
+          the attestation, a review without a review-set id, the same index for the same reviews, and the opened
+          setting are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Evidence-Index
           - ReviewCenter-Evidence-Visibility
           - ReviewCenter-Api-EvidenceJourney
           - ReviewCenter-Api-AnonymousEvidence
         tests:
-          - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
-          - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
-          - EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed
-          - EvidenceIndexService_Build_IncompleteReview_IsNotListed
-          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
-          - AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject
-          - AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed
+          - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
       # ----------------------------------------------------------------------------------------------
       # Access and identity: who may act, and who may see
@@ -601,28 +569,24 @@ sections:
 
       - id: ReviewCenter-System-ProjectMembers
         title: >-
-          The tool shall let a system administrator or a project admin of a project manage its members, as a project
-          admin or a member, adding an existing user only by the exact user name, with no list of users, or creating
-          an account only as part of adding it to the project, with a temporary password that must be replaced at
-          the first sign-in, and shall never leave a project without a project admin except by a system
-          administrator.
+          The tool shall let a system administrator or a project admin of a project manage its members, adding an
+          existing user to the project as a project admin or a member only by the exact user name, and shall make
+          only the members of a project available to be named as reviewers of its reviews.
         tags: [system]
         justification: |
           Independence of review depends on who is in the project. The people who run a project must be able to
           manage its members without a system administrator, but not to browse the users of the installation, and a
           project must not be left without anybody who can manage it. A temporary password that the person must
-          replace keeps the person who created the account from knowing the password that is used to sign.
+          replace keeps the person who created the account from knowing the password that is used to sign. The
+          system tests add members by the user name in a real browser; the creation of an account with a temporary
+          password, the rule that a project keeps a project admin, and the refusal of other users are verified by
+          the tests of the child requirements.
         children:
           - ReviewCenter-Core-ProjectAccess
           - ReviewCenter-Web-ProjectAccess
           - ReviewCenter-Storage-Memberships
         tests:
-          - ProjectService_Members_SystemAdminManages_OthersAreRefused
-          - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
-          - ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds
-          - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
-          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
-          - AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice
+          - ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers
 
       - id: ReviewCenter-System-Users
         title: >-

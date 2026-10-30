@@ -20,6 +20,7 @@
 
 using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Utilities;
+using Microsoft.Data.Sqlite;
 
 namespace DemaConsulting.ReviewCenter.Tests;
 
@@ -441,6 +442,48 @@ public partial class IntegrationTests
         // Assert: a clear error and a non-zero exit code
         Assert.Equal(1, exitCode);
         Assert.Contains("No password was provided.", output);
+    }
+
+    /// <summary>
+    ///     Test that the published application records its history in a tamper-evident audit trail: the audit verify
+    ///     verb reports an intact chain with exit code 0, and after an entry in the middle of the history is edited
+    ///     in the database file behind the application's back, it reports the first broken entry with exit code 1.
+    /// </summary>
+    [Fact]
+    public void ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne()
+    {
+        // Arrange: a new database whose history holds three audited events (three users added by the application)
+        var connectionString = TestDatabase.NewConnectionString();
+        var environment = new Dictionary<string, string>
+        {
+            [TestDatabase.ConnectionStringVariable] = connectionString,
+            ["REVIEWCENTER_PASSWORD"] = "correct horse battery"
+        };
+        foreach (var name in new[] { "ann", "bob", "carl" })
+        {
+            Assert.Equal(
+                0,
+                Runner.RunWithEnvironment(
+                    out _, environment, "dotnet", _dllPath, "user", "add", "--username", name, "--display-name", name));
+        }
+
+        // Act: verify the untouched history, edit the second entry in the file, and verify again
+        var intactCode = Runner.RunWithEnvironment(out var intactOutput, environment, "dotnet", _dllPath, "audit", "verify");
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE AuditEntries SET Detail = 'forged' WHERE Sequence = 2";
+            command.ExecuteNonQuery();
+        }
+
+        var brokenCode = Runner.RunWithEnvironment(out var brokenOutput, environment, "dotnet", _dllPath, "audit", "verify");
+
+        // Assert: intact before the edit, and the edited entry is named afterwards
+        Assert.Equal(0, intactCode);
+        Assert.Contains("Audit chain intact", intactOutput);
+        Assert.Equal(1, brokenCode);
+        Assert.Contains("Audit chain BROKEN at entry 2", brokenOutput);
     }
 
     /// <summary>
