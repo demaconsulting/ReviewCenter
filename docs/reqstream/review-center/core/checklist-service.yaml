@@ -126,3 +126,14 @@ sections:
           cannot bypass the rule.
         tests:
           - ChecklistService_Constructor_NullArguments_Throws
+
+      - id: ReviewCenter-ChecklistService-ApprovalLock
+        title: >-
+          The ChecklistService class shall refuse to answer a check and to change the applicability of a section in a
+          review that is approved and therefore locked, with the ReviewLocked rule, after the access check and before
+          anything is stored.
+        justification: |
+          The answers are part of what a signature approves. Changing one after the approval would make the approval
+          describe a record that no longer exists, so the service refuses until an administrator reopens the review.
+        tests:
+          - ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked

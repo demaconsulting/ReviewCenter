@@ -598,7 +598,8 @@ a.action:active {
     color: var(--success-text);
 }
 
-.badge.outdated {
+.badge.outdated,
+.badge.locked {
     border-color: var(--warning-border);
     background: var(--warning-background);
     color: var(--warning-text);

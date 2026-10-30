@@ -91,8 +91,9 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 
 **What the attestation is for**: Approval inside the tool is of little use to someone who has no access to it. The
 attestation is a portable record of the approval: it states what was reviewed (the content fingerprint, the revisions,
-the files), what the reviewers answered and discussed, who signed which slot and when, and the head of the audit chain
-at
+the files), what the reviewers answered and discussed, who signed which slot and when, the reopen history of the review
+(when it was reopened after an approval, by whom, and why; only for a review that was reopened), and the head of
+the audit chain at
 the time. The server then signs the document, so that a change made after the signing shows in a PDF reader or any CMS
 tool.
 
@@ -173,6 +174,16 @@ attestation is rare. A change that happens between the second check and the audi
 tiny and the event states the digest that was attested. The user interface offers the download only
 for an approved review, but the endpoint decides again, so the rule does not depend on the page. The document prints
 every checklist comment in full; the only caps are on the list of resolved threads (see `AttestationRenderer`).
+
+**Approval lock, reopen, and the evidence**: An approved review is locked in `Core`, so the record that an attestation
+describes cannot change after the approval, and the "changed during generation" window that this subsystem checks is
+only left for a reopen or a stale signature. Reading, the attestation, and the evidence index keep working on a locked
+review. When an administrator reopens a review, the review is no longer complete: the attestation endpoint answers as for
+a review that is not approved, and the review leaves the evidence index, until the review is signed again. The earlier
+approval stays visible as the reopen history of the next attestation, which lists each reopen with its time, who reopened
+it (a name or a label, as the reviewer names switch decides), the reason, and the digest of the record that was
+reopened. The attestation of an earlier approval that was downloaded before the reopen is a signed document of that
+earlier record and is not invalidated.
 
 **Evidence settings and the content of a PDF**: Each project has evidence settings (see `EvidenceSettings` in `Core`).
 Five switches decide what every attestation PDF of the project contains: discussion threads, reviewer names, the

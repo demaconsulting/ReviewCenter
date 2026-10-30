@@ -1,7 +1,8 @@
 # Reviewing
 
 This chapter describes the daily work of a review: projects and their reviews, planning, comments, the checklist,
-and the signatures with the signed attestation that proves an approval.
+the signatures, the lock of an approved review and how an administrator reopens it, and the signed attestation that
+proves an approval.
 
 ## Projects and Reviews
 
@@ -258,7 +259,9 @@ first line must not be after the last line. Leading and trailing spaces of the t
 problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
 
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
-changes. Comments posted by other people appear when you reload the page or take an action on it. Comment text is
+changes. While a review is approved it is locked and no thread can be started, answered, resolved, or reopened (see
+[Locked Reviews and Reopening](#locked-reviews-and-reopening)). Comments posted by other people appear when you reload
+the page or take an action on it. Comment text is
 always shown as plain text; any markup in it is displayed as typed.
 
 ### Sharing links
@@ -312,7 +315,9 @@ and the first section with unanswered checks is open when you arrive.
 1. Open a section and choose Pass, Fail, or N/A for each check. A Pass is saved at once. For Fail and N/A a
    justification (up to 2000 characters) is required: type it in the box that appears and press Save. A missing
    justification is reported next to the box, and nothing is saved until it is given. You can change an answer at any
-   time. Each answer is stored under your user, together with the UTC time, and shown as "Answered by" with your
+   time until the review is approved; an approved review is locked and its checklist is read-only (see
+   [Locked Reviews and Reopening](#locked-reviews-and-reopening)). Each answer is stored under your user, together
+   with the UTC time, and shown as "Answered by" with your
    display name.
 2. If a section does not apply to the review, clear its "This section applies to the review" switch, give the reason
    (required), and press Save reason. A section that does not apply counts as done and its checks leave the totals.
@@ -331,7 +336,7 @@ page is made for narrow screens too.
 A review is approved when its reviewers have signed it. The review page shows an **Approved** or **In review** badge
 next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the same badge for
 each review, next to a second badge with the state of the review (see the known limitation at the end of this
-section).
+section). An Approved review is also locked (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
 
 **Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
 members of the project. Either of the two can sign the slot. A review can have any number of slots, or none; a review
@@ -340,7 +345,26 @@ system administrator) can add a slot (open **Add a slot**,
 choose the reviewers and press **Add slot**) and change or remove a slot that is not signed (open **Change
 reviewers**, then **Save** or **Remove**). A user can be in only one slot of
 a review, and the primary and the alternate must be different users. A slot that has been signed can no longer be
-changed or removed, even if its signature is out of date; to change the reviewers, add a new slot.
+changed or removed, even if its signature is out of date; to change the reviewers, add a new slot. The slots of an
+approved review cannot be changed at all (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
+
+**Independent reviewers.** In a project that requires independent reviewers (the default; see Review Rules in the
+Administration chapter), the person who created the review cannot be the primary or the alternate reviewer of any
+slot of it, and cannot sign it. Adding or changing a slot with the author is refused with "*Name* created this review
+and cannot be one of its reviewers while independent reviewers are required.", and the review page leaves the author
+out of the lists of people to choose from. The author is also told on the review page: "You created this review, so a
+different project member has to review and sign it." A signature attempt by the author is refused with "You created
+this review, so you cannot be a reviewer of it. A different project member must review and sign it, or a project
+administrator can switch off 'Require independent reviewers'." This also holds for a slot that was filled while the
+rule was switched off. The rule is not applied to signatures that already exist, and a review created from the
+command line has no recorded author, so nobody is excluded from it. For a review created with an API token the
+author is the owner of the token.
+
+Known limitation: the author is the ReviewCenter user who created the review. ReviewCenter does not know who wrote
+the reviewed files and does not match the authors of git commits, so a person who wrote the code but did not create
+the review in ReviewCenter is not excluded. The rule helps to keep the creator of a review from approving it alone;
+it is not proof that the reviewer did not write the code. A project in which one person has to do both can switch the
+rule off.
 
 **Signing.** The reviewer of a slot sees a signing form on the slot, if the review can be signed. Signing needs
 membership of the project and being the assigned reviewer; a system administrator who is not a member cannot sign. The
@@ -379,8 +403,10 @@ changes while you are signing, the signature is refused and you are asked to rev
 **Out of date and Approved.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the current
 record, "Signature out of date" when it has signatures but the record has changed since (for example a new comment or
 a changed answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot and every slot is
-signed for the current record; it goes back to In review when a change makes a signature out of date. The reviewer then
-signs the new record again; the earlier signatures stay as history.
+signed for the current record. While some slots are still unsigned, a change to the record makes the signatures given
+so far out of date, and the reviewers sign the new record again; the earlier signatures stay as history. Once the
+review is Approved it is locked and cannot change any more, unless an administrator reopens it (see
+[Locked Reviews and Reopening](#locked-reviews-and-reopening)); it then goes back to In review.
 
 ![The Reviewers and signing card of an approved review, with both slots signed.](images/review-signatures.png)
 
@@ -389,10 +415,67 @@ default), and the page is replaced by the Session ended message. Until then the 
 not re-checked, such as answering checks and adding comments and threads. Signing and changing reviewer slots check
 the account again on every action and are refused for a disabled user at once.
 
-Approved is computed each time from the record and the signatures; it is not a stored state of the review. Every
+Approved is computed each time from the record and the signatures; it is not a stored state of the review, and neither
+is the lock that follows from it: a review is locked exactly while it is Approved. Every
 signature is also recorded in the audit trail, which is described in Audit Trail in the Administration chapter. An
 Approved
-review can be downloaded as a digitally signed PDF; see the next section.
+review can be downloaded as a digitally signed PDF; see the section Signed Attestation.
+
+## Locked Reviews and Reopening
+
+An approved review is **locked**. The lock is not a separate state: a review is locked while it has at least one
+reviewer slot and every slot holds a signature of the current record, which is the same condition as **Approved**.
+The review page then shows a **Locked** badge next to the Approved badge and a notice: "This review is approved and
+locked. Its content, checklist and reviewers can no longer change. A project administrator can reopen it; the
+signatures are then kept as history and the review must be signed again." The checklist page shows a similar notice.
+
+**What is refused.** While a review is locked, ReviewCenter refuses every change of what was approved, whoever asks
+and from wherever:
+
+- starting a comment thread, replying to a thread, resolving a thread, and reopening a thread;
+- answering a check, and switching a checklist section between applicable and not applicable (with its reason);
+- adding, changing, and removing a reviewer slot; and
+- signing (there is nothing left to sign).
+
+The buttons and fields that do this are disabled on the review page, the checklist page and the line comment buttons
+of the diff, with an explanation, and a request that gets through anyway (for example from a page that was opened
+before the review was approved) is refused with the message "This review is approved and locked. A project
+administrator must reopen it before it can change." Signing an approved review is refused with the same message. The
+files and the selection of a review are fixed when it is created, so there is nothing to lock there. Everything that
+only reads keeps working on a locked review: reading the files, the diff, the threads and the checklist, copying
+links, the signed attestation PDF, and the evidence index. Project settings and project members are not part of a
+review and are not locked.
+
+A review in which only some of the slots are signed is **not** locked: it can still change, and a change makes the
+signatures that were given out of date (see [Review Signatures](#review-signatures)). The lock begins with the last
+signature.
+
+**Reopening.** The only way out of the lock is an explicit, recorded action. A project administrator or a system
+administrator opens the locked review and, in the locked notice at the top of the page, enters a **Reason for
+reopening** (required, 1 to 250 characters) and presses **Reopen review**. Other users do not see the form. An API
+token cannot reopen a review: it is a step of the web pages, and a request with a token is refused. A reopen of a
+review that is not locked is refused with "The review is not locked, so there is nothing to reopen.", and an empty or
+too long reason with "A reason of at most 250 characters is required to reopen a review.".
+
+**What a reopen does.**
+
+- The review is In review again and can change: threads, checklist and reviewers work as before.
+- The signatures that were given stay in the record as history, but they are **out of date** for good. A reopen
+  changes the record digest (the number of reopens is part of it), so no earlier signature can become current again,
+  not even when the content is changed back to what it was. The slots show "Signature out of date". The reviewers
+  have to review the review again and sign again; the people of the slots stay, and the checklist and the threads must
+  be complete as for any signature.
+- The reopen is kept with the review as history, listed on the review page in a **Reopen history** card (who, when in
+  UTC, the reason, and the shortened digest of the record that was reopened), oldest first.
+- The audit trail gets an entry `review.reopened` with the administrator as the actor and the detail
+  `previous digest <digest>; reason: <reason>`. The change and its audit entry are stored together.
+- The attestation PDF of a review that was reopened and approved again has a **Reopen history** section. It lists each
+  reopen with the time, the person who reopened, the reason and the previous digest. A review that was never
+  reopened has no such section. The name of the person who reopened follows the reviewer names setting of the project
+  (see Evidence Settings in the Administration chapter).
+
+The review can be approved and locked again by new signatures, and reopened again; each reopen is one more entry of
+the history. A review that was reopened is not in the evidence index until it is approved again.
 
 **Known limitation: a Draft badge next to an Approved badge.** Every review row of the project page shows two badges:
 the state of the review and the approval. The state is stored with the review, and `Draft` is the only state in this
@@ -411,14 +494,16 @@ with every answer and justification in full (a comment is never shortened), the 
 reviewer slot with the record digest it was bound to, and the state of the audit trail (the number of entries, whether
 the chain is intact, and the head hash). The counts of open and resolved threads are exact. The first 100 resolved
 threads are listed, each with the start of its first comment (at most 300 characters), and a line says how many more
-there are; the full threads are in the review record. The last section describes the signing key and what the
+there are; the full threads are in the review record. A review that was reopened by an administrator also has a
+**Reopen history** section (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)). The last section
+describes the signing key and what the
 signature proves. A review that is not Approved has no button; a direct request to its `attestation.pdf` address is
 refused with the message "The review is not complete" (status 409). For a caller who is not signed in (the anonymous API
 route, see Evidence Settings in the Administration chapter) a review that is not complete is answered 404, like a
 review that does not exist, so that review identifiers cannot be probed; signed-in members still get the 409. If the
 review changes
 while the PDF is being
-prepared (for example a reviewer changes an answer), nothing is signed or recorded and the request is also refused
+prepared (for example an administrator reopens the review), nothing is signed or recorded and the request is also refused
 with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
 Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
 administrators can download the PDF; for anyone else the address answers 404, as for a project that does not exist. The

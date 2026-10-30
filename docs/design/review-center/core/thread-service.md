@@ -68,6 +68,14 @@ looked at. Every member can take part in the discussion; the unsigned-slot and m
 apply to comments. Reads (`ListAsync`) take no actor; the boundary guards them (every page and API handler first
 reads the project as the actor).
 
+**Approval lock**: while the review is approved it is locked (see the `SigningService` unit), so every change of a
+thread is refused with `ReviewLocked` ("This review is approved and locked. A project administrator must reopen it
+before it can change."): `StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, and `ReopenAsync` each call
+`ReviewLock.EnsureUnlockedAsync` after the access check and the checks of the input, and before the store write, so a
+thread (and a reply, a resolve, a reopen of a thread) cannot change what the signatures cover. The store repeats the
+check inside its write transaction. `ListAsync` is not affected. After an administrator reopens the review, threads can
+change again.
+
 #### Key Methods
 
 **StartThreadAsync**: Starts a thread with its first comment.
@@ -84,7 +92,8 @@ reads the project as the actor).
 The rules are checked in this order, and the first violation is reported: the text (`CommentTextInvalid`); the shape
 of the anchor, that is both lines or neither, start at least 1, and end not
 before start (`ThreadAnchorInvalid`); that a whole-file anchor does not name the `Baseline` side
-(`ThreadAnchorInvalid`); that the review and the file exist (`ThreadAnchorInvalid`); that the side may carry lines
+(`ThreadAnchorInvalid`); that the review and the file exist (`ThreadAnchorInvalid`); that the review is not locked
+(`ReviewLocked`); that the side may carry lines
 for this file (`ThreadAnchorInvalid`: a `Head` range on a deleted file, "A deleted file has no head lines; comment on
 its baseline lines or on the whole file instead."; a `Baseline` range on a review without a baseline commit or on an
 added file, "This file has no baseline lines to comment on."); and, only when a range is given, that the content of
@@ -97,10 +106,12 @@ need no I/O come first so that a bad request fails cheaply, and file content is 
   cancellation token.
 - *Returns*: `Task<ReviewComment>` — the stored comment.
 - *Postconditions*: Earlier comments are unchanged and the state of the thread does not change, so a resolved thread
-  still accepts replies. A thread that does not exist in the review is reported as `ThreadNotFound`.
+  still accepts replies. A thread that does not exist in the review is reported as `ThreadNotFound`. A locked review
+  refuses the reply with `ReviewLocked`.
 
 **ResolveAsync** and **ReopenAsync**: Set the state of a thread to `Resolved` or `Open`. Repeating a request leaves
-the state as requested. A thread that does not exist in the review is reported as `ThreadNotFound`.
+the state as requested. A thread that does not exist in the review is reported as `ThreadNotFound`. A locked review
+refuses both with `ReviewLocked`.
 
 **ListAsync**: Lists all threads of a review, for every file, in creation order, each with its comments in posting
 order; the list is empty when there are none or the review does not exist.
@@ -148,6 +159,7 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 
 - **IReviewStore** — checks the review, reads file content, and stores and reads threads (injected).
 - **IProjectAccess** — requires that the actor may see the project (injected).
+- **ReviewLock** (part of the `SigningService` unit) — refuses a change while the review is approved.
 - **TimeProvider** — supplies the creation times (injected).
 
 #### Callers

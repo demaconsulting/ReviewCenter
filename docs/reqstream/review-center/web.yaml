@@ -262,6 +262,37 @@ sections:
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
 
+      - id: ReviewCenter-Web-ReviewLock
+        title: >-
+          The Web subsystem shall show a review that is approved as locked on the review page and on the checklist page,
+          with the controls that change the review disabled and the reason given, let an administrator of the project
+          or a system administrator reopen the review on the review page with a reason, show the reopenings in a
+          history, and show the user who created the review that a different project member has to review and sign
+          it when the project requires independent reviewers.
+        justification: |
+          The lock and the independence rule are enforced by the services, but the pages are where people meet them. The
+          pages must say what is locked and why, offer the way out only to those who may take it, and keep the
+          history of reopenings visible, so that a user is not left with controls that fail for no visible reason.
+        children:
+          - ReviewCenter-ReviewPage-Locked
+          - ReviewCenter-ReviewPage-Reopen
+          - ReviewCenter-ReviewPage-Independence
+          - ReviewCenter-ChecklistPage-Locked
+        tests:
+          - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
+
+      - id: ReviewCenter-Web-ReviewRules
+        title: >-
+          The Web subsystem shall let an administrator of the project or a system administrator switch the requirement
+          of independent reviewers on the project page, and shall not show the setting to any other user.
+        justification: |
+          A project that has to let one person do both must be able to say so, and only the people who administer the
+          project may relax a rule that protects its reviews.
+        children:
+          - ReviewCenter-ProjectPage-ReviewRules
+        tests:
+          - WebSubsystem_ProjectAdmin_TogglesIndependentReviewers
+
       - id: ReviewCenter-Web-SignIn
         title: >-
           The Web subsystem shall show in the page header the name of the signed-in user with a link to the

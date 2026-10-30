@@ -214,6 +214,33 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the checklist of an approved review shows the locked notice and disables every control that
+    ///     would change it.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls()
+    {
+        // Arrange: an approved review
+        var projectId = await CreateReviewAsync();
+        await AuditTestExtensions.ApproveReviewAsync(Store, Time, projectId, "REV-1", cancellationToken: TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the notice, and the answer buttons of the opened section are disabled
+        Assert.Contains("locked", cut.Find("[data-testid='checklist-locked']").TextContent, StringComparison.Ordinal);
+        await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
+        foreach (var testId in new[] { "check-pass-req-01", "check-fail-req-01", "check-na-req-01" })
+        {
+            Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
+        }
+
+        // Assert: pressing a disabled button changes nothing
+        var state = await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.Equal(ChecklistOutcome.Pass, state!.AnswerFor("REQ-01")!.Outcome);
+    }
+
+    /// <summary>
     ///     Test that a pass is saved at once, with the name and time, and updates the progress.
     /// </summary>
     [Fact]

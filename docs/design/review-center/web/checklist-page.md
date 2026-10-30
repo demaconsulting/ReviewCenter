@@ -16,13 +16,21 @@ action, so the reviewer does not have to scroll back: the same "Next unanswered 
 checklist is complete, a link back to the review. A Fail is shown in a different color than a Pass. It
 is a Razor component split into presentation (`ChecklistPage.razor`) and behavior (`ChecklistPage.razor.cs`). It
 reads and writes the checklist only through `ChecklistService`, so every checklist rule is applied there. It requires
-a signed-in user, and every answer and section decision is saved on behalf of that user.
+a signed-in user, and every answer and section decision is saved on behalf of that user. When the review is approved,
+and so locked, the page shows a banner (`checklist-locked`) that says the checklist is read-only and that a project
+administrator can reopen the review, and disables the section applicability switch, the reason field and its Save, the
+Pass, Fail, and N/A buttons, and the justification field and its Save. The answers stay visible.
 
 #### Data Model
 
 The page instance is created per browser connection, so its state is per user.
 
 **ProjectId**, **ReviewId**: the route parameters.
+
+**IsLocked**: whether the review is locked. It is read from `SigningService.GetApprovalAsync` (`IsApproved`) when the
+page loads, only for a review that has a checklist, and is also set when a save is refused with `ReviewLocked`, so a
+page that was loaded before the last signature stops offering the controls at its first refused save. **LockedMarker**:
+`true` while locked, written to the `data-locked` attribute of the disabled applicability switch and outcome buttons.
 
 **Loaded**, **Review**, **ProjectName**: whether loading finished, the review (`null` when it does not exist or its
 project is not visible to the user), and
@@ -40,7 +48,7 @@ parameters change. The page also keeps the test id to scroll to after the next r
 
 Test identifiers: `checklist-page` (root), `breadcrumb-projects-link`, `project-link`, `review-link`,
 `checklist-loading`, `checklist-not-found`, `checklist-missing`, `checklist-review-title`, `checklist-status`,
-`checklist-progress`, `next-unanswered-button`, `back-to-review-link`, and, per section,
+`checklist-progress`, `next-unanswered-button`, `back-to-review-link`, `checklist-locked`, and, per section,
 `section-{id}`, `section-{id}-toggle`, `section-{id}-progress`, `section-{id}-applicable`, `section-{id}-reason`,
 `section-{id}-save`, `section-{id}-error`, `section-{id}-next`, and `section-{id}-back`, and, per check, `check-{item}`,
 `check-pass-{item}`, `check-fail-{item}`, `check-na-{item}`, `check-justification-{item}`, `check-save-{item}`,
@@ -113,7 +121,9 @@ in" message on this page.
 - **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
   project.
 - **ReviewService** — reads the review.
-- **ChecklistService** — reads the checklist and records answers and section decisions.
+- **ChecklistService** — reads the checklist and records answers and section decisions; it refuses a change of a locked
+  review with `ReviewLocked`.
+- **SigningService** — tells whether the review is approved (`GetApprovalAsync`), which is what locks the page.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
   name for the breadcrumb.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.

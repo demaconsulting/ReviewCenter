@@ -33,6 +33,7 @@ a project checklist, and sign the review with their credentials. Every action is
 - ✅ **Review Checklist** - 14-section Pass, Fail, or N/A checklist
 - 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot
 - ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to reviewed record
+- 🔒 **Approval Lock** - Approved reviews lock, admins reopen with a reason, authors cannot self-review
 - 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history
 - 📄 **Signed PDF Attestation** - Approved reviews download as verifiable PDFs
 - ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access

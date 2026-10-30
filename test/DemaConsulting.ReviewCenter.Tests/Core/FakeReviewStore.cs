@@ -83,6 +83,11 @@ internal sealed class FakeReviewStore : IReviewStore
     private readonly List<ReviewSignature> _signatures = [];
 
     /// <summary>
+    ///     The stored reopens of approved reviews.
+    /// </summary>
+    private readonly List<ReviewReopen> _reopens = [];
+
+    /// <summary>
     ///     The identity given to the next stored comment.
     /// </summary>
     private int _nextCommentId = 1;
@@ -115,11 +120,75 @@ internal sealed class FakeReviewStore : IReviewStore
             Name = project.Name,
             Description = project.Description,
             Created = project.Created,
-            Evidence = project.Evidence
+            Evidence = project.Evidence,
+            RequireIndependentReviewers = project.RequireIndependentReviewers
         };
         _projects.Add(stored);
         Audits.Add(audit(stored));
         return Task.FromResult(stored);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> UpdateRequireIndependentReviewersAsync(
+        int projectId,
+        bool expected,
+        bool updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        // Like the real store: compare and set in one step; a lost race or an unknown project changes nothing
+        var index = _projects.FindIndex(p => p.Id == projectId);
+        if (index < 0 || _projects[index].RequireIndependentReviewers != expected)
+        {
+            return Task.FromResult(false);
+        }
+
+        var old = _projects[index];
+        _projects[index] = new Project
+        {
+            Id = old.Id,
+            Name = old.Name,
+            Description = old.Description,
+            Created = old.Created,
+            Evidence = old.Evidence,
+            RequireIndependentReviewers = updated
+        };
+        Audits.Add(audit);
+        return Task.FromResult(true);
+    }
+
+    /// <inheritdoc />
+    public async Task ReopenReviewAsync(
+        int projectId,
+        string reviewId,
+        ReviewReopen reopen,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        // Like the real store: the review must be approved now; the fake adds no lock to the other writes so
+        // that tests can arrange a record that the services would refuse to change
+        var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken)
+                       ?? throw new DomainRuleException(DomainRule.ReviewNotFound, "The review does not exist.");
+        if (!ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        {
+            throw new DomainRuleException(DomainRule.ReviewNotLocked, "The review is not approved, so it cannot be reopened.");
+        }
+
+        _reopens.Add(reopen with { Id = _reopens.Count + 1 });
+        Audits.Add(audit);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ReviewReopen>> ListReopensAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ReviewReopen> list = _reopens
+            .Where(r => r.ProjectId == projectId && r.ReviewId == reviewId)
+            .OrderBy(r => r.Id)
+            .ToList();
+        return Task.FromResult(list);
     }
 
     /// <inheritdoc />
@@ -144,7 +213,8 @@ internal sealed class FakeReviewStore : IReviewStore
             Name = old.Name,
             Description = old.Description,
             Created = old.Created,
-            Evidence = updated
+            Evidence = updated,
+            RequireIndependentReviewers = old.RequireIndependentReviewers
         };
         Audits.Add(audit);
         return Task.FromResult(true);
@@ -546,7 +616,8 @@ internal sealed class FakeReviewStore : IReviewStore
                             f.ChangeKind == ChangeKind.Deleted ? null : f.Sha256))
                         .ToList(),
                     review.ReviewSetId)
-                : ReviewSource.Upload);
+                : ReviewSource.Upload,
+            _reopens.Count(r => r.ProjectId == projectId && r.ReviewId == reviewId));
         return Task.FromResult<ReviewRecord?>(record);
     }
 
@@ -741,6 +812,8 @@ internal sealed class FakeReviewStore : IReviewStore
             Title = review.Title,
             State = review.State,
             Created = review.Created,
+            CreatedBy = review.CreatedBy,
+            CreatedViaApi = review.CreatedViaApi,
             ContentFingerprint = review.ContentFingerprint,
             RepositoryId = review.RepositoryId,
             RepositoryName = review.RepositoryName,

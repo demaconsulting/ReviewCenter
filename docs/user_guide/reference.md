@@ -109,7 +109,9 @@ Example validation report:
 
 ✓ ReviewCenter_GitAvailable - Passed (432 ms): git version 2.51.0.windows.2 (minimum 2.31)
 ✓ ReviewCenter_GitRoundTrip - Passed (4363 ms): 2 commits, 2 changes, file read back unchanged
-✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; review signed; evidence index read back
+✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; review signed by a separate reviewer;
+    author signature refused; approved review locked and reopened by an administrator;
+    evidence index fingerprint 13e028da0629…, record digest 5ab1c0de42f7…
 ✓ ReviewCenter_Fingerprint - Passed (28 ms): 3 files, fingerprint 13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2
 ✓ ReviewCenter_PasswordHash - Passed (219 ms): right password accepted, wrong password refused, hashes salted
 ✓ ReviewCenter_Totp - Passed (12 ms): RFC 6238 SHA-1 vectors, window +/-1, replay step returned
@@ -124,7 +126,8 @@ Failed: 0
 Total Time: 8.1 s
 ```
 
-The detail text after each test and the times are examples; they differ from run to run. The tests run at the
+The detail text after each test and the times are examples; they differ from run to run (the detail of the workflow test
+is wrapped here, and it is one line in the report). The tests run at the
 same time, so their individual times overlap and do not add up to the total time.
 
 ### Validation Tests
@@ -138,9 +141,11 @@ JUnit files.
 - **`ReviewCenter_GitAvailable`** - the installed git is found and is recent enough.
 - **`ReviewCenter_GitRoundTrip`** - a local repository can be committed to, mirrored and read back by the git
   layer of the server.
-- **`ReviewCenter_ReviewWorkflow`** - on an embedded SQLite database, a project and a review are created, the
-  checklist is answered, the review is signed after a password re-authentication, and the evidence index shows the
-  fingerprint and the record digest.
+- **`ReviewCenter_ReviewWorkflow`** - on an embedded SQLite database, a project with two members is created, and one
+  member creates a review and answers its checklist. The check then shows that the author is refused as a reviewer and
+  as a signer, and that the other member signs after a password re-authentication. It shows that the approved review is
+  locked (a change of an answer is refused), that an administrator can reopen it with a reason, and that the evidence
+  index shows the fingerprint and the record digest.
 - **`ReviewCenter_Fingerprint`** - the content fingerprint of fixed files equals a pinned value on every platform.
 - **`ReviewCenter_PasswordHash`** - the password hasher accepts the right password and refuses a wrong one.
 - **`ReviewCenter_Totp`** - the one-time codes of the second factor (see
@@ -175,7 +180,10 @@ This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**. It loads the conf
 (`appsettings.json` and the environment variables), recognizes the database provider, opens the database
 **read-only**, and compares its tables and columns with the ones this version expects. It never writes to the
 database and never creates it, and it never prints the connection string or other secrets; a problem is reported
-by table and column name. If nothing is configured and there is no database at the default location, the test is
+by table and column name. A development database created before the tables and columns of this version existed (for
+example `ReviewReopens` and `Projects.RequireIndependentReviewers`) is reported that way; delete it and let the server
+create it again, because ReviewCenter has no migrations (see Database in the Administration chapter). If nothing is
+configured and there is no database at the default location, the test is
 **skipped**: the report shows `SKIPPED`, the summary counts it under `Skipped`, the results file records it as not
 executed (TRX) or skipped (JUnit), and the run does not fail. `--check-config` is only valid together with
 `--validate`.
@@ -207,6 +215,40 @@ Error: Unsupported argument '--unknown'
 
 This behavior enables automated scripts and CI/CD pipelines to detect and surface
 misconfiguration failures automatically.
+
+## Review Lock and Independence Reference
+
+This section lists, in one place, the audit actions, messages, and settings of the approval lock and of the
+independent reviewers. The chapters Reviewing and Administration explain how they work.
+
+| Audit action                            | Detail                                               |
+| --------------------------------------- | ---------------------------------------------------- |
+| `review.reopened`                       | `previous digest <digest>; reason: <reason>`         |
+| `project.independent-reviewers-changed` | `RequireIndependentReviewers on->off` (or `off->on`) |
+
+The messages that the user sees:
+
+- "This review is approved and locked. A project administrator must reopen it before it can change." for a change of
+  an approved review, and for a signature on it.
+- "The review is not locked, so there is nothing to reopen." for a reopen of a review that is not approved.
+- "A reason of at most 250 characters is required to reopen a review." for a reopen with no reason or a longer one.
+- "You created this review, so you cannot be a reviewer of it. A different project member must review and sign it, or
+  a project administrator can switch off 'Require independent reviewers'." when the author tries to sign.
+- "*Name* created this review and cannot be one of its reviewers while independent reviewers are required." when a
+  slot is added or changed to hold the author.
+- "The setting was changed by someone else. Reload the page and try again." when the review rules were changed while
+  the page was open.
+- "Reviewer slots and signatures cannot be changed with an API token; sign in to the web pages." for a reopen with an
+  API token.
+
+The setting **Require independent reviewers** is a per-project setting on the project page, on by default, that only a
+project administrator or a system administrator changes in the web pages. The author that it compares is the
+ReviewCenter user who created the review (the owner of the token for a review created with an API token). Git commit
+authors are not matched.
+
+A development database created before the approval lock existed lacks the table `ReviewReopens` and the column
+`Projects.RequireIndependentReviewers`. ReviewCenter has no migrations, so delete such a database and let the server
+create it again (see Database in the Administration chapter).
 
 ## Puppet Development Tool
 

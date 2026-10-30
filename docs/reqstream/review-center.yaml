@@ -202,8 +202,10 @@ sections:
           The tool shall have the reviewers of a review named beforehand in reviewer slots, each a primary reviewer
           with an optional alternate, offering only members of the project and putting each person in one slot
           only, shall never let an API token sign a review or arrange its reviewers, shall offer no way to sign
-          while an unanswered check, a Fail answer, or an open thread blocks the review, and shall offer no way to
-          change or remove a slot that holds a signature.
+          while an unanswered check, a Fail answer, or an open thread blocks the review, shall offer no way to
+          change or remove a slot that holds a signature, and, while the project requires independent reviewers,
+          which is the default and which a project administrator can switch off and on with the change audited,
+          shall refuse the person who created a review as a reviewer of it and as its signer.
         tags: [system]
         justification: |
           A review is independent only when the people who approve it are fixed beforehand, are distinct, and
@@ -211,9 +213,11 @@ sections:
           reviewer is away without opening the review to anybody else. A person outside the project, or a script
           holding a token, must never be able to supply a signature that stands for human judgement. Blocking
           unfinished work stops an approval of a review nobody finished (EU GMP Annex 11 clause 12, security;
-          21 CFR Part 11 section 11.10(d), limiting access to authorized individuals). The tool does not decide
-          who may be named, and does not forbid the author of the content from signing: that rule is left to the
-          project that names the slots. The system tests drive the web interface and the API of a running server:
+          21 CFR Part 11 section 11.10(d), limiting access to authorized individuals). Nobody approves their own
+          work: the author of a review is the user who created it, and the tool refuses that user in a slot and at
+          the signature unless the project has turned the requirement off, for example a team of one or two. The
+          tool does not match the authors of the commits in the reviewed repository to users, and it does not
+          decide who else may be named. The system tests drive the web interface and the API of a running server:
           the refusal of a non-member by the server itself, and of every other person than the slot holders, is
           verified by the tests of the child requirements.
         children:
@@ -221,10 +225,16 @@ sections:
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Storage-Signatures
           - ReviewCenter-Api-Isolation
+          - ReviewCenter-Core-IndependentReviewers
+          - ReviewCenter-Web-ReviewRules
         tests:
           - ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
           - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
+          - ReviewCenter_IndependentReviewers_AuthorIsNotOfferedAndAdministratorCanSwitchTheRuleOff
+          - CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign
+          - CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly
+          - CoreSubsystem_ApiTokenReview_AuthorIsTokenUser
 
       - id: ReviewCenter-System-SignatureReauthentication
         title: >-
@@ -281,21 +291,27 @@ sections:
       - id: ReviewCenter-System-RecordImmutability
         title: >-
           The tool shall keep the reviewed content, every posted comment, and every signature as they were stored,
-          offer no way to edit or delete a posted comment or to change or remove a signature, show a review as In
-          review again, with its signatures kept as history, as soon as the record changes after it was signed, so
-          that an approval never stands for a record that nobody signed, and let an edit of a stored audit entry
-          be found by the verification of the audit trail.
+          offer no way to edit or delete a posted comment or to change or remove a signature, lock a review against
+          every change as soon as it is approved, until a project or system administrator reopens it with a reason
+          that is audited, show a review as In review again, with its signatures kept as history, as soon as the
+          record changes after it was signed or the review is reopened, so that an approval never stands for a
+          record that nobody signed, and let an edit of a stored audit entry be found by the verification of the
+          audit trail.
         tags: [system]
         justification: |
           Evidence is trusted only when it cannot be rewritten afterwards. Content, comments, signatures, and audit
-          entries are stored so that they can only be added to, and a change of what is still open to change, the
-          checklist answers or a new comment, cannot leave the old approval standing, because the digest of the
-          record no longer matches the signatures (21 CFR Part 11 section 11.10(c), protection of records, and
-          section 11.10(e), audit trails that do not obscure earlier entries). The tool does not lock a review
-          against further work after approval: it makes the approval out of date instead, which the reviewers
-          can see and sign again. The system tests drive a running server and a real database; that the stored
-          baseline, the checklist wording, and the audit entries are never updated by the code, and that the
-          database itself refuses to remove a signed slot, are verified by the tests of the child requirements.
+          entries are stored so that they can only be added to (21 CFR Part 11 section 11.10(c), protection of
+          records, and section 11.10(e), audit trails that do not obscure earlier entries). An approved review is
+          locked, in the services and again in the database transaction, so that nobody can change what the
+          reviewers signed; the only way forward is a deliberate reopen by an administrator, which needs a reason,
+          is recorded with who, when, why, and the digest that was approved, and ends the approval, because the
+          digest of the record changes and no earlier signature matches it: the reviewers sign again. The earlier
+          signatures stay as history and can never be made current again. A record that changes before the
+          approval, the checklist answers or a new comment, equally leaves an earlier signature out of date. The
+          system tests drive a running server and a real database; that the stored baseline, the checklist
+          wording, and the audit entries are never updated by the code, that each service and the database refuse
+          a change of a locked review, and that the database itself refuses to remove a signed slot, are verified by
+          the tests of the child requirements.
         children:
           - ReviewCenter-Core-Reviews
           - ReviewCenter-Core-RepositoryReviews
@@ -309,9 +325,20 @@ sections:
           - ReviewCenter-Core-AuditTrail
           - ReviewCenter-Storage-AuditTrail
           - ReviewCenter-Storage-Persistence
+          - ReviewCenter-Core-ApprovalLock
+          - ReviewCenter-Storage-ReviewIntegrity
+          - ReviewCenter-Web-ReviewLock
+          - ReviewCenter-Api-LockedReview
         tests:
           - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
           - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
+          - ReviewCenter_ApprovedReview_IsLockedUntilAnAdministratorReopensItWithAReason
+          - CoreSubsystem_ApprovedReview_RefusesEveryMutationWithReviewLocked
+          - CoreSubsystem_ReopenReview_RequiresAdminAndReasonAndNeedsFreshSignatures
+          - StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction
+          - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
+          - ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409
+          - IntegrationTests_ApprovalLockReopenResign_EndToEnd
 
       # ----------------------------------------------------------------------------------------------
       # Evidence and audit: the history, its verification, and the portable proof

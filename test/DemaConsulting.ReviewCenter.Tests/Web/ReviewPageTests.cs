@@ -1495,10 +1495,8 @@ public partial class ReviewPageTests : PageTestBase
         await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
         await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
 
-        // Act: a comment changes the record, and the page is opened again
-        await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Late", TestContext.Current.CancellationToken);
-        await Threads.ResolveAsync(
-            projectId, "REV-1", (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().Id, TestContext.Current.CancellationToken);
+        // Act: an administrator reopens the approved review, so the record changes, and the page is opened again
+        await Signing.ReopenReviewAsync(TestActors.Ann, projectId, "REV-1", "Late remark", TestContext.Current.CancellationToken);
         var reopened = RenderPage(projectId);
 
         // Assert: out of date and In review, the slot is still locked, and signing again is offered
@@ -1975,5 +1973,140 @@ public partial class ReviewPageTests : PageTestBase
         Assert.DoesNotContain("late reply", cut.Markup, StringComparison.Ordinal);
         var stored = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
         Assert.Single(stored.Comments);
+    }
+
+    /// <summary>
+    ///     Creates a review of the files that is approved: one slot of ann (primary) and bob (alternate), signed by
+    ///     ann, so that the review is locked.
+    /// </summary>
+    /// <returns>The project identity and the slot identity.</returns>
+    private async Task<(int ProjectId, int SlotId)> CreateApprovedAsync()
+    {
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        await SignSlotAsync(projectId, slotId);
+        return (projectId, slotId);
+    }
+
+    /// <summary>
+    ///     Test that an approved review shows the Locked badge and the explanation, and that every control that
+    ///     would change the review is disabled.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls()
+    {
+        // Arrange: an approved review
+        var (projectId, _) = await CreateApprovedAsync();
+
+        // Act: render the page and select the file
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the badge and the explanation
+        Assert.Equal("Locked", cut.Find("[data-testid='review-locked']").TextContent);
+        Assert.Contains("approved and locked", cut.Find("[data-testid='review-locked-banner']").TextContent, StringComparison.Ordinal);
+        Assert.NotNull(cut.Find("[data-testid='slots-locked-hint']"));
+
+        // Assert: the controls that change the review are disabled
+        foreach (var testId in new[]
+        {
+            "thread-text-input", "start-thread-button", "new-slot-primary-select", "new-slot-alternate-select", "new-slot-add-button"
+        })
+        {
+            Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
+        }
+
+        // Assert: the review can still be read, and the attestation is still offered
+        Assert.NotEmpty(cut.FindAll("[data-testid='attestation-download-button']"));
+    }
+
+    /// <summary>
+    ///     Test that a project member who is not an administrator sees the locked review without the reopen form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm()
+    {
+        // Arrange: an approved review, viewed by cyd, a member without administrator rights
+        var (projectId, _) = await CreateApprovedAsync();
+        SignInAs("cyd", "Cyd", isSystemAdmin: false);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: locked, and no form to reopen
+        Assert.NotNull(cut.Find("[data-testid='review-locked']"));
+        Assert.Empty(cut.FindAll("[data-testid='reopen-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='reopen-button']"));
+    }
+
+    /// <summary>
+    ///     Test that an administrator who gives a reason reopens the review, which is then In review again with the
+    ///     reopen history shown and the old signature kept as out of date.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory()
+    {
+        // Arrange: an approved review, viewed by root, a system administrator
+        var (projectId, slotId) = await CreateApprovedAsync();
+        SignInAs("root", "Root", UserRole.Admin);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='reopen-reason']").InputAsync("Found a missing file");
+
+        // Act: reopen
+        await cut.Find("[data-testid='reopen-form']").SubmitAsync();
+
+        // Assert: In review, unlocked, with the history
+        Assert.Equal("In review", cut.Find("[data-testid='review-approval']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-locked']"));
+        Assert.Empty(cut.FindAll("[data-testid='reopen-form']"));
+        Assert.Equal("Root", cut.Find("[data-testid='reopen-by-0']").TextContent);
+        Assert.Equal("Found a missing file", cut.Find("[data-testid='reopen-reason-0']").TextContent);
+        Assert.NotEmpty(cut.Find("[data-testid='reopen-digest-0']").TextContent);
+        Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+        Assert.Single(await Store.ListReopensAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a reopen without a reason shows the problem, keeps the review locked and reopens nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Reopen_EmptyReason_ShowsError()
+    {
+        // Arrange: an approved review, viewed by an administrator who types no reason
+        var (projectId, _) = await CreateApprovedAsync();
+        SignInAs("root", "Root", UserRole.Admin);
+        var cut = RenderPage(projectId);
+
+        // Act: submit the empty form
+        await cut.Find("[data-testid='reopen-form']").SubmitAsync();
+
+        // Assert: an error is shown, the review is still locked, and nothing was recorded
+        Assert.NotEmpty(cut.Find("[data-testid='reopen-error']").TextContent);
+        Assert.NotNull(cut.Find("[data-testid='review-locked']"));
+        Assert.Empty(await Store.ListReopensAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that, when the project requires independent reviewers, the author of the review is not offered as a
+    ///     reviewer and is told that another member has to review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates()
+    {
+        // Arrange: a review that ann created, in a project that requires independent reviewers
+        await CreateUsersAsync();
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Act: render the page as ann
+        var cut = RenderPage(project.Id);
+
+        // Assert: the hint is shown and ann is not among the choices; bob and cyd are
+        Assert.NotNull(cut.Find("[data-testid='author-independence-hint']"));
+        var options = cut.Find("[data-testid='new-slot-primary-select']").QuerySelectorAll("option").Select(o => o.TextContent).ToList();
+        Assert.DoesNotContain(options, o => o.Contains("(ann)", StringComparison.Ordinal));
+        Assert.Contains(options, o => o.Contains("(bob)", StringComparison.Ordinal));
+        Assert.Contains(options, o => o.Contains("(cyd)", StringComparison.Ordinal));
     }
 }

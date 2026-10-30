@@ -28,9 +28,17 @@ The default run has nine checks:
   with the production `GitSource` into a temporary cache, resolves the branch, lists the changes and reads a file
   as a raw blob.
 - **ReviewWorkflowCheck** (`ReviewCenter_ReviewWorkflow`): on an embedded SQLite database in a temporary folder,
-  with the services registered by `SelfTestServices`, creates a user, a project and a review, answers the
-  checklist, signs the review with a local-password re-authentication, and reads the evidence index back with the
-  fingerprint and the record digest. The detail says `embedded SQLite`. To keep the run short, the local origin
+  with the services registered by `SelfTestServices`, creates two users and a project (the system administrator
+  `selftest`, who creates the review and so is its author, and the ordinary project member `selftest-reviewer`) and a
+  review, answers the checklist as the author, and shows the review integrity rules: adding the author as a reviewer is
+  refused with `ReviewerNotIndependent`; with the independent reviewers rule switched off the author is seated, and
+  after it is switched on again the author's signature is refused with `ReviewerNotIndependent` and the author's slot is
+  removed; the separate reviewer is added to a slot and signs the review with a local-password re-authentication; the
+  evidence index is read back with the fingerprint and the record digest; then the approved review is shown to be
+  locked (changing a checklist answer is refused with `ReviewLocked`), the administrator reopens it with a reason, and
+  the approval must then be not approved with one reopen. The detail says `embedded SQLite; review signed by a separate
+  reviewer; author signature refused; approved review locked and reopened by an administrator; evidence index
+  fingerprint {short fingerprint}, record digest {short digest}`. To keep the run short, the local origin
   repository (four git commands) is created at the same time as the services are built, and the git version check
   of the services' `GitRunner` starts as soon as they exist; both are awaited before the repository is registered,
   and neither is left running when the check ends. The embedded database uses `FastCommitInterceptor` (below).

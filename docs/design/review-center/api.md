@@ -180,7 +180,8 @@ touching the limits of the web sign-in.
 
 **Errors**: Every failure of the endpoints is `application/problem+json`, so that a program can read the status and the
 message in one way. A broken domain rule is mapped to one status in one place (`ApiProblems.StatusOf`): not found
-rules to 404, conflicts (including the removal of the last project admin) to 409, too many attempts to 429, an unusable
+rules to 404, conflicts (including the removal of the last project admin and a change that the approval lock refuses) to
+409, too many attempts to 429, an unusable
 or failing git to 503, 502, or 504, a not allowed actor and a pending password change to 403, and every
 other rule to 400. A request body that cannot be read, or that has none or both of the sources of a review, is a 400
 that names the field. An unexpected exception is the generic 500 of the host and shows no detail.

@@ -7,7 +7,7 @@
 The `Storage` subsystem keeps projects (with their evidence settings), project memberships, reviews, review comment
 threads, review checklists, users, second factor enrollments,
 reviewer slots,
-signatures, personal access tokens, and the hash-chained audit trail in a relational
+signatures, review reopens, personal access tokens, and the hash-chained audit trail in a relational
 database through Entity
 Framework Core. It
 implements the store interfaces of the `Core` subsystem and owns everything about the database: the schema, the
@@ -57,7 +57,15 @@ application; the rest of the system sees only the Core store interfaces.
   (`UpdateEvidenceSettingsAsync`) that stores the new settings together with the audit entry
   `project.evidence-settings-changed` in one transaction when the stored settings still equal the expected ones, and
   otherwise changes nothing and stores no entry. The schema has no migration: a development database that was created
-  before the settings existed is recreated.
+  before the settings existed is recreated. A review rule of the project, `RequireIndependentReviewers`, is stored in
+  a boolean column of the project and changed in the same way (`UpdateRequireIndependentReviewersAsync`, audited as
+  `project.independent-reviewers-changed`). An approved review is locked: the operations that change a thread, a
+  comment, a checklist section or answer, or a reviewer slot re-check inside their own transaction that the review is
+  not approved and raise a `DomainRuleException` for `ReviewLocked` otherwise (nothing is stored). A reopen of an
+  approved review (`ReopenReviewAsync`) is stored as a row of the append-only `ReviewReopens` table together with its
+  audit entry, after the same transaction re-checked that the review is approved (`ReviewNotLocked` otherwise); the
+  number of reopens is part of the record that is read for the digest. The new table and the new column also have no
+  migration: a development database that was created before them is recreated.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
 **UserStore (as IUserStore)**: The persistence operations for users.
@@ -161,15 +169,17 @@ after those, the tables of reviewer slots and signatures after those, the audit 
 `Repositories` table after that, the source and change columns of reviews from a repository after that, and the
 `PersonalAccessTokens` table with the creator columns of reviews after that, and the `ProjectMemberships` table with
 the project of a repository and the system administrator flag of a user after that, and the `MustChangePassword` column
-of a user after that, and the external identity columns of a user after that, so a database
+of a user after that, and the external identity columns of a user after that, and the `ReviewReopens` table with
+the `RequireIndependentReviewers` column of a project after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
 databases created before the signature slice, before the audit trail, before the repository registry, before
 reviews from a repository, before the personal access tokens, before the project access control, before the
-project members management (the `MustChangePassword` column), and before the sign-in with an identity provider (the
-external identity columns); there is no
+project members management (the `MustChangePassword` column), before the sign-in with an identity provider (the
+external identity columns), and before the approval lock (the `ReviewReopens` table and the
+`RequireIndependentReviewers` column); there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide
@@ -239,8 +249,16 @@ signature to its slot uses the
 whole review with its slots and signatures. This transaction mode and the foreign key behavior are SQLite specific
 and would need an equivalent for another provider.
 
-**The audit trail and its transaction**: Every audited change is stored together with its audit entry. All stores
-share one `AuditAppender`, which owns a process-wide gate, a semaphore with one slot. A mutation takes the gate, opens a
+**Approval lock in the transaction**: `ReviewStore` repeats the Core lock rule inside the write transactions that change
+reviewed content or reviewer slots (and inside the reopen). It loads the slots, the record, and the signatures in the
+same serialized transaction and calls the Core `ReviewLock.IsApproved`, so the store and the services share one
+definition of "approved". Because the write lock is taken when the transaction begins, a final signature cannot commit
+between the check and the change; this closes the gap that the service-level check, which runs earlier, leaves open.
+This is SQLite specific in the same way as the signing transaction.
+
+**The audit trail and its transaction**: Every audited change is stored together with its
+audit entry. All stores share one `AuditAppender`, which owns a process-wide gate, a semaphore with one slot. A
+mutation takes the gate, opens a
 `Serializable` transaction (for SQLite the write lock is taken when it begins, so another process, such as the
 `audit verify` or `user add` command beside the server, is serialized by the database), makes the change, appends the
 audit entry to the same context, saves, and commits. If anything fails, the change and its entry are rolled back

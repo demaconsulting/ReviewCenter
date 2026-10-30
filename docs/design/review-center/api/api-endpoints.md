@@ -125,6 +125,7 @@ pass the `Host` header on. Every answer of the handler, including the 404 of an 
 
 **ApiProblems.StatusOf**: Maps a rule to a status: the not-found rules (including a missing token) to 404; a duplicate
 review identifier, an existing membership, the removal or demotion of the last project admin, a disabled repository,
+a change that the approval lock refuses (`ReviewLocked`), a reopen of a review that is not locked (`ReviewNotLocked`),
 and a changed record to 409; too many attempts to 429; an unavailable git to 503, a git access failure
 to
 502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, and a token action of a user who
@@ -134,6 +135,13 @@ detail;
 **NotFound** builds a 404; **ActorOf** builds the actor from a token principal (the user name, the display name, and the
 display id of the token, which is "unknown" when the claim is missing); **ActorOrAnonymous** returns that actor for an
 authenticated principal and `null` for a request without a token.
+
+**Approval lock and the API**: The API has no endpoint that changes the content of an existing review, its threads, its
+checklist answers, or its reviewer slots, and none that signs or reopens a review (reviewers and signatures are made in
+the web pages with a re-authentication, and an API token is refused for them in Core). The mapping of `ReviewLocked` and
+`ReviewNotLocked` to 409 is therefore defense in depth for a future endpoint, and no wire shape of the interface
+changed. The read endpoints (the review, the checklist and thread counts, the attestation, and the evidence index) are
+not affected by the lock; a reopened review simply reads as not approved.
 
 #### Error Handling
 

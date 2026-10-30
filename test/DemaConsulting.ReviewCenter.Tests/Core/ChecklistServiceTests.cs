@@ -53,6 +53,37 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that an answer and a section's applicability are refused with <see cref="DomainRule.ReviewLocked"/>
+    ///     while the review is approved, and that the record is unchanged.
+    /// </summary>
+    /// <param name="operation">The mutation to try: answer or section.</param>
+    [Theory]
+    [InlineData("answer")]
+    [InlineData("section")]
+    public async Task ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked(string operation)
+    {
+        // Arrange: a review approved by a separate reviewer (every check answered Pass)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        await AuditTestExtensions.ApproveReviewAsync(store, new FixedTimeProvider(_now), projectId, "rev-1", "approver", cancellationToken);
+        var first = DefaultChecklist.Current.Sections[0];
+        var answersBefore = (await service.GetAsync(projectId, "rev-1", cancellationToken))!.Overall.Answered;
+
+        // Act: try to change an answer, or to mark a section as not applicable
+        Task Mutate() => operation == "answer"
+            ? service.SetAnswerAsync(projectId, "rev-1", first.Items[0].Id, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken)
+            : service.SetSectionApplicabilityAsync(projectId, "rev-1", first.Id, false, "Not relevant.", TestActors.Ann, cancellationToken);
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(Mutate);
+
+        // Assert: refused as locked, and the answers are untouched
+        Assert.Equal(DomainRule.ReviewLocked, ex.Rule);
+        var state = (await service.GetAsync(projectId, "rev-1", cancellationToken))!;
+        Assert.Equal(answersBefore, state.Overall.Answered);
+        Assert.Equal(ChecklistOutcome.Pass, state.AnswerFor(first.Items[0].Id)!.Outcome);
+        Assert.True(state.IsApplicable(first.Id));
+    }
+
+    /// <summary>
     ///     Test that the default checklist has the 14 sections of the template with the known number of checks.
     /// </summary>
     [Fact]

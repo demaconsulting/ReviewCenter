@@ -30,6 +30,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     immutable, so the service offers no way to edit or delete one; the only change to an existing
 ///     thread is its <see cref="ReviewThreadState"/>. The author of a comment is the signed-in
 ///     <see cref="Actor"/>, never free text, so it cannot be spoofed by a form field.
+///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is approved (see
+///     <see cref="ReviewLock"/>), because the threads are part of what the signatures cover.
 ///     Two pure static helpers shape threads for display (<see cref="BuildIndex"/>, <see cref="NextStep"/>).
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
@@ -138,6 +140,9 @@ public sealed class ThreadService
                 $"The file '{filePath}' does not exist in this review.");
         }
 
+        // An approved review is locked: nothing a signature covers may change until an administrator reopens it
+        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+
         // Which side may carry line anchors depends on the kind of change
         if (startLine is not null)
         {
@@ -242,6 +247,9 @@ public sealed class ThreadService
             Text = ValidateText(text),
             Created = _timeProvider.GetUtcNow()
         };
+
+        // An approved review is locked: replies, like every other change to a thread, wait for a reopen
+        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
         return await _store.AddCommentAsync(
                    projectId,
@@ -450,6 +458,9 @@ public sealed class ThreadService
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireViewAsync(actor, projectId, cancellationToken);
+
+        // An approved review is locked: a thread can neither be resolved nor reopened until the review is reopened
+        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
         // The store saves the entry only when the thread exists, so a refused call leaves no trace
         var action = state == ReviewThreadState.Resolved ? "thread.resolved" : "thread.reopened";

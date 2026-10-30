@@ -129,6 +129,18 @@ N/A - standard test environment.
   topic; a key
   that cannot be used shows the reason as an alert instead of the download; a review that is not approved shows
   nothing about the attestation; and the download appears as soon as the last signature is made through the page.
+- An approved review is shown as locked: a Locked badge next to the Approved badge, and a banner that says that the
+  content, checklist, and reviewers can no longer change and that an administrator can reopen the review; every control
+  that would change it (new thread, line comments, reply, resolve, reopen thread, add, edit, and remove slot) is
+  disabled and marked `data-locked="true"`, while reading, copying a link, and the attestation download keep working; a
+  review that is not approved shows no badge and no banner.
+- The reopen form (a reason of up to 250 characters and the button) is offered only to a project or system
+  administrator and only while the review is locked; a missing reason shows the message of the rule and keeps the
+  review locked; a valid reason returns the page to In review with the old signatures out of date and a reopen history
+  that names who, when, why, and the shortened previous digest; the history is shown only after a reopen.
+- While the project requires independent reviewers, the author of the review is not offered as primary or alternate
+  reviewer, and the author sees the hint that a different member has to review and sign; with the rule off the author is
+  offered and no hint is shown.
 - A signer who has a second factor sees a code field (that asks for a one-time code) next to the password field, and a
   signer who has none sees no such field; the password and a fresh code sign and both fields are empty afterwards; a
   missing, wrong, recovery, or already used code shows the one message that names the password and the code, signs
@@ -436,6 +448,35 @@ This scenario is tested by `ReviewPage_Render_ThreadText_IsShownAsPlainText`.
 thread controls and the thread index (with an open and a resolved thread) has a `data-testid`. This scenario is
 tested by `ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId`.
 
+**ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls**: An approved review is rendered. The
+Locked badge (`review-locked`) next to the Approved badge and the banner (`review-locked-banner`) that says the review
+is locked and that an administrator can reopen it are shown; the controls that would change the review (the start
+thread button, the reply field and button of a thread, the resolve and reopen thread buttons, and the add slot form)
+are disabled and marked `data-locked="true"`, while reading the files and the download of the attestation still work.
+A review that is not approved shows none of these and has `data-locked="false"` controls. This scenario is tested by
+`ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls`.
+
+**ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm**: The approved review is rendered for a project member who
+is not an administrator; the banner is shown, but neither the reopen form (reason field and button) nor its error is
+rendered. This scenario is tested by `ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm`.
+
+**ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory**: For an administrator the banner holds the
+reopen form. A reason is typed and the button pressed; the badge reads "In review", the Locked badge and banner are
+gone, the controls are enabled again, the old signature shows "Signature out of date", and the reopen history
+(`reopen-history`) lists the administrator, the time, the reason, and the shortened previous digest. This scenario is
+tested by `ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory`.
+
+**ReviewPage_Reopen_EmptyReason_ShowsError**: The button is pressed with an empty reason; the message of the rule
+(`reopen-error`) is shown, the review is still approved and locked, and no reopen is stored. This scenario is tested by
+`ReviewPage_Reopen_EmptyReason_ShowsError`.
+
+**ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates**: With the project at its default of requiring
+independent reviewers, a review created by one member is rendered for the author: the author is not offered in the
+primary and alternate lists of the add form, the other members are, and the hint `author-independence-hint` ("You
+created this review, so a different project member has to review and sign it.") is shown. For another member the
+hint is not shown, and with the rule switched off the author is offered again. This scenario is tested by
+`ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates`.
+
 **ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge**: A review without slots is rendered; the
 Reviewers card, its empty message, and the add form are shown, and the badge reads "In review". This scenario is
 tested by `ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge`.
@@ -477,8 +518,9 @@ current signature.", the password is nowhere in the markup, the Save, Remove, an
 stored signature belongs to the user in the primary role. This scenario is tested by
 `ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot`.
 
-**ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview**: A slot is signed, a thread is then
-started and resolved through the service, and the page is rendered again; the slot shows "Signature out of date", the
+**ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview**: A slot is signed, so the review is approved;
+an administrator then reopens it through the service with a reason, which changes the record, and the page is rendered
+again; the slot shows "Signature out of date", the
 badge reads "In review", the slot has no Save or Remove, and the sign form is offered again. This scenario is tested
 by `ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview`.
 

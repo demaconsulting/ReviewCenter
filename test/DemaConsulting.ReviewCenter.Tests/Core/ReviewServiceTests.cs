@@ -88,7 +88,7 @@ public class ReviewServiceTests
         var review = await service.CreateDraftAsync(projectId, "REV-1", "First", One("a.txt", TestContent.A), TestContext.Current.CancellationToken);
 
         // Assert: creator recorded, no API flag, no token text
-        Assert.Equal("ann", review.CreatedBy);
+        Assert.Equal(TestActors.Author.Username, review.CreatedBy);
         Assert.False(review.CreatedViaApi);
         var audit = Assert.Single(store.Audits, a => a.Action == "review.created");
         Assert.DoesNotContain("API token", audit.Detail, StringComparison.Ordinal);

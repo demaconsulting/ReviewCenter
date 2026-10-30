@@ -93,6 +93,11 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         }
 
         WriteSignOffs(writer, document);
+        if (document.Reopens is { Count: > 0 })
+        {
+            WriteReopens(writer, document.Reopens);
+        }
+
         WriteAudit(writer, document);
         WriteSignature(writer, document);
         return writer.Build();
@@ -355,6 +360,33 @@ internal sealed class AttestationRenderer : IAttestationRenderer
             writer.Row("Signed at", Time(signature.SignedAt), PdfFont.Helvetica, 12, 110);
             writer.Row("Meaning", signature.Meaning, PdfFont.Helvetica, 12, 110);
             writer.Row("Record digest", $"{signature.RecordDigest}\n({signature.DigestVersion})", PdfFont.Courier, 12, 110);
+        }
+    }
+
+    /// <summary>
+    ///     Writes the reopen history: each time an administrator reopened the approved review, who, when and why.
+    /// </summary>
+    /// <remarks>
+    ///     Written only when the review was reopened at least once. The signatures printed above bind to the current
+    ///     record; signatures of earlier approvals stay in the review record as history.
+    /// </remarks>
+    /// <param name="writer">The writer.</param>
+    /// <param name="reopens">The reopens, oldest first.</param>
+    private static void WriteReopens(PdfDocumentWriter writer, IReadOnlyList<AttestationReopen> reopens)
+    {
+        writer.Heading("Reopen history");
+        writer.Paragraph(
+            "This review was approved earlier and was reopened by an administrator; the sign-offs above are of the current record.",
+            PdfFont.HelveticaOblique,
+            9,
+            12,
+            4);
+        foreach (var reopen in reopens)
+        {
+            writer.Row("Reopened at", Time(reopen.ReopenedAt), PdfFont.Helvetica, 12, 110);
+            writer.Row("Reopened by", reopen.ReopenedBy, PdfFont.Helvetica, 12, 110);
+            writer.Row("Reason", reopen.Reason, PdfFont.Helvetica, 12, 110);
+            writer.Row("Previous digest", reopen.PreviousDigest, PdfFont.Courier, 12, 110);
         }
     }
 

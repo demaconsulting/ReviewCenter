@@ -48,6 +48,8 @@ provider with a scripted fake.
   no other, to a request without credentials; a project that has not (the default), or does not exist, answers it with
   the same 401 as a missing token; a request with a wrong token is never served as anonymous; an anonymous release is
   audited as `anonymous`; and the document of the API marks exactly those two routes as callable without credentials.
+- A review that is approved, and therefore locked, stays readable through the API (the review, its attestation, and the
+  evidence index), and the refusal of a change to it is a 409 problem document.
 
 ### Test Scenarios
 
@@ -97,6 +99,12 @@ requested and lists the review; the attestation address of the entry is followed
 PDF;
 the token is revoked and the index is requested again, which is answered with 401. This scenario is tested by
 `ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd`.
+
+**ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409**: A review is approved through the Core services. With
+a token, the review is read (it is approved), its attestation is downloaded with status 200, and the evidence index
+is read. A change to the review through `ThreadService` is refused with `ReviewLocked`, and `ApiProblems` maps that
+refusal to a 409 problem document. After an administrator reopens the review through `SigningService`, the API reports
+it as not approved. This scenario is tested by `ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409`.
 
 **ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable**: A post to a signing address under `/api` is answered
 with 404, because no such route exists; `SigningService.SignAsync` with an actor that came through the token is refused

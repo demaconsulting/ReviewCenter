@@ -31,7 +31,8 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 /// </summary>
 /// <remarks>
 ///     These tests are the system-level evidence of the reviewer independence, signature re-authentication, signature
-///     binding, record immutability, evidence and attestation requirements of the system. Like the other Puppet tests
+///     binding, record immutability (the lock of an approved review and its reopening), evidence and attestation
+///     requirements of the system. Like the other Puppet tests
 ///     they are skipped locally when Chromium (or git) is missing, and fail in CI, where
 ///     <c>REVIEWCENTER_REQUIRE_CHROMIUM=true</c>, so the evidence cannot be skipped silently.
 /// </remarks>
@@ -57,7 +58,8 @@ public class ReviewCenterSystemTests
     [Fact]
     public async Task ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers()
     {
-        // Arrange: a planned review in a project whose members are puppet and second; outsider is not a member
+        // Arrange: a planned review, created by puppet, in a project whose members are puppet, second and third;
+        // outsider is not a member
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
         var browser = scenario.Browser;
         await scenario.OpenReviewAsync();
@@ -65,16 +67,16 @@ public class ReviewCenterSystemTests
         // Act: read who is offered, and add slots
         var offered = await browser.EvalAsync(
             "Array.from(document.querySelector('[data-testid=new-slot-primary-select]').options).map(o => o.textContent).join('|')");
-        await scenario.AddSlotAsync("Puppet Admin (puppet)", alternate: null);
-        var samePerson = await scenario.TryAddSlotAsync("Puppet Admin (puppet)", alternate: null);
-        var alternateInOtherSlot = await scenario.TryAddSlotAsync("Second Reviewer (second)", "Puppet Admin (puppet)");
-        var slotsBefore = await browser.CountAsync("slot-status-");
         await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        var samePerson = await scenario.TryAddSlotAsync("Second Reviewer (second)", alternate: null);
+        var alternateInOtherSlot = await scenario.TryAddSlotAsync("Third Reviewer (third)", "Second Reviewer (second)");
+        var slotsBefore = await browser.CountAsync("slot-status-");
+        await scenario.AddSlotAsync("Third Reviewer (third)", alternate: null);
         var slotsAfter = await browser.CountAsync("slot-status-");
 
         // Assert: a member can be named, a non-member is not offered, and nobody fills two slots
-        Assert.Contains("(puppet)", offered, StringComparison.Ordinal);
         Assert.Contains("(second)", offered, StringComparison.Ordinal);
+        Assert.Contains("(third)", offered, StringComparison.Ordinal);
         Assert.DoesNotContain("outsider", offered, StringComparison.Ordinal);
         Assert.Contains("already in another slot", samePerson, StringComparison.Ordinal);
         Assert.Contains("already in another slot", alternateInOtherSlot, StringComparison.Ordinal);
@@ -91,59 +93,55 @@ public class ReviewCenterSystemTests
     [Fact]
     public async Task ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen()
     {
-        // Arrange: a planned review with a slot for puppet, whose checklist is not answered yet, and a second
-        // browser session of the same person
+        // Arrange: a planned review, created by puppet, with a slot for second, whose checklist is not answered yet;
+        // second is signed in in a browser of their own, and puppet's browser changes the record later
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
         var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
         await scenario.OpenReviewAsync();
-        var slot = await scenario.AddSlotAsync("Puppet Admin (puppet)", alternate: null);
-        var blockedText = await browser.TextOfAsync($"sign-blockers-{slot}");
-        var blockedForm = await browser.ExistsAsync($"sign-form-{slot}");
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await scenario.OpenReviewAsync(reviewer);
+        var blockedText = await reviewer.TextOfAsync($"sign-blockers-{slot}");
+        var blockedForm = await reviewer.ExistsAsync($"sign-form-{slot}");
 
         // Act: answer the checklist, then try a wrong password
         await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
-        await scenario.OpenReviewAsync();
-        var formWhenReady = await browser.ExistsAsync($"sign-form-{slot}");
-        await browser.OkAsync("fill", $"sign-password-{slot}", "this is not the password");
-        await browser.OkAsync("click", $"sign-button-{slot}");
-        await browser.WaitUntilAsync(() => browser.ExistsAsync($"sign-error-{slot}"), "the error of the wrong password");
-        var wrongError = await browser.TextOfAsync($"sign-error-{slot}");
-        var approvalAfterWrong = await browser.TextOfAsync("review-approval");
-        var statusAfterWrong = await browser.TextOfAsync($"slot-status-{slot}");
+        await scenario.OpenReviewAsync(reviewer);
+        var formWhenReady = await reviewer.ExistsAsync($"sign-form-{slot}");
+        await reviewer.OkAsync("fill", $"sign-password-{slot}", "this is not the password");
+        await reviewer.OkAsync("click", $"sign-button-{slot}");
+        await reviewer.WaitUntilAsync(() => reviewer.ExistsAsync($"sign-error-{slot}"), "the error of the wrong password");
+        var wrongError = await reviewer.TextOfAsync($"sign-error-{slot}");
+        var approvalAfterWrong = await reviewer.TextOfAsync("review-approval");
+        var statusAfterWrong = await reviewer.TextOfAsync($"slot-status-{slot}");
 
-        // Act: the same person changes the record in another session while this page still shows the old one
-        await using var other = await scenario.StartBrowserAsync("other");
-        await other.SignInAsync(PuppetEndToEndTests.UserName);
-        await other.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
-        await Scenario.OpenSectionAsync(other, "req");
-        await other.OkAsync("fill", "section-req-reason", "Changed while the other page was open.");
-        await other.OkAsync("click", "section-req-save");
+        // Act: somebody changes the record in another session while the page of the reviewer still shows the old one
+        await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
+        await Scenario.OpenSectionAsync(browser, "req");
+        await browser.OkAsync("fill", "section-req-reason", "Changed while the other page was open.");
+        await browser.OkAsync("click", "section-req-save");
         await Task.Delay(1000, TestContext.Current.CancellationToken);
-        await other.WaitUntilAsync(
+        await browser.WaitUntilAsync(
             async () =>
             {
-                await other.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
-                await Scenario.OpenSectionAsync(other, "req");
-                return (await other.EvalAsync("document.querySelector('[data-testid=section-req-reason]').value"))
+                await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
+                await Scenario.OpenSectionAsync(browser, "req");
+                return (await browser.EvalAsync("document.querySelector('[data-testid=section-req-reason]').value"))
                     .Contains("Changed while", StringComparison.Ordinal);
             },
             "the changed reason to be stored");
 
         // Act: sign on the stale page with the right password
-        await browser.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
-        await browser.OkAsync("click", $"sign-button-{slot}");
-        await browser.WaitUntilAsync(
-            async () => (await browser.TextOfAsync($"sign-error-{slot}")).Contains("changed", StringComparison.Ordinal),
+        await reviewer.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
+        await reviewer.OkAsync("click", $"sign-button-{slot}");
+        await reviewer.WaitUntilAsync(
+            async () => (await reviewer.TextOfAsync($"sign-error-{slot}")).Contains("changed", StringComparison.Ordinal),
             "the refusal of the stale page");
-        var approvalAfterStale = await browser.TextOfAsync("review-approval");
+        var approvalAfterStale = await reviewer.TextOfAsync("review-approval");
 
         // Act: reload the page, so that it shows the record as it is now, and sign with the right password
-        await scenario.OpenReviewAsync();
-        await browser.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
-        await browser.OkAsync("click", $"sign-button-{slot}");
-        await browser.WaitUntilAsync(
-            async () => (await browser.TextOfAsync("review-approval")).Contains("Approved", StringComparison.Ordinal),
-            "the approval");
+        await scenario.OpenReviewAsync(reviewer);
+        await Scenario.SignAsync(reviewer, slot);
 
         // Act: read the audit trail of the server and verify its chain
         await browser.GotoAsync("/audit", "audit-page");
@@ -172,20 +170,36 @@ public class ReviewCenterSystemTests
     /// <summary>
     ///     Test that an approved review is delivered as a signed attestation and listed in the evidence index, that a
     ///     token can read it but never sign or arrange reviewers, that nothing is released without credentials, that a
-    ///     later comment makes the approval out of date without removing the signature or changing the reviewed
-    ///     content, that no posted comment can be edited, and that a link to a thread survives the sign-in.
+    ///     later change (the reopening of the locked review by an administrator) makes the approval out of date without
+    ///     removing the signature or changing the reviewed content, that no posted comment can be edited, and that a
+    ///     link to a thread survives the sign-in.
     /// </summary>
     /// <returns>A task that completes when the test has finished.</returns>
     [Fact]
     public async Task ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised()
     {
-        // Arrange: an approved review, and a personal API token of the signer
+        // Arrange: puppet created the review, so second is its reviewer; puppet comments on it and resolves the
+        // thread, answers the checklist, and second signs and holds a personal API token
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
         var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
         await scenario.OpenReviewAsync();
-        var slot = await scenario.AddSlotAsync("Puppet Admin (puppet)", alternate: null);
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
         await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
-        var token = await scenario.CreateTokenAsync();
+        await scenario.OpenReviewAsync();
+        await browser.OkAsync("click", "file-select-0");
+        await browser.OkAsync("wait", "new-thread-form");
+        await browser.OkAsync("fill", "thread-text-input", "A comment before the approval.");
+        await browser.OkAsync("click", "start-thread-button");
+        await browser.OkAsync("wait", "css=[data-testid^=thread-state-]");
+        var threadPath = await browser.EvalAsync(
+            "document.querySelector('[data-testid^=\"thread-state-\"]').getAttribute('data-testid').replace('thread-state-', '')");
+        await browser.OkAsync("click", $"thread-toggle-{threadPath}");
+        await browser.WaitUntilAsync(
+            async () => (await browser.TextOfAsync($"thread-state-{threadPath}")).Contains("Resolved", StringComparison.Ordinal),
+            "the thread to be resolved");
+        var commentControls = await browser.EvalAsync("document.querySelectorAll('.comment button, .comment textarea, .comment input').length");
+        var token = await Scenario.CreateTokenAsync(reviewer);
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(scenario.Server.Url) };
         using var anonymous = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(scenario.Server.Url) };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -199,12 +213,8 @@ public class ReviewCenterSystemTests
         var indexBefore = await GetJsonAsync(http, indexUrl);
 
         // Act: sign with the password, and read the evidence
-        await scenario.OpenReviewAsync();
-        await browser.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
-        await browser.OkAsync("click", $"sign-button-{slot}");
-        await browser.WaitUntilAsync(
-            async () => (await browser.TextOfAsync("review-approval")).Contains("Approved", StringComparison.Ordinal),
-            "the approval");
+        await scenario.OpenReviewAsync(reviewer);
+        await Scenario.SignAsync(reviewer, slot);
         var signed = await GetJsonAsync(http, reviewUrl);
         var attestation = await http.GetAsync(attestationUrl, TestContext.Current.CancellationToken);
         var pdf = await attestation.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
@@ -216,24 +226,19 @@ public class ReviewCenterSystemTests
         var tokenOnPage = await http.GetAsync($"/projects/1/reviews/{scenario.ReviewId}", TestContext.Current.CancellationToken);
         var tokenSigns = await http.PostAsync($"{reviewUrl}/signatures", new StringContent("{}"), TestContext.Current.CancellationToken);
         var tokenSlots = await http.PostAsync($"{reviewUrl}/slots", new StringContent("{}"), TestContext.Current.CancellationToken);
-        var slotCanChange = await browser.ExistsAsync($"slot-remove-{slot}") || await browser.ExistsAsync($"slot-save-{slot}");
+        var slotCanChange = await reviewer.ExistsAsync($"slot-remove-{slot}") || await reviewer.ExistsAsync($"slot-save-{slot}");
 
-        // Act: add a comment after the approval
-        await browser.OkAsync("click", "file-select-0");
-        await browser.OkAsync("wait", "new-thread-form");
-        await browser.OkAsync("fill", "thread-text-input", "A comment after the approval.");
-        await browser.OkAsync("click", "start-thread-button");
-        await browser.OkAsync("wait", "css=[data-testid^=thread-state-]");
+        // Act: an administrator reopens the approved review, which is the only later change that is possible
+        await scenario.OpenReviewAsync();
+        await browser.OkAsync("fill", "reopen-reason", "The reviewed content must be looked at again.");
+        await browser.OkAsync("click", "reopen-button");
         await browser.WaitUntilAsync(
             async () => (await browser.TextOfAsync("review-approval")).Contains("In review", StringComparison.Ordinal),
-            "the approval to go out of date");
+            "the approval to end");
         var changed = await GetJsonAsync(http, reviewUrl);
         var attestationAfter = await http.GetAsync(attestationUrl, TestContext.Current.CancellationToken);
         var indexAfter = await GetJsonAsync(http, indexUrl);
-        var commentControls = await browser.EvalAsync("document.querySelectorAll('.comment button, .comment textarea, .comment input').length");
         var slotCanChangeAfter = await browser.ExistsAsync($"slot-remove-{slot}") || await browser.ExistsAsync($"slot-save-{slot}");
-        var threadPath = await browser.EvalAsync(
-            "document.querySelector('[data-testid^=\"thread-state-\"]').getAttribute('data-testid').replace('thread-state-', '')");
 
         // Act: somebody who is signed out follows a link to the thread
         await using var other = await scenario.StartBrowserAsync("link");
@@ -253,7 +258,7 @@ public class ReviewCenterSystemTests
         // Assert: after it the review is approved, the PDF is a digitally signed document, and the index names the set
         Assert.True(signed.GetProperty("approved").GetBoolean());
         Assert.Equal("Signed", signed.GetProperty("slots")[0].GetProperty("state").GetString());
-        Assert.Equal("Puppet Admin", signed.GetProperty("slots")[0].GetProperty("signedBy").GetString());
+        Assert.Equal("Second Reviewer", signed.GetProperty("slots")[0].GetProperty("signedBy").GetString());
         Assert.Equal(HttpStatusCode.OK, attestation.StatusCode);
         Assert.Equal("application/pdf", attestation.Content.Headers.ContentType?.MediaType);
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
@@ -272,7 +277,7 @@ public class ReviewCenterSystemTests
         Assert.Equal(HttpStatusCode.NotFound, tokenSlots.StatusCode);
         Assert.False(slotCanChange, "A signed slot must offer no way to change or remove it.");
 
-        // Assert: a later comment ends the approval, keeps the signature as history and the content as it was
+        // Assert: reopening ends the approval, keeps the signature as history and the content as it was
         Assert.False(changed.GetProperty("approved").GetBoolean());
         Assert.Equal("OutOfDate", changed.GetProperty("slots")[0].GetProperty("state").GetString());
         Assert.NotEqual(signed.GetProperty("approvalDigest").GetString(), changed.GetProperty("approvalDigest").GetString());
@@ -284,6 +289,165 @@ public class ReviewCenterSystemTests
 
         // Assert: the link to the thread survived the sign-in
         Assert.EndsWith($"/threads/{threadPath}", landedOn, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an approved review is locked: it shows as locked with its controls disabled, a member who is not
+    ///     an administrator cannot reopen it, an administrator needs a reason to reopen it, and the reopened review is
+    ///     in review again with the earlier signature kept as history, needs a fresh signature, and has the reopening in
+    ///     its history.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_ApprovedReview_IsLockedUntilAnAdministratorReopensItWithAReason()
+    {
+        // Arrange: a review that puppet (the administrator) created and second (a member) approved
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
+        await scenario.OpenReviewAsync();
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.OpenReviewAsync(reviewer);
+        await Scenario.SignAsync(reviewer, slot);
+
+        // Act: look at the approved review as the administrator, on its page and on its checklist
+        await scenario.OpenReviewAsync();
+        var approvalLocked = await browser.TextOfAsync("review-approval");
+        var lockedBadge = await browser.TextOfAsync("review-locked");
+        var slotsDisabled = await browser.IsDisabledAsync("new-slot-primary-select")
+                            && await browser.IsDisabledAsync("new-slot-alternate-select")
+                            && await browser.IsDisabledAsync("new-slot-add-button");
+        await browser.OkAsync("click", "file-select-0");
+        await browser.OkAsync("wait", "new-thread-form");
+        var commentDisabled = await browser.IsDisabledAsync("thread-text-input")
+                              && await browser.IsDisabledAsync("start-thread-button");
+        await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
+        await browser.OkAsync("wait", "checklist-locked");
+        await Scenario.OpenSectionAsync(browser, "req");
+        var checklistDisabled = await browser.IsDisabledAsync("section-req-applicable")
+                                && await browser.IsDisabledAsync("section-req-reason")
+                                && await browser.IsDisabledAsync("section-req-save");
+
+        // Act: look at it as a member who is not an administrator
+        await scenario.OpenReviewAsync(reviewer);
+        var memberSeesLock = await reviewer.ExistsAsync("review-locked");
+        var memberCanReopen = await reviewer.ExistsAsync("reopen-form") || await reviewer.ExistsAsync("reopen-button");
+
+        // Act: the administrator tries to reopen without a reason, then with one
+        await scenario.OpenReviewAsync();
+        await browser.OkAsync("click", "reopen-button");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("reopen-error"), "the refusal of the missing reason");
+        var noReasonError = await browser.TextOfAsync("reopen-error");
+        var lockedAfterRefusal = await browser.ExistsAsync("review-locked");
+        await browser.OkAsync("fill", "reopen-reason", "Found a problem that needs another look.");
+        await browser.OkAsync("click", "reopen-button");
+        await browser.WaitUntilAsync(
+            async () => (await browser.TextOfAsync("review-approval")).Contains("In review", StringComparison.Ordinal),
+            "the review to be reopened");
+        var lockedAfterReopen = await browser.ExistsAsync("review-locked");
+        var reopenedBy = await browser.TextOfAsync("reopen-by-0");
+        var reopenReason = await browser.TextOfAsync("reopen-reason-0");
+        var slotAfterReopen = await browser.TextOfAsync($"slot-status-{slot}");
+        var slotsEnabledAfterReopen = !await browser.IsDisabledAsync("new-slot-add-button");
+
+        // Act: the reviewer needs a fresh signature, and the review is approved and locked again with it
+        await scenario.OpenReviewAsync(reviewer);
+        var signFormAfterReopen = await reviewer.ExistsAsync($"sign-form-{slot}");
+        var approvalBeforeFreshSignature = await reviewer.TextOfAsync("review-approval");
+        await Scenario.SignAsync(reviewer, slot);
+        var lockedAgain = await reviewer.ExistsAsync("review-locked");
+
+        // Act: read the history of the review
+        await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/history", "history-page");
+        await browser.OkAsync("wait", "history-table");
+        var history = await browser.TextOfAsync("history-table");
+
+        // Assert: the approved review is locked, and nothing that would change it can be used
+        Assert.Contains("Approved", approvalLocked, StringComparison.Ordinal);
+        Assert.Contains("Locked", lockedBadge, StringComparison.Ordinal);
+        Assert.True(slotsDisabled, "The reviewer slots of a locked review must not be changeable.");
+        Assert.True(commentDisabled, "A locked review must not accept a new comment.");
+        Assert.True(checklistDisabled, "The checklist of a locked review must be read-only.");
+        Assert.True(memberSeesLock);
+        Assert.False(memberCanReopen, "Only an administrator may be offered the reopening.");
+
+        // Assert: a reason is required, and the review stays locked until it is given
+        Assert.Contains("reason", noReasonError, StringComparison.Ordinal);
+        Assert.True(lockedAfterRefusal, "A reopening without a reason must leave the review locked.");
+
+        // Assert: the reopened review is in review, keeps the old signature as history, and shows who reopened it and why
+        Assert.False(lockedAfterReopen);
+        Assert.Equal("Puppet Admin", reopenedBy);
+        Assert.Contains("Found a problem", reopenReason, StringComparison.Ordinal);
+        Assert.Contains("out of date", slotAfterReopen, StringComparison.Ordinal);
+        Assert.True(slotsEnabledAfterReopen);
+
+        // Assert: a fresh signature is needed, and it approves and locks the review again
+        Assert.True(signFormAfterReopen, "The reviewer must be able to sign the reopened review again.");
+        Assert.Contains("In review", approvalBeforeFreshSignature, StringComparison.Ordinal);
+        Assert.True(lockedAgain);
+
+        // Assert: the history shows the first signature, the reopening with its reason, and the fresh signature
+        Assert.Contains("review.reopened", history, StringComparison.Ordinal);
+        Assert.Contains("Found a problem", history, StringComparison.Ordinal);
+        Assert.Equal(2, history.Split("signature.added").Length - 1);
+    }
+
+    /// <summary>
+    ///     Test that the author of a review is not offered as a reviewer while the project requires independent
+    ///     reviewers, that an administrator can switch the rule off (which is audited) so that the author can be
+    ///     seated, and that switching it on again stops the author from signing, with a clear message.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_IndependentReviewers_AuthorIsNotOfferedAndAdministratorCanSwitchTheRuleOff()
+    {
+        // Arrange: a review that puppet (a project administrator) created; the rule is on, as it is by default
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await scenario.OpenReviewAsync();
+        var offeredWhenOn = await Scenario.OfferedReviewersAsync(browser);
+        var hintWhenOn = await browser.ExistsAsync("author-independence-hint");
+
+        // Act: the administrator switches the rule off, and the author is seated
+        var statusOff = await scenario.SetIndependentReviewersAsync(required: false);
+        await scenario.OpenReviewAsync();
+        var offeredWhenOff = await Scenario.OfferedReviewersAsync(browser);
+        var hintWhenOff = await browser.ExistsAsync("author-independence-hint");
+        var slot = await scenario.AddSlotAsync("Puppet Admin (puppet)", alternate: null);
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+
+        // Act: the rule is switched on again, and the author tries to sign with the right password
+        var statusOn = await scenario.SetIndependentReviewersAsync(required: true);
+        await scenario.OpenReviewAsync();
+        await browser.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
+        await browser.OkAsync("click", $"sign-button-{slot}");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync($"sign-error-{slot}"), "the refusal of the author");
+        var signError = await browser.TextOfAsync($"sign-error-{slot}");
+        var approval = await browser.TextOfAsync("review-approval");
+
+        // Act: read the audit trail of the server
+        await browser.GotoAsync("/audit", "audit-page");
+        var trail = await browser.TextOfAsync("audit-page");
+
+        // Assert: while the rule is on the author is not offered, and the page tells the author why
+        Assert.Contains("(second)", offeredWhenOn, StringComparison.Ordinal);
+        Assert.DoesNotContain("(puppet)", offeredWhenOn, StringComparison.Ordinal);
+        Assert.True(hintWhenOn, "The author must be told that somebody else has to review.");
+
+        // Assert: once an administrator switched it off the author is offered and can be seated
+        Assert.Contains("no longer required", statusOff, StringComparison.Ordinal);
+        Assert.Contains("(puppet)", offeredWhenOff, StringComparison.Ordinal);
+        Assert.False(hintWhenOff);
+
+        // Assert: after it is switched on again the author cannot sign, and is told why, and the review is not approved
+        Assert.Contains("now required", statusOn, StringComparison.Ordinal);
+        Assert.Contains("You created this review, so you cannot be a reviewer of it", signError, StringComparison.Ordinal);
+        Assert.Contains("In review", approval, StringComparison.Ordinal);
+
+        // Assert: the audit trail shows that the rule was changed
+        Assert.Contains("project.independent-reviewers-changed", trail, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -361,6 +525,16 @@ public class ReviewCenterSystemTests
         public async Task<bool> ExistsAsync(string testId)
         {
             return await EvalAsync($"!!document.querySelector('[data-testid=\"{testId}\"]')") == "true";
+        }
+
+        /// <summary>
+        ///     Tells whether an element exists and is disabled.
+        /// </summary>
+        /// <param name="testId">The test identifier of the element.</param>
+        /// <returns><c>true</c> when the page has the element and it is disabled.</returns>
+        public async Task<bool> IsDisabledAsync(string testId)
+        {
+            return await EvalAsync($"document.querySelector('[data-testid=\"{testId}\"]')?.disabled === true") == "true";
         }
 
         /// <summary>
@@ -503,7 +677,7 @@ public class ReviewCenterSystemTests
                 cancellationToken,
                 seedUser: true,
                 gitCachePath: Path.Combine(directory.FullName, "git-cache"),
-                extraUsers: [("second", "Second Reviewer"), ("outsider", "Outside Person")]);
+                extraUsers: [("second", "Second Reviewer"), ("third", "Third Reviewer"), ("outsider", "Outside Person")]);
             var browser = new Browser(Path.Combine(directory.FullName, "control-main.json"), cancellationToken);
             var scenario = new Scenario(server, directory, browser, cancellationToken);
             try
@@ -534,12 +708,66 @@ public class ReviewCenterSystemTests
         }
 
         /// <summary>
+        ///     Starts another browser session and signs a user in.
+        /// </summary>
+        /// <param name="name">A name for the session.</param>
+        /// <param name="userName">The user name.</param>
+        /// <returns>The browser; disposing it stops it.</returns>
+        public async Task<Browser> StartSignedInBrowserAsync(string name, string userName)
+        {
+            var browser = await StartBrowserAsync(name);
+            await browser.SignInAsync(userName);
+            return browser;
+        }
+
+        /// <summary>
         ///     Opens the page of the planned review.
         /// </summary>
+        /// <param name="browser">The browser to use, or <c>null</c> for the one of the administrator.</param>
         /// <returns>A task that completes when the page is interactive.</returns>
-        public Task OpenReviewAsync()
+        public Task OpenReviewAsync(Browser? browser = null)
         {
-            return Browser.GotoAsync($"/projects/1/reviews/{ReviewId}", "review-page");
+            return (browser ?? Browser).GotoAsync($"/projects/1/reviews/{ReviewId}", "review-page");
+        }
+
+        /// <summary>
+        ///     Signs in a slot with the right password and waits for the review to be approved.
+        /// </summary>
+        /// <param name="browser">The browser of the reviewer, showing the review.</param>
+        /// <param name="slot">The identifier of the slot.</param>
+        /// <returns>A task that completes when the review shows as approved.</returns>
+        public static async Task SignAsync(Browser browser, string slot)
+        {
+            await browser.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
+            await browser.OkAsync("click", $"sign-button-{slot}");
+            await browser.WaitUntilAsync(
+                async () => (await browser.TextOfAsync("review-approval")).Contains("Approved", StringComparison.Ordinal),
+                "the approval");
+        }
+
+        /// <summary>
+        ///     Gets the people that the form of a new slot offers as primary reviewer.
+        /// </summary>
+        /// <param name="browser">The browser, showing the review.</param>
+        /// <returns>The labels of the options, separated by a bar.</returns>
+        public static Task<string> OfferedReviewersAsync(Browser browser)
+        {
+            return browser.EvalAsync(
+                "Array.from(document.querySelector('[data-testid=new-slot-primary-select]').options).map(o => o.textContent).join('|')");
+        }
+
+        /// <summary>
+        ///     Switches the "require independent reviewers" rule of the project on or off on the project page.
+        /// </summary>
+        /// <param name="required">The new value.</param>
+        /// <returns>The confirmation that the page shows.</returns>
+        public async Task<string> SetIndependentReviewersAsync(bool required)
+        {
+            await Browser.GotoAsync("/projects/1", "project-page");
+            await Browser.OkAsync(required ? "check" : "uncheck", "independent-reviewers-switch");
+            await Browser.OkAsync("click", "independent-reviewers-save");
+            await Browser.OkAsync("wait", "review-rules-status");
+            return await Browser.TextOfAsync("review-rules-status");
         }
 
         /// <summary>
@@ -615,16 +843,17 @@ public class ReviewCenterSystemTests
         }
 
         /// <summary>
-        ///     Creates an API token of the signed-in user.
+        ///     Creates an API token of a signed-in user.
         /// </summary>
+        /// <param name="browser">The browser of the user.</param>
         /// <returns>The value of the token.</returns>
-        public async Task<string> CreateTokenAsync()
+        public static async Task<string> CreateTokenAsync(Browser browser)
         {
-            await Browser.GotoAsync("/account", "account-page");
-            await Browser.OkAsync("fill", "token-name-input", "system test");
-            await Browser.OkAsync("click", "create-token-button");
-            await Browser.OkAsync("wait", "new-token-value");
-            return (await Browser.TextOfAsync("new-token-value")).Trim();
+            await browser.GotoAsync("/account", "account-page");
+            await browser.OkAsync("fill", "token-name-input", "system test");
+            await browser.OkAsync("click", "create-token-button");
+            await browser.OkAsync("wait", "new-token-value");
+            return (await browser.TextOfAsync("new-token-value")).Trim();
         }
 
         /// <inheritdoc />
@@ -669,7 +898,7 @@ public class ReviewCenterSystemTests
             await Browser.OkAsync("click", "create-repository-button");
             await Browser.OkAsync("wait", "repository-row-1");
 
-            foreach (var member in new[] { PuppetEndToEndTests.UserName, "second" })
+            foreach (var member in new[] { PuppetEndToEndTests.UserName, "second", "third" })
             {
                 await Browser.GotoAsync("/projects/1/members/new", "new-member-page");
                 await Browser.OkAsync("fill", "new-member-username-input", member);

@@ -40,6 +40,10 @@ N/A - standard test environment (everything runs in memory).
   event then names the actor `anonymous`.
 - A request without an actor for a review that is not complete gets `NotFound`, the same answer as for a review that
   does not exist, while an actor gets `NotApproved`.
+- A review that is approved is locked, and the attestation is still produced for it. A review that was reopened by an
+  administrator and signed again gives a PDF with a "Reopen history" section (time, who, reason, and the previous
+  digest of each reopen), and a review that was never reopened gives a PDF without that section. When the reviewer
+  names are off the administrator is a label (`Participant N`), not a name.
 
 The second check is made testable by the internal `AfterRender` step of the service, which the tests use to change the
 review in the moment between the rendering and the check. The short window between the second check and the signing
@@ -54,19 +58,21 @@ and the audit event is not covered by a test; it contains no read of the review.
 signed is asked for. The status is `NotApproved` and the key provider was not called. This scenario is tested by
 `AttestationService_GenerateAsync_SlotNotSigned_ReturnsNotApprovedWithoutAskingForTheKey`.
 
-**AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved**: The record of a signed review changes.
-The status is `NotApproved`. This scenario is tested by
+**AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved**: The record of a signed review
+changes (an administrator reopens the approved review). The status is `NotApproved`. This scenario is tested by
 `AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved`.
 
 **AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing**: The checklist answers
-change after the document is rendered and before the second check. The status is `Changed` with the message "The review
-changed while the attestation was being prepared; try again.", there is no content or file name, and the audit trail has
-no attestation event. This scenario is tested by
+change after the document is rendered and before the second check. The change is written to the store directly by the
+fixture, because the services refuse to change an approved review. The status is `Changed` with the message "The
+review changed while the attestation was being prepared; try again.", there is no content or file name, and the audit
+trail has no attestation event. This scenario is tested by
 `AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing`.
 
 **AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing**: A second slot that nobody
-has signed is added in that moment. The status is `Changed`, there is no content, and nothing is recorded. This scenario
-is tested by `AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing`.
+has signed is added in that moment, directly in the store for the same reason. The status is `Changed`, there is no
+content, and nothing is recorded. This scenario is tested by
+`AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing`.
 
 **AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing**: A second
 slot is added and signed in that moment, so the review is still approved and the digest of the record is the same, but
@@ -149,3 +155,21 @@ is tested by `AttestationService_GenerateAsync_AnonymousIncompleteReview_Returns
 **AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged**: The settings change in the moment
 between the rendering and the second check. The status is `Changed`, there is no content, and nothing is recorded. This
 scenario is tested by `AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged`.
+
+**AttestationService_GenerateAsync_ReopenedReview_IncludesReopenHistory**: A review is approved, reopened by an
+administrator with a reason, and signed again. The PDF has the "Reopen history" section with the time, the
+administrator's name, the reason, and the previous digest of the reopen, and its signature verifies. This scenario is
+tested by `AttestationService_GenerateAsync_ReopenedReview_IncludesReopenHistory`.
+
+**AttestationService_GenerateAsync_NeverReopened_OmitsReopenHistory**: A complete review that was never reopened is
+asked for. The PDF has no "Reopen history" section. This scenario is tested by
+`AttestationService_GenerateAsync_NeverReopened_OmitsReopenHistory`.
+
+**AttestationService_GenerateAsync_ReopenedWithoutReviewerNames_OmitsReopenedByName**: The reviewer names are turned
+off for a reopened review. The "Reopen history" section is there with the reason, but the administrator's user name and
+display name appear nowhere in the PDF, which names a participant label instead. This scenario is tested by
+`AttestationService_GenerateAsync_ReopenedWithoutReviewerNames_OmitsReopenedByName`.
+
+**AttestationService_GenerateAsync_LockedReview_StillRenders**: An approved (locked) review is asked for. The status is
+`Ok` with a signed PDF, so the lock does not stop the attestation. This scenario is tested by
+`AttestationService_GenerateAsync_LockedReview_StillRenders`.

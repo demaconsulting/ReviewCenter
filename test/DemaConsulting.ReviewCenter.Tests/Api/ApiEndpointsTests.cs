@@ -70,6 +70,29 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that a locked review, and a reopen of a review that is not locked, are conflicts (409) whose problem
+    ///     answer carries the rule's message.
+    /// </summary>
+    /// <param name="rule">The rule that failed.</param>
+    [Theory]
+    [InlineData(DomainRule.ReviewLocked)]
+    [InlineData(DomainRule.ReviewNotLocked)]
+    public void ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409(DomainRule rule)
+    {
+        // Arrange: the refusal of a service
+        var exception = new DomainRuleException(rule, "The review is in the wrong state.");
+
+        // Act
+        var status = ApiProblems.StatusOf(rule);
+        var problem = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult>(ApiProblems.ToResult(exception));
+
+        // Assert: 409 with the message as the detail
+        Assert.Equal(409, status);
+        Assert.Equal(409, problem.StatusCode);
+        Assert.Equal("The review is in the wrong state.", problem.ProblemDetails.Detail);
+    }
+
+    /// <summary>
     ///     Test that the project list returns every project with its details in camel-case JSON.
     /// </summary>
     [Fact(Timeout = 120000)]

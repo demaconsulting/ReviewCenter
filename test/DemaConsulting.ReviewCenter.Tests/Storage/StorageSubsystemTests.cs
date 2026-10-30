@@ -373,6 +373,80 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the approval lock, the reopen with its history and the independence setting are stored: an
+    ///     approved review is still locked after the database is closed and opened again, a change is refused
+    ///     there, the reopen survives with its reason and previous digest, and the old signature is kept.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction()
+    {
+        // Arrange: a new database file
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        int projectId;
+        string digest;
+
+        // Act: create a review (the author is not a user), approve it with the signature of bob, close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var users = NewUserService(first.Provider);
+            var ann = await users.CreateAsync("ann", "Ann", false, "correct horse battery", cancellationToken);
+            var bob = await users.CreateAsync("bob", "Bob", false, "correct horse battery", cancellationToken);
+            var project = await first.Projects.CreateAsync("Apollo", null, cancellationToken);
+            projectId = project.Id;
+            await first.Store.AddMembershipAsync(ann.Id, projectId, cancellationToken);
+            await first.Store.AddMembershipAsync(bob.Id, projectId, cancellationToken);
+            await first.Reviews.CreateDraftAsync(projectId, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now));
+            foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+            {
+                await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+            }
+
+            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
+            var slot = await signing.AddSlotAsync(TestActors.Ann, projectId, "rev-1", bob.Id, null, cancellationToken);
+            digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+            await signing.SignAsync(TestActors.Bob, projectId, "rev-1", slot.Id, digest, "correct horse battery", cancellationToken);
+        }
+
+        // Act: open it again; the review is still locked, so a thread is refused, and then it is reopened
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var signing = TestServices.Signing(second.Store, NewUserService(second.Provider), new FixedTimeProvider(_now));
+            var threads = TestServices.Threads(second.Store, new FixedTimeProvider(_now));
+            var locked = await Assert.ThrowsAsync<DomainRuleException>(() => threads.StartThreadAsync(
+                projectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "Late", cancellationToken));
+            await signing.ReopenReviewAsync(TestActors.Ann, projectId, "rev-1", "Found a gap", cancellationToken);
+            await second.Projects.SetRequireIndependentReviewersAsync(TestActors.Ann, projectId, true, false, cancellationToken);
+
+            // Assert: refused as locked, and nothing was stored by the refused thread
+            Assert.Equal(DomainRule.ReviewLocked, locked.Rule);
+            Assert.Empty(await threads.ListAsync(projectId, "rev-1", cancellationToken));
+        }
+
+        // Act: open it a third time and read everything back
+        var third = Open(options);
+        using (third.Provider)
+        {
+            var signing = TestServices.Signing(third.Store, NewUserService(third.Provider), new FixedTimeProvider(_now));
+            var approval = await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken);
+            var project = await third.Store.GetProjectAsync(projectId, cancellationToken);
+
+            // Assert: In review again with the reopen history, the old signature kept as out of date, the setting off
+            Assert.NotNull(approval);
+            Assert.False(approval.IsApproved);
+            var reopen = Assert.Single(approval.Reopens!);
+            Assert.Equal(("Found a gap", digest), (reopen.Reason, reopen.PreviousDigest));
+            Assert.NotEqual(digest, approval.Digest);
+            Assert.Equal(SlotSignatureState.OutOfDate, Assert.Single(approval.Slots).State);
+            Assert.Single(await third.Store.ListSignaturesAsync(projectId, "rev-1", cancellationToken));
+            Assert.False(project!.RequireIndependentReviewers);
+        }
+    }
+
+    /// <summary>
     ///     Builds a user service over the database of a provider.
     /// </summary>
     /// <param name="provider">The provider that owns the database factory.</param>

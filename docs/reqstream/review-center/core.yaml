@@ -274,6 +274,52 @@ sections:
         tests:
           - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
 
+      - id: ReviewCenter-Core-ApprovalLock
+        title: >-
+          The Core subsystem shall treat a review that every slot has signed for the current record as approved and
+          locked, refuse every change of its threads, checklist answers, section applicability, and reviewer slots,
+          and refuse a further signature, with the ReviewLocked rule, until an administrator of the project or a system
+          administrator reopens it with a reason, shall refuse the reopening of a review that is not locked with the
+          ReviewNotLocked rule, shall keep every earlier signature as history after the reopening, out of date for good,
+          even when the content is changed back, shall need fresh signatures from every slot to approve the review
+          again, and shall record the reopening, with the reason and the digest of the approved record, in the audit
+          trail.
+        justification: |
+          An approval is only worth something if the content it approved cannot move afterwards. Locking the approved
+          review, and allowing only a deliberate, explained, and recorded reopening by someone responsible for the
+          project, keeps the record that was signed the record that exists, and keeps the history of approvals complete.
+        children:
+          - ReviewCenter-SigningService-ApprovalLock
+          - ReviewCenter-SigningService-Reopen
+          - ReviewCenter-ThreadService-ApprovalLock
+          - ReviewCenter-ChecklistService-ApprovalLock
+          - ReviewCenter-RecordDigest-ReopenCount
+        tests:
+          - CoreSubsystem_ApprovedReview_RefusesEveryMutationWithReviewLocked
+          - CoreSubsystem_ReopenReview_RequiresAdminAndReasonAndNeedsFreshSignatures
+          - CoreSubsystem_ReopenReview_OfUnlockedReview_ThrowsReviewNotLocked
+
+      - id: ReviewCenter-Core-IndependentReviewers
+        title: >-
+          The Core subsystem shall let each project require independent reviewers, on for a new project, so that the
+          user who created a review, which for a review created with an access token is the owner of the token, can
+          neither be a primary reviewer or an alternate of a slot of it nor sign it, also for a slot that was filled
+          before the setting was switched on, shall let only an administrator of the project or a system
+          administrator change the setting, never through an access token, and shall record each change in the audit
+          trail.
+        justification: |
+          A review in which the author is also the approver gives little assurance. Making independence the default,
+          while leaving a project that must let one person do both a recorded way to switch it off, keeps the rule
+          strong without blocking such a project. The rule applies to the user who created the review in this tool and
+          not to the authors of the commits, which the tool cannot know.
+        children:
+          - ReviewCenter-SigningService-IndependentReviewers
+          - ReviewCenter-ProjectService-IndependentReviewersSetting
+        tests:
+          - CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign
+          - CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly
+          - CoreSubsystem_ApiTokenReview_AuthorIsTokenUser
+
       - id: ReviewCenter-Core-AuditTrail
         title: >-
           The Core subsystem shall record every change of projects, reviews, threads, checklists, reviewer slots,

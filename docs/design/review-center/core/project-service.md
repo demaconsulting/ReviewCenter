@@ -16,7 +16,10 @@ what is decided by `ProjectAccess`; this unit only asks.
 #### Data Model
 
 **Project**: a data class (init-only properties) of `Id` (`int`, assigned by the store), `Name` (`string`), `Description`
-(`string`, may be empty), and `Created` (`DateTimeOffset`, from the injected clock).
+(`string`, may be empty), `Created` (`DateTimeOffset`, from the injected clock), `Evidence` (the evidence settings), and
+`RequireIndependentReviewers` (`bool`, default `true`): whether the person who created a review is kept out of its
+reviewer slots and cannot sign it (see the `SigningService` unit, which enforces it). Review Center only knows who
+created the review in the tool; the authors of git commits are not matched.
 
 **ReviewLimits**: constants that define every limit of the domain once, so that the pages, the services, and the
 storage agree:
@@ -31,6 +34,7 @@ storage agree:
 | `MaxProjectDescriptionLength` | 1000 | longest project description |
 | `MaxReviewIdLength` | 100 | longest review id |
 | `MaxReviewTitleLength` | 200 | longest review title |
+| `MaxReopenReasonLength` | 250 | longest reason for reopening an approved review (fits one audit entry) |
 
 **NewMemberAccount**: an immutable record of `Member` (the new `ProjectMember`) and `TemporaryPassword` (`string`, the
 clear-text temporary password). The password exists only in this value: it is stored as a hash only and is never
@@ -55,9 +59,11 @@ password).
 
 **IReviewStore**: the persistence interface of the domain, with the operations `AddProjectAsync`,
 `GetProjectAsync`, `ListProjectsAsync`, `ReviewExistsAsync`, `AddReviewAsync`, `GetReviewAsync`,
-`ListReviewsAsync`, and `GetFileContentAsync`, and for project membership `AddMembershipAsync`,
+`ListReviewsAsync`, and `GetFileContentAsync`, for project membership `AddMembershipAsync`,
 `RemoveMembershipAsync`, `SetMembershipRoleAsync`, `GetMembershipAsync`, `ListMembershipsAsync` (the members of a
-project), and `ListMembershipsForUserAsync`. The three changing membership operations take the audit draft that is
+project), and `ListMembershipsForUserAsync`. The setting of a project is changed with
+`UpdateRequireIndependentReviewersAsync`, a compare-and-set that takes the audit draft. The three changing
+membership operations take the audit draft that is
 saved in the same transaction; the removal and the role change report whether a membership existed and take a
 `requireAnotherAdmin` flag that makes the store refuse, with `LastProjectAdmin`, a change that would leave the project
 without an enabled project administrator (the check and the change are one atomic step). It is implemented by
@@ -139,6 +145,21 @@ account can never be a system administrator and cannot exist without the members
   change one atomic step inside its serialized audit transaction, so two concurrent changes cannot empty the project.
   Nothing is changed when a rule fails.
 
+**SetRequireIndependentReviewersAsync**: Switches the "require independent reviewers" rule of a project.
+
+- *Parameters*: the `Actor`, the project identity, the `expected` value (what the caller read and based the change on),
+  the new `value`, and a cancellation token.
+- *Returns*: `Task<bool>` — `true` when the value was changed, `false` when `value` equals `expected` (nothing is
+  stored or recorded).
+- *Preconditions*: The actor is not an API token (`ActorNotAllowed`: "Project settings cannot be changed with an API
+  token; sign in to the web pages.") and administers the project or is a system administrator (`ProjectNotFound` or
+  `ActorNotAllowed`, as `RequireAdministerAsync` decides; asked again on every call).
+- *Postconditions*: The store changes the value only while it still equals `expected` (compare-and-set), together with
+  the audit entry `project.independent-reviewers-changed` (detail `RequireIndependentReviewers on->off` or
+  `off->on`). When the stored value is no longer `expected`, `RecordChanged` is raised ("The setting was changed by
+  someone else. Reload the page and try again.") and nothing is stored. The rule is not retroactive: it is applied
+  when a reviewer is chosen and when a review is signed, and existing signatures stay valid.
+
 **Audit**: `CreateAsync` builds the audit draft `project.created` (detail `project 'Name'`) from the stored project, so
 it can name the identity the database assigned, and passes it to the store, which saves it in the same transaction. A
 creation that is refused records nothing. The member operations build `project.member-added` and
@@ -152,7 +173,8 @@ cause. See the `AuditService` unit for the action codes.
 
 Rule violations raise `DomainRuleException` before any store change: `ActorNotAllowed`, `ProjectNotFound`,
 `ProjectNameInvalid`, `ProjectDescriptionTooLong`, `UserNotFound`, `MembershipExists`, `MembershipNotFound`,
-`UserNameInvalid`, `DisplayNameInvalid`, `UserNameTaken`, `TooManyAttempts`, and `LastProjectAdmin`. The messages for a
+`UserNameInvalid`, `DisplayNameInvalid`, `UserNameTaken`, `TooManyAttempts`, `LastProjectAdmin`, and `RecordChanged` (a
+stale review rule). The messages for a
 name that cannot be added, a user that is not a member, and a taken name are deliberately generic, so the service cannot
 be used to find out which accounts exist. A failure to write the audit entry of a failed add does not hide the refusal.
 Constructing the service with a null store, user store, access, hasher, or clock raises `ArgumentNullException`; the
@@ -185,5 +207,6 @@ failures of the stores are turned into the friendly messages above.
 #### Callers
 
 - **ProjectsPage**, **ProjectPage**, **NewMemberPage**, **NewMemberAccountPage**, **ProjectAuditPage**, and
-  **ApiEndpoints** — create, list, and read projects, and list and manage members.
+  **ApiEndpoints** — create, list, and read projects, and list and manage members; **ProjectPage** also reads and
+  switches the review rule.
 - **ServerHost** — registers the service for the pages.

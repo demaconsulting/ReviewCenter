@@ -435,6 +435,11 @@ for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
 and a review is Approved only while every slot has a current signature. A review without a slot is In review. An
+Approved review is locked: its comments, checklist, and reviewer slots can no longer change, and only a project
+administrator or a system administrator can reopen it, with a recorded reason; the earlier signatures then stay as
+history, are out of date, and the review needs new signatures. While the project rule "Require independent reviewers"
+is on (the default), the person who created the review in ReviewCenter cannot be one of its reviewers and cannot sign
+it; the authors of git commits are not matched. An
 Approved review can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
 (a self-signed key by default, or a certificate from a certificate store), proves that the document is unchanged and
 comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
@@ -453,7 +458,7 @@ rewrite of the chain by someone with write access to the database, unless the he
 verification show, was recorded somewhere else. There is no external anchoring in this version. The design of the unit
 `AuditChain` states this in full.
 
-Author signatures, rejecting or withdrawing a signature, and a second
+Rejecting or withdrawing a signature and a second
 factor are deferred to later slices; a signed slot cannot be reassigned.
 The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so anyone who
 knows a user name can lock that account for a few minutes at a time, also from an address that the sign-in throttle
@@ -470,7 +475,8 @@ audit trail (it has no audit table), before the repository registry (it has no `
 from a repository (its reviews have no source columns), before personal access tokens (it has no token table and
 its reviews have no creator columns), or before project access control (it has no `ProjectMemberships` table, its
 users have no system administrator flag, and its repositories have no project), or before project members management (its
-users have no `MustChangePassword` column) must be
+users have no `MustChangePassword` column), or before the approval lock (its projects have no
+`RequireIndependentReviewers` column and it has no `ReviewReopens` table) must be
 deleted and created again, because there are no migrations (the schema is created with `EnsureCreated`, so a
 development database must be deleted and recreated whenever the schema changes).
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
@@ -629,7 +635,8 @@ is running.
   source and change columns), before personal access tokens (it has no token table and its reviews lack the
   creator columns), before project access control (it has no `ProjectMemberships` table, its users lack the system
   administrator flag, and its repositories lack the project), or before project members management (its users lack the
-  `MustChangePassword` column) must be deleted and
+  `MustChangePassword` column), or before the approval lock (its projects lack the `RequireIndependentReviewers`
+  column and it has no `ReviewReopens` table) must be deleted and
   created again; development databases are simply deleted and recreated. The audit table is append-only for the
   application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`
@@ -780,7 +787,9 @@ to start, answer, resolve, and reopen comment threads on a file, passing the sig
 `ThreadService` applies the comment rules and
 stores the threads through `ReviewStore`. `ReviewPage` and `ChecklistPage` call `ChecklistService`, which applies
 the checklist rules and stores answers, saved on behalf of the signed-in user, through `ReviewStore`. `ReviewPage`
-calls `SigningService` to add, change, and remove reviewer slots and to sign: the service checks the rules, asks
+calls `SigningService` to add, change, and remove reviewer slots, to sign, and (for an administrator) to
+reopen a locked review: the service checks the rules, including the approval lock and the independence of the
+reviewer, asks
 `UserService` to check the password again (for a user of a provider, `OidcSignIn` puts a proof of a new sign-in at the
 provider into `ReauthProofStore`, and `SigningService` spends it; for a user with a second factor `SigningService` also
 checks the code through `TotpService`), takes the digest of the record from `RecordDigest`,
@@ -834,9 +843,13 @@ result or the reason of a failure is reported through `Context`.
   by issuer and subject, a name of a local account never links to them, and their signature needs a fresh, single-use
   sign-in at the provider instead.
 - Signatures: a signature is bound to the digest of the review record and is never changed or removed; the approval
-  of a review is computed from the record and the signatures each time and is never stored.
+  of a review is computed from the record and the signatures each time and is never stored. The lock of an approved
+  review is that computed approval, so it is not stored either; a reopen is stored as a row of its own and changes the
+  digest, which retires the signatures without deleting them. The service checks the lock before each change and the
+  store checks it again inside its write transactions.
 - Access tokens: only the SHA-256 hash of a token is stored and the value is shown once, when it is created; a token
-  is accepted only on `/api`, never makes a user signed in on a page, and can never sign or change reviewer slots.
+  is accepted only on `/api`, never makes a user signed in on a page, and can never sign, reopen a review, or change
+  reviewer slots or project settings.
   A user has at most 20 active tokens, each valid for 30, 90, or 365 days.
 - Upload limits: a review accepts at most 200 files, each at most 2 MiB, and 20 MiB in total, with the limits
   defined once in the Core subsystem; a review from a repository honors the same limits for the files it freezes

@@ -396,3 +396,18 @@ sections:
           - EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage
           - EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange
           - EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject
+
+      - id: ReviewCenter-ProjectPage-ReviewRules
+        title: >-
+          The ProjectPage unit shall show to an administrator of the project or a system administrator, and to nobody
+          else, a Review rules card with a switch that requires independent reviewers, with an explanation that the
+          person who created the review cannot be a reviewer or sign it and that the authors of commits are not
+          matched, shall save a changed switch through the project service from the value that was loaded, and shall
+          show the confirmation or the message of the rule, for example when someone else changed the setting first.
+        justification: |
+          The rule belongs to the people who administer the project, and a project that must let one person do both has
+          to be able to switch it off. The explanation states what the tool can and cannot know about authors, so that
+          nobody reads the rule as a guarantee about commits.
+        tests:
+          - ProjectPage_ReviewRules_AdminSavesToggle
+          - ProjectPage_ReviewRules_NonAdmin_HidesCard

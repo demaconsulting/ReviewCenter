@@ -35,7 +35,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     not gain their tables or columns and must be deleted and recreated (this includes the repository registry and
 ///     the repository source columns of reviews and review files, the personal access token table and the creator
 ///     columns of reviews). The same is true for the second factor tables (<c>UserTotps</c> and
-///     <c>TotpRecoveryCodes</c>): a database from before them must be deleted and recreated. Instances are
+///     <c>TotpRecoveryCodes</c>): a database from before them must be deleted and recreated. The same is true for
+///     the <c>ReviewReopens</c> table and the <c>RequireIndependentReviewers</c> column of projects. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -146,6 +147,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<ReviewSignature> Signatures => Set<ReviewSignature>();
 
     /// <summary>
+    ///     Gets the table of review reopens (append-only history).
+    /// </summary>
+    public DbSet<ReviewReopen> ReviewReopens => Set<ReviewReopen>();
+
+    /// <summary>
     ///     Gets the table of audit entries.
     /// </summary>
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
@@ -194,6 +200,10 @@ internal sealed class ReviewCenterDbContext : DbContext
             project.HasKey(p => p.Id);
             project.Property(p => p.Name).IsRequired().HasMaxLength(ReviewLimits.MaxProjectNameLength);
             project.Property(p => p.Description).IsRequired().HasMaxLength(ReviewLimits.MaxProjectDescriptionLength);
+
+            // The review rules: independent reviewers are required unless an administrator switches the rule off. No
+            // database default is declared, so the value always comes from the entity (true unless set otherwise)
+            project.Property(p => p.RequireIndependentReviewers);
 
             // Evidence settings: seven boolean columns; the defaults match EvidenceSettings.Default. There is no
             // migration: the database is created from this model and recreated while the product is pre-release
@@ -442,6 +452,23 @@ internal sealed class ReviewCenterDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(s => s.SlotId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Review reopens: append-only history of the times an administrator reopened an approved review. The
+        // identity is assigned by the database; a reopen goes away with its review
+        modelBuilder.Entity<ReviewReopen>(reopen =>
+        {
+            reopen.HasKey(r => r.Id);
+            reopen.Property(r => r.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            reopen.Property(r => r.ReopenedBy).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength);
+            reopen.Property(r => r.ReopenedByDisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
+            reopen.Property(r => r.Reason).IsRequired().HasMaxLength(ReviewLimits.MaxReopenReasonLength);
+            reopen.Property(r => r.PreviousDigest).IsRequired().HasMaxLength(Sha256HexColumnLength);
+            reopen.HasIndex(r => new { r.ProjectId, r.ReviewId });
+            reopen.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(r => new { r.ProjectId, r.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Audit trail: append-only (nothing in the application updates or deletes a row). The sequence is the key,

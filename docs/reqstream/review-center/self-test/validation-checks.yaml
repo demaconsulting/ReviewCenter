@@ -35,16 +35,22 @@ sections:
 
       - id: ReviewCenter-ValidationChecks-ReviewWorkflow
         title: >-
-          The ReviewWorkflow check shall, on a temporary embedded SQLite database, create a project and a review,
-          answer the checklist, sign the review with a local-password re-authentication, and read the evidence index
-          back with the content fingerprint and the record digest.
+          The ReviewWorkflow check shall, on a temporary embedded SQLite database, create a project and a review as one
+          user, answer the checklist, sign the review as a separate reviewer with a local-password re-authentication,
+          show that the author is refused as a signer while independent reviewers are required, show that the approved
+          review is locked and that a change is refused with the ReviewLocked rule, show that an administrator can
+          reopen it, which returns it to not approved, and read the evidence index back with the content fingerprint and
+          the record digest.
         justification: |
           The signed review and its evidence index are the product of ReviewCenter. Running the production services
           through the whole path, from the project to the evidence, shows that the pieces work together on this
-          machine, on a database that is private to the run.
+          machine, on a database that is private to the run. The separate reviewer, the refusal of the author, the
+          lock, and the reopening are the rules that make an approval trustworthy, so the qualification run shows them
+          working and not only the happy path.
         tests:
           - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+          - ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails
 
       - id: ReviewCenter-ValidationChecks-Fingerprint
         title: >-

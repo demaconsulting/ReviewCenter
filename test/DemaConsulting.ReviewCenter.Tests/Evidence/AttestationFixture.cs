@@ -147,17 +147,46 @@ internal sealed class AttestationFixture
     }
 
     /// <summary>
-    ///     Answers every check of the checklist.
+    ///     Answers every check of the checklist. The answers are written to the store directly, so the step also works
+    ///     on an approved review, which the services refuse to change: it models a change that slipped in while a
+    ///     document was being prepared.
     /// </summary>
     /// <param name="outcome">The answer.</param>
+    /// <param name="reviewId">The review to answer; the fixture's review when <c>null</c>.</param>
     /// <returns>A task that completes when all checks are answered.</returns>
-    public async Task AnswerAllAsync(ChecklistOutcome outcome)
+    public async Task AnswerAllAsync(ChecklistOutcome outcome, string? reviewId = null)
     {
+        reviewId ??= ReviewId;
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
-            await Checklists.SetAnswerAsync(
-                ProjectId, ReviewId, item.Id, outcome, outcome == ChecklistOutcome.Pass ? null : "Changed after the signature.", TestActors.Ann, TestContext.Current.CancellationToken);
+            await Store.SetChecklistAnswerAsync(
+                new ChecklistAnswer
+                {
+                    ProjectId = ProjectId,
+                    ReviewId = reviewId,
+                    ItemId = item.Id,
+                    Outcome = outcome,
+                    Justification = outcome == ChecklistOutcome.Pass ? null : "Changed after the signature.",
+                    AnsweredBy = TestActors.Ann.DisplayName,
+                    AnsweredByUsername = TestActors.Ann.Username,
+                    AnsweredAt = Clock.GetUtcNow()
+                },
+                AuditDraft.By(TestActors.Ann, "checklist.answered", item.Id, ProjectId, reviewId),
+                TestContext.Current.CancellationToken);
         }
+    }
+
+    /// <summary>
+    ///     Adds an unsigned slot for cyd straight to the store, as if it slipped in while a document was prepared.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The new slot.</returns>
+    public Task<ReviewerSlot> AddUnsignedSlotAsync(CancellationToken cancellationToken)
+    {
+        return Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = ProjectId, ReviewId = ReviewId, PrimaryUserId = CydUserId },
+            stored => AuditDraft.By(new Actor("cyd", "Cyd"), "slot.added", $"slot {stored.Id}", ProjectId, ReviewId),
+            cancellationToken);
     }
 
     /// <summary>
@@ -199,7 +228,7 @@ internal sealed class AttestationFixture
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var cyd = new Actor("cyd", "Cyd");
-        var slot = await Signing.AddSlotAsync(cyd, ProjectId, ReviewId, CydUserId, null, cancellationToken);
+        var slot = await AddUnsignedSlotAsync(cancellationToken);
         var approval = await Signing.GetApprovalAsync(ProjectId, ReviewId, cancellationToken);
         await Signing.SignAsync(cyd, ProjectId, ReviewId, slot.Id, approval!.Digest, Password, cancellationToken);
     }

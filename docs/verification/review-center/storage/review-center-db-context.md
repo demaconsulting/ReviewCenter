@@ -47,6 +47,10 @@ be loadable on the test platform.
 - The tables for the second factor hold one enrollment per user and the recovery codes of a user; the database refuses
   two identical recovery code hashes of one user and allows the same hash for two users, and deleting a user deletes the
   enrollment and its codes.
+- The table for review reopens holds the reopen history of a review (who, when, why, and the previous digest), with the
+  identity assigned by the database; it is removed together with its review; and a new project reads back with the
+  `RequireIndependentReviewers` column set (a column of the `Projects` table without a database default, whose value
+  comes from the entity).
 
 #### Test Scenarios
 
@@ -148,6 +152,14 @@ project, which is tested by `ReviewStore_AddMembershipAsync_UnknownProject_IsRef
 `ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings`, and a changed setting is stored in its own columns
 and read back with the project, while the other projects keep the defaults, which is tested by
 `ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited`.
+
+**Review reopens table and independent reviewers column**: The `ReviewReopens` table and the `RequireIndependentReviewers`
+column of the `Projects` table are exercised by the tests of `ReviewStore` in `ReviewStoreSigningTests.cs`: a reopen is
+stored with the administrator, the time, the reason, and the previous digest and is listed in the order of the reopens,
+which is tested by `ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory`, and a new project reads back with the
+requirement on, a change is stored in the column by a compare-and-set and read back with the project, which is tested
+by `ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet`. The new table and column mean that a database
+that was created before them must be deleted and recreated (see the design of this unit).
 
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
 of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a

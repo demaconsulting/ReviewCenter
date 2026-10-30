@@ -6,7 +6,8 @@
    button to the page that decides who may read the evidence anonymously and what the attestation PDFs contain. Whoever may administer the
    project also sees a Members section below the reviews: the members with a role button and a Remove button, and a
    "+ Add member" button that leads to its own page (members are rarely changed, so the form is not here and no list
-   of users is ever shown). A project the user may not see looks exactly like a project that does not exist.
+   of users is ever shown). Above the members an administrator also sees a "Review rules" card with the switch
+   "Require independent reviewers" (the author of a review cannot be its reviewer or sign it). A project the user may not see looks exactly like a project that does not exist.
 
    Presentation only; state lives in ProjectPage.razor.cs. Every interactive element and every key value carries a
    stable kebab-case data-testid (row-level ids carry the review id or the user name), and the data-interactive
@@ -104,6 +105,35 @@
 
         @if (CanAdminister)
         {
+            <h2 class="section-title">Review rules</h2>
+            @if (RulesError is not null)
+            {
+                <p class="error" role="alert" data-testid="review-rules-error">@RulesError</p>
+            }
+            @if (RulesStatus is not null)
+            {
+                <p class="notice" role="status" data-testid="review-rules-status">@RulesStatus</p>
+            }
+            <section class="card" data-testid="review-rules-card">
+                <div class="field setting" data-testid="review-rule-independent-reviewers">
+                    <label class="switch">
+                        <input type="checkbox" checked="@RequireIndependentChoice"
+                               @onchange="e => RequireIndependentChoice = (bool)(e.Value ?? false)"
+                               data-testid="independent-reviewers-switch" />
+                        Require independent reviewers
+                    </label>
+                    <p class="muted hint">
+                        The person who created a review cannot be one of its reviewers and cannot sign it. Switch
+                        this off for a project where one person has to do both. ReviewCenter only knows who created
+                        the review in this tool; it does not match the authors of commits.
+                    </p>
+                </div>
+                <p>
+                    <button type="button" class="outline small" data-testid="independent-reviewers-save"
+                            @onclick="SaveReviewRulesAsync">Save review rules</button>
+                </p>
+            </section>
+
             <h2 class="section-title">Members</h2>
             @if (MemberError is not null)
             {

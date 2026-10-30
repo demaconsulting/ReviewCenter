@@ -187,3 +187,23 @@ sections:
           - ProjectService_Members_SystemAdminManages_OthersAreRefused
           - ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject
           - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+
+      - id: ReviewCenter-ProjectService-IndependentReviewersSetting
+        title: >-
+          The ProjectService class shall keep for each project the setting that requires independent reviewers, on
+          for a new project, shall let only an administrator of the project or a system administrator change it, and
+          never an actor that came through a personal access token, shall change it only when the value that the
+          caller saw is still the stored one and refuse with the RecordChanged rule otherwise, shall change and record
+          nothing when the new value equals the one the caller saw, and shall record a change in the audit trail as
+          project.independent-reviewers-changed, in the same transaction as the change, with the old and the new
+          value.
+        justification: |
+          Whether the author of a review may also review it is a rule of the project, and a project that has to
+          let one person do both needs a way to say so. Only the people who administer the project may relax the rule,
+          the change must be in the history, and a caller who saw an old value must not overwrite a newer one without
+          noticing.
+        tests:
+          - ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn
+          - ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits
+          - ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused
+          - ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged

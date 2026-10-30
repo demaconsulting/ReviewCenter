@@ -89,6 +89,7 @@
              data-testid="diff-row-@key" data-kind="@KindClass(line)">
             <span class="gutter">
                 <button type="button" class="line-comment" data-testid="diff-comment-@key"
+                        disabled="@CommentsDisabled" data-locked="@(CommentsDisabled ? "true" : "false")"
                         aria-label="@CommentLabel(line, side)" title="@CommentLabel(line, side)"
                         @onclick="e => CommentAsync(row, side, e)">+</button>
                 @if (isLeft)

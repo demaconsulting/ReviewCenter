@@ -32,6 +32,120 @@ namespace DemaConsulting.ReviewCenter.Tests.Evidence;
 public class AttestationServiceTests
 {
     /// <summary>
+    ///     Reopens the approved review of the fixture as cyd and signs it again, so it is approved a second time.
+    /// </summary>
+    /// <param name="fixture">The fixture, signed.</param>
+    /// <param name="reason">The reason of the reopen.</param>
+    /// <returns>The digest the first approval was for.</returns>
+    private static async Task<string> ReopenAndResignAsync(AttestationFixture fixture, string reason)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var previous = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, AttestationFixture.ReviewId, cancellationToken))!.Digest;
+        await fixture.Signing.ReopenReviewAsync(new Actor("cyd", "Cyd"), fixture.ProjectId, AttestationFixture.ReviewId, reason, cancellationToken);
+        await fixture.SignAsync();
+        return previous;
+    }
+
+    /// <summary>
+    ///     Test that the attestation of a review that was reopened and approved again holds the reopen history:
+    ///     who reopened, why, and the digest that was superseded.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_ReopenedReview_IncludesReopenHistory()
+    {
+        // Arrange: an approved review that was reopened and signed again
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        var previous = await ReopenAndResignAsync(fixture, "Missed a case.");
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the section with the reason, the administrator and the previous digest
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        var text = string.Join("\n", new PdfInspector(result.Content!).TextLines);
+        Assert.Contains("Reopen history", text, StringComparison.Ordinal);
+        Assert.Contains("Missed a case.", text, StringComparison.Ordinal);
+        Assert.Contains("Cyd (cyd)", text, StringComparison.Ordinal);
+        Assert.Contains(previous, text.Replace("\n", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the attestation of a review that was never reopened has no reopen section.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_NeverReopened_OmitsReopenHistory()
+    {
+        // Arrange: an approved review that was never reopened
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        Assert.DoesNotContain("Reopen history", string.Join("\n", new PdfInspector(result.Content!).TextLines), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that with reviewer names left out the administrator who reopened is named by a label only.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_ReopenedWithoutReviewerNames_OmitsReopenedByName()
+    {
+        // Arrange: a reopened and re-approved review in a project that leaves reviewer names out
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        await fixture.Store.UpdateEvidenceSettingsAsync(
+            fixture.ProjectId,
+            EvidenceSettings.Default,
+            EvidenceSettings.Default with { IncludeReviewerNames = false },
+            AuditTestExtensions.Draft(),
+            cancellationToken);
+        await ReopenAndResignAsync(fixture, "Missed a case.");
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
+
+        // Assert: the section is there, with the reason but without the administrator's names
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        var text = string.Join("\n", new PdfInspector(result.Content!).TextLines);
+        Assert.Contains("Reopen history", text, StringComparison.Ordinal);
+        Assert.Contains("Missed a case.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cyd", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("cyd", text, StringComparison.Ordinal);
+        Assert.Contains("Participant", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the attestation of an approved (and so locked) review is still produced.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_LockedReview_StillRenders()
+    {
+        // Arrange: an approved review, which is locked
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        var locked = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, "REQ-01", ChecklistOutcome.Fail, "No.", TestActors.Ann, cancellationToken));
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
+
+        // Assert: the review is locked, and the signed PDF is delivered anyway
+        Assert.Equal(DomainRule.ReviewLocked, locked.Rule);
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        Assert.NotNull(new PdfInspector(result.Content!).VerifySignature());
+    }
+
+    /// <summary>
     ///     Test that a review that does not exist has no attestation and leaves no audit entry.
     /// </summary>
     [Fact]
@@ -167,8 +281,7 @@ public class AttestationServiceTests
         using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
         var service = fixture.CreateService(
             keys,
-            afterRender: async cancellationToken =>
-                await fixture.Signing.AddSlotAsync(new Actor("cyd", "Cyd"), fixture.ProjectId, AttestationFixture.ReviewId, fixture.CydUserId, null, cancellationToken));
+            afterRender: async cancellationToken => await fixture.AddUnsignedSlotAsync(cancellationToken));
 
         // Act: ask for the attestation
         var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);

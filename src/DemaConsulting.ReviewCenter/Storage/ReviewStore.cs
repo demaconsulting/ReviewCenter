@@ -36,7 +36,9 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness violation on the review key is translated to a
 ///     <see cref="DomainRuleException"/> so callers see the same error as for the service pre-check.
 ///     Every change is made through <see cref="AuditAppender.ExecuteAsync{TResult}"/>: one write transaction, under the
-///     process-wide audit gate, that stores the change and its audit entry together or not at all.
+///     process-wide audit gate, that stores the change and its audit entry together or not at all. The changes of
+///     reviewed content and of the reviewer slots re-check inside that transaction that the review is not approved
+///     (locked) and refuse with <see cref="DomainRule.ReviewLocked"/> otherwise.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
 /// <param name="appender">The appender that runs each change together with its audit entry.</param>
@@ -71,7 +73,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     Name = project.Name,
                     Description = project.Description,
                     Created = project.Created,
-                    Evidence = project.Evidence
+                    Evidence = project.Evidence,
+                    RequireIndependentReviewers = project.RequireIndependentReviewers
                 };
                 context.Projects.Add(entity);
                 await context.SaveChangesAsync(cancellationToken);
@@ -134,6 +137,29 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                             .SetProperty(x => x.Evidence.IncludeFiles, updated.IncludeFiles)
                             .SetProperty(x => x.Evidence.IncludeGitContext, updated.IncludeGitContext),
                         cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateRequireIndependentReviewersAsync(
+        int projectId,
+        bool expected,
+        bool updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // The comparison is part of the update statement, so it is atomic with the change
+                var rows = await context.Projects
+                    .Where(p => p.Id == projectId && p.RequireIndependentReviewers == expected)
+                    .ExecuteUpdateAsync(p => p.SetProperty(x => x.RequireIndependentReviewers, updated), cancellationToken);
                 return rows > 0 ? (true, audit) : (false, null);
             },
             cancellationToken);
@@ -434,6 +460,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, thread.ProjectId, thread.ReviewId, cancellationToken);
+
                 // Insert fresh entities so that the database always assigns the identities, whatever the caller supplied
                 var entity = new ReviewThread
                 {
@@ -470,6 +498,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+
                 // The thread must belong to the stated review, so an identity from another review cannot be commented on
                 var exists = await context.Threads.AnyAsync(
                     t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId,
@@ -502,6 +532,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
                 var rows = await context.Threads
                     .Where(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId)
                     .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, state), cancellationToken);
@@ -575,6 +606,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, state.ProjectId, state.ReviewId, cancellationToken);
                 if (await UpdateSectionStateAsync(context, state, cancellationToken) == 0)
                 {
                     context.ChecklistSectionStates.Add(state);
@@ -600,6 +632,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, answer.ProjectId, answer.ReviewId, cancellationToken);
                 if (await UpdateAnswerAsync(context, answer, cancellationToken) == 0)
                 {
                     context.ChecklistAnswers.Add(answer);
@@ -682,6 +715,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, slot.ProjectId, slot.ReviewId, cancellationToken);
+
                 // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
                 var entity = new ReviewerSlot
                 {
@@ -713,6 +748,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
                 var rows = await context.ReviewerSlots
                     .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
                     .ExecuteUpdateAsync(
@@ -738,6 +774,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+
                 // The foreign key from the signatures makes the database refuse to remove a slot that was signed
                 var rows = await context.ReviewerSlots
                     .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
@@ -828,6 +866,144 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task ReopenReviewAsync(
+        int projectId,
+        string reviewId,
+        ReviewReopen reopen,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reopen);
+        ArgumentNullException.ThrowIfNull(audit);
+
+        // The approval is checked again inside the write transaction, so two administrators who reopen at the same
+        // moment cannot both succeed: the second one finds the review no longer approved
+        await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                if (!await ReviewRowExistsAsync(context, projectId, reviewId, cancellationToken))
+                {
+                    throw new DomainRuleException(
+                        DomainRule.ReviewNotFound,
+                        $"Review '{reviewId}' does not exist.");
+                }
+
+                if (!await IsApprovedAsync(context, projectId, reviewId, cancellationToken))
+                {
+                    throw new DomainRuleException(
+                        DomainRule.ReviewNotLocked,
+                        "The review is not locked, so there is nothing to reopen.");
+                }
+
+                // Insert a fresh entity so that the database always assigns the identity
+                context.ReviewReopens.Add(new ReviewReopen(
+                    0,
+                    projectId,
+                    reviewId,
+                    reopen.ReopenedAt,
+                    reopen.ReopenedBy,
+                    reopen.ReopenedByDisplayName,
+                    reopen.Reason,
+                    reopen.PreviousDigest));
+                return (true, audit);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ReviewReopen>> ListReopensAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        // Ordered by identity, which grows with the order of the reopens (SQLite cannot order by a DateTimeOffset)
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ReviewReopens.AsNoTracking()
+            .Where(r => r.ProjectId == projectId && r.ReviewId == reviewId)
+            .OrderBy(r => r.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    ///     Refuses the change when the review is approved; must run inside the audit transaction.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the review is known not to be locked.</returns>
+    /// <remarks>
+    ///     This is the second line of defense behind the Core services: the check shares the write transaction with the
+    ///     change, so a final signature that commits between the service check and the change cannot be overtaken.
+    ///     A review that does not exist is not locked.
+    /// </remarks>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is approved.</exception>
+    private static async Task EnsureNotLockedAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken)
+    {
+        if (await IsApprovedAsync(context, projectId, reviewId, cancellationToken))
+        {
+            throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
+        }
+    }
+
+    /// <summary>
+    ///     Tells whether a review is approved right now, using the one definition of <see cref="ReviewLock.IsApproved"/>.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the review exists, has slots and every slot holds a signature of the current digest.</returns>
+    private static async Task<bool> IsApprovedAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken)
+    {
+        // Without a slot nothing can be approved; this skips loading the record for the common case
+        var slots = await context.ReviewerSlots.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .ToListAsync(cancellationToken);
+        if (slots.Count == 0)
+        {
+            return false;
+        }
+
+        var record = await LoadRecordAsync(context, projectId, reviewId, cancellationToken);
+        if (record is null)
+        {
+            return false;
+        }
+
+        var signatures = await context.Signatures.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .ToListAsync(cancellationToken);
+        return ReviewLock.IsApproved(record, slots, signatures);
+    }
+
+    /// <summary>
+    ///     Tells whether the review row exists.
+    /// </summary>
+    /// <param name="context">The context to read with.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the review exists.</returns>
+    private static Task<bool> ReviewRowExistsAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken)
+    {
+        return context.Reviews.AnyAsync(r => r.ProjectId == projectId && r.Id == reviewId, cancellationToken);
+    }
+
     /// <summary>
     ///     Reads the record a signature covers, in one context so the parts are consistent with each other.
     /// </summary>
@@ -886,7 +1062,9 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .Include(t => t.Comments.OrderBy(c => c.Id))
             .OrderBy(t => t.Id)
             .ToListAsync(cancellationToken);
-        return new ReviewRecord(header.ContentFingerprint, checklist, sections, answers, threads, source);
+        var reopens = await context.ReviewReopens.AsNoTracking()
+            .CountAsync(r => r.ProjectId == projectId && r.ReviewId == reviewId, cancellationToken);
+        return new ReviewRecord(header.ContentFingerprint, checklist, sections, answers, threads, source, reopens);
     }
 
     /// <summary>

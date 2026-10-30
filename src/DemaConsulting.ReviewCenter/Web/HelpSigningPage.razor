@@ -19,6 +19,13 @@
             <li>Any later change to the review, such as a new comment or a changed answer, makes the earlier signatures
                 out of date, and the reviewer signs again. The review is <strong>Approved</strong> when every slot is
                 signed for its current state.</li>
+            <li>An approved review is <strong>locked</strong>: nobody can add comments, change answers, change the
+                files or the reviewers. A project admin or a system administrator can <strong>reopen</strong> it with
+                a reason; this is recorded in the audit trail, the old signatures are kept as history, and the
+                reviewers must sign again.</li>
+            <li>When the project requires independent reviewers (the default), the person who created a review cannot
+                be one of its reviewers and cannot sign it. Only the person who created the review in ReviewCenter is
+                checked; the authors of the commits are not.</li>
         </ul>
         <figure class="help-figure">
             <img class="help-shot" src="/help/reviewers-and-signing-1.png" loading="lazy"

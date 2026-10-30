@@ -33,6 +33,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     it from the stored entity, when the draft needs an identity the database assigns) and must save the
 ///     audit entry in the same transaction as the change: both are stored or neither. A change that did not
 ///     take effect (a method that returns <c>null</c> or <c>false</c>) records nothing.
+///     The methods that change reviewed content (<see cref="AddThreadAsync"/>, <see cref="AddCommentAsync"/>,
+///     <see cref="SetThreadStateAsync"/>, <see cref="SetChecklistSectionStateAsync"/>, <see cref="SetChecklistAnswerAsync"/>,
+///     <see cref="AddSlotAsync"/>, <see cref="UpdateSlotAsync"/> and <see cref="RemoveSlotAsync"/>) must also refuse with
+///     <see cref="DomainRule.ReviewLocked"/> when the review is approved (see <see cref="ReviewLock"/>), checked inside
+///     the same transaction as the change, so a signature that completes the approval at the same moment cannot be
+///     overtaken by a change; nothing is stored then.
 /// </remarks>
 public interface IReviewStore
 {
@@ -83,6 +89,31 @@ public interface IReviewStore
         int projectId,
         EvidenceSettings expected,
         EvidenceSettings updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Changes the "require independent reviewers" setting of a project, if it still holds the value the caller
+    ///     based its change on.
+    /// </summary>
+    /// <remarks>
+    ///     The comparison and the update are one atomic step (compare-and-set), like
+    ///     <see cref="UpdateEvidenceSettingsAsync"/>, so two administrators who save at the same time cannot silently
+    ///     overwrite each other.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="expected">The value the caller read and based its change on.</param>
+    /// <param name="updated">The new value.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the setting was changed; <c>false</c> (and nothing recorded) when the project does not
+    ///     exist or the setting is no longer <paramref name="expected"/>.
+    /// </returns>
+    Task<bool> UpdateRequireIndependentReviewersAsync(
+        int projectId,
+        bool expected,
+        bool updated,
         AuditDraft audit,
         CancellationToken cancellationToken = default);
 
@@ -483,5 +514,42 @@ public interface IReviewStore
     Task<ReviewSignature> AddSignatureAsync(
         ReviewSignature signature,
         AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Reopens an approved review: stores the reopen and its audit entry in one transaction.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="reopen">The reopen to store. Must not be null; its <see cref="ReviewReopen.Id"/> is ignored.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the reopen is stored.</returns>
+    /// <remarks>
+    ///     The store re-checks inside its transaction that the review is still approved, so two administrators who
+    ///     reopen at the same moment cannot both succeed. Signatures are not touched: the reopen raises the reopen
+    ///     count of the record, which changes the digest and so retires every earlier signature while keeping it as history.
+    /// </remarks>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReviewNotFound"/> when the review does not exist and with
+    ///     <see cref="DomainRule.ReviewNotLocked"/> when it is not approved. Nothing is stored then.
+    /// </exception>
+    Task ReopenReviewAsync(
+        int projectId,
+        string reviewId,
+        ReviewReopen reopen,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the reopens of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The reopens ordered by identity (oldest first); empty when there are none or the review does not exist.</returns>
+    Task<IReadOnlyList<ReviewReopen>> ListReopensAsync(
+        int projectId,
+        string reviewId,
         CancellationToken cancellationToken = default);
 }

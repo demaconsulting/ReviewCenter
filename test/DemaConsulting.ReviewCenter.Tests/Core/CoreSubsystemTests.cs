@@ -207,11 +207,11 @@ public class CoreSubsystemTests
         // only answers are those the re-authentication scenario needs to get as far as the password
         Assert.Equal(rule, exception.Rule);
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
-        Assert.Single(await users.ListAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned ? 2 : 1, (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
         Assert.Single(store.Reviews);
         Assert.Empty(store.Threads);
         var overall = (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall;
-        Assert.Equal(rule == DomainRule.ReauthenticationFailed ? overall.Total : 0, overall.Answered);
+        Assert.Equal(rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned ? overall.Total : 0, overall.Answered);
     }
 
     /// <summary>
@@ -242,7 +242,7 @@ public class CoreSubsystemTests
     {
         if (SigningRules.Contains(rule))
         {
-            return ViolateSigningAsync(rule, signing, checklists, store, root, projectId);
+            return ViolateSigningAsync(rule, signing, checklists, store, root, users, projectId);
         }
 
         if (RepositoryRules.Contains(rule))
@@ -552,7 +552,11 @@ public class CoreSubsystemTests
         DomainRule.ActorNotAllowed,
         DomainRule.SigningNotAllowed,
         DomainRule.ReauthenticationFailed,
-        DomainRule.RecordChanged
+        DomainRule.RecordChanged,
+        DomainRule.ReviewLocked,
+        DomainRule.ReviewNotLocked,
+        DomainRule.ReopenReasonInvalid,
+        DomainRule.ReviewerNotIndependent
     ];
 
     /// <summary>
@@ -564,6 +568,7 @@ public class CoreSubsystemTests
     /// <param name="checklists">The checklist service.</param>
     /// <param name="store">The store behind the services.</param>
     /// <param name="root">The user <c>root</c>.</param>
+    /// <param name="users">The user service, to create the author of the review where a rule needs them.</param>
     /// <param name="projectId">The identity of the existing project.</param>
     /// <returns>A task that fails with the rule violation.</returns>
     private static async Task ViolateSigningAsync(
@@ -572,6 +577,7 @@ public class CoreSubsystemTests
         ChecklistService checklists,
         FakeReviewStore store,
         User root,
+        UserService users,
         int projectId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -590,6 +596,18 @@ public class CoreSubsystemTests
             case DomainRule.ActorNotAllowed:
                 await signing.AddSlotAsync(new Actor("ghost", "Ghost"), projectId, "rev-1", root.Id, null, cancellationToken);
                 return;
+            case DomainRule.ReopenReasonInvalid:
+                await signing.ReopenReviewAsync(actor, projectId, "rev-1", "  ", cancellationToken);
+                return;
+            case DomainRule.ReviewNotLocked:
+                await signing.ReopenReviewAsync(actor, projectId, "rev-1", "Not approved yet", cancellationToken);
+                return;
+            case DomainRule.ReviewerNotIndependent:
+                // The review was created by the user "author", who is a member of the project and so a candidate
+                var author = await users.CreateAsync("author", "Author", UserRole.Reviewer, ValidPassword, cancellationToken);
+                await store.AddMembershipAsync(author.Id, projectId, cancellationToken);
+                await signing.AddSlotAsync(actor, projectId, "rev-1", author.Id, null, cancellationToken);
+                return;
         }
 
         // The rest need a slot of root and the digest of the record as it is
@@ -605,21 +623,17 @@ public class CoreSubsystemTests
                 await signing.SignAsync(actor, projectId, "rev-1", slot.Id, digest, ValidPassword, cancellationToken);
                 return;
             case DomainRule.SlotSigned:
-                // A signature stored directly (the store does not judge blockers), then the slot is removed
-                await store.AddSignatureAsync(
-                    new ReviewSignature
-                    {
-                        ProjectId = projectId,
-                        ReviewId = "rev-1",
-                        SlotId = slot.Id,
-                        UserId = root.Id,
-                        DisplayName = "Root",
-                        Role = SlotRole.Primary,
-                        SignedAt = _now,
-                        RecordDigest = digest,
-                        Meaning = SigningService.MeaningText
-                    },
-                    cancellationToken);
+                // A second slot nobody signs keeps the review from being approved and so from being locked; then the
+                // first slot is signed and removed
+                var second = await users.CreateAsync("second", "Second", UserRole.Reviewer, ValidPassword, cancellationToken);
+                await store.AddMembershipAsync(second.Id, projectId, cancellationToken);
+                await signing.AddSlotAsync(actor, projectId, "rev-1", second.Id, null, cancellationToken);
+                await AnswerAllAndSignAsync(signing, checklists, actor, projectId, slot.Id, cancellationToken);
+                await signing.RemoveSlotAsync(actor, projectId, "rev-1", slot.Id, cancellationToken);
+                return;
+            case DomainRule.ReviewLocked:
+                // Answer every check, sign, and then try to change the approved review
+                await AnswerAllAndSignAsync(signing, checklists, actor, projectId, slot.Id, cancellationToken);
                 await signing.RemoveSlotAsync(actor, projectId, "rev-1", slot.Id, cancellationToken);
                 return;
             default:
@@ -633,6 +647,33 @@ public class CoreSubsystemTests
                 await signing.SignAsync(actor, projectId, "rev-1", slot.Id, digest, "wrong password here", cancellationToken);
                 return;
         }
+    }
+
+    /// <summary>
+    ///     Answers every check of <c>rev-1</c> as passed and signs the slot with the resulting record.
+    /// </summary>
+    /// <param name="signing">The signing service.</param>
+    /// <param name="checklists">The checklist service.</param>
+    /// <param name="actor">The signer, who holds the slot.</param>
+    /// <param name="projectId">The identity of the existing project.</param>
+    /// <param name="slotId">The slot to sign.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the slot is signed.</returns>
+    private static async Task AnswerAllAndSignAsync(
+        SigningService signing,
+        ChecklistService checklists,
+        Actor actor,
+        int projectId,
+        int slotId,
+        CancellationToken cancellationToken)
+    {
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+        }
+
+        var digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+        await signing.SignAsync(actor, projectId, "rev-1", slotId, digest, ValidPassword, cancellationToken);
     }
 
     /// <summary>
@@ -882,18 +923,22 @@ public class CoreSubsystemTests
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
         var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, ValidPassword, cancellationToken);
         var project = await projects.CreateAsync("Apollo", null, cancellationToken);
         await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
+        await store.AddMembershipAsync(bob.Id, project.Id, cancellationToken);
         var viaToken = new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" };
+        var bobViaToken = new Actor("bob", "Bob") { ApiTokenId = "K7M2QX9P" };
 
-        // Act: create a review as the token actor, name a reviewer as the person, then try to name and sign as the token actor
+        // Act: create a review as the token actor, name a reviewer (not the author) as the person, then try to name
+        // and sign as a token actor
         var review = await reviews.CreateDraftAsync(project.Id, "rev-9", "Via API", [new("a.txt", TestContent.A)], viaToken, cancellationToken);
-        var slot = await signing.AddSlotAsync(new Actor("ann", "Ann"), project.Id, "rev-9", ann.Id, null, cancellationToken);
+        var slot = await signing.AddSlotAsync(new Actor("ann", "Ann"), project.Id, "rev-9", bob.Id, null, cancellationToken);
         var approval = await signing.GetApprovalAsync(project.Id, "rev-9", cancellationToken);
         var naming = await Assert.ThrowsAsync<DomainRuleException>(
-            () => signing.AddSlotAsync(viaToken, project.Id, "rev-9", ann.Id, null, cancellationToken));
+            () => signing.AddSlotAsync(viaToken, project.Id, "rev-9", bob.Id, null, cancellationToken));
         var signed = await Assert.ThrowsAsync<DomainRuleException>(() => signing.SignAsync(
-            viaToken, project.Id, "rev-9", slot.Id, approval!.Digest, ValidPassword, cancellationToken));
+            bobViaToken, project.Id, "rev-9", slot.Id, approval!.Digest, ValidPassword, cancellationToken));
 
         // Assert: the review is flagged, naming and signing are refused for the token actor, and nothing is signed
         Assert.True(review.CreatedViaApi);
@@ -915,7 +960,6 @@ public class CoreSubsystemTests
         var store = new FakeReviewStore();
         var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
         var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
-        var threads = TestServices.Threads(store, new FixedTimeProvider(_now));
         var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
         var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
@@ -942,10 +986,8 @@ public class CoreSubsystemTests
         await signing.SignAsync(annActor, project.Id, "rev-1", slot.Id, ready!.Digest, ValidPassword, cancellationToken);
         var approved = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
 
-        // Act: a comment is posted and resolved, so the record changes; the alternate then signs the new record
-        var thread = await threads.StartThreadAsync(
-            project.Id, "rev-1", new ThreadAnchor("a.txt"), bobActor, "One more thing", cancellationToken);
-        await threads.ResolveAsync(project.Id, "rev-1", thread.Id, cancellationToken);
+        // Act: an administrator reopens the approved review, so the record changes; the alternate then signs the new record
+        await signing.ReopenReviewAsync(annActor, project.Id, "rev-1", "One more thing", cancellationToken);
         var outOfDate = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
         await signing.SignAsync(bobActor, project.Id, "rev-1", slot.Id, outOfDate!.Digest, ValidPassword, cancellationToken);
         var resigned = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
@@ -963,5 +1005,329 @@ public class CoreSubsystemTests
         Assert.True(resigned!.IsApproved);
         Assert.Equal("Bob", resigned.Slots.Single().SignerName);
         Assert.Equal(2, (await store.ListSignaturesAsync(project.Id, "rev-1", cancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     The services of one project under the real access rules, with a system administrator, the author of the
+    ///     review and two more members.
+    /// </summary>
+    /// <param name="Store">The review store.</param>
+    /// <param name="Users">The user service.</param>
+    /// <param name="Projects">The project service.</param>
+    /// <param name="Threads">The thread service.</param>
+    /// <param name="Checklists">The checklist service.</param>
+    /// <param name="Signing">The signing service.</param>
+    /// <param name="ProjectId">The identity of the project.</param>
+    /// <param name="Root">The system administrator.</param>
+    /// <param name="Ann">The author of the review <c>rev-1</c>.</param>
+    /// <param name="Bob">A reviewer.</param>
+    /// <param name="Cyd">Another reviewer.</param>
+    /// <param name="Ids">The user identities by user name.</param>
+    private sealed record Realm(
+        FakeReviewStore Store,
+        UserService Users,
+        ProjectService Projects,
+        ThreadService Threads,
+        ChecklistService Checklists,
+        SigningService Signing,
+        int ProjectId,
+        Actor Root,
+        Actor Ann,
+        Actor Bob,
+        Actor Cyd,
+        IReadOnlyDictionary<string, int> Ids);
+
+    /// <summary>
+    ///     Creates the services over one store under the real access rules, a project, and the review
+    ///     <c>rev-1</c> that <c>ann</c> created.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The realm.</returns>
+    private static async Task<Realm> CreateRealmAsync(CancellationToken cancellationToken)
+    {
+        var clock = new FixedTimeProvider(_now);
+        var store = new FakeReviewStore();
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var access = new ProjectAccess(userStore, store);
+        await users.CreateAsync("root", "Root", true, ValidPassword, Actor.CommandLine, cancellationToken);
+        var root = new Actor("root", "Root");
+        var projects = new ProjectService(store, userStore, access, new FakePasswordHasher(), clock);
+        var project = await projects.CreateAsync("Apollo", null, root, cancellationToken);
+        var ids = new Dictionary<string, int>();
+        foreach (var name in new[] { "ann", "bob", "cyd" })
+        {
+            var user = await users.CreateAsync(name, char.ToUpperInvariant(name[0]) + name[1..], false, ValidPassword, Actor.CommandLine, cancellationToken);
+            await store.AddMembershipAsync(user.Id, project.Id, ProjectRole.User, cancellationToken);
+            ids[name] = user.Id;
+        }
+
+        var ann = new Actor("ann", "Ann");
+        await TestServices.Reviews(store, clock).CreateDraftAsync(
+            project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], ann, cancellationToken);
+        return new Realm(
+            store,
+            users,
+            projects,
+            TestServices.Threads(store, clock),
+            TestServices.Checklists(store, clock),
+            new SigningService(store, users, access, clock),
+            project.Id,
+            root,
+            ann,
+            new Actor("bob", "Bob"),
+            new Actor("cyd", "Cyd"),
+            ids);
+    }
+
+    /// <summary>
+    ///     Answers every check of <c>rev-1</c> as Pass, as the given actor.
+    /// </summary>
+    /// <param name="realm">The realm.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when every check is answered.</returns>
+    private static async Task AnswerAllAsync(Realm realm, CancellationToken cancellationToken)
+    {
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await realm.Checklists.SetAnswerAsync(
+                realm.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, realm.Bob, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Gets the approval status of <c>rev-1</c>.
+    /// </summary>
+    /// <param name="realm">The realm.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The approval status.</returns>
+    private static async Task<ReviewApproval> ApprovalOfAsync(Realm realm, CancellationToken cancellationToken)
+    {
+        return (await realm.Signing.GetApprovalAsync(realm.ProjectId, "rev-1", cancellationToken))!;
+    }
+
+    /// <summary>
+    ///     Approves <c>rev-1</c>: a resolved thread, every check answered, one slot of <c>bob</c>, signed by bob.
+    /// </summary>
+    /// <param name="realm">The realm.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The identity of the thread, the identity of the slot and the digest that was signed.</returns>
+    private static async Task<(int ThreadId, int SlotId, string Digest)> ApproveAsync(Realm realm, CancellationToken cancellationToken)
+    {
+        var thread = await realm.Threads.StartThreadAsync(
+            realm.ProjectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), realm.Bob, "A remark", cancellationToken);
+        await realm.Threads.ResolveAsync(realm.ProjectId, "rev-1", thread.Id, realm.Bob, cancellationToken);
+        await AnswerAllAsync(realm, cancellationToken);
+        var slot = await realm.Signing.AddSlotAsync(realm.Bob, realm.ProjectId, "rev-1", realm.Ids["bob"], null, cancellationToken);
+        var digest = (await ApprovalOfAsync(realm, cancellationToken)).Digest;
+        await realm.Signing.SignAsync(realm.Bob, realm.ProjectId, "rev-1", slot.Id, digest, ValidPassword, cancellationToken);
+        return (thread.Id, slot.Id, digest);
+    }
+
+    /// <summary>
+    ///     Test that an approved review is locked: every kind of change (thread, reply, resolve, reopen of a thread,
+    ///     answer, applicability, reviewer slots and signing) is refused with the same rule and changes nothing,
+    ///     while the approval can still be read.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ApprovedReview_RefusesEveryMutationWithReviewLocked()
+    {
+        // Arrange: an approved review with a resolved thread
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var (threadId, slotId, digest) = await ApproveAsync(realm, cancellationToken);
+        var section = DefaultChecklist.Current.Sections[0];
+        var pid = realm.ProjectId;
+        var mutations = new List<Func<Task>>
+        {
+            () => realm.Threads.StartThreadAsync(pid, "rev-1", new ThreadAnchor("a.txt", 2, 2), realm.Bob, "New", cancellationToken),
+            () => realm.Threads.ReplyAsync(pid, "rev-1", threadId, realm.Bob, "More", cancellationToken),
+            () => realm.Threads.ResolveAsync(pid, "rev-1", threadId, realm.Bob, cancellationToken),
+            () => realm.Threads.ReopenAsync(pid, "rev-1", threadId, realm.Bob, cancellationToken),
+            () => realm.Checklists.SetAnswerAsync(pid, "rev-1", section.Items[0].Id, ChecklistOutcome.Fail, "No.", realm.Bob, cancellationToken),
+            () => realm.Checklists.SetSectionApplicabilityAsync(pid, "rev-1", section.Id, false, "Not relevant.", realm.Bob, cancellationToken),
+            () => realm.Signing.AddSlotAsync(realm.Bob, pid, "rev-1", realm.Ids["cyd"], null, cancellationToken),
+            () => realm.Signing.UpdateSlotAsync(realm.Bob, pid, "rev-1", slotId, realm.Ids["bob"], realm.Ids["cyd"], cancellationToken),
+            () => realm.Signing.RemoveSlotAsync(realm.Bob, pid, "rev-1", slotId, cancellationToken),
+            () => realm.Signing.SignAsync(realm.Bob, pid, "rev-1", slotId, digest, ValidPassword, cancellationToken)
+        };
+
+        // Act: try every change
+        var rules = new List<DomainRule>();
+        foreach (var mutation in mutations)
+        {
+            rules.Add((await Assert.ThrowsAsync<DomainRuleException>(mutation)).Rule);
+        }
+
+        // Assert: every one is refused as locked, and the approval is exactly as it was
+        Assert.All(rules, rule => Assert.Equal(DomainRule.ReviewLocked, rule));
+        var approval = await ApprovalOfAsync(realm, cancellationToken);
+        Assert.True(approval.IsApproved);
+        Assert.Equal(digest, approval.Digest);
+        Assert.Single(approval.Slots);
+        Assert.Single(await realm.Threads.ListAsync(pid, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that reopening needs an administrator and a reason, is audited, returns the review to In review with
+    ///     the old signature kept as history, and that approving again needs a fresh signature for the new digest.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ReopenReview_RequiresAdminAndReasonAndNeedsFreshSignatures()
+    {
+        // Arrange: an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var (_, slotId, digest) = await ApproveAsync(realm, cancellationToken);
+        var pid = realm.ProjectId;
+
+        // Act: a member and an administrator's token try, then the administrator without and with a reason
+        var byMember = await Assert.ThrowsAsync<DomainRuleException>(
+            () => realm.Signing.ReopenReviewAsync(realm.Ann, pid, "rev-1", "Because.", cancellationToken));
+        var byToken = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.ReopenReviewAsync(
+            new Actor("root", "Root") { ApiTokenId = "K7M2QX9P" }, pid, "rev-1", "Because.", cancellationToken));
+        var noReason = await Assert.ThrowsAsync<DomainRuleException>(
+            () => realm.Signing.ReopenReviewAsync(realm.Root, pid, "rev-1", "  ", cancellationToken));
+        await realm.Signing.ReopenReviewAsync(realm.Root, pid, "rev-1", "A file was missing", cancellationToken);
+        var reopened = await ApprovalOfAsync(realm, cancellationToken);
+
+        // Assert: only the administrator with a reason reopened; In review, history kept, and the reopen is audited
+        Assert.Equal(DomainRule.ActorNotAllowed, byMember.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, byToken.Rule);
+        Assert.Equal(DomainRule.ReopenReasonInvalid, noReason.Rule);
+        Assert.False(reopened.IsApproved);
+        Assert.Equal(SlotSignatureState.OutOfDate, reopened.Slots.Single().State);
+        Assert.NotEqual(digest, reopened.Digest);
+        var reopen = Assert.Single(reopened.Reopens!);
+        Assert.Equal(("root", "A file was missing", digest), (reopen.ReopenedBy, reopen.Reason, reopen.PreviousDigest));
+        Assert.Single(await realm.Store.ListSignaturesAsync(pid, "rev-1", cancellationToken));
+        var audit = Assert.Single(realm.Store.Audits, a => a.Action == "review.reopened");
+        Assert.Contains(digest, audit.Detail, StringComparison.Ordinal);
+        Assert.Contains("A file was missing", audit.Detail, StringComparison.Ordinal);
+
+        // Act: the review is unlocked again, so a fresh signature for the new digest approves it a second time
+        await realm.Signing.SignAsync(realm.Bob, pid, "rev-1", slotId, reopened.Digest, ValidPassword, cancellationToken);
+        var again = await ApprovalOfAsync(realm, cancellationToken);
+
+        // Assert: approved again for the new digest, and both signatures are kept
+        Assert.True(again.IsApproved);
+        Assert.Equal(reopened.Digest, again.Digest);
+        Assert.Equal(2, (await realm.Store.ListSignaturesAsync(pid, "rev-1", cancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     Test that reopening a review that is not locked is refused with <see cref="DomainRule.ReviewNotLocked"/>
+    ///     and records nothing.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ReopenReview_OfUnlockedReview_ThrowsReviewNotLocked()
+    {
+        // Arrange: a review that nobody has signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+
+        // Act: an administrator reopens it
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(
+            () => realm.Signing.ReopenReviewAsync(realm.Root, realm.ProjectId, "rev-1", "Why not.", cancellationToken));
+
+        // Assert: refused, and nothing was recorded
+        Assert.Equal(DomainRule.ReviewNotLocked, ex.Rule);
+        Assert.Empty(await realm.Store.ListReopensAsync(realm.ProjectId, "rev-1", cancellationToken));
+        Assert.DoesNotContain(realm.Store.Audits, a => a.Action == "review.reopened");
+    }
+
+    /// <summary>
+    ///     Test that, while the project requires independent reviewers, the author of a review cannot be a primary
+    ///     or alternate reviewer and cannot sign; with the setting off the author can be a reviewer, and switching
+    ///     it on again stops that author from signing.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign()
+    {
+        // Arrange: the author ann created rev-1 in a project that requires independent reviewers (the default)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var pid = realm.ProjectId;
+
+        // Act: name the author as primary and as alternate
+        var primary = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.AddSlotAsync(
+            realm.Cyd, pid, "rev-1", realm.Ids["ann"], null, cancellationToken));
+        var alternate = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.AddSlotAsync(
+            realm.Cyd, pid, "rev-1", realm.Ids["bob"], realm.Ids["ann"], cancellationToken));
+
+        // Assert: refused with the independence rule, and no slot exists
+        Assert.Equal(DomainRule.ReviewerNotIndependent, primary.Rule);
+        Assert.Equal(DomainRule.ReviewerNotIndependent, alternate.Rule);
+        Assert.Empty((await ApprovalOfAsync(realm, cancellationToken)).Slots);
+
+        // Act: an administrator switches the rule off, the author is seated, and the rule is switched on again
+        Assert.True(await realm.Projects.SetRequireIndependentReviewersAsync(realm.Root, pid, true, false, cancellationToken));
+        var slot = await realm.Signing.AddSlotAsync(realm.Cyd, pid, "rev-1", realm.Ids["ann"], null, cancellationToken);
+        await AnswerAllAsync(realm, cancellationToken);
+        var digest = (await ApprovalOfAsync(realm, cancellationToken)).Digest;
+        Assert.True(await realm.Projects.SetRequireIndependentReviewersAsync(realm.Root, pid, false, true, cancellationToken));
+        var signed = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.SignAsync(
+            realm.Ann, pid, "rev-1", slot.Id, digest, ValidPassword, cancellationToken));
+
+        // Assert: the author cannot sign, and nothing is signed
+        Assert.Equal(DomainRule.ReviewerNotIndependent, signed.Rule);
+        Assert.Empty(await realm.Store.ListSignaturesAsync(pid, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that only an administrator (not a member, not a token) changes the independence setting, that a
+    ///     stale expectation is refused, and that every change is audited.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly()
+    {
+        // Arrange: a project with the default setting (on)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var pid = realm.ProjectId;
+
+        // Act: a member and an administrator's token try, then the administrator switches off, and a stale
+        // expectation tries again
+        var byMember = await Assert.ThrowsAsync<DomainRuleException>(
+            () => realm.Projects.SetRequireIndependentReviewersAsync(realm.Ann, pid, true, false, cancellationToken));
+        var byToken = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Projects.SetRequireIndependentReviewersAsync(
+            new Actor("root", "Root") { ApiTokenId = "K7M2QX9P" }, pid, true, false, cancellationToken));
+        var changed = await realm.Projects.SetRequireIndependentReviewersAsync(realm.Root, pid, true, false, cancellationToken);
+        var stale = await Assert.ThrowsAsync<DomainRuleException>(
+            () => realm.Projects.SetRequireIndependentReviewersAsync(realm.Root, pid, true, false, cancellationToken));
+
+        // Assert: refused for the member and the token; the administrator's change is stored and audited once
+        Assert.Equal(DomainRule.ActorNotAllowed, byMember.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, byToken.Rule);
+        Assert.True(changed);
+        Assert.Equal(DomainRule.RecordChanged, stale.Rule);
+        Assert.False((await realm.Store.GetProjectAsync(pid, cancellationToken))!.RequireIndependentReviewers);
+        var audit = Assert.Single(realm.Store.Audits, a => a.Action == ProjectService.IndependentReviewersChangedAction);
+        Assert.Equal("root", audit.ActorUsername);
+        Assert.Contains("on->off", audit.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the author of a review created through an API token is the user of the token, so that user
+    ///     cannot be a reviewer of it while independence is required.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ApiTokenReview_AuthorIsTokenUser()
+    {
+        // Arrange: the realm and a token of ann
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var viaToken = new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" };
+
+        // Act: create a review through the token, then name ann as its reviewer
+        var review = await TestServices.Reviews(realm.Store, new FixedTimeProvider(_now)).CreateDraftAsync(
+            realm.ProjectId, "rev-9", "Via API", [new("a.txt", TestContent.A)], viaToken, cancellationToken);
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.AddSlotAsync(
+            realm.Cyd, realm.ProjectId, "rev-9", realm.Ids["ann"], null, cancellationToken));
+
+        // Assert: the author is ann (the token's user), flagged as created through the API, and ann is not independent
+        Assert.Equal("ann", review.CreatedBy);
+        Assert.True(review.CreatedViaApi);
+        Assert.Equal(DomainRule.ReviewerNotIndependent, ex.Rule);
     }
 }

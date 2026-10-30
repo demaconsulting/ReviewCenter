@@ -34,6 +34,10 @@ N/A - standard test environment.
   title or items, or item id or text), is not hidden: it raises a `JsonException`. A minimal complete definition
   still computes.
 - Text that contains the delimiters of the format cannot produce the digest of another record.
+- A record that was never reopened (a reopen count of 0) has exactly the canonical text, and so the digest, that it had
+  before reopening existed, with the same version line; a record that was reopened gets a final `reopens {count}` line,
+  so its digest differs from that of the same record without reopens and from that of the same record with another
+  count.
 - A null record is rejected with an `ArgumentNullException` by both methods.
 
 #### Test Scenarios
@@ -128,6 +132,14 @@ digest as the original. This scenario is tested by `RecordDigest_Compute_Applica
 **RecordDigest_Compute_TextWithDelimiters_DoesNotCollide**: A record with one comment whose text contains a line feed
 and a fake comment line, and a record with two real comments, give different digests. This scenario is tested by
 `RecordDigest_Compute_TextWithDelimiters_DoesNotCollide`.
+
+**RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest**: A record with a reopen count of 0 has the same canonical text
+(no `reopens` line) and the same digest as the known values of the records that were fixed before reopening existed.
+This scenario is tested by `RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest`.
+
+**RecordDigest_Compute_ReopensChangeDigest**: The same record with a reopen count of 1 and of 2 gives two digests that
+differ from each other and from the record without reopens, and the canonical text ends with the line `reopens 1`
+for the first. This scenario is tested by `RecordDigest_Compute_ReopensChangeDigest`.
 
 **RecordDigest_Compute_NullRecord_Throws**: A null record is rejected with an `ArgumentNullException` by both
 methods. This scenario is tested by `RecordDigest_Compute_NullRecord_Throws`.

@@ -16,16 +16,19 @@ and has no access to the database. It holds the project and the review (identifi
 review the repository, the baseline and head commits, and the review-set), the content fingerprint, the record digest and
 its version, the files (path, status, SHA-256, and size), the checklist sections with their items, answers, and
 comments, the count of open threads and the summaries of the resolved ones, the reviewer slots with their signatures
-(signer, role, time, the digest signed, and its meaning), the head of the audit chain with its length and whether it is
-intact, the version of the tool, the time of the creation, who asked for it (a name, a label, or a statement that the
+(signer, role, time, the digest signed, and its meaning), the reopen history of the review (time, who, reason, and the
+digest of the record that was reopened; none when the review was never reopened), the head of the audit chain with
+its length and whether it is intact, the version of the tool, the time of the creation, who asked for it (a name,
+a label, or a statement that the
 request was anonymous), the description of the key
 (`AttestationKeyInfo`), the evidence settings that were in effect (`Content`), and whether the request was anonymous.
 The person fields of the input are already the final text: `AttestationService` replaces names with labels when the
 settings keep names out, so the renderer never sees a name that it has to hide. The output is the
 bytes of a PDF. Two public constants hold the standing statements: `SelfSignedNotice` ("SELF-SIGNED KEY - NOT AN
 ORGANIZATION KEY. Dev/test only; do not rely on it as organizational evidence.") and `ProvesStatement`. The document has
-these sections in order: the review, the content scope, the files, the checklist, the threads, the sign-offs, the audit
-anchor, and the signature. The files and the threads are left out when their switch is off.
+these sections in order: the review, the content scope, the files, the checklist, the threads, the sign-offs, the reopen
+history, the audit anchor, and the signature. The files and the threads are left out when their switch is off, and the
+reopen history only appears when the review was reopened at least once.
 
 #### Key Methods
 
@@ -49,6 +52,14 @@ anchor, and the signature. The files and the threads are left out when their swi
     not git context and stays.
   - *Reviewer names* off: nothing is hidden by the renderer, because the labels are already in the input; the switch is
     only reported in the content scope.
+
+**Reopen history**: A review that was reopened by an administrator after an approval has a section "Reopen history"
+after the sign-offs and before the audit anchor, and a review that never was has none, so its document is unchanged.
+The section says in an italic sentence that the review was approved earlier and reopened by an administrator, and that
+the sign-offs above are of the current record, and then prints for every reopen, oldest first, the rows "Reopened at",
+"Reopened by", "Reason", and "Previous digest" (in a fixed-width font). The names come from the input, so with the
+reviewer names switch off they are labels. The reason is the administrator's own words and is printed in full, like a
+comment.
 
 **Content scope**: Every PDF has a section "Content scope", right after the review section, that prints the settings as
 they were when the document was generated (so a reader can see what a project's own setting was on that day), says
@@ -85,9 +96,11 @@ commit, selection, review-set, and for every changed file its path, kind, and ba
 the review was created with (version, and for every section its identifier and title and for every check its
 identifier and wording); every checklist answer (check identifier, outcome, justification, and who answered, by display
 name and user name); the sections that do not apply (identifier and reason); and every thread with its comments (anchor,
-state, time, and for each comment the author, the user name, the text, and the time).
+state, time, and for each comment the author, the user name, the text, and the time); and, only when the review was
+reopened, the number of reopens.
 It does **not** cover the time an answer was given (`Answered at`), the review title, the project name, the repository
-name, the reviewer slots, and the audit chain head, which the PDF may also show. The signature over the PDF covers
+name, the reviewer slots, and the audit chain head, which the PDF may also show. The reopen history (who reopened the
+review, when, and why) is shown by the PDF but only its count is bound by the digest. The signature over the PDF covers
 every byte of the PDF, so these extra items are protected by the PDF signature (and, for what the audit event holds,
 by the audit chain); they are not bound by the reviewers' own signatures on the record.
 

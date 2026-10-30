@@ -267,7 +267,7 @@ public class ApiProjectAccessTests
         var mem = (await app.Services.GetRequiredService<UserService>().GetAsync("mem", cancellationToken))!;
         await app.Services.GetRequiredService<IReviewStore>().AddMembershipAsync(mem.Id, project.Id, cancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], cancellationToken);
+            project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
         return project.Id;
     }
 }

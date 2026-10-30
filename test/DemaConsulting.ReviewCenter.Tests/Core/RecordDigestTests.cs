@@ -845,6 +845,47 @@ public class RecordDigestTests
     }
 
     /// <summary>
+    ///     Test that a record that was never reopened has the digest it had before reopening existed: no
+    ///     <c>reopens</c> line is written, so the known digest holds and old signatures stay valid.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest()
+    {
+        // Arrange: the known record, once with the default and once with an explicit zero count
+        var legacy = new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload);
+        var zero = legacy with { Reopens = 0 };
+
+        // Act
+        var canonical = RecordDigest.Canonicalize(zero);
+
+        // Assert: the same known digest as before, and no reopens line
+        Assert.Equal("9fee8bc5c8ddc1c908ed605ccb301bfa1be3e0499cc824d787275c7a783543f0", RecordDigest.Compute(zero));
+        Assert.Equal(RecordDigest.Compute(legacy), RecordDigest.Compute(zero));
+        Assert.DoesNotContain("reopens", canonical);
+    }
+
+    /// <summary>
+    ///     Test that each reopen changes the digest, with the count as the last line, so a signature given before a
+    ///     reopen can never be current again whatever the content.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ReopensChangeDigest()
+    {
+        // Arrange: the same content with no reopen, one and two reopens
+        var none = new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload);
+        var one = none with { Reopens = 1 };
+        var two = none with { Reopens = 2 };
+
+        // Act
+        var digests = new[] { RecordDigest.Compute(none), RecordDigest.Compute(one), RecordDigest.Compute(two) };
+
+        // Assert: three different digests; the count is the final line of the canonical text
+        Assert.Equal(3, digests.Distinct().Count());
+        Assert.EndsWith("\nreopens 1", RecordDigest.Canonicalize(one));
+        Assert.EndsWith("\nreopens 2", RecordDigest.Canonicalize(two));
+    }
+
+    /// <summary>
     ///     Test that a null record is refused.
     /// </summary>
     [Fact]

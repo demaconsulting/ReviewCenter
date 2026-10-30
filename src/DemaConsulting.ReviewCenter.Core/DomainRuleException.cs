@@ -230,7 +230,25 @@ public enum DomainRule
     TotpEnrollmentExpired,
 
     /// <summary>The stored secret of a user cannot be decrypted, for example because the key ring was lost; an administrator must reset the second factor.</summary>
-    TotpSecretUnreadable
+    TotpSecretUnreadable,
+
+    /// <summary>
+    ///     The review is approved (every reviewer slot has a signature of the current record) and therefore locked:
+    ///     its threads, checklist answers and reviewer slots can not change until an administrator reopens it.
+    /// </summary>
+    ReviewLocked,
+
+    /// <summary>The review is not approved, so it is not locked and there is nothing to reopen.</summary>
+    ReviewNotLocked,
+
+    /// <summary>The reason given for reopening a review is missing or longer than <see cref="ReviewLimits.MaxReopenReasonLength"/>.</summary>
+    ReopenReasonInvalid,
+
+    /// <summary>
+    ///     The user created the review and the project requires independent reviewers, so the user can neither be
+    ///     chosen as a reviewer of it nor sign it.
+    /// </summary>
+    ReviewerNotIndependent
 }
 
 /// <summary>

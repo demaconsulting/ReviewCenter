@@ -13,7 +13,10 @@ access is the test double `AllowAllProjectAccess`, which treats every actor as a
 membership from the memberships stored in the fake store; the access rules themselves are verified by the
 `ProjectAccess` unit. The rules
 are checked through the `DomainRuleException` that names the broken rule, and through the state of the fake store, so
-that a refused request is shown to store nothing.
+that a refused request is shown to store nothing. The fake store does not re-check the approval lock inside a write
+(the real store does, and its tests are in the `ReviewStore` unit), so these tests show the lock decided by the
+service. The review is created by a user (`author`) who is not a test user, so the many tests that sign with the other
+users are not affected by the rule of independent reviewers; the tests of that rule use a review created by a member.
 
 #### Test Environment
 
@@ -47,6 +50,19 @@ N/A - standard test environment.
 - A signature goes out of date when the record changes, the slot can be signed again, and the earlier signature is
   kept.
 - A review is approved only when it has at least one slot and every slot has a current signature.
+- An approved review is locked: adding, changing, and removing a slot and signing are refused with `ReviewLocked`,
+  the message of which says that an administrator must reopen the review, and nothing is stored.
+- A project administrator (a system administrator, or an administrator of the project) reopens a locked review with a
+  reason of 1 to 250 characters after trimming; a user who does not administer the project and an actor that came
+  through a token are refused with `ActorNotAllowed`, an empty or too long reason with `ReopenReasonInvalid`, and a
+  review that is not approved with `ReviewNotLocked`; nothing is stored in these cases.
+- A reopen stores who, when, why, and the digest of the approved record, and records the audit entry
+  `review.reopened` with the previous digest and the reason. The review is In review afterwards, the earlier
+  signatures are kept as out-of-date history, and the review is approved again only when every slot is signed again.
+- While the project requires independent reviewers (the default), the user who created the review is refused as
+  primary or alternate reviewer when a slot is added or changed and is refused when signing, also in a slot that was
+  filled before the rule was switched on, with `ReviewerNotIndependent` and before the password is asked for; with the
+  rule off the author may be assigned and may sign.
 - The candidates for a slot are the enabled members of the project.
 - The status of a slot says for the primary and the alternate reviewer whether the user is still a member of the
   project, and a removed user stays assigned to the slot.
@@ -93,8 +109,8 @@ and then the slot is removed; the status shows the change and then no slot. This
 `SigningService_UpdateAndRemoveSlotAsync_Unsigned_Succeed`.
 
 **SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned**: A theory over a slot with a current signature and
-a slot whose signature is out of date; changing and removing each is refused with `SlotSigned` and the slot is
-unchanged. This scenario is tested by `SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned`.
+a slot whose signature is out of date, each next to a second slot nobody has signed so that the review is not locked;
+changing and removing each is refused with `SlotSigned` and the slot is unchanged. This scenario is tested by `SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned`.
 
 **SigningService_UpdateAndRemoveSlotAsync_UnknownSlot_ThrowsSlotNotFound**: Changing or removing a slot that is not
 part of the review is refused with `SlotNotFound`. This scenario is tested by
@@ -141,12 +157,14 @@ its section is marked as not applicable the blockers are empty. This scenario is
 opened and resolved. Signing with the digest seen is refused with `RecordChanged` and nothing is signed. This scenario
 is tested by `SigningService_SignAsync_StaleExpectedDigest_ThrowsRecordChanged`.
 
-**SigningService_SignAsync_AlreadySignedCurrent_ThrowsSigningNotAllowed**: A slot that the primary reviewer has signed
+**SigningService_SignAsync_AlreadySignedCurrent_ThrowsSigningNotAllowed**: A slot that the primary reviewer has signed,
+next to a second slot nobody has signed so that the review is not locked,
 cannot be signed again for the same record by the alternate; the request is refused with `SigningNotAllowed` and one
 signature remains. This scenario is tested by `SigningService_SignAsync_AlreadySignedCurrent_ThrowsSigningNotAllowed`.
 
-**SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable**: After a signature, a thread is opened
-and resolved. The slot is OutOfDate, the review is not approved, and the digest differs. The alternate signs again;
+**SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable**: After a signature, an administrator
+reopens the approved review, which changes the record (an approved review accepts no other change). The slot is
+OutOfDate, the review is not approved, and the digest differs. The alternate signs again;
 the slot is Signed by the alternate, the review is approved, and both signatures are kept. This scenario is tested by
 `SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable`.
 
@@ -197,6 +215,60 @@ shows that nothing else is checked first, and the slot stays unsigned. This scen
 **SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused**: An actor that came through a token adds, changes, and
 removes a slot; each is refused with `ActorNotAllowed` and the existing slot is unchanged. This scenario is tested by
 `SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused`.
+
+**SigningService_AddSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent**: A theory over the author of the
+review (a project member who created it) chosen as primary and as alternate reviewer of a new slot, with the project
+at its default of requiring independent reviewers; each is refused with `ReviewerNotIndependent` and no slot is stored.
+This scenario is tested by `SigningService_AddSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent`.
+
+**SigningService_UpdateSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent**: A theory over an unsigned
+slot of another reviewer that is changed so that the author is the primary or the alternate; each is refused with
+`ReviewerNotIndependent` and the slot keeps its reviewers. This scenario is tested by
+`SigningService_UpdateSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent`.
+
+**SigningService_AddSlotAsync_AuthorAndIndependenceOff_Succeeds**: With the requirement switched off for the project,
+the author is accepted as the primary reviewer of a slot. This scenario is tested by
+`SigningService_AddSlotAsync_AuthorAndIndependenceOff_Succeeds`.
+
+**SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent**: The author is put into a slot while
+the requirement is off, and the requirement is then switched on. The author signing the ready review, with the right
+password, is refused with `ReviewerNotIndependent` and nothing is signed. This scenario is tested by
+`SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent`.
+
+**SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked**: A review that every slot has signed is
+approved. Adding, changing, and removing a slot are each refused with `ReviewLocked`; the slots are unchanged and the
+review is still approved with the same digest. This scenario is tested by
+`SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked`.
+
+**SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked**: Signing an approved review again is refused with
+`ReviewLocked` (not with the "already signed" message), and the signatures are unchanged. This scenario is tested by `SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked`.
+
+**SigningService_ReopenReviewAsync_NotAdmin_ThrowsActorNotAllowed**: A member of the project who does not administer it
+asks to reopen an approved review; the request is refused with `ActorNotAllowed`, and the review is still approved with
+no reopen stored. This scenario is tested by `SigningService_ReopenReviewAsync_NotAdmin_ThrowsActorNotAllowed`.
+
+**SigningService_ReopenReviewAsync_InvalidReason_ThrowsReopenReasonInvalid**: A missing, a white-space, and a too long
+reason (more than 250 characters) are each refused with `ReopenReasonInvalid` and the review stays approved. This
+scenario is tested by `SigningService_ReopenReviewAsync_InvalidReason_ThrowsReopenReasonInvalid`.
+
+**SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked**: Reopening a review that is not approved (one
+without a current signature in every slot) is refused with `ReviewNotLocked` and nothing is stored. This scenario is tested
+by `SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked`.
+
+**SigningService_ReopenReviewAsync_ApiToken_ThrowsActorNotAllowed**: An administrator whose identity arrives through a
+token asks to reopen an approved review with a valid reason; the request is refused with `ActorNotAllowed` and the
+review stays approved. This scenario is tested by `SigningService_ReopenReviewAsync_ApiToken_ThrowsActorNotAllowed`.
+
+**SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits**: An administrator reopens an
+approved review with a reason that has surrounding white space. The review is no longer approved, the digest differs
+from the approved one, the signature is kept and its slot is OutOfDate, the history has one reopen with the trimmed
+reason, the administrator, the time, and the previous digest, and the audit trail has `review.reopened` with the
+previous digest and the reason in its detail. This scenario is tested by
+`SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits`.
+
+**SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures**: After the reopen, the reviewer signs
+the new record; the review is approved again, both the old and the new signature are stored, and only the new one is
+current. This scenario is tested by `SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures`.
 
 **SigningService external scenarios**: The signature of a user of an external identity provider is verified in
 `SigningServiceExternalTests.cs`, over the same fakes and a real `ReauthProofStore` that shares the clock of the

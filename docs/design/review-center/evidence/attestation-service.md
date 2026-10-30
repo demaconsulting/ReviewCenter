@@ -30,8 +30,17 @@ that keep the roles visible: `Reviewer N (primary)` and `Reviewer N (alternate)`
 signer of the slot gets the label of the member who signed), `Participant N` for anybody else, numbered in the order in
 which they are first named, and `a signed-in user` for who asked. A person is recognized by user name, or by display
 name when only that is known. Only the structured name fields (the author of a comment, who answered a check, the
-signer, the slot members, who asked) are replaced; names that people typed into a comment or a justification are the
-author's own text and stay.
+signer, the slot members, who reopened the review, who asked) are replaced; names that people typed into a comment
+or a justification are the author's own text and stay.
+
+The document also carries the reopen history of the approval (`ReviewApproval.Reopens`, read by `SigningService`): for
+every time an administrator reopened the review after an approval, when, by whom (written as "display name (user name)"
+with the reviewer names switch on and as a participant label with it off, like every other person), the reason, and the
+digest of the record that was reopened. The history is empty for a review that was never reopened, and then the
+document is the same as before. It is information about the history of the record; the signatures in the document are
+still only those of the current record, so a signature of an earlier record never appears as a sign-off. A reopened
+review is not complete until it is signed again, so `GenerateAsync` gives `NotApproved` (or `NotFound` to an anonymous
+request) in that time.
 
 #### Key Methods
 

@@ -113,7 +113,10 @@ pages for projects, planning, reviews, review checklists, project members, and e
   and creates the ticked ones; the review route shows a summary of the checklist progress, the reviewers, and the
   threads, then
   the review, its fingerprint, its files, the content of a selected file, its reviewer
-  slots with their signature status, and an Approved or In review badge, and lets a reviewer sign;
+  slots with their signature status, an Approved or In review badge (and a Locked badge with a banner while the review
+  is approved), and lets a reviewer sign and, to whoever administers the project, reopen a locked review with a reason;
+  the project route also has a Review rules card for whoever administers the project (the switch "Require independent
+  reviewers");
   the checklist route shows the checklist, where each check is answered. A project that
   does not exist, and equally a project the user may not see, is reported on the page itself with the same
   message, "Project N does not exist.", with HTTP status 200, so that a user who is no member cannot tell a hidden
@@ -299,7 +302,8 @@ system administrator is refused at once, and so does the signing of a review in 
 for the
 original user until the next check, which is at most one revalidation interval, and what they record is attributed to
 that user. Every action that changes something (creating a project or a review, starting, answering, resolving, and
-reopening a thread, answering checklist checks, changing reviewer slots, signing, changing a password, and the user
+reopening a thread, answering checklist checks, changing reviewer slots, signing, reopening a locked review, changing the
+review rules of a project, changing a password, and the user
 administration actions) first asks `GetActorAsync` for the current user, even where its Core service takes no actor,
 so an action that meets an authentication state that has already ended is refused with a message and saves nothing.
 
@@ -348,7 +352,8 @@ page as for a project the user may not see. Nobody being signed in is treated as
 without calling a service, so nothing is read and nothing is stored.
 
 The guard is the first statement of the handlers that call a service or read data: `ReviewPage` (view file, view
-thread, start thread, reply, resolve or reopen, add, save and remove slot, and sign), `ChecklistPage` (answer, save,
+thread, start thread, reply, resolve or reopen, add, save and remove slot, sign, and reopen a locked review),
+`ChecklistPage` (answer, save,
 and the not-applicable switch), `PlanPage` (show plan and create reviews), and `NewReviewPage` (create the review).
 The handlers that only change what is shown (the thread filter, expanding a thread, the diff, head, and baseline views,
 the open section of the checklist, the next unanswered check, the mode and ticks of `PlanPage`, and the source choice
@@ -488,6 +493,20 @@ an identity provider there is no password: the page offers a button that posts t
 `SigningService.HasReauthProofAsync`, which spends nothing) it shows the same Sign button; Core spends the proof when
 it signs. The project page shows the
 approval status of every listed review, one lookup per review.
+
+An approved review is locked, and the pages show it without holding a rule. `ReviewPage` shows the approval from
+`SigningService` as a Locked badge and a banner, disables every control that would change the discussion, the
+checklist answers, or the reviewer slots (the `DiffView` component through its `CommentsDisabled` parameter), and, to
+whoever administers the project, offers a form that reopens the review with a required reason through
+`SigningService.ReopenReviewAsync`; after a reopen the review is In review, the earlier signatures show as out of
+date, and a reopen history lists who reopened it, when, why, and the digest of the earlier record. `ChecklistPage` asks
+the same approval and makes the checklist read-only with an explanation. A page that is out of date still cannot change
+a locked review, because Core and the store refuse with `ReviewLocked` and the page shows that message. The review
+author is not offered as a reviewer while the project requires independent reviewers, and the Reviewers card says why
+(Core refuses the author as a reviewer or signer in any case). The project page has the admin-only "Review rules" card
+that saves the `RequireIndependentReviewers` setting of the project through `ProjectService`, based on the value it
+loaded, so that a change by someone else is shown and never overwritten. Reading, the attestation download, and the
+evidence index are unaffected by the lock.
 
 #### Signed attestation
 

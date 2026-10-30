@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Tests.Core;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
 
@@ -69,7 +70,7 @@ internal static class EvidenceTestSupport
             Title = $"Review {id}",
             State = ReviewState.Draft,
             Created = clock.GetUtcNow(),
-            CreatedBy = Ann.Username,
+            CreatedBy = TestActors.Author.Username,
             ContentFingerprint = Fingerprint.Compute(files.Select(file => file.Sha256)),
             ReviewSetId = reviewSetId,
             Files = files,

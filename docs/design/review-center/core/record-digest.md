@@ -41,6 +41,8 @@ text. Hashing is the only use of the text; it is never stored.
    posting order: the display name of the author, the user name of the author, the text, and the time. A line of a
    thread means a line of the text of its side, so a head thread and a baseline thread on the same numbers are
    different discussions and give different digests.
+7. The number of times an administrator reopened the review, but only when it is above zero (see below). A reopen is
+   therefore part of what a signature approves: an earlier approval can never be current after a reopen.
 
 **What the digest does not cover**:
 
@@ -81,6 +83,7 @@ not-applicable {S:sectionId} {S:reason}                    one line per section 
 threads
 thread {S:path} {S:side} {start} {end} {S:state} {createdTicks}   one block per thread: this line,
 comment {S:author} {S:username} {S:text} {ticks}           then one line per comment in posting order
+reopens {count}                                            only when the review was reopened (count above zero)
 ```
 
 Notation and rules:
@@ -89,7 +92,8 @@ Notation and rules:
   units, so no text can imitate a delimiter or the start of another line. An absent string (for example a missing
   justification, the baseline of a review without one, the review-set identifier of a review that was not planned
   from a set, or the head hash of a deleted file) is written as `-`; the empty text is written as `0:`.
-- `{repositoryId}`, `{start}` and `{end}` are the numbers in the invariant culture; `{start}` and `{end}` are `-`
+- `{repositoryId}`, `{start}`, `{end}`, and `{count}` are the numbers in the invariant culture; `{start}` and `{end}`
+  are `-`
   when the thread is on the whole file.
 - `{createdTicks}` and `{ticks}` are the UTC ticks of the time, in the invariant culture.
 - The outcome, the thread state, the thread side, and the change kind are written by their enumeration names (the
@@ -102,8 +106,15 @@ Notation and rules:
   threads, which the store does not guarantee, does not matter. The order of the comments inside a thread does matter
   and is kept as stored, because it is part of what was said.
 - The header line holds the format version. Any change to this format, to what is covered, or to the way a value is
-  written must change the version, because it changes the digest of every record and makes all earlier signatures
-  out of date.
+  written that alters the digest of an existing record must change the version, because it makes all earlier
+  signatures out of date.
+- **The reopens line**: `ReviewRecord.Reopens` is the number of times an administrator reopened the review. The line
+  `reopens {count}` is appended after the last thread block only when the count is above zero. A review that was never
+  reopened has no such line, so its canonical text and digest are exactly what they were before reopening existed:
+  the format version is therefore **not** bumped (a bump would make every existing signature out of date for no
+  reason), and the vectors below are unchanged. After a reopen the line (or a higher count) makes the digest differ from
+  every earlier one, whatever the content, so a signature given before the reopen stays in the record as history but
+  can never be current again, not even when the content is changed back to what was signed.
 
 **Known-answer vectors**: for an uploaded review with the fingerprint `abc`, no checklist, no answers, no sections
 that do not apply, and no threads, the canonical text is the seven lines
@@ -219,7 +230,8 @@ not hidden. Whether a record is signable is not decided here (see `SigningServic
 
 #### Dependencies
 
-- **ReviewRecord** and the thread, comment, answer, checklist, and section types of the `Core` subsystem, which it
+- **ReviewRecord** and the thread, comment, answer, checklist, section, and reopen count (`ReviewRecord.Reopens`) types
+  of the `Core` subsystem, which it
   reads.
 - **.NET runtime library** — `System.Security.Cryptography.SHA256`, `System.Text.Encoding` for UTF-8, and
   `System.Globalization.CultureInfo` for the invariant number format.
@@ -227,6 +239,7 @@ not hidden. Whether a record is signable is not decided here (see `SigningServic
 #### Callers
 
 - **SigningService** — computes the digest to show, to compare with the digest the signer saw, and to find the
-  current signatures.
-- **ReviewStore** (`Storage` subsystem) — computes the digest again inside the transaction that stores a signature.
+  current signatures; `ReviewLock.IsApproved` (part of the same unit) computes it to decide whether a review is locked.
+- **ReviewStore** (`Storage` subsystem) — computes the digest again inside the transaction that stores a signature and
+  inside the write transactions that check the lock; it fills `ReviewRecord.Reopens` from the stored reopens.
 - **Tests** — check the format and the known-answer vectors.

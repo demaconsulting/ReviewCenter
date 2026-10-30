@@ -5,9 +5,10 @@
 #### Purpose
 
 `ReviewStore` implements the Core store interface on top of `ReviewCenterDbContext`. Its single responsibility is
-to persist projects, project memberships, reviews, file content, comment threads, checklists, reviewer slots, and
-signatures, and to read
-them back, translating database behavior into the terms of the domain.
+to persist projects, project memberships, reviews, file content, comment threads, checklists, reviewer slots,
+signatures, and review reopens, and to read
+them back, translating database behavior into the terms of the domain. It also enforces, inside its write
+transactions, that an approved review is locked.
 
 #### Data Model
 
@@ -20,24 +21,40 @@ commits (see the `AuditStore` unit).
 #### Key Methods
 
 **Audit transaction of every change**: `AddProjectAsync`, `AddMembershipAsync`, `RemoveMembershipAsync`,
-`SetMembershipRoleAsync`, `UpdateEvidenceSettingsAsync`, `AddReviewAsync`, `AddThreadAsync`, `AddCommentAsync`,
+`SetMembershipRoleAsync`, `UpdateEvidenceSettingsAsync`, `UpdateRequireIndependentReviewersAsync`, `AddReviewAsync`,
+`AddThreadAsync`, `AddCommentAsync`,
 `SetThreadStateAsync`, `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
-`RemoveSlotAsync`, and `AddSignatureAsync` take the audit draft of the change (or a function that builds it from the
-stored entity, when the draft names an identity that the database assigns). The change and its audit entry are
+`RemoveSlotAsync`, `AddSignatureAsync`, and `ReopenReviewAsync` take the audit draft of the change (or a function
+that builds it from the stored entity, when the draft names an identity that the database assigns). The change and
+its audit entry are
 stored in the same transaction, so both exist or neither does. A change that did not take effect (a thread, slot, or
 review that is not found) returns its null or false result and stores no entry. A failure of any kind, including a
 duplicate review identifier or a refused signature, rolls back the change and the entry together. The descriptions below
 are of the change itself.
 
+**Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `SetThreadStateAsync`,
+`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, and `RemoveSlotAsync` call
+the private `EnsureNotLockedAsync` first, inside the same serialized transaction as the change. It loads the slots, the
+record (with its reopen count), and the signatures with the same code as `AddSignatureAsync`, and asks the Core
+`ReviewLock.IsApproved`, the one definition of "approved", so the store and the services cannot disagree. When the review
+is approved it raises `DomainRuleException` with `ReviewLocked` (the message of `ReviewLock.LockedMessage`), and the
+transaction rolls back: nothing is stored and no audit entry is written. A review without slots is never approved, and
+the check returns early without loading the record. This is defense in depth behind the Core services and closes the
+race with a concurrent final signature: because the write transaction holds the database write lock, a signature
+cannot commit between the check and the change. `AddSignatureAsync` is unchanged (it already compares the digest inside
+its transaction), and reads are not affected.
+
 **AddProjectAsync**: Stores a project and returns it with the identity assigned by the database. The unit copies the
 name, description, and creation time into a new entity, so an identity supplied by the caller is ignored and can
 neither be persisted nor collide with an existing project; the returned project is the stored entity. The evidence
 settings of the project are copied too, and a project that was not given others has the defaults
-(`EvidenceSettings.Default`).
+(`EvidenceSettings.Default`). So is `RequireIndependentReviewers` (true unless the caller gave another value).
 
-**GetProjectAsync**: Reads one project by identity, with its evidence settings; null when absent.
+**GetProjectAsync**: Reads one project by identity, with its evidence settings and its `RequireIndependentReviewers`
+value; null when absent.
 
-**ListProjectsAsync**: Lists all projects ordered by name and then identity, with their evidence settings. SQLite cannot
+**ListProjectsAsync**: Lists all projects ordered by name and then identity, with their evidence settings and review
+rule. SQLite cannot
 order by a `DateTimeOffset`, so the creation time is not used for ordering.
 
 **UpdateEvidenceSettingsAsync**: Changes the seven evidence settings of one project if they still hold the values the
@@ -56,6 +73,19 @@ time cannot both succeed: the second finds no matching row and gets `false`, wit
 columns of that project are written. The store also returns `false` when no project has the identity (no row
 matches). The service turns the `false` of a project that was changed meanwhile into `RecordChanged`; a project that
 does not exist is refused earlier by the access check with `ProjectNotFound` and never reaches the store.
+
+**UpdateRequireIndependentReviewersAsync**: Changes the `RequireIndependentReviewers` setting of one project if it still
+holds the value the caller started from (compare-and-set), in the same way.
+
+- *Parameters*: the project identity, the `expected` value, the `updated` value, and the audit draft of the change.
+- *Returns*: `Task<bool>` — `true` when the value was changed; `false` when the project does not exist or the stored
+  value is no longer `expected`.
+- *Postconditions*: Either the new value and the audit entry (`project.independent-reviewers-changed`) are stored in
+  the same serialized transaction, or nothing is.
+
+The comparison is part of one `ExecuteUpdate` statement (`WHERE Id = projectId AND RequireIndependentReviewers =
+expected`), so two administrators who save at the same time cannot both succeed. `ProjectService` turns the `false`
+into `RecordChanged`.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 
@@ -135,8 +165,9 @@ there is always exactly one row and neither request fails.
 snapshot, the section states, the answers, the threads with their comments, and the source (`ReviewSource`: `Upload`,
 or for a repository review the repository identity, both commits, the selection, the review-set identifier (null when
 the review was not planned), and every change with its path,
-kind, and baseline and head hashes read from the stored columns without loading any bytes); null when the review does
-not exist.
+kind, and baseline and head hashes read from the stored columns without loading any bytes), and `Reopens`, the number of
+stored reopens of the review; null when the review does not
+exist.
 The work is done by a private loader that takes the context, so the same code serves this method and
 `AddSignatureAsync`. Threads and comments are ordered by identity, as for `ListThreadsAsync`. `GetRecordAsync` reads
 inside one read transaction, so the parts come from one state of the database.
@@ -183,6 +214,24 @@ inserts a fresh entity copied from the argument (so the database assigns the ide
 `ReviewStore_SerializableTransaction_TakesWriteLockAtBegin` shows the lock behavior: while one connection has only
 begun a `Serializable` transaction, a write from a second connection fails with SQLITE_BUSY.
 
+**ReopenReviewAsync**: Reopens an approved review: stores a `ReviewReopen` and its audit entry (`review.reopened`) in
+one transaction.
+
+- *Parameters*: the project identity, the review identifier, the `ReviewReopen` to store, and the audit draft.
+- *Preconditions*: `reopen` and the audit draft are not null.
+- *Postconditions*: Either one reopen row is stored with its audit entry, or nothing is and a `DomainRuleException` is
+  raised.
+
+Inside the write transaction the method checks that the review row exists (`ReviewNotFound` otherwise) and that the
+review is still approved by the same check as the lock (`ReviewNotLocked` otherwise), so two administrators who reopen
+at the same moment cannot both succeed: the second one finds the review no longer approved. It then inserts a fresh
+entity copied from the argument (the database assigns the identity). Signatures are not touched: the stored reopen
+raises the reopen count of the record, which changes the digest and so retires the earlier signatures while they stay
+in the table as history. A reopen row is never updated or deleted by the store.
+
+**ListReopensAsync**: Lists the reopens of one review ordered by identity, which grows with the order of the reopens
+(SQLite cannot order by a `DateTimeOffset`); empty when there are none or the review does not exist.
+
 #### Error Handling
 
 A duplicate review identifier is detected from the SQLite primary key and unique constraint error codes (1555 and
@@ -192,8 +241,10 @@ the key of a membership into `MembershipExists`. The last-project-administrator 
 the transaction, which rolls back. `AddSignatureAsync`
 maps its other failures to domain rules: a digest that differs from the digest of the stored record is
 `RecordChanged`, a review that does not exist is `ReviewNotFound`, and a slot that does not exist in the review is
-`SlotNotFound`. In every failure the transaction is rolled back, so nothing is stored. Any other database failure
-propagates unchanged to the caller, including the refusal to add a slot for a review that does not exist and the
+`SlotNotFound`. A change of content or slots of an approved review is refused with `ReviewLocked` and a reopen of a
+review that is not approved with `ReviewNotLocked`. In every failure the transaction is rolled back, so nothing is
+stored. Any other database failure propagates unchanged to the caller, including the refusal to add a slot for a
+review that does not exist and the
 refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.
 
 #### Dependencies
@@ -201,7 +252,7 @@ refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.
 - **ReviewCenterDbContext** — the schema and the context factory.
 - **AuditAppender** — runs every change together with its audit entry.
 - **Core domain types and IReviewStore** — the types stored and the interface implemented, including `ReviewRecord`,
-  `ReviewerSlot`, `ReviewSignature`, `RecordDigest`, and `AuditDraft`.
+  `ReviewerSlot`, `ReviewSignature`, `ReviewReopen`, `ReviewLock`, `RecordDigest`, and `AuditDraft`.
 - **Entity Framework Core and Microsoft.Data.Sqlite** — queries and the error code of a constraint violation.
 
 #### Callers

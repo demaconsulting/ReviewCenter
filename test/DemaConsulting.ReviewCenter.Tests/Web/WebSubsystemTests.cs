@@ -91,6 +91,7 @@ public partial class WebSubsystemTests
             "rev-1",
             "First review",
             [new("a.txt", TestContent.A), new("b.txt", TestContent.B), new("c.bin", TestContent.C)],
+            TestActors.Ann,
             TestContext.Current.CancellationToken);
 
         // Act: request the three pages
@@ -127,7 +128,7 @@ public partial class WebSubsystemTests
         var project = await app.Services.GetRequiredService<ProjectService>()
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
         var threads = app.Services.GetRequiredService<ThreadService>();
         var bob = await app.Services.GetRequiredService<UserService>()
             .CreateAsync("bob", "Bob", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
@@ -170,7 +171,7 @@ public partial class WebSubsystemTests
         var project = await app.Services.GetRequiredService<ProjectService>()
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         await checklists.SetAnswerAsync(
             project.Id, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
@@ -219,7 +220,7 @@ public partial class WebSubsystemTests
         await store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
         await store.AddMembershipAsync(bob.Id, project.Id, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Bob, TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
@@ -229,7 +230,7 @@ public partial class WebSubsystemTests
 
         var signing = app.Services.GetRequiredService<SigningService>();
         var slot = await signing.AddSlotAsync(
-            TestActors.Ann, project.Id, "rev-1", ann.Id, bob.Id, TestContext.Current.CancellationToken);
+            TestActors.Ann, project.Id, "rev-1", ann.Id, null, TestContext.Current.CancellationToken);
         var route = $"/projects/{project.Id}/reviews/rev-1";
 
         // Act, Assert: before signing, the page offers the sign form and the review is In review
@@ -237,22 +238,22 @@ public partial class WebSubsystemTests
         Assert.Equal("In review", before.QuerySelector("[data-testid='review-approval']")?.TextContent);
         Assert.NotNull(before.QuerySelector($"[data-testid='sign-form-{slot.Id}']"));
 
-        // Act: bob signs with his password, for the digest read from the service
+        // Act: ann signs with her password, for the digest read from the service
         var approval = (await signing.GetApprovalAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!;
         await signing.SignAsync(
-            TestActors.Bob, project.Id, "rev-1", slot.Id, approval.Digest, TestBrowser.Password, TestContext.Current.CancellationToken);
+            TestActors.Ann, project.Id, "rev-1", slot.Id, approval.Digest, TestBrowser.Password, TestContext.Current.CancellationToken);
 
-        // Assert: both pages show the approval, and the review page the full digest in the details
+        // Assert: both pages show the approval and the lock, and the review page the full digest in the details
         var signed = await ParseAsync(client, route);
         var list = await ParseAsync(client, $"/projects/{project.Id}");
         Assert.Equal("Approved", signed.QuerySelector("[data-testid='review-approval']")?.TextContent);
-        Assert.StartsWith("Signed by Bob on ", signed.QuerySelector($"[data-testid='slot-status-{slot.Id}']")?.TextContent, StringComparison.Ordinal);
+        Assert.NotNull(signed.QuerySelector("[data-testid='review-locked']"));
+        Assert.StartsWith("Signed by Ann on ", signed.QuerySelector($"[data-testid='slot-status-{slot.Id}']")?.TextContent, StringComparison.Ordinal);
         Assert.Equal(approval.Digest, signed.QuerySelector("[data-testid='record-digest']")?.GetAttribute("title"));
         Assert.Equal("Approved", list.QuerySelector("[data-testid='review-approval-rev-1']")?.TextContent);
 
-        // Act: a new thread changes the record
-        await app.Services.GetRequiredService<ThreadService>().StartThreadAsync(
-            project.Id, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Late remark", TestContext.Current.CancellationToken);
+        // Act: an administrator reopens the review, which changes the record
+        await signing.ReopenReviewAsync(TestActors.Ann, project.Id, "rev-1", "Late remark", TestContext.Current.CancellationToken);
 
         // Assert: the signature is out of date and the review is In review again
         var changed = await ParseAsync(client, route);
@@ -260,6 +261,105 @@ public partial class WebSubsystemTests
         Assert.Equal("Signature out of date", changed.QuerySelector($"[data-testid='slot-status-{slot.Id}']")?.TextContent);
         Assert.Equal("In review", changed.QuerySelector("[data-testid='review-approval']")?.TextContent);
         Assert.Equal("In review", changedList.QuerySelector("[data-testid='review-approval-rev-1']")?.TextContent);
+    }
+
+    /// <summary>
+    ///     Test that an approved review is presented as locked through the real pipeline, with the reopen form for
+    ///     an administrator and none for a plain member, and that after an administrator reopens it the page shows
+    ///     the review as In review with the reopen history.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen()
+    {
+        // Arrange: start the real pipeline with an administrator (ann), a member (cyd) and an approved review
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var admin = await TestBrowser.SignedInAsync(app, "ann");
+        using var member = await TestBrowser.SignedInAsync(app, "cyd", UserRole.Reviewer);
+        var users = app.Services.GetRequiredService<UserService>();
+        var ann = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!;
+        var cyd = (await users.GetAsync("cyd", TestContext.Current.CancellationToken))!;
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
+        await store.AddMembershipAsync(cyd.Id, project.Id, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        var checklists = app.Services.GetRequiredService<ChecklistService>();
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+        }
+
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slot = await signing.AddSlotAsync(
+            TestActors.Ann, project.Id, "rev-1", cyd.Id, null, TestContext.Current.CancellationToken);
+        var approval = (await signing.GetApprovalAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!;
+        await signing.SignAsync(
+            new Actor("cyd", "Cyd"), project.Id, "rev-1", slot.Id, approval.Digest, TestBrowser.Password, TestContext.Current.CancellationToken);
+        var route = $"/projects/{project.Id}/reviews/rev-1";
+
+        // Act: read the locked review as the administrator and as the member
+        var asAdmin = await ParseAsync(admin.Client, route);
+        var asMember = await ParseAsync(member.Client, route);
+
+        // Assert: locked with the controls disabled; the reopen form only for the administrator
+        Assert.NotNull(asAdmin.QuerySelector("[data-testid='review-locked']"));
+        Assert.NotNull(asAdmin.QuerySelector("[data-testid='review-locked-banner']"));
+        Assert.NotNull(asAdmin.QuerySelector("[data-testid='reopen-form']"));
+        Assert.True(asAdmin.QuerySelector("[data-testid='new-slot-add-button']")?.HasAttribute("disabled"));
+        Assert.NotNull(asMember.QuerySelector("[data-testid='review-locked']"));
+        Assert.Null(asMember.QuerySelector("[data-testid='reopen-form']"));
+
+        // Act: the administrator reopens the review with a reason
+        await signing.ReopenReviewAsync(TestActors.Ann, project.Id, "rev-1", "A file was missing", TestContext.Current.CancellationToken);
+        var reopened = await ParseAsync(admin.Client, route);
+
+        // Assert: In review, no longer locked, and the history shows who, why and the earlier record
+        Assert.Equal("In review", reopened.QuerySelector("[data-testid='review-approval']")?.TextContent);
+        Assert.Null(reopened.QuerySelector("[data-testid='review-locked']"));
+        Assert.Equal("A file was missing", reopened.QuerySelector("[data-testid='reopen-reason-0']")?.TextContent);
+        Assert.Equal("Ann", reopened.QuerySelector("[data-testid='reopen-by-0']")?.TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the project page shows the independent-reviewers setting (on by default) to a project
+    ///     administrator only, and shows the stored value after an administrator changes it.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_ProjectAdmin_TogglesIndependentReviewers()
+    {
+        // Arrange: start the real pipeline with an administrator (ann) and a plain member (cyd) of a project
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var admin = await TestBrowser.SignedInAsync(app, "ann");
+        using var member = await TestBrowser.SignedInAsync(app, "cyd", UserRole.Reviewer);
+        var users = app.Services.GetRequiredService<UserService>();
+        var ann = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!;
+        var cyd = (await users.GetAsync("cyd", TestContext.Current.CancellationToken))!;
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
+        await store.AddMembershipAsync(cyd.Id, project.Id, TestContext.Current.CancellationToken);
+        var route = $"/projects/{project.Id}";
+
+        // Act: read the page as the administrator and as the member
+        var before = await ParseAsync(admin.Client, route);
+        var asMember = await ParseAsync(member.Client, route);
+
+        // Assert: required by default for the administrator; no setting for the member
+        Assert.True(before.QuerySelector("[data-testid='independent-reviewers-switch']")?.HasAttribute("checked"));
+        Assert.Null(asMember.QuerySelector("[data-testid='review-rules-card']"));
+
+        // Act: the administrator switches the rule off through the service (the page button does the same call)
+        var changed = await app.Services.GetRequiredService<ProjectService>().SetRequireIndependentReviewersAsync(
+            TestActors.Ann, project.Id, true, false, TestContext.Current.CancellationToken);
+        var after = await ParseAsync(admin.Client, route);
+
+        // Assert: stored, and shown as off
+        Assert.True(changed);
+        Assert.False(after.QuerySelector("[data-testid='independent-reviewers-switch']")?.HasAttribute("checked"));
     }
 
     /// <summary>
@@ -276,7 +376,7 @@ public partial class WebSubsystemTests
         var client = browser.Client;
         var project = await TestWebApp.CreateProjectAsync(app, "Apollo", "Moon landing");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], new Actor("root", "root"), TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<RepositoryService>().CreateAsync(
             project.Id, "main-repo", "https://example.com/org/repo.git", null, null, new Actor("root", "root"), TestContext.Current.CancellationToken);
         string[] routes =
@@ -407,7 +507,7 @@ public partial class WebSubsystemTests
         var client = browser.Client;
         var project = await TestWebApp.CreateProjectAsync(app, "Apollo", "Moon landing");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], new Actor("root", "root"), TestContext.Current.CancellationToken);
         var reviews = $"/projects/{project.Id}/reviews/rev-1";
         (string Route, string Breadcrumb, string Header)[] pages =
         [

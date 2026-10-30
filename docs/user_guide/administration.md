@@ -1,7 +1,8 @@
 # Administration
 
 This chapter is for the people who run ReviewCenter and manage its projects: system administrators and project
-administrators. It covers the user accounts, who can see which project, the evidence settings of a project, the audit
+administrators. It covers the user accounts, who can see which project, the evidence settings and the review rules of a
+project, the reopening of approved reviews, the audit
 trail, the database, and the git repositories of a project.
 
 ## Manage Users (System Administrators)
@@ -34,8 +35,8 @@ ReviewCenter controls access by project. There are three roles:
 
 - **System administrator**: a flag on a user account. A system administrator creates projects, manages users and
   project membership, reads the audit trail, and can see and manage every project.
-- **Project administrator**: a member of one project who also manages the members, the git repositories, and the
-  evidence settings of that project.
+- **Project administrator**: a member of one project who also manages the members, the git repositories, the
+  evidence settings, and the review rules of that project, and who can reopen an approved review of it.
 - **Member**: a user who belongs to a project (a project member, role "Member" on the project page). A member works on
   the reviews of that project.
 
@@ -51,7 +52,7 @@ the Users and Sign-in chapter).
 | ---------------------------------------------------- | ------ | ------------- | ------------ |
 | See the project, its reviews, history, and evidence  | yes    | yes           | yes          |
 | Create reviews, comment, edit checklists             | yes    | yes           | yes          |
-| Edit unsigned reviewer slots                         | yes    | yes           | yes          |
+| Edit unsigned reviewer slots (not on a locked review)| yes    | yes           | yes          |
 | Sign a review as the assigned reviewer               | yes    | yes           | if a member  |
 | Download the attestation PDF of an approved review   | yes    | yes           | yes          |
 | Manage the repositories and credentials of a project | no     | yes           | yes          |
@@ -60,6 +61,8 @@ the Users and Sign-in chapter).
 | Manage users; read the audit page                    | no     | no            | yes          |
 | Read the audit trail of the project                  | no     | yes           | yes          |
 | Change evidence settings of a project                | no     | yes           | yes          |
+| Change the review rules of a project                 | no     | yes           | yes          |
+| Reopen an approved (locked) review                   | no     | yes           | yes          |
 
 **Hidden means missing.** A project you cannot see looks exactly like a project that does not exist. The project
 pages say "Project N does not exist.", and the API and the PDF routes answer **404**, never 403, so a refused request
@@ -70,11 +73,14 @@ same list.
 **Reviewers must be members.** Both the primary and the alternate reviewer of a slot must be members of the project.
 Signing needs two things: you are a member of the project, and you are the assigned reviewer of the slot. A system
 administrator who is not a member of the project cannot sign it; add yourself as a member first, and then be assigned.
+While the project requires independent reviewers (see [Review Rules](#review-rules)), the person who created a review
+cannot be one of its reviewers and cannot sign it.
 
 **Tokens.** A personal access token acts as its owner and carries the owner's memberships, so it reads and creates
 reviews only in the projects the owner can see, and the API lists only those projects (see
 the Automation and API Tokens chapter). A token never signs, so a token user can never sign a
-review.
+review. A token cannot reopen a review or change the review rules either. A review created with a token has the
+owner of the token as its author.
 
 **Evidence.** By default the signed attestation PDF of a review and the evidence index of a project are visible only to
 project members and system administrators. A project administrator or a system administrator can open the evidence
@@ -229,6 +235,51 @@ the document. It also says that the record digest covers the complete record, in
 Changing a setting does not change reviews, signatures, or the record digest. It changes what the next PDF contains and
 who can read the index and the PDFs.
 
+## Review Rules
+
+**Where you are.** The **Review rules** card on the project page (`/projects/{id}`), above the members. It is shown
+only to a project administrator of the project and to a system administrator; other members do not see it. It holds one
+rule today, the switch **Require independent reviewers**, saved with **Save review rules**.
+
+**Require independent reviewers.** The setting is **on by default**, for every project of a newly created database (a
+database made before this setting existed must be recreated, because the schema has no migrations). While it is on,
+the person who created a review (the ReviewCenter user who made it, or the owner of the API token that made it)
+cannot be the primary or the alternate reviewer of a slot of that review and cannot sign it. This holds for a slot that
+was filled while the setting was off, too: the signature of the author is refused. The review page leaves the author
+out of the lists of reviewers to choose from and tells the author that a different project member has to review and sign
+the review. Switch the setting off for a project where one person has to do both; then nothing is refused for that
+reason. The change is not retroactive: the rule is applied when a reviewer is chosen and when a review is signed, and
+signatures that exist stay valid.
+
+**Limit: only the ReviewCenter author is known.** The rule compares the user who created the review in ReviewCenter with
+the reviewer. It does not know who wrote the reviewed files and does not match the authors of git commits, so someone who
+wrote the code but did not create the review is not excluded. A review created from the command line has no recorded
+author, so the rule excludes nobody from it.
+
+**Saving.** The page says "Independent reviewers are now required." or "Independent reviewers are no longer required."
+after a change, and "The review rules were already set this way." when nothing changed (nothing is recorded then). If
+somebody else changed the setting while your page was open, nothing is saved, the message is "The setting was changed by
+someone else. Reload the page and try again.", and the page shows the stored value. A personal access token cannot change
+the setting ("Project settings cannot be changed with an API token; sign in to the web pages."). Every change is recorded
+in the audit trail as `project.independent-reviewers-changed` with the project and the detail
+`RequireIndependentReviewers on->off` (or `off->on`).
+
+## Reopening an Approved Review
+
+An approved review is locked: ReviewCenter refuses every change of its threads, checklist, and reviewer slots (see
+Locked Reviews and Reopening in the Reviewing chapter). A project administrator or a system administrator can reopen it.
+Open the review; in the locked notice, enter a **Reason for reopening** (required, 1 to 250 characters) and press
+**Reopen review**. Ordinary members do not see the form, and a personal access token cannot reopen a review.
+
+- The review is In review again, and its signatures stay as history but are out of date; they cannot become current
+  again, so the reviewers must sign again.
+- The audit trail records `review.reopened` with the administrator as the actor and the detail
+  `previous digest <digest>; reason: <reason>`. The review page lists the reopens in its **Reopen history**, and the
+  attestation PDF of a review that was reopened and approved again has a **Reopen history** section.
+- A reopen of a review that is not locked is refused: "The review is not locked, so there is nothing to reopen.".
+- Reopen only when the approval must really be undone: it makes every signature of the review worthless for the
+  current record, and nothing takes the reopen back.
+
 ## Audit Trail
 
 ReviewCenter records every change that the application makes to projects, reviews, comments, checklists, reviewer
@@ -260,7 +311,8 @@ the number of entries and the **head hash**, or the first entry at which the cha
 
 A project administrator (and a system administrator) sees an **Audit trail** button on the project page. It opens
 `/projects/{id}/audit`, a read-only list of the entries recorded for that project only: its reviews, members, evidence
-settings, and account creations, and nothing of other projects, sign-ins, or user administration. The list is newest
+settings, review rules, and account creations, and nothing of other projects, sign-ins, or user administration. The
+list is newest
 first, 50 at a
 time, with **Older** and **Newer** buttons. It has no **Verify chain** button; verification covers the whole trail
 and stays with the system administrator. Ordinary members do not get the button, and the page looks like a missing
@@ -318,7 +370,10 @@ head hash is a manual step, and it is most useful after important events such as
 | Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
 | Signing   | `signature.reauth-failed` (a wrong password, or a missing confirmation at a provider)|
 | Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
+| Project   | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
 | Evidence  | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
+| Project   | `project.independent-reviewers-changed` (the independence rule was switched)         |
+| Reopening | `review.reopened` (an administrator reopened an approved review)                     |
 | Tokens    | `token.created`, `token.revoked`                                                     |
 | Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
 
@@ -343,7 +398,8 @@ head hash is a manual step, and it is most useful after important events such as
   recorded as `auth.totp-failed`, as is a missing or wrong code when a person with a second factor changes the own
   password; the codes themselves, the secrets, and the recovery codes are never recorded.
 - Comments, justifications, and the reason for marking a checklist section not applicable are recorded only as a short
-  digest, never as text.
+  digest, never as text. The reason for reopening a review is the exception: it is recorded as text (at most 250
+  characters, so that it fits the entry), together with the digest of the record that was reopened.
 - There is no export and no retention or archiving of the trail, and no external anchoring.
 - The audit trail is a new table. A development database created before it existed must be recreated (see the next
   section).
@@ -395,7 +451,11 @@ and `EvidenceIncludeGitContext`), and the record digest is now labeled `ReviewCe
 ReviewCenter that also covers the wording of the checklist questions and who answered them. The sign-in with an
 OpenID Connect provider adds two columns to the users (`Users.ExternalIssuer` and `Users.ExternalSubject`) with a unique
 index on the pair. The two-factor sign-in adds two tables (`UserTotps` and `TotpRecoveryCodes`). There is no migration:
-recreate development databases created before them.
+recreate development databases created before them. The approval lock and the independent reviewers add the table
+`ReviewReopens` (the history of reopened reviews) and the column `Projects.RequireIndependentReviewers`, again with no
+migration: the server creates them only when the database is new, so a development database created before them must
+be deleted and created again, like the earlier ones. A new project, and a review that was never reopened, keep their
+record digests (the number of reopens is added to the digest only when it is more than zero).
 
 ## Repositories and Credentials
 

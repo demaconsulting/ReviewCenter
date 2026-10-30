@@ -94,6 +94,9 @@ public class AuditEventTests
             reviews, users, new AllowAllProjectAccess(reviews), new FakePasswordHasher(), clock);
         var project = await projects.CreateAsync("Apollo", "Moon", TestActors.Ann, TestContext.Current.CancellationToken);
         var auditCount = reviews.Audits.Count;
+
+        // These tests assign the author as a reviewer, so the independence rule is switched off (trimmed below)
+        await projects.SetIndependentReviewersOffAsync(project.Id, TestContext.Current.CancellationToken);
         foreach (var userId in ids.Values)
         {
             await reviews.AddMembershipAsync(userId, project.Id, TestContext.Current.CancellationToken);

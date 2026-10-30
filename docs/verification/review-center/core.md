@@ -30,7 +30,7 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all sixty-four values of `DomainRule`) is reported as a domain rule exception that names it, and
+- Every domain rule (all sixty-eight values of `DomainRule`) is reported as a domain rule exception that names it, and
   nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
   `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
@@ -53,8 +53,15 @@ N/A - standard test environment.
   answer for a missing project); a change that was overtaken by another is refused and stores nothing; and every change
   is audited with its changed keys (see the unit tests of `EvidenceSettingsService`).
 - A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
-  signature makes the review approved, a later change of the record makes it out of date and not approved, and the
+  signature makes the review approved, an administrator's reopen makes it out of date and not approved, and the
   slot can be signed again.
+- An approved review is locked: every change of its threads, checklist, and reviewer slots, and a further signature,
+  is refused with `ReviewLocked`, and its approval and digest stay as they were; only a project administrator reopens
+  it, with a reason, which is audited with the previous digest, keeps the earlier signatures as out-of-date history,
+  and needs fresh signatures; reopening a review that is not locked is refused with `ReviewNotLocked`.
+- While a project requires independent reviewers (the default), the author of a review is refused as reviewer of a slot
+  and as signer, also for a slot that was filled earlier and for a review created through a token (its author is the
+  owner of the token); only a project administrator switches the rule, and every switch is audited.
 - Every change made through the services is recorded in the audit trail with the person, the action, and a detail
   that never holds a password or a token; recorded entries verify as an intact chain.
 - A repository registry that only the administrator of the project (or a system administrator) can change: names,
@@ -113,7 +120,9 @@ token (these use the real `ProjectAccess` and `PersonalAccessTokenService`, over
 a slot with an unknown reviewer or one that does not exist or is not a member, a change of a
 signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
 a signing of a record that changed; a token with an invalid name, an invalid lifetime, or beyond the limit of 20 active
-tokens, and an actor that came through a token that signs or names a reviewer; a repository with an invalid name,
+tokens, and an actor that came through a token that signs or names a reviewer; a change of an approved review, a
+reopen without a reason, a reopen of a review that is not approved, and a reviewer who is the author of the review
+(`ReviewLocked`, `ReopenReasonInvalid`, `ReviewNotLocked`, and `ReviewerNotIndependent`); a repository with an invalid name,
 location, or credential, a name already used,
 an unknown or disabled repository, or a token that cannot be decrypted; a revision that is not a safe name; and a
 selection with no valid pattern; and a selection that matches no changed file; and, over the real `TotpService` in a
@@ -145,9 +154,10 @@ This scenario is tested by `CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLa
 
 **CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord**: A review has one slot of two users. Its
 status is blocked while the checks are unanswered; after all checks are answered it has no blockers. Signing with a
-wrong password is refused with `ReauthenticationFailed`; signing with the right one approves the review. A thread is
-then opened and resolved, which changes the record: the slot is out of date, the review is not approved, and the
-digest differs. The alternate signs the new record, and the review is approved again with the alternate as signer.
+wrong password is refused with `ReauthenticationFailed`; signing with the right one approves the review. An
+administrator then reopens the approved review with a reason, which changes the record: the slot is out of date, the
+review is not approved, and the digest differs. The alternate signs the new record, and the review is approved again
+with the alternate as signer.
 This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.
 
 **CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner**: A user is created and a token is made through
@@ -160,6 +170,37 @@ revokes the token the value is refused. This scenario is tested by
 which is flagged as created through the API; the same actor is refused with `ActorNotAllowed` when it names a reviewer
 or signs, even with the right password and digest, and the slot stays unsigned. This scenario is tested by
 `CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign`.
+
+**CoreSubsystem_ApprovedReview_RefusesEveryMutationWithReviewLocked**: A review with one slot is answered completely
+and signed, so that it is approved. Starting a thread, replying, resolving, and reopening a thread, answering a check,
+changing the applicability of a section, and adding, changing, and removing a slot are each refused with
+`ReviewLocked`, and a further signature is refused too; the review is still approved with the same digest. This
+scenario is tested by `CoreSubsystem_ApprovedReview_RefusesEveryMutationWithReviewLocked`.
+
+**CoreSubsystem_ReopenReview_RequiresAdminAndReasonAndNeedsFreshSignatures**: On an approved review, a plain member is
+refused with `ActorNotAllowed` and an empty reason with `ReopenReasonInvalid`. An administrator then reopens it with a
+reason: the review is In review, the old signature is kept and out of date, and the digest differs. The reviewer signs
+the new record and the review is approved again with both signatures kept, and the audit trail holds `review.reopened`
+with the reason and the previous digest. This scenario is tested by
+`CoreSubsystem_ReopenReview_RequiresAdminAndReasonAndNeedsFreshSignatures`.
+
+**CoreSubsystem_ReopenReview_OfUnlockedReview_ThrowsReviewNotLocked**: An administrator reopens a review that is not
+approved; the request is refused with `ReviewNotLocked` and nothing is stored. This scenario is tested by
+`CoreSubsystem_ReopenReview_OfUnlockedReview_ThrowsReviewNotLocked`.
+
+**CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign**: With the rule at its default, the author of a
+review is refused as primary and as alternate when a slot is added or changed. A slot filled with the author while the
+rule is off cannot be signed by the author once the rule is on, whereas a separate reviewer can sign it. With the rule
+off the author is accepted as reviewer. This scenario is tested by
+`CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign`.
+
+**CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly**: A project administrator switches the rule off
+and on again and each change is audited with `project.independent-reviewers-changed`; a plain member is refused with
+`ActorNotAllowed`. This scenario is tested by `CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly`.
+
+**CoreSubsystem_ApiTokenReview_AuthorIsTokenUser**: A review created by an actor that came through a token has the
+owner of the token as its author, so that the owner is refused as reviewer of a slot while a different member is
+accepted. This scenario is tested by `CoreSubsystem_ApiTokenReview_AuthorIsTokenUser`.
 
 **Audit trail of the services**: The unit tests of `AuditService` and `UserService` verify the subsystem requirement
 for the audit trail. A draft recorded through `AuditService` is stored and the chain verifies, which is tested by

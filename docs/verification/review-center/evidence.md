@@ -48,6 +48,10 @@ Acceptance Criteria).
 - A PDF follows the evidence settings of the project: a part that a switch turns off is missing, the neutral labels
   replace the names when those are off, every PDF has a Content scope section, and the signature of the reduced PDF
   verifies.
+- A review that is approved, and therefore locked, still gets its attestation PDF and its evidence index. A PDF of a
+  review that was reopened carries a "Reopen history" section (the administrator is named only when the reviewer names
+  are on), and a PDF of a review that was never reopened has none; these are verified in the unit tests of
+  `AttestationService`.
 - The evidence index that the application serves equals a committed file, has the shape that ReviewMark reads, and
   carries
   a fingerprint that equals the one that the algorithm of ReviewMark computes from the same files.

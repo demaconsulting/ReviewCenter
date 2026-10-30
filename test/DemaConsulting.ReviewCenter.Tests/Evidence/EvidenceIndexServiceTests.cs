@@ -110,12 +110,7 @@ public class EvidenceIndexServiceTests
         // Arrange: a complete review whose checklist answers then change
         var fixture = await AttestationFixture.CreateAsync(signed: false);
         await AddCompleteAsync(fixture, "set-1", "Core-Logic", TestContent.A);
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await fixture.Checklists.SetAnswerAsync(
-                fixture.ProjectId, "set-1", item.Id, ChecklistOutcome.Fail, "Changed.", TestActors.Ann, TestContext.Current.CancellationToken);
-        }
-
+        await fixture.AnswerAllAsync(ChecklistOutcome.Fail, "set-1");
         // Act: build the index
         var entries = await CreateService(fixture).BuildAsync(fixture.ProjectId, TestContext.Current.CancellationToken);
 
