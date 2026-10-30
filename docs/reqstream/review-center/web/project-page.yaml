@@ -130,12 +130,12 @@ sections:
 
       - id: ReviewCenter-ProjectPage-Reviews
         title: >-
-          The ProjectPage unit shall list the reviews of the project as rows with a link to each review, its
-          title, and its state.
+          The ProjectPage unit shall list the reviews of the project as rows with a link to each review and its
+          title, without a badge for the stored state, which has only one value.
         justification: |
           The project page is how users reach their reviews and see where each one stands.
         tests:
-          - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState
+          - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval
 
       - id: ReviewCenter-ProjectPage-NewReview
         title: >-
@@ -149,14 +149,14 @@ sections:
 
       - id: ReviewCenter-ProjectPage-Approval
         title: >-
-          The ProjectPage unit shall show next to the state of each listed review a badge that reads Approved when
+          The ProjectPage unit shall show on each listed review a badge that reads Approved when
           the review has at least one reviewer slot and every slot has a current signature, and In review
           otherwise.
         justification: |
           Users scan the project page to see which reviews are finished. The approval status is computed from the
           current record, so a review whose record changed after signing is shown as In review again.
         tests:
-          - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState
+          - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval
           - ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview
 
       - id: ReviewCenter-ProjectPage-Selection

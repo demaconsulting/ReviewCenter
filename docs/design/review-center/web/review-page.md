@@ -37,8 +37,10 @@ reading, a banner (`review-locked-banner`) that says why: the review is approved
 can no longer change, and a project administrator can reopen it. While the review is locked every control that would
 change reviewed content or the
 reviewer slots is disabled with that explanation (the add-slot selects and button, the slot edit controls, the thread
-resolve and reopen toggle, the reply and new-thread fields and buttons, and the line-comment buttons of the diff, through
-the `CommentsDisabled` parameter of `DiffView`); reading, the attestation download, and the evidence index are not
+resolve and reopen toggle, the line-comment buttons of the diff, through
+the `CommentsDisabled` parameter of `DiffView`); the forms that could never be sent (the whole-file new-thread form, the
+form under a diff row, and the reply box of each thread) are not rendered; reading, the attestation download, and the
+evidence index are not
 affected. For a project administrator or system administrator the banner is followed by the reopen form
 (`reopen-form`): a required reason (`reopen-reason`, at most `ReviewLimits.MaxReopenReasonLength` characters), the
 button `reopen-button` ("Reopen review"), and a message area `reopen-error`. When the review has been reopened before, a
@@ -91,6 +93,11 @@ from
 hash ever reaches the page). Each assignee of a slot (a `SlotMember` of the approval) also carries `IsMember`, whether
 that user is still a member of the project; the page shows a badge "No longer a project member" next to a primary or
 alternate who is not, with a hint under the names that such a reviewer cannot sign until added to the project again.
+The candidate lists offer enabled members only, so a primary or alternate who is disabled or no longer a member would
+have no matching option and the select would show blank; in the change fields the page therefore adds one extra option
+for the stored choice (`UnavailableLabel`: "{display name} ({user name}), disabled or no longer a member"), with the
+test ids `slot-primary-unavailable-{id}` and `slot-alternate-unavailable-{id}`, and offers no extra option when the
+stored choice is among the candidates.
 **CurrentUsername**: the user name
 of the signed-in user, from the authentication state, used to tell which slots the user occupies.
 **IsLocked**: whether the review is locked, which is `Approval.IsApproved`; **LockedMarker**: the text `true` or `false`
@@ -127,7 +134,17 @@ has acted since so that a failure report is no longer shown. The settings of the
 **IndexFilter**: the state the thread index shows (`Open` by default, `Resolved`, or `null` for all).
 **ExpandedThreads**: the identities of the resolved threads the reader has expanded; an open thread is always shown
 expanded. **FocusedThreadId**: the thread chosen in the index, whose lines and card are highlighted. The page also
-keeps the test id to scroll to after the next render. All of these are cleared when the route parameters change.
+keeps the test id to scroll to after the next render and the test id to focus after the next render (the comment
+field, set when a `+` or Comment button opens the composer); the focus goes through `reviewCenter.focusTestId`, defined
+by `App`, and a closed circuit during that call is ignored. All of these are cleared when the route parameters change.
+
+The comment fields (`thread-text-input` and every `reply-text-{id}`) carry the attribute `data-ctrl-enter-submits`, which
+names the test id of their submit button (`start-thread-button` or `reply-button-{id}`); a listener defined by `App`
+presses that button when Ctrl+Enter (or Cmd+Enter) is pressed in the field and the button is enabled, so the shortcut
+costs no server round trip per key. A hint "Ctrl+Enter to submit" (`thread-submit-hint`, `reply-submit-hint-{id}`)
+stands next to the button. In a locked review the whole-file form, the form under a diff row, and the reply box of
+every thread are not rendered at all (they could never be sent), the `+` and Comment buttons stay and are disabled with
+`data-locked="true"`, and the diff hint reads "This review is locked; comments are read-only."
 
 Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-link`, `review-loading`,
 `review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `reopen-form`,
@@ -137,6 +154,7 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
 `summary-threads`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
 `slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
+`slot-primary-unavailable-{id}`, `slot-alternate-unavailable-{id}`,
 `slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
 `slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `sign-form-{id}`, `sign-meaning-{id}`,
 `sign-password-{id}`, `sign-totp-{id}` (only for a user with a second factor), `sign-error-{id}`, `sign-button-{id}`
@@ -145,7 +163,7 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `slot-add-form`,
 `new-slot-primary-select`, `new-slot-alternate-select`, `new-slot-add-button`, `new-slot-error`,
 `review-details`, `review-details-summary`, `review-id`,
-`review-state`, `review-fingerprint`, `record-digest`, `file-hash-path-{index}`, `file-hash-{index}`, `thread-index`,
+`review-fingerprint`, `record-digest`, `file-hash-path-{index}`, `file-hash-{index}`, `thread-index`,
 `thread-summary` (the filter group), `index-filter-all`, `index-filter-open`, `index-filter-resolved`,
 `threads-all-count`, `threads-open-count`, `threads-resolved-count`, `thread-index-list`, `thread-index-empty`,
 `index-row-{id}`, `index-file-{id}`, `index-anchor-{id}`, `index-state-{id}`, `index-count-{id}`,
@@ -153,7 +171,8 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `file-size-{index}`, `file-open-threads-{index}`, `file-select-{index}`,
 `selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`,
 `thread-start-line-input`, `thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`,
-`start-thread-button`, `thread-cancel-button` and `thread-whole-file-button` (only in the form under a diff row),
+`start-thread-button`, `thread-submit-hint`, `thread-cancel-button` and `thread-whole-file-button` (only in the form
+under a diff row),
 `file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`, `thread-link-{id}`,
 `thread-copy-link-{id}`, `thread-copy-status-{id}`,
 `line-text-{n}` (all by 1-based line number), `file-kind-{index}` (the change kind of a file in the list, shown for
@@ -173,7 +192,8 @@ a repository), `threads-empty`, `threads-list`, `thread-{id}`,
 `thread-anchor-{id}`, `thread-state-{id}`, `thread-count-{id}`, `thread-expand-{id}` (resolved threads only),
 `thread-toggle-{id}`, `comment-{id}-{n}`, `comment-author-{id}-{n}`,
 `comment-time-{id}-{n}`, `comment-text-{id}-{n}` (by thread identity and the position of the comment in the
-thread), `reply-text-{id}`, `reply-button-{id}`, and `reply-error-{id}`. The comments, `thread-toggle-{id}` and the
+thread), `reply-text-{id}`, `reply-button-{id}`, `reply-submit-hint-{id}`, and `reply-error-{id}`. The comments,
+`thread-toggle-{id}` and the
 reply controls of a resolved thread exist only while it is expanded.
 
 #### Key Methods
@@ -233,7 +253,8 @@ by row with the run of added lines that follows it, and the leftover cells of th
 placeholders (muted, hidden from assistive technology). A cell has a comment control, the line number of its side, a
 `-` or `+` sign, and the text as plain text, wrapped inside the cell. Removed and added cells are marked by color and
 by their sign. Above the rows it shows "x added, y removed" (or a sentence that only the line endings differ), and,
-when there are rows, the hint "Click + to comment on a line." The rows are grouped by `LineDiff.Segment`, and a run
+when there are rows, the hint "Click + to comment on a line." (or, while `CommentsDisabled`, "This review is locked;
+comments are read-only."). The rows are grouped by `LineDiff.Segment`, and a run
 of unchanged lines that is collapsed shows a button "Show N unchanged lines" that expands it. The rows of threads and
 of the selected line are pinned, so they are never hidden; a thread pins both its first and its last row, because the
 thread index and links scroll to the first row. The first change is therefore near the top of the view,

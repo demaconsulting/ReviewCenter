@@ -388,6 +388,39 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a section switched off but not yet saved says "Reason needed" in its heading, with the note that
+    ///     nothing is saved yet, and that the stored state is unchanged until the reason is saved.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded()
+    {
+        // Arrange: the design section is open and the reviewer is signed in
+        var projectId = await CreateReviewAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
+        Assert.Equal("0 of 5", cut.Find("[data-testid='section-des-progress']").TextContent);
+
+        // Act: switch the section off without saving a reason
+        await cut.Find("[data-testid='section-des-applicable']").ChangeAsync(new ChangeEventArgs { Value = false });
+
+        // Assert: the heading and the note say that a reason is still needed, and nothing is stored
+        Assert.Equal("Reason needed", cut.Find("[data-testid='section-des-progress']").TextContent);
+        Assert.Contains("pending", cut.Find("[data-testid='section-des-progress']").ClassList);
+        Assert.Equal("Not saved until you press Save reason.", cut.Find("[data-testid='section-des-unsaved-hint']").TextContent);
+        Assert.Equal("0 of 58 checks answered", cut.Find("[data-testid='checklist-progress']").TextContent);
+        var state = await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.True(state!.IsApplicable("DES"));
+
+        // Act: type a reason and save it
+        await cut.Find("[data-testid='section-des-reason']").InputAsync("No design files");
+        await cut.Find("[data-testid='section-des-save']").ClickAsync();
+
+        // Assert: now it is stored as not applicable and the note is gone
+        Assert.Equal("Not applicable", cut.Find("[data-testid='section-des-progress']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='section-des-unsaved-hint']"));
+    }
+
+    /// <summary>
     ///     Test that the next-unanswered action opens the section of the first unanswered check and scrolls to it.
     /// </summary>
     [Fact]

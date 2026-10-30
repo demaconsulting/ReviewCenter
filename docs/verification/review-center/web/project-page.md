@@ -30,7 +30,7 @@ N/A - standard test environment.
 - An unknown project shows a not-found message and no form, and so does a project the user is no member of (the same
   message, `project-not-found`, and nothing of the project, on the project page and on the page for a new review); a
   known project shows its name and description and
-  its reviews as rows with link, title, state, and an Approved or In review badge, or an empty message. A review
+  its reviews as rows with link, title, and an Approved or In review badge, or an empty message. A review
   whose every slot has a current signature is Approved; a review without slots or with an unsigned slot is In review.
 - A member who is no administrator sees the reviews and the New review button, but no Members section, no add member
   button, no Audit trail button, and no Repositories button.
@@ -308,10 +308,10 @@ reviews; the name, the description, the empty message, and the New review button
 page of the project, are shown. This scenario is tested by
 `ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage`.
 
-**ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState**: The page is rendered for a project with
-a review; the review is listed with a link to its page, its title, the state "Draft", and the badge "In review" (it has
-no reviewer slot). This scenario is tested
-by `ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState`.
+**ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval**: The page is rendered for a project with
+a review; the review is listed with a link to its page, its title, and the badge "In review" (it has
+no reviewer slot), and no state badge (`review-state-{id}`) is shown. This scenario is tested
+by `ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval`.
 
 **ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview**: A project has one review whose only slot was
 signed with the right password and one review without slots; the first is listed as "Approved" and the second as "In

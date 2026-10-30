@@ -142,6 +142,26 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a diff whose comments are disabled (a locked review) does not tell the reviewer to click +, and
+    ///     says that the comments are read-only instead.
+    /// </summary>
+    [Fact]
+    public void ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked()
+    {
+        // Arrange: the diff of a file with one added line
+        var result = LineDiff.Compute(["a"], ["a", "b"]);
+
+        // Act: render the diff with the comment controls disabled
+        var cut = Render<DiffView>(parameters => parameters
+            .Add(view => view.Result, result)
+            .Add(view => view.CommentsDisabled, true));
+
+        // Assert: the hint no longer invites a click, and the + controls are disabled
+        Assert.Equal("This review is locked; comments are read-only.", cut.Find("[data-testid='diff-hint']").TextContent);
+        Assert.All(cut.FindAll("[data-testid^='diff-comment-']"), button => Assert.True(button.HasAttribute("disabled")));
+    }
+
+    /// <summary>
     ///     Test that a modified file opens as a diff with the "x added, y removed" summary, the hint, and the
     ///     rows numbered on both sides.
     /// </summary>

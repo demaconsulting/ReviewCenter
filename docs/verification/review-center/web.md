@@ -110,7 +110,7 @@ is `false`. This scenario is tested by
 **WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages**: The pipeline is started in memory on a temporary
 database, a project with a review of three files (one of them binary) is created through the Core services, and
 the projects page, the project page, and the review page are requested. The project and review are listed and
-linked, and the review page shows the title, the Draft state, the fingerprint, and the path and hash of each
+linked, and the review page shows the title, the fingerprint (and no Draft state), and the path and hash of each
 file, equal to the known values. This scenario is tested by
 `WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages`.
 

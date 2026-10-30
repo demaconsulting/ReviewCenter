@@ -483,6 +483,7 @@ sections:
         tests:
           - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
           - WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch
+          - WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill
 
       - id: ReviewCenter-Web-DeepLinks
         title: >-

@@ -97,7 +97,8 @@ N/A - standard test environment.
 - A deleted file opens on the Diff view of removed lines, offers Diff and Baseline but no Head, and accepts a
   whole-file comment; its Baseline view has a note and no line comment controls.
 - The Diff view is laid out side by side, the baseline on the left and the head on the right: it shows the summary
-  "x added, y removed", the hint "Click + to comment on a line.", each side's line numbers, an unchanged line on both
+  "x added, y removed", the hint "Click + to comment on a line." (in a locked review: "This review is locked; comments
+  are read-only."), each side's line numbers, an unchanged line on both
   sides, a removed run paired row by row with the added run that follows it with muted empty placeholders for the
   leftover cells, rows with their sign, and unchanged runs of more than three lines collapsed behind a "Show N
   unchanged lines" button that expands them; opening a file brings its first change into view.
@@ -130,10 +131,16 @@ N/A - standard test environment.
   that cannot be used shows the reason as an alert instead of the download; a review that is not approved shows
   nothing about the attestation; and the download appears as soon as the last signature is made through the page.
 - An approved review is shown as locked: a Locked badge next to the Approved badge, and a banner that says that the
-  content, checklist, and reviewers can no longer change and that an administrator can reopen the review; every control
-  that would change it (new thread, line comments, reply, resolve, reopen thread, add, edit, and remove slot) is
-  disabled and marked `data-locked="true"`, while reading, copying a link, and the attestation download keep working; a
+  content, checklist, and reviewers can no longer change and that an administrator can reopen the review; the controls
+  that would change it by one click (line comments, resolve, reopen thread, add, edit, and remove slot) are
+  disabled and marked `data-locked="true"`, while the forms that could never be sent (the whole-file new-thread form,
+  the form under a diff row, and the reply box of a thread) are not rendered; reading, copying a link, and the
+  attestation download keep working; a
   review that is not approved shows no badge and no banner.
+- Ctrl+Enter in the new-thread field or a reply field presses the enabled submit button named by the field, a hint
+  next to the button says so, and a `+` or Comment button moves the focus to the comment field it opens.
+- A primary or alternate reviewer who is disabled or no longer a member of the project is kept as a labeled choice in
+  the change lists instead of a blank one; enabled reviewers get no extra option.
 - The reopen form (a reason of up to 250 characters and the button) is offered only to a project or system
   administrator and only while the review is locked; a missing reason shows the message of the rule and keeps the
   review locked; a valid reason returns the page to In review with the old signatures out of date and a reopen history
@@ -313,9 +320,10 @@ scenario is tested by `ReviewPage_Render_DeletedFile_ListsBaselineSize`.
 message names the identifier and no fingerprint is shown. This scenario is tested by
 `ReviewPage_Render_UnknownReview_ShowsNotFound`.
 
-**ReviewPage_Render_ExistingReview_ShowsIdTitleStateAndFingerprint**: The page is rendered for a review; the
-identifier, title, state "Draft", and the known fingerprint are shown. This scenario is tested by
-`ReviewPage_Render_ExistingReview_ShowsIdTitleStateAndFingerprint`.
+**ReviewPage_Render_ExistingReview_ShowsIdTitleAndFingerprint**: The page is rendered for a review; the
+identifier, title, and the known fingerprint are shown, and the Details section has no state row (the stored state has
+one value and the approval badge shows the status). This scenario is tested by
+`ReviewPage_Render_ExistingReview_ShowsIdTitleAndFingerprint`.
 
 **ReviewPage_Render_ExistingReview_ListsFilesWithPathSizeAndHash**: Every file is listed with its path and size, and
 its known SHA-256 hash is shown in the Details section. This scenario is tested by
@@ -450,11 +458,37 @@ tested by `ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId`.
 
 **ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls**: An approved review is rendered. The
 Locked badge (`review-locked`) next to the Approved badge and the banner (`review-locked-banner`) that says the review
-is locked and that an administrator can reopen it are shown; the controls that would change the review (the start
-thread button, the reply field and button of a thread, the resolve and reopen thread buttons, and the add slot form)
-are disabled and marked `data-locked="true"`, while reading the files and the download of the attestation still work.
+is locked and that an administrator can reopen it are shown; the controls that would change the review by one click (the
+resolve and reopen thread buttons and the add slot form) are disabled and marked `data-locked="true"`, while the
+whole-file new-thread form (`new-thread-form`, `thread-text-input`, `start-thread-button`) is not rendered at all, and
+reading the files and the download of the attestation still work.
 A review that is not approved shows none of these and has `data-locked="false"` controls. This scenario is tested by
 `ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls`.
+
+**ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox**: An approved review with a thread is rendered; the thread
+is shown with its comments and neither a reply field nor a reply button. This scenario is tested by
+`ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox`.
+
+**ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked**: A diff is rendered with `CommentsDisabled`; the hint
+reads "This review is locked; comments are read-only." and every `+` button is disabled. This scenario is tested by
+`ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked`.
+
+**ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton**: The new-thread field and the reply field of a thread
+carry `data-ctrl-enter-submits` with the test id of their submit button, each submit button exists, and the hints
+"Ctrl+Enter to submit" are shown next to them. The key press itself runs in the browser, so it is checked by hand there
+(Puppet `press Control+Enter`). This scenario is tested by `ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton`.
+
+**ReviewPage_LineCommentButton_Click_MovesFocusToTheCommentField**: A click on a line comment button calls
+`reviewCenter.focusTestId` with `thread-text-input` as the last browser call. This scenario is tested by
+`ReviewPage_LineCommentButton_Click_MovesFocusToTheCommentField`.
+
+**ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists**: A slot whose primary and alternate users are
+disabled afterwards is rendered; each change list has an extra, labeled option for the stored user, which is the
+selected one, so the select is not blank. This scenario is tested by
+`ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists`.
+
+**ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption**: A slot of enabled members has no `unavailable` option.
+This scenario is tested by `ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption`.
 
 **ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm**: The approved review is rendered for a project member who
 is not an administrator; the banner is shown, but neither the reopen form (reason field and button) nor its error is
@@ -685,6 +719,11 @@ end to end by the Puppet test
 `PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer` (`hover` on a row reveals
 its `+`, a `click` on it opens the composer; see the verification of ReviewCenterPuppet), and by the acceptance
 walk-through with Puppet (`puppet hover` on a row, a screenshot, then `puppet click` on its `+`).
+
+**WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill**: the stylesheet has a hover and focus rule for
+`.section-toggle` and for `.line-comment` that fills with `var(--accent-soft)` and never with `--accent-hover`, and the
+section toggle keeps `var(--text)` as its color, so the text stays readable on a dark theme. This scenario is tested by
+the test of that name.
 
 **ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine**: a theory over file paths with nested directories,
 spaces, `#`, `?`, `%`, a literal `%2F`, a literal `%20`, `+`, `&` and non-ASCII letters, next to a decoy file; the link

@@ -82,7 +82,7 @@
                         <button type="button" class="section-toggle" aria-expanded="@(isOpen ? "true" : "false")"
                                 data-testid="section-@sid-toggle" @onclick="() => GuardedAsync(() => ToggleSection(sectionId))">
                             <span class="section-title"><span class="section-chevron" aria-hidden="true">@(isOpen ? "\u25BE" : "\u25B8")</span>@section.Title</span>
-                            <span class="badge @(State.IsApplicable(section.Id) && progress.IsDone ? "resolved" : null)"
+                            <span class="badge @SectionBadgeClass(section.Id, progress.IsDone)"
                                   data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
                         </button>
                     </h2>
@@ -100,6 +100,10 @@
                             @if (!applicable)
                             {
                                 <p class="muted hint">@section.ApplicabilityHint</p>
+                                @if (PendingNotApplicable.Contains(section.Id))
+                                {
+                                    <p class="muted hint" data-testid="section-@sid-unsaved-hint">Not saved until you press Save reason.</p>
+                                }
                                 <div class="field">
                                     <label for="reason-@sid">Reason it does not apply <span class="required">* required</span></label>
                                     <textarea id="reason-@sid" rows="2" maxlength="@ReviewLimits.MaxJustificationLength"

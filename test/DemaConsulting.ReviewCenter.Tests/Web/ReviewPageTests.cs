@@ -141,10 +141,10 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the review's id, title, state and fingerprint are shown.
+    ///     Test that the review's id, title and fingerprint are shown, and that the always-"Draft" state is not.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_Render_ExistingReview_ShowsIdTitleStateAndFingerprint()
+    public async Task ReviewPage_Render_ExistingReview_ShowsIdTitleAndFingerprint()
     {
         // Arrange: a review of three files with a known fingerprint
         var projectId = await CreateReviewAsync(
@@ -158,7 +158,7 @@ public partial class ReviewPageTests : PageTestBase
         // Assert: every header value is shown
         Assert.Equal("First review", cut.Find("[data-testid='review-title']").TextContent);
         Assert.Equal("REV-1", cut.Find("[data-testid='review-id']").TextContent);
-        Assert.Equal("Draft", cut.Find("[data-testid='review-state']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-state']"));
         Assert.Equal(TestContent.FingerprintABC, cut.Find("[data-testid='review-fingerprint']").TextContent);
     }
 
@@ -522,6 +522,53 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the comment field of the composer is the target of the keyboard focus after a line's Comment
+    ///     button opens it, so the reviewer can type at once.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_LineCommentButton_Click_MovesFocusToTheCommentField()
+    {
+        // Arrange: a two-line file, selected
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "x\ny\n"u8.ToArray()));
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Act: click the Comment button of line 2
+        await cut.Find("[data-testid='line-comment-2']").ClickAsync();
+
+        // Assert: the browser was asked to focus the comment field
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Equal(["thread-text-input"], JSInterop.Invocations["reviewCenter.focusTestId"][^1].Arguments));
+    }
+
+    /// <summary>
+    ///     Test that the comment field and each reply field name the button that Ctrl+Enter presses, that the
+    ///     button exists, and that the hint says so.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CommentFields_CtrlEnterTarget_NamesTheSubmitButton()
+    {
+        // Arrange: a selected file with a thread, so that there is a reply field
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+
+        // Act: render the page and select the file
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the new-thread field presses the Start thread button, a submit button of its own form
+        var field = cut.Find("[data-testid='thread-text-input']");
+        Assert.Equal("start-thread-button", field.GetAttribute("data-ctrl-enter-submits"));
+        Assert.Equal("submit", cut.Find("[data-testid='start-thread-button']").GetAttribute("type"));
+        Assert.Equal("Ctrl+Enter to submit", cut.Find("[data-testid='thread-submit-hint']").TextContent);
+
+        // Assert: the reply field presses the Reply button of its thread
+        Assert.Equal($"reply-button-{thread.Id}", cut.Find($"[data-testid='reply-text-{thread.Id}']").GetAttribute("data-ctrl-enter-submits"));
+        Assert.NotNull(cut.Find($"[data-testid='reply-button-{thread.Id}']"));
+        Assert.Equal("Ctrl+Enter to submit", cut.Find($"[data-testid='reply-submit-hint-{thread.Id}']").TextContent);
+    }
+
+    /// <summary>
     ///     Test that a whole-file thread is created, shown, counted, and that the text field is cleared.
     /// </summary>
     [Fact]
@@ -799,7 +846,7 @@ public partial class ReviewPageTests : PageTestBase
         var detailsElement = cut.Find("[data-testid='review-details']");
         Assert.False(detailsElement.HasAttribute("open"));
         Assert.Equal("REV-1", detailsElement.QuerySelector("[data-testid='review-id']")?.TextContent);
-        Assert.Equal("Draft", detailsElement.QuerySelector("[data-testid='review-state']")?.TextContent);
+        Assert.Null(detailsElement.QuerySelector("[data-testid='review-state']"));
         Assert.Equal(TestContent.FingerprintABC, detailsElement.QuerySelector("[data-testid='review-fingerprint']")?.TextContent);
         Assert.Equal(TestContent.HashA, detailsElement.QuerySelector("[data-testid='file-hash-0']")?.TextContent);
         Assert.Equal("c.bin", detailsElement.QuerySelector("[data-testid='file-hash-path-2']")?.TextContent);
@@ -1253,6 +1300,53 @@ public partial class ReviewPageTests : PageTestBase
         // Assert: it is gone
         Assert.Empty(cut.FindAll($"[data-testid='slot-{slotId}']"));
         Assert.NotNull(cut.Find("[data-testid='slots-empty']"));
+    }
+
+    /// <summary>
+    ///     Test that the reviewer lists of an unsigned slot keep the current choice when that reviewer is disabled,
+    ///     instead of showing nothing selected.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists()
+    {
+        // Arrange: a slot of ann (primary) and bob (alternate), both disabled afterward, and an administrator signed in
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        await Users.CreateAsync("root", "Root", UserRole.Admin, SigningPassword, TestContext.Current.CancellationToken);
+        await Users.SetEnabledAsync("ann", false, TestActors.Ann, TestContext.Current.CancellationToken);
+        await Users.SetEnabledAsync("bob", false, TestActors.Ann, TestContext.Current.CancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: each list holds an extra option for its current reviewer, and that option is the chosen value
+        var primary = cut.Find($"[data-testid='slot-primary-select-{slotId}']");
+        var alternate = cut.Find($"[data-testid='slot-alternate-select-{slotId}']");
+        var primaryOption = cut.Find($"[data-testid='slot-primary-unavailable-{slotId}']");
+        var alternateOption = cut.Find($"[data-testid='slot-alternate-unavailable-{slotId}']");
+        Assert.Equal(ids["ann"].ToString(), primaryOption.GetAttribute("value"));
+        Assert.Equal(ids["bob"].ToString(), alternateOption.GetAttribute("value"));
+        Assert.Equal(ids["ann"].ToString(), primary.GetAttribute("value"));
+        Assert.Equal(ids["bob"].ToString(), alternate.GetAttribute("value"));
+        Assert.Equal("Ann (ann), disabled or no longer a member", primaryOption.TextContent);
+        Assert.Equal("Bob (bob), disabled or no longer a member", alternateOption.TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a slot of enabled reviewers adds no extra option to the reviewer lists.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption()
+    {
+        // Arrange: a slot of ann and bob, who are both enabled members
+        var (projectId, slotId, _) = await CreateSignableAsync();
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: both reviewers are among the regular options
+        Assert.Empty(cut.FindAll($"[data-testid='slot-primary-unavailable-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='slot-alternate-unavailable-{slotId}']"));
     }
 
     /// <summary>
@@ -2009,14 +2103,43 @@ public partial class ReviewPageTests : PageTestBase
         // Assert: the controls that change the review are disabled
         foreach (var testId in new[]
         {
-            "thread-text-input", "start-thread-button", "new-slot-primary-select", "new-slot-alternate-select", "new-slot-add-button"
+            "new-slot-primary-select", "new-slot-alternate-select", "new-slot-add-button"
         })
         {
             Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
         }
 
+        // Assert: the whole-file comment form is not offered at all, rather than shown disabled
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='thread-text-input']"));
+        Assert.Empty(cut.FindAll("[data-testid='start-thread-button']"));
+
         // Assert: the review can still be read, and the attestation is still offered
         Assert.NotEmpty(cut.FindAll("[data-testid='attestation-download-button']"));
+    }
+
+    /// <summary>
+    ///     Test that an approved review shows its existing threads without a reply box.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox()
+    {
+        // Arrange: a signable review with a resolved thread, then signed so that it is approved and locked
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var thread = await Threads.StartThreadAsync(
+            projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestActors.Ann, TestContext.Current.CancellationToken);
+        await SignSlotAsync(projectId, slotId);
+
+        // Act: render the page, select the file and expand the resolved thread
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find($"[data-testid='thread-expand-{thread.Id}']").ClickAsync();
+
+        // Assert: the thread is readable, with neither reply field nor reply button
+        Assert.Equal("First", cut.Find($"[data-testid='comment-text-{thread.Id}-1']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='reply-text-{thread.Id}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='reply-button-{thread.Id}']"));
     }
 
     /// <summary>

@@ -106,7 +106,7 @@ public partial class WebSubsystemTests
         Assert.Equal("Apollo", projectPage.QuerySelector("[data-testid='project-name']")?.TextContent);
         Assert.Equal($"/projects/{project.Id}/reviews/rev-1", projectPage.QuerySelector("[data-testid='review-link-rev-1']")?.GetAttribute("href"));
         Assert.Equal("First review", reviewPage.QuerySelector("[data-testid='review-title']")?.TextContent);
-        Assert.Equal("Draft", reviewPage.QuerySelector("[data-testid='review-state']")?.TextContent);
+        Assert.Null(reviewPage.QuerySelector("[data-testid='review-state']"));
         Assert.Equal(TestContent.FingerprintABC, reviewPage.QuerySelector("[data-testid='review-fingerprint']")?.TextContent);
         Assert.Equal("a.txt", reviewPage.QuerySelector("[data-testid='file-path-0']")?.TextContent);
         Assert.Equal(TestContent.HashA, reviewPage.QuerySelector("[data-testid='file-hash-0']")?.TextContent);
@@ -491,6 +491,30 @@ public partial class WebSubsystemTests
         Assert.DoesNotMatch(@"a\.thread-link\s*\{", css);
         Assert.Matches(@"\.thread-head button,\s*\.thread-head a\.action\s*\{[^}]*padding:", css);
         Assert.Matches(@"\.thread-head button,\s*\.thread-head a\.action\s*\{[^}]*font-size:", css);
+    }
+
+    /// <summary>
+    ///     Test that the stylesheet gives the checklist section toggle and the line comment button their own hover
+    ///     look instead of the global button hover fill, which left their text close to unreadable on a dark theme.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill()
+    {
+        // Arrange and Act: read the stylesheet the shell links to
+        var css = await ReadStylesheetAsync();
+
+        // Assert: both buttons define a hover rule that fills with the soft accent and never with the hover accent
+        foreach (var selector in new[] { @"\.section-toggle", @"\.line-comment" })
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(
+                css, selector + @":hover,\s*" + selector + @":focus-visible\s*\{(?<body>[^}]*)\}");
+            Assert.True(match.Success, $"{selector} has no hover rule.");
+            Assert.Contains("background: var(--accent-soft)", match.Groups["body"].Value, StringComparison.Ordinal);
+            Assert.DoesNotContain("--accent-hover", match.Groups["body"].Value, StringComparison.Ordinal);
+        }
+
+        // Assert: the section toggle keeps its text color on hover
+        Assert.Matches(@"\.section-toggle:hover,\s*\.section-toggle:focus-visible\s*\{[^}]*color:\s*var\(--text\)", css);
     }
 
     /// <summary>

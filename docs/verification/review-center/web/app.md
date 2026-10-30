@@ -61,6 +61,11 @@ in the document, and the script comes before the style sheet link. This scenario
 the document defines `copyText`, uses `navigator.clipboard`, and has the fallback that creates a text area and calls
 `document.execCommand('copy')`. This scenario is tested by `App_Render_ServedAtRoot_DefinesCopyTextHelper`.
 
+**App_Render_ServedAtRoot_DefinesFocusHelperAndCtrlEnterListener**: The pipeline is started in memory and the root
+document is requested; the document defines `focusTestId` and a `keydown` listener that reads the attribute
+`data-ctrl-enter-submits` and checks Ctrl or Meta with Enter. The browser behavior itself is not run here; it is
+checked by hand in the browser. This scenario is tested by `App_Render_ServedAtRoot_DefinesFocusHelperAndCtrlEnterListener`.
+
 **Routes_Render_RootUrl_RendersHomePage**: The navigation address is set to the root URL and `Routes` is rendered; the
 home page is shown. This scenario is tested by `Routes_Render_RootUrl_RendersHomePage`.
 
