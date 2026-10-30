@@ -32,9 +32,10 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     Each operation uses its own short-lived context from the factory, so the store is safe for
 ///     concurrent use by all browser sessions. Read operations are untracked, and listing a review
 ///     never loads file bytes. The checklist snapshot is stored in the same transaction as its review.
-///     Answers and section states are replaced in place (one row per check or section). Slots are plain rows;
-///     signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness violation on the review key is translated to a
-///     <see cref="DomainRuleException"/> so callers see the same error as for the service pre-check.
+///     Answers and section states are replaced in place (one row per check or section). Slots are plain rows.
+///     Signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness
+///     violation on the review key is translated to a <see cref="DomainRuleException"/> so callers see the same
+///     error as for the service pre-check.
 ///     Every change is made through <see cref="AuditAppender.ExecuteAsync{TResult}"/>: one write transaction, under the
 ///     process-wide audit gate, that stores the change and its audit entry together or not at all. The changes of
 ///     reviewed content and of the reviewer slots re-check inside that transaction that the review is not approved

@@ -201,6 +201,30 @@ public class ReviewStoreTests
     }
 
     /// <summary>
+    ///     Test that the setting that requires independent reviewers is stored with a new project (on unless the caller
+    ///     says otherwise) and returned by both the single read and the listing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddProjectAsync_RequireIndependentReviewers_IsStoredAndReturned()
+    {
+        // Arrange: an empty database
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+
+        // Act: add a project that switches the rule off, and one that does not say
+        var off = await db.Store.AddProjectAsync(
+            new Project { Name = "Off", Created = _created, RequireIndependentReviewers = false }, cancellationToken);
+        var unset = await db.Store.AddProjectAsync(new Project { Name = "Unset", Created = _created }, cancellationToken);
+
+        // Assert: the stored values come back from the read and from the listing
+        Assert.False((await db.Store.GetProjectAsync(off.Id, cancellationToken))!.RequireIndependentReviewers);
+        Assert.True((await db.Store.GetProjectAsync(unset.Id, cancellationToken))!.RequireIndependentReviewers);
+        var listed = await db.Store.ListProjectsAsync(cancellationToken);
+        Assert.False(listed.Single(p => p.Id == off.Id).RequireIndependentReviewers);
+        Assert.True(listed.Single(p => p.Id == unset.Id).RequireIndependentReviewers);
+    }
+
+    /// <summary>
     ///     Test that projects are listed by name.
     /// </summary>
     [Fact]

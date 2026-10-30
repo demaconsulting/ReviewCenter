@@ -68,13 +68,17 @@ be loadable on the test platform.
 - A change of reviewed content (a thread, a comment, the state of a thread, a checklist answer, the applicability of a
   section) and a change of the reviewer slots (add, update, remove) on an approved review is refused inside the write
   transaction with `ReviewLocked`, whatever the caller did before, and stores no row and no audit entry; the same
-  change on a review that is not approved is stored.
+  change on a review that is not approved is stored; a change of a review that does not exist is not refused as
+  locked; and when a change races with the final signature of a review, exactly one of them takes effect (the change
+  is refused as locked, or the signature as a changed record) and the stored state agrees with it.
 - A reopen of an approved review stores one row with the administrator, the display name, the time, the reason, and the
-  previous digest, together with one audit entry of the review; the history is listed in the order of the reopens, only
-  for its own review; the record of the review carries the number of reopens, so its digest changes; the reopen of a
-  review that is not approved is refused with `ReviewNotLocked` and a missing one with `ReviewNotFound`, both without a
-  row or an entry.
-- A new project requires independent reviewers; the setting is changed by a compare-and-set that is stored with one
+  previous digest, together with one audit entry of the review whose chain verifies; the history is listed in the
+  order of the reopens, only for its own review; the record of the review carries the number of reopens, so its digest
+  changes; a reopen whose audit entry cannot be stored stores no row and leaves the review approved.
+- The reopen of a review that is not approved is refused with `ReviewNotLocked` and a missing one with
+  `ReviewNotFound`, both without a row or an entry; of two reopens made at the same time exactly one succeeds.
+- A new project requires independent reviewers, or does not when the caller says so; the stored value is returned by
+  the read and by the listing; the setting is changed by a compare-and-set that is stored with one
   audit entry, is read back with the project, and for an expected value that is not stored (or an unknown project)
   reports `false` and changes nothing.
 
@@ -312,17 +316,48 @@ tested by `ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothin
 **ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction**: A review is signed in every slot, so
 that it is approved, with the store called directly (the services and their lock check are not involved). Adding a
 thread, adding a comment, changing the state of a thread, answering a check, changing the applicability of a section,
-and adding, updating, and removing a slot are each refused with `ReviewLocked`; the threads, answers, sections, and
-slots are as they were and no audit entry was added. This scenario is defined in `ReviewStoreSigningTests.cs` and is
-tested by `ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction`.
+and adding, updating, and removing a slot are each refused with `ReviewLocked`; the digest of the record, the slot, and
+the thread with its comment and state are as they were, no answer or section state exists, and the number of audit
+entries is unchanged. After the review is reopened, the same answer is stored. This scenario is defined in
+`ReviewStoreSigningTests.cs` and is tested by `ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction`.
+
+**ReviewStore_WriteMethods_UnknownReview_AreNotRefusedAsLocked**: Each of the same writes is made for a review that
+does not exist. None is refused with `ReviewLocked` (a not-found result or a refusal by the relationships of the
+database is accepted), and no thread, slot, answer, section state, or audit entry exists afterward. This scenario is
+tested by `ReviewStore_WriteMethods_UnknownReview_AreNotRefusedAsLocked`.
+
+**ReviewStore_AddSignatureAsync_RacingWithWrite_SignatureStartedFirst_EndsConsistent** and
+**ReviewStore_AddSignatureAsync_RacingWithWrite_WriteStartedFirst_EndsConsistent**: A review has two slots and the
+first is signed. The final signature and the addition of a thread are started together through the store, once with
+the signature started first and once with the write started first, and both are awaited. Exactly one takes effect:
+either the signature is stored, the thread is refused with `ReviewLocked`, and the review is approved; or the thread is
+stored, the signature is refused with `RecordChanged`, and the review is not approved. The audit chain verifies. The
+checks hold for either order, so the tests do not depend on timing. These scenarios are tested by the two tests named.
 
 **ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory**: An approved review is reopened with an audit draft. The
 history read back holds one reopen with the administrator, the display name, the time, the reason, and the previous
-digest; the record of the review has a reopen count of 1, so its digest differs from the approved one; one entry
-`review.reopened` of the review is stored and the chain verifies. A second reopen of the same review is refused with
-`ReviewNotLocked`, as is the reopen of a review that was never approved, and neither adds a row or an entry. This
-scenario is defined in `ReviewStoreSigningTests.cs` and is tested by
-`ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory`.
+digest; the record of the review has a reopen count of 1, so its digest differs from the approved one; the old
+signature is kept but the review is no longer approved; exactly one entry `review.reopened` of the review is stored
+with the detail of the draft and the chain verifies. This scenario is defined in `ReviewStoreSigningTests.cs` and is
+tested by `ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory`.
+
+**ReviewStore_ReopenReviewAsync_NotApprovedOrUnknown_IsRefusedAndStoresNothing**: A review whose slot has not signed,
+a review that was already reopened, and a review that does not exist are reopened; the first two throw `ReviewNotLocked`
+and the last `ReviewNotFound`, and no reopen row and no audit entry is added. This scenario is tested by
+`ReviewStore_ReopenReviewAsync_NotApprovedOrUnknown_IsRefusedAndStoresNothing`.
+
+**ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen**: The database is made to refuse every audit
+entry and an approved review is reopened. The call fails, no reopen row exists, the reopen count of the record is still
+0, the digest is as approved, and the review is still approved. With the refusal removed, the same reopen succeeds.
+This scenario is tested by `ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen`.
+
+**ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds**: Two reopens of one approved review are made at the same
+time; one succeeds and the other throws `ReviewNotLocked`; one row and one audit entry exist, the reopen count is 1, and
+the chain verifies. This scenario is tested by `ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds`.
+
+**ReviewStore_AddProjectAsync_RequireIndependentReviewers_IsStoredAndReturned**: A project is added with the setting
+switched off and another without saying; the read and the listing return false for the first and true for the second.
+This scenario is tested by `ReviewStore_AddProjectAsync_RequireIndependentReviewers_IsStoredAndReturned`.
 
 **ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet**: A new project requires independent reviewers.
 The setting is switched off with the expected value `true`; the call reports `true`, the new value is read back, and one

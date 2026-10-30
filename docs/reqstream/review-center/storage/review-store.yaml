@@ -193,32 +193,69 @@ sections:
           interleaving of two requests can change an approved review.
         tests:
           - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
+          - ReviewStore_WriteMethods_UnknownReview_AreNotRefusedAsLocked
+          - ReviewStore_AddSignatureAsync_RacingWithWrite_SignatureStartedFirst_EndsConsistent
+          - ReviewStore_AddSignatureAsync_RacingWithWrite_WriteStartedFirst_EndsConsistent
 
       - id: ReviewCenter-ReviewStore-ReopenHistory
         title: >-
           The ReviewStore class shall store the reopening of an approved review as an append-only row with the user,
           the display name, the time, the reason, and the digest of the approved record, together with its audit
-          entry in one transaction, shall refuse with the ReviewNotLocked rule, storing nothing, a review that is not
-          approved at that moment, shall list the reopenings of one review in the order in which they were made, shall
-          include their number in the record that a signature covers, and shall change the setting that requires
-          independent reviewers of a project only through an atomic compare-and-set with its audit entry in the same
-          transaction, reporting a project that does not exist or a value that is no longer the expected one without
-          a change and without an entry.
+          entry in one transaction, storing neither when either fails, and shall list the reopenings of one review in
+          the order in which they were made.
         justification: |
           The history of who reopened which approval and why is evidence, so it must exist exactly when the reopening
-          took effect, and two administrators acting together must not both reopen the same approval. Including the
-          number in the record is what makes the earlier signatures out of date. The setting decides who may sign, so
-          it follows the same atomic rule as the other settings of a project.
+          took effect, and it must be read back in the order in which the reopenings were made.
         tests:
           - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
+          - ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen
+
+      - id: ReviewCenter-ReviewStore-ReopenRefusal
+        title: >-
+          The ReviewStore class shall refuse with the ReviewNotLocked rule a reopening of a review that is not
+          approved at that moment, and with the ReviewNotFound rule a reopening of a review that does not exist,
+          inside the transaction that would store the reopening, storing no row and no audit entry, so that of two
+          reopenings made at the same time exactly one succeeds.
+        justification: |
+          Two administrators acting together must not both reopen the same approval, and a reopening of a review that
+          was never approved would put a false entry into the history. The check is made in the transaction of the
+          change because only there can no other request come between the check and the row.
+        tests:
+          - ReviewStore_ReopenReviewAsync_NotApprovedOrUnknown_IsRefusedAndStoresNothing
+          - ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds
+
+      - id: ReviewCenter-ReviewStore-ReopenCount
+        title: >-
+          The ReviewStore class shall include the number of reopenings of a review in the record that a signature
+          covers.
+        justification: |
+          Including the number in the record is what makes the signatures that were made before a reopening out of
+          date, so that the reviewers have to sign again.
+        tests:
+          - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
+
+      - id: ReviewCenter-ReviewStore-IndependentReviewers
+        title: >-
+          The ReviewStore class shall store the setting that requires independent reviewers with the project, on for
+          a project that was not given another value, return it with every project it reads or lists, and change it
+          only through an atomic compare-and-set that stores the audit entry of the change in the same transaction
+          and reports, without a change and without an entry, a project that does not exist or a value that is no
+          longer the expected one.
+        justification: |
+          The setting decides who may sign, so it follows the same atomic rule as the other settings of a project: a
+          change must neither be lost nor silently overwrite the change of another administrator, and it must not be
+          stored without its entry.
+        tests:
+          - ReviewStore_AddProjectAsync_RequireIndependentReviewers_IsStoredAndReturned
           - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
 
       - id: ReviewCenter-ReviewStore-Audit
         title: >-
-          The ReviewStore class shall store every audited change (project, review, thread, comment, thread state,
-          checklist answer and section state, slot, and signature) together with its audit entry in one transaction,
-          through the process-wide audit gate, shall store neither when either fails, and shall store no entry
-          for a change that has no effect.
+          The ReviewStore class shall store every audited change (project, project membership, evidence settings,
+          setting that requires independent reviewers, review, thread, comment, thread state, checklist answer and
+          section state, slot, signature, and reopening) together with its audit entry in one transaction, through the
+          process-wide audit gate, shall store neither when either fails, and shall store no entry for a change that
+          has no effect.
         justification: |
           The history must be true: a change without its entry, or an entry without its change, cannot be allowed
           to exist.
@@ -228,6 +265,10 @@ sections:
           - ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing
           - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
           - ReviewStore_NoOpChanges_RecordNothing
+          - ReviewStore_Membership_Changes_AreAuditedWithTheProject
+          - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+          - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
+          - ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen
 
       - id: ReviewCenter-ReviewStore-Memberships
         title: >-
