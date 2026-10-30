@@ -13,11 +13,18 @@ Know the hard rules first, because the practices build on them. A review can be 
 - no comment thread is open.
 
 Signing asks the signer to confirm their identity again (the password, or a fresh sign-in at the identity provider),
-and a signature covers the whole record as it was at that moment. Any later change to the record, such as a new comment
-or a changed answer, makes the signatures out of date, and the review goes back to In review. The product also
-constrains the reviewers: a slot holds only enabled members of the project, a person can be in only one slot, and only
-the primary or the alternate of a slot can sign it. See the Reviewing and Administration chapters for the rules the
-product enforces. Everything else is up to the team: who writes a comment, who resolves it, and how it is worded.
+and a signature covers the whole record as it was at that moment. While only some slots are signed, any change to the
+record, such as a new comment or a changed answer, makes the signatures given so far out of date. When the last slot is
+signed, the review is Approved and **locked**: ReviewCenter then refuses every change of its threads, checklist, and
+reviewers until a project administrator reopens it (see *Approved Reviews Are Locked* below).
+
+The product also constrains the reviewers: a slot holds only enabled members of the project, a person can be in only
+one slot, and only the primary or the alternate of a slot can sign it. In addition, a project requires independent
+reviewers by default: the person who created the review in ReviewCenter cannot be a reviewer of it or sign it. That
+setting can be switched off per project, it compares only the creator of the review (not the authors of git commits),
+and it does not apply to a review created from the command line, which has no recorded author. See the Reviewing and
+Administration chapters (Review Rules) for the exact rules. Everything else is up to the team: who writes a comment,
+who resolves it, and how it is worded.
 
 ## Answering the Checklist
 
@@ -64,7 +71,8 @@ record of the decision:
 
 Resolution has no text of its own: the **Resolve** button only changes the state of the thread. Write the reason as a
 reply first, then resolve. A reply can also be added to a resolved thread (expand it first), and it does not reopen it.
-Remember that a reply posted after reviewers have signed makes their signatures out of date, so reply before signing.
+Remember that a reply or a resolve after some reviewers have signed makes their signatures out of date, and after the
+last signature the review is locked and refuses both, so close every thread before the first signature.
 Say what was done and who decided, for example "Declined by the author after discussion with Alex: ...", because a
 resolved thread is shown collapsed, and the audit trail records who pressed the button but not why.
 
@@ -88,7 +96,7 @@ Prefer that the person who raised the thread resolves it, after the author has r
 agree on an outcome, the reviewer who agrees with it can resolve it instead. Do not let the author resolve their own
 reviewers' threads without a reply that the reviewer has seen. The product does not enforce any of this: every member of
 the project can resolve or reopen any thread, so it is a convention to agree on in the team. Reopen a thread that was
-resolved too early.
+resolved too early, before the review is approved; after that the lock refuses it.
 
 ## Baselines and Scope
 
@@ -99,8 +107,8 @@ resolved too early.
   last signed review, so changes of an unsigned (for example failed) review are not skipped.
 - **Know the trade-off with ReviewMark.** A review made from the changes since a baseline holds only the changed
   files, so its fingerprint is not the one ReviewMark computes for the whole review-set, and ReviewMark reports it as
-  stale. If you enforce review-sets with the evidence index,   review all files of the set (see Use the Evidence Index
-    with ReviewMark in the Automation and API Tokens chapter).
+  stale. If you enforce review-sets with the evidence index, review all files of the set (see Use the Evidence Index
+  with ReviewMark in the Automation and API Tokens chapter).
 
 ## Alternates
 
@@ -109,13 +117,41 @@ the primary may be away, so that a signature does not wait for one person. Choos
 because the signature records the role (primary or alternate) of the person who signed, and the alternate carries the
 same responsibility. Agree in the team who signs when both are available; usually it is the primary. A person can be in
 only one slot of a review, and a signed slot cannot be changed, so decide the reviewers before the first signature.
-Whether the author of a change may also be a reviewer is a question of the product's rules and of your own process: see
-the Reviewing and Administration chapters, and keep your team's rule consistent with what the product enforces.
+Independence from the author is enforced by default, but only as described under *What the Product Enforces*: it covers
+the creator of the review in ReviewCenter, a project administrator can switch it off, and it does not know who wrote
+the code. If your process needs more (for example, that nobody who committed to the change reviews it), that is a
+convention: check the commit authors yourself when you choose the reviewers. Keep your team's rule consistent with the
+project's review rules setting.
+
+## Approved Reviews Are Locked
+
+An Approved review is **Locked**: every slot has signed the current record, and the review page shows a Locked badge.
+The lock is not a separate state; it lasts exactly while the review is Approved. A project administrator or a system
+administrator can **Reopen** it in the locked notice of the review page, with a reason of 1 to 250 characters. A reopen
+is audited (`review.reopened`, with the reason and the previous digest) and listed in the **Reopen history** of the
+review. It puts the review back In review. The earlier signatures stay as history but are out of date for good, even
+if the content is changed back, so the reviewers must sign again. Reading, the attestation PDF, and the evidence index
+keep working while the review is locked, and a review that was reopened is not in the evidence index until it is
+approved again.
+
+- **Treat Approved as final.** Finish the discussion, the checklist, and the reviewer slots before the last signature,
+  because afterward nothing can change without a reopen.
+- **Reopen sparingly.** A reopen undoes the approval and nothing takes it back. Reopen only when the approval must
+  really be undone, for example a wrong answer or a finding that was missed, not for a late nit-pick or a typo.
+- **State the reason concretely.** The reason is recorded as text in the audit trail and, once the review is approved
+  again, in the attestation PDF, so write what was wrong and who asked, for example "Missed SQL injection in Orders.cs
+  line 40, found by Alex after approval", not "needs rework".
+- **Prefer a new review for new work.** Files of a review never change. If the code changed after approval, create a
+  new review of the new revision (see *When a Check Fails*) and leave the approved one as the record of what was
+  approved. Reopen is for correcting the judgment on the same files.
+- **Sign again with care.** After a reopen, the reviewers read what changed (the **Reopen history** and the **History**
+  of the review) before they sign the new record.
 
 ## Signing Hygiene
 
 - **Sign only when the record you saw is final.** Before you sign, check that all threads and answers are as you
-  expect. Anything that changes afterward makes the signature out of date.
+  expect. While other slots are unsigned, anything that changes afterward makes your signature out of date; when you
+  are the last signer, the review locks and the record cannot change without an administrator's reopen.
 - **A stale signature means review again.** When a slot says "Signature out of date", read what changed (the thread
   list and the **History** of the review show it) before you sign the new record. Do not sign only because the
   button is there.
