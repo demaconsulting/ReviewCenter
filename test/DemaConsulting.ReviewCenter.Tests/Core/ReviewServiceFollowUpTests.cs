@@ -437,6 +437,43 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
+    ///     Test that the audit text names the whole identifier of the earlier review: two follow-ups of reviews whose
+    ///     identifiers (100 characters) share a long prefix read differently at both create paths, and the line stays
+    ///     within the limit of the audit detail.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId()
+    {
+        // Arrange: four sources with 100-character identifiers that share their first 57 characters
+        var w = await CreateAsync();
+        var prefix = new string('a', 57);
+        var uploadOne = prefix + new string('b', 43);
+        var uploadTwo = prefix + new string('c', 43);
+        var repoOne = prefix + new string('d', 43);
+        var repoTwo = prefix + new string('e', 43);
+        await UploadAsync(w, uploadOne);
+        await UploadAsync(w, uploadTwo);
+        await FromRepositoryAsync(w, repoOne);
+        await FromRepositoryAsync(w, repoTwo);
+
+        // Act
+        await UploadAsync(w, "up-1", follows: uploadOne);
+        await UploadAsync(w, "up-2", follows: uploadTwo);
+        await FromRepositoryAsync(w, "rp-1", follows: repoOne);
+        await FromRepositoryAsync(w, "rp-2", follows: repoTwo);
+
+        // Assert
+        var details = new[] { "up-1", "up-2", "rp-1", "rp-2" }.Select(id => CreatedDetail(w, id)).ToArray();
+        Assert.Contains($", follows '{uploadOne}';", details[0], StringComparison.Ordinal);
+        Assert.Contains($", follows '{uploadTwo}';", details[1], StringComparison.Ordinal);
+        Assert.Contains($", follows '{repoOne}';", details[2], StringComparison.Ordinal);
+        Assert.Contains($", follows '{repoTwo}';", details[3], StringComparison.Ordinal);
+        Assert.NotEqual(details[0], details[1]);
+        Assert.NotEqual(details[2], details[3]);
+        Assert.All(details, d => Assert.True(d.Length <= AuditText.MaxDetailLength, $"The detail has {d.Length} characters."));
+    }
+
+    /// <summary>
     ///     Test that an ordinary review has no follow-up text in the audit and no carried data.
     /// </summary>
     [Fact]

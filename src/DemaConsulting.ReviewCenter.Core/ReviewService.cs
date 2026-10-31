@@ -409,13 +409,14 @@ public sealed class ReviewService
 
         // The title is shortened so the SHAs and the fingerprint always fit in the audit detail; an API-created review
         // names its token right after the title (a shorter title) so the statement can never be cut off at the end;
-        // a follow-up adds its own text after the fingerprint and so shortens the title a little more
+        // a follow-up adds its own text after the fingerprint (with the whole identifier of the earlier review, so two
+        // reviews that share a prefix stay apart) and so shortens the title a little more
         var added = files.Count(f => f.ChangeKind == ChangeKind.Added);
         var modified = files.Count(f => f.ChangeKind == ChangeKind.Modified);
         var deleted = files.Count(f => f.ChangeKind == ChangeKind.Deleted);
         var setText = reviewSetId is null ? string.Empty : $", set '{AuditText.Clean(reviewSetId, 60)}'";
         var viaText = CreatedViaText(actor);
-        var titleText = AuditText.Clean(trimmedTitle, (viaText.Length == 0 ? 60 : 40) - (follow is null ? 0 : 20));
+        var titleText = AuditText.Clean(trimmedTitle, (viaText.Length == 0 ? 60 : 40) - (follow is null ? 0 : 30));
         await _store.AddReviewAsync(
             review,
             AuditDraft.By(
@@ -517,7 +518,7 @@ public sealed class ReviewService
             return string.Empty;
         }
 
-        var text = $", follows '{AuditText.Clean(follow, 60)}'; carried {Plural(carry.Answers.Count, "answer")}, {Plural(carry.Threads.Count, "thread")}";
+        var text = $", follows '{AuditText.Clean(follow, ReviewLimits.MaxReviewIdLength)}'; carried {Plural(carry.Answers.Count, "answer")}, {Plural(carry.Threads.Count, "thread")}";
         if (carry.ResolvedThreadsNotCarried > 0)
         {
             text += $", {Plural(carry.ResolvedThreadsNotCarried, "resolved thread")} not carried";

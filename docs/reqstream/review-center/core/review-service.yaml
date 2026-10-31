@@ -351,6 +351,7 @@ sections:
           - ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource
           - ReviewService_CreateFromSessionAsync_ReviewSet_MustMatch
           - ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts
+          - ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId
           - ReviewService_FollowUp_DuplicateId_IsRefusedAndNothingChanges
           - FollowUpCarry_CheckFit_Matrix
           - FollowUpCarry_DroppedMessage_ListsFilesAndTheRest

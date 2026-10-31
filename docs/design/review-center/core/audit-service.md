@@ -119,7 +119,8 @@ administrator is not throttled but is a trusted actor).
 | `audit.events-suppressed` | `tracking table full, events of new keys are not recorded` (see below) |
 
 The detail of `review.created` has, after the file text, the text `, follows 'X'; carried N answers, M threads` for a
-follow-up, with `, R resolved threads not carried` and `, open threads on F files dropped` when they apply, and the text
+follow-up (`X` is the whole identifier of the earlier review), with `, R resolved threads not carried` and
+`, open threads on F files dropped` when they apply, and the text
 `, due yyyy-MM-dd` when a due date is set.
 
 An overflow entry (`audit.events-suppressed`) has the actor text `audit service`. It is written at most once per

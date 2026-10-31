@@ -419,9 +419,15 @@ changed the wording of a check, the answer to that check is not carried and the 
 tested by `ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried`.
 
 **ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts**: Open threads are carried; the entry
-`review.created` ends the review text with `, follows 'X'; carried N answers, M threads` and names the resolved threads
+`review.created` ends the review text with `, follows 'X'; carried N answers, M threads` (`X` is the whole identifier) and
+names the resolved threads
 that were not carried. This scenario is tested by
 `ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts`.
+
+**ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId**: Four earlier reviews have 100-character identifiers
+that share their first 57 characters; a follow-up of each, two per create path, names the whole identifier in the
+`review.created` detail, so the entries of two follow-ups differ, and no detail exceeds 500 characters. This scenario is
+tested by `ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId`.
 
 **ReviewService_CreateDraftAsync_NoFollowUp_HasNoCarriedData**: A review without `followsReviewId` follows nothing,
 carries nothing, and its audit detail has no follow-up text. This scenario is tested by

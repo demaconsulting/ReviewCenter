@@ -200,10 +200,14 @@ setting a carried section again, stores the new value without the mark (see `Che
 **Audit of a follow-up**: the detail of `review.created` gets `, follows 'X'; carried N answers, M threads` (after the
 files, and on the repository path after the fingerprint; before the set, due date and token text), followed by
 `, R resolved threads not carried` when R is greater than zero and `, open threads on F files dropped` when the creator
-acknowledged a drop. A review that follows nothing has exactly the detail as before. The title of a follow-up is cleaned
-to 100 characters for an upload (an upload that follows nothing is unchanged), and to 20 characters fewer than before
-(40, or 20 with a token) for a repository, so that the line stays within the 500 characters of the audit detail. No
-new action code is needed.
+acknowledged a drop. `X` is the whole identifier of the earlier review (up to 100 characters, never shortened), so two
+follow-ups of reviews whose identifiers share a prefix are told apart in the trail. A review that follows nothing has
+exactly the detail as before. The title of a follow-up is cleaned to 100 characters for an upload (an upload that
+follows nothing is unchanged), and to 30 characters fewer than before (30, or 10 with a token) for a repository, so
+that the whole identifier always fits within the 500 characters of the audit detail; in the extreme case (a 100
+character identifier together with a token, a 40 character repository name, a review-set and a due date) the audit
+store cuts the end of the line, which is the review-set and the due date, and marks the cut with `...`. No new action
+code is needed.
 
 **Due date at creation**: `CreateDraftAsync`, `CreateFromRepositoryAsync`, and (through `SessionReviewRequest.DueDate`)
 `CreateFromSessionAsync` check the optional date after the title and before the files and any I/O: a date before today
