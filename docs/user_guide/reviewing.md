@@ -320,11 +320,11 @@ an empty file can be commented on as a whole only. A line number must be a whole
 first line must not be after the last line. Leading and trailing spaces of the text are removed. A
 problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
 
-When a review already has a current signature but is not yet approved, a new thread, a reply, a resolve, or a reopen
-makes that signature out of date. The page does not store the change at once: it shows a warning under the form, in the
-thread, or at the head of the thread, that names every affected slot and its signer, for example "Slot 1 (Ann)". Press
-**Confirm change** to store it (the named signatures go out of date and those reviewers sign again), or **Cancel** to
-store nothing; the text you typed stays in the form or the reply field.
+When a review already has a current signature but is not yet approved, the comments you post here are **chat**: a new
+thread, a reply, a resolve, and a reopen of a thread do not change what the signatures cover, so they never make a
+signature out of date and the page asks for no confirmation. A comment is part of the signed record only when it is
+included in the report, which this version of the pages does not offer; the open threads still block signing and the
+approval (see [Review Signatures](#review-signatures)).
 
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
 changes. While a review is approved it is locked: the comment forms and reply fields are not shown, the line buttons are
@@ -442,7 +442,8 @@ their work.
 **What is carried over.** The Pass and N/A answers of checks whose wording is unchanged, the sections that do not
 apply (with the same title), and the open threads on files that are in the new review. On the checklist an answer shows
 the badge "Carried from" with a link to the earlier review, and a section shows "Not applicable, carried from review X"
-with a link. On the review page a carried thread shows "carried from" with a link. The
+with a link. On the review page a carried thread shows "carried from" with a link. A carried thread keeps its kind and
+the report flags of its comments, so a Finding stays a Finding. The
 review page also says "Follows X" with the number of answers and threads carried, and the earlier review lists the
 reviews that follow it.
 
@@ -462,7 +463,8 @@ mind, and answer again a check that the fix may affect, because the changes of t
 
 ## Review Signatures
 
-A review is approved when its reviewers have signed it. The review page shows an **Approved** or **In review** badge
+A review is approved when its reviewers have signed it and no comment thread is open. The review page shows an
+**Approved** or **In review** badge
 next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the stage of each
 review (see [The Project Page Overview](#the-project-page-overview)). An Approved review is also locked (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
@@ -537,21 +539,25 @@ statement.
 
 **What a signature covers.** A signature is bound to the record as it was when you signed. The record is the content
 fingerprint of the files, the wording of every checklist question, every checklist answer with its justification and
-the person who gave it, every section marked as not applicable with its reason, and every comment thread with its
-comments. For a review from a repository it also covers the repository, the
+the person who gave it, every section marked as not applicable with its reason, and the comments that are included in
+the report (a comment is chat, and not part of the record, unless it is included). For a review from a repository it
+also covers the repository, the
 baseline and head commits, the selection, and every changed file with its change kind and the hashes of its baseline
 and head content, so a signature cannot look current for a different selection or a different change. The
 **Record digest** in the Details section (shortened; the full
 value is its tooltip) identifies that record. The time an answer was given is not part of it, but who gave it is: if
 somebody else answers a check again, even with the same value, the earlier signatures go out of date. In general, any
-change to the record, including another reviewer's checklist answer, a new comment, or a resolved thread, makes the
-signatures given so far out of date. If the record
+change to the record, including another reviewer's checklist answer or a change to the report, makes the
+signatures given so far out of date. Chat, and whether a thread is open or resolved, are not part of the record, so
+they never do; an open thread blocks signing instead. If the record
 changes while you are signing, the signature is refused and you are asked to review it and try again.
 
 **Out of date and Approved.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the current
-record, "Signature out of date" when it has signatures but the record has changed since (for example a new comment or
-a changed answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot and every slot is
-signed for the current record. While some slots are still unsigned, a change to the record makes the signatures given
+record, "Signature out of date" when it has signatures but the record has changed since (for example a changed
+answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot, every slot is
+signed for the current record, and no thread is open. A review whose slots are all signed but that has an open thread
+is not approved and not locked; the thread must be resolved first. While some slots are still unsigned, a change to the
+record makes the signatures given
 so far out of date, and the reviewers sign the new record again; the earlier signatures stay as history. Before the
 page stores such a change it names the affected slots and signers in a warning and asks you to confirm it; see
 *What Makes a Signature Out of Date* in the Review Practices chapter. Once the
@@ -565,7 +571,8 @@ default), and the page is replaced by the Session ended message. Until then the 
 not re-checked, such as answering checks and adding comments and threads. Signing and changing reviewer slots check
 the account again on every action and are refused for a disabled user at once.
 
-Approved is computed each time from the record and the signatures; it is not a stored state of the review, and neither
+Approved is computed each time from the record, the signatures, and the open threads; it is not a stored state of the
+review, and neither
 is the lock that follows from it: a review is locked exactly while it is Approved. Every
 signature is also recorded in the audit trail, which is described in Audit Trail in the Administration chapter. An
 Approved
@@ -574,7 +581,8 @@ review can be downloaded as a digitally signed PDF; see the section Signed Attes
 ## Locked Reviews and Reopening
 
 An approved review is **locked**. The lock is not a separate state: a review is locked while it has at least one
-reviewer slot and every slot holds a signature of the current record, which is the same condition as **Approved**.
+reviewer slot, every slot holds a signature of the current record, and no comment thread is open, which is the same
+condition as **Approved**.
 The review page then shows a **Locked** badge next to the Approved badge and a notice: "This review is approved and
 locked. Its content, checklist and reviewers can no longer change. A project administrator can reopen it; the
 signatures are then kept as history and the review must be signed again." The checklist page shows a similar notice.
@@ -589,7 +597,7 @@ and from wherever:
 
 The buttons and fields that do this are disabled on the review page, the checklist page and the line comment buttons
 of the diff, with an explanation, and a request that gets through anyway (for example from a page that was opened
-before the review was approved) is refused with the message "This review is approved and locked. A project
+before the review was approved) is refused with the message "This review is concluded and locked. A project
 administrator must reopen it before it can change." Signing an approved review is refused with the same message. The
 files and the selection of a review are fixed when it is created, so there is nothing to lock there. Everything that
 only reads keeps working on a locked review: reading the files, the diff, the threads and the checklist, copying

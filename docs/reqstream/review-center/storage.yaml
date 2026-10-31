@@ -147,6 +147,7 @@ sections:
           - ReviewCenter-AuditStore-Filter
           - ReviewCenter-AuditStore-ReadMatching
           - ReviewCenter-ReviewStore-Audit
+          - ReviewCenter-ReviewStore-ThreadReport
           - ReviewCenter-UserStore-Audit
           - ReviewCenter-RepositoryStore-Audit
           - ReviewCenter-DbContext-AuditEntries
@@ -318,6 +319,7 @@ sections:
           evidence about the review and must survive a restart and stay true.
         children:
           - ReviewCenter-ReviewStore-ApprovalLockInTransaction
+          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck
           - ReviewCenter-ReviewStore-ReopenHistory
           - ReviewCenter-ReviewStore-ReopenRefusal
           - ReviewCenter-ReviewStore-ReopenCount

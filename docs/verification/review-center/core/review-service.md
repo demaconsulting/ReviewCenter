@@ -54,7 +54,9 @@ N/A - standard test environment.
   is overdue only when the date has passed and it is not approved.
 - A review can be created as a follow-up of an earlier review of the same project: the Pass and N/A answers of checks
   with unchanged wording, the not-applicable sections with the same title, and the open threads on files of the new
-  review are carried, marked with the earlier review, and stored with it in one step; Fail answers, resolved threads,
+  review are carried, marked with the earlier review, and stored with it in one step, each thread with its comments
+  keeping their kinds and report flags (a Finding stays a Finding, chat stays chat, and the note about a moved anchor
+  is a comment that is not included); Fail answers, resolved threads,
   slots, signatures and reopenings are not; a line anchor is kept only for identical content; an unknown or foreign
   review, a review that does not fit, and dropped open threads without an acknowledgement are refused with
   `FollowUpInvalid`; the audit entry names the carry; a review that follows nothing is unchanged. The preview of a
@@ -379,6 +381,17 @@ This scenario is tested by `FollowUpCarry_Compute_NotApplicableSections_AreCarri
 carried open with every comment (author, user name, text, time) unchanged, its original time, and the marks of the
 review and the thread it came from. This scenario is tested by
 `FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim`.
+
+**FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments**: A carried Finding keeps the flags
+and the kinds of its comments, including its Resolution comments. This scenario is tested by
+`FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments`.
+
+**FollowUpCarry_CarryThreads_CarriedChat_StaysChat**: A carried chat thread keeps its comments as chat. This scenario
+is tested by `FollowUpCarry_CarryThreads_CarriedChat_StaysChat`.
+
+**FollowUpCarry_CarryThreads_MovedAnchorNote_IsExcludedComment**: The note about a moved anchor is added as a comment
+that is not included in the report and has the kind Comment. This scenario is tested by
+`FollowUpCarry_CarryThreads_MovedAnchorNote_IsExcludedComment`.
 
 **FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed**: A resolved thread is counted and not carried;
 an open thread on a file that the new review does not have is listed (sorted, once per file) and not carried. This

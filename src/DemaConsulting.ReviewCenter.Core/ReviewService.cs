@@ -570,7 +570,7 @@ public sealed class ReviewService
     /// </summary>
     /// <param name="review">The review. Must not be null.</param>
     /// <param name="isApproved">
-    ///     Whether the review is approved now (see <see cref="ReviewLock.IsApproved"/>). An approved review is never
+    ///     Whether the review is approved now (see <see cref="ReviewLock.IsConcluded"/>). An approved review is never
     ///     overdue; its date is kept as history.
     /// </param>
     /// <returns><c>true</c> when the review has a due date that lies before today (UTC) and is not approved.</returns>

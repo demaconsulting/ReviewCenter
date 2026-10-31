@@ -36,7 +36,7 @@ public enum ReviewStage
     /// <summary>The review has reviewer slots and at least one has no current signature.</summary>
     InReview,
 
-    /// <summary>The review is approved: every slot holds a current signature, and the review is locked.</summary>
+    /// <summary>The review is approved: every slot holds a current signature, no thread is open, and the review is locked.</summary>
     Approved
 }
 
@@ -69,7 +69,7 @@ public enum ReviewStage
 /// </param>
 /// <param name="DueDate">The due date (a UTC calendar day), or <c>null</c> when there is none.</param>
 /// <param name="IsOverdue"><c>true</c> when the due date is before today (UTC) and the review is not approved.</param>
-/// <param name="IsApproved"><c>true</c> when every slot holds a current signature.</param>
+/// <param name="IsApproved"><c>true</c> when every slot holds a current signature and no thread is open.</param>
 /// <param name="Reopened"><c>true</c> when the review was reopened after an approval and is not approved now.</param>
 /// <param name="IsBlocked">
 ///     <c>true</c> when the review is not approved and has no checklist, an open thread, an unanswered check or a

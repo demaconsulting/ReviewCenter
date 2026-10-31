@@ -106,15 +106,17 @@ record.
 A null document raises `ArgumentNullException`. Text that the PDF fonts cannot show becomes question marks (see
 `PdfDocumentWriter`). A review without a checklist is reported as such in the document and is not an error.
 
-**What the digest binds and what the PDF shows**: The record digest (`ReviewCenter record v1`) that the reviewers'
+**What the digest binds and what the PDF shows**: The record digest (`ReviewCenter record v2`) that the reviewers'
 signatures bind to covers: the content fingerprint; the source of the files (repository identity, baseline and head
 commit, selection, review-set, and for every changed file its path, kind, and baseline and head hashes); the checklist
 the review was created with (version, and for every section its identifier and title and for every check its
 identifier and wording); every checklist answer (check identifier, outcome, justification, and who answered, by display
-name and user name); the sections that do not apply (identifier and reason); and every thread with its comments (anchor,
-state, time, and for each comment the author, the user name, the text, and the time); and, only when the review was
+name and user name); the sections that do not apply (identifier and reason); and the report: every thread that has a
+comment included in the report, with its anchor and, for each included comment, the author, the user name, the text,
+and the time; and, only when the review was
 reopened, the number of reopens.
-It does **not** cover the time an answer was given (`AnsweredAt`), the review title, the project name, the repository
+It does **not** cover chat (comments that are not included in the report), the state and the creation time of a thread,
+the time an answer was given (`AnsweredAt`), the review title, the project name, the repository
 name, the reviewer slots, and the audit chain head, which the PDF may also show. The PDF does print the time of every
 answer (see the checklist rendering above), so a burst of answers within seconds is visible to a reader, and the time is
 protected by the PDF signature, not by the reviewers' own signatures; it is the clock of the server, not a trusted

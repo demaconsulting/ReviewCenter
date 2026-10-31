@@ -307,6 +307,103 @@ public class FollowUpCarryTests
     }
 
     /// <summary>
+    ///     Test that a carried Finding keeps the flags and the kind of its comments, including a resolution note of an
+    ///     earlier round, so it is still a Finding in the new review.
+    /// </summary>
+    [Fact]
+    public void FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments()
+    {
+        // Arrange: an open (reopened) Finding with an included starting comment, a chat reply and an included note
+        var finding = new ReviewThread
+        {
+            Id = 1,
+            ProjectId = 1,
+            ReviewId = "old",
+            FilePath = "a.txt",
+            StartLine = 3,
+            EndLine = 5,
+            Created = _then,
+            Comments =
+            [
+                new ReviewComment { Id = 10, ThreadId = 1, Author = "Bob", AuthorUsername = "bob", Text = "Fix", Created = _then, IncludeInReport = true },
+                new ReviewComment { Id = 11, ThreadId = 1, Author = "Cyd", AuthorUsername = "cyd", Text = "Chat", Created = _then },
+                new ReviewComment
+                {
+                    Id = 12,
+                    ThreadId = 1,
+                    Author = "Bob",
+                    AuthorUsername = "bob",
+                    Text = "Done",
+                    Created = _then,
+                    IncludeInReport = true,
+                    Kind = ReviewCommentKind.Resolution
+                }
+            ]
+        };
+
+        // Act
+        var thread = Assert.Single(Compute(Record(threads: [finding])).Threads);
+
+        // Assert
+        Assert.Equal(ThreadKind.Finding, thread.Kind);
+        Assert.Equal([true, false, true], thread.Comments.Select(c => c.IncludeInReport));
+        Assert.Equal(
+            [ReviewCommentKind.Comment, ReviewCommentKind.Comment, ReviewCommentKind.Resolution],
+            thread.Comments.Select(c => c.Kind));
+    }
+
+    /// <summary>
+    ///     Test that a carried chat thread stays chat: no comment of it is in the report.
+    /// </summary>
+    [Fact]
+    public void FollowUpCarry_CarryThreads_CarriedChat_StaysChat()
+    {
+        // Arrange: the helper thread has two chat comments
+        var record = Record(threads: [Thread(1)]);
+
+        // Act
+        var thread = Assert.Single(Compute(record).Threads);
+
+        // Assert
+        Assert.Equal(ThreadKind.Question, thread.Kind);
+        Assert.All(thread.Comments, comment => Assert.False(comment.IncludeInReport));
+        Assert.All(thread.Comments, comment => Assert.Equal(ReviewCommentKind.Comment, comment.Kind));
+    }
+
+    /// <summary>
+    ///     Test that the system comment of a moved anchor is never part of the report, even in a carried Finding.
+    /// </summary>
+    [Fact]
+    public void FollowUpCarry_CarryThreads_MovedAnchorNote_IsExcludedComment()
+    {
+        // Arrange: a Finding on lines of a file whose content changed
+        var finding = new ReviewThread
+        {
+            Id = 1,
+            ProjectId = 1,
+            ReviewId = "old",
+            FilePath = "a.txt",
+            StartLine = 3,
+            EndLine = 5,
+            Created = _then,
+            Comments =
+            [
+                new ReviewComment { Id = 10, ThreadId = 1, Author = "Bob", AuthorUsername = "bob", Text = "Fix", Created = _then, IncludeInReport = true }
+            ]
+        };
+
+        // Act
+        var thread = Assert.Single(Compute(Record(threads: [finding]), newFiles: [File("a.txt", "other", "b1")]).Threads);
+
+        // Assert: the thread stays a Finding and the added note is chat
+        Assert.Equal(ThreadKind.Finding, thread.Kind);
+        var note = thread.Comments[^1];
+        Assert.Equal(FollowUpCarry.SystemUsername, note.AuthorUsername);
+        Assert.False(note.IncludeInReport);
+        Assert.Equal(ReviewCommentKind.Comment, note.Kind);
+    }
+
+    /// <summary>
     ///     Test that a resolved thread is not carried but is counted, and that an open thread on a file that is not in
     ///     the new review is not carried but its file is listed, each file once and in order.
     /// </summary>

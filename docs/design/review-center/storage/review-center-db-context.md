@@ -62,7 +62,9 @@ repository registry is the one exception, see `Repositories`).
 - **Comments** (`ReviewComment`): key `Id`, assigned by the database, so it grows with the posting order.
   `ThreadId` relates the comment to its thread, and a comment is deleted with its thread. `Author` (the display name
   at the time) is required, at most 100 characters; `AuthorUsername` (the user name) is required, at most 50;
-  `Text` is required, at most 4000; `Created`.
+  `Text` is required, at most 4000; `Created`; `IncludeInReport` (a boolean, default false: chat; true puts the comment
+  in the report that the record digest covers); `Kind`, stored as text of at most 32 with the default `Comment` (the
+  other value is `Resolution`). The kind of a thread is derived from its starting comment and is not stored.
 - **ReviewChecklists** (`ReviewChecklist`): key `ProjectId` plus `ReviewId`, one frozen snapshot per review.
   `Version` is required, at most 64; `Definition` is required text (the JSON of the checklist). It belongs to its
   review (a one-to-one relationship, so the snapshot is saved with the review) and is deleted with it.
@@ -196,7 +198,7 @@ before the personal-access-token slice does not have them and must be deleted an
 table, and development databases are recreated. The same holds for the follow-up columns (`FollowsReviewId`,
 `CarriedAnswerCount`, `CarriedThreadCount` of a review, `CarriedFromReviewId` of an answer, a section state and a
 thread, `CarriedFromThreadId` of a thread) and the index on `ProjectId` and `FollowsReviewId`. The same holds for the
-`ProjectMemberships` table, the
+`IncludeInReport` and `Kind` columns of a comment. The same holds for the `ProjectMemberships` table, the
 `IsSystemAdmin` column of a user (which replaces the role column), and the `ProjectId` of a repository: a database
 created before the project access slice does not have them and must be deleted and created
 again. The same holds for the `LastSignInUtc` column of a user (users page): there is no migration, so a development

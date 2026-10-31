@@ -991,6 +991,10 @@ reviews:
       - "docs/design/review-center/core/thread-service.md"
       - "docs/verification/review-center/core/thread-service.md"
       - "src/DemaConsulting.ReviewCenter.Core/ThreadService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ThreadKindRules.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ThreadKind.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewCommentKind.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewActorRoles.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ThreadAnchor.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewThread.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewComment.cs"
@@ -998,6 +1002,9 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ThreadSide.cs"
       - "src/DemaConsulting.ReviewCenter.Core/FileText.cs"
       - "test/**/Core/ThreadServiceTests.cs"
+      - "test/**/Core/ThreadServiceReportTests.cs"
+      - "test/**/Core/ThreadKindRulesTests.cs"
+      - "test/**/Core/ReviewActorRolesTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ChecklistService
@@ -1063,6 +1070,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewRecord.cs"
       - "test/**/Core/RecordDigestTests.cs"
       - "test/**/Core/RecordDigestFollowUpTests.cs"
+      - "test/**/Core/RecordDigestReportTests.cs"
 
   - id: ReviewCenter-Core-SigningService
     title: Review of ReviewCenter SigningService unit implementation
@@ -1088,6 +1096,7 @@ reviews:
       - "test/**/Core/ReopenRulesTests.cs"
       - "test/**/Core/SigningServiceExternalTests.cs"
       - "test/**/Core/SigningServiceTotpTests.cs"
+      - "test/**/Core/SigningServiceOpenThreadTests.cs"
       - "test/**/Core/CountingUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -1386,6 +1395,7 @@ reviews:
       - "test/**/Storage/ReviewStoreSnapshotBatchTests.cs"
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
       - "test/**/Storage/ReviewStoreUserImpactTests.cs"
+      - "test/**/Storage/ReviewStoreRecordContentTests.cs"
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectChecklistStoreTests.cs"
       - "test/**/Storage/ReviewDueDateStoreTests.cs"

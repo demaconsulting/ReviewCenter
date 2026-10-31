@@ -163,40 +163,200 @@ sections:
 
       - id: ReviewCenter-ThreadService-Access
         title: >-
-          The ThreadService class shall require, for starting a thread, replying, resolving, and reopening, that the
-          actor may see the project of the review (through IProjectAccess), refusing an actor who may not with the
-          same ProjectNotFound rule as for a project that does not exist, before anything else is checked or stored.
+          The ThreadService class shall require, for starting a thread, replying, resolving, reopening, promoting,
+          demoting, and changing whether a comment is included in the report, that the actor may see the project of
+          the review (through IProjectAccess), refusing an actor who may not with the same ProjectNotFound rule as
+          for a project that does not exist, before anything else is checked or stored.
         justification: |
           A user outside a project must not be able to read or write its discussion, nor learn that it exists. The
           service enforces this itself, whatever the page or the API checked, so that a route added later cannot
           bypass the rule.
         tests:
           - ThreadService_Constructor_NullArguments_Throws
+          - ThreadService_ReportMutations_OutsideUser_ThrowsProjectNotFound
+          - ThreadService_ReportActions_CommandLine_ThrowsProjectNotFound
+          - ThreadService_ReportMutations_Auditor_ThrowActorNotAllowedOrProjectNotFoundAsBefore
 
       - id: ReviewCenter-ThreadService-ApprovalLock
         title: >-
-          The ThreadService class shall refuse to start a thread, to reply, to resolve, and to reopen a thread in a
-          review that is approved and therefore locked, with the ReviewLocked rule, after the access check and before
-          anything is stored, and shall leave a review that does not exist to the existing not-found rule.
+          The ThreadService class shall refuse to start a thread, to reply, to resolve, to reopen, to promote, to
+          demote, and to change whether a comment is included in the report in a review that is concluded (every
+          slot signed for the current record and no thread open, and therefore locked), with the ReviewLocked rule,
+          after the access check and before the file of a new thread is looked up or anything is stored, shall not
+          refuse them in a review whose slots are all signed but that still has an open thread, and shall leave a
+          review that does not exist to the existing not-found rule.
         justification: |
-          A discussion is part of what a signature approves. Changing it after the approval would make the approval
-          describe a record that no longer exists, so the service refuses until an administrator reopens the review.
+          What a concluded review signed is its record, and it must not change after that, so the service refuses
+          until an administrator reopens the review. A review with an open thread is not concluded, so the open
+          thread can still be discussed and resolved.
         tests:
           - ThreadService_Mutations_ApprovedReview_ThrowReviewLocked
+          - ThreadService_AllThreadActions_ConcludedReview_ThrowReviewLocked
+          - ThreadService_StartThreadAsync_ConcludedReviewAndInvalidAnchor_ReportsReviewLocked
+          - ThreadService_Mutations_OpenThreadReview_NotLockedEvenWhenAllSigned
 
       - id: ReviewCenter-ThreadService-SignatureImpact
         title: >-
-          The ThreadService class shall refuse to start a thread, to reply, to resolve, and to reopen a thread when
-          the change would make a current signature out of date and the caller has not acknowledged the affected
-          slots, with the SignaturesWouldBecomeOutOfDate rule that names each affected slot number and signer, after
-          the validation of the request and before anything is stored, shall report a thread that does not exist with
-          the existing not-found rule, and shall not refuse a resolve or reopen that leaves the state as it is.
+          The ThreadService class shall refuse to start a thread, to reply, to resolve, to reopen, to promote, to
+          demote, and to change whether a comment is included in the report when the change would alter the record
+          digest and so make a current signature out of date and the caller has not acknowledged the affected slots,
+          with the SignaturesWouldBecomeOutOfDate rule that names each affected slot number and signer, after the
+          validation of the request and before anything is stored, shall report a thread that does not exist with
+          the existing not-found rule, shall not refuse a resolve or reopen that leaves the state as it is, and shall
+          need no acknowledgement for chat (a thread or reply that is not included in the report), for resolving a
+          Question, or for reopening a thread, because none of them changes the digest.
         justification: |
-          A person who comments after somebody has signed silently withdraws that signature. The service says which
-          signatures would be lost and asks the caller to confirm, so that the consequence is never hidden. A request
-          that is not valid is reported as that error, and a request that changes nothing needs no confirmation.
+          Only the content of the report is part of what a signature covers. A person who changes it after somebody
+          has signed silently withdraws that signature, so the service says which signatures would be lost and asks
+          the caller to confirm. Chat and the open or resolved state of a thread are not part of the digest, so they
+          never invalidate a signature and need no confirmation. A request that is not valid is reported as that
+          error, and a request that changes nothing needs no confirmation.
         tests:
-          - ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
           - ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor
-          - ThreadService_ReplyAsync_Signed_NeedsAcknowledgement
-          - ThreadService_ReopenAndResolveAsync_Signed_OnlyARealChangeNeedsAcknowledgement
+          - ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement
+          - ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement
+          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
+          - ThreadService_ReplyAsync_ChatAfterSignature_KeepsSignature
+          - ThreadService_StartThreadAsync_IncludedAfterSignature_NeedsAcknowledgement
+          - ThreadService_ReplyAsync_IncludedAfterSignature_NeedsAcknowledgement
+          - ThreadService_PromoteAsync_AfterSignature_NeedsAcknowledgement
+          - ThreadService_DemoteAsync_AfterSignature_NeedsAcknowledgement
+          - ThreadService_SetCommentIncludedAsync_AfterSignature_NeedsAcknowledgement
+          - ThreadService_ResolveAsync_FindingAfterSignature_NeedsAcknowledgement
+          - ThreadService_ResolveAsync_QuestionAfterSignature_NeedsNoAcknowledgement
+          - ThreadService_ReopenAsync_FindingAfterSignature_NeedsNoAcknowledgement
+          - ThreadService_PromoteThenDemoteWithAcknowledgement_RestoresOriginalDigest
+
+      - id: ReviewCenter-ThreadService-IncludedComment
+        title: >-
+          The ThreadService class shall let a thread or a reply be included in the report when it is started or
+          posted, store the flag with the comment, treat a comment that is not included as chat, and derive the kind
+          of a thread from its starting comment: a Finding when that comment is included, otherwise a Question.
+        justification: |
+          Only what the owner chooses to include is part of the signed record. Chat stays free of consequences, so
+          the discussion is not slowed by the question whether a remark is part of the record; the flag decides, and
+          the kind of the thread follows from the starting comment, so there is no second field to keep in step.
+        tests:
+          - ThreadService_StartThreadAsync_IncludeInReport_StoresFindingWithFlaggedStartingComment
+          - ThreadService_StartThreadAsync_Default_StoresQuestion
+          - ThreadService_ReplyAsync_IncludeInReport_FlagsOnlyTheReply
+          - ThreadService_ListAsync_Comments_CarryFlagAndKind
+          - ThreadKindRules_KindOf_StartingCommentIncluded_IsFinding
+          - ThreadKindRules_KindOf_OnlyReplyIncluded_IsQuestion
+
+      - id: ReviewCenter-ThreadService-ResolutionNote
+        title: >-
+          The ThreadService class shall require a resolution note of at most 4000 characters that is not blank after
+          trimming to resolve a Finding, refusing it otherwise with the ResolutionNoteRequired rule and storing
+          nothing, shall accept an optional note for a Question and treat a blank note as none, shall store a note as a
+          Resolution comment in the same transaction as the new state (included in the report when the thread is a
+          Finding), shall treat resolving a thread that is already resolved as harmless without a note, an audit entry
+          or an acknowledgement, and shall keep the earlier Resolution comments when a thread is reopened and resolved
+          again, and shall refuse a resolution with the RecordChanged rule, storing nothing, when the thread was
+          promoted or demoted between its check and the write.
+        justification: |
+          Closing a Finding is a statement in the record, so the record must say how it was closed. A Question is
+          chat, so its resolution needs no explanation. Storing the note with the state change keeps the two from
+          ever disagreeing, and keeping the earlier notes keeps the history of the thread. The note, the
+          acknowledgement and the report flag are decided for the kind that the service saw, so a kind that changed
+          meanwhile must be refused and not accepted silently.
+        tests:
+          - ThreadService_ResolveAsync_FindingWithoutNote_ThrowsResolutionNoteRequiredAndStoresNothing
+          - ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing
+          - ThreadService_ResolveAsync_FindingWithNote_StoresIncludedResolutionComment
+          - ThreadService_ResolveAsync_QuestionWithNote_StoresExcludedResolutionComment
+          - ThreadService_ResolveAsync_QuestionWithoutNote_Resolves
+          - ThreadService_ResolveAsync_BlankNoteOnQuestion_IsNoNote
+          - ThreadService_ResolveAsync_NoteTooLong_ThrowsCommentTextInvalid
+          - ThreadService_ResolveAsync_AlreadyResolved_IsNoOpWithoutNoteOrAudit
+          - ThreadService_ReopenThenResolveFinding_AddsSecondResolutionComment
+          - ThreadService_ReopenAsync_Finding_KeepsEarlierResolutionComment
+
+      - id: ReviewCenter-ThreadService-Promote
+        title: >-
+          The ThreadService class shall promote a Question to a Finding for the starter of the thread, the owner of
+          any reviewer slot (primary or alternate), and a lead (the creator of the review who may contribute, a
+          project administrator, or a system administrator; never an actor authenticated with an API token), shall
+          demote a Finding to a Question for the starter and
+          a lead only, shall refuse everybody else with the ActorNotAllowed rule, shall include or exclude the
+          Resolution comments of the thread together with its starting comment while keeping the flags of the
+          replies, shall treat promoting a Finding or demoting a Question as harmless, and shall never let an Auditor
+          promote or demote.
+        justification: |
+          Moving a thread into or out of the record changes what the signatures cover, so only the people who are
+          responsible for the content of the thread or the review may do it. The Resolution comments follow the kind,
+          because a note on a Question is chat and a note on a Finding is part of the record.
+        tests:
+          - ThreadService_PromoteAsync_StarterSlotOwnerAndLead_Allowed
+          - ThreadService_PromoteAsync_OtherMember_ThrowsActorNotAllowed
+          - ThreadService_PromoteAsync_AlsoIncludesExistingResolutionComments
+          - ThreadService_PromoteAsync_AlreadyFinding_IsNoOp
+          - ThreadService_PromoteAsync_AlternateOfSlot_Allowed
+          - ThreadService_ReportActions_LeadWhoIsNotStarterOrReviewer_Allowed
+          - ThreadService_ReportActions_LeadViaApiToken_ThrowsActorNotAllowed
+          - ThreadService_ReportActions_CreatorDowngradedToAuditor_ThrowsActorNotAllowed
+          - ReviewActorRoles_IsLeadAsync_Creator_IsLeadWithoutRegardToCase
+          - ReviewActorRoles_IsLeadAsync_ProjectAdminWhoIsNotCreator_IsLead
+          - ReviewActorRoles_IsLeadAsync_SystemAdminWhoIsNotMember_IsLead
+          - ReviewActorRoles_IsLeadAsync_CreatorDowngradedToAuditor_IsNotLead
+          - ReviewActorRoles_IsLeadAsync_PlainMemberAndOutsider_AreNotLead
+          - ReviewActorRoles_IsLeadAsync_ApiTokenCommandLineOrNoActor_IsNotLead
+          - ReviewActorRoles_IsLeadAsync_ReviewWithoutCreator_OnlyAdministratorsLead
+          - ReviewActorRoles_IsSlotOwnerAsync_PrimaryAndAlternate_AreSlotOwners
+          - ReviewActorRoles_IsSlotOwnerAsync_NoSlotCommandLineOrNoActor_IsNotSlotOwner
+          - ThreadService_DemoteAsync_StarterAndLead_Allowed
+          - ThreadService_DemoteAsync_SlotOwnerWhoIsNotStarter_ThrowsActorNotAllowed
+          - ThreadService_DemoteAsync_ExcludesResolutionButKeepsReplyFlags
+          - ThreadService_DemoteAsync_AlreadyQuestion_IsNoOp
+          - ThreadKindRules_CanPromote_Roles_StarterSlotOwnerLeadOnly
+          - ThreadKindRules_CanDemote_Roles_StarterAndLeadOnly
+
+      - id: ReviewCenter-ThreadService-CommentToggle
+        title: >-
+          The ThreadService class shall include a reply in the report or take it out again for the author of that
+          reply and a lead, shall refuse everybody else with the ActorNotAllowed rule, shall refuse the starting
+          comment and a Resolution comment with the CommentNotTogglable rule, shall report a comment that is not in
+          the thread as a missing thread, and shall treat setting the value a comment already has as harmless.
+        justification: |
+          A reply is the author's own words, so the author decides whether they are part of the record, and a lead
+          can correct it. The starting comment and the resolution follow the kind of the thread instead, so they are
+          changed by promoting or demoting.
+        tests:
+          - ThreadService_SetCommentIncludedAsync_ReplyByAuthorOrLead_Toggles
+          - ThreadService_SetCommentIncludedAsync_OtherMember_ThrowsActorNotAllowed
+          - ThreadService_SetCommentIncludedAsync_StartingOrResolutionComment_ThrowsCommentNotTogglable
+          - ThreadService_SetCommentIncludedAsync_UnknownComment_ThrowsThreadNotFound
+          - ThreadService_SetCommentIncludedAsync_SameValue_IsNoOp
+          - ThreadService_ReportActions_LeadWhoIsNotStarterOrReviewer_Allowed
+          - ThreadService_ReportActions_LeadViaApiToken_ThrowsActorNotAllowed
+          - ThreadKindRules_CanToggleReply_Roles_AuthorAndLeadOnly
+          - ThreadKindRules_IsToggleable_StartingAndResolutionComments_AreNot
+
+      - id: ReviewCenter-ThreadService-ConcludedRefusal
+        title: >-
+          The ThreadService class shall refuse every thread action (start, reply, resolve, reopen, promote, demote,
+          and the inclusion of a comment) on a concluded review with the ReviewLocked rule.
+        justification: |
+          A concluded review is locked, and no thread action may be a way around the lock, so all seven actions are
+          covered by one test over every one of them.
+        tests:
+          - ThreadService_AllThreadActions_ConcludedReview_ThrowReviewLocked
+          - ThreadService_StartThreadAsync_ConcludedReviewAndInvalidAnchor_ReportsReviewLocked
+
+      - id: ReviewCenter-ThreadService-ReportAudit
+        title: >-
+          The ThreadService class shall record in the audit trail, in the same transaction as the change, a change of
+          the kind of a thread (thread.kind-changed, naming the old and the new kind), a change of whether a comment is
+          included in the report (thread.comment-report-changed, naming the thread and the comment), the hash but never
+          the text of a resolution note on thread.resolved, and the marker that a started thread or reply is in the
+          report, and shall record nothing for a request that changes nothing.
+        justification: |
+          Moving content into or out of the record is a decision that must be traceable. Hashing the note keeps the
+          text out of a record that cannot be edited, and a request that changed nothing must leave no entry.
+        tests:
+          - ThreadService_PromoteAndDemoteAsync_Audit_NamesKindChange
+          - ThreadService_SetCommentIncludedAsync_Audit_NamesCommentAndChange
+          - ThreadService_ResolveAsync_WithNote_Audit_HasNoteHashButNotText
+          - ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport
+          - ThreadService_NoOpReportMutations_RecordNothing

@@ -34,11 +34,13 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     audit entry in the same transaction as the change: both are stored or neither. A change that did not
 ///     take effect (a method that returns <c>null</c> or <c>false</c>) records nothing.
 ///     The methods that change reviewed content (<see cref="AddThreadAsync"/>, <see cref="AddCommentAsync"/>,
-///     <see cref="SetThreadStateAsync"/>, <see cref="SetChecklistSectionStateAsync"/>, <see cref="SetChecklistAnswerAsync"/>,
+///     <see cref="ReopenThreadAsync"/>, <see cref="ResolveThreadAsync"/>, <see cref="SetThreadKindAsync"/>,
+///     <see cref="SetCommentReportAsync"/>, <see cref="SetChecklistSectionStateAsync"/>,
+///     <see cref="SetChecklistAnswerAsync"/>,
 ///     <see cref="AddSlotAsync"/>, <see cref="UpdateSlotAsync"/>, <see cref="RemoveSlotAsync"/> and, for the same reason of
-///     "approved means nothing changes", <see cref="UpdateDueDateAsync"/>) must also refuse with
-///     <see cref="DomainRule.ReviewLocked"/> when the review is approved (see <see cref="ReviewLock"/>), checked inside
-///     the same transaction as the change, so a signature that completes the approval at the same moment cannot be
+///     "concluded means nothing changes", <see cref="UpdateDueDateAsync"/>) must also refuse with
+///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded (see <see cref="ReviewLock"/>), checked inside
+///     the same transaction as the change, so a signature that completes the conclusion at the same moment cannot be
 ///     overtaken by a change; nothing is stored then.
 /// </remarks>
 public interface IReviewStore
@@ -386,7 +388,8 @@ public interface IReviewStore
     /// </summary>
     /// <param name="thread">
     ///     The thread to store, with its comments. Must not be null; the identities of the thread and its
-    ///     comments are ignored. The file it names must exist in the review.
+    ///     comments are ignored, their <see cref="ReviewComment.IncludeInReport"/> and <see cref="ReviewComment.Kind"/>
+    ///     are stored as given. The file it names must exist in the review.
     /// </param>
     /// <param name="audit">Builds the audit draft from the stored thread (so the draft can name the assigned identities). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -402,7 +405,10 @@ public interface IReviewStore
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
-    /// <param name="comment">The comment to store. Must not be null; its identities are ignored.</param>
+    /// <param name="comment">
+    ///     The comment to store. Must not be null; its identities are ignored, its <see cref="ReviewComment.IncludeInReport"/>
+    ///     and <see cref="ReviewComment.Kind"/> are stored as given.
+    /// </param>
     /// <param name="audit">Builds the audit draft from the stored comment (so the draft can name the assigned identity). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored comment, or <c>null</c> when the thread does not exist in that review (nothing is recorded then).</returns>
@@ -415,20 +421,113 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Changes the state of a thread. It is the only change ever made to a stored thread.
+    ///     Marks a thread open again. This is the only store method that changes the state of a thread besides
+    ///     <see cref="ResolveThreadAsync"/>; it cannot resolve, so every resolution goes through the resolution-note
+    ///     rule of <see cref="ResolveThreadAsync"/>.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
-    /// <param name="state">The state to store.</param>
     /// <param name="audit">The audit draft of the change; stored only when the thread exists.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns><c>true</c> when the thread exists in that review (also when it already had the state); otherwise <c>false</c>.</returns>
-    Task<bool> SetThreadStateAsync(
+    /// <returns><c>true</c> when the thread exists in that review (also when it was already open); otherwise <c>false</c>.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded.</exception>
+    Task<bool> ReopenThreadAsync(
         int projectId,
         string reviewId,
         int threadId,
-        ReviewThreadState state,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Resolves a thread, storing the resolution note (if any) as a <see cref="ReviewCommentKind.Resolution"/>
+    ///     comment in the same transaction.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
+    /// <param name="expectedKind">
+    ///     The kind of the thread the caller based the resolution on: the note, the acknowledgement of the signatures
+    ///     and the report flag were all decided for it.
+    /// </param>
+    /// <param name="resolution">
+    ///     The note to store, or <c>null</c> for none. Its <see cref="ReviewComment.Kind"/> and
+    ///     <see cref="ReviewComment.IncludeInReport"/> are set by the store: a resolution comment, included exactly when
+    ///     the thread is a Finding.
+    /// </param>
+    /// <param name="audit">The audit draft of the change; stored only when the thread was resolved by this call.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the thread was open and is now resolved; <c>false</c> (nothing stored, no audit entry, the
+    ///     note ignored) when the thread does not exist in that review or was already resolved.
+    /// </returns>
+    /// <remarks>
+    ///     The kind of the thread is read again inside the transaction and compared with
+    ///     <paramref name="expectedKind"/>, so a promote or demote that lands between the caller's check and the write is
+    ///     never accepted silently: the caller decided the note and the acknowledgement for the other kind.
+    /// </remarks>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ResolutionNoteRequired"/> when the thread is a Finding and
+    ///     <paramref name="resolution"/> is <c>null</c>, with <see cref="DomainRule.RecordChanged"/> when the thread is
+    ///     open and its kind is no longer <paramref name="expectedKind"/>, and with <see cref="DomainRule.ReviewLocked"/>
+    ///     when the review is concluded. Nothing is stored then.
+    /// </exception>
+    Task<bool> ResolveThreadAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ThreadKind expectedKind,
+        ReviewComment? resolution,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Promotes a thread to a Finding or demotes it to a Question by including or excluding its starting comment
+    ///     and its resolution notes in the report.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
+    /// <param name="kind">The kind to store.</param>
+    /// <param name="audit">The audit draft of the change; stored only when something changed.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the thread changed; <c>false</c> (nothing stored, no audit entry) when it does not exist in
+    ///     that review or already has the kind. Replies keep their own flags.
+    /// </returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded.</exception>
+    Task<bool> SetThreadKindAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ThreadKind kind,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Includes a reply in the report or takes it out again.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
+    /// <param name="commentId">The comment identity; the comment must belong to the thread.</param>
+    /// <param name="include">Whether the comment is part of the report.</param>
+    /// <param name="audit">The audit draft of the change; stored only when something changed.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the flag changed; <c>false</c> (nothing stored, no audit entry) when the thread or comment
+    ///     does not exist or the comment already has the value.
+    /// </returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.CommentNotTogglable"/> for the starting comment and for a resolution note,
+    ///     and with <see cref="DomainRule.ReviewLocked"/> when the review is concluded.
+    /// </exception>
+    Task<bool> SetCommentReportAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        int commentId,
+        bool include,
         AuditDraft audit,
         CancellationToken cancellationToken = default);
 
@@ -646,13 +745,15 @@ public interface IReviewStore
     ///     This is the only way a signature is stored, and there is deliberately no method to change or delete
     ///     one (signatures are append-only). The store recomputes the digest of the record inside the same
     ///     transaction as the insert, so a comment or answer that arrives while signing cannot slip in
-    ///     between the check and the insert.
+    ///     between the check and the insert. It also reads the thread states in that transaction: a review with an
+    ///     open thread, chat or included, cannot be signed.
     /// </remarks>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.RecordChanged"/> when the digest of the record now differs from
     ///     <see cref="ReviewSignature.RecordDigest"/>, with <see cref="DomainRule.ReviewNotFound"/> when the
     ///     review does not exist, with <see cref="DomainRule.SlotNotFound"/> when the slot is not part of the review,
-    ///     and with <see cref="DomainRule.SigningNotAllowed"/> when the slot already has a signature of this digest.
+    ///     and with <see cref="DomainRule.SigningNotAllowed"/> when the slot already has a signature of this digest or
+    ///     a thread of the review is open.
     ///     Nothing is stored then.
     /// </exception>
     Task<ReviewSignature> AddSignatureAsync(

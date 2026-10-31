@@ -209,7 +209,7 @@ public class CoreSubsystemTests
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
         Assert.Equal(rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign ? 2 : 1, (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
         Assert.Single(store.Reviews);
-        Assert.Empty(store.Threads);
+        Assert.Equal(rule is DomainRule.ResolutionNoteRequired or DomainRule.CommentNotTogglable ? 1 : 0, store.Threads.Count);
         var overall = (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall;
         Assert.Equal(rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign or DomainRule.ReopenWouldStrandSlot ? overall.Total : 0, overall.Answered);
     }
@@ -266,7 +266,43 @@ public class CoreSubsystemTests
             return ViolateTotpAsync(rule);
         }
 
+        if (rule is DomainRule.ResolutionNoteRequired or DomainRule.CommentNotTogglable)
+        {
+            return ViolateThreadReportAsync(rule, threads, projectId);
+        }
+
         return ViolateAsync(rule, projects, reviews, threads, checklists, users, projectId);
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks one rule of the report content of a thread; the thread that the request needs
+    ///     is stored first.
+    /// </summary>
+    /// <param name="rule">The rule to break; <see cref="DomainRule.ResolutionNoteRequired"/> or
+    ///     <see cref="DomainRule.CommentNotTogglable"/>.</param>
+    /// <param name="threads">The thread service.</param>
+    /// <param name="projectId">The identity of the existing project.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateThreadReportAsync(DomainRule rule, ThreadService threads, int projectId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var included = rule == DomainRule.ResolutionNoteRequired;
+        var thread = await threads.StartThreadAsync(
+            projectId,
+            "rev-1",
+            new ThreadAnchor("a.txt"),
+            TestActors.Ann,
+            "Remark",
+            cancellationToken,
+            includeInReport: included);
+        if (included)
+        {
+            await threads.ResolveAsync(projectId, "rev-1", thread.Id, TestActors.Ann, cancellationToken);
+            return;
+        }
+
+        await threads.SetCommentIncludedAsync(
+            projectId, "rev-1", thread.Id, thread.Comments[0].Id, true, TestActors.Ann, cancellationToken);
     }
 
     /// <summary>
@@ -1098,7 +1134,8 @@ public class CoreSubsystemTests
         var answer = await Assert.ThrowsAsync<DomainRuleException>(() => checklists.SetAnswerAsync(
             project.Id, "rev-1", itemId, ChecklistOutcome.Fail, "Found a problem.", annActor, cancellationToken));
         var thread = await Assert.ThrowsAsync<DomainRuleException>(() => threads.StartThreadAsync(
-            project.Id, "rev-1", new ThreadAnchor("a.txt"), annActor, "A remark", cancellationToken));
+            project.Id, "rev-1", new ThreadAnchor("a.txt"), annActor, "A remark", cancellationToken,
+            includeInReport: true));
         var untouched = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
 
         // Assert: both refused naming slot 1 and its signer, and nothing was written

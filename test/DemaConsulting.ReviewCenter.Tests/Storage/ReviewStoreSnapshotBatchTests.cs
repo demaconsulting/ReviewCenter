@@ -402,9 +402,9 @@ public class ReviewStoreSnapshotBatchTests
 
         // Assert: the interesting parts are really there (the comparison above would also pass on empty reads)
         Assert.Equal(2, batch["REV-REOPENED"].Record.Reopens);
-        Assert.True(ReviewLock.IsApproved(
+        Assert.True(ReviewLock.IsConcluded(
             batch["REV-APPROVED"].Record, batch["REV-APPROVED"].Slots, batch["REV-APPROVED"].Signatures));
-        Assert.False(ReviewLock.IsApproved(
+        Assert.False(ReviewLock.IsConcluded(
             batch["REV-STALE"].Record, batch["REV-STALE"].Slots, batch["REV-STALE"].Signatures));
         Assert.Single(batch["REV-STALE"].Signatures);
         Assert.Equal(2, batch["REV-BUSY"].Record.Threads.Count);
@@ -507,7 +507,11 @@ public class ReviewStoreSnapshotBatchTests
                 var id = $"REV-{ids.Count}";
                 ids.Add(id);
                 await AddReviewAsync(db, projectId, id);
-                await AddThreadAsync(db, projectId, id, "Comment");
+                var thread = await AddThreadAsync(db, projectId, id, "Comment");
+
+                // An open thread would refuse the signature
+                await db.Store.ResolveThreadAsync(
+                    projectId, id, thread.Id, ThreadKind.Question, TestContext.Current.CancellationToken);
                 await SignAsync(db, projectId, id, await AddSlotAsync(db, projectId, id));
             }
         }

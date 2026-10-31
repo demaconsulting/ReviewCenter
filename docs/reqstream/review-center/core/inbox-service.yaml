@@ -11,11 +11,12 @@ sections:
     requirements:
       - id: ReviewCenter-InboxService-ToSign
         title: >-
-          The InboxService class shall list as to sign every review that is not approved and in which the user is the
+          The InboxService class shall list as to sign every review that is not concluded and in which the user is the
           primary or the alternate reviewer of a slot that has no current signature, with the chip Not signed when
           nothing was signed and the chip Out of date, sign again when the signature no longer covers the record, shall
-          list nothing for a slot that is signed, and shall give the item the due date, and the Overdue mark when the
-          date is past, while the review is not approved.
+          list nothing for a slot that is signed, shall keep a review whose slots are all signed but that still has an
+          open thread out of the concluded reviews, and shall give the item the due date, and the Overdue mark when the
+          date is past, while the review is not concluded.
         justification: |
           A reviewer must find the signatures that are theirs to give, and a signature that went out of date because
           the review changed is as much work as one that was never given. The state of a slot is decided as the
@@ -26,13 +27,16 @@ sections:
           - InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip
           - InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem
           - InboxService_GetInboxAsync_DueDateInPast_ShowsOverdueChip_ApprovedShowsNone
+          - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded
           - InboxRules_SlotState_MatchesSigningServiceApproval
           - InboxRules_IsAssigned_PrimaryAndAlternate_AreAssigned
+          - ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations
 
       - id: ReviewCenter-InboxService-RepliesWaiting
         title: >-
-          The InboxService class shall list as replies waiting every review that is not approved and has an open
-          thread whose last comment is by someone else, a comment of the system counting as someone else, in which the
+          The InboxService class shall list as replies waiting every review that is not concluded and has an open
+          thread, chat or included in the report, whose last comment is by someone else, a comment of the system
+          counting as someone else, in which the
           user wrote a comment while holding a slot of the review, or whose review the user created, with a chip that
           gives the number of such threads, and
           shall list nothing for a thread that is resolved or whose last comment is the user's own.
@@ -46,6 +50,7 @@ sections:
           - InboxService_GetInboxAsync_AuthorOfReview_ThreadByOther_ShowsRepliesWaiting
           - InboxService_GetInboxAsync_SystemCommentLast_CountsAsOther
           - InboxRules_WaitingThreads_OpenLatestByOther_AreWaiting
+          - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded
 
       - id: ReviewCenter-InboxService-FailedChecks
         title: >-

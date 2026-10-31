@@ -162,8 +162,8 @@ account can never be a system administrator and cannot exist without the members
 existing member is left to the store, which reports `MembershipExists`): an auditor cannot be named in a slot or sign,
 so a user who still owes a signature must not become one. The check calls the one shared definition of open work
 (`UserImpactService.FindOpenWorkAsync`, the same read as the offboarding impact query: `ListSlotsOfUserAsync` and
-`ListSnapshotsAsync` limited to this project, `ReviewLock.IsApproved`, `InboxRules.SlotState`), so a slot whose review
-is not approved and that is not signed and current is open work. If one exists the
+`ListSnapshotsAsync` limited to this project, `ReviewLock.IsConcluded`, `InboxRules.SlotState`), so a slot whose review
+is not concluded and that is not signed and current is open work. If one exists the
 call is refused with `MemberHasOpenReviewWork`, whose message lists up to five reviews as `'id' (title)`, and nothing is
 changed. To resolve it, a member who can work in the project reassigns or removes the slot, or the member signs. The
 check is a service-level read made before the store change and not
