@@ -124,6 +124,13 @@ member gets `false` and no callback, so a page keeps what it showed; a non-membe
 the access-lost callback runs once. These scenarios are defined in `ProjectViewGuardTests.cs` and tested by the tests
 of the same names.
 
+**ProjectViewGuard_GuardContribute_RevokedBetweenLookups_IsLostNotReadOnly** and
+**ProjectViewGuard_GuardContribute_MemberRevokedAfterFirstLookup_FollowsTheFirstAnswer**: The access is revoked right
+after the first lookup of one guard call, using a decorator of the access rules. A read-only member whose membership
+disappears is reported as lost (`false` and the callback once), not as read-only; a member who could work keeps the
+answer of the first lookup and the removal is caught by the next guard. These scenarios are defined in
+`ProjectViewGuardTests.cs` and tested by the tests of the same names.
+
 **ProjectViewGuard_GuardAudit_AuditorAndProjectAdmin_ReturnTrueWithoutCallback**,
 **ProjectViewGuard_GuardAudit_PlainMember_ReturnsFalseAndCallsBackOnce**, and
 **ProjectViewGuard_GuardAudit_NobodySignedIn_ReturnsFalseAndCallsBackOnce**: An auditor and a project administrator

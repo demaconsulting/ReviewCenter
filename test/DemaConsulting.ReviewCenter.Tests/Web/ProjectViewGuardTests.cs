@@ -501,4 +501,132 @@ public class ProjectViewGuardTests : PageTestBase
         Assert.False(allowed);
         Assert.Equal(1, lost);
     }
+
+    /// <summary>
+    ///     Test that a member who is revoked between the two lookups of the contribute guard is reported as lost,
+    ///     not as read-only: the project is hidden, so the page must drop its data.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardContribute_RevokedBetweenLookups_IsLostNotReadOnly()
+    {
+        // Arrange: an auditor is signed in and the membership is removed right after the first lookup
+        var projectId = await ArrangeAuditorAsync();
+        SignInAs("aud", "Aud", UserRole.Reviewer);
+        var revoking = new RevokingAfterFirstLookup(Access, () => RevokeMembershipAsync(projectId, "aud"));
+        var lost = 0;
+
+        // Act
+        var allowed = await revoking.GuardContributeAsync(
+            Services.GetRequiredService<AuthenticationStateProvider>(), projectId, () => lost++);
+
+        // Assert: the second lookup sees the removal, so the page is told that the project is gone
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that a member who may work and is revoked after the first lookup still gets the answer of that single
+    ///     lookup, without a callback, so the result is consistent with one decision.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardContribute_MemberRevokedAfterFirstLookup_FollowsTheFirstAnswer()
+    {
+        // Arrange: a plain member is signed in and the membership is removed right after the first lookup
+        var projectId = await ArrangeAuditorAsync();
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var revoking = new RevokingAfterFirstLookup(Access, () => RevokeMembershipAsync(projectId, "mem"));
+        var lost = 0;
+
+        // Act
+        var allowed = await revoking.GuardContributeAsync(
+            Services.GetRequiredService<AuthenticationStateProvider>(), projectId, () => lost++);
+
+        // Assert: the removal is caught by the next guard, not reported as read-only
+        Assert.True(allowed);
+        Assert.Equal(0, lost);
+    }
+
+    /// <summary>
+    ///     An access decorator that runs an action once, right after the first view or contribute lookup, to model
+    ///     a revocation that lands between two lookups of one guard call.
+    /// </summary>
+    /// <param name="inner">The access rules to delegate to.</param>
+    /// <param name="afterFirst">The action to run once after the first lookup.</param>
+    private sealed class RevokingAfterFirstLookup(IProjectAccess inner, Func<Task> afterFirst) : IProjectAccess
+    {
+        /// <summary>
+        ///     Whether the action has run.
+        /// </summary>
+        private bool _done;
+
+        /// <inheritdoc />
+        public Task<bool> IsSystemAdminAsync(Actor? actor, CancellationToken cancellationToken = default)
+            => inner.IsSystemAdminAsync(actor, cancellationToken);
+
+        /// <inheritdoc />
+        public async Task<bool> CanViewAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            var answer = await inner.CanViewAsync(actor, projectId, cancellationToken);
+            await RunOnceAsync();
+            return answer;
+        }
+
+        /// <inheritdoc />
+        public async Task<bool> CanContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            var answer = await inner.CanContributeAsync(actor, projectId, cancellationToken);
+            await RunOnceAsync();
+            return answer;
+        }
+
+        /// <inheritdoc />
+        public Task<bool> CanAdministerAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+            => inner.CanAdministerAsync(actor, projectId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<bool> CanAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+            => inner.CanAuditAsync(actor, projectId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<bool> IsMemberAsync(int userId, int projectId, CancellationToken cancellationToken = default)
+            => inner.IsMemberAsync(userId, projectId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<Project>> ListVisibleProjectsAsync(Actor? actor, CancellationToken cancellationToken = default)
+            => inner.ListVisibleProjectsAsync(actor, cancellationToken);
+
+        /// <inheritdoc />
+        public Task RequireViewAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+            => inner.RequireViewAsync(actor, projectId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task RequireContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+            => inner.RequireContributeAsync(actor, projectId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task RequireAdministerAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+            => inner.RequireAdministerAsync(actor, projectId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task RequireAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+            => inner.RequireAuditAsync(actor, projectId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task RequireSystemAdminAsync(Actor? actor, CancellationToken cancellationToken = default)
+            => inner.RequireSystemAdminAsync(actor, cancellationToken);
+
+        /// <summary>
+        ///     Runs the action the first time only.
+        /// </summary>
+        private async Task RunOnceAsync()
+        {
+            if (_done)
+            {
+                return;
+            }
+
+            _done = true;
+            await afterFirst();
+        }
+    }
 }

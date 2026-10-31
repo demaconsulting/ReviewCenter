@@ -80,6 +80,8 @@ sections:
           - ProjectViewGuard_GuardContribute_Auditor_ReturnsFalseWithoutCallback
           - ProjectViewGuard_GuardContribute_NonMember_ReturnsFalseAndCallsBackOnce
           - ProjectViewGuard_GuardContribute_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardContribute_RevokedBetweenLookups_IsLostNotReadOnly
+          - ProjectViewGuard_GuardContribute_MemberRevokedAfterFirstLookup_FollowsTheFirstAnswer
 
       - id: ReviewCenter-ProjectAccess-AuditAccess
         title: >-

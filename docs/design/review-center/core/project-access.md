@@ -109,7 +109,9 @@ page handles on an open circuit. Besides the view, administer, and system admini
 `GuardContributeAsync` and `GuardAuditAsync`. `GuardAuditAsync` behaves like the administer guard: a refused user gets
 `false` and the page's access-lost callback runs once. `GuardContributeAsync` is different on purpose: a user who
 cannot see the project gets `false` and the callback runs once, but a user who sees the project and may only read it
-gets `false` without the callback, so that a page can keep what it loaded and show that the access is read-only.
+gets `false` without the callback, so that a page can keep what it loaded and show that the access is read-only. The
+guard decides with one pass: it asks the contribute question first and asks visibility only when work is refused, so
+a revocation between the two lookups is reported as lost rather than as read-only.
 
 #### Error Handling
 

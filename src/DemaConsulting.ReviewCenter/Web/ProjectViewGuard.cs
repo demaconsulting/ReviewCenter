@@ -100,21 +100,17 @@ internal static class ProjectViewGuard
     {
         ArgumentNullException.ThrowIfNull(access);
 
-        // One question for the callback decision (visible) and one for the answer (may work), both from the
-        // same actor read
+        // One decision, contribute asked first: a user who may work is visible by definition, so the answer cannot
+        // be "read-only" because the access was revoked between two lookups. Only when work is refused is the
+        // visibility asked, and that second answer alone decides between "read-only" and "lost".
         var contributes = false;
         var visible = await GuardAsync(
             authentication,
             onLost,
             async actor =>
             {
-                if (!await access.CanViewAsync(actor, projectId))
-                {
-                    return false;
-                }
-
                 contributes = await access.CanContributeAsync(actor, projectId);
-                return true;
+                return contributes || await access.CanViewAsync(actor, projectId);
             });
         return visible && contributes;
     }
