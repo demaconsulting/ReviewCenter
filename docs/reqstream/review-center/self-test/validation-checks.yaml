@@ -3,8 +3,9 @@
 #
 # The checks are the tests that `--validate` runs: each one exercises a real part of ReviewCenter (git, a
 # complete review workflow, the content fingerprint, password hashing, the audit chain, the signed attestation
-# PDF and the web host) against throw-away data in a temporary folder. The tenth check, opt-in through
-# `--check-config`, compares the configured database with the schema of this build, read-only.
+# PDF and the web host) against throw-away data in a temporary folder. The tenth and eleventh checks, opt-in through
+# `--check-config`, compare the configured database with the schema of this build and the configured key ring with the
+# database, both read-only.
 
 sections:
   - title: Validation Checks Unit Requirements
@@ -142,6 +143,35 @@ sections:
           - ValidationChecks_ConfiguredDatabase_MissingTable_FailsNamingTableOnly
           - ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt
           - ValidationChecks_ConfiguredDatabase_UnsupportedProvider_Fails
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredKeys
+        title: >-
+          The ConfiguredKeys check shall, only when asked for with `--check-config`, load the configuration the way the
+          server does, read the configured key ring and the database read-only without creating a key, a folder, or a
+          file, report the protection mode, the number of key files and how many are not encrypted, and the number of
+          protected secrets and how many cannot be decrypted, fail when secrets cannot be decrypted, when the ring is
+          empty but the database holds secrets, when the ring is not encrypted although
+          DataProtection:RequireEncryptedKeys is true, or when the newest key cannot be decrypted, never show a key, a
+          secret, a password, or a path other
+          than the key folder, and be skipped, with the reason, when nothing is configured, the database file does not
+          exist yet, or the key folder does not exist yet and there is nothing to protect.
+        justification: |
+          After a restore the operator wants to know, before starting the server, whether the key ring and the database
+          belong together. The check must not create what it looks for: a key created while the ring is examined would
+          hide the loss. On a fresh installation both are created at the first start, so their absence is not a failure,
+          but a database with secrets and no ring is. The report is archived, so it must not hold anything secret.
+        tests:
+          - ValidationChecks_ConfiguredKeys_NothingConfigured_IsSkipped
+          - ValidationChecks_ConfiguredKeys_MissingDatabase_IsSkippedWithoutCreatingAnything
+          - ValidationChecks_ConfiguredKeys_NoKeyFolderAndNoSecrets_IsSkippedWithoutCreatingTheFolder
+          - ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything
+          - ValidationChecks_ConfiguredKeys_CertificateRing_PassesAndNeverPrintsThePassword
+          - ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey
+          - ValidationChecks_ConfiguredKeys_SecretsOfAnotherRing_FailsWithCountsAndIds
+          - ValidationChecks_ConfiguredKeys_WrongCertificate_FailsAndCreatesNoKey
+          - ValidationChecks_ConfiguredKeys_PlaintextRingWhenEncryptionRequired_Fails
+          - ValidationChecks_ConfiguredKeys_UnusableSettings_FailsWithoutLeaking
+          - ValidationChecks_ConfiguredKeys_UnsupportedProvider_Fails
 
       - id: ReviewCenter-ValidationChecks-Hermetic
         title: >-

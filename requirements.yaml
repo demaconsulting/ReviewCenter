@@ -48,6 +48,7 @@ includes:
   - docs/reqstream/review-center/hosting.yaml
   - docs/reqstream/review-center/hosting/server-host.yaml
   - docs/reqstream/review-center/hosting/key-ring-protection.yaml
+  - docs/reqstream/review-center/hosting/secret-scan.yaml
   - docs/reqstream/review-center/hosting/user-command.yaml
   - docs/reqstream/review-center/hosting/audit-command.yaml
   - docs/reqstream/review-center/web.yaml

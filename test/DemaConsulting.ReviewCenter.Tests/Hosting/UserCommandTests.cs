@@ -138,6 +138,26 @@ public class UserCommandTests
     }
 
     /// <summary>
+    ///     Test that adding a user neither creates a key nor scans the secrets: the key folder it is pointed at stays
+    ///     absent, even though the database is new.
+    /// </summary>
+    [Fact]
+    public void UserCommand_Run_ValidUser_CreatesNoKeyFile()
+    {
+        // Arrange: a new database and a key folder that does not exist
+        var connectionString = TestDatabase.NewConnectionString();
+        using var folder = new Utilities.TemporaryDirectory();
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+
+        // Act
+        var (exitCode, _) = Run(connectionString, keys, () => Password, "--username", "ann", "--display-name", "Ann");
+
+        // Assert: the user was created, and no key or folder
+        Assert.Equal(0, exitCode);
+        Assert.False(Directory.Exists(keys), "user add must not create the key ring");
+    }
+
+    /// <summary>
     ///     Test that a null context is refused.
     /// </summary>
     [Fact]
@@ -156,7 +176,22 @@ public class UserCommandTests
     /// <param name="passwordSource">Supplies the password.</param>
     /// <param name="arguments">The arguments after <c>user add</c>.</param>
     /// <returns>The exit code and everything the command wrote.</returns>
-    private static (int ExitCode, string Output) Run(string connectionString, Func<string?> passwordSource, params string[] arguments)
+    private static (int ExitCode, string Output) Run(string connectionString, Func<string?> passwordSource, params string[] arguments) =>
+        Run(connectionString, null, passwordSource, arguments);
+
+    /// <summary>
+    ///     Runs the user command with the given arguments against a database and a key folder.
+    /// </summary>
+    /// <param name="connectionString">The connection string of the database.</param>
+    /// <param name="keysPath">The key folder to configure, or <c>null</c> for the default.</param>
+    /// <param name="passwordSource">Supplies the password.</param>
+    /// <param name="arguments">The arguments after <c>user add</c>.</param>
+    /// <returns>The exit code and everything the command wrote.</returns>
+    private static (int ExitCode, string Output) Run(
+        string connectionString,
+        string? keysPath,
+        Func<string?> passwordSource,
+        params string[] arguments)
     {
         var log = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N") + ".log");
         try
@@ -169,7 +204,8 @@ public class UserCommandTests
                     passwordSource,
                     configuration => configuration.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["Database:ConnectionString"] = connectionString
+                        ["Database:ConnectionString"] = connectionString,
+                        ["DataProtection:KeysPath"] = keysPath
                     }));
                 exitCode = context.ExitCode;
             }

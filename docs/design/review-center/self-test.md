@@ -11,7 +11,8 @@ workflow, the content fingerprint, password hashing, the one-time password algor
 attestation PDF
 and the web host), prints a pass/fail summary with the elapsed time of every check, and
 optionally writes the results to a TRX or JUnit XML file for CI/CD integration. With
-`--check-config` it adds a tenth, read-only check of the configured database. The
+`--check-config` it adds a tenth and an eleventh, read-only check, of the configured database and of the configured key
+ring. The
 `SelfTest` subsystem contains two units: `Validation` (the runner, the report and the results
 file) and `ValidationChecks` (the checks themselves).
 
@@ -24,7 +25,7 @@ results file.
 - *Role*: Provider.
 - *Contract*: Accepts a `Context` argument. Prints a Markdown-formatted heading (depth
   controlled by `context.HeadingDepth`) and a table of environment metadata, runs the nine
-  default checks (ten with `context.CheckConfig`), prints one line per check with its outcome and
+  default checks (eleven with `context.CheckConfig`), prints one line per check with its outcome and
   elapsed time, prints aggregate totals (`Total Tests:`, `Passed:`, `Skipped:`, `Failed:`,
   `Total Time:`), and writes a results file if `context.ResultsFile` is set. Calls
   `context.WriteError` for each failed check and for unsupported results file extensions,

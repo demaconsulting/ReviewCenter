@@ -34,6 +34,7 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -677,7 +678,9 @@ internal static class ServerHost
     ///     A key ring that cannot be saved would silently fall back to keys that are lost at the next restart, and
     ///     every stored token would become unreadable, so the server refuses to start instead. For the same reason the
     ///     existing ring is read (<see cref="KeyRingProtection.CheckRing"/>) before the probe, which creates a key
-    ///     when the ring has none that works. The protection that is in force is logged at the end of every start.
+    ///     when the ring has none that works. An empty ring next to a database that holds protected secrets is a lost
+    ///     ring and refused as well, unless <c>DataProtection:AllowNewKeyRing</c> is set. The protection that is in
+    ///     force is logged at the end of every start.
     /// </remarks>
     private static void ValidateDataProtection(WebApplication app)
     {
@@ -711,6 +714,10 @@ internal static class ServerHost
             // Before anything is protected: a ring that cannot be read must not be replaced by a new one
             KeyRingProtection.CheckRing(plan, app.Services.GetRequiredService<IKeyManager>(), folder, logger);
 
+            // Still before the probe, which creates the first key in an empty ring: a database full of secrets
+            // next to a ring without keys is a lost or not restored ring, not a new installation
+            GuardLostRing(app.Services, settings, database, folder, logger);
+
             var protector = app.Services.GetRequiredService<ICredentialProtector>();
             ProbeRoundTrip(protector);
 
@@ -735,6 +742,93 @@ internal static class ServerHost
         }
 
         KeyRingProtection.LogProtection(plan, logger);
+    }
+
+    /// <summary>
+    ///     Refuses to start when the key ring is empty but the database holds protected secrets, and reports the
+    ///     secrets that the ring cannot read.
+    /// </summary>
+    /// <param name="services">The services of the built application.</param>
+    /// <param name="settings">The key ring settings; <see cref="KeyRingSettings.AllowNewKeyRing"/> is the escape hatch.</param>
+    /// <param name="database">The database options.</param>
+    /// <param name="folder">The folder of the key ring.</param>
+    /// <param name="logger">The logger for the warning and the error.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the folder holds no key file, the database holds protected secrets and
+    ///     <c>DataProtection:AllowNewKeyRing</c> is not set.
+    /// </exception>
+    /// <remarks>
+    ///     A restored database with a missing key ring would otherwise start with a brand new ring and lose every stored
+    ///     token and second-factor secret without a word. The scan (<see cref="SecretScan"/>) is read-only. With
+    ///     <c>AllowNewKeyRing</c> the start goes on and a warning with the number of secrets is logged; when the ring
+    ///     has keys but some secrets cannot be read (another ring was restored, or a key is gone) an error with the
+    ///     counts per kind and the remedy is logged and the start goes on, because the rest of the server works. A
+    ///     database that cannot be read here is left to the start-up that opens it, which reports that problem.
+    /// </remarks>
+    private static void GuardLostRing(
+        IServiceProvider services,
+        KeyRingSettings settings,
+        DatabaseOptions database,
+        string folder,
+        ILogger logger)
+    {
+        SecretScanResult scan;
+        try
+        {
+            scan = SecretScan.ScanAsync(
+                    folder,
+                    database,
+                    services.GetRequiredService<ICredentialProtector>(),
+                    services.GetRequiredService<ITotpSecretProtector>())
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch (SqliteException ex)
+        {
+#pragma warning disable CA1848 // One entry per start; a LoggerMessage delegate adds no value here
+            logger.LogWarning(
+                ex,
+                "The database could not be read to check that the key ring still fits it; run " +
+                "'reviewcenter --validate --check-config' for the details");
+#pragma warning restore CA1848
+            return;
+        }
+
+#pragma warning disable CA1848 // One entry per start; a LoggerMessage delegate adds no value here
+        if (scan.RingIsEmpty && scan.ProtectedSecrets > 0)
+        {
+            if (!settings.AllowNewKeyRing)
+            {
+                throw new InvalidOperationException(
+                    $"Key ring '{folder}' is empty but the database holds {scan.ProtectedSecrets} protected secrets. " +
+                    "Restore the keys folder that belongs to this database, or set DataProtection:AllowNewKeyRing=true " +
+                    "for one start to accept that they become unreadable.");
+            }
+
+            logger.LogWarning(
+                "DataProtection:AllowNewKeyRing is set: a new key ring is started and the {Count} protected secrets " +
+                "of the database ({Tokens} repository tokens, {Totp} second-factor secrets) become unreadable. Enter the " +
+                "repository tokens again; an administrator resets the two-factor secret of each affected user. Remove " +
+                "the setting now",
+                scan.ProtectedSecrets,
+                scan.RepositoryTokens,
+                scan.TotpSecrets);
+        }
+        else if (scan.UnreadableSecrets > 0)
+        {
+            logger.LogError(
+                "The key ring cannot decrypt {Count} of {Total} protected secrets: {Tokens} repository token(s) " +
+                "(repository ids {RepositoryIds}) and {Totp} second-factor secret(s) (user ids {UserIds}). Enter the " +
+                "repository tokens again; an administrator resets the two-factor secret of each affected user. To " +
+                "recover them instead, restore the key folder that belongs to this database",
+                scan.UnreadableSecrets,
+                scan.ProtectedSecrets,
+                scan.UnreadableRepositoryTokens,
+                SecretScan.FormatIds(scan.UnreadableRepositoryIds),
+                scan.UnreadableTotpSecrets,
+                SecretScan.FormatIds(scan.UnreadableUserIds));
+        }
+#pragma warning restore CA1848
     }
 
     /// <summary>

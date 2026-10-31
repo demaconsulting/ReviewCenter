@@ -22,7 +22,7 @@ N/A - standard test environment. The real run needs `git` on the path, as the to
 - The real validation completes with exit code 0, nine tests passed, none skipped or failed, each
   line showing its elapsed time, within a generous time bound that catches a hung check.
 - The real validation never creates the configured database and never runs or records the opt-in
-  `ReviewCenter_ConfiguredDatabase` check.
+  `ReviewCenter_ConfiguredDatabase` and `ReviewCenter_ConfiguredKeys` checks.
 - TRX and JUnit XML result files are generated with the correct XML root elements when valid
   file paths are supplied, and a skipped test is recorded as not executed.
 - An unsupported result file extension produces exit code 1 and no file is created.

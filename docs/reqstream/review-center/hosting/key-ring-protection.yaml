@@ -139,6 +139,20 @@ sections:
           - KeyRingProtection_CheckRing_OlderKeyUnreadable_LogsErrorAndPasses
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
 
+      - id: ReviewCenter-KeyRingProtection-AllowNewKeyRing
+        title: >-
+          The KeyRingProtection class shall provide the DataProtection:AllowNewKeyRing setting, false by default, that
+          lets the server start with a new key ring although the database holds protected secrets, and shall describe
+          a ring without touching it by counting its key files and how many hold an unencrypted or an encrypted key,
+          reading only and creating nothing, a folder that does not exist counting as zero.
+        justification: |
+          The refusal to start over a lost key ring needs an explicit, temporary escape for an operator who has
+          accepted the loss, and it must be off unless chosen. The scan and the configuration check must describe the
+          ring without a side effect, since a ring that is created while it is examined would hide the loss.
+        tests:
+          - KeyRingSettings_AllowNewKeyRing_DefaultsToFalse
+          - KeyRingProtection_InspectKeyFiles_MixedFolder_CountsByKindAndChangesNothing
+
       - id: ReviewCenter-KeyRingProtection-Validation
         title: >-
           The KeyRingProtection class shall refuse a DataProtection:Protection value that is not Auto, Dpapi,

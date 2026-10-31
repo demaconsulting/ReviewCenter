@@ -144,6 +144,7 @@ that is not part of the release archive. The defaults are:
 | `DataProtection:CertificatePasswordFile`  | empty (no password file)       | Key Ring Protection (Administration)    |
 | `DataProtection:PreviousCertificatePaths` | empty list                     | Key Ring Protection (Administration)    |
 | `DataProtection:RequireEncryptedKeys`     | false                          | Key Ring Protection (Administration)    |
+| `DataProtection:AllowNewKeyRing`          | false                          | Back Up and Restore (Deployment)        |
 | `Attestation:*`                           | a self-signed key              | The Signing Key (Reviewing)             |
 | `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
 | `Git:TimeoutSeconds`                      | 120 seconds (1 to 3600)        | Repositories and Credentials            |
@@ -387,14 +388,29 @@ $env:Database__ConnectionString = 'D:\ReviewCenterData\reviewcenter.db'
 ```
 
 The run takes a few seconds. It checks that git is available (and its version), runs a review workflow, a signed
-attestation, and a short start of the web server on a free loopback port, and last opens the configured database
-**read-only** and compares its tables and columns with what this version expects. On the Windows machine of the
-project it ended with `Passed: 10` and exit code 0, and the last line read `ReviewCenter_ConfiguredDatabase - Passed
-(...): provider Sqlite; opened read-only; schema matches (18 tables, 148 columns)`; the numbers are those of this
-version and grow when a release adds tables or columns. A non-zero exit code means that a
-check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter). A fresh
-installation has no database file yet: the check is then **skipped** (the report shows `SKIPPED` and the run does not
-fail), and the server creates the file at the first start.
+attestation, and a short start of the web server on a free loopback port, and last runs two checks of the
+deployment itself, both **read-only**:
+
+- `ReviewCenter_ConfiguredDatabase` opens the configured database and compares its tables and columns with what this
+  version expects.
+- `ReviewCenter_ConfiguredKeys` reads the configured key ring and tries to decrypt every stored repository token and
+  second-factor secret with it. It reports the protection in force, the number of key files (and how many are not
+  encrypted), the number of protected secrets, and how many of them cannot be decrypted. It creates no key, folder, or
+  file, and prints no key, secret, password, or path other than the key folder.
+
+With a database and a key ring in place, the run ends with `Passed: 11` and exit code 0, and the last two lines read like
+`ReviewCenter_ConfiguredDatabase - Passed (...): provider Sqlite; opened read-only; schema matches (18 tables, 148
+columns)` and `ReviewCenter_ConfiguredKeys - Passed (...): protection Dpapi; key files 1 (0 not encrypted); protected
+secrets 3 (repository tokens 2, second-factor secrets 1); unreadable 0`; the numbers are those of the installation and,
+for the schema, grow when a release adds tables or columns. The first of the two lines was observed on a Windows
+machine of the project; the second shows the form of the report. A non-zero exit code means that a
+check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter). The key check
+**fails** when secrets cannot be decrypted (the message gives the counts and the repository and user ids), when the key
+folder is empty or missing but the database holds secrets, when the ring is not encrypted and
+`DataProtection:RequireEncryptedKeys` is true, and when the newest key cannot be decrypted. A fresh
+installation has no database file yet: both checks are then **skipped** (the report shows `SKIPPED` and the run does not
+fail), and the server creates the file at the first start. The key check is also skipped when the database exists and
+holds no secret and the key folder does not exist yet.
 
 Then start the server and check `/health`. A first start with a new database creates the data folder, the database,
 the key ring, and the attestation key. Create the first system administrator before anyone signs in, with the command
@@ -404,47 +420,97 @@ Administration chapter describe.
 
 ## Back Up and Restore
 
-Everything that matters is in the database file and the key folder. Back up both, and back them up together.
+Four things belong together, and a backup that misses one of them is not a backup:
 
-1. Stop the server (a graceful stop closes the database and removes the `-wal` and `-shm` files).
-2. Copy the database file, and its `-wal` and `-shm` files when they exist, to the backup location.
-3. Copy the whole `keys` folder (the Data Protection key ring and `attestation-selfsigned`). If you moved them with
-   `DataProtection:KeysPath` or `Attestation:SelfSignedFolder`, copy those folders. If the signing key is in the
-   certificate store of the machine (`Attestation:Provider` set to `CertificateStore`), back up that certificate
-   and its private key by the means of your organization.
-4. Start the server again.
+1. **The database** (`reviewcenter.db`), with its `-wal` and `-shm` files when they exist.
+2. **The key ring folder** (`keys`, or `DataProtection:KeysPath`). It holds the keys that encrypt the stored repository
+   tokens and the second-factor secrets of the database, and, by default, the self-signed attestation key
+   (`attestation-selfsigned`). If you moved the attestation key with `Attestation:SelfSignedFolder`, back that folder up
+   too. If the signing key is in the certificate store of the machine (`Attestation:Provider` set to `CertificateStore`),
+   back up that certificate and its private key by the means of your organization.
+3. **The secret that protects the key ring**, which is not in the folder: for DPAPI, the Windows account (and the machine,
+   or only the machine with `DpapiScope` `LocalMachine`) that wrote the keys; for a certificate, the certificate file
+   (`DataProtection:CertificatePath`, and any `PreviousCertificatePaths`) **and its password** (or the password file).
+   Back them up apart from the keys, so that one lost backup does not give an attacker both.
+4. **The settings** of the installation: the environment variables or `appsettings.Production.json` that name these
+   locations and the protection.
 
 The `git-cache` folder is optional: the server rebuilds it from the repositories.
 
-Why the keys matter, and what was observed on Windows:
+To take a backup:
+
+1. Stop the server (a graceful stop closes the database and removes the `-wal` and `-shm` files). A plain copy of a
+   database that is in use may be inconsistent, because recent changes can be in the `-wal` file that the copy does not
+   take together with the database file; so either stop the server, or copy the `-wal` and `-shm` files with the
+   database file and use a backup method that understands SQLite. The project did not test any online backup.
+2. Copy the database file and its `-wal` and `-shm` files, and the key ring folder (and the attestation folder when it
+   is elsewhere), to the backup location. Keep the certificate and its password as described above.
+3. Start the server again.
+
+The keys and the pfx file are not encrypted at rest unless the key ring is protected (see Key Ring Protection in the
+Administration chapter; the pfx file of the attestation key has no password). Protect the backup like the live data,
+and let only the service account and the backup operator read the files.
+
+**A key ring that Windows DPAPI protects cannot be restored on another machine or under another account.** DPAPI
+binds the keys to the account (or machine) that wrote them, so a copy restored elsewhere is unreadable, and with it
+every stored repository token and second-factor secret. If the installation may have to be restored on another machine
+(a disaster recovery, a migration), protect the key ring with a certificate (`DataProtection:Protection` `Certificate`
+and `DataProtection:CertificatePath`; see Key Ring Protection in the Administration chapter) and keep the certificate
+and its password in the backup.
+
+What happens when the keys are missing at the restore:
 
 - **Restoring all of it works.** A copy of the stopped data folder, started with `Database:ConnectionString` pointing
   at the copy, accepted the password sign-in of the existing user.
-- **Restoring only the database file also starts and accepts passwords**, but when the old keys are not there it
-  silently creates a new Data Protection key ring. The stored repository tokens and the two-factor secrets are
-  encrypted with the old key ring and cannot be read any more (they must be entered again). The attestation key is
-  affected only with the default `SelfSigned` provider: when its pfx file is missing, the server generates a new key,
-  so the signatures of new attestation PDFs come from a new key, and a verifier that trusts the old key does not trust
-  them. A key of the `CertificateStore` provider is not in the data folder; it stays in the certificate store, and the
-  server does not generate one (a missing certificate stops the start with a message).
-- The keys and the pfx file are not encrypted at rest unless the key ring is protected (see Key Ring Protection in the
-  Administration chapter; the pfx file of the attestation key has no password). Protect the backup like the live data,
-  and let only the service account and the backup operator read the files. **Back up the certificate of a certificate
-  protected key ring, and its password, apart from the keys:** the ring cannot be read without it, and a ring that
-  DPAPI protects cannot be restored on another machine or account.
-- A more complete description of backing up, restoring, and moving a protected key ring is still to come; until then,
-  restore the folder, the certificate, and the settings together, and start the server once by hand. If the server
-  refuses to start with a message that names `DataProtection:CertificatePath`, it has not created a new key: fix the
-  certificate or list the old one in `DataProtection:PreviousCertificatePaths`.
+- **Restoring the database without its key ring is refused.** When the key folder holds no key file but the database
+  holds protected secrets, the server does not start. Data Protection would otherwise create a new key ring silently,
+  and every stored repository token and second-factor secret, which the old key ring encrypted, could never be read
+  again. The server stops with
+  `Key ring '<folder>' is empty but the database holds N protected secrets. Restore the keys folder that belongs to this
+  database, or set DataProtection:AllowNewKeyRing=true for one start to accept that they become unreadable.`
+  The right action is to restore the key folder that belongs to this database. If you accept the loss (the tokens
+  must then be entered again, and an administrator resets the two-factor secret of each user), set
+  `DataProtection:AllowNewKeyRing` to `true` for **one start** (for example `DataProtection__AllowNewKeyRing=true` in
+  the environment of that start, and remove it afterwards). The server then starts, creates a new key ring, and logs a
+  warning with the number of secrets that became unreadable. A fresh installation (no secrets) is not affected and
+  needs no setting.
+- **A key ring that does not belong to the database is not refused, but reported.** When the folder has keys but some
+  secrets cannot be decrypted with them (a key folder of another installation, or an older backup), the server starts,
+  because the rest of the data is usable, and logs an error at every start with the counts of unreadable repository
+  tokens and second-factor secrets and their repository and user ids. Enter the repository tokens again, and have an
+  administrator reset the two-factor secret of each user listed; or restore the right key folder. Run
+  `reviewcenter --validate --check-config` to see the same counts without starting the server.
+- The attestation key is affected only with the default `SelfSigned` provider: when its pfx file is missing (it is in the
+  key folder by default), the server generates a new key, so the signatures of new attestation PDFs come from a new key,
+  and a verifier that trusts the old key does not trust them. A key of the `CertificateStore` provider is not in the data
+  folder; it stays in the certificate store, and the server does not generate one (a missing certificate stops the start
+  with a message).
+- A ring protected by a certificate that is missing or wrong is not replaced: the server refuses to start with a message
+  that names `DataProtection:CertificatePath`. Fix the certificate or list the old one in
+  `DataProtection:PreviousCertificatePaths`.
 
-A plain copy of a database that is in use (the server running) may be inconsistent, because recent changes can be
-in the `-wal` file that the copy does not take together with the database file. Back up a stopped server, or use a
-backup method that understands SQLite; the project did not test any online backup.
+### Test a Restore
 
-To check a restored database, run `reviewcenter audit verify` (exit code 0 when the audit chain is intact, 1 when it is
-broken) with the same environment as the server; it never creates a database, so a wrong path is reported as an error
-with exit code 1. The project's test on a new database printed
-`Audit chain intact: 1 entries`.
+Test the backup before you need it, in a scratch location, never over the live data. The restore must happen with the
+same environment as the real installation, because a DPAPI ring is bound to the account and machine, and a certificate
+ring needs the certificate and its password:
+
+1. Restore the database file (with its `-wal` and `-shm` files if the backup has them) and the key ring folder to a
+   scratch folder, and the certificate to where the settings expect it.
+2. Point the settings at the scratch folder (`Database__ConnectionString`, and `DataProtection__KeysPath` and
+   `Attestation__SelfSignedFolder` when the backup does not use the default places beside the database), and set the same
+   protection settings and certificate password as the installation.
+3. Run `reviewcenter --validate --check-config`. The `ReviewCenter_ConfiguredKeys` line must pass with `unreadable 0`.
+   It fails, without creating anything, when the key ring does not belong to the database, when the ring is empty, or
+   when the certificate does not open it; it does not start the server and changes nothing in the scratch folder.
+4. Run `reviewcenter audit verify` with the same environment (exit code 0 when the audit chain is intact, 1 when it is
+   broken). It never creates a database, so a wrong path is reported as an error with exit code 1. The project's test on
+   a new database printed `Audit chain intact: 1 entries`.
+5. Delete the scratch copy, which holds the same secrets as the live data.
+
+The checks of steps 3 and 4 show that the database can be read and that the keys decrypt what it holds. They do not
+show that the attestation key is the one that signed earlier PDFs; compare the certificate of a new and an old
+attestation PDF if you must be sure.
 
 ## Upgrade
 
@@ -463,8 +529,9 @@ The supported upgrade procedure is therefore:
 3. Replace the folder of the executable with the folder of the new release (keep your `appsettings.<Environment>.json`
    or the environment of the service).
 4. Run `reviewcenter --validate --check-config` with the environment of the service. If the check of the database
-   fails, do not start the server on that file: the file does not fit the new version. Restore the old version and the
-   backup, or, **for development data only**, start with a new database file as the Database section describes.
+   or of the keys fails, do not start the server on that file: the file does not fit the new version. Restore the old
+   version and the backup, or, **for development data only**, start with a new database file as the Database section
+   describes.
 5. Start the server and check `/health` and a sign-in.
 
 To go back, stop the server, restore the old executable folder and the backup that you took in step 2 (restore the
@@ -487,8 +554,9 @@ because no release has been published yet.
 - Set `DataProtection:RequireEncryptedKeys` to true where the key ring must be encrypted: the server then refuses to
   start with a ring that is not encrypted at rest. Protect the disk or volume with disk encryption as well, because
   encrypted keys do not protect the database, the logs, or a running process.
-- Back up the database and the key folder together, and test a restore. Back up a certificate of the key ring apart from
-  the keys.
+- Back up the database and the key folder together, and test a restore (see Test a Restore). Back up a certificate of
+  the key ring, and its password, apart from the keys. Use a certificate, not DPAPI, for a ring that may have to be
+  restored on another machine.
 - Keep the built-in protections on: the sign-in throttle (5 attempts per user name and 20 per address in 300 seconds by
   default), passwords of 12 to 128 characters, the optional two-factor sign-in, and the limit of 30 requests a minute
   for each address on anonymous evidence downloads (see Password Rules and Lockout in the Users and Sign-in chapter,
@@ -550,6 +618,11 @@ the project produced on purpose with a wrong setting, and what to do:
   key, which would have made the stored tokens unreadable. Restore the key folder that belongs to this database (for
   example from a backup). Only if you accept that the stored tokens and second-factor secrets are lost, remove the
   damaged key files from the folder to start a new ring.
+- `Key ring '<folder>' is empty but the database holds N protected secrets. Restore the keys folder that belongs to
+  this database, or set DataProtection:AllowNewKeyRing=true for one start to accept that they become unreadable.`: the
+  database was restored (or the key folder was lost) without its key ring. Restore the key folder that belongs to the
+  database. Only if you accept that the stored repository tokens and second-factor secrets are lost, start once with
+  `DataProtection:AllowNewKeyRing` set to `true` (see Back Up and Restore).
 - `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned or
   CertificateStore.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
 
@@ -564,5 +637,8 @@ Other things to check:
 - **A repository cannot be read.** Check that `git` is on the `PATH` of the service account and is version 2.31 or
   later; see Repositories and Credentials in the Administration chapter.
 - **Stored repository tokens or two-factor secrets cannot be used after a restore.** The key ring of the old
-  installation was not restored; see Back Up and Restore.
+  installation was not restored, or not restored completely. The server logs an error at every start with the counts
+  and the repository and user ids, and `reviewcenter --validate --check-config` reports the same in the
+  `ReviewCenter_ConfiguredKeys` line (it fails when secrets are unreadable). Restore the key folder that belongs to the
+  database, or enter the tokens again and have an administrator reset the two-factor secrets; see Back Up and Restore.
 - **The setting `ASPNETCORE_URLS` has no effect.** It is ignored; use `--urls`.

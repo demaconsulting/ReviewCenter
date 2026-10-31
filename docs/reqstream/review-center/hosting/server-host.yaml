@@ -206,6 +206,31 @@ sections:
           - ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError
           - SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection
 
+      - id: ReviewCenter-ServerHost-LostKeyRing
+        title: >-
+          The ServerHost class shall, at the server start only and after the key ring check but before the probe round
+          trip creates a key, scan the database for protected secrets without creating a key, and shall fail with an
+          error that names the key folder, the number of secrets, and DataProtection:AllowNewKeyRing, before serving
+          requests, when the folder holds no key file and the database holds protected secrets; with
+          DataProtection:AllowNewKeyRing set it shall start and log a warning with the number of secrets, and when the
+          ring has keys but some secrets cannot be decrypted it shall log an error with the counts per kind and the
+          remedy and shall still start. A fresh installation shall start, and the command-line verbs shall neither
+          scan nor create a key.
+        justification: |
+          A database restored without the key ring that belongs to it would otherwise start with a brand new ring and
+          make every stored repository token and second-factor secret unreadable without a word. The refusal must
+          come before the probe because the probe is what creates the new key. The escape hatch lets an operator who
+          has accepted the loss start once; secrets that are only partly unreadable do not stop the rest of the server
+          from working, so they are reported loudly instead of refused.
+        tests:
+          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+          - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
+          - ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint
+          - ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts
+          - ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing
+          - UserCommand_Run_ValidUser_CreatesNoKeyFile
+          - AuditCommand_Run_IntactTrail_CreatesNoKeyFile
+
       - id: ReviewCenter-ServerHost-AttestationServices
         title: >-
           The ServerHost class shall register the attestation key provider chosen by the Attestation settings, the

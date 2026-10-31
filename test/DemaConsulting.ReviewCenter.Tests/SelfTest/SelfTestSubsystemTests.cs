@@ -85,7 +85,7 @@ public partial class SelfTestSubsystemTests
     }
 
     /// <summary>
-    ///     Test that the default real run never touches the configured database and never runs the opt-in check.
+    ///     Test that the opt-in checks are not part of the default run: the configured database and key ring are not touched.
     /// </summary>
     [Fact]
     public void SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic()
@@ -99,6 +99,8 @@ public partial class SelfTestSubsystemTests
         Assert.False(run.ConfiguredDatabaseCreated, "The default run must not create the configured database");
         Assert.DoesNotContain("ReviewCenter_ConfiguredDatabase", run.Log);
         Assert.DoesNotContain("ReviewCenter_ConfiguredDatabase", run.Trx);
+        Assert.DoesNotContain("ReviewCenter_ConfiguredKeys", run.Log);
+        Assert.DoesNotContain("ReviewCenter_ConfiguredKeys", run.Trx);
     }
 
     /// <summary>

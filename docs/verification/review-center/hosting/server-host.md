@@ -51,6 +51,11 @@ N/A - standard test environment.
   (never naming the password), a certificate that does not open the existing ring (without a second key being
   created), and a plain ring with `DataProtection:RequireEncryptedKeys` each stop the start with an error that names
   the setting at fault; `PermissionsOnly` logs a warning at every start.
+- The lost-ring guard: a database with protected secrets and a key folder with no key file (or no folder) stops the
+  start with an error that names the folder, the count, and `DataProtection:AllowNewKeyRing`, and no key is created;
+  with the setting true the server starts and logs a warning with the count; a restart on the same ring, and a fresh
+  installation (no secrets, empty ring), start without complaint; when the ring has keys but some secrets cannot be
+  decrypted, the server logs an error with the counts and starts. `user add` and `audit verify` create no key file.
 - The personal access token service is one shared instance, the routes under `/api` are mapped, the OpenAPI document is
   served without a token, a protected route without a token is answered 401, and an unknown address under `/api` is
   answered with a JSON problem document instead of a page.
@@ -231,6 +236,35 @@ the same folder; each start logs the warning that the ring is not encrypted at r
 **ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError**: A ring with a plain key file
 is started with `DataProtection:RequireEncryptedKeys` true; the build fails with a message that names the setting.
 This scenario is tested by `ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError`.
+
+**ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing**: A new database without secrets and an empty
+key folder are started; the build succeeds and the ring now holds a key. This scenario is tested by
+`ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing`.
+
+**ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey**: A database holds a repository token and a
+second-factor secret that a ring protected, and the key folder is empty or has been removed (a theory with both
+cases). The build fails with the message "Key ring '...' is empty but the database holds 2 protected secrets" that names
+`DataProtection:AllowNewKeyRing`, and no key file exists afterwards. This scenario is tested by
+`ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey`.
+
+**ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning**: The same lost ring is started with
+`DataProtection:AllowNewKeyRing` true; the build succeeds and a warning that names the setting and the number of
+secrets is logged. This scenario is tested by `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`.
+
+**ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint**: A server is started, its secrets are
+stored, and a second start over the same database and ring succeeds without a warning or an error about the secrets.
+This scenario is tested by `ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint`.
+
+**ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts**: The database holds secrets that another
+ring protected and the ring in the folder has a key; the build succeeds and an error is logged that gives the counts
+per kind and the remedy. This scenario is tested by `ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts`.
+
+**KeyRingSettings_AllowNewKeyRing_DefaultsToFalse**: The setting that accepts a new ring is off unless it is set. This
+scenario is tested by `KeyRingSettings_AllowNewKeyRing_DefaultsToFalse`.
+
+**Command-line verbs and keys**: `user add` and `audit verify` run against a database and a key folder; no key file is
+created, so neither verb scans nor uses the ring. This scenario is tested by `UserCommand_Run_ValidUser_CreatesNoKeyFile`
+and `AuditCommand_Run_IntactTrail_CreatesNoKeyFile`.
 
 **ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError** and
 **ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles**: On Linux and macOS only (skipped on

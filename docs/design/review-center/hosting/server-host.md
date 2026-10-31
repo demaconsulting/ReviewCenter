@@ -212,7 +212,8 @@ fails earlier, while the configuration is bound, with a message that names the k
 - *Postconditions*: The key ring plan has no problem; the folder exists (on a system other than Windows with the Unix
   mode that only the owner can use; on Windows with `PermissionsOnly`, with access rules that admit only the account
   of the server and the system), a probe file can be written and deleted in it, the ring passes
-  `KeyRingProtection.CheckRing` (before any key can be created), a test value can be protected and unprotected, and the
+  `KeyRingProtection.CheckRing` (before any key can be created), the lost-ring guard passes (below), a test value can be
+  protected and unprotected, and the
   key files are restricted to the owner on Unix (those that exist now; later ones as Data Protection creates them);
   otherwise the application is disposed and an
   `InvalidOperationException` is thrown. A plan with a problem or a failed check throws a message that names the
@@ -224,6 +225,21 @@ Runs after `ValidateAuthOptions` in `CreateApplication`, so it applies to the `s
 round trip failures (I/O, access, cryptographic, domain rule, argument, and not-supported errors) all become that one
 message, so an administrator gets a clear start-up error instead of failing at the first token. The ring is checked
 before the probe round trip because the round trip creates a key when there is none that can be read.
+
+**GuardLostRing**: The lost-ring guard, called by `ValidateDataProtection` right after `CheckRing` and before the probe.
+
+- *Parameters*: the application services, the settings, and the key folder.
+- *Postconditions*: `SecretScan` reads the key files and unprotects the stored repository tokens and second-factor
+  secrets with the production protectors (a read-only scan; nothing is written and no key is created). With no key file
+  and at least one protected secret, an `InvalidOperationException` "Key ring '{folder}' is empty but the database holds
+  {N} protected secrets. Restore the keys folder that belongs to this database, or set DataProtection:AllowNewKeyRing=true
+  for one start to accept that they become unreadable." is thrown, unless `DataProtection:AllowNewKeyRing` is true, in
+  which case a warning with the count is logged and the start goes on. With keys in the ring but some secrets that cannot
+  be decrypted, an error is logged with the counts per kind, the ids of the repositories and users, and the remedy
+  (enter the repository tokens again; an administrator resets the two-factor secret), and the start goes on.
+- *Notes*: A database with no secrets (a fresh installation) never triggers the guard. The message holds the folder
+  and a count only, never a secret value, ciphertext, or key. It runs for the `serve` verb only, because it is part of
+  `ValidateDataProtection`; `user add` and `audit verify` neither scan nor create a key.
 
 **ValidateAttestation**: Obtains the attestation signing key of a built application once.
 
@@ -297,6 +313,7 @@ always disposed.
 - **ASP.NET Core Data Protection** — the key ring and the protection of tokens.
 - **KeyRingProtection**, **KeyRingSettings**, **KeyRingPlan** — the `DataProtection` settings, the protection of the key
   files, and the check of the ring.
+- **SecretScan** — the read-only count of the key files and the protected secrets, used by the lost-ring guard.
 - **PasswordHasher**, **SignIn** — the password hasher registered for the Core, and the cookie sign-in, authorization,
   and login and logout endpoints.
 - **OidcSignIn**, **OidcOptions**, **ReauthProofStore** — sign-in with an OpenID Connect provider (registered, validated

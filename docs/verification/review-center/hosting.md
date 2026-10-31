@@ -71,7 +71,10 @@ a restart, and the clear error for a key ring folder that cannot be written are 
 start-up refusals are verified by the unit tests of `KeyRingProtection` and by
 `ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable`,
 `ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError`, and
-`ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey`. The registration of the
+`ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey`. The refusal of a lost key
+ring and its escape hatch are verified by `ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey` and
+`ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`, and the scan that feeds them by the unit
+tests of `SecretScan`. The registration of the
 review planner and of the parser of the review-set file is verified by
 `ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
 

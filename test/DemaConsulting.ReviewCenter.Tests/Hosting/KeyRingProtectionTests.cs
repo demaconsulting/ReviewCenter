@@ -799,6 +799,34 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that the read-only inspection counts the key files by kind, counts nothing for a folder that does not
+    ///     exist, and creates and changes nothing.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_InspectKeyFiles_MixedFolder_CountsByKindAndChangesNothing()
+    {
+        // Arrange: one unencrypted key file, one encrypted, one that is neither, and a file that is not a key file
+        using var folder = new TemporaryDirectory();
+        var keys = folder.GetFilePath("keys");
+        Directory.CreateDirectory(keys);
+        File.WriteAllText(Path.Combine(keys, "key-00000000-0000-0000-0000-000000000001.xml"), "<key><masterKey>AAAA</masterKey></key>");
+        File.WriteAllText(Path.Combine(keys, "key-00000000-0000-0000-0000-000000000002.xml"), "<key><encryptedSecret>AAAA</encryptedSecret></key>");
+        File.WriteAllText(Path.Combine(keys, "key-00000000-0000-0000-0000-000000000003.xml"), "not xml");
+        File.WriteAllText(Path.Combine(keys, "other.xml"), "<masterKey>");
+        var before = Directory.GetFiles(keys).Order(StringComparer.Ordinal).ToArray();
+
+        // Act
+        var counts = KeyRingProtection.InspectKeyFiles(keys);
+        var missing = KeyRingProtection.InspectKeyFiles(folder.GetFilePath("not-yet"));
+
+        // Assert: three key files of which one is plaintext and one encrypted; zero for a missing folder; nothing created
+        Assert.Equal((3, 1, 1), counts);
+        Assert.Equal((0, 0, 0), missing);
+        Assert.False(Directory.Exists(folder.GetFilePath("not-yet")));
+        Assert.Equal(before, Directory.GetFiles(keys).Order(StringComparer.Ordinal).ToArray());
+    }
+
+    /// <summary>
     ///     Test that an empty ring, and a folder that does not exist yet, are fine: they are new rings.
     /// </summary>
     [Fact]

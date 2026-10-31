@@ -105,6 +105,13 @@ internal sealed class KeyRingSettings
     ///     rest, that is, in the <c>PermissionsOnly</c> mode or when a key file of the ring is not encrypted.
     /// </summary>
     public bool RequireEncryptedKeys { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the server may start with an empty key ring although the database
+    ///     holds protected secrets; the secrets then become unreadable. It is the escape hatch of the lost-ring
+    ///     refusal (see <see cref="SecretScan"/>) and meant for one start only. <c>false</c> by default.
+    /// </summary>
+    public bool AllowNewKeyRing { get; set; }
 }
 
 /// <summary>
@@ -248,6 +255,11 @@ internal static class KeyRingProtection
     ///     element instead, which hides this element.
     /// </summary>
     private const string PlaintextMarker = "<masterKey";
+
+    /// <summary>
+    ///     The text of the element that holds an encrypted key in a key file.
+    /// </summary>
+    private const string EncryptedMarker = "<encryptedSecret";
 
     /// <summary>
     ///     The names of the key files of a Data Protection key ring.
@@ -773,6 +785,53 @@ internal static class KeyRingProtection
 
         found.Sort(StringComparer.Ordinal);
         return found;
+    }
+
+    /// <summary>
+    ///     Counts the key files of the ring and how many hold their key unencrypted or encrypted.
+    /// </summary>
+    /// <param name="folder">The folder of the key ring.</param>
+    /// <returns>
+    ///     The number of <c>key-*.xml</c> files, of those with an unencrypted key, and of those with an encrypted
+    ///     key; all zero when the folder does not exist. A file that is neither (or cannot be read at this moment)
+    ///     is only part of the total.
+    /// </returns>
+    /// <remarks>
+    ///     Read-only: nothing is created, changed or returned of the content of a file. The scan of the stored
+    ///     secrets (<see cref="SecretScan"/>) and the key ring check of the self-validation use it to describe a ring
+    ///     without touching it.
+    /// </remarks>
+    internal static (int KeyFiles, int Plaintext, int Encrypted) InspectKeyFiles(string folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (!Directory.Exists(folder))
+        {
+            return (0, 0, 0);
+        }
+
+        int total = 0, plaintext = 0, encrypted = 0;
+        foreach (var file in Directory.EnumerateFiles(folder, KeyFilePattern))
+        {
+            total++;
+            try
+            {
+                var text = File.ReadAllText(file);
+                if (text.Contains(PlaintextMarker, StringComparison.Ordinal))
+                {
+                    plaintext++;
+                }
+                else if (text.Contains(EncryptedMarker, StringComparison.Ordinal))
+                {
+                    encrypted++;
+                }
+            }
+            catch (IOException)
+            {
+                // Being written right now: it counts as a file, nothing more is known of it
+            }
+        }
+
+        return (total, plaintext, encrypted);
     }
 
     /// <summary>

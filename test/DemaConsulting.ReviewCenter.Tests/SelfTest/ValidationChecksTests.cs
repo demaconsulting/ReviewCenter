@@ -23,6 +23,7 @@ using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.SelfTest;
 using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
+using DemaConsulting.ReviewCenter.Tests.Hosting;
 using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -282,6 +283,294 @@ public partial class ValidationChecksTests
         // Act: run the check
         var exception = await Assert.ThrowsAsync<ValidationFailedException>(
             () => ConfiguredDatabaseCheck.RunAsync(CancellationToken.None));
+
+        // Assert: the provider is named
+        Assert.Contains("Oracle", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check is skipped, not failed, when nothing is configured.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_NothingConfigured_IsSkipped()
+    {
+        // Arrange: no configured connection string and no database at the default location
+        Assert.SkipWhen(
+            File.Exists(DatabaseSetup.GetDefaultDatabasePath()),
+            "A database exists at the default location of this machine.");
+        using var configuration = new ConfiguredKeysEnvironment(new KeyValuePair<string, string?>(TestDatabase.ConnectionStringVariable, null));
+
+        // Act: run the check
+        var exception = await Assert.ThrowsAsync<ValidationSkippedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the reason says that nothing is configured
+        Assert.Contains("No database is configured", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check is skipped for a database file that does not exist yet, and creates nothing.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_MissingDatabase_IsSkippedWithoutCreatingAnything()
+    {
+        // Arrange: a database file and a key folder that do not exist yet
+        using var folder = new TemporaryDirectory();
+        var database = folder.GetFilePath("absent.db");
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+        using var configuration = new ConfiguredKeysEnvironment(
+            new(TestDatabase.ConnectionStringVariable, $"Data Source={database};Pooling=False"),
+            new("DataProtection__KeysPath", keys));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationSkippedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: skipped with the reason, no path in the message, nothing created
+        Assert.Contains("does not exist yet", exception.Message);
+        Assert.DoesNotContain(folder.DirectoryPath, exception.Message);
+        Assert.False(File.Exists(database), "The check must never create the database");
+        Assert.False(Directory.Exists(keys), "The check must never create the key folder");
+    }
+
+    /// <summary>
+    ///     Test that the key check is skipped for a database without secrets when the key folder does not exist yet
+    ///     (a fresh installation), and does not create the folder.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_NoKeyFolderAndNoSecrets_IsSkippedWithoutCreatingTheFolder()
+    {
+        // Arrange: a database with the schema and no secrets, and a key folder that does not exist
+        using var install = new KeysInstall();
+        using var configuration = install.ConfigureKeysPath(Path.Combine(install.Folder.DirectoryPath, "not-yet"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationSkippedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert
+        Assert.Contains("key folder does not exist yet", exception.Message);
+        Assert.False(Directory.Exists(Path.Combine(install.Folder.DirectoryPath, "not-yet")));
+    }
+
+    /// <summary>
+    ///     Test that the key check passes when the ring reads every secret, reports the counts without the secrets and
+    ///     without paths, and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything()
+    {
+        // Arrange: an installation with a repository token and a second-factor secret
+        using var install = new KeysInstall();
+        var cipher = install.AddToken(1, KeysInstall.TokenText);
+        install.AddTotp(2);
+        using var configuration = install.Configure();
+        var before = install.Snapshot();
+
+        // Act
+        var detail = await ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the counts, no secret, no ciphertext, no path, and no file was touched or created
+        Assert.Contains("protection PermissionsOnly", detail);
+        Assert.Contains("key files 1 (1 not encrypted)", detail);
+        Assert.Contains("protected secrets 2 (repository tokens 1, second-factor secrets 1)", detail);
+        Assert.Contains("unreadable 0", detail);
+        Assert.DoesNotContain(KeysInstall.TokenText, detail);
+        Assert.DoesNotContain(cipher, detail);
+        Assert.DoesNotContain(install.Folder.DirectoryPath, detail);
+        Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check passes for a ring that is encrypted with a certificate, and names the mode and
+    ///     never the password.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_CertificateRing_PassesAndNeverPrintsThePassword()
+    {
+        // Arrange: a ring protected with a certificate, with one secret
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(certificates, "ring", KeysInstall.Password);
+        using var install = new KeysInstall(pfx);
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("DataProtection__Protection", "Auto"),
+            new("DataProtection__CertificatePath", pfx),
+            new("DataProtection__CertificatePassword", KeysInstall.Password),
+            new("DataProtection__RequireEncryptedKeys", "true"));
+
+        // Act
+        var detail = await ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Contains("protection Certificate", detail);
+        Assert.Contains("(0 not encrypted)", detail);
+        Assert.Contains("unreadable 0", detail);
+        Assert.DoesNotContain(KeysInstall.Password, detail);
+        Assert.DoesNotContain(pfx, detail);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for an empty ring (an existing folder without key files, or no folder) next to
+    ///     a database with secrets, names the folder and the number, and creates no key.
+    /// </summary>
+    /// <param name="removeFolder"><c>true</c> to remove the key folder, <c>false</c> to keep it empty.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey(bool removeFolder)
+    {
+        // Arrange: secrets in the database, and a ring whose key files are gone
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        install.AddTotp(2);
+        foreach (var file in install.KeyFiles())
+        {
+            File.Delete(file);
+        }
+
+        if (removeFolder)
+        {
+            Directory.Delete(install.KeysFolder, recursive: true);
+        }
+
+        using var configuration = install.Configure();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the key folder is named, the secrets are not, and no key was created
+        Assert.Contains($"Key ring '{install.KeysFolder}' is empty but the database holds 2 protected secrets", exception.Message);
+        Assert.DoesNotContain(KeysInstall.TokenText, exception.Message);
+        Assert.DoesNotContain("selftest.db", exception.Message);
+        Assert.Empty(install.KeyFiles());
+        Assert.Equal(!removeFolder, Directory.Exists(install.KeysFolder));
+    }
+
+    /// <summary>
+    ///     Test that the key check fails when another ring cannot decrypt the secrets, with the counts and the ids of
+    ///     the rows, and without the secrets.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_SecretsOfAnotherRing_FailsWithCountsAndIds()
+    {
+        // Arrange: secrets of one installation next to the ring of another one
+        using var install = new KeysInstall();
+        var cipher = install.AddToken(4, KeysInstall.TokenText);
+        install.AddTotp(6);
+        using var other = new KeysInstall();
+        other.CreateKey();
+        using var configuration = install.ConfigureKeysPath(other.KeysFolder);
+        var before = other.Snapshot();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: counts and ids, no secret or ciphertext, no path, and the ring was left alone
+        Assert.Contains("cannot decrypt 2 of 2 protected secrets", exception.Message);
+        Assert.Contains("repository ids 4", exception.Message);
+        Assert.Contains("user ids 6", exception.Message);
+        Assert.DoesNotContain(KeysInstall.TokenText, exception.Message);
+        Assert.DoesNotContain(cipher, exception.Message);
+        Assert.DoesNotContain(install.Folder.DirectoryPath, exception.Message);
+        Assert.Equal(before, other.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check fails when the newest key of the ring cannot be decrypted with the configured
+    ///     certificate, without the password and without creating a key.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_WrongCertificate_FailsAndCreatesNoKey()
+    {
+        // Arrange: a ring encrypted with one certificate, and a configuration with another
+        using var certificates = new TemporaryDirectory();
+        var right = KeyRingTestCertificates.WritePfx(certificates, "right", KeysInstall.Password);
+        var wrong = KeyRingTestCertificates.WritePfx(certificates, "wrong", KeysInstall.Password);
+        using var install = new KeysInstall(right);
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("DataProtection__Protection", "Auto"),
+            new("DataProtection__CertificatePath", wrong),
+            new("DataProtection__CertificatePassword", KeysInstall.Password));
+        var files = install.KeyFiles();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the newest key is named as the problem, the password is not shown, and no key was added
+        Assert.Contains("newest key cannot be decrypted", exception.Message);
+        Assert.DoesNotContain(KeysInstall.Password, exception.Message);
+        Assert.Equal(files, install.KeyFiles());
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for a ring with unencrypted keys when encrypted keys are required.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_PlaintextRingWhenEncryptionRequired_Fails()
+    {
+        // Arrange: a ring of unencrypted keys, and a configuration with a certificate that requires encryption
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(certificates, "ring", KeysInstall.Password);
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("DataProtection__Protection", "Auto"),
+            new("DataProtection__CertificatePath", pfx),
+            new("DataProtection__CertificatePassword", KeysInstall.Password),
+            new("DataProtection__RequireEncryptedKeys", "true"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the unencrypted files are the finding, without the password
+        Assert.Contains("are not encrypted", exception.Message);
+        Assert.DoesNotContain(KeysInstall.Password, exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for key ring settings the server refuses, without repeating a path or a secret.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_UnusableSettings_FailsWithoutLeaking()
+    {
+        // Arrange: a certificate ring whose certificate file is missing
+        using var install = new KeysInstall();
+        var missing = Path.Combine(install.Folder.DirectoryPath, "missing.pfx");
+        using var configuration = install.Configure(
+            new("DataProtection__Protection", "Certificate"),
+            new("DataProtection__CertificatePath", missing),
+            new("DataProtection__CertificatePassword", KeysInstall.Password));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the setting group is named; the certificate path and the password are not
+        Assert.Contains("key ring settings (DataProtection) are not usable", exception.Message);
+        Assert.DoesNotContain(missing, exception.Message);
+        Assert.DoesNotContain(KeysInstall.Password, exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for an unsupported provider.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_UnsupportedProvider_Fails()
+    {
+        // Arrange: a configured provider that this version does not support
+        using var configuration = new ConfiguredKeysEnvironment(
+            new(TestDatabase.ConnectionStringVariable, "Data Source=x.db"),
+            new("Database__Provider", "Oracle"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
 
         // Assert: the provider is named
         Assert.Contains("Oracle", exception.Message);

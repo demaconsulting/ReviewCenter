@@ -25,7 +25,9 @@ default), `Dpapi`, `Certificate`, or `PermissionsOnly`, in any case; `DpapiScope
 `LocalMachine`; `CertificatePath` and `CertificateKeyPath` — the certificate (PFX, PKCS#12, or PEM) and an optional
 separate PEM private key; `CertificatePassword` and `CertificatePasswordFile` — the password of the certificate, in
 one form only (resolved with `SecretSource`); `PreviousCertificatePaths` — certificates that may still decrypt the
-ring; `RequireEncryptedKeys` — refuse to start with a ring that is not encrypted (false by default).
+ring; `RequireEncryptedKeys` — refuse to start with a ring that is not encrypted (false by default); `AllowNewKeyRing` —
+accept a new key ring although the database holds
+protected secrets (false by default; the escape hatch of the lost-ring refusal of `ServerHost`, see `SecretScan`).
 
 **KeyRingProtectionMode**: the resolved choice, `Auto`, `Dpapi`, `Certificate`, or `PermissionsOnly` (the resolved
 value is never `Auto`).
@@ -114,6 +116,16 @@ to change that.
 
 **FindPlaintextKeyFiles**: Returns the key files that hold a plain `<masterKey` instead of an `<encryptedSecret`.
 
+**InspectKeyFiles**: Describes the ring without touching it.
+
+- *Parameters*: the folder.
+- *Returns*: the number of `key-*.xml` files, how many of them hold a plain `<masterKey`, and how many an
+  `<encryptedSecret`; all zero for a folder that does not exist. A file that is neither, or that is being written at
+  that moment, counts only in the total.
+- *Notes*: Read-only; nothing is created and no content of a file is returned. `SecretScan` and the key check of the
+  self-validation use it, so that the ring is described without calling Data Protection, which creates a key in an
+  empty ring.
+
 #### Error Handling
 
 `Prepare` never throws for a setting: it reports it as `Problem`, so that the one place that stops the start is
@@ -143,4 +155,6 @@ none; and the plan is made when the services are registered, so a `DataProtectio
 
 - **ServerHost** — `AddServices` calls `Prepare` and `Apply` and wraps the `FileSystemXmlRepository` of the key folder
   in a `KeyFileRestrictingXmlRepository`; `ValidateDataProtection` calls `RestrictKeyFolder`, `CheckRing`,
-  `RestrictKeyFiles`, and `LogProtection`.
+  `RestrictKeyFiles`, and `LogProtection`, and reads `AllowNewKeyRing`.
+- **SecretScan** — calls `InspectKeyFiles`.
+- **ConfiguredKeysCheck** (SelfTest) — calls `CheckRing` (on an existing folder only) and `InspectKeyFiles`.

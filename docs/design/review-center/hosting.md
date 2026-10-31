@@ -15,9 +15,10 @@ the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
 start, run, and stop lifecycle of that application and
 the translation of start-up failures into ordinary error reports. The `user add` and `audit verify` verbs reuse the same
-registration of the database and the services to work without starting a server. The subsystem contains four
+registration of the database and the services to work without starting a server. The subsystem contains five
 units: `ServerHost`, together with its small options type `ServerHostOptions`, which is
-documented with `ServerHost` as a supporting type, `KeyRingProtection`, `UserCommand`, and `AuditCommand`.
+documented with `ServerHost` as a supporting type, `KeyRingProtection`, `SecretScan`, `UserCommand`, and
+`AuditCommand`.
 
 ### Interfaces
 
@@ -167,7 +168,19 @@ the `Evidence` design.
 - *Contract*: `KeysPath` is the folder of the key ring that protects the stored repository tokens (empty for a `keys`
   folder beside the database). The `Git` section sets `CachePath` (empty for a `git-cache` folder beside the database)
   and `TimeoutSeconds` (120 by default, 1 to 3600) of the git content source.
-- *Constraints*: The server refuses to start when the key ring folder cannot be written.
+- *Constraints*: The server refuses to start when the key ring folder cannot be written, and when the key ring folder
+  holds no key but the database holds protected secrets (the lost-ring refusal), unless `AllowNewKeyRing` is true. The
+  other `DataProtection` settings (protection, certificates, `RequireEncryptedKeys`) are described in the
+  `KeyRingProtection` design; `AllowNewKeyRing` (false by default) is the escape hatch of the lost-ring refusal.
+
+**SecretScan (consumed and provided)**: The read-only count of the protected secrets of the database and of the files
+of the key ring, described in its own design. The server calls it before the probe round trip; the self-validation
+check `ConfiguredKeys` of the `SelfTest` subsystem calls it too.
+
+- *Type*: In-process .NET static method.
+- *Role*: Provider.
+- *Contract*: Takes the services of the install and the folder of the key ring and returns the numbers of key files
+  and of readable and unreadable secrets; never creates a key and never writes.
 
 ### Design
 
@@ -259,13 +272,20 @@ keeps the manual `XmlRepository` for the folder, wrapped so that new key files a
 the
 database, the folder is checked once at start-up (`ValidateDataProtection`): a plan with a problem or a ring that the
 certificate does not open (`KeyRingProtection.CheckRing`, which must run before anything can create a key) stops the
-start-up with one message that names the setting; then the folder is checked by writing and deleting a probe file and
+start-up with one message that names the setting; then, still before anything can create a key, `SecretScan` counts the
+protected secrets of the database (`GuardLostRing`): when the folder holds no key file but the database holds secrets,
+the ring was lost or replaced, Data Protection would silently create a new key, and every stored secret would become
+unreadable, so the start-up is refused with "Key ring '...' is empty but the database holds N protected secrets..."
+unless `DataProtection:AllowNewKeyRing` is true (one start, with a warning that gives the count). When the ring has
+keys but some secrets cannot be decrypted (the ring belongs to another database or was replaced), the server logs an
+error with the counts per kind and the remedy, and starts, because the rest of the data is usable. The folder is
+then checked by writing and deleting a probe file and
 by encrypting and decrypting a test value, so that a folder that cannot be read or written stops the start-up with one
 clear message
 naming the setting. The check is part of `CreateApplication`, so it applies to the `serve` verb only; the command-line
 verbs register the same services (and therefore the same protection plan for the key files) but do not use the key
 ring, so
-they neither check nor probe it and report no problem of the plan. Three consequences are
+they neither check, scan, nor probe it and report no problem of the plan. Three consequences are
 documented for the administrator (see the `ContentSources` design and the user guide): losing or replacing the key
 ring makes the stored tokens unreadable and they must be entered again; a ring protected with DPAPI cannot be restored
 on another machine or account, and a ring protected by a certificate cannot be read without it, so the certificate must
