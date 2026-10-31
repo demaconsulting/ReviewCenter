@@ -229,7 +229,8 @@ reviewcenter keys reprotect
 ```
 
 It reads the same configuration as the server (`appsettings.json` and the environment variables), so run it with the
-same environment, and **stop the server first**: a running server may change a secret while the command works, and the
+same environment, and **stop the server first**, and run only one copy of the command at a time: it is not safe to
+run concurrently with itself or with the server. A running server may change a secret while the command works, and the
 command then stops with an error for the table that it could not complete. It is the only verb that writes to the key
 ring, and the only one that changes these stored secrets (other verbs, such as `user add`, write other data of the
 database). It takes no option of its own; `--silent` and `--log <file>`

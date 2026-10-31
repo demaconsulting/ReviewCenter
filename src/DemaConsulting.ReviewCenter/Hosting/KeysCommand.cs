@@ -52,8 +52,9 @@ namespace DemaConsulting.ReviewCenter.Hosting;
 ///     password are never printed or logged. Automatic key generation is switched off for the command, so that a
 ///     refusal cannot create a key as a side effect. After the new key exists the services are built a second time,
 ///     because a key ring that was read earlier is refreshed in the background and could still protect with the old
-///     key for a moment. A second run is fine and gives another new key. The class is
-///     stateless and therefore thread-safe.
+///     key for a moment. A second run, after the first has finished, is fine and gives another new key. The class
+///     keeps no state, but the command is not safe to run concurrently with itself or with the server: it must be run
+///     once at a time, with the server stopped.
 /// </remarks>
 internal static class KeysCommand
 {

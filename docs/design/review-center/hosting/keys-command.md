@@ -12,7 +12,10 @@ the key ring and to the stored repository token and second-factor secret columns
 
 #### Data Model
 
-`KeysCommand` is a stateless static class, so it is thread-safe. It has no input other than the configuration, which
+`KeysCommand` keeps no state, but it is not safe to run concurrently with itself or with the server: run it once at a
+time, with the server stopped. The guard on each row update (it only replaces the value that was read) stops a table
+with an error when a row changed meanwhile instead of overwriting it, but that is a safeguard, not support for
+concurrent runs. It has no input other than the configuration, which
 is the one the server reads (`appsettings.json` and environment variables): the key ring and the database it works on
 are the ones the server uses.
 
