@@ -272,6 +272,12 @@ public enum DomainRule
     FollowUpInvalid,
 
     /// <summary>
+    ///     An audit filter is not valid: its first day is after its last day, or a text is longer than the field it is
+    ///     matched against.
+    /// </summary>
+    AuditFilterInvalid,
+
+    /// <summary>
     ///     The change would make one or more current signatures out of date and the person making it did not
     ///     acknowledge them; <see cref="DomainRuleException.AffectedSlots"/> lists the signatures not acknowledged.
     /// </summary>

@@ -545,6 +545,54 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a database created from scratch has the indexes the audit filters rely on: the project, the
+    ///     actor and the action, each followed by the sequence, next to the one of the history of a review.
+    /// </summary>
+    [Fact]
+    public void StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes()
+    {
+        // Arrange: a freshly created database
+        using var db = new TestStore();
+
+        // Act: read the columns of every index of the audit table from the database itself
+        var indexes = new List<string>();
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection(db.ConnectionString))
+        {
+            connection.Open();
+            var names = new List<string>();
+            using (var list = connection.CreateCommand())
+            {
+                list.CommandText = "SELECT name FROM pragma_index_list('AuditEntries')";
+                using var reader = list.ExecuteReader();
+                while (reader.Read())
+                {
+                    names.Add(reader.GetString(0));
+                }
+            }
+
+            foreach (var name in names)
+            {
+                using var info = connection.CreateCommand();
+                info.CommandText = $"SELECT name FROM pragma_index_info('{name}') ORDER BY seqno";
+                using var reader = info.ExecuteReader();
+                var columns = new List<string>();
+                while (reader.Read())
+                {
+                    columns.Add(reader.GetString(0));
+                }
+
+                indexes.Add(string.Join(",", columns));
+            }
+        }
+
+        // Assert
+        Assert.Contains("ProjectId,ReviewId,Sequence", indexes);
+        Assert.Contains("ProjectId,Sequence", indexes);
+        Assert.Contains("ActorUserId,Sequence", indexes);
+        Assert.Contains("Action,Sequence", indexes);
+    }
+
+    /// <summary>
     ///     Test that a second review with an id already used in the same project is refused by the services
     ///     over a real database, and that the original review is left unchanged.
     /// </summary>

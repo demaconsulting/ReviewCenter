@@ -283,4 +283,112 @@ public class ProjectAuditPageTests : PageTestBase
         // Assert
         Assert.Equal("true", cut.Find("[data-testid='project-audit-page']").GetAttribute("data-interactive"));
     }
+
+    /// <summary>
+    ///     Test that the project page shows the filter form without a project selector, and that the actor, action and
+    ///     review in the address limit the entries of the project.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries()
+    {
+        // Arrange
+        var (apollo, gemini) = await ArrangeAsync();
+        var token = TestContext.Current.CancellationToken;
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "review.created", "ann review", apollo, "REV-1"), token);
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Bob, "review.locked", "bob review", apollo, "REV-2"), token);
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Bob, "review.locked", "bob elsewhere", gemini, "REV-2"), token);
+        SignInAs("padm", "Padm", isSystemAdmin: false);
+
+        // Act: every view is read right after it is rendered, because the next navigation re-renders the earlier ones
+        var all = RenderAt(apollo);
+        var hasProjectSelector = all.FindAll("[data-testid='audit-filter-project']").Count > 0;
+        var hasForm = all.FindAll("[data-testid='audit-filter-form']").Count > 0;
+        var byActor = RenderAt(apollo, "?actor=bob");
+        var byActorDetails = byActor.FindAll("[data-testid='audit-detail']").Select(e => e.TextContent).ToList();
+        var clear = byActor.Find("[data-testid='audit-filter-clear']").GetAttribute("href");
+        var formAction = byActor.Find("[data-testid='audit-filter-form']").GetAttribute("action");
+        var byGroup = RenderAt(apollo, "?action=review.&review=REV-2");
+        var byGroupDetails = byGroup.FindAll("[data-testid='audit-detail']").Select(e => e.TextContent).ToList();
+        var otherProject = RenderAt(apollo, $"?project={gemini}&actor=bob");
+        var otherDetails = otherProject.FindAll("[data-testid='audit-detail']").Select(e => e.TextContent).ToList();
+
+        // Assert
+        Assert.False(hasProjectSelector);
+        Assert.True(hasForm);
+        Assert.Equal(["bob review"], byActorDetails);
+        Assert.Equal(["bob review"], byGroupDetails);
+        Assert.Equal(["bob review"], otherDetails);
+        Assert.Equal($"/projects/{apollo}/audit", clear);
+        Assert.Equal($"/projects/{apollo}/audit", formAction);
+    }
+
+    /// <summary>
+    ///     Test that the paging links of a filtered project page carry the filter and the page size.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter()
+    {
+        // Arrange
+        var (apollo, _) = await ArrangeAsync();
+        var token = TestContext.Current.CancellationToken;
+        for (var i = 1; i <= 30; i++)
+        {
+            await Audit.RecordAsync(AuditDraft.By(TestActors.Bob, "review.created", $"bob {i}", apollo), token);
+        }
+
+        SignInAs("padm", "Padm", isSystemAdmin: false);
+
+        // Act
+        var first = RenderAt(apollo, "?actor=bob&size=25");
+        var older = first.Find("[data-testid='audit-older']").GetAttribute("href")!;
+        var firstRows = first.FindAll("[data-testid='audit-row']").Count;
+        var second = RenderAt(apollo, older[older.IndexOf('?', StringComparison.Ordinal)..]);
+
+        // Assert
+        Assert.Equal(25, firstRows);
+        Assert.StartsWith($"/projects/{apollo}/audit?actor=bob&size=25&before=", older, StringComparison.Ordinal);
+        Assert.Equal(5, second.FindAll("[data-testid='audit-row']").Count);
+        Assert.Empty(second.FindAll("[data-testid='audit-older']"));
+    }
+
+    /// <summary>
+    ///     Test that a filter that matches nothing says so, and that hostile values neither break the page nor show
+    ///     the entries of another project or of no project.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAuditPage_Render_NoMatchAndHostileValues_AreSafe()
+    {
+        // Arrange
+        var (apollo, _) = await ArrangeAsync();
+        SignInAs("padm", "Padm", isSystemAdmin: false);
+
+        // Act
+        var none = RenderAt(apollo, "?actor=nobody-has-this-name");
+        var noneText = none.Find("[data-testid='audit-empty']").TextContent;
+        var hostile = RenderAt(apollo, "?actor=<marquee>&from=bad&to=worse&size=-9&action=x%27");
+
+        // Assert
+        Assert.Equal("No entry matches the filters.", noneText);
+        Assert.Empty(hostile.FindAll("marquee"));
+        Assert.Empty(hostile.FindAll("[data-testid='project-not-found']"));
+        Assert.DoesNotContain("global event", hostile.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the filter never lets a page show the entries of another project or the entries that belong to
+    ///     no project, even for a system administrator who gives another project in the address.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries()
+    {
+        // Arrange
+        var (apollo, _) = await ArrangeAsync();
+        SignInAs("root", "Root", UserRole.Admin);
+
+        // Act
+        var cut = RenderAt(apollo, "?actor=ann");
+
+        // Assert
+        Assert.Equal(["apollo event"], cut.FindAll("[data-testid='audit-detail']").Select(e => e.TextContent));
+    }
 }

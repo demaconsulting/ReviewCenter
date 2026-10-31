@@ -39,7 +39,8 @@ a project checklist, and sign the review with their credentials. Every action is
 - 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot
 - ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to reviewed record
 - 🔒 **Approval Lock** - Approved reviews lock, admins reopen with a reason, authors cannot self-review
-- 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history
+- 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history, filterable by project, actor,
+  action, review, and date
 - 📄 **Signed PDF Attestation** - Approved reviews download as verifiable PDFs
 - ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access
 - 🛡️ **Access Control** - Project roles, local accounts, and sign-in lockout

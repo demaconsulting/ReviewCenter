@@ -379,8 +379,8 @@ text of every entry is shown as plain text.
 ### The Audit Page (System Administrators)
 
 A system administrator sees an **Audit** link in the page header. It opens `/audit`, which lists the whole trail (for
-all projects and reviews, sign-ins, and user administration), newest first, 50 entries at a time. Other users are
-refused. Events of a project carry the project.
+all projects and reviews, sign-ins, and user administration), newest first, 50 entries at a time by default. Other
+users are refused. Events of a project carry the project.
 The page has a **Verify chain** button. It reads the whole trail once and shows either that the chain is intact, with
 the number of entries and the **head hash**, or the first entry at which the chain is broken.
 
@@ -391,11 +391,37 @@ the number of entries and the **head hash**, or the first entry at which the cha
 A project administrator (and a system administrator) sees an **Audit trail** button on the project page. It opens
 `/projects/{id}/audit`, a read-only list of the entries recorded for that project only: its reviews, members, evidence
 settings, review rules, and account creations, and nothing of other projects, sign-ins, or user administration. The
-list is newest
-first, 50 at a
-time, with **Older** and **Newer** buttons. It has no **Verify chain** button; verification covers the whole trail
+list is newest first, with **Older** and **Newer** buttons, and has the same filter as the audit page, except for the
+project. It has no **Verify chain** button; verification covers the whole trail
 and stays with the system administrator. Ordinary members do not get the button, and the page looks like a missing
-project to them.
+project to them. Who may read it is decided by the audit-read access of a project: today that is the project
+administrators and the system administrators, and Auditors will have it too once that role can be assigned.
+
+### Filtering and Paging the Audit Trail
+
+Both audit pages have a filter form above the table. All the fields are optional, and an entry is shown only when it
+matches every field that is filled in:
+
+- **Actor**: a part of the name of the person; it matches letters without regard to case (for the letters A to Z) and
+  the characters `%`, `_`, and `\` are matched as they are typed. The actor name is stored as the display name followed
+  by the user name in parentheses, so either part finds the entries.
+- **Action**: any action, a whole group (for example every `review.` action), or one exact action. The choices are the
+  actions listed under [Recorded Actions](#recorded-actions).
+- **Review**: the identifier of a review. On the audit page, without a project, it finds that identifier in every
+  project; on the audit page of a project it is limited to that project.
+- **From** and **To**: days in UTC. Both days are included, from the first instant of the From day to the last
+  instant of the To day. A From day after the To day cannot match anything, so both days are ignored and the page says
+  so.
+- **Per page**: 25, 50 (the default), or 100 entries.
+- **Project** (the audit page only): one project out of the projects you can see. The audit page of a project is
+  always limited to that project; entries that belong to no project (sign-ins, user administration) are shown only on
+  the audit page, which only system administrators can open.
+
+**Apply** shows the result, and **Clear filters** (shown while something is set) returns to the whole trail. The
+filter is part of the address, so a filtered view can be bookmarked or shared with someone who may read the same
+page, and the **Older** and **Newer** buttons keep the filter and the page size. A page always holds at most 200
+entries, whatever the address says. A filter value of the address that is not usable (a date that is not `yyyy-MM-dd`, an
+unknown action, another page size) is ignored. When nothing matches, the page says "No entry matches the filters."
 
 ### The Chain
 
@@ -486,7 +512,8 @@ head hash is a manual step, and it is most useful after important events such as
   characters, so that it fits the entry), together with the digest of the record that was reopened.
 - There is no export and no retention or archiving of the trail, and no external anchoring.
 - The audit trail is a new table. A development database created before it existed must be recreated (see the next
-  section).
+  section). The same applies to a database created before the filter of the audit pages, which stores the time of an
+  entry in another form and has fewer indexes.
 
 ## Database
 

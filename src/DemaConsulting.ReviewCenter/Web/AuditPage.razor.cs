@@ -35,8 +35,10 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     when the verification is started, whether the signed-in user is still an enabled administrator, and refuses
 ///     with an error otherwise (defense in depth). The verification is a click on a live circuit, not a form post,
 ///     so the framework's circuit protection applies instead of an antiforgery token. The page talks to the domain
-///     only through <see cref="AuditService"/> and <see cref="UserService"/>, and changes nothing. The position in the
-///     trail is carried in the address (<c>?before=</c> for an older page, <c>?after=</c> for a newer one). Each
+///     only through <see cref="AuditService"/>, <see cref="UserService"/> and <see cref="ProjectService"/> (the
+///     last only to offer the project selector), and changes nothing. The position in the
+///     trail is carried in the address (<c>?before=</c> for an older page, <c>?after=</c> for a newer one) together
+///     with the filter (<see cref="AuditFilterState"/>), which never fails on a hand-edited address. Each
 ///     browser connection (circuit) gets its own page instance, so the state here is per-user and needs no
 ///     synchronization.
 /// </remarks>
@@ -68,6 +70,55 @@ public partial class AuditPage : ComponentBase
     public long? After { get; set; }
 
     /// <summary>
+    ///     Gets or sets the actor text to look for, from the <c>actor</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "actor")]
+    public string? ActorQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the action or action group to look for, from the <c>action</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "action")]
+    public string? ActionQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the review identifier to look for, from the <c>review</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "review")]
+    public string? ReviewQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the first UTC day to show, from the <c>from</c> query value (<c>yyyy-MM-dd</c>).
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "from")]
+    public string? FromQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the last UTC day to show, from the <c>to</c> query value (<c>yyyy-MM-dd</c>).
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "to")]
+    public string? ToQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the page size, from the <c>size</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "size")]
+    public string? SizeQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the project to look at, from the <c>project</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "project")]
+    public string? ProjectQuery { get; set; }
+
+    /// <summary>
     ///     Gets or sets the service that reads and verifies the audit trail, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -80,6 +131,13 @@ public partial class AuditPage : ComponentBase
     private UserService UserService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that reads projects, supplied by dependency injection; offers the project
+    ///     selector of the filter.
+    /// </summary>
+    [Inject]
+    private ProjectService ProjectService { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -89,6 +147,16 @@ public partial class AuditPage : ComponentBase
     ///     Gets a value indicating whether the lookup has finished.
     /// </summary>
     private bool Loaded { get; set; }
+
+    /// <summary>
+    ///     Gets the cleaned filter of the address.
+    /// </summary>
+    private AuditFilterState Filter { get; set; } = AuditFilterState.FromQuery(null, null, null, null, null, null, null);
+
+    /// <summary>
+    ///     Gets the projects the project selector offers, or <c>null</c> when the user is refused.
+    /// </summary>
+    private IReadOnlyList<Project>? Projects { get; set; }
 
     /// <summary>
     ///     Gets the page of entries shown, or <c>null</c> when it is not loaded (or the user is refused).
@@ -123,11 +191,14 @@ public partial class AuditPage : ComponentBase
         // Clear the previous page before the first await so a stale page is never shown under a new address
         Loaded = false;
         Page = null;
+        Projects = null;
         ErrorMessage = null;
+        Filter = AuditFilterState.FromQuery(ActorQuery, ActionQuery, ReviewQuery, FromQuery, ToQuery, SizeQuery, ProjectQuery);
 
         if (await RequireAdministratorAsync())
         {
-            Page = await AuditService.ListAsync(null, null, Before, After);
+            Projects = await ProjectService.ListAsync(await AuthenticationState.GetActorOrNullAsync());
+            Page = await AuditService.ListAsync(Filter.ToFilter(null), Before, After, Filter.PageSize);
         }
 
         Loaded = true;
@@ -162,6 +233,7 @@ public partial class AuditPage : ComponentBase
         {
             // A refusal must leave nothing of the trail on screen
             Page = null;
+            Projects = null;
             return;
         }
 

@@ -26,8 +26,9 @@ appearance and managing one's personal access tokens, and managing users and who
 (`UsersPage` includes `NewUserPage`);
 `HistoryPage` and `AuditPage`, the pages that
 show the history of a review and let a system administrator
-verify the audit trail (`AuditPage` includes `ProjectAuditPage`, the audit view of one project for its administrators,
-and `AuditEntryTable`, the table both audit pages share); `RepositoriesPage`, the page where whoever manages a
+verify the audit trail (`AuditPage` includes `ProjectAuditPage`, the audit view of one project for those who may read
+its audit trail, `AuditFilterForm`, the filter both audit pages offer, `AuditFilterState`, the cleaned filter of the
+address, and `AuditEntryTable`, the table both audit pages share); `RepositoriesPage`, the page where whoever manages a
 project registers the git
 repositories of that project that its reviews can be created from (it includes `NewRepositoryPage`); and `InboxPage`,
 the page that lists the reviews that wait for the signed-in user, which is also the list of notifications. Which projects
@@ -284,7 +285,8 @@ and `IProjectAccess`; `NewMemberPage` and `NewMemberAccountPage`: `ProjectServic
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
 `UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
-`UserService`; `ProjectAuditPage`: `AuditService`, `ProjectService`, and `IProjectAccess`; `RepositoriesPage`:
+`UserService`; `AuditPage` also `ProjectService` for the project selector; `ProjectAuditPage`: `AuditService`,
+`ProjectService`, and `IProjectAccess`; `RepositoriesPage`:
 `RepositoryService`, `ProjectService`, and `IProjectAccess`; each other creation page
 the service of its parent page) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
@@ -365,7 +367,8 @@ The access above is decided when a page loads. A page that stays open does not l
 was removed meanwhile would keep reading through it: the files, comments, checklist answers, and plans that the page
 loads from the services in its handlers, and the data already in its component state. The pages of a project therefore
 ask again, at the start of every handler of the open circuit, with one shared helper,
-`ProjectViewGuard.GuardViewAsync` (an extension of `IProjectAccess`, which also offers `GuardAdministerAsync` and
+`ProjectViewGuard.GuardViewAsync` (an extension of `IProjectAccess`, which also offers `GuardAdministerAsync`,
+`GuardAuditAsync`, and
 `GuardSystemAdminAsync` over the same core, see below): it reads the actor from the authentication state
 and returns whether `IProjectAccess.CanViewAsync` allows that actor to see the project; when it does not, it runs a
 callback of the page, which resets the component state (so that no loaded data is kept) and shows the same not-found
@@ -385,12 +388,13 @@ new address, which is its one check. `ProjectPage` and the administration pages 
 Three handlers are left unguarded on purpose because they show no project data: cancelling a comment form,
 copying a thread link, and reading the file names of a browser selection.
 
-The pages that show data for administrators only use the two other levels of the same guard, because an error shown
+The pages that show data for administrators only use the other levels of the same guard, because an error shown
 above data that stays rendered still leaves the data readable. `GuardAdministerAsync` (the user manages the project, a
 system administrator or a project admin of it) guards `RepositoriesPage` (every action and the start of an edit),
 `NewRepositoryPage` (the creation), the members section of `ProjectPage` (after the view check), `NewMemberPage`,
-`NewMemberAccountPage`, and `ProjectAuditPage` (the load and every paging or verification step).
-`GuardSystemAdminAsync` (the user is an enabled system administrator) guards every action of `UsersPage`. All three
+`NewMemberAccountPage`. `GuardAuditAsync` (the user may read the audit trail of the project: today a system
+administrator or a project admin of it) guards `ProjectAuditPage` (the load and every paging or filter step).
+`GuardSystemAdminAsync` (the user is an enabled system administrator) guards every action of `UsersPage`. All four
 call one private core that reads the actor and runs the callback when the check fails. When the check fails, the page
 clears what it had loaded and shows what an ordinary member would see: the not-found page of the project for the
 repositories pages, the member pages, the project audit page, and for `ProjectPage` when the project is no longer
@@ -620,11 +624,14 @@ the sign-in, the recovery codes, and what to do after losing a phone.
 #### History and audit
 
 `HistoryPage`, `AuditPage`, and `ProjectAuditPage` only read. They show the audit entries through `AuditService`, which
-pages them 50 at a
-time newest first, and the position is carried in the address, so the Older and Newer links are plain anchors. A page
+pages them newest first (50 at a time by default; the audit pages offer 25, 50, and 100), and the position and the
+filter are carried in the address, so the Older and Newer links are plain anchors that keep the filter. A page
 shows what the trail says; it does not claim more. `AuditPage` and `ProjectAuditPage` share the table component
-`AuditEntryTable`. `ProjectAuditPage` (`/projects/{id}/audit`, reached from the Audit trail button of the project
-page) shows the entries of one project only and is open to whoever administers that project; it re-checks the access
+`AuditEntryTable` and the filter form `AuditFilterForm`, a GET form (actor, action, review, dates, page size, and on
+`AuditPage` the project) whose values `AuditFilterState` cleans: a value that cannot be used is dropped, never raised.
+`ProjectAuditPage` (`/projects/{id}/audit`, reached from the Audit trail button of the project
+page) shows the entries of one project only and is open to project administrators and system administrators (and to
+Auditors once that role can be given), through the audit-read access of `IProjectAccess`; it re-checks the access
 on load and before every paging step, and for anyone else it shows the not-found text of a project. It has no
 verification button: only `AuditPage` verifies the chain, and its result text says what
 was checked (the chain is intact, or the first entry that no longer fits) and shows the head hash so that an

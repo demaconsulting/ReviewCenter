@@ -357,6 +357,14 @@ Approved while the first review is still In review and lists the follow-up. The 
 "Follows review" and the identifier of the first review. This scenario is tested by
 `ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn`.
 
+**ReviewCenter_AuditTrail_FiltersByActionAndActor**: This scenario verifies the filter of the audit page of the system
+requirement for the audit trail on the audit page. The user `puppet` has signed in and created a review, so the trail
+holds both. The whole trail shows no Clear link. Choosing the action `review.created` in the filter form and applying
+it leaves only entries of that action, fewer than the whole trail, puts `action=review.created` in the address and
+shows the Clear link. The address with the actor `puppet` and the group `auth.` shows only sign-in entries of that user,
+and an actor nobody has shows the no-match state without a row. The Clear link returns to the whole trail. This
+scenario is tested by `ReviewCenter_AuditTrail_FiltersByActionAndActor`.
+
 **ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne**: Three users are created
 with the `user add` verb on a temporary database, and `audit verify` reports an intact chain with exit code 0. One audit
 entry is then edited directly in the SQLite file, and `audit verify` reports that the chain is broken at that entry with

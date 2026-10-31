@@ -27,13 +27,15 @@ namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the project audit page (<c>ProjectAuditPage.razor</c>): the audit entries of one project for
-///     whoever administers it.
+///     whoever may read its audit trail.
 /// </summary>
 /// <remarks>
-///     An attribute on the page requires a signed-in user; the page shows the entries only to whoever may
-///     administer the project (a system administrator or a project admin of it) and shows the not-found state of a
+///     An attribute on the page requires a signed-in user; the page shows the entries only to whoever holds the
+///     audit-read right of the project (a system administrator or a project admin of it today; an Auditor too once
+///     that role can be assigned) and shows the not-found state of a
 ///     missing project to anybody else. The page changes nothing. It reads only the entries that carry the project
-///     identity (see <see cref="AuditService.ListAsync"/>), never entries of other projects or global ones. The
+///     identity (see <see cref="AuditService.ListAsync"/>), never entries of other projects or global ones, with the
+///     filter of the address (<see cref="AuditFilterState"/>, which never fails on a hand-edited address). The
 ///     position in the trail is carried in the address (<c>?before=</c> for an older page, <c>?after=</c> for a
 ///     newer one). Each browser connection (circuit) gets its own page instance, so the state here is per-user and
 ///     needs no synchronization.
@@ -67,6 +69,48 @@ public partial class ProjectAuditPage : ComponentBase
     public long? After { get; set; }
 
     /// <summary>
+    ///     Gets or sets the actor text to look for, from the <c>actor</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "actor")]
+    public string? ActorQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the action or action group to look for, from the <c>action</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "action")]
+    public string? ActionQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the review identifier to look for, from the <c>review</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "review")]
+    public string? ReviewQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the first UTC day to show, from the <c>from</c> query value (<c>yyyy-MM-dd</c>).
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "from")]
+    public string? FromQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the last UTC day to show, from the <c>to</c> query value (<c>yyyy-MM-dd</c>).
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "to")]
+    public string? ToQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the page size, from the <c>size</c> query value.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "size")]
+    public string? SizeQuery { get; set; }
+
+    /// <summary>
     ///     Gets or sets the service that reads the audit trail, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -79,7 +123,7 @@ public partial class ProjectAuditPage : ComponentBase
     private ProjectService ProjectService { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the access service, supplied by dependency injection; decides who may administer the project.
+    ///     Gets or sets the access service, supplied by dependency injection; decides who may read the audit trail of the project.
     /// </summary>
     [Inject]
     private IProjectAccess Access { get; set; } = null!;
@@ -106,6 +150,11 @@ public partial class ProjectAuditPage : ComponentBase
     private AuditEntryPage? Page { get; set; }
 
     /// <summary>
+    ///     Gets the cleaned filter of the address (the project of the page is always applied on top of it).
+    /// </summary>
+    private AuditFilterState Filter { get; set; } = AuditFilterState.FromQuery(null, null, null, null, null, null, null);
+
+    /// <summary>
     ///     Gets the address the paging buttons extend, without a query.
     /// </summary>
     private string BasePath => $"/projects/{ProjectId}/audit";
@@ -129,15 +178,17 @@ public partial class ProjectAuditPage : ComponentBase
         Loaded = false;
         Project = null;
         Page = null;
+        Filter = AuditFilterState.FromQuery(ActorQuery, ActionQuery, ReviewQuery, FromQuery, ToQuery, SizeQuery, null);
 
-        // The shared guard is the one access check of every handler; here it also decides whether to load at all
-        if (await Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowNoAccess))
+        // The shared guard is the one access check of every handler; here it also decides whether to load at all.
+        // Reading the trail is the audit-read right (project administrators and system administrators today)
+        if (await Access.GuardAuditAsync(AuthenticationState, ProjectId, ShowNoAccess))
         {
             var actor = await AuthenticationState.GetActorOrNullAsync();
             Project = await ProjectService.GetAsync(actor, ProjectId);
             if (Project is not null)
             {
-                Page = await AuditService.ListAsync(ProjectId, null, Before, After);
+                Page = await AuditService.ListAsync(Filter.ToFilter(ProjectId), Before, After, Filter.PageSize);
             }
         }
 

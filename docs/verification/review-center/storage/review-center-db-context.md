@@ -60,6 +60,8 @@ be loadable on the test platform.
   creator that the inbox query uses (`DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`); the
   rows of the read state are removed together with their review or user, and the real store is verified in the tests of
   the `InboxStore` unit.
+- The table of the audit trail has the four indexes of its reads, which a new database creates
+  (`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`, listed under the `AuditStore` unit).
 
 #### Test Scenarios
 

@@ -148,8 +148,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   review, what such a follow-up would carry and drop, without storing or auditing anything. `RecordDigest` calculates the
   digest of a record. Every
   operation that changes data takes
-  the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
-  and verifies its hash chain. Create a personal access token for the actor (the value is returned once), list the
+  the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages, narrowed
+  by an `AuditFilter`, and verifies its hash chain. Create a personal access token for the actor (the value is returned
+  once), list the
   tokens of the actor, revoke one, and authenticate a presented token value into a token and its owner. Set up a second
   factor for the signed-in local user (with the password, and a first code that proves the authenticator works; ten
   recovery codes are returned once), turn it off, issue new recovery codes, let a system administrator reset the factor
@@ -474,6 +475,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `TotpCodeIncorrect` | A code is wrong, was already used, or the account is locked out |
 | `TotpEnrollmentExpired` | The setup was started more than 15 minutes ago |
 | `TotpSecretUnreadable` | A stored secret cannot be decrypted, for example after the key ring changed |
+| `AuditFilterInvalid` | An audit filter has a text that is too long, or a From date after the To date |
 
 The checklist of a review is the copy of the checklist of its project (the built-in default checklist when the project has
 none) that the review received when it was created, so changing the default, or the checklist of the project, never

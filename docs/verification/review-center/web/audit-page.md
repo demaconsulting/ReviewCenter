@@ -2,8 +2,9 @@
 
 #### Verification Approach
 
-`AuditPage` and `ProjectAuditPage` are verified with component tests defined in `AuditPageTests.cs` and
-`ProjectAuditPageTests.cs`, which use the bUnit test context to render
+`AuditPage` and `ProjectAuditPage` are verified with component tests defined in `AuditPageTests.cs`,
+`ProjectAuditPageTests.cs`, and `AuditEntryTableTests.cs`, and the cleaning of the address in `AuditFilterStateTests.cs`
+(plain unit tests), which use the bUnit test context to render
 the real components over a real `AuditService` with the in-memory fake audit store (`FakeAuditStore`, which can also
 alter a stored entry to break the chain) and a real `UserService` with an in-memory fake user store; the tests of the
 project page also use a real `ProjectService` and `ProjectAccess` over the in-memory fake review store
@@ -24,7 +25,8 @@ N/A - standard test environment.
 - All component tests pass with zero failures.
 - A system administrator sees the whole trail newest first, with the sequence, time, actor, action, review, and detail
   of each
-  entry; an empty trail shows the empty message; a trail over 50 entries is shown in pages of 50 with links.
+  entry; an empty trail shows the empty message; a trail over the page size (50 by default; 25, 50, and 100 are offered)
+  is shown in pages with links.
 - Markup in the trail is shown as text and not interpreted.
 - A long hexadecimal value in the detail of an entry is shown as its first 12 characters and an ellipsis, with the full
   value as the tooltip, and the surrounding words are kept.
@@ -37,11 +39,19 @@ N/A - standard test environment.
 - A user who is not a system administrator and opens the route is shown the access denied message and no entries; a
   system administrator who opens the
   route is shown the page.
-- A project administrator or a system administrator who opens the audit page of a project sees the events of that
-  project only, newest first, in pages of 50 with links, in the table of the whole audit trail, and a message when
-  nothing was recorded; a plain member, a user who is no member, and a missing project give the not-found message and no
+- A project administrator or a system administrator who opens the audit page of a project (the audit-read access) sees
+  the events of that
+  project only, newest first, in pages of the chosen size with links, in the table of the whole audit trail, and a
+  message when nothing was recorded; a plain member, a user who is no member, and a missing project give the not-found
+  message and no
   entries; a user who lost the right after the page was opened, by revoked membership, demotion, or the end of the
   session, sees the not-found message and no entries.
+- The filter form (actor, action, review, dates, page size, and the project on the whole-trail page) limits the entries
+  and shows its values again; its state is in the address; the links to the older and newer page carry the filter and the
+  page size; a filter that matches nothing says so and offers to clear it; a project page never shows another
+  project or an entry without a project, whatever the address says.
+- Hostile values in the address (markup, huge texts, negative or unknown sizes, bad dates, unknown actions, reversed
+  dates) never raise and are shown, if at all, as encoded text.
 
 #### Test Scenarios
 
@@ -126,3 +136,50 @@ entries. This scenario is tested by `ProjectAuditPage_Load_DemotedOrSessionEnded
 
 **ProjectAuditPage_AfterRender_Interactive_SetsMarker**: The page is rendered; its root element has `data-interactive`
 equal to `true`. This scenario is tested by `ProjectAuditPage_AfterRender_Interactive_SetsMarker`.
+
+**AuditPage_Render_Admin_ShowsFilterFormWithProjectSelector**: A system administrator opens the page; the filter form
+is shown with the fields actor, action (grouped by prefix), review, from, to, page size, and the project selector,
+and no clear link while nothing is set. This scenario is tested by
+`AuditPage_Render_Admin_ShowsFilterFormWithProjectSelector`.
+
+**AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm**: The page is opened with query values for the actor,
+action, review, and dates; only the matching entries are shown, the form shows the values, and the clear link is
+present. This scenario is tested by `AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm`, and the project
+selector by `AuditPage_Render_ProjectQuery_ShowsOnlyThatProjectsEntries`.
+
+**AuditPage_Render_FilterMatchesNothing_ShowsNoMatchStateAndClearLink**: A filter that matches nothing shows "No entry
+matches the filters." and the clear link, not the message of an empty trail. This scenario is tested by
+`AuditPage_Render_FilterMatchesNothing_ShowsNoMatchStateAndClearLink`.
+
+**AuditPage_Render_HostileQueryValues_AreHandledAndEncoded**: Markup, bad dates, a negative and an unknown page size,
+and an unknown action in the query are dropped or shown as text, and the page renders. This scenario is tested by
+`AuditPage_Render_HostileQueryValues_AreHandledAndEncoded`, `AuditPage_Render_HugeActorText_IsCutAndPageRenders`,
+and `AuditPage_Render_FromAfterTo_ShowsMessageAndIgnoresTheDates`.
+
+**AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter**: A filter with more matches than a page shows the page
+size asked for, and the Older and Newer links carry the filter and the page size. This scenario is tested by
+`AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter`,
+`ProjectAuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter`, and the component alone by
+`AuditEntryTable_Render_WithFilter_LinksCarryTheFilter` and
+`AuditEntryTable_Render_EmptyPage_TellsNoMatchFromNothingRecorded`.
+
+**ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries**: The audit page of a project is opened with query
+values; only the matching entries of the project are shown and the form has no project selector. This scenario is
+tested by `ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries`, and with a filter that matches nothing and
+hostile values by `ProjectAuditPage_Render_NoMatchAndHostileValues_AreSafe`.
+
+**ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries**: Even with a project in the query, the
+page shows only the entries of its own project and none without a project. This scenario is tested by
+`ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries`.
+
+**AuditFilterState_FromQuery_NoValues_IsTheDefaultState**: Without query values the state matches everything with the
+default size. This scenario is tested by `AuditFilterState_FromQuery_NoValues_IsTheDefaultState`, good values read and
+written back by `AuditFilterState_FromQuery_GoodValues_AreReadAndWrittenBack`, and the project of a project page
+winning over the query by `AuditFilterState_ToFilter_ProjectPageProject_WinsOverTheQueryProject`.
+
+**AuditFilterState_FromQuery_BadValues_FallBackToDefaults**: Bad dates, an unknown action, a negative, zero, and huge
+page size, and a bad project fall back to the defaults without raising; huge texts are cut; reversed dates are dropped.
+This scenario is tested by `AuditFilterState_FromQuery_BadValues_FallBackToDefaults`,
+`AuditFilterState_FromQuery_HugeTexts_AreBoundedAndTheFilterIsValid`, and
+`AuditFilterState_FromQuery_ReversedDatesAndSize_DropDatesAndSizeIsNotNarrowing`, and the escaping of the written
+query by `AuditFilterState_ToQuery_TextWithSpecialCharacters_IsEscaped`.

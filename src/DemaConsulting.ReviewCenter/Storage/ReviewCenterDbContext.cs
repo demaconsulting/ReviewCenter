@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
 using DemaConsulting.ReviewCenter.Core;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,7 +43,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     and <c>CarriedThreadCount</c> of reviews and the <c>CarriedFromReviewId</c> and <c>CarriedFromThreadId</c> columns
 ///     of answers, section states and threads). The same is true for the <c>ReviewUserStates</c> table and for the
 ///     indexes of the reviewer slots and of the creator of reviews (and for the case-insensitive collation of the
-///     creator column): a database from before them must be deleted and
+///     creator column) and of the audit trail (the project, actor and action indexes and the fixed-width UTC text
+///     form of the entry timestamp): a database from before them must be deleted and
 ///     recreated. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
@@ -57,6 +59,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     The width of a column that holds a SHA-256 value written as lowercase hexadecimal (64 characters).
     /// </summary>
     private const int Sha256HexColumnLength = 64;
+
+    /// <summary>
+    ///     The format of the stored audit timestamp: UTC, always seven fraction digits, so text order is time order.
+    /// </summary>
+    private const string TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'";
 
     /// <summary>
     ///     The width of a column that holds a commit identifier in hexadecimal (40 characters, or 64 for SHA-256 repositories).
@@ -536,11 +543,21 @@ internal sealed class ReviewCenterDbContext : DbContext
         // Audit trail: append-only (nothing in the application updates or deletes a row). The sequence is the key,
         // assigned by the appender under the process-wide gate (never by the database), so a duplicate sequence
         // is refused by the primary key. There are no foreign keys: an entry is a snapshot of text and must
-        // survive whatever happens to the rows it describes. The index serves the history of one review
+        // survive whatever happens to the rows it describes. The indexes serve the history of one review and the
+        // filters of the audit pages (project, actor, action; each ends with the sequence, the paging order).
+        // The timestamp is stored as fixed-width UTC text (seven fraction digits, "Z"): the SQLite provider cannot
+        // compare an unconverted DateTimeOffset, and this text sorts and compares as the instant does. The chain
+        // hash is computed from the ticks in code, so the stored form does not change a hash
         modelBuilder.Entity<AuditEntry>(entry =>
         {
             entry.HasKey(a => a.Sequence);
             entry.Property(a => a.Sequence).ValueGeneratedNever();
+            entry.Property(a => a.TimestampUtc).HasConversion(
+                value => value.UtcDateTime.ToString(TimestampFormat, CultureInfo.InvariantCulture),
+                text => DateTimeOffset.Parse(
+                    text,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal));
             entry.Property(a => a.ActorName).IsRequired().HasMaxLength(AuditText.MaxActorNameLength);
             entry.Property(a => a.Action).IsRequired().HasMaxLength(AuditText.MaxActionLength);
             entry.Property(a => a.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
@@ -548,6 +565,9 @@ internal sealed class ReviewCenterDbContext : DbContext
             entry.Property(a => a.PreviousHash).IsRequired().HasMaxLength(Sha256HexColumnLength);
             entry.Property(a => a.Hash).IsRequired().HasMaxLength(Sha256HexColumnLength);
             entry.HasIndex(a => new { a.ProjectId, a.ReviewId, a.Sequence });
+            entry.HasIndex(a => new { a.ProjectId, a.Sequence });
+            entry.HasIndex(a => new { a.ActorUserId, a.Sequence });
+            entry.HasIndex(a => new { a.Action, a.Sequence });
         });
     }
 }

@@ -41,13 +41,13 @@ public interface IAuditStore
     Task<AuditEntry> AppendAsync(AuditDraft draft, CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Lists entries newest first, optionally of one project, of one review and from one side of a position.
+    ///     Lists entries newest first that match a filter, from one side of a position.
     /// </summary>
-    /// <param name="projectId">
-    ///     Only entries of this project (all of them, whether or not they name a review), or <c>null</c> for all
-    ///     entries. Entries that name no project are never returned for a non-null project.
+    /// <param name="filter">
+    ///     What to look for, already validated by <see cref="AuditService"/>. A filter with a project matches only
+    ///     entries of that project (never an entry that names no project); a review matches by identifier inside the
+    ///     project, or in any project when none is set. Must not be null.
     /// </param>
-    /// <param name="reviewId">Only entries of this review (of <paramref name="projectId"/>), or <c>null</c> for all.</param>
     /// <param name="beforeSequence">Only entries with a lower sequence than this, or <c>null</c>.</param>
     /// <param name="afterSequence">
     ///     Only entries with a higher sequence than this, or <c>null</c>; the nearest ones are returned, still newest first.
@@ -56,8 +56,7 @@ public interface IAuditStore
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>At most <paramref name="take"/> entries, newest first.</returns>
     Task<IReadOnlyList<AuditEntry>> ListAsync(
-        int? projectId,
-        string? reviewId,
+        AuditFilter filter,
         long? beforeSequence,
         long? afterSequence,
         int take,

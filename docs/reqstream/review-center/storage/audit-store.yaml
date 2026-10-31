@@ -50,9 +50,9 @@ sections:
       - id: ReviewCenter-AuditStore-Read
         title: >-
           The AuditStore unit shall list entries newest first, optionally for one project, for one review, or both,
-          and before or after a sequence, with the listing of a project returning only the entries of that project,
-          shall read entries in ascending bounded batches for verification, and shall offer no operation
-          that updates or deletes an entry.
+          and before or after a sequence, with the listing of a project returning only the entries of that project
+          and never an entry without a project, shall read entries in ascending bounded batches for verification, and
+          shall offer no operation that updates or deletes an entry.
         justification: |
           Reading must support paging and streaming verification, the administrators of a project must be able to
           read the history of their project without seeing that of another, and the application must not provide a
@@ -64,6 +64,33 @@ sections:
           - AuditStore_PublicSurface_OffersNoUpdateOrDelete
           - AuditStore_Verification_EditedRow_ReportsThatSequence
           - AuditStore_Verification_DeletedRow_ReportsThatSequence
+
+      - id: ReviewCenter-AuditStore-Filter
+        title: >-
+          The AuditStore unit shall narrow the listing by the identity of the actor, by a case-insensitive text in the
+          actor name that matches the characters %, _ and \ literally, by one exact action or a group of actions
+          (a literal prefix), by review, and by a range of UTC days with both ends included (the day of the end up to
+          its last instant), all together with the project and the cursors, using the indexes of the project, the
+          actor and the action and no count of the trail, shall store the time of an entry as fixed-width UTC text so
+          that ranges and order are correct on the database without changing the hash of any entry, and shall create
+          the indexes with the database.
+        justification: |
+          A filter that scans the whole trail, or that treats a typed percent sign as a wildcard, is slow on a trail
+          that only grows and wrong for the person who typed it. The provider of the database cannot compare the
+          unconverted time with offsets, so the stored form is made sortable text of the same instant, and the hash of
+          the chain, which is computed in code from the ticks of the instant, stays valid for every entry written
+          before and after.
+        tests:
+          - AuditStore_ListAsync_EachField_SelectsMatchingEntries
+          - AuditStore_ListAsync_CombinedFields_AllMustMatch
+          - AuditStore_ListAsync_ProjectFilter_NeverReturnsGlobalEntries
+          - AuditStore_ListAsync_ActorText_MatchesLiterallyAndIgnoresCase
+          - AuditStore_ListAsync_ActionPrefix_MatchesLiterally
+          - AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive
+          - AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable
+          - AuditStore_ListAsync_FilterWithCursors_PagesThroughMatchesOnly
+          - AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded
+          - StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes
 
       - id: ReviewCenter-AuditStore-LastActivity
         title: >-

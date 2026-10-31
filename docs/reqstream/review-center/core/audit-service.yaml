@@ -69,14 +69,15 @@ sections:
 
       - id: ReviewCenter-AuditService-List
         title: >-
-          The AuditService class shall list the audit trail newest first, 50 entries to a page, for the whole trail,
-          for one project (every entry of the project, and no entry of another project or without a project), or
-          for one review, with cursors for the older and the newer page that are offered only when entries exist
-          behind them, and with the older position winning when both are given.
+          The AuditService class shall list the audit trail newest first, 50 entries to a page by default and never
+          more than 200, for the whole trail, for one project (every entry of the project, and no entry of another
+          project or without a project), or for one review, with cursors for the older and the newer page that are
+          offered only when entries exist behind them, and with the older position winning when both are given.
         justification: |
           The history of a review, the audit history of a project, and the audit page must show a trail of any
           length in bounded pages, and every entry must appear exactly once while paging. The administrators of a
-          project may see the history of their project and must see nothing of any other project.
+          project may see the history of their project and must see nothing of any other project. The hard cap keeps
+          a hostile page size from reading the whole trail at once.
         tests:
           - AuditService_ListAsync_FirstPage_IsNewestFirstWithOlderOnly
           - AuditService_ListAsync_PagingOlder_CoversEveryEntryOnce
@@ -87,6 +88,35 @@ sections:
           - AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents
           - AuditService_ListAsync_ReviewFilterOverFiftyEntries_Pages
           - AuditService_ListAsync_BothPositions_BeforeWins
+          - AuditService_ListAsync_PageSize_DefaultsAndIsCapped
+
+      - id: ReviewCenter-AuditService-Filter
+        title: >-
+          The AuditService class shall narrow the listing of the audit trail by project, review, actor identity, a
+          case-insensitive text in the actor name, one exact action or a group of actions, and a range of UTC days
+          with both ends included, all conditions together, with the paging of the listing following the matching
+          entries only, shall trim the texts and turn an empty text into no condition, shall refuse a text that is
+          longer than the field it is compared with and a range that ends before it starts with the invalid-filter
+          rule, and shall keep to a list of the known actions that matches the actions the code records.
+        justification: |
+          An auditor looking for what one person did, or for every change of a kind, cannot read a trail of any length
+          page by page. The filter is checked before the store is read, so a hostile query value cannot cost a scan,
+          and a filter for a project can never return an entry without a project. The list of actions lets the page
+          offer the choices, and the test that scans the sources keeps the list from drifting away from what is really
+          recorded.
+        tests:
+          - AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping
+          - AuditService_ListAsync_FilterWithPaging_LinksFollowTheMatchingEntries
+          - AuditService_ListAsync_InvalidFilter_IsRefused
+          - AuditFilter_Validated_TextsAreTrimmedAndEmptyBecomesNull
+          - AuditFilter_None_ValidatesToItself
+          - AuditFilter_Validated_TextTooLong_IsRefused
+          - AuditFilter_Validated_ReversedRange_IsRefusedAndSingleDayAccepted
+          - AuditFilter_Range_StartOfFromDayAndStartOfDayAfterTo
+          - AuditActions_All_IsSortedUniqueAndWellFormed
+          - AuditActions_Prefixes_AreTheGroupsOfTheActions
+          - AuditActions_IsKnown_AcceptsOnlyListedValues
+          - AuditActions_All_MatchesTheActionsTheSourcesRecord
 
       - id: ReviewCenter-AuditService-Verify
         title: >-

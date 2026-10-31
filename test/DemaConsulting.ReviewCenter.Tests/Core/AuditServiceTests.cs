@@ -396,10 +396,130 @@ public class AuditServiceTests
         await Fill(service, 10);
 
         // Act
-        var page = await service.ListAsync(null, null, 5, 8, TestContext.Current.CancellationToken);
+        var page = await service.ListAsync(AuditFilter.None, 5, 8, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Equal([4L, 3L, 2L, 1L], page.Entries.Select(e => e.Sequence));
+    }
+
+    /// <summary>
+    ///     Test that the page size is the default when not given or not usable, as asked within the limit, and
+    ///     never above the hard cap.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_ListAsync_PageSize_DefaultsAndIsCapped()
+    {
+        // Arrange
+        var (service, _) = Create();
+        await Fill(service, 260);
+        var token = TestContext.Current.CancellationToken;
+
+        // Act
+        var byDefault = await service.ListAsync(AuditFilter.None, null, null, cancellationToken: token);
+        var small = await service.ListAsync(AuditFilter.None, null, null, 25, token);
+        var zero = await service.ListAsync(AuditFilter.None, null, null, 0, token);
+        var negative = await service.ListAsync(AuditFilter.None, null, null, -7, token);
+        var huge = await service.ListAsync(AuditFilter.None, null, null, int.MaxValue, token);
+
+        // Assert
+        Assert.Equal(50, byDefault.Entries.Count);
+        Assert.Equal(25, small.Entries.Count);
+        Assert.Equal(50, zero.Entries.Count);
+        Assert.Equal(50, negative.Entries.Count);
+        Assert.Equal(AuditService.MaxPageSize, huge.Entries.Count);
+        Assert.Equal(200, AuditService.MaxPageSize);
+        Assert.Equal([25, 50, 100], AuditService.PageSizes);
+        Assert.True(huge.HasOlder);
+    }
+
+    /// <summary>
+    ///     Test the keyset paging with a filter and a chosen page size: the older and the newer page hold only
+    ///     matching entries, and the links appear only where more matching entries exist.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_ListAsync_FilterWithPaging_LinksFollowTheMatchingEntries()
+    {
+        // Arrange: 120 entries, 60 of them of the review "even"
+        var (service, _) = Create();
+        await Fill(service, 120);
+        var even = new AuditFilter(ProjectId: 1, ReviewId: "even");
+        var token = TestContext.Current.CancellationToken;
+
+        // Act
+        var first = await service.ListAsync(even, null, null, 25, token);
+        var second = await service.ListAsync(even, first.OlderBefore, null, 25, token);
+        var third = await service.ListAsync(even, second.OlderBefore, null, 25, token);
+        var back = await service.ListAsync(even, null, third.NewerAfter, 25, token);
+
+        // Assert
+        Assert.Equal(25, first.Entries.Count);
+        Assert.True(first.HasOlder);
+        Assert.False(first.HasNewer);
+        Assert.Equal(25, second.Entries.Count);
+        Assert.True(second.HasOlder);
+        Assert.True(second.HasNewer);
+        Assert.Equal(10, third.Entries.Count);
+        Assert.False(third.HasOlder);
+        Assert.True(third.HasNewer);
+        Assert.All(first.Entries.Concat(second.Entries).Concat(third.Entries), e => Assert.Equal("even", e.ReviewId));
+        Assert.Equal(second.Entries.Select(e => e.Sequence), back.Entries.Select(e => e.Sequence));
+    }
+
+    /// <summary>
+    ///     Test that each field of the filter narrows the page and that the project scoping holds with the other
+    ///     fields: a project filter never returns an entry that names no project.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_ListAsync_Filter_NarrowsByEachFieldAndKeepsProjectScoping()
+    {
+        // Arrange
+        var (service, _) = Create();
+        var token = TestContext.Current.CancellationToken;
+        await service.RecordAsync(AuditDraft.By(TestActors.Ann, "review.created", "a", 1, "r1"), token);
+        await service.RecordAsync(AuditDraft.By(TestActors.Bob, "review.signed", "b", 1, "r1"), token);
+        await service.RecordAsync(AuditDraft.By(TestActors.Ann, "auth.sign-in", "c"), token);
+        await service.RecordAsync(AuditDraft.By(TestActors.Ann, "project.created", "d", 2), token);
+
+        // Act
+        var byActor = await service.ListAsync(new AuditFilter(ActorText: " BOB "), null, null, 50, token);
+        var byAction = await service.ListAsync(new AuditFilter(Action: "review.created"), null, null, 50, token);
+        var byGroup = await service.ListAsync(new AuditFilter(ActionPrefix: "review."), null, null, 50, token);
+        var byDay = await service.ListAsync(
+            new AuditFilter(From: new DateOnly(2025, 3, 4), To: new DateOnly(2025, 3, 4)), null, null, 50, token);
+        var otherDay = await service.ListAsync(new AuditFilter(From: new DateOnly(2025, 3, 5)), null, null, 50, token);
+        var projectGroup = await service.ListAsync(
+            new AuditFilter(ProjectId: 1, ActionPrefix: "auth."), null, null, 50, token);
+
+        // Assert
+        Assert.Equal([2L], byActor.Entries.Select(e => e.Sequence));
+        Assert.Equal([1L], byAction.Entries.Select(e => e.Sequence));
+        Assert.Equal([2L, 1L], byGroup.Entries.Select(e => e.Sequence));
+        Assert.Equal(4, byDay.Entries.Count);
+        Assert.Empty(otherDay.Entries);
+        Assert.Empty(projectGroup.Entries);
+    }
+
+    /// <summary>
+    ///     Test that an invalid filter is refused with the invalid-filter rule before the store is read, and that a
+    ///     missing filter is refused as a programming error.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_ListAsync_InvalidFilter_IsRefused()
+    {
+        // Arrange
+        var (service, _) = Create();
+        await Fill(service, 3);
+        var reversed = new AuditFilter(From: new DateOnly(2025, 3, 5), To: new DateOnly(2025, 3, 4));
+        var tooLong = new AuditFilter(ActorText: new string('a', AuditText.MaxActorNameLength + 1));
+        var token = TestContext.Current.CancellationToken;
+
+        // Act
+        var first = await Assert.ThrowsAsync<DomainRuleException>(() => service.ListAsync(reversed, null, null, 50, token));
+        var second = await Assert.ThrowsAsync<DomainRuleException>(() => service.ListAsync(tooLong, null, null, 50, token));
+
+        // Assert
+        Assert.Equal(DomainRule.AuditFilterInvalid, first.Rule);
+        Assert.Equal(DomainRule.AuditFilterInvalid, second.Rule);
     }
 
     /// <summary>

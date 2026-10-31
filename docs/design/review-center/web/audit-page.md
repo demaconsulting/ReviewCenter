@@ -4,23 +4,28 @@
 
 #### Purpose
 
-The `AuditPage` unit consists of two pages and a shared component. `AuditPage` is the page at `/audit`. Its
-responsibilities are to show the whole audit trail of the system, newest first,
-50 entries to a page, and to let a system administrator verify the hash chain with the *Verify chain* button and read the
+The `AuditPage` unit consists of two pages, a form, and a shared component. `AuditPage` is the page at `/audit`. Its
+responsibilities are to show the whole audit trail of the system, newest first, 25, 50 (the default) or 100 entries to
+a page, to let a system administrator narrow it with the filter form, and to let a system administrator verify the hash
+chain with the *Verify chain* button and read the
 result, including the head hash. It requires the `SystemAdmin` role: a signed-in user without it is shown the
 access denied message of the router instead of the page, and an anonymous visitor is sent to the login page. It
 changes nothing. `ProjectAuditPage` is the page at `/projects/{id}/audit`: it shows the audit entries of one project,
-newest first, 50 to a page, to whoever administers that project (a project admin or a system administrator), with the
-same paging, and it has no verification (the chain verifies as a whole on `/audit`; the project view is a filtered
+newest first, to the project administrators and the system administrators (and to Auditors once that role can be
+given; the page asks the audit-read access of `ProjectViewGuard`, `GuardAuditAsync`, and not the administer right),
+with the same filter form (without the project selector) and paging, and it has no verification (the chain verifies as
+a whole on `/audit`; the project view is a filtered
 read of the same chain). The entries of a project are those that name the project, among them the member changes and
 `project.evidence-settings-changed`, which the evidence settings page causes through `EvidenceSettingsService`; the pages
 show every entry in the same way and know no action by name. It requires a signed-in user and shows the same "Project N
 does not exist." message as the
-other project pages to a project that does not exist, to a user who may not see it, and to a user who sees it but does
-not administer it. `AuditEntryTable` is the component that both pages use to show one page of entries with the paging
+other project pages to a project that does not exist, to a user who may not see it, and to a user who sees it but may
+not read its audit trail. `AuditFilterForm` is the form that both pages use to narrow the entries, and
+`AuditFilterState` is the parsed and cleaned filter that the address carries. `AuditEntryTable` is the component that
+both pages use to show one page of entries with the paging
 buttons; it holds no state and no access rule, because its parent decides who sees the entries and clears them when the
 right is lost. Each is a Razor component split into presentation (`AuditPage.razor`, `ProjectAuditPage.razor`,
-`AuditEntryTable.razor`) and behavior (the matching `.razor.cs` files).
+`AuditFilterForm.razor`, `AuditEntryTable.razor`) and behavior (the matching `.razor.cs` files).
 
 #### Data Model
 
@@ -28,19 +33,38 @@ The page instance is created per browser connection, so its state is per user.
 
 **Before**, **After**: the position in the trail, from the `before` and `after` query values (`long?`), on both pages.
 
+**ActorQuery**, **ActionQuery**, **ReviewQuery**, **FromQuery**, **ToQuery**, **SizeQuery**, **ProjectQuery**
+(query values, `AuditPage`; the project page has no `ProjectQuery`): the raw `actor`, `action`, `review`, `from`, `to`,
+`size`, and `project` query values. They are
+strings and are never parsed by the framework; `AuditFilterState.FromQuery` reads them, so a value that is not usable
+can never raise.
+
+**Filter** (`AuditFilterState`): the cleaned filter: the actor and review texts are trimmed and cut to the width of the
+stored field, the action is accepted only when it is a known action or a known group (`AuditActions`), the dates only
+as `yyyy-MM-dd` in the invariant culture, the project only as a positive integer, and the page size only when it is 25,
+50 or 100 (otherwise 50). A From date after the To date can never match, so both dates are dropped and a message says
+so (`audit-filter-message`). `ToFilter` builds the `AuditFilter`, and `ToQuery` writes the state and a position back
+into a query string, escaped, so the Older and Newer links keep the filter.
+
 **Loaded**, **Page**: whether the lookup has finished and the `AuditEntryPage` shown (`null` while not loaded, or when the
 user is refused), on both pages.
 
 **Result** (`AuditPage`): the `AuditVerificationResult` of the last verification (`null` when none was run).
 **ErrorMessage** (`AuditPage`): the
-message of the last refusal, or `null`. **InteractiveMarker**: as for the other pages.
+message of the last refusal, or `null`. **InteractiveMarker**: as for the other pages. **Projects** (`AuditPage`): the
+projects the system administrator may see, for the project selector.
 
 **ProjectId**, **Project**, **BasePath** (`ProjectAuditPage`): the route parameter, the project (null unless the user
-administers it), and the address `/projects/{id}/audit` that the paging buttons extend.
+may read its audit trail), and the address `/projects/{id}/audit` that the paging buttons extend.
 
-**Page**, **BasePath**, **EmptyText** (`AuditEntryTable`): the parameters of the component: the entries to show, the
-address of the parent page without a query (`/audit` or `/projects/{id}/audit`), and the sentence for an empty page
-(by default "Nothing has been recorded yet.").
+**Page**, **BasePath**, **EmptyText**, **Filter** (`AuditEntryTable`): the parameters of the component: the entries to
+show, the address of the parent page without a query (`/audit` or `/projects/{id}/audit`), the sentence for an empty
+page (by default "Nothing has been recorded yet."), and the filter whose query the Older and Newer links carry. When
+the filter narrows the trail and nothing matches, the table says "No entry matches the filters." instead.
+
+**State**, **BasePath**, **Projects** (`AuditFilterForm`): the filter shown, the address the form is submitted to
+(a GET, so every filtered view has an address), and the projects of the selector (`null` on the project page, which
+has no selector).
 
 The table shows, for each entry, the sequence number, the time in UTC, the actor, the action code, the review (as
 `{project}/{review}`, `project {id}`, or a dash), and the detail, all as plain text. The time, actor, action, and review
@@ -67,7 +91,10 @@ Every interactive element and key value has a stable `data-testid`: `audit-page`
 `audit-verify`, `audit-result`, `audit-head-hash`, `audit-empty` ("Nothing has been recorded yet."), `audit-table`,
 and per row `audit-row`, `audit-sequence`, `audit-time`, `audit-actor`, `audit-action`, `audit-review`, and
 `audit-detail`, then `audit-newer` and `audit-older` (the table, the rows, `audit-empty`, and the paging buttons come
-from `AuditEntryTable`, so both pages have them). `ProjectAuditPage` has `project-audit-page` (root),
+from `AuditEntryTable`, so both pages have them). `AuditFilterForm` has `audit-filter-form`, `audit-filter-actor`,
+`audit-filter-action`, `audit-filter-review`, `audit-filter-from`, `audit-filter-to`, `audit-filter-size`,
+`audit-filter-apply`, `audit-filter-clear` (only while a value differs from the default), `audit-filter-message`, and,
+on the whole-trail page only, `audit-filter-project`. `ProjectAuditPage` has `project-audit-page` (root),
 `breadcrumb-projects-link`, `breadcrumb-project-link`, `project-audit-loading`, and `project-not-found`.
 
 #### Key Methods
@@ -75,19 +102,22 @@ from `AuditEntryTable`, so both pages have them). `ProjectAuditPage` has `projec
 **OnParametersSetAsync** (`AuditPage`): Loads the page of entries whenever the address changes, for a system
 administrator only.
 
-- *Postconditions*: The previous page is cleared before the first await. The entries are read with
-  `AuditService.ListAsync` for the whole trail. A user who is not an enabled system administrator gets the message
-  "System administrator rights are required." and no entries.
+- *Postconditions*: The previous page is cleared before the first await. The filter is read from the query values with
+  `AuditFilterState.FromQuery`, and the entries are read with `AuditService.ListAsync(filter, before, after, size)` for
+  the whole trail (or the chosen project); the project selector lists the projects the user may see. A user who is not
+  an enabled system administrator gets the message "System administrator rights are required." and no entries.
 
-**OnParametersSetAsync** (`ProjectAuditPage`): Loads the page of entries whenever the address changes, for an
-administrator of the project only.
+**OnParametersSetAsync** (`ProjectAuditPage`): Loads the page of entries whenever the address changes, for a user who
+may read the audit trail of the project only.
 
-- *Postconditions*: The project and the page are cleared before the first await. `ProjectViewGuard.GuardAdministerAsync`
-  decides whether to load at all; when it refuses, `ShowNoAccess` leaves no project and no entries, and the page shows
-  the not-found message. Otherwise the project is read with `ProjectService.GetAsync` and the entries with
-  `AuditService.ListAsync(projectId, null, before, after)`, which returns only the entries that carry the project (never
-  those of another project or those without one). The page holds no other access rule; every load goes through the
-  shared guard, so a user who lost the right sees nothing stale.
+- *Postconditions*: The project and the page are cleared before the first await. `ProjectViewGuard.GuardAuditAsync`
+  (the audit-read access of `IProjectAccess`: a project administrator or a system administrator, and an Auditor once
+  that role can be given) decides whether to load at all; when it refuses, `ShowNoAccess` leaves no project and no
+  entries, and the page shows the not-found message. Otherwise the project is read with `ProjectService.GetAsync` and
+  the entries with `AuditService.ListAsync(filter, before, after, size)`, where the filter always carries the project
+  of the route whatever the address says, so the page returns only the entries that carry the project (never those of
+  another project or those without one). The page holds no other access rule; every load goes through the shared
+  guard, so a user who lost the right sees nothing stale.
 
 **VerifyAsync**: Verifies the whole chain and shows the result.
 
@@ -117,8 +147,11 @@ The concatenated text of the parts is the original detail.
 
 A refusal is shown as a message ("System administrator rights are required." or the message of the ended sign-in state)
 and not
-raised; `ProjectAuditPage` shows the not-found message instead. The pages handle no other exception of their own. A
-long trail is read in pages, and the verification streams the
+raised; `ProjectAuditPage` shows the not-found message instead. A value of the address that is not usable is dropped
+and never raised (a `from` after `to` is reported as a message); the filter built from the state is valid by
+construction, so the service never refuses it (`AuditFilterInvalid` is the guard for other callers). The pages handle
+no other exception of their own. A
+long trail is read in pages, the page size is capped, and the verification streams the
 trail in batches, so neither holds the whole trail in memory; the Verify button is available to system administrators
 only.
 
@@ -126,9 +159,12 @@ only.
 
 - **SessionGate** (App) — wraps the whole page content.
 - **AuditService** — reads the page of entries (the whole trail, or one project) and verifies the chain.
+- **AuditFilter** and **AuditActions** (Core) — the filter that is passed to the service and the vocabulary of the
+  action choices.
 - **UserService** — looks up the signed-in user for the system administrator check (`AuditPage`).
 - **ProjectService** and **IProjectAccess** (Core) — read the project for the actor and, through `ProjectViewGuard`,
-  decide whether the user administers it (`ProjectAuditPage`).
+  decide whether the user may read its audit trail (`ProjectAuditPage`); `ProjectService` also lists the projects for
+  the selector of `AuditPage`.
 - **AuthenticationStateProvider** (ASP.NET Core) — gives the signed-in user.
 - **ASP.NET Core Blazor components** — the component base class, events, query parameters, authorization attribute, and
   the interactive server render mode.
