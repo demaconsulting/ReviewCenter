@@ -94,6 +94,10 @@ loopback TCP ports.
   is created or planned and may be changed or cleared by an administrator or the creator, each change audited; the page
   shows an Overdue badge once the date has passed unless the review is approved, and an approved review keeps its date
   without a badge and without an edit form (`ReviewCenter-System-DueDate`).
+- The project page shows a lead, for every review of the project, its stage, its signatures, what blocks it, who it
+  waits on, its last activity, and its due date, with a summary by stage and overdue, filters, sorting, and paging that
+  live in the address; a read-only auditor sees the same, and the API list carries the progress fields
+  (`ReviewCenter-System-Oversight`).
 - A review can be created in the browser or through the API as a follow-up of an earlier review of the project: the form
   previews what is carried over, the checklist marks every carried answer and shows the earlier Fail of an open check,
   the review page names the followed review and marks carried threads, the follow-up is approved on its own while the
@@ -331,6 +335,17 @@ badge; clearing the date removes the badge. The first review is given yesterday 
 the signature of `second`; it keeps its date as history, shows no Overdue badge, and offers no edit form. The audit
 page lists the `review.due-date-changed` entries. This scenario is tested by
 `ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited`.
+
+**ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState**: This scenario verifies the system requirement for
+the oversight of the reviews of a project. The first review is given yesterday as its due date and gets the reviewer
+`second` in a slot; a second review is planned. The project page lists both with the stage (In review and Setup),
+the signatures `0/1`, the name of the person the first review waits on, the Overdue badge on the first review only,
+and a
+summary of one overdue and one in setup. The query string `stage=setup` shows only the planned review, `overdue=1` only
+the first, and `stage=approved` shows none and says so; the filter form narrows the table by the text of an identifier.
+After the reviewer approves the first review, it is listed under the approved stage, waits for nobody, shows no
+Overdue badge, and the summary counts one approved and no overdue review. This scenario is tested by
+`ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState`.
 
 **ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn**: In a browser, one user fails a check of a review,
 passes the rest of its section, marks the other sections as not applicable and starts a thread. A second review is

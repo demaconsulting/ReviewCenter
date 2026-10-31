@@ -151,13 +151,13 @@ public class ProjectPageTests : PageTestBase
         Assert.Equal($"/projects/{project.Id}/reviews/REV-1", link.GetAttribute("href"));
         Assert.Equal("First review", cut.Find("[data-testid='review-title-REV-1']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='review-state-REV-1']"));
-        Assert.Equal("In review", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
+        Assert.Equal("Setup", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='reviews-empty']"));
     }
 
     /// <summary>
     ///     Test that a review whose every slot has a current signature is listed as Approved, and one without
-    ///     slots or with an unsigned slot as In review.
+    ///     slots as Setup.
     /// </summary>
     [Fact]
     public async Task ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview()
@@ -184,7 +184,7 @@ public class ProjectPageTests : PageTestBase
 
         // Assert: the badges follow the approval
         Assert.Equal("Approved", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
-        Assert.Equal("In review", cut.Find("[data-testid='review-approval-REV-2']").TextContent);
+        Assert.Equal("Setup", cut.Find("[data-testid='review-approval-REV-2']").TextContent);
     }
 
     /// <summary>
@@ -777,7 +777,7 @@ public class ProjectPageTests : PageTestBase
         Assert.Equal(
             $"/projects/{projectId}/evidence-settings",
             cut.Find("[data-testid='evidence-settings-link']").GetAttribute("href"));
-        Assert.Empty(cut.FindAll("select"));
+        Assert.Empty(cut.FindAll("select:not([data-testid='filter-stage'])"));
         Assert.DoesNotContain("outsider", cut.Markup, StringComparison.Ordinal);
     }
 

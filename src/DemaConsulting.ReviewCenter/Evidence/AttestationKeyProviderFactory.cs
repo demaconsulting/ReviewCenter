@@ -39,19 +39,30 @@ internal static class AttestationKeyProviderFactory
     ///     Whether a provider may create the key (and its folder). <c>false</c> is the inspect-only mode of the
     ///     configuration check: a key that does not exist yet is reported, never written.
     /// </param>
+    /// <param name="requireEncryptedKeys">
+    ///     Whether a key that is stored without encryption is refused (<c>DataProtection:RequireEncryptedKeys</c>):
+    ///     the <c>File</c> provider refuses an unprotected certificate file when it is set and warns when it is not.
+    /// </param>
     /// <returns>The provider. It is disposable (it owns the key) and the caller keeps it for the life of the application.</returns>
-    /// <exception cref="AttestationKeyException">Thrown when the provider is not supported.</exception>
+    /// <exception cref="AttestationKeyException">Thrown when the provider is not supported or a setting is not valid.</exception>
     public static IAttestationKeyProvider Create(
         AttestationOptions options,
         TimeProvider time,
         ILoggerFactory logs,
         IDataProtectionProvider dataProtection,
-        bool allowCreate)
+        bool allowCreate,
+        bool requireEncryptedKeys = false)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(logs);
         ArgumentNullException.ThrowIfNull(dataProtection);
+
+        if (options.ExpiryWarningDays < 0)
+        {
+            throw new AttestationKeyException(
+                $"Attestation:ExpiryWarningDays must be 0 (no warning) or a number of days; it is {options.ExpiryWarningDays}.");
+        }
 
         // A blank setting means the default
         var name = string.IsNullOrWhiteSpace(options.Provider) ? AttestationOptions.SelfSignedProvider : options.Provider.Trim();
@@ -66,7 +77,13 @@ internal static class AttestationKeyProviderFactory
             return new CertificateStoreKeyProvider(options, time, logs.CreateLogger<CertificateStoreKeyProvider>());
         }
 
+        if (string.Equals(name, AttestationOptions.FileProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            return new FileKeyProvider(options, time, logs.CreateLogger<FileKeyProvider>(), requireEncryptedKeys);
+        }
+
         throw new AttestationKeyException(
-            $"Attestation:Provider '{name}' is not supported. Use {AttestationOptions.SelfSignedProvider} or {AttestationOptions.CertificateStoreProvider}.");
+            $"Attestation:Provider '{name}' is not supported. "
+            + $"Use {AttestationOptions.SelfSignedProvider}, {AttestationOptions.CertificateStoreProvider} or {AttestationOptions.FileProvider}.");
     }
 }

@@ -12,7 +12,8 @@ only
 asks. It contains seven units: `PdfDocumentWriter`, a small writer of
 plain PDF files; `AttestationRenderer`, which lays out the record of a review in that writer; `AttestationSigner`, which
 adds a detached CMS signature to the result; `AttestationKeyProvider`, which finds the key that signs (a self-signed key
-that the server creates or a certificate of a certificate store); `AttestationService`, which checks the review, gets
+that the server creates, a certificate of a certificate store, or a certificate file); `AttestationService`, which
+checks the review, gets
 the
 key, renders, signs, and records the release in the audit trail; `AttestationEndpoint`, the download address; and
 `EvidenceIndexService`, which lists the completed reviews that have a
@@ -70,11 +71,15 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 
 - *Type*: Configuration (`appsettings.json` and environment variables, for example `Attestation__Provider`).
 - *Role*: Consumer.
-- *Contract*: `Provider` is `SelfSigned` (the default) or `CertificateStore`; `RequireTrustedKey` (default false);
-  `CertificateThumbprint`, `StoreLocation` (`CurrentUser` by default or `LocalMachine`), and `StoreName` (`My` by
-  default) for the certificate store; `SelfSignedFolder` for the self-signed key.
-- *Constraints*: An unknown provider, a missing or malformed thumbprint, or a key that does not meet the rule stops the
-  server at start-up with an error that names the setting.
+- *Contract*: `Provider` is `SelfSigned` (the default), `CertificateStore` or `File`; `RequireTrustedKey` (default
+  false); `CertificateThumbprint`, `StoreLocation` (`CurrentUser` by default or `LocalMachine`), and `StoreName` (`My`
+  by default) for the certificate store; `CertificatePath`, `PrivateKeyPath`, `CertificatePassword` (a secret) and
+  `CertificatePasswordFile` for the File provider; `ExpiryWarningDays` (default 30, 0 for no warning) for the
+  certificate store and the File provider; `SelfSignedFolder` for the self-signed key.
+- *Constraints*: An unknown provider, a missing or malformed thumbprint, a missing or unreadable certificate file, a
+  missing or wrong password, a negative `ExpiryWarningDays`, or a key that does not meet the rule stops the server at
+  start-up with an error that names the setting. A private key that is not protected by a password stops it only when
+  `DataProtection:RequireEncryptedKeys` is set; otherwise it is loaded with a warning.
 
 **Core services (consumed)**: `SigningService`, `AuditService`, `IReviewStore`, `IProjectAccess`, and
 `EvidenceSettingsService`.
@@ -120,7 +125,7 @@ that no changes are permitted. The space for the signature is reserved
 before the signature is known, so a certificate chain that does not fit is reported and no broken document is produced.
 The signer works only with a document that has the layout of its own writer.
 
-**The keys**: Two providers exist. The **self-signed provider** is the default, so that a new installation works without
+**The keys**: Three providers exist. The **self-signed provider** is the default, so that a new installation works without
 configuration. It creates an RSA key and a self-signed certificate on first use, in a file in a folder beside the Data
 Protection keys (`attestation-selfsigned` under the folder of `DataProtection:KeysPath`, or
 `Attestation:SelfSignedFolder`),
@@ -136,7 +141,12 @@ the memory of the server in a form that could be copied. The server account need
 supports RSA and ECDSA keys, and keeps the intermediate certificates of the chain (without revocation checks) so that
 the signature carries them. It does not sign a test value at start-up, so a smart card is not asked for its PIN just
 because the server
-started. A certificate that is meant for code signing only is not suited to signing a PDF: Adobe Acrobat will not trust
+started. The **file provider** reads a certificate with its private key from a PFX or PEM file that an administrator
+deploys, with the password from a setting or from a password file, keeps the key in memory only, and takes the other
+certificates of the file as the chain; a key without a password is a warning, or an error when
+`DataProtection:RequireEncryptedKeys` is set. For the certificate store and file providers the server warns, at start
+and on the review page, when the certificate ends within `ExpiryWarningDays` or has ended; the self-signed key renews
+itself. A certificate that is meant for code signing only is not suited to signing a PDF: Adobe Acrobat will not trust
 it for document signatures.
 Use a document-signing certificate (an internal certification authority is fine, if its root is distributed to
 the readers). The provider logs a warning at start-up for such a certificate, and the attestation prints a one-line
@@ -233,4 +243,5 @@ without one when the project allows it (see
 the `Api` subsystem). The PDF
 is generated for every request and is not stored; the audit event holds its hash, so a copy can be checked against the
 trail. Tests of the certificate store provider use a temporary certificate in the store of the current user and skip
-themselves when the store is not available; the local machine store and a real hardware module need a manual check.
+themselves when the store is not available; the tests of the file provider write their certificates to temporary
+files and never use a store; the local machine store and a real hardware module need a manual check.

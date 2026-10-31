@@ -13,6 +13,7 @@ package ReviewCenter {
         part projectAccess : ProjectAccess;
         part evidenceSettingsService : EvidenceSettingsService;
         part projectChecklistService : ProjectChecklistService;
+        part reviewProgressService : ReviewProgressService;
         part reviewService : ReviewService;
         part threadService : ThreadService;
         part checklistService : ChecklistService;

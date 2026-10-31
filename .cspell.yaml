@@ -20,6 +20,7 @@ words:
   - pyhanko
   - hanko
   - appsettings
+  - outofdate
   - offadm
   - dpapi
   - encryptor
@@ -148,6 +149,7 @@ words:
   - certificatestore
   - certlm
   - certmgr
+  - topk
   - Oids
   - Acro
   - Annot

@@ -30,6 +30,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - The newest-first listing honors the review filter and both cursors; the batch read is ascending and bounded.
 - The listing for a project returns only that project's entries, none of another project or without a project, and the
   chain over all entries still verifies.
+- The last activity of a project is the time of the newest entry of each of its reviews, without entries that have no
+  review or belong to another project, and does not change the chain.
 - An edited or a deleted row is found by verification, at its sequence.
 - The store offers no update or delete operation.
 
@@ -82,6 +84,11 @@ and without the review filter and with both cursors; the result is newest first.
 of project two, and without a project are appended; the listing for project one returns its two entries newest
 first, project two returns its one, a project without entries returns none, and the chain over all four entries
 verifies. This scenario is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`.
+
+**AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject**: Entries of two reviews of project one, one entry of
+the project without a review, and one entry of another project are appended. The last activity of project one names the
+time of the newest entry of each of its two reviews and nothing else, a project without entries gives an empty result,
+and the chain still verifies. This scenario is tested by `AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject`.
 
 **AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded**: Entries are read in batches after a sequence; each batch is
 ascending and not larger than requested. This scenario is tested by

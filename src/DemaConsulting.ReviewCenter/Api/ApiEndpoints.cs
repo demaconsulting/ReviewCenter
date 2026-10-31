@@ -359,6 +359,7 @@ internal static class ApiEndpoints
     /// <param name="http">The request context; supplies the token actor.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
+    /// <param name="progress">The progress service, which says how far each review has come.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The reviews, or 404 when the project does not exist or is not visible to the token's owner.</returns>
     private static async Task<IResult> ListReviewsAsync(
@@ -366,19 +367,23 @@ internal static class ApiEndpoints
         HttpContext http,
         ProjectService projects,
         ReviewService reviews,
+        ReviewProgressService progress,
         CancellationToken cancellationToken)
     {
-        if (await projects.GetAsync(ApiProblems.ActorOf(http.User), projectId, cancellationToken) is null)
+        var actor = ApiProblems.ActorOf(http.User);
+        if (await projects.GetAsync(actor, projectId, cancellationToken) is null)
         {
             return ApiProblems.NotFound(ProjectNotFoundMessage);
         }
 
+        // The review fields come from the list, the progress (signatures, approval, overdue, last activity) from the
+        // progress service, which is given that same list so the reviews are read once
         var list = await reviews.ListAsync(projectId, cancellationToken);
-
-        // Only a review with a date in the past can be overdue; one batch query says which of those are approved
-        var approved = await reviews.ListApprovedWithPastDueDateAsync(projectId, list, cancellationToken);
+        var byId = (await progress.GetProgressAsync(actor, projectId, list, cancellationToken))
+            .ToDictionary(p => p.ReviewId);
         return TypedResults.Ok(list
-            .Select(r => ToSummary(r, reviews, approved.Contains(r.Id)))
+            .Where(r => byId.ContainsKey(r.Id))
+            .Select(r => ToSummary(r, byId[r.Id]))
             .ToList());
     }
 
@@ -677,10 +682,9 @@ internal static class ApiEndpoints
     ///     Maps a review to its list entry.
     /// </summary>
     /// <param name="review">The review.</param>
-    /// <param name="reviews">The review service, which says whether the review is overdue.</param>
-    /// <param name="isApproved"><c>true</c> when the review is approved, so never overdue.</param>
+    /// <param name="progress">The progress of the review, from the progress service.</param>
     /// <returns>The list entry.</returns>
-    private static ReviewSummaryDto ToSummary(Review review, ReviewService reviews, bool isApproved)
+    private static ReviewSummaryDto ToSummary(Review review, ReviewProgress progress)
     {
         return new ReviewSummaryDto(
             review.Id,
@@ -692,8 +696,13 @@ internal static class ApiEndpoints
             review.CreatedViaApi,
             review.IsFromRepository,
             DueDateText(review.DueDate),
-            reviews.IsOverdue(review, isApproved),
-            review.FollowsReviewId);
+            progress.IsOverdue,
+            review.FollowsReviewId,
+            progress.IsApproved,
+            progress.SlotsRequired,
+            progress.SlotsSigned,
+            progress.SlotsOutOfDate,
+            progress.LastActivity);
     }
 
     /// <summary>

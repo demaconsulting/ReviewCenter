@@ -64,3 +64,15 @@ sections:
           - AuditStore_PublicSurface_OffersNoUpdateOrDelete
           - AuditStore_Verification_EditedRow_ReportsThatSequence
           - AuditStore_Verification_DeletedRow_ReportsThatSequence
+
+      - id: ReviewCenter-AuditStore-LastActivity
+        title: >-
+          The AuditStore unit shall return for one project, with one query, the time of the newest entry of each
+          review of that project, leaving out the entries that belong to no review and every entry of another
+          project, and shall change nothing in the chain by doing so.
+        justification: |
+          The project overview shows when each review last changed. One grouped read of the trail serves any number
+          of reviews, and because the entries of a review are never combined with others, the newest entry is the
+          real last activity.
+        tests:
+          - AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject

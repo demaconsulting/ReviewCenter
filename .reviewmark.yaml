@@ -591,6 +591,7 @@ reviews:
       - "src/**/Web/NewMemberAccountPage.razor"
       - "src/**/Web/NewMemberAccountPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
+      - "test/**/Web/ProjectPageOverviewTests.cs"
       - "test/**/Web/ProjectAccessPageTests.cs"
       - "test/**/Web/EvidenceSettingsPageTests.cs"
       - "test/**/Web/ProjectChecklistPageTests.cs"
@@ -886,6 +887,22 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ProjectChecklist.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ProjectChecklistService.cs"
       - "test/**/Core/ProjectChecklistServiceTests.cs"
+
+  - id: ReviewCenter-Core-ReviewProgressService
+    title: Review of ReviewCenter ReviewProgressService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/review-progress-service.yaml"
+      - "docs/design/review-center/core/review-progress-service.md"
+      - "docs/verification/review-center/core/review-progress-service.md"
+      - "docs/sysml2/model/review-center/core/review-progress-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewProgress.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewProgressService.cs"
+      - "test/**/Core/ReviewProgressServiceTests.cs"
 
   - id: ReviewCenter-Core-ProjectAccess
     title: Review of ReviewCenter ProjectAccess unit implementation
@@ -1297,6 +1314,7 @@ reviews:
       - "test/**/Storage/ReviewStoreTests.cs"
       - "test/**/Storage/ReviewStoreRepositoryTests.cs"
       - "test/**/Storage/ReviewStoreSigningTests.cs"
+      - "test/**/Storage/ReviewStoreSnapshotBatchTests.cs"
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectChecklistStoreTests.cs"
@@ -1574,6 +1592,7 @@ reviews:
       - "src/**/Evidence/AttestationKeyProviderBase.cs"
       - "src/**/Evidence/SelfSignedKeyProvider.cs"
       - "src/**/Evidence/CertificateStoreKeyProvider.cs"
+      - "src/**/Evidence/FileKeyProvider.cs"
       - "src/**/Evidence/AttestationKeyPolicy.cs"
       - "src/**/Evidence/IAttestationKeyProvider.cs"
       - "src/**/Evidence/AttestationSigningKey.cs"
@@ -1583,6 +1602,7 @@ reviews:
       - "test/**/Evidence/AttestationKeyPolicyTests.cs"
       - "test/**/Evidence/SelfSignedKeyProviderTests.cs"
       - "test/**/Evidence/CertificateStoreKeyProviderTests.cs"
+      - "test/**/Evidence/FileKeyProviderTests.cs"
 
   - id: ReviewCenter-Evidence-AttestationService
     title: Review of ReviewCenter AttestationService unit implementation

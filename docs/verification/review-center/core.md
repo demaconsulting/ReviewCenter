@@ -104,6 +104,12 @@ N/A - standard test environment.
   recovery codes work once for signing in and never for signing, a signing needs the password and a fresh code, and
   a system administrator can reset the second factor; each change is audited without a secret or a code (see the unit
   tests of `TotpService`, `TotpChallengeStore`, `UserService`, and `SigningService`).
+- The progress of the reviews of a project gives, for each review, the stage derived from its approval status (Setup,
+  In review, Approved), the signatures given, needed, and out of date, the people it waits on, the blocker counts that
+  equal the numbers in the blocker sentences, the last activity from the audit trail, and the overdue state of the
+  due date rule, with one read of the approvals and one of the activity however many reviews there are, to everyone who
+  may see the project and to nobody else (see the unit tests of `ReviewProgressService`, `SigningService`, and
+  `AuditStore`).
 
 ### Test Scenarios
 
@@ -238,6 +244,14 @@ stays valid after a change. They are tested by `ReviewService_CreateDraftAsync_D
 `ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew`,
 `ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature`, and
 `ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow`.
+
+**Review progress**: The unit tests of `ReviewProgressService`, `SigningService`, and `AuditStore` verify the subsystem
+requirement for the progress of the reviews of a project: the derived stage, the signature and blocker counts (equal to
+the blocker sentences), the people a review waits on, the overdue rule, the last activity from the audit trail (one
+grouped read), the access of members, auditors, and strangers, and the constant number of reads for 300 reviews. They are
+tested by `ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage`,
+`ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers`, and
+`ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast`.
 
 **Follow-up review**: The unit tests of `ReviewService`, `FollowUpCarry`, `RecordDigest`, `ChecklistService`, and
 `SigningService` verify the subsystem requirement for the follow-up review: the Pass and not-applicable answers, the

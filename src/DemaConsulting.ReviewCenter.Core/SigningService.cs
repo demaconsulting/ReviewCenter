@@ -230,12 +230,12 @@ public sealed class SigningService
         string reviewId,
         CancellationToken cancellationToken = default)
     {
-        return ReadApprovalAsync(projectId, reviewId, null, null, cancellationToken);
+        return ReadApprovalAsync(projectId, reviewId, cancellationToken);
     }
 
     /// <summary>
-    ///     Reads the approval status of several reviews of a project, loading the users once for all of them, and not
-    ///     at all when there are no reviews.
+    ///     Reads the approval status of several reviews of a project with one set-based read of their snapshots,
+    ///     loading the users once for all of them, and not at all when there are no reviews.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewIds">The review identifiers.</param>
@@ -250,7 +250,7 @@ public sealed class SigningService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reviewIds);
-        var ids = reviewIds.ToList();
+        var ids = reviewIds.Distinct().ToList();
         var approvals = new Dictionary<string, ReviewApproval>();
 
         // Nothing to read, so do not load the whole user list
@@ -264,16 +264,19 @@ public sealed class SigningService
             .ToHashSet();
         var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
 
-        // A review that does not exist is absent from the result
-        var read = new List<(string ReviewId, ReviewApproval? Approval)>();
-        foreach (var reviewId in ids)
+        // One set-based read of all snapshots, and one of the history of the reviews that were reopened; a review
+        // that does not exist is absent from the result
+        var snapshots = await _store.ListSnapshotsAsync(projectId, ids, cancellationToken);
+        var reopened = snapshots
+            .Where(entry => entry.Value.Record.Reopens > 0)
+            .Select(entry => entry.Key)
+            .ToList();
+        var history = reopened.Count > 0
+            ? await _store.ListReopensAsync(projectId, reopened, cancellationToken)
+            : new Dictionary<string, IReadOnlyList<ReviewReopen>>();
+        foreach (var (reviewId, snapshot) in snapshots)
         {
-            read.Add((reviewId, await ReadApprovalAsync(projectId, reviewId, members, memberIds, cancellationToken)));
-        }
-
-        foreach (var (reviewId, approval) in read.Where(r => r.Approval is not null))
-        {
-            approvals[reviewId] = approval!;
+            approvals[reviewId] = BuildApproval(snapshot, members, memberIds, history.GetValueOrDefault(reviewId));
         }
 
         return approvals;
@@ -284,17 +287,11 @@ public sealed class SigningService
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
-    /// <param name="preloaded">The users by identity when the caller already loaded them; <c>null</c> loads them.</param>
-    /// <param name="preloadedMemberIds">
-    ///     The identities of the current project members when the caller already loaded them; <c>null</c> loads them.
-    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The status, or <c>null</c> when the review does not exist.</returns>
     private async Task<ReviewApproval?> ReadApprovalAsync(
         int projectId,
         string reviewId,
-        IReadOnlyDictionary<int, User>? preloaded,
-        IReadOnlySet<int>? preloadedMemberIds,
         CancellationToken cancellationToken)
     {
         // One snapshot, so the digest, the slots and the signatures compared with it describe the same state
@@ -304,14 +301,36 @@ public sealed class SigningService
             return null;
         }
 
-        var (record, slots, signatures) = snapshot;
-        var members = preloaded ?? (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
+        var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
 
         // Who is still a member: a slot keeps its assignee after a removal, so the status says who can no longer sign
-        var memberIds = preloadedMemberIds
-                        ?? (await _store.ListMembershipsAsync(projectId, cancellationToken))
-                        .Select(membership => membership.UserId)
-                        .ToHashSet();
+        var memberIds = (await _store.ListMembershipsAsync(projectId, cancellationToken))
+            .Select(membership => membership.UserId)
+            .ToHashSet();
+
+        // The history is read only for a review that was reopened, so the common case costs no extra query
+        var reopens = snapshot.Record.Reopens > 0
+            ? await _store.ListReopensAsync(projectId, reviewId, cancellationToken)
+            : null;
+        return BuildApproval(snapshot, members, memberIds, reopens);
+    }
+
+    /// <summary>
+    ///     Builds the approval status of a review from what was already read; the one place that does, for both the
+    ///     single and the batch read, so they cannot differ.
+    /// </summary>
+    /// <param name="snapshot">The snapshot of the review.</param>
+    /// <param name="members">The users by identity.</param>
+    /// <param name="memberIds">The identities of the current project members.</param>
+    /// <param name="reopens">The reopens of the review, or <c>null</c> when it was never reopened.</param>
+    /// <returns>The status.</returns>
+    private static ReviewApproval BuildApproval(
+        ReviewSnapshot snapshot,
+        IReadOnlyDictionary<int, User> members,
+        IReadOnlySet<int> memberIds,
+        IReadOnlyList<ReviewReopen>? reopens)
+    {
+        var (record, slots, signatures) = snapshot;
         var digest = RecordDigest.Compute(record);
 
         // One status per slot, numbered in creation order
@@ -342,18 +361,19 @@ public sealed class SigningService
 
         var isApproved = ReviewLock.IsApproved(record, slots, signatures);
         var (checklist, blockers, failed) = Assess(record);
-
-        // The history is read only for a review that was reopened, so the common case costs no extra query
-        var reopens = record.Reopens > 0
-            ? await _store.ListReopensAsync(projectId, reviewId, cancellationToken)
-            : null;
         return new ReviewApproval(
             isApproved,
             digest,
             statuses,
             blockers,
             NextStepFor(isApproved, blockers, statuses.Count, record, checklist, failed),
-            reopens);
+            reopens,
+            // The structured counts behind the blocker sentences of Assess, so a list can show them without parsing
+            record.Threads.Count(thread => thread.State == ReviewThreadState.Open),
+            checklist?.Overall.Unanswered ?? 0,
+            failed,
+            // Assess returns no checklist state exactly when it adds the "no checklist" blocker
+            checklist is null);
     }
 
     /// <summary>
@@ -1309,7 +1329,7 @@ public sealed class SigningService
     {
         var isMember = memberIds.Contains(userId);
         return members.TryGetValue(userId, out var user)
-            ? new SlotMember(user.Id, user.Username, user.DisplayName, isMember)
+            ? new SlotMember(user.Id, user.Username, user.DisplayName, isMember, user.Enabled)
             : new SlotMember(userId, string.Empty, $"User {userId}", isMember);
     }
 

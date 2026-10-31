@@ -1,5 +1,10 @@
-@* ProjectPage: one project with its reviews, at "/projects/{id}". The reviews are the whole page: a list of rows (id,
-   title, state and approval badges, creation date), each row a link to the review, with a "+ New review" button
+@* ProjectPage: one project with its reviews, at "/projects/{id}". The reviews are the whole page: a progress table
+   (review id with title and creation date, stage, signatures such as 2/3 with a note for out-of-date ones, blockers
+   (open threads, unanswered checks, Fail answers), who a review is waiting on, last activity and due date with an
+   Overdue badge), each row a link to the review. Above the table sit a summary strip (reviews per stage and overdue)
+   and a filter bar (stage, overdue only, blocked only, text search); the column headers sort; 25 reviews make a page.
+   All of that lives in the query string (?stage=&overdue=1&blocked=1&sort=&dir=&q=&page=), so each view has an address.
+   A "+ New review" button
    that leads to the separate creation page at "/projects/{id}/reviews/new" and a "Plan reviews" button. Whoever
    may administer the project (a system administrator or a project admin) also gets a "Repositories" button to the
    repository page of the project, an "Audit trail" button to the project audit page and an "Evidence settings"
@@ -65,18 +70,21 @@
                     <a class="action outline" href="/projects/@ProjectId/checklist"
                        data-testid="checklist-link">Checklist</a>
                 }
-                @if (Repositories.Count > 0)
+                @if (CanContribute && Repositories.Count > 0)
                 {
                     <a class="action outline" href="/projects/@ProjectId/plan" data-testid="plan-reviews-link">Plan reviews</a>
                 }
-                <a class="action" href="/projects/@ProjectId/reviews/new" data-testid="new-review-button">+ New review</a>
+                @if (CanContribute)
+                {
+                    <a class="action" href="/projects/@ProjectId/reviews/new" data-testid="new-review-button">+ New review</a>
+                }
             </div>
         </div>
         @if (Project.Description.Length > 0)
         {
             <p class="page-lead" data-testid="project-description">@Project.Description</p>
         }
-        @if (Repositories.Count == 0)
+        @if (CanContribute && Repositories.Count == 0)
         {
             <p class="muted hint" data-testid="plan-reviews-unavailable">
                 @(CanAdminister
@@ -86,31 +94,143 @@
         }
 
         <h2 class="section-title">Reviews</h2>
-        @if (Reviews.Count == 0)
+        @if (Progress.Count == 0)
         {
-            <p class="muted" data-testid="reviews-empty">This project has no reviews yet. Use + New review to add the first one.</p>
+            <p class="muted" data-testid="reviews-empty">
+                @(CanContribute
+                    ? "This project has no reviews yet. Use + New review to add the first one."
+                    : "This project has no reviews yet.")
+            </p>
         }
         else
         {
-            <ul class="row-list" data-testid="reviews-list">
-                @foreach (var review in Reviews)
+            var summary = Summary;
+            <p class="summary-strip" data-testid="project-summary">
+                <span class="badge" data-testid="project-summary-setup">@summary.Setup in setup</span>
+                <span class="badge" data-testid="project-summary-in-review">@summary.InReview in review</span>
+                <span class="badge approved" data-testid="project-summary-approved">@summary.Approved approved</span>
+                <span class="badge @(summary.Overdue > 0 ? "failed" : null)" data-testid="project-summary-overdue">@summary.Overdue overdue</span>
+            </p>
+
+            @* The filter bar is a plain form with a GET method, so every view has an address of its own *@
+            <form class="filter-bar" method="get" action="/projects/@ProjectId" data-testid="review-filter">
+                <label>Stage
+                    <select name="stage" data-testid="filter-stage">
+                        <option value="" selected="@(StageFilter is null)">All stages</option>
+                        <option value="setup" selected="@(StageFilter == ReviewStage.Setup)">Setup</option>
+                        <option value="in-review" selected="@(StageFilter == ReviewStage.InReview)">In review</option>
+                        <option value="approved" selected="@(StageFilter == ReviewStage.Approved)">Approved</option>
+                    </select>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" name="overdue" value="1" checked="@OverdueOnly" data-testid="filter-overdue" />
+                    Overdue only
+                </label>
+                <label class="switch">
+                    <input type="checkbox" name="blocked" value="1" checked="@BlockedOnly" data-testid="filter-blocked" />
+                    Blocked only
+                </label>
+                <label>Search
+                    <input type="search" name="q" value="@SearchText" maxlength="100" placeholder="Id or title"
+                           data-testid="filter-search" />
+                </label>
+                @* Keep the sort state, also a descending order of the default column; the default (id ascending) adds nothing *@
+                @if (SortColumn != "id" || Descending)
                 {
-                    <li class="row-card review-row" data-testid="review-row-@review.Id">
-                        <div class="row-main">
-                            <a class="row-title" href="/projects/@ProjectId/reviews/@review.Id" data-testid="review-link-@review.Id">@review.Id</a>
-                            <p class="muted" data-testid="review-title-@review.Id">@review.Title</p>
-                            @if (review.FollowsReviewId is { } follows)
-                            {
-                                <p class="muted" data-testid="review-follows-@review.Id">Follow-up to <a href="/projects/@ProjectId/reviews/@follows" data-testid="review-follows-link-@review.Id">@follows</a></p>
-                            }
-                        </div>
-                        <div class="row-meta">
-                            <span class="badge @(IsApproved(review.Id) ? "approved" : null)" data-testid="review-approval-@review.Id">@(IsApproved(review.Id) ? "Approved" : "In review")</span>
-                            <time class="muted" datetime="@review.Created.UtcDateTime.ToString("O")" data-testid="review-created-@review.Id">@review.Created.UtcDateTime.ToString("yyyy-MM-dd")</time>
-                        </div>
-                    </li>
+                    <input type="hidden" name="sort" value="@SortColumn" />
+                    <input type="hidden" name="dir" value="@(Descending ? "desc" : "asc")" />
                 }
-            </ul>
+                <button type="submit" class="outline small" data-testid="filter-apply">Apply</button>
+                @if (Filtered)
+                {
+                    <a class="action outline small" href="/projects/@ProjectId"
+                       data-testid="filter-clear">Clear filters</a>
+                }
+            </form>
+
+            @if (Matching.Count == 0)
+            {
+                <p class="muted" data-testid="reviews-no-match">No review matches the filters.</p>
+            }
+            else
+            {
+                <div class="review-scroll">
+                    <table class="review-table" data-testid="reviews-list">
+                        <thead>
+                            <tr>
+                                <th scope="col" aria-sort="@AriaSort("id")"><a href="@SortAddress("id")" data-testid="sort-id">Review</a></th>
+                                <th scope="col" aria-sort="@AriaSort("stage")"><a href="@SortAddress("stage")" data-testid="sort-stage">Stage</a></th>
+                                <th scope="col" aria-sort="@AriaSort("signatures")"><a href="@SortAddress("signatures")" data-testid="sort-signatures">Signatures</a></th>
+                                <th scope="col">Blockers</th>
+                                <th scope="col">Waiting on</th>
+                                <th scope="col" aria-sort="@AriaSort("activity")"><a href="@SortAddress("activity")" data-testid="sort-activity">Last activity</a></th>
+                                <th scope="col" aria-sort="@AriaSort("due")"><a href="@SortAddress("due")" data-testid="sort-due">Due</a></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var review in PageRows)
+                            {
+                                <tr class="review-row" data-testid="review-row-@review.ReviewId">
+                                    <td>
+                                        <a class="row-title" href="/projects/@ProjectId/reviews/@review.ReviewId" data-testid="review-link-@review.ReviewId">@review.ReviewId</a>
+                                        <p class="muted" data-testid="review-title-@review.ReviewId">@review.Title</p>
+                                        @if (review.FollowsReviewId is { } follows)
+                                        {
+                                            <p class="muted" data-testid="review-follows-@review.ReviewId">Follow-up to <a href="/projects/@ProjectId/reviews/@follows" data-testid="review-follows-link-@review.ReviewId">@follows</a></p>
+                                        }
+                                        <time class="muted" datetime="@review.Created.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" data-testid="review-created-@review.ReviewId">@review.Created.UtcDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)</time>
+                                    </td>
+                                    <td>
+                                        <span class="badge @(review.IsApproved ? "approved" : null)" data-testid="review-approval-@review.ReviewId">@StageLabel(review.Stage)</span>
+                                        @if (review.Reopened)
+                                        {
+                                            <span class="badge pending" data-testid="review-reopened-@review.ReviewId">Reopened</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (review.SlotsRequired == 0)
+                                        {
+                                            <span class="muted" data-testid="review-progress-@review.ReviewId" title="No reviewers assigned yet">-</span>
+                                        }
+                                        else
+                                        {
+                                            <span data-testid="review-progress-@review.ReviewId">@review.SlotsSigned/@review.SlotsRequired</span>
+                                            @if (review.SlotsOutOfDate > 0)
+                                            {
+                                                <span class="muted" data-testid="review-outofdate-@review.ReviewId">@review.SlotsOutOfDate out of date</span>
+                                            }
+                                        }
+                                    </td>
+                                    <td data-testid="review-blockers-@review.ReviewId">@BlockersText(review)</td>
+                                    <td data-testid="review-waiting-@review.ReviewId">@(review.WaitingOn.Count == 0 ? "-" : string.Join(", ", review.WaitingOn))</td>
+                                    <td class="nowrap">
+                                        <time datetime="@review.LastActivity.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" data-testid="review-activity-@review.ReviewId">@review.LastActivity.UtcDateTime.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)</time>
+                                    </td>
+                                    <td class="nowrap">
+                                        <span data-testid="review-due-@review.ReviewId">@(review.DueDate is { } due ? due.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "-")</span>
+                                        @if (review.IsOverdue)
+                                        {
+                                            <span class="badge failed" data-testid="review-overdue-@review.ReviewId">Overdue</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="review-paging" data-testid="reviews-paging">
+                    <span class="muted" data-testid="reviews-range">Showing @((CurrentPage - 1) * PageSize + 1)-@((CurrentPage - 1) * PageSize + PageRows.Count) of @Matching.Count</span>
+                    @if (CurrentPage > 1)
+                    {
+                        <a href="@Address(null, false, CurrentPage - 1)" data-testid="reviews-prev">Previous</a>
+                    }
+                    @if (CurrentPage < PageCount)
+                    {
+                        <a href="@Address(null, false, CurrentPage + 1)" data-testid="reviews-next">Next</a>
+                    }
+                </p>
+            }
         }
 
         @if (CanAdminister)

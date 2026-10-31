@@ -23,7 +23,7 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// <summary>
 ///     What the attestation, the page and the audit event show about the signing key: everything public, nothing secret.
 /// </summary>
-/// <param name="Provider">The provider that supplied the key (<c>SelfSigned</c> or <c>CertificateStore</c>).</param>
+/// <param name="Provider">The provider that supplied the key (<c>SelfSigned</c>, <c>CertificateStore</c> or <c>File</c>).</param>
 /// <param name="Subject">The certificate subject.</param>
 /// <param name="Issuer">The certificate issuer.</param>
 /// <param name="Thumbprint">The SHA-1 thumbprint in upper-case hex, as certlm and MMC show it.</param>

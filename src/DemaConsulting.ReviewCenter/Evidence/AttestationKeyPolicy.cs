@@ -75,7 +75,7 @@ internal static class AttestationKeyPolicy
         {
             throw new AttestationKeyException(
                 "Attestation:RequireTrustedKey is true but the signing key is self-signed. "
-                + "Set Attestation:Provider to CertificateStore and use a certificate issued by your organization.");
+                + "Set Attestation:Provider to CertificateStore or File and use a certificate issued by your organization.");
         }
 
         if (!info.HasDigitalSignatureUsage)
@@ -90,6 +90,47 @@ internal static class AttestationKeyPolicy
             throw new AttestationKeyException(
                 $"Attestation:RequireTrustedKey is true but the signing certificate is not valid now (valid {info.NotBefore:u} to {info.NotAfter:u}).");
         }
+    }
+
+    /// <summary>
+    ///     Tells an operator that the signing certificate is about to expire or has expired, so that it is replaced
+    ///     before attestations are no longer accepted.
+    /// </summary>
+    /// <param name="info">The description of the key.</param>
+    /// <param name="now">The current time.</param>
+    /// <param name="days">
+    ///     The number of days before the end of the validity from which to warn (<c>Attestation:ExpiryWarningDays</c>);
+    ///     0 or less switches the warning off.
+    /// </param>
+    /// <returns>
+    ///     The warning, which names the thumbprint and the date; <c>null</c> when the warning is off or the end of the
+    ///     validity is more than <paramref name="days"/> days away. The text does not change from day to day, so a log
+    ///     can show it when it changes and not every day.
+    /// </returns>
+    /// <remarks>
+    ///     The warning is independent of <c>Attestation:RequireTrustedKey</c>: with the policy a key that has expired
+    ///     is refused (<see cref="Enforce"/>), without it the key keeps signing, which the warning must not let pass
+    ///     unnoticed. Attestations that were signed earlier carry their own certificate and are not affected.
+    /// </remarks>
+    public static string? ExpiryWarning(AttestationKeyInfo info, DateTimeOffset now, int days)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        if (days <= 0)
+        {
+            return null;
+        }
+
+        var date = info.NotAfter.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        if (now > info.NotAfter)
+        {
+            return $"The signing certificate {info.Thumbprint} expired on {date} (UTC). "
+                   + "Replace it; attestations that were signed earlier are not affected.";
+        }
+
+        // A comparison of days as a number: a very large setting must not overflow a time span
+        return (info.NotAfter - now).TotalDays <= days
+            ? $"The signing certificate {info.Thumbprint} expires on {date} (UTC). Replace it before then."
+            : null;
     }
 
     /// <summary>

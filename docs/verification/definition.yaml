@@ -64,6 +64,7 @@ input-files:
   - docs/verification/review-center/core/project-access.md
   - docs/verification/review-center/core/evidence-settings-service.md
   - docs/verification/review-center/core/project-checklist-service.md
+  - docs/verification/review-center/core/review-progress-service.md
   - docs/verification/review-center/core/review-service.md
   - docs/verification/review-center/core/thread-service.md
   - docs/verification/review-center/core/checklist-service.md

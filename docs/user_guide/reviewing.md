@@ -442,9 +442,9 @@ mind, and answer again a check that the fix may affect, because the changes of t
 ## Review Signatures
 
 A review is approved when its reviewers have signed it. The review page shows an **Approved** or **In review** badge
-next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the same badge for
-each review, next to a second badge with the state of the review (see the known limitation at the end of this
-section). An Approved review is also locked (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
+next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the stage of each
+review (see [The Project Page Overview](#the-project-page-overview)). An Approved review is also locked (see
+[Locked Reviews and Reopening](#locked-reviews-and-reopening)).
 
 **Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
 members of the project. Either of the two can sign the slot. A review can have any number of slots, or none; a review
@@ -588,10 +588,41 @@ too long reason with "A reason of at most 250 characters is required to reopen a
 The review can be approved and locked again by new signatures, and reopened again; each reopen is one more entry of
 the history. A review that was reopened is not in the evidence index until it is approved again.
 
-**The project page shows the approval only.** Every review row of the project page shows the Approved or In review
-badge, which is the signature status computed from the record. The stored state of a review (`Draft`, the only state in
+**The project page shows who is holding a review up.** Every review row of the project page is described in
+[The Project Page Overview](#the-project-page-overview). The stored state of a review (`Draft`, the only state in
 this release) is not shown, because it has one value and no action changes it yet; a later release is planned to add
 more review states.
+
+## The Project Page Overview
+
+The project page (`/projects/{id}`) is where a lead sees all the reviews of a project at once. Every member, an
+administrator, and a system administrator see the same table; a member who may only read (a viewer) sees it without
+the **+ New review** and **Plan reviews** controls, and a user who is not a member of the project is told that the
+project does not exist.
+
+- **Summary.** Above the table, four counts: reviews in setup, in review, approved, and overdue.
+- **Columns.** *Review* (the identifier, the title, and the creation date; the identifier links to the review, and a
+  follow-up names the review it follows), *Stage*, *Signatures*, *Blockers*, *Waiting on*, *Last activity*, and *Due*.
+- **Stage.** **Setup** is a review without a reviewer slot. **In review** has slots that are not all signed, or a
+  signature that went out of date. **Approved** has every slot signed on the current record and nothing that blocks it.
+  A review that an administrator reopened also shows a **Reopened** badge. The stage is worked out from the
+  signatures, not stored.
+- **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature became out of date
+  (the record changed after it was given), `1 out of date`. A review without slots shows a dash.
+- **Blockers.** What prevents approval: a missing checklist ("No checklist"), the open comment threads, the
+  unanswered checklist checks, and the checks answered Fail. A dash means nothing blocks the review.
+- **Waiting on.** The people who still have to sign: the primary reviewer, and a different alternate, of each slot that
+  is not signed or is out of date. A disabled account is shown with "(disabled)". An approved review waits on nobody.
+- **Last activity.** The time (UTC) of the newest entry of the audit trail of the review, or its creation time.
+- **Due.** The due date, with the **Overdue** badge when it is before today in UTC and the review is not approved (see
+  [Due Dates](#due-dates)).
+
+Above the table a filter bar narrows the list by **stage**, **Overdue only**, **Blocked only**, and a text that is
+searched in the identifier and the title; **Clear filters** removes them. The headers *Review*, *Stage*,
+*Signatures*, *Last activity*, and *Due* sort the table; selecting the sorted header again reverses the order. The table
+shows 25 reviews to a page with **Previous** and **Next**. The filters, the sort, and the page are kept in the address
+(`?stage=in-review&overdue=1&blocked=1&q=text&sort=due&dir=desc&page=2`), so you can bookmark a view or send it to
+someone.
 
 ## Signed Attestation
 
@@ -660,16 +691,25 @@ machine.
 The server signs with one key, which an administrator chooses in the `Attestation` section of `appsettings.json` or
 with environment variables (a double underscore stands for the colon, for example `Attestation__Provider`):
 
-`Provider` is `SelfSigned` or `CertificateStore`; the settings marked "Store" apply to `CertificateStore` only.
+`Provider` is `SelfSigned`, `CertificateStore` or `File`; the settings marked "Store" apply to `CertificateStore` only,
+and the settings marked "File" to `File` only.
 
-| Setting                             | Environment variable                 | Meaning                               |
-| ----------------------------------- | ------------------------------------ | ------------------------------------- |
-| `Attestation:Provider`              | `Attestation__Provider`              | Key source; default `SelfSigned`      |
-| `Attestation:RequireTrustedKey`     | `Attestation__RequireTrustedKey`     | Refuse unsuitable keys; default false |
-| `Attestation:CertificateThumbprint` | `Attestation__CertificateThumbprint` | Store: certificate thumbprint         |
-| `Attestation:StoreLocation`         | `Attestation__StoreLocation`         | Store: `CurrentUser` or `LocalMachine`|
-| `Attestation:StoreName`             | `Attestation__StoreName`             | Store: store name; default `My`       |
-| `Attestation:SelfSignedFolder`      | `Attestation__SelfSignedFolder`      | Folder of the self-signed key file    |
+| Setting                               | Meaning                                                              |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `Attestation:Provider`                | Key source; default `SelfSigned`                                     |
+| `Attestation:RequireTrustedKey`       | Refuse unsuitable keys; default false                                |
+| `Attestation:ExpiryWarningDays`       | Warn this many days before the end; default 30, 0 for no warning     |
+| `Attestation:CertificateThumbprint`   | Store: certificate thumbprint                                        |
+| `Attestation:StoreLocation`           | Store: `CurrentUser` or `LocalMachine`                               |
+| `Attestation:StoreName`               | Store: store name; default `My`                                      |
+| `Attestation:CertificatePath`         | File: PFX/PKCS #12 or PEM certificate file                           |
+| `Attestation:PrivateKeyPath`          | File: PEM file with the private key, when it is not in the other     |
+| `Attestation:CertificatePassword`     | File: password of the PFX or of the encrypted PEM key (a secret)     |
+| `Attestation:CertificatePasswordFile` | File: file holding the password (not with the one above)             |
+| `Attestation:SelfSignedFolder`        | Folder of the self-signed key file                                   |
+
+`Attestation:CertificatePassword` is a secret: prefer `Attestation:CertificatePasswordFile`, or the environment
+variable, and never write the password into `appsettings.json` in a folder that others can read.
 
 **The self-signed key (default) is for development and test only.** On first use the server creates a key and a
 self-signed certificate named "ReviewCenter self-signed attestation key (not an organization key)", and keeps them in
@@ -693,8 +733,8 @@ and Restore in the Deployment chapter), and keep the key ring protected. What ha
 `reviewcenter --validate --check-config` reports the subject, the thumbprint, and the validity of the key, or that it
 "will be created on first start", without creating anything. The review page and the PDF say that the key is
 self-signed and not an organization key. If an
-administrator supplies a self-signed certificate through the certificate store, the review page says that it is a
-self-signed certificate supplied by the administrator from the certificate store, not an organization key and not
+administrator supplies a self-signed certificate (through the certificate store or a file), the review page says that
+it is a self-signed certificate supplied by the administrator, not an organization key and not
 issued by a certificate authority; it says "generated by this server" only for the key that the server creates itself.
 
 **Choose the certificate store for real use.** Set `Attestation:Provider` to `CertificateStore` and
@@ -721,8 +761,79 @@ issued by a certificate authority; it says "generated by this server" only for t
   does **not** check that the
   certificate chains to a trusted root and does **not** check revocation.
 
+**Use a certificate file when there is no certificate store (for example on Linux).** Set `Attestation:Provider` to
+`File` and `Attestation:CertificatePath` to a PFX (PKCS #12, `.pfx` or `.p12`) or a PEM file; the server detects the
+format from the content (a file with `-----BEGIN` is PEM). The same rules for a document-signing certificate and for
+`RequireTrustedKey` apply as for the store.
+
+- *PFX.* Put the certificate, its private key and, optionally, the certificates of the chain in one password-protected
+  file. The first certificate with a private key signs; the other certificates of the file are embedded as the chain
+  (the signer itself and a self-signed root are left out, because the reader has to trust the root on its own).
+- *PEM.* The file holds the certificate, followed by any intermediate certificates. The private key is in the same file
+  or in the file named by `Attestation:PrivateKeyPath`. A key that is encrypted (`BEGIN ENCRYPTED PRIVATE KEY`) needs
+  the password; a key that is not encrypted does not. A legacy encrypted key (`BEGIN RSA PRIVATE KEY` with
+  `Proc-Type: 4,ENCRYPTED`) is not supported: the server says so and tells you to convert it to PKCS #8, for example
+  with `openssl pkcs8 -topk8 -in old.key -out new.key`.
+- *PFX and `PrivateKeyPath`.* `Attestation:PrivateKeyPath` is for PEM only; for a PFX it is ignored, because the PFX
+  holds the key.
+- *The key stays in memory.* The server loads the key into memory and writes it nowhere (on macOS, where a PFX cannot
+  be loaded without the key store of the user, the default key set is used, so the key may be written there); the bytes
+  that it read from the files are cleared after the load.
+- *Protect the key.* A key without a password is loaded with a warning. The server decides from the content of the
+  file, not from the setting: a password that is set for a PFX that has no encrypted key protects nothing, so such a
+  file counts as unprotected. When `DataProtection:RequireEncryptedKeys` is
+  `true`, the server refuses it: "The private key in '...' is not protected by a password, and
+  DataProtection:RequireEncryptedKeys is set." Set a password with `Attestation:CertificatePassword` (for example from
+  the environment variable `Attestation__CertificatePassword`) or, better, `Attestation:CertificatePasswordFile`; the
+  contents of that file, trimmed of surrounding white space, are the password. Setting both is refused ("... are both
+  set; set only one of them.").
+- *Restrict the files (Linux and macOS).* The server warns when the file that holds the private key (the key file
+  when `Attestation:PrivateKeyPath` is used with a PEM certificate, otherwise the certificate file) or the password file
+  can be accessed by the group or by others, and names the file and its mode. With a separate key file the certificate
+  file is not checked, because it holds no secret. Make the files readable by the account that
+  runs the server only.
+
+A worked example for Linux, with a PFX and a password file (the account `reviewcenter` runs the server):
+
+```bash
+# Put the files where only the service account can read them
+sudo install -d -m 700 -o reviewcenter /etc/reviewcenter/attestation
+sudo install -m 600 -o reviewcenter signing.pfx /etc/reviewcenter/attestation/signing.pfx
+printf '%s\n' "$PFX_PASSWORD" | sudo -u reviewcenter tee /etc/reviewcenter/attestation/password.txt >/dev/null
+sudo chmod 600 /etc/reviewcenter/attestation/password.txt
+
+# Settings (environment of the service, or appsettings.json)
+Attestation__Provider=File
+Attestation__CertificatePath=/etc/reviewcenter/attestation/signing.pfx
+Attestation__CertificatePasswordFile=/etc/reviewcenter/attestation/password.txt
+```
+
+With a PEM certificate and an encrypted key in a second file, set `Attestation__CertificatePath` to the certificate
+file, `Attestation__PrivateKeyPath` to the key file, and the password as above. To make a PFX from PEM files, for
+example with OpenSSL, put the certificate and the chain into one file (`cat cert.pem chain.pem > bundle.pem`) and run
+`openssl pkcs12 -export -inkey key.pem -in bundle.pem -out signing.pfx`. Check the
+setup before the first start with `reviewcenter --validate --check-config`: it describes the certificate (subject,
+thumbprint, validity) and any warning, and shows no password and no folder.
+
+**Expiry warnings.** For the certificate store and the file, the server warns at start, in the log and in
+`--check-config`, and on the review page next to the download button, when the certificate ends within
+`Attestation:ExpiryWarningDays` days (default 30) or has already ended. The message names the thumbprint and the date.
+An expired certificate warns also when `RequireTrustedKey` is not set (the server then still signs with it); with
+`RequireTrustedKey` the server refuses it. A value of `0` turns the warnings off, and a negative value is refused. The
+self-signed key gets no such warning, because the server replaces it when it has ended.
+
+**Replace a certificate before it ends (rotation).** Obtain the new certificate, put it in place of the old file (or in
+a new file and change `Attestation:CertificatePath`), and restart the server; a new key is read only at the start.
+Check the result with `reviewcenter --validate --check-config`. PDFs that were signed earlier stay verifiable: each
+signature is self-contained and embeds the signer certificate, so it does not depend on the file or the store. **Keep
+the public part of the retired certificate** (and its issuing chain) with your backups. There is no RFC 3161 time stamp
+(see the limitations), so after the certificate has ended, a PDF reader may report the signer of an older PDF as expired
+or not trusted, although the document is unchanged. Do not delete the old private key until your retention rules allow
+it, and never publish it.
+
 The server checks the key when it starts. A setting that cannot work (an unknown provider, a missing thumbprint, a
-certificate that is not in the store, or `RequireTrustedKey` with a self-signed key or a certificate without a signing
+certificate that is not in the store, a missing certificate file or password, a wrong password, or `RequireTrustedKey`
+with a self-signed key or a certificate without a signing
 key usage) stops the start with a message
 that names the setting. If the key later becomes unusable (for example the certificate expires while the server runs),
 the page shows the problem instead of the button, and a direct request is answered with status 500 ("Attestation
@@ -731,7 +842,10 @@ signing key unavailable"). A signed-out request to the address is sent to the si
 ### Limitations of the Attestation
 
 - The default key is self-signed and is not an organization key.
-- There is no time stamp authority; the signing time is the server clock.
+- There is no time stamp authority; the signing time is the server clock. Without one, a reader may report the signer
+  of an older PDF as expired once the certificate has ended.
+- A certificate file is read at the start only; replace it and restart the server. The File provider does not back up
+  the file or the password for you.
 - Signing with a key in Azure Key Vault and with an RFC 3161 time stamp authority are planned, not implemented.
 - The server does not check the trust chain or the revocation of the certificate; the reader does.
 - The PDF uses the standard PDF fonts (Windows-1252 characters), so any other character is shown as a question mark.

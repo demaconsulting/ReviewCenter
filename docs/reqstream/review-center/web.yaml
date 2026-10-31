@@ -665,6 +665,29 @@ sections:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
 
+      - id: ReviewCenter-Web-Progress
+        title: >-
+          The Web subsystem shall show on the project page, for every review, its stage, its signatures with the
+          out-of-date ones, what blocks it, the people it waits on, its last activity, and its due date with the
+          Overdue badge, a summary of the reviews by stage and the overdue ones, filters by stage, overdue, blocked,
+          and text, sortable columns, and 25 reviews to a page, keep all of it in the query string, and show the same
+          to a read-only auditor of the project and nothing to a user outside it.
+        justification: |
+          The project page is where a lead starts. It has to show who is holding each review up and let the lead
+          narrow and order the list, with a link that others can open. The behavior needs a live connection, so it is
+          verified by the component tests of the unit, and the whole journey by a system test.
+        children:
+          - ReviewCenter-ProjectPage-Progress
+          - ReviewCenter-ProjectPage-Summary
+          - ReviewCenter-ProjectPage-ProgressFilter
+          - ReviewCenter-ProjectPage-ProgressSort
+          - ReviewCenter-ProjectPage-ReadOnly
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+          - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+
       - id: ReviewCenter-Web-FollowUp
         title: >-
           The Web subsystem shall let a user create a review as a follow-up of an earlier review of the project from

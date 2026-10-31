@@ -102,10 +102,16 @@ The opt-in tenth and eleventh checks are run only with `--validate --check-confi
   name but never the folder) when another problem makes the key unusable. The clause does not mention what
   `Attestation:RequireTrustedKey` would do to a key that does not exist yet: with that setting true and no key, the
   check still passes with "will be created on first start", while the server refuses to start because the new
-  self-signed key is not trusted (the check does not create a key, so it cannot apply the trust policy to it). The
-  certificate store provider is not covered by a test of the check; it relies on the describe path of the provider
-  itself (`GetSigningKey` and its trust policy), which is tested in the `Evidence` subsystem. The clause is only added
-  when the check runs, not when it is skipped.
+  self-signed key is not trusted (the check does not create a key, so it cannot apply the trust policy to it). For the
+  CertificateStore and File providers the clause gives the same description of the key (the File provider reads the
+  file, which is not a change), followed by `; warning:` and the expiry warning when the certificate ends within
+  `Attestation:ExpiryWarningDays` or has ended, and the warnings that the provider noted (for example a key without a
+  password, or a file that others can read); the File provider receives `DataProtection:RequireEncryptedKeys` and, with
+  that setting, fails for a key without a password. A missing path, file or password, a wrong password and a key
+  that `RequireTrustedKey` refuses fail with the path-free message, so the password and the folder of the file are
+  never printed. The store provider is not covered by a test of the check; it relies on the describe path of the
+  provider itself (`GetSigningKey` and its trust policy), which is tested in the `Evidence` subsystem. The clause is
+  only added when the check runs, not when it is skipped.
 
 **FastCommitInterceptor** (internal, `SelfTestServices`): an EF Core connection interceptor that sets
 `synchronous=OFF` and `journal_mode=MEMORY` when a connection opens, so that the many commits of the review

@@ -106,7 +106,9 @@ answered Pass are created through the services over a new database; a slot is ad
 alternate reviewer signs it with the correct password; the database is closed and opened again. The approval is read
 again: the review is approved, the single slot is signed by the alternate reviewer at the saved time, and the
 signature is current for the unchanged record. This scenario is tested by
-`StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
+`StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`. The set-based read of the snapshots of several reviews
+(`ReviewCenter-ReviewStore-SnapshotBatch`) is verified at the unit level, by the scenarios of
+`ReviewStoreSnapshotBatchTests.cs` in the verification of `ReviewStore`.
 
 **StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction**: Over a new database, a review created by
 one user is answered completely and signed by a second user through the services, so that it is approved. The store
@@ -168,7 +170,8 @@ The last project administrator rule, including two removals made at the same tim
 membership and its audit entry by `UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether` and
 `UserStore_AddToProjectAsync_Failure_StoresNothing`, all defined in `ProjectMembersStoreTests.cs`. The listing of the
 audit trail for one project only is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`
-in the same file.
+in the same file. The time of the newest audit entry of each review of a project (the last activity) is tested by
+`AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject`, defined in `AuditStoreTests.cs`.
 
 **External identity**: An account of an identity provider is found only by the exact pair of issuer and subject, and a
 second account with the same pair is refused, while any number of local accounts (no pair) are stored; these are tested
@@ -198,11 +201,7 @@ nothing, and of two writers from the same date exactly one wins; these are teste
 `ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`,
 `ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited`,
 `ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing`, and
-`ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`, all defined in `ReviewDueDateStoreTests.cs`. The
-batch question of which dated reviews are approved (what a list needs for its overdue state) returns exactly the
-approved ones and agrees with the single-review definition; it is tested by
-`ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes`, defined in
-`ReviewStoreSigningTests.cs`.
+`ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`, all defined in `ReviewDueDateStoreTests.cs`.
 
 **Follow-up review**: A follow-up review is stored with its followed review and carried counts and with the carried
 answers, sections, and threads in the one transaction of the review, so that a carry that fails halfway creates nothing,

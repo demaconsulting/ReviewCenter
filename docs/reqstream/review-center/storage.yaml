@@ -122,6 +122,7 @@ sections:
           - ReviewCenter-ReviewStore-Slots
           - ReviewCenter-ReviewStore-Record
           - ReviewCenter-ReviewStore-Signatures
+          - ReviewCenter-ReviewStore-SnapshotBatch
           - ReviewCenter-DbContext-Signatures
         tests:
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
@@ -254,20 +255,29 @@ sections:
           recreated.
         justification: |
           The date is a commitment that must survive a restart and must not be lost when two people save at the same
-          time. The history of a change must stay true, so the entry is stored with the change or not at all. A list
-          that shows which dated reviews are overdue asks which of them are approved in one batch, so its cost does
-          not grow with a full read of every late review.
+          time. The history of a change must stay true, so the entry is stored with the change or not at all.
         children:
           - ReviewCenter-ReviewStore-DueDate
-          - ReviewCenter-ReviewStore-ApprovedReviewIds
           - ReviewCenter-DbContext-DueDate
         tests:
-          - ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes
           - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
           - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
           - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
           - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
+
+      - id: ReviewCenter-Storage-Progress
+        title: >-
+          The Storage subsystem shall return the time of the newest audit entry of each review of a project with one
+          query, so that the last activity of a review comes from the audit trail and not from a copy that could
+          differ from it.
+        justification: |
+          The audit trail already records every change of a review and is tamper evident. Reading the last activity
+          from it adds no second record to keep true and no work to every change.
+        children:
+          - ReviewCenter-AuditStore-LastActivity
+        tests:
+          - AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject
 
       - id: ReviewCenter-Storage-FollowUp
         title: >-

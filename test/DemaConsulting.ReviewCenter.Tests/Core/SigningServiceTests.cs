@@ -774,6 +774,73 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the structured blocker counts of the approval status (open threads, unanswered checks and Fail
+    ///     answers) equal the numbers in the blocker sentences, for a single read and for the batch read, and are zero
+    ///     for an approved review.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences()
+    {
+        // Arrange: a review with one Fail answer, the rest unanswered and one open thread; and an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        var items = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ToList();
+        await fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, "rev-1", items[0].Id, ChecklistOutcome.Fail, "Wrong", TestActors.Ann, cancellationToken);
+        await fixture.Threads.StartThreadAsync(
+            fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Look", cancellationToken);
+        var (approvedFixture, _, _) = await CreateApprovedAsync();
+
+        // Act: read the status singly and in a batch
+        var single = await ApprovalAsync(fixture);
+        var batch = (await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-1"], cancellationToken))["rev-1"];
+        var approved = await ApprovalAsync(approvedFixture);
+
+        // Assert: the counts are those of the sentences, in both reads
+        foreach (var approval in new[] { single, batch })
+        {
+            Assert.Equal(1, approval.OpenThreads);
+            Assert.Equal(1, approval.FailedChecks);
+            Assert.Equal(items.Count - 1, approval.UnansweredChecks);
+            Assert.Contains("1 thread is open", approval.Blockers);
+            Assert.Contains("1 check is answered Fail", approval.Blockers);
+            Assert.Contains($"{items.Count - 1} checklist checks are unanswered", approval.Blockers);
+        }
+
+        Assert.True(approved.IsApproved);
+        Assert.Equal((0, 0, 0), (approved.OpenThreads, approved.UnansweredChecks, approved.FailedChecks));
+    }
+
+    /// <summary>
+    ///     Test that the structured <see cref="ReviewApproval.MissingChecklist"/> flag is true exactly when the "no
+    ///     checklist" blocker sentence is present, for a single read and for the batch read.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence()
+    {
+        // Arrange: a stored review without a checklist next to the review with the default checklist
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        await fixture.Store.AddReviewAsync(
+            new Review { ProjectId = fixture.ProjectId, Id = "rev-none", Title = "No checklist", Created = _now },
+            cancellationToken);
+
+        // Act: read both singly and in a batch
+        var without = await ApprovalAsync(fixture, "rev-none");
+        var with = await ApprovalAsync(fixture);
+        var batch = await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-none", "rev-1"], cancellationToken);
+
+        // Assert: the flag is set exactly with the sentence, in both reads
+        Assert.True(without.MissingChecklist);
+        Assert.Contains("This review has no checklist.", without.Blockers);
+        Assert.False(with.MissingChecklist);
+        Assert.DoesNotContain("This review has no checklist.", with.Blockers);
+        Assert.True(batch["rev-none"].MissingChecklist);
+        Assert.False(batch["rev-1"].MissingChecklist);
+        Assert.Equivalent(without, batch["rev-none"]);
+    }
+
+    /// <summary>
     ///     Test that a reopening of the review, which changes the record, makes the old signature out of date, which
     ///     can be signed again, and that the history stays.
     /// </summary>
@@ -993,6 +1060,37 @@ public class SigningServiceTests
         // Assert: nothing returned and the user list was never read
         Assert.Empty(batch);
         Assert.Equal(0, userStore.ListCount);
+    }
+
+    /// <summary>
+    ///     Test that the batch read takes the snapshots of all reviews with one store batch read and not one snapshot
+    ///     read per review, that a duplicated identifier is read once, and that every status, including the reopen
+    ///     history of a reopened review, equals the single read of the same review.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots()
+    {
+        // Arrange: a reopened review and a second review of the same project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, _, _) = await CreateApprovedAsync();
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Because.", cancellationToken);
+        await CreateAuthoredReviewAsync(fixture, TestActors.Ann);
+        var singleReadsBefore = fixture.Store.SnapshotReads;
+        var batchReadsBefore = fixture.Store.SnapshotBatchReads;
+
+        // Act
+        var batch = await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-1", "rev-2", "rev-1", "nope"], cancellationToken);
+        var singleReadsDuring = fixture.Store.SnapshotReads - singleReadsBefore;
+        var batchReadsDuring = fixture.Store.SnapshotBatchReads - batchReadsBefore;
+
+        // Assert: one batch read, no single snapshot read, and every status equals the single read
+        Assert.Equal(1, batchReadsDuring);
+        Assert.Equal(0, singleReadsDuring);
+        Assert.Equal(["rev-1", "rev-2"], batch.Keys.Order().ToArray());
+        Assert.Equal("Because.", Assert.Single(batch["rev-1"].Reopens!).Reason);
+        Assert.Null(batch["rev-2"].Reopens);
+        Assert.Equivalent(await ApprovalAsync(fixture, "rev-1"), batch["rev-1"]);
+        Assert.Equivalent(await ApprovalAsync(fixture, "rev-2"), batch["rev-2"]);
     }
 
     /// <summary>

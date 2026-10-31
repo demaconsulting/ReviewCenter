@@ -26,8 +26,12 @@ UTC and the review is not approved), the source of a review
 from a repository, the approval state and record digest, the slots (the primary and alternate reviewer are user names,
 and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the
 next
-step. A summary carries `dueDate` and `overdue` as well; the list computes `overdue` only for reviews whose date is
-already past, asking `SigningService` for their approval, so a project without due dates costs nothing extra. The
+step. A summary carries `dueDate` and `overdue` as well, and the progress of the review: `approved`, `slotsRequired`,
+`slotsSigned`, `slotsOutOfDate`, and `lastActivity` (the time of the newest audit entry of the review, or its creation
+time). The list takes all of them from `ReviewProgressService` (the same service as the project page), which reads the
+approvals and the last activity of all reviews of the project at once; the list endpoint reads the reviews of the project
+once and hands that list to `ReviewProgressService.GetProgressAsync` (the overload that takes the list), so the reviews
+are not read a second time; the fields were added and none was changed. The
 details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over.
 
 #### Key Methods
@@ -185,7 +189,7 @@ without credentials, for a project that does not allow it, gets the same generic
 #### Dependencies
 
 - **ProjectService**, **ReviewService**, **SigningService**, **ThreadService**, **ChecklistService**,
-  **ProjectChecklistService** — Core; the work.
+  **ProjectChecklistService**, **ReviewProgressService** — Core; the work.
 - **AttestationService**, **AttestationEndpoint** — Evidence; the attestation and the shared mapping of its result.
 - **EvidenceIndexService** — Evidence; the entries of the evidence index.
 - **ApiTokenAuthentication**, **AnonymousRateLimit** — the policies of the groups and the limiter of anonymous callers.

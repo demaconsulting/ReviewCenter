@@ -61,13 +61,15 @@ sections:
       - id: ReviewCenter-Evidence-Key
         title: >-
           The Evidence subsystem shall sign with a key that the operator chooses between a self-signed key that the
-          server creates and keeps for itself, protected at rest by the Data Protection key ring, and a certificate
-          in a certificate store, shall refuse a key that does not meet the RequireTrustedKey rule, and shall tell the
-          user and the reader of the document which kind of key signed it.
+          server creates and keeps for itself, protected at rest by the Data Protection key ring, a certificate in a
+          certificate store, and a certificate with its private key in a file, shall refuse a key that does not meet
+          the RequireTrustedKey rule, shall warn when the certificate of a key ends soon or has ended, and shall tell
+          the user and the reader of the document which kind of key signed it.
         justification: |
           A new installation must work without configuration, and an organization must be able to sign with a key that
-          it controls. Nobody should mistake the default key for an organization key, and a key that the server keeps
-          for itself must not be usable by anyone who only copies its file.
+          it controls. Nobody should mistake the default key for an organization key, a key that the server keeps
+          for itself must not be usable by anyone who only copies its file, and the operator must hear about the end
+          of a certificate before the readers of the attestations do.
         children:
           - ReviewCenter-AttestationKeyProvider-Selection
           - ReviewCenter-AttestationKeyProvider-SelfSigned
@@ -76,6 +78,10 @@ sections:
           - ReviewCenter-AttestationKeyProvider-SelfSignedWarning
           - ReviewCenter-AttestationKeyProvider-SelfSignedErrors
           - ReviewCenter-AttestationKeyProvider-CertificateStore
+          - ReviewCenter-AttestationKeyProvider-File
+          - ReviewCenter-AttestationKeyProvider-FileSecret
+          - ReviewCenter-AttestationKeyProvider-FilePermissions
+          - ReviewCenter-AttestationKeyProvider-Expiry
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning
           - ReviewCenter-AttestationKeyProvider-Describe
