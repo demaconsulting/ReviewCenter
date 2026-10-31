@@ -35,10 +35,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               those of the original answer; the answer is marked as carried from the immediate source. Fail answers
 ///               are never carried: the check stays unanswered so a reviewer decides again.</item>
 ///         <item>Not-applicable sections (with their reason) whose section exists in the new checklist with the same title.</item>
-///         <item>Open threads whose file is in the new review, with all comments verbatim and in the state Open. The anchor
+///         <item>Open threads whose file is in the new review, with all comments verbatim (each keeping whether it is part
+///               of the report and whether it is a resolution note, so a carried Finding stays a Finding and chat stays
+///               chat) and in the state Open. The anchor
 ///               is kept only when the file content the line numbers refer to is identical in both reviews; otherwise the
 ///               thread is moved to the whole file (the model has a whole-file anchor, so a first line is never guessed) and
-///               a system comment at the end of the thread names the original anchor. Resolved threads are not carried.</item>
+///               a system comment (chat) at the end of the thread names the original anchor. Resolved threads are not carried.</item>
 ///     </list>
 ///     Reviewer slots, signatures and reopens are never carried, and carrying never makes the creator of the new review the
 ///     answerer of anything.
@@ -300,20 +302,25 @@ public static class FollowUpCarry
                 Author = c.Author,
                 AuthorUsername = c.AuthorUsername,
                 Text = c.Text,
-                Created = c.Created
+                Created = c.Created,
+                IncludeInReport = c.IncludeInReport,
+                Kind = c.Kind
             })
             .ToList();
         if (!keep)
         {
             // The original anchor is told to the reviewers in a comment of the system, appended after the original
-            // comments so their order is not disturbed
+            // comments so their order is not disturbed; it is chat (not included in the report), so it never
+            // changes what a signature of the new review covers
             comments.Add(new ReviewComment
             {
                 Author = SystemAuthor,
                 AuthorUsername = SystemUsername,
                 Text = $"Carried over from review '{sourceId}'. The file is not the same as in that review, so the thread, which was " +
                        $"anchored to {AnchorText(thread)}, now refers to the whole file.",
-                Created = now
+                Created = now,
+                IncludeInReport = false,
+                Kind = ReviewCommentKind.Comment
             });
         }
 

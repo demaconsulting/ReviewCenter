@@ -28,8 +28,8 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// </summary>
 /// <remarks>
 ///     A review is listed when it was planned from a review-set (it has a review-set id, which is the ReviewMark
-///     review id) and it is complete: at least one reviewer slot, and every slot signed with the current record
-///     digest, which is the completion rule of <see cref="AttestationService"/>. A review without a review-set id is
+///     review id) and it is complete: at least one reviewer slot, every slot signed with the current record
+///     digest and no thread open, which is the completion rule of <see cref="AttestationService"/>. A review without a review-set id is
 ///     skipped, because a made-up id could wrongly satisfy a review-set. Only passing reviews exist: a review with a
 ///     failed checklist answer cannot be signed. ReviewMark keeps one entry per (id, fingerprint), so the index has
 ///     one entry per pair: the one completed last, and on a tie the lowest review id. The entries are ordered by id,

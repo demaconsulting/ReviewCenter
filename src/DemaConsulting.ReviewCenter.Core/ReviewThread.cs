@@ -25,8 +25,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     A thread always has at least one comment: the first comment is created together with the
-///     thread. The comments are immutable; the only field that changes after creation is
-///     <see cref="State"/>. Instances are created by <see cref="ThreadService"/>, which enforces
+///     thread. The comments are immutable in what they say; what changes after creation is the
+///     <see cref="State"/> and which comments are part of the signed report (<see cref="ReviewComment.IncludeInReport"/>),
+///     which decides the <see cref="Kind"/>. Instances are created by <see cref="ThreadService"/>, which enforces
 ///     the rules, and are populated by the storage layer. The type is not thread-safe.
 /// </remarks>
 public sealed class ReviewThread
@@ -93,6 +94,17 @@ public sealed class ReviewThread
     ///     Gets the comments of the thread in posting order; never empty for a stored thread.
     /// </summary>
     public List<ReviewComment> Comments { get; init; } = [];
+
+    /// <summary>
+    ///     Gets whether the thread is chat or a finding of the signed report, derived from its starting comment.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="ThreadKind.Finding"/> exactly when the first comment (the comments are kept in posting order) is
+    ///     included in the report; <see cref="ThreadKind.Question"/> otherwise, also for a thread without comments.
+    ///     Derived, not stored.
+    /// </remarks>
+    public ThreadKind Kind =>
+        Comments.Count > 0 && Comments[0].IncludeInReport ? ThreadKind.Finding : ThreadKind.Question;
 
     /// <summary>
     ///     Gets the time of the latest comment, or <see cref="Created"/> when the thread has no comments.

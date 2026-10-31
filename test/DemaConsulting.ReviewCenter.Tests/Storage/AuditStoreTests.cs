@@ -395,12 +395,14 @@ public class AuditStoreTests
             new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "x", Created = _created },
             _ => Draft("comment"),
             TestContext.Current.CancellationToken);
-        var changed = await db.Store.SetThreadStateAsync(project.Id, "rev-1", 999, ReviewThreadState.Resolved, Draft("resolve"), TestContext.Current.CancellationToken);
+        var changed = await db.Store.ReopenThreadAsync(project.Id, "rev-1", 999, Draft("reopen"), TestContext.Current.CancellationToken);
+        var resolved = await db.Store.ResolveThreadAsync(project.Id, "rev-1", 999, ThreadKind.Question, null, Draft("resolve"), TestContext.Current.CancellationToken);
         var removed = await db.Store.RemoveSlotAsync(project.Id, "rev-1", 999, Draft("remove"), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Null(comment);
         Assert.False(changed);
+        Assert.False(resolved);
         Assert.False(removed);
         Assert.Equal(before, (await ReadAll(db)).Count);
     }

@@ -138,8 +138,9 @@ N/A - standard test environment.
   the form under a diff row, and the reply box of a thread) are not rendered; reading, copying a link, and the
   attestation download keep working; a
   review that is not approved shows no badge and no banner.
-- A thread started on a review with a current signature is stored by the page, which acknowledges the affected
-  signatures for now, and the signature is then out of date.
+- A thread started on a review with a current signature is stored by the page as chat that is not part of the report,
+  without a warning, and the signature stays current; the page resolves a thread without a resolution note, and a
+  refusal for another reason is shown as the normal error message.
 - Ctrl+Enter in the new-thread field or a reply field presses the enabled submit button named by the field, a hint
   next to the button says so, and a `+` or Comment button moves the focus to the comment field it opens.
 - A primary or alternate reviewer who is disabled or no longer a member of the project is kept as a labeled choice in
@@ -460,42 +461,18 @@ whole file and created by the signed-in user with the text only, with no author 
 the text is cleared. This scenario is tested by
 `ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText`.
 
-**ReviewPage_StartThread_SignedReview_ShowsWarningAndConfirmStoresTheThreadAndMarksTheSignatureOutOfDate**: A review has
-two slots and only the first is signed. A thread is started on the page; the page shows the warning naming "Slot 1
-(Ann)" and stores nothing, the slot still shows "Signed by Ann". After Confirm the thread is stored, the warning, the
-error, and the text are gone, and the slot shows "Signature out of date". This scenario is tested by
-`ReviewPage_StartThread_SignedReview_ShowsWarningAndConfirmStoresTheThreadAndMarksTheSignatureOutOfDate`.
+**ReviewPage_PostChat_SignedReview_NeedsNoWarningAndKeepsSignature**: A review has two slots and only the first is
+signed. A thread is started on the page; it is stored at once as chat that is not in the report, no warning is shown,
+and the slot still shows "Signed by Ann". This scenario is tested by
+`ReviewPage_PostChat_SignedReview_NeedsNoWarningAndKeepsSignature`.
 
-**ReviewPage_StartThread_SignedReview_CancelStoresNothingAndKeepsTheText**: The warning is shown for a new thread and
-Cancel is clicked; the warning is gone, no thread is stored, the signature stands, and the typed text is still in the
-field. This scenario is tested by `ReviewPage_StartThread_SignedReview_CancelStoresNothingAndKeepsTheText`.
-
-**ReviewPage_StartThread_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring**: A review has three slots and
-the warning names the first signature. Another reviewer signs the second slot, then Confirm is clicked; nothing is
-stored and the warning names both slots. A second Confirm stores the thread and both signatures are out of date. This
-scenario is tested by `ReviewPage_StartThread_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring`.
-
-**ReviewPage_StartThread_ConfirmClickedTwice_StoresExactlyOneThread**: Confirm is clicked twice before the page has
-drawn the result; exactly one thread is stored. This scenario is tested by
-`ReviewPage_StartThread_ConfirmClickedTwice_StoresExactlyOneThread`.
+**ReviewPage_ResolveThread_Question_PassesNullNoteAndResolves**: An open chat thread is resolved on the page without a
+resolution note; the page passes no note to the service and the thread shows as resolved. This scenario is tested by
+`ReviewPage_ResolveThread_Question_PassesNullNoteAndResolves`.
 
 **ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning**: The review is approved after the page was drawn
 and the new-thread form is then submitted; the normal error is shown, no warning is shown, and nothing is stored. This
 scenario is tested by `ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning`.
-
-**ReviewPage_Reply_SignedReview_ShowsWarningInTheThreadAndConfirmStoresTheReply**: A resolved thread exists and the
-first of two slots is signed. A reply is sent; the warning is shown inside the thread and nothing is stored. After
-Confirm the reply is stored and the signature is out of date. This scenario is tested by
-`ReviewPage_Reply_SignedReview_ShowsWarningInTheThreadAndConfirmStoresTheReply`.
-
-**ReviewPage_Reopen_SignedReview_ConfirmReopensTheThread**: A resolved thread exists and the first of two slots is
-signed. Reopening shows the warning and leaves the thread resolved; Cancel leaves it resolved and signed; reopening
-again and Confirm open the thread and the signature is out of date. This scenario is tested by
-`ReviewPage_Reopen_SignedReview_ConfirmReopensTheThread`.
-
-**ReviewPage_Render_SignatureWarningOpen_EveryInteractiveElementHasTestId**: With a warning open, every link, button,
-input, and text area of the page, including the two buttons of the warning, has a kebab-case `data-testid`. This
-scenario is tested by `ReviewPage_Render_SignatureWarningOpen_EveryInteractiveElementHasTestId`.
 
 **ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines**: A range and a single line are stored with the
 entered anchors and shown with the matching labels. This scenario is tested by
@@ -651,7 +628,8 @@ badge reads "In review", the slot has no Save or Remove, and the sign form is of
 by `ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview`.
 
 **ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused**: A signable page is drawn, the record is changed through
-the service, and the occupant signs with the right password; the message says the record changed and no signature is
+the service (an included Finding is started and resolved with a note), and the occupant signs with the right
+password; the message says the record changed and no signature is
 stored. This scenario is tested by `ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused`.
 
 **OidcReauth_ReviewPage_OffersConfirmationThenSigning**: Through the real pipeline with a fake identity provider (the

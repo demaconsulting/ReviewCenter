@@ -184,22 +184,27 @@ its files, the new review's files and checklist, and the creation time, and retu
   checklist with the same title, with its reason, setter and time, marked in the same way.
 - *Threads*: in the order of the earlier threads. A resolved thread is counted (`ResolvedThreadsNotCarried`) and not
   carried. An open thread whose file is not in the new review goes to `DroppedThreadFiles` (sorted, distinct). Any
-  other open thread is carried open with every comment verbatim (author, user name, text, time), its original
-  creation time, `CarriedFromReviewId` and `CarriedFromThreadId` (the number it had there).
+  other open thread is carried open with every comment verbatim (author, user name, text, time, kind, and the report
+  flag), its original creation time, `CarriedFromReviewId` and `CarriedFromThreadId` (the number it had there). A
+  carried Finding therefore stays a Finding, carried chat stays chat, and a carried resolution note keeps its flag.
 - *Anchors*: a thread keeps its anchor when it is anchored to the whole file, or when the file has the identical,
   non-empty hash on the side the thread is anchored to in both reviews (the head side compares `Sha256`, the baseline
   side compares `BaselineSha256`; a file that was not there counts as different). Otherwise the thread becomes a
   whole-file thread on the head side (the model has no "nearest line", and a wrong line would be worse than none) and a
   last comment is added by the author `ReviewCenter` with the user name `(system)`, dated with the creation of the new
   review, that says the thread was carried, that the file is not the same, and which lines on which side it was
-  anchored to. The note is added after the original comments (not before them) so that the carried comments keep their
+  anchored to. The note is a plain comment that is not included in the report, so it never changes the digest. The
+  note is added after the original comments (not before them) so that the carried comments keep their
   order and the first comment stays the one that was written first.
 - Reviewer slots, signatures, the reopenings, and the person who created the follow-up are never part of the carry:
   the carried answers keep the original answerer, so the creator does not become the answerer of anything, and the
   independence rule still looks at `Review.CreatedBy` only.
+- The review conclusion text of the earlier review (the free text of the record) is never carried: a follow-up starts
+  without one, because the conclusion belongs to the review it was written for.
 
 A carried answer counts as an answer (the progress of the checklist and `SigningService.Assess` need no change), and a
-carried thread is an open thread, so it blocks approval until it is resolved. Answering a carried check again, or
+carried thread is an open thread, so it blocks signing and the conclusion until it is resolved. Answering a carried
+check again, or
 setting a carried section again, stores the new value without the mark (see `ChecklistService`).
 
 **Preview of a follow-up**: `PreviewFollowUpAsync` takes the project, the earlier review, the uploaded files and the

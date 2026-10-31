@@ -283,6 +283,54 @@ public class ReviewFollowUpStoreTests
     }
 
     /// <summary>
+    ///     Test that a carried Finding keeps its flags: the included starting comment and the included resolution
+    ///     comment round-trip with their kinds, and the thread is a Finding when read back.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind()
+    {
+        // Arrange: a first review and a carry whose thread is a Finding with an included resolution note
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddFirstAsync(db);
+        var carry = NewCarry(projectId);
+        var thread = carry.Threads[0];
+        thread.Comments.Clear();
+        thread.Comments.AddRange(
+        [
+            new ReviewComment
+            {
+                Author = "Bob",
+                AuthorUsername = "bob",
+                Text = "Check this",
+                Created = _created,
+                IncludeInReport = true
+            },
+            new ReviewComment
+            {
+                Author = "Ann",
+                AuthorUsername = "ann",
+                Text = "Fixed",
+                Created = _created,
+                IncludeInReport = true,
+                Kind = ReviewCommentKind.Resolution
+            },
+            new ReviewComment { Author = "Cy", AuthorUsername = "cy", Text = "Chat", Created = _created }
+        ]);
+
+        // Act
+        await db.Store.AddReviewAsync(NewReview(projectId, "REV-2", "REV-1", carry), cancellationToken);
+        var stored = Assert.Single(await db.Store.ListThreadsAsync(projectId, "REV-2", cancellationToken));
+
+        // Assert: the flags and kinds are stored per comment, and the thread is a Finding
+        Assert.Equal(ThreadKind.Finding, stored.Kind);
+        Assert.Equal([true, true, false], stored.Comments.Select(c => c.IncludeInReport));
+        Assert.Equal(
+            [ReviewCommentKind.Comment, ReviewCommentKind.Resolution, ReviewCommentKind.Comment],
+            stored.Comments.Select(c => c.Kind));
+    }
+
+    /// <summary>
     ///     Test that the model has the index on the project and the followed review, which the lookup of the
     ///     reviews that follow a review will use.
     /// </summary>

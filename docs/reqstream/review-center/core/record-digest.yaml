@@ -3,8 +3,8 @@
 #
 # The RecordDigest class calculates the digest of a review record: the value a signature binds itself to. The digest
 # is a SHA-256 hash of a canonical text of the fingerprint, the source of the files, the checklist wording, the
-# checklist answers with who answered, the sections that do not apply, the threads with their comments and times,
-# and the number of reopenings.
+# checklist answers with who answered, the sections that do not apply, the report (the Findings and the included
+# comments of the threads), and the number of reopenings.
 
 sections:
   - title: RecordDigest Unit Requirements
@@ -13,7 +13,7 @@ sections:
         title: >-
           The RecordDigest class shall calculate the digest of a review record as the SHA-256 hash, written as 64
           lowercase hexadecimal characters, of a canonical text that is built in one documented way and starts with
-          the version header ReviewCenter record v1, so that the same record always gives the same digest.
+          the version header ReviewCenter record v2, so that the same record always gives the same digest.
         justification: |
           A signature is only evidence if the same record can be recognized later. Fixing the text that is hashed,
           and checking it against a known answer, means a change of the format cannot go unnoticed and make every
@@ -24,6 +24,10 @@ sections:
           - RecordDigest_Compute_KnownRecord_MatchesKnownValue
           - RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue
           - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+          - RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue
+          - RecordDigest_Canonicalize_Header_IsV2
+          - RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue
+          - RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue
 
       - id: ReviewCenter-RecordDigest-NullRecord
         title: >-
@@ -38,18 +42,29 @@ sections:
         title: >-
           The RecordDigest class shall give a different digest when the content fingerprint, the outcome
           (Pass, Fail, or NotApplicable) or justification of a check (an absent justification being different from
-          an empty one), an answered check, a section marked as not applicable or its reason, a thread or its file,
-          side, start line, end line (a whole-file thread being different from one with lines), state, or creation
-          time, or the author display name, author user name, text, time, or order of a comment, or a new comment,
-          changes.
+          an empty one), an answered check, a section marked as not applicable or its reason, a thread that has an
+          included comment or its file, side, start line, end line (a whole-file thread being different from one with
+          lines), or an included comment's kind, author display name, author user name, text, time, or order, or a new
+          included comment, changes, and shall give the same digest when only chat, the state of a thread, or the
+          creation time or identity of a thread changes. It shall also give a different digest when the review
+          conclusion text (the free text, not the approved or rejected conclusion) is set, changed or cleared, by
+          writing it as the line conclusion-text with its length and text between the sections and the report, and no
+          line when there is none, so that a record without a text keeps its digest.
         justification: |
           A signature approves what the reviewer saw. Anything the reviewer relied on must change the digest, or a
-          signature could stay current after the content, the answers, or the discussion it approved had changed.
+          signature could stay current after the content, the answers, or the report it approved had changed. Chat
+          and whether a thread is open are not part of what is signed, so they must not invalidate a signature;
+          an open thread blocks signing by a rule of its own. The review conclusion text is what the reviewers
+          concluded in words, so it is signed like the report.
         tests:
           - RecordDigest_Compute_CoveredChange_ChangesDigest
           - RecordDigest_Compute_CommentOrder_ChangesDigest
           - RecordDigest_Compute_ThreadSideChange_ChangesDigest
           - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+          - RecordDigest_Compute_ChatAddedToFinding_DigestUnchanged
+          - RecordDigest_Compute_ThreadState_NotCovered
+          - RecordDigest_Compute_ThreadCreatedAndIds_NotCovered
+          - RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-Checklist
         title: >-
@@ -126,15 +141,16 @@ sections:
 
       - id: ReviewCenter-RecordDigest-ThreadSide
         title: >-
-          The RecordDigest class shall write the side of every thread (Head or Baseline) into the canonical text
-          between the file path and the line range, and shall give a different digest
+          The RecordDigest class shall write the side of every thread of the report (Head or Baseline) into the
+          canonical text between the file path and the line range, and shall give a different digest
           for two records that differ only in the side of a thread.
         justification: |
           A comment on a baseline line is about different text than a comment on a head line of the same number.
-          A signature approves the discussion as it was, so the side must be part of what the signature binds to.
+          A signature approves the report as it was, so the side must be part of what the signature binds to.
         tests:
           - RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue
           - RecordDigest_Compute_ThreadSideChange_ChangesDigest
+          - RecordDigest_Compute_BaselineFinding_MatchesKnownValue
 
       - id: ReviewCenter-RecordDigest-Source
         title: >-
@@ -176,18 +192,20 @@ sections:
           while leaving the line out for a review that was never reopened keeps every existing signature and the
           evidence index valid.
         tests:
-          - RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest
+          - RecordDigest_Compute_ZeroReopens_EqualsDigestWithoutReopensLine
           - RecordDigest_Compute_ReopensChangeDigest
           - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+          - RecordDigest_Compute_Reopens_MatchesKnownValueAfterReport
 
       - id: ReviewCenter-RecordDigest-FollowUp
         title: >-
           The RecordDigest class shall cover the review that a follow-up review follows, as a line that is written
           only for a follow-up, and the review that a carried answer, a carried not-applicable section and a carried
-          thread came from, as a suffix that is written only on a carried line, shall give a different digest when
-          either changes, shall not cover the number that the carried thread had in the earlier review, and shall give
-          for a review that is not a follow-up, and has nothing carried, the same digest as before follow-up reviews
-          existed, without a new format version.
+          thread of the report came from, as a suffix that is written only on a carried line (a carried thread that
+          has no included comment is not written at all), shall give a different digest when either changes, shall
+          not cover the number that the carried thread had in the earlier review, and shall give
+          for a review that is not a follow-up, and has nothing carried, the same digest as a review without them,
+          without a new format version.
         justification: |
           What a signature approves includes whether the reviewers answered a check themselves or took the answer over
           from an earlier review, so a change of that is a change of the record. Leaving the lines out when they do
@@ -199,3 +217,34 @@ sections:
           - RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest
           - RecordDigest_Compute_CarriedFromThreadId_NotCovered
           - ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange
+          - RecordDigest_Compute_CarriedFinding_MatchesKnownValue
+
+      - id: ReviewCenter-RecordDigest-Report
+        title: >-
+          The RecordDigest class shall write the report of a review into the canonical text as the marker line
+          report followed by one block for every thread that has at least one included comment, shall write in a block
+          the file anchor of the thread and then, in the order they were posted, only the included comments as
+          claim (the starting comment of a Finding), comment (an included reply), or resolution (an included
+          resolution note) lines with the author display name, author user name, text, and time, shall sort the blocks
+          ordinally so that the order of the threads does not matter, shall not write chat or a thread without an
+          included comment, and shall keep the digest of a record without any included comment equal to that of the
+          empty report.
+        justification: |
+          The report is what the owner chooses to put into the signed record. A canonical layout that names the kind
+          of every line keeps a claim, a reply, and a resolution apart, and omitting everything else makes chat
+          free of consequences. The known values pin the layout so that a change of it cannot go unnoticed.
+        tests:
+          - RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue
+          - RecordDigest_Compute_ResolvedFinding_MatchesKnownValue
+          - RecordDigest_Compute_OpenFinding_MatchesKnownValue
+          - RecordDigest_Compute_QuestionWithIncludedReply_MatchesKnownValue
+          - RecordDigest_Compute_BaselineFinding_MatchesKnownValue
+          - RecordDigest_Compute_CarriedFinding_MatchesKnownValue
+          - RecordDigest_Compute_TwoIncludedThreads_SortedBlocksMatchKnownValue
+          - RecordDigest_Compute_ChatOnlyThreads_EqualsEmptyReport
+          - RecordDigest_Compute_PromoteDemote_ChangesDigestAndRoundTrips
+          - RecordDigest_Compute_ReplyInclusionToggle_ChangesDigest
+          - RecordDigest_Compute_ResolutionNote_CoveredOnlyWhenIncluded
+          - RecordDigest_Compute_ThreadOrder_SameDigest
+          - RecordDigest_Compute_ReportCommentOrder_ChangesDigest
+          - RecordDigest_Compute_DelimitersInReportText_DoNotCollide

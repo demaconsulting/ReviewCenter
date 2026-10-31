@@ -38,7 +38,7 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     error as for the service pre-check.
 ///     Every change is made through <see cref="AuditAppender.ExecuteAsync{TResult}"/>: one write transaction, under the
 ///     process-wide audit gate, that stores the change and its audit entry together or not at all. The changes of
-///     reviewed content and of the reviewer slots re-check inside that transaction that the review is not approved
+///     reviewed content and of the reviewer slots re-check inside that transaction that the review is not concluded
 ///     (locked) and refuse with <see cref="DomainRule.ReviewLocked"/> otherwise; so does the change of the due date,
 ///     which also compares the due date the caller read (compare-and-set).
 /// </remarks>
@@ -496,13 +496,42 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
-                // An approved review is locked; the check shares the transaction with the change
+                // A concluded review is locked; the check shares the transaction with the change
                 await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
 
                 // The comparison is part of the update statement, so it is atomic with the change (null needs IS NULL)
                 var rows = await context.Reviews
                     .Where(r => r.ProjectId == projectId && r.Id == reviewId && r.DueDate == expected)
                     .ExecuteUpdateAsync(r => r.SetProperty(x => x.DueDate, dueDate), cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateReviewConclusionTextAsync(
+        int projectId,
+        string reviewId,
+        string? expected,
+        string? reviewConclusionText,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // A concluded review is locked; the check shares the transaction with the change
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+
+                // The comparison is part of the update statement, so it is atomic with the change (null needs IS NULL)
+                var rows = await context.Reviews
+                    .Where(r => r.ProjectId == projectId && r.Id == reviewId && r.ReviewConclusionText == expected)
+                    .ExecuteUpdateAsync(
+                        r => r.SetProperty(x => x.ReviewConclusionText, reviewConclusionText),
+                        cancellationToken);
                 return rows > 0 ? (true, audit) : (false, null);
             },
             cancellationToken);
@@ -654,11 +683,10 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
-    public async Task<bool> SetThreadStateAsync(
+    public async Task<bool> ReopenThreadAsync(
         int projectId,
         string reviewId,
         int threadId,
-        ReviewThreadState state,
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
@@ -671,8 +699,167 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
                 var rows = await context.Threads
                     .Where(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, state), cancellationToken);
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, ReviewThreadState.Open), cancellationToken);
                 return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ResolveThreadAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ThreadKind expectedKind,
+        ReviewComment? resolution,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+                var thread = await context.Threads.AsNoTracking()
+                    .Include(t => t.Comments.OrderBy(c => c.Id))
+                    .FirstOrDefaultAsync(
+                        t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId,
+                        cancellationToken);
+
+                // A missing or already resolved thread changes nothing and leaves no audit entry
+                if (thread is null || thread.State == ReviewThreadState.Resolved)
+                {
+                    return (false, null);
+                }
+
+                // The kind is read again inside the transaction. The caller decided the note, the acknowledgement of
+                // the signatures and the report flag for the expected kind, so another kind is refused, not accepted
+                var isFinding = thread.Kind == ThreadKind.Finding;
+                if (thread.Kind != expectedKind)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.RecordChanged,
+                        "The thread was promoted or demoted while you were resolving it. Review it and try again.");
+                }
+
+                if (isFinding && resolution is null)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.ResolutionNoteRequired,
+                        "A finding can only be resolved with a note that says what was done.");
+                }
+
+                await context.Threads
+                    .Where(t => t.Id == threadId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, ReviewThreadState.Resolved), cancellationToken);
+                if (resolution is not null)
+                {
+                    context.Comments.Add(new ReviewComment
+                    {
+                        ThreadId = threadId,
+                        Author = resolution.Author,
+                        AuthorUsername = resolution.AuthorUsername,
+                        Text = resolution.Text,
+                        Created = resolution.Created,
+                        IncludeInReport = isFinding,
+                        Kind = ReviewCommentKind.Resolution
+                    });
+                    await context.SaveChangesAsync(cancellationToken);
+                }
+
+                return (true, audit);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetThreadKindAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ThreadKind kind,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+                var thread = await context.Threads.AsNoTracking()
+                    .Include(t => t.Comments.OrderBy(c => c.Id))
+                    .FirstOrDefaultAsync(
+                        t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId,
+                        cancellationToken);
+                if (thread is null || thread.Kind == kind)
+                {
+                    return (false, null);
+                }
+
+                // The starting comment decides the kind; the notes that resolved the thread follow it, replies do not
+                var include = kind == ThreadKind.Finding;
+                var followers = thread.Comments
+                    .Where((c, i) => i == 0 || c.Kind == ReviewCommentKind.Resolution)
+                    .Select(c => c.Id)
+                    .ToList();
+                await context.Comments
+                    .Where(c => followers.Contains(c.Id))
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.IncludeInReport, include), cancellationToken);
+                return (true, audit);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetCommentReportAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        int commentId,
+        bool include,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+                var thread = await context.Threads.AsNoTracking()
+                    .Include(t => t.Comments.OrderBy(c => c.Id))
+                    .FirstOrDefaultAsync(
+                        t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId,
+                        cancellationToken);
+                var comment = thread?.Comments.FirstOrDefault(c => c.Id == commentId);
+                if (thread is null || comment is null)
+                {
+                    return (false, null);
+                }
+
+                // The starting comment and the resolution notes follow the thread; only a reply can be set on its own
+                if (thread.Comments[0].Id == comment.Id || comment.Kind == ReviewCommentKind.Resolution)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.CommentNotTogglable,
+                        "Only a reply can be included on its own; promote or demote the thread to change its starting " +
+                        "comment and its resolution notes.");
+                }
+
+                if (comment.IncludeInReport == include)
+                {
+                    return (false, null);
+                }
+
+                await context.Comments
+                    .Where(c => c.Id == commentId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.IncludeInReport, include), cancellationToken);
+                return (true, audit);
             },
             cancellationToken);
     }
@@ -1053,6 +1240,16 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                         $"Slot {signature.SlotId} does not exist in this review.");
                 }
 
+                // The open-thread rule is checked again inside the write transaction: a thread that opened after the
+                // service looked cannot be signed over. Thread state is not part of the digest, so the digest check
+                // above cannot see it
+                if (record.Threads.Any(t => t.State != ReviewThreadState.Resolved))
+                {
+                    throw new DomainRuleException(
+                        DomainRule.SigningNotAllowed,
+                        "A thread is open; resolve it before signing.");
+                }
+
                 // Insert a fresh entity so that the database always assigns the identity
                 var entity = new ReviewSignature
                 {
@@ -1095,8 +1292,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         ArgumentNullException.ThrowIfNull(reopen);
         ArgumentNullException.ThrowIfNull(audit);
 
-        // The approval is checked again inside the write transaction, so two administrators who reopen at the same
-        // moment cannot both succeed: the second one finds the review no longer approved
+        // The conclusion is checked again inside the write transaction, so two administrators who reopen at the same
+        // moment cannot both succeed: the second one finds the review no longer concluded
         await appender.ExecuteAsync<bool>(
             factory,
             async context =>
@@ -1108,7 +1305,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                         $"Review '{reviewId}' does not exist.");
                 }
 
-                if (!await IsApprovedAsync(context, projectId, reviewId, cancellationToken))
+                if (!await IsConcludedAsync(context, projectId, reviewId, cancellationToken))
                 {
                     throw new DomainRuleException(
                         DomainRule.ReviewNotLocked,
@@ -1176,7 +1373,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <summary>
-    ///     Refuses the change when the review is approved; must run inside the audit transaction.
+    ///     Refuses the change when the review is concluded; must run inside the audit transaction.
     /// </summary>
     /// <param name="context">The context of the open transaction.</param>
     /// <param name="projectId">The project identity.</param>
@@ -1188,34 +1385,37 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     ///     change, so a final signature that commits between the service check and the change cannot be overtaken.
     ///     A review that does not exist is not locked.
     /// </remarks>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is approved.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded.</exception>
     private static async Task EnsureNotLockedAsync(
         ReviewCenterDbContext context,
         int projectId,
         string reviewId,
         CancellationToken cancellationToken)
     {
-        if (await IsApprovedAsync(context, projectId, reviewId, cancellationToken))
+        if (await IsConcludedAsync(context, projectId, reviewId, cancellationToken))
         {
             throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
         }
     }
 
     /// <summary>
-    ///     Tells whether a review is approved right now, using the one definition of <see cref="ReviewLock.IsApproved"/>.
+    ///     Tells whether a review is concluded right now, using the one definition of <see cref="ReviewLock.IsConcluded"/>.
     /// </summary>
     /// <param name="context">The context of the open transaction.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns><c>true</c> when the review exists, has slots and every slot holds a signature of the current digest.</returns>
-    private static async Task<bool> IsApprovedAsync(
+    /// <returns>
+    ///     <c>true</c> when the review exists, has slots, no thread is open and every slot holds a signature of the
+    ///     current digest.
+    /// </returns>
+    private static async Task<bool> IsConcludedAsync(
         ReviewCenterDbContext context,
         int projectId,
         string reviewId,
         CancellationToken cancellationToken)
     {
-        // Without a slot nothing can be approved; this skips loading the record for the common case
+        // Without a slot nothing can be concluded; this skips loading the record for the common case
         var slots = await context.ReviewerSlots.AsNoTracking()
             .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
             .ToListAsync(cancellationToken);
@@ -1233,7 +1433,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         var signatures = await context.Signatures.AsNoTracking()
             .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
             .ToListAsync(cancellationToken);
-        return ReviewLock.IsApproved(record, slots, signatures);
+        return ReviewLock.IsConcluded(record, slots, signatures);
     }
 
     /// <summary>
@@ -1297,7 +1497,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             var ids = chunk.ToList();
             var headers = await context.Reviews.AsNoTracking()
                 .Where(r => r.ProjectId == projectId && ids.Contains(r.Id))
-                .Select(r => new { r.Id, r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId, r.FollowsReviewId })
+                .Select(r => new { r.Id, r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId, r.FollowsReviewId, r.ReviewConclusionText })
                 .ToListAsync(cancellationToken);
             if (headers.Count == 0)
             {
@@ -1362,7 +1562,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     threads[header.Id].ToList(),
                     source,
                     reopens.GetValueOrDefault(header.Id),
-                    header.FollowsReviewId);
+                    header.FollowsReviewId,
+                    header.ReviewConclusionText);
             }
         }
 
@@ -1454,7 +1655,9 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             Author = comment.Author,
             AuthorUsername = comment.AuthorUsername,
             Text = comment.Text,
-            Created = comment.Created
+            Created = comment.Created,
+            IncludeInReport = comment.IncludeInReport,
+            Kind = comment.Kind
         };
     }
 

@@ -29,7 +29,8 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// </summary>
 /// <remarks>
 ///     An attestation is available only when the review is complete: every reviewer slot has a signature of the
-///     record as it is now (the existing completion rule of <see cref="SigningService"/>). Nothing is stored; the
+///     record as it is now and no thread is open (the existing completion rule of <see cref="SigningService"/>).
+///     Nothing is stored; the
 ///     PDF is built, signed and returned each time, and each creation is recorded in the audit trail. A key problem
 ///     never produces an unsigned or partly signed document and is not recorded as an attestation. Because reading,
 ///     verifying the audit chain, and rendering take time, the review is read again after rendering and before
@@ -201,7 +202,7 @@ internal sealed class AttestationService
         {
             return actor is null
                 ? NotFoundResult()
-                : new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record.");
+                : new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record, or a thread is open.");
         }
 
         // Then the key: without a usable key there is nothing to produce, and nothing is recorded

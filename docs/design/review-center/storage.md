@@ -66,15 +66,22 @@ application; the rest of the system sees only the Core store interfaces.
   stored with the project in one
   nullable, unbounded text column (null stands for the built-in default) and changed by a compare-and-set on the hash of
   the stored text (`UpdateChecklistDefinitionAsync`, audited as `project.checklist-changed` in the same transaction, so
-  the hash chain stays intact). An approved review is locked: the operations that change a thread, a
+  the hash chain stays intact). A concluded review is locked: the operations that change a thread, a
   comment, a checklist section or answer, or a reviewer slot re-check inside their own transaction that the review is
-  not approved and raise a `DomainRuleException` for `ReviewLocked` otherwise (nothing is stored). A reopen of an
-  approved review (`ReopenReviewAsync`) is stored as a row of the append-only `ReviewReopens` table together with its
-  audit entry, after the same transaction re-checked that the review is approved (`ReviewNotLocked` otherwise); the
-  number of reopens is part of the record that is read for the digest. The due date of a review (`DueDate`, a nullable
+  not concluded and raise a `DomainRuleException` for `ReviewLocked` otherwise (nothing is stored). A reopen of a
+  concluded review (`ReopenReviewAsync`) is stored as a row of the append-only `ReviewReopens` table together with its
+  audit entry, after the same transaction re-checked that the review is concluded (`ReviewNotLocked` otherwise); the
+  number of reopens is part of the record that is read for the digest. A comment is stored with its report flag
+  (`IncludeInReport`) and its kind (`Comment` or `Resolution`); resolving a thread stores the optional resolution
+  comment in the same transaction and compares the kind of the thread read there with the kind the caller expected
+  (`RecordChanged` when they differ), setting the flag of the comment from it;
+  promoting or demoting a thread sets the flag of its starting comment and its resolution comments in one transaction,
+  and setting the flag of one reply does the same for that comment, each with its audit entry and only when the stored
+  value changes. A signature is refused with `SigningNotAllowed` when any thread of the review is open, checked in the
+  signing transaction after the digest check. The due date of a review (`DueDate`, a nullable
   date column of the `Reviews` table) is changed by a compare-and-set (`UpdateDueDateAsync`) that stores the new date
   together with the audit entry `review.due-date-changed` in one transaction, after the same transaction re-checked
-  that the review is not approved (`ReviewLocked` otherwise), and otherwise changes nothing and returns `false`. A
+  that the review is not concluded (`ReviewLocked` otherwise), and otherwise changes nothing and returns `false`. A
   follow-up review is stored with the answers, section states and threads (with their comments) that were carried
   from the earlier review, in the same transaction as the review and its audit entry (`AddReviewAsync`), and a
   re-answer or re-set of a carried row replaces the row without its carried marker. The
@@ -187,7 +194,7 @@ with migrations. This is adequate while there is no released schema to upgrade: 
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
 data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
-already matters ten times: the tables for comment threads were added after the first schema, the tables for review
+already matters eleven times: the tables for comment threads were added after the first schema, the tables for review
 checklists after those, the users table and the user name columns of comments, answers, and section decisions
 after those, the tables of reviewer slots and signatures after those, the audit table after those, the
 `Repositories` table after that, the source and change columns of reviews from a repository after that, and the
@@ -196,7 +203,8 @@ the project of a repository and the system administrator flag of a user after th
 of a user after that, and the external identity columns of a user after that, and the `ReviewReopens` table with
 the `RequireIndependentReviewers` column of a project after that, and the `RequireNonAuthorChecklistAnswers` and
 `RequireNonReopenerSigning` columns of a project after that, and the `DueDate` column of a review after that, and the
-follow-up columns of reviews, answers, section states and threads after that, so a
+follow-up columns of reviews, answers, section states and threads after that, and the `IncludeInReport` and `Kind`
+columns of comments after that, so a
 database
 created before them does not
 have them and the pages fail until the
@@ -287,8 +295,8 @@ and would need an equivalent for another provider.
 
 **Approval lock in the transaction**: `ReviewStore` repeats the Core lock rule inside the write transactions that change
 reviewed content or reviewer slots (and inside the reopen). It loads the slots, the record, and the signatures in the
-same serialized transaction and calls the Core `ReviewLock.IsApproved`, so the store and the services share one
-definition of "approved". Because the write lock is taken when the transaction begins, a final signature cannot commit
+same serialized transaction and calls the Core `ReviewLock.IsConcluded`, so the store and the services share one
+definition of "concluded". Because the write lock is taken when the transaction begins, a final signature cannot commit
 between the check and the change; this closes the gap that the service-level check, which runs earlier, leaves open.
 This is SQLite specific in the same way as the signing transaction.
 

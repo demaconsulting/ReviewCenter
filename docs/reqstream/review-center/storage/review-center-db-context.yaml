@@ -60,15 +60,19 @@ sections:
           The ReviewCenterDbContext class shall map threads and comments to tables in which a thread belongs to
           an existing file of its review and a comment belongs to a thread, so that the database refuses a
           thread for a file that does not exist and deletes the comments of a deleted thread, and shall map the side
-          of a thread as text with Head as the default.
+          of a thread as text with Head as the default, and shall map the kind of a comment as text with Comment as the
+          default and the report flag of a comment as a column that is false by default; the kind of a thread is not
+          stored, it is derived from its starting comment.
         justification: |
           A thread is about one file of one review. Having the database enforce that relationship keeps the
           record consistent even when two requests overlap or a programming error occurs. Storing the side by
-          name keeps the stored value readable and independent of the order of the enumeration.
+          name keeps the stored value readable and independent of the order of the enumeration. A comment that was
+          stored without the new columns is chat, so nothing becomes part of the signed record by accident.
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
           - ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase
           - ReviewStore_AddThreadAsync_Side_IsStoredAsText
+          - ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment
 
       - id: ReviewCenter-DbContext-Checklist
         title: >-
@@ -146,6 +150,20 @@ sections:
           migrated while the product is not released, so development databases are recreated.
         tests:
           - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
+
+      - id: ReviewCenter-DbContext-ReviewConclusionText
+        title: >-
+          The ReviewCenterDbContext class shall map the optional review conclusion text of a review (the free text, not
+          the approved or rejected conclusion) to one nullable text column of the review table that is limited to
+          4000 characters, so that a review that was not given a text reads back with none and a text reads back
+          unchanged. The schema is created from the model without a migration, so a development database that was
+          created before the column existed has to be recreated.
+        justification: |
+          The text belongs to exactly one review and is read with it, so it is a column of the review. The limit keeps
+          the signed record small and the same everywhere. The schema is created from the model and not migrated
+          while the product is not released, so development databases are recreated.
+        tests:
+          - ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional
 
       - id: ReviewCenter-DbContext-FollowUp
         title: >-

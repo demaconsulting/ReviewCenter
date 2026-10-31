@@ -196,7 +196,9 @@ sections:
           The Core subsystem shall start comment threads on a file of a review, anchored to the whole file or a
           line range, let anyone reply, resolve and reopen threads, and read the threads of a review back with
           their comments in order, never changing or removing a posted comment, and give the last activity of a
-          thread, an index of threads by state, and a next step.
+          thread, an index of threads by state, and a next step. A comment shall be chat unless it is included in the
+          report; the owner rules for including comments, resolution notes, and promoting and demoting threads are
+          met by the ThreadService requirements below.
         justification: |
           Review comments are the purpose of a review. Keeping posted comments unchanged makes the discussion a
           reliable record of what was said and in which order.
@@ -207,6 +209,10 @@ sections:
           - ReviewCenter-ThreadService-Read
           - ReviewCenter-ThreadService-Index
           - ReviewCenter-ThreadService-NextStep
+          - ReviewCenter-ThreadService-IncludedComment
+          - ReviewCenter-ThreadService-ResolutionNote
+          - ReviewCenter-ThreadService-Promote
+          - ReviewCenter-ThreadService-CommentToggle
         tests:
           - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder
 
@@ -252,6 +258,8 @@ sections:
           - ReviewCenter-ChecklistService-Answer
           - ReviewCenter-ChecklistService-AnsweredBy
           - ReviewCenter-ChecklistService-Progress
+          - ReviewCenter-ChecklistService-ReviewConclusionText
+          - ReviewCenter-ChecklistService-ReviewConclusionTextAudit
         tests:
           - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
 
@@ -312,6 +320,7 @@ sections:
           - ReviewCenter-RecordDigest-SectionSetter
           - ReviewCenter-RecordDigest-Independence
           - ReviewCenter-RecordDigest-Unambiguous
+          - ReviewCenter-RecordDigest-Report
           - ReviewCenter-SigningService-Slots
           - ReviewCenter-SigningService-SlotUsers
           - ReviewCenter-SigningService-SlotEdit
@@ -346,6 +355,8 @@ sections:
           - ReviewCenter-SigningService-ApprovalLock
           - ReviewCenter-SigningService-Reopen
           - ReviewCenter-ThreadService-ApprovalLock
+          - ReviewCenter-ThreadService-ConcludedRefusal
+          - ReviewCenter-SigningService-OpenThreadRule
           - ReviewCenter-ChecklistService-ApprovalLock
           - ReviewCenter-RecordDigest-ReopenCount
         tests:
@@ -444,6 +455,7 @@ sections:
           - ReviewCenter-ProjectChecklistService-Audit
           - ReviewCenter-ReviewService-Audit
           - ReviewCenter-ThreadService-Audit
+          - ReviewCenter-ThreadService-ReportAudit
           - ReviewCenter-ChecklistService-Audit
           - ReviewCenter-SigningService-Audit
           - ReviewCenter-UserService-Audit

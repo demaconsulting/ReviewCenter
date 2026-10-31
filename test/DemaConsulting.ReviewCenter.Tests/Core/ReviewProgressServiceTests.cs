@@ -163,8 +163,8 @@ public partial class ReviewProgressServiceTests
             auditStore,
             reviews,
             signing,
-            new ChecklistService(store, access, clock),
-            new ThreadService(store, access, clock),
+            new ChecklistService(store, access, userStore, clock),
+            new ThreadService(store, access, userStore, clock),
             users,
             progress,
             project.Id,
@@ -415,7 +415,8 @@ public partial class ReviewProgressServiceTests
             _member,
             "Look",
             cancellationToken,
-            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "rev-1"));
+            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "rev-1"),
+            true);
         var after = await ProgressOfAsync(world, "rev-1");
 
         // Assert: one signed before; afterwards that signature is out of date and the thread blocks
@@ -423,6 +424,38 @@ public partial class ReviewProgressServiceTests
         Assert.Equal((2, 0, 1), (after.SlotsRequired, after.SlotsSigned, after.SlotsOutOfDate));
         Assert.Equal(1, after.OpenThreads);
         Assert.Equal(ReviewStage.InReview, after.Stage);
+    }
+
+    /// <summary>
+    ///     Test that a review whose every slot is signed but that has a thread open is in review and blocked, not
+    ///     approved, in line with the approval status.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked()
+    {
+        // Arrange: reviewer1 signs, a chat thread is opened, and the unsigned slot of reviewer2 is removed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AnswerAllAsync(world, "rev-1");
+        var first = await AddSlotAsync(world, "rev-1", "reviewer1");
+        var second = await AddSlotAsync(world, "rev-1", "reviewer2");
+        await SignAsync(world, "rev-1", first, _reviewerOne);
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "rev-1", new ThreadAnchor("a.txt"), _member, "Question", cancellationToken);
+        await world.Signing.RemoveSlotAsync(_projectAdmin, world.ProjectId, "rev-1", second, cancellationToken);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+        var approval = (await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", cancellationToken))!;
+
+        // Assert
+        Assert.Equal((1, 1), (progress.SlotsRequired, progress.SlotsSigned));
+        Assert.Equal(ReviewStage.InReview, progress.Stage);
+        Assert.False(progress.IsApproved);
+        Assert.True(progress.IsBlocked);
+        Assert.Equal(1, progress.OpenThreads);
+        Assert.Equal(approval.IsApproved, progress.IsApproved);
     }
 
     /// <summary>

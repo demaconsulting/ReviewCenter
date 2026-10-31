@@ -122,9 +122,11 @@ sections:
         children:
           - ReviewCenter-ReviewStore-Slots
           - ReviewCenter-ReviewStore-Record
+          - ReviewCenter-ReviewStore-ReviewConclusionText
           - ReviewCenter-ReviewStore-Signatures
           - ReviewCenter-ReviewStore-SnapshotBatch
           - ReviewCenter-DbContext-Signatures
+          - ReviewCenter-DbContext-ReviewConclusionText
         tests:
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
 
@@ -147,6 +149,7 @@ sections:
           - ReviewCenter-AuditStore-Filter
           - ReviewCenter-AuditStore-ReadMatching
           - ReviewCenter-ReviewStore-Audit
+          - ReviewCenter-ReviewStore-ThreadReport
           - ReviewCenter-UserStore-Audit
           - ReviewCenter-RepositoryStore-Audit
           - ReviewCenter-DbContext-AuditEntries
@@ -318,6 +321,7 @@ sections:
           evidence about the review and must survive a restart and stay true.
         children:
           - ReviewCenter-ReviewStore-ApprovalLockInTransaction
+          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck
           - ReviewCenter-ReviewStore-ReopenHistory
           - ReviewCenter-ReviewStore-ReopenRefusal
           - ReviewCenter-ReviewStore-ReopenCount

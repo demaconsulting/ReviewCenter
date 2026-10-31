@@ -360,12 +360,16 @@ sections:
           store it together with the review in one call: the Pass and N/A answers of checks that are in the checklist
           of the new review with the same wording, with their outcome, justification, answerer and time, but not the
           Fail answers; the not-applicable sections that are in the new checklist with the same title, with their
-          reasons; and the open threads whose file is in the new review, with every comment unchanged and the thread
-          open. A thread keeps its line anchor only when the file has the same content on the side it is anchored to,
-          and otherwise refers to the whole file, with a note from the system, added after the comments, that gives the
+          reasons; and the open threads whose file is in the new review, with every comment unchanged, the kind of
+          the thread and the report flag of every comment kept (a carried Finding stays a Finding and carried chat
+          stays chat), and the thread open. A thread keeps its line anchor only when the file has the same content on
+          the side it is anchored to,
+          and otherwise refers to the whole file, with a note from the system, added after the comments and not
+          included in the report, that gives the
           original anchor. Resolved threads, reviewer slots, signatures and reopenings are not carried, the person who
           creates the follow-up does not become the answerer of anything, and everything that is carried is marked with
-          the review it came from.
+          the review it came from, and shall not carry the review conclusion text (the free text, not the approved or
+          rejected conclusion).
         justification: |
           What a person has already answered and not failed is still true of unchanged wording, and answering it again
           wastes time and invites mistakes. A Fail is the reason for the follow-up, so it must be answered again. A
@@ -373,12 +377,18 @@ sections:
           where it was. The original text and author of a comment are evidence, so they are copied unchanged. Slots and
           signatures belong to the record that was signed, and the person who creates the review must not look like
           the one who answered. A failed carry must not leave a half-built review, so all rows are stored together.
+          The review conclusion text is the free text the reviewers wrote about the earlier record, so it is not
+          carried either: the follow-up starts without one.
         tests:
           - FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer
           - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
           - FollowUpCarry_Compute_SourceWithoutChecklist_CarriesNoChecklistRows
           - FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame
           - FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim
+          - FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments
+          - FollowUpCarry_CarryThreads_CarriedChat_StaysChat
+          - FollowUpCarry_CarryThreads_MovedAnchorNote_IsExcludedComment
+          - ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind
           - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
           - FollowUpCarry_Compute_LineAnchor_IsKeptOnlyForIdenticalContent
           - FollowUpCarry_Compute_SingleLineWholeFileAndUnknownHash_AreHandled
@@ -386,6 +396,7 @@ sections:
           - ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried
           - ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors
           - ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor
+          - ReviewService_CreateFollowUpAsync_ReviewConclusionText_NotCarried
           - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
           - ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened
 

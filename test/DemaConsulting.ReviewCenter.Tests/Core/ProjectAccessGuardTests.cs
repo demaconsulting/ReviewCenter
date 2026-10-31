@@ -68,6 +68,10 @@ public class ProjectAccessGuardTests
             ["reply"] = () => world.Threads.ReplyAsync(project, "rev-1", world.ThreadId, actor, "hello", cancellationToken),
             ["resolve"] = () => world.Threads.ResolveAsync(project, "rev-1", world.ThreadId, actor, cancellationToken),
             ["reopen"] = () => world.Threads.ReopenAsync(project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["promote"] = () => world.Threads.PromoteAsync(project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["demote"] = () => world.Threads.DemoteAsync(project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["toggle comment"] = () => world.Threads.SetCommentIncludedAsync(
+                project, "rev-1", world.ThreadId, 1, true, actor, cancellationToken),
             ["answer"] = () => world.Checklists.SetAnswerAsync(
                 project, "rev-1", item, ChecklistOutcome.Pass, null, actor, cancellationToken),
             ["applicability"] = () => world.Checklists.SetSectionApplicabilityAsync(
@@ -206,6 +210,7 @@ public class ProjectAccessGuardTests
     private static readonly string[] _refusedForAuditor =
     [
         "ChecklistService.SetAnswerAsync",
+        "ChecklistService.SetReviewConclusionTextAsync",
         "ChecklistService.SetSectionApplicabilityAsync",
         "RepositoryService.ListEnabledAsync",
         "ReviewPlanner.CreateAsync",
@@ -221,9 +226,12 @@ public class ProjectAccessGuardTests
         "SigningService.SignAsync",
         "SigningService.SignWithCredentialsAsync",
         "SigningService.UpdateSlotAsync",
+        "ThreadService.DemoteAsync",
+        "ThreadService.PromoteAsync",
         "ThreadService.ReopenAsync",
         "ThreadService.ReplyAsync",
         "ThreadService.ResolveAsync",
+        "ThreadService.SetCommentIncludedAsync",
         "ThreadService.StartThreadAsync"
     ];
 
@@ -232,6 +240,7 @@ public class ProjectAccessGuardTests
     /// </summary>
     private static readonly string[] _reads =
     [
+        "ChecklistService.CanSetReviewConclusionTextAsync",
         "ProjectChecklistService.GetAsync",
         "ProjectService.GetAsync",
         "ProjectService.ListAsync",
@@ -297,10 +306,18 @@ public class ProjectAccessGuardTests
                 project, "rev-1", world.ThreadId, actor, cancellationToken),
             ["ThreadService.ReopenAsync"] = () => world.Threads.ReopenAsync(
                 project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["ThreadService.PromoteAsync"] = () => world.Threads.PromoteAsync(
+                project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["ThreadService.DemoteAsync"] = () => world.Threads.DemoteAsync(
+                project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["ThreadService.SetCommentIncludedAsync"] = () => world.Threads.SetCommentIncludedAsync(
+                project, "rev-1", world.ThreadId, 1, true, actor, cancellationToken),
             ["ChecklistService.SetAnswerAsync"] = () => world.Checklists.SetAnswerAsync(
                 project, "rev-1", item, ChecklistOutcome.Pass, null, actor, cancellationToken),
             ["ChecklistService.SetSectionApplicabilityAsync"] = () => world.Checklists.SetSectionApplicabilityAsync(
                 project, "rev-1", section, false, "not needed", actor, cancellationToken),
+            ["ChecklistService.SetReviewConclusionTextAsync"] = () => world.Checklists.SetReviewConclusionTextAsync(
+                project, "rev-1", "A conclusion.", actor, cancellationToken),
             ["SigningService.AddSlotAsync"] = () => world.Signing.AddSlotAsync(
                 actor, project, "rev-1", world.Ids["usr"], null, cancellationToken),
             ["SigningService.UpdateSlotAsync"] = () => world.Signing.UpdateSlotAsync(
@@ -486,8 +503,8 @@ public class ProjectAccessGuardTests
         var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), access, clock);
         var git = new FakeGitRepositoryProvider();
         var reviews = new ReviewService(store, access, clock, repositories, git);
-        var threads = new ThreadService(store, access, clock);
-        var checklists = new ChecklistService(store, access, clock);
+        var threads = new ThreadService(store, access, userStore, clock);
+        var checklists = new ChecklistService(store, access, userStore, clock);
         var signing = new SigningService(store, users, access, clock);
         var planner = new ReviewPlanner(store, reviews, repositories, git, signing, new FakeReviewSetParser(), access);
 

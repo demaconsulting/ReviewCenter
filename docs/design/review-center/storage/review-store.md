@@ -8,7 +8,7 @@
 to persist projects, project memberships, reviews, file content, comment threads, checklists, reviewer slots,
 signatures, and review reopens, and to read
 them back, translating database behavior into the terms of the domain. It also enforces, inside its write
-transactions, that an approved review is locked.
+transactions, that a concluded review is locked.
 
 #### Data Model
 
@@ -24,8 +24,10 @@ commits (see the `AuditStore` unit).
 `SetMembershipRoleAsync`, `UpdateEvidenceSettingsAsync`, `UpdateRequireIndependentReviewersAsync`,
 `UpdateReviewRuleAsync`, `AddReviewAsync`,
 `AddThreadAsync`, `AddCommentAsync`,
-`SetThreadStateAsync`, `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
-`RemoveSlotAsync`, `UpdateDueDateAsync`, `AddSignatureAsync`, and `ReopenReviewAsync` take the audit draft of the
+`ReopenThreadAsync`, `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
+`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
+`RemoveSlotAsync`, `UpdateDueDateAsync`, `UpdateReviewConclusionTextAsync`, `AddSignatureAsync`, and
+`ReopenReviewAsync` take the audit draft of the
 change (or a function that builds it from the stored entity, when the draft names an identity that the database
 assigns). The change and
 its audit entry are
@@ -34,18 +36,21 @@ review that is not found) returns its null or false result and stores no entry. 
 duplicate review identifier or a refused signature, rolls back the change and the entry together. The descriptions below
 are of the change itself.
 
-**Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `SetThreadStateAsync`,
-`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`, and
-`UpdateDueDateAsync` call
+**Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `ReopenThreadAsync`,
+`ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
+`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`,
+`UpdateDueDateAsync`, and `UpdateReviewConclusionTextAsync` call
 the private `EnsureNotLockedAsync` first, inside the same serialized transaction as the change. It loads the slots, the
 record (with its reopen count), and the signatures with the same code as `AddSignatureAsync`, and asks the Core
-`ReviewLock.IsApproved`, the one definition of "approved", so the store and the services cannot disagree. When the review
-is approved it raises `DomainRuleException` with `ReviewLocked` (the message of `ReviewLock.LockedMessage`), and the
-transaction rolls back: nothing is stored and no audit entry is written. A review without slots is never approved, and
+`ReviewLock.IsConcluded`, the one definition of "concluded" (every slot signed for the current record and no thread
+open), so the store and the services cannot disagree. When the review
+is concluded it raises `DomainRuleException` with `ReviewLocked` (the message of `ReviewLock.LockedMessage`), and the
+transaction rolls back: nothing is stored and no audit entry is written. A review without slots is never concluded, and
 the check returns early without loading the record. This is defense in depth behind the Core services and closes the
 race with a concurrent final signature: because the write transaction holds the database write lock, a signature
-cannot commit between the check and the change. `AddSignatureAsync` compares the digest inside its own transaction, and
-reads are not affected.
+cannot commit between the check and the change. `AddSignatureAsync` compares the digest inside its own transaction and,
+after the digest check, refuses with `SigningNotAllowed` when any thread of the review is open (a thread that was
+started or reopened after the signer loaded the page); reads are not affected.
 
 **AddProjectAsync**: Stores a project and returns it with the identity assigned by the database. The unit copies the
 name, description, and creation time into a new entity, so an identity supplied by the caller is ignored and can
@@ -140,12 +145,32 @@ not exist is refused earlier by the access check and never reaches the store.
 - *Postconditions*: Either the new date and the audit entry (`review.due-date-changed`, carrying the project and the
   review) are stored in the same serialized transaction, so the hash chain stays intact, or nothing is.
 
-The change first runs the approval check of the transaction (`EnsureNotLockedAsync`), so a review that is approved at
+The change first runs the approval check of the transaction (`EnsureNotLockedAsync`), so a review that is concluded at
 that moment is refused with `ReviewLocked` and nothing is stored. It then writes with one `ExecuteUpdate` statement
 whose condition repeats the expected date (`WHERE ProjectId = p AND Id = r AND DueDate = expected`; a null compares as
 `IS NULL`), so two people who save at the same time cannot both succeed: the second affects no row, gets `false`, and
 leaves no change and no entry. Only the column of that review is written, and the date is not part of the record
 digest. `ReviewService` turns the `false` into `RecordChanged`.
+
+**UpdateReviewConclusionTextAsync**: Changes the optional review conclusion text of one review (the free text of the
+record; not the approved or rejected conclusion) if it still equals the text the caller started from (compare-and-set).
+
+- *Parameters*: the project identity, the review identifier, the expected text (`string?`, null for none), the new text
+  (null to clear it), and the audit draft of the change.
+- *Returns*: `Task<bool>` — `true` when the text was changed; `false` when the review does not exist or the stored text
+  is no longer the expected one.
+- *Preconditions*: the audit draft is not null (`ArgumentNullException` otherwise).
+- *Postconditions*: Either the new text and the audit entry (`review.conclusion-changed`, carrying the project and the
+  review, with lengths only) are stored in the same serialized transaction, so the hash chain stays intact, or nothing
+  is.
+
+The change first runs the approval check of the transaction (`EnsureNotLockedAsync`), so a review that is concluded at
+that moment is refused with `ReviewLocked` and nothing is stored. It then writes with one `ExecuteUpdate` statement
+whose condition repeats the expected text (`WHERE ProjectId = p AND Id = r AND ReviewConclusionText = expected`; a null
+compares as `IS NULL`), so two people who save at the same time cannot both succeed: the second affects no row, gets
+`false`, and leaves no change and no entry. Only the column of that review is written. Unlike the due date, the text is
+part of the record digest, so `LoadRecordsAsync` (shared by `GetSnapshotAsync`, `GetRecordAsync` and the batch read)
+selects the column and puts it into the `ReviewRecord`. `ChecklistService` turns the `false` into `RecordChanged`.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 
@@ -207,17 +232,38 @@ absent or the file has no baseline.
 
 **AddThreadAsync**: Stores a thread together with its first comment in one save, which is one transaction. Fresh
 entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns
-them; the thread keeps its side, and the comment keeps the display name and the user name of its author. A thread for
+them; the thread keeps its side, and the comment keeps the display name and the user name of its author, its kind,
+and its report flag. A thread for
 a file that does not exist in
 the review is refused by the relationship constraint of the
 database.
 
-**AddCommentAsync**: Appends a comment to a thread, with the display name and the user name of its author. It first
+**AddCommentAsync**: Appends a comment to a thread, with the display name, the user name of its author, and its report
+flag. It first
 checks that the thread belongs to the stated project
 and review and returns null when it does not, so a thread identity from another review cannot be commented on.
 
-**SetThreadStateAsync**: Sets the state of a thread of the stated review with a single update statement and
-returns whether a thread was found.
+**ReopenThreadAsync**: Sets a thread of the stated review to open with a single update statement and returns whether a
+thread was found. `ThreadService` uses it to reopen a thread. It takes no state: it cannot resolve, so every resolution
+of a thread goes through `ResolveThreadAsync` and its resolution-note rule, and the store has no other way to change
+the state of a thread.
+
+**ResolveThreadAsync**: Resolves an open thread and, when a resolution comment is given, stores it in the same
+transaction. The caller passes the kind of the thread that it based the note, the acknowledgement of the signatures
+and the report flag on. The store reads the thread and its starting comment inside the transaction and compares the
+kind it finds there with the expected kind: a difference (a promote or demote landed in between) raises
+`RecordChanged` and stores nothing, no state, no comment and no audit entry. When the kinds agree, the comment is
+stored with the kind `Resolution` and its flag set to whether the thread is a Finding, and a Finding without a
+comment raises `ResolutionNoteRequired`. A thread that does not exist or is already resolved returns `false` and
+stores nothing, no comment and no audit entry.
+
+**SetThreadKindAsync**: Promotes or demotes a thread by setting the report flag of its starting comment and of its
+resolution comments (replies keep theirs) with `ExecuteUpdateAsync`, and returns `true` only when the thread had the
+other kind.
+
+**SetCommentReportAsync**: Sets the report flag of one reply, with a single update. The starting comment and the
+resolution comments are refused with `CommentNotTogglable`; a thread or comment that does not exist, or a flag that
+already has the value, returns `false` and stores no entry.
 
 **ListThreadsAsync**: Lists the threads of one review, for every file, with their comments. Threads and comments
 are ordered by identity, which grows with the order of creation; the creation time is not used for ordering because
@@ -321,7 +367,7 @@ inserts a fresh entity copied from the argument (so the database assigns the ide
 `ReviewStore_SerializableTransaction_TakesWriteLockAtBegin` shows the lock behavior: while one connection has only
 begun a `Serializable` transaction, a write from a second connection fails with SQLITE_BUSY.
 
-**ReopenReviewAsync**: Reopens an approved review: stores a `ReviewReopen` and its audit entry (`review.reopened`) in
+**ReopenReviewAsync**: Reopens a concluded review: stores a `ReviewReopen` and its audit entry (`review.reopened`) in
 one transaction.
 
 - *Parameters*: the project identity, the review identifier, the `ReviewReopen` to store, and the audit draft.
@@ -330,8 +376,8 @@ one transaction.
   raised.
 
 Inside the write transaction the method checks that the review row exists (`ReviewNotFound` otherwise) and that the
-review is still approved by the same check as the lock (`ReviewNotLocked` otherwise), so two administrators who reopen
-at the same moment cannot both succeed: the second one finds the review no longer approved. It then inserts a fresh
+review is still concluded by the same check as the lock (`ReviewNotLocked` otherwise), so two administrators who reopen
+at the same moment cannot both succeed: the second one finds the review no longer concluded. It then inserts a fresh
 entity copied from the argument (the database assigns the identity). Signatures are not touched: the stored reopen
 raises the reopen count of the record, which changes the digest and so retires the earlier signatures while they stay
 in the table as history. A reopen row is never updated or deleted by the store.
@@ -354,8 +400,9 @@ the key of a membership into `MembershipExists`. The last-project-administrator 
 the transaction, which rolls back. `AddSignatureAsync`
 maps its other failures to domain rules: a digest that differs from the digest of the stored record is
 `RecordChanged`, a review that does not exist is `ReviewNotFound`, and a slot that does not exist in the review is
-`SlotNotFound`. A change of content or slots of an approved review is refused with `ReviewLocked` and a reopen of a
-review that is not approved with `ReviewNotLocked`. In every failure the transaction is rolled back, so nothing is
+`SlotNotFound`. A change of content, threads, or slots of a concluded review is refused with `ReviewLocked` and a
+reopen of a
+review that is not concluded with `ReviewNotLocked`. In every failure the transaction is rolled back, so nothing is
 stored. Any other database failure propagates unchanged to the caller, including the refusal to add a slot for a
 review that does not exist and the
 refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.

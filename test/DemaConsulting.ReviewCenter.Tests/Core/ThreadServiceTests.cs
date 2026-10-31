@@ -102,11 +102,12 @@ public class ThreadServiceTests
     }
 
     /// <summary>
-    ///     Test that starting a thread while a signature is current is refused naming the slot and storing nothing,
-    ///     and that acknowledging the slot stores the thread and leaves the signature out of date.
+    ///     Test that starting a thread whose first comment is included in the report while a signature is current is
+    ///     refused naming the slot and storing nothing, and that acknowledging the slot stores the thread and leaves
+    ///     the signature out of date.
     /// </summary>
     [Fact]
-    public async Task ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement()
+    public async Task ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement()
     {
         // Arrange: slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -114,12 +115,14 @@ public class ThreadServiceTests
         await world.SignAsync(1);
         var anchor = new ThreadAnchor("a.txt");
 
-        // Act: start a thread without, and then with, the acknowledgement
+        // Act: start an included thread without, and then with, the acknowledgement
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, anchor, TestActors.Bob, "A remark", cancellationToken));
+            world.ProjectId, SignedReviewWorld.ReviewId, anchor, TestActors.Bob, "A remark", cancellationToken,
+            includeInReport: true));
         var storedByRefusal = world.Store.Threads.Count;
         await world.Threads.StartThreadAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, anchor, TestActors.Bob, "A remark", cancellationToken, await world.SignedSlotIdsAsync());
+            world.ProjectId, SignedReviewWorld.ReviewId, anchor, TestActors.Bob, "A remark", cancellationToken,
+            await world.SignedSlotIdsAsync(), true);
 
         // Assert: refused naming slot 1 and storing nothing, then stored with the signature out of date
         Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
@@ -150,11 +153,12 @@ public class ThreadServiceTests
     }
 
     /// <summary>
-    ///     Test that a reply while a signature is current needs the acknowledgement, that a reply to a thread that does
-    ///     not exist is still reported as not found, and that nothing is stored by a refusal.
+    ///     Test that a reply included in the report while a signature is current needs the acknowledgement, that a
+    ///     reply to a thread that does not exist is still reported as not found, and that nothing is stored by a
+    ///     refusal.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReplyAsync_Signed_NeedsAcknowledgement()
+    public async Task ThreadService_ReplyAsync_IncludedAndSigned_NeedsAcknowledgement()
     {
         // Arrange: a resolved thread and slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -162,12 +166,15 @@ public class ThreadServiceTests
 
         // Act: reply without acknowledging, to a missing thread, and then with the acknowledgement
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ReplyAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, "More", cancellationToken));
+            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, "More", cancellationToken,
+            includeInReport: true));
         var missing = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ReplyAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, 999, TestActors.Bob, "More", cancellationToken));
+            world.ProjectId, SignedReviewWorld.ReviewId, 999, TestActors.Bob, "More", cancellationToken,
+            includeInReport: true));
         var commentsAfterRefusal = world.Store.Threads.Single().Comments.Count;
         await world.Threads.ReplyAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, "More", cancellationToken, await world.SignedSlotIdsAsync());
+            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, "More", cancellationToken,
+            await world.SignedSlotIdsAsync(), true);
 
         // Assert: refused naming slot 1 with nothing stored, a missing thread is not found, and the acknowledged reply is stored
         Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
@@ -179,31 +186,26 @@ public class ThreadServiceTests
     }
 
     /// <summary>
-    ///     Test that reopening a resolved thread while a signature is current needs the acknowledgement, and that
-    ///     resolving a thread that is already resolved is a no-op that neither asks nor changes anything.
+    ///     Test that reopening a resolved question and resolving a resolved thread never need an acknowledgement:
+    ///     the thread state is not part of the signed record, so the signature stays valid.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReopenAndResolveAsync_Signed_OnlyARealChangeNeedsAcknowledgement()
+    public async Task ThreadService_ReopenAndResolveAsync_Signed_StateChangesNeedNoAcknowledgement()
     {
         // Arrange: a resolved thread and slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;
         var (world, threadId) = await CreateSignedWithResolvedThreadAsync();
 
-        // Act: resolve again, reopen without acknowledging, then reopen with the acknowledgement
+        // Act: resolve again (a no-op), then reopen without any acknowledgement
         await world.Threads.ResolveAsync(world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken);
         var stillSigned = (await world.ApprovalAsync()).Slots[0].State;
-        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ReopenAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken));
-        var stateAfterRefusal = world.Store.Threads.Single().State;
         await world.Threads.ReopenAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken, await world.SignedSlotIdsAsync());
+            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken);
 
-        // Assert: the no-op kept the signature, the refusal stored nothing, and the acknowledged reopen changed the thread
+        // Assert: the thread is open and the signature is still valid
         Assert.Equal(SlotSignatureState.Signed, stillSigned);
-        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
-        Assert.Equal(ReviewThreadState.Resolved, stateAfterRefusal);
         Assert.Equal(ReviewThreadState.Open, world.Store.Threads.Single().State);
-        Assert.Equal(SlotSignatureState.OutOfDate, (await world.ApprovalAsync()).Slots[0].State);
+        Assert.Equal(SlotSignatureState.Signed, (await world.ApprovalAsync()).Slots[0].State);
     }
 
     /// <summary>
@@ -1069,8 +1071,10 @@ public class ThreadServiceTests
         // Arrange, Act, Assert: each missing dependency is refused
         var store = new FakeReviewStore();
         var access = new AllowAllProjectAccess(store);
-        Assert.Throws<ArgumentNullException>(() => new ThreadService(null!, access, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new ThreadService(store, null!, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new ThreadService(store, access, null!));
+        var users = new FakeUserStore(store);
+        Assert.Throws<ArgumentNullException>(() => new ThreadService(null!, access, users, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ThreadService(store, null!, users, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ThreadService(store, access, null!, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ThreadService(store, access, users, null!));
     }
 }

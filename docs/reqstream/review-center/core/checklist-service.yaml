@@ -238,3 +238,49 @@ sections:
         tests:
           - ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker
           - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText
+        title: >-
+          The ChecklistService class shall let the primary or the alternate reviewer of any slot of a review, and the
+          lead of the review (its creator who can still contribute, or an administrator of the project), set, change
+          or clear the review conclusion text (the free text of the record, at most 4000 characters, not the approved
+          or rejected conclusion), shall refuse a person outside the project as a missing project, and an auditor, an
+          API token and a member who is neither a reviewer nor the lead as not allowed, shall tell a page through
+          CanSetReviewConclusionTextAsync who may write it, shall store the text with line breaks written as LF and
+          without leading and trailing white space and a blank text as none, shall refuse a text that is too long or
+          has a control character other than a line feed or a tab with the ConclusionTextInvalid rule, shall refuse a
+          concluded review with the ReviewLocked rule, shall refuse a change that would make a current signature out
+          of date, naming each affected slot and signer, until the caller acknowledges the slots, shall treat the same
+          text again as no change without an acknowledgement and without an audit entry, and shall refuse with the
+          RecordChanged rule, storing nothing, when someone else changed the text between the read and the store.
+        justification: |
+          The text is what the people behind the record conclude in words, so only they and the lead may write it. It
+          is part of what a signature approves, so a concluded review is locked, and a change while a signature is
+          current withdraws the signature and must be confirmed. The comparison against the text that was read keeps
+          two people from silently overwriting each other. A normalized text keeps the digest the same whatever the
+          browser sent. The rule that a rejected review needs a text to be signed is a separate, later rule.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores
+          - ChecklistService_SetReviewConclusionTextAsync_OtherMember_ThrowsActorNotAllowed
+          - ChecklistService_SetReviewConclusionTextAsync_NonMember_ThrowsProjectNotFound
+          - ChecklistService_SetReviewConclusionTextAsync_Auditor_Refused
+          - ChecklistService_SetReviewConclusionTextAsync_ApiToken_Refused
+          - ChecklistService_SetReviewConclusionTextAsync_Concluded_ThrowsReviewLocked
+          - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
+          - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement
+          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
+          - ChecklistService_SetReviewConclusionTextAsync_ConcurrentChange_ThrowsRecordChanged
+          - ChecklistService_CanSetReviewConclusionTextAsync_Roles
+          - ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionTextAudit
+        title: >-
+          The ChecklistService class shall record every change of the review conclusion text in the audit trail as
+          review.conclusion-changed, in the same transaction as the change, with the actor, the project, the review
+          and only the old and the new length of the text in the detail, and shall never write the text itself into
+          the audit trail.
+        justification: |
+          The audit trail is read by people who may not be allowed to read the review, and it can never be corrected,
+          so what a reviewer wrote must not be copied into it. The lengths show that and how much the text changed.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_Audit_RecordsLengthsOnly

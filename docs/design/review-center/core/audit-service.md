@@ -95,11 +95,15 @@ administrator is not throttled but is a trusted actor).
 | `project.checklist-changed` | `version V, N sections, M items, sha256 {8 hex}, previous version P` (or reset) |
 | `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)`, plus follow-up and due date text (see below) |
 | `review.due-date-changed` | `none -> 2030-01-31` (old and new due date, `none` for no date; review in its own field) |
+| `review.conclusion-changed` | `length 0 -> 42` (old and new length of the review conclusion text, never the text) |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {number}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {number}, role {Primary or Alternate}, record digest <64 hex>` |
-| `thread.started` | `thread {id} on {path} {anchor}; comment {cid}, text sha256 {8 hex}` |
-| `thread.replied` | `thread {id}, comment {cid}, text sha256 {8 hex}` |
-| `thread.resolved`, `thread.reopened` | `thread {id}` |
+| `thread.started` | `thread {id} on {path} {anchor}; comment {cid}, text sha256 {8 hex}` (`; in report` if included) |
+| `thread.replied` | `thread {id}, comment {cid}, text sha256 {8 hex}` (`; in report` if included) |
+| `thread.resolved` | `thread {id}` (`; note sha256 {8 hex}` when a resolution note was stored) |
+| `thread.reopened` | `thread {id}` |
+| `thread.kind-changed` | `thread {id}: question -> finding` (promotion), `thread {id}: finding -> question` (demote) |
+| `thread.comment-report-changed` | `thread {id}, comment {cid}:` then `included in report` or `taken out of report` |
 | `checklist.answered` | `item {id}: {Outcome}`, plus `; justification sha256 {8 hex}` when there is one |
 | `checklist.applicability-changed` | `section {id}:` then `applicable` or `not applicable, reason sha256 {hex}` |
 | `user.created` | `user 'bob'`, plus `, system administrator` when the account is one |
@@ -155,8 +159,9 @@ a password is never recorded. For a failure on an existing account the existing 
 is not recorded again. For `auth.sign-in-throttled` there is no known account, so the actor text is the literal
 `not signed in` and the detail carries the cleaned typed name. The address of the client is **not** recorded in any
 entry: the entry has no field for it, and adding one would change the hash chain format; the address is only in the web
-server log. `thread.resolved` and `thread.reopened` are recorded for
-every successful call, even when the thread already had that state.
+server log. `thread.reopened` is recorded for every successful call, and `thread.resolved` for every call that
+resolves an open thread; resolving a thread that is already resolved, a promotion or demotion that changes nothing,
+and a flag that already has the requested value record nothing. The text of a note or comment is never in an entry.
 
 Changes are recorded in the same transaction as the change (this includes the second factor: `TotpService` takes no
 `AuditService`, and the entries `auth.totp-enrolled`, `auth.totp-disabled`, `auth.totp-reset`,

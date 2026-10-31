@@ -787,7 +787,7 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that the constructor refuses a missing store, access or clock.
+    ///     Test that the constructor refuses a missing store, access, user store or clock.
     /// </summary>
     [Fact]
     public void ChecklistService_Constructor_NullArguments_Throws()
@@ -795,9 +795,11 @@ public class ChecklistServiceTests
         // Arrange, Act, Assert: each missing dependency is refused
         var store = new FakeReviewStore();
         var access = new AllowAllProjectAccess(store);
-        Assert.Throws<ArgumentNullException>(() => new ChecklistService(null!, access, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new ChecklistService(store, null!, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new ChecklistService(store, access, null!));
+        var users = new FakeUserStore();
+        Assert.Throws<ArgumentNullException>(() => new ChecklistService(null!, access, users, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ChecklistService(store, null!, users, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ChecklistService(store, access, null!, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ChecklistService(store, access, users, null!));
     }
 }
 

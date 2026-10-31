@@ -86,7 +86,16 @@ public class RecordDigestFollowUpTests
             CarriedFromThreadId = threadFrom is null ? null : 9,
             Comments =
             [
-                new ReviewComment { Id = 10, ThreadId = 1, Author = "Ann", AuthorUsername = "ann", Text = "Please fix", Created = _time }
+                new ReviewComment
+                {
+                    Id = 10,
+                    ThreadId = 1,
+                    Author = "Ann",
+                    AuthorUsername = "ann",
+                    Text = "Please fix",
+                    Created = _time,
+                    IncludeInReport = true
+                }
             ]
         };
         return new ReviewRecord("abc", null, [section], [answer], [thread], ReviewSource.Upload, 0, follows);
@@ -108,10 +117,10 @@ public class RecordDigestFollowUpTests
         // Act
         var canonical = RecordDigest.Canonicalize(full);
 
-        // Assert: the digest known from before is unchanged, and neither text mentions a follow-up
-        Assert.Equal("9fee8bc5c8ddc1c908ed605ccb301bfa1be3e0499cc824d787275c7a783543f0", RecordDigest.Compute(legacy));
+        // Assert: the digest is the pinned v2 value, and neither text mentions a follow-up
+        Assert.Equal("eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3", RecordDigest.Compute(legacy));
         Assert.Equal(RecordDigest.Compute(legacy), RecordDigest.Compute(explicitNone));
-        Assert.StartsWith("ReviewCenter record v1\n", canonical, StringComparison.Ordinal);
+        Assert.StartsWith("ReviewCenter record v2\n", canonical, StringComparison.Ordinal);
         Assert.DoesNotContain("follows", canonical, StringComparison.Ordinal);
         Assert.DoesNotContain("carried", canonical, StringComparison.Ordinal);
     }
@@ -133,7 +142,7 @@ public class RecordDigestFollowUpTests
         // Assert
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v1",
+            "ReviewCenter record v2",
             "fingerprint 3:abc",
             "source upload",
             "follows 5:rev-0",
@@ -142,9 +151,9 @@ public class RecordDigestFollowUpTests
             "answer 6:REQ-01 4:Pass 2:ok 3:Ann 3:ann carried 5:rev-0",
             "sections",
             "not-applicable 3:DES 4:none carried 5:rev-0",
-            "threads",
-            $"thread 5:a.txt 4:Head 1 2 4:Open {ticks} carried 5:rev-0",
-            $"comment 3:Ann 3:ann 10:Please fix {ticks}");
+            "report",
+            "thread file 5:a.txt 4:Head 1 2 carried 5:rev-0",
+            $"claim 3:Ann 3:ann 10:Please fix {ticks}");
         Assert.Equal(expected, text);
     }
 

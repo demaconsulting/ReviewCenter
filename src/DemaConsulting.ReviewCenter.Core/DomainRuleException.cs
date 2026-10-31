@@ -239,7 +239,8 @@ public enum DomainRule
     TotpSecretUnreadable,
 
     /// <summary>
-    ///     The review is approved (every reviewer slot has a signature of the current record) and therefore locked:
+    ///     The review is approved (every reviewer slot has a signature of the current record and no thread is open) and
+    ///     therefore locked:
     ///     its threads, checklist answers and reviewer slots can not change until an administrator reopens it.
     /// </summary>
     ReviewLocked,
@@ -305,7 +306,26 @@ public enum DomainRule
     ///     The reopen would leave a reviewer slot in which nobody may sign again (the primary and the alternate, if
     ///     any, are the person reopening or people who reopened it before), so the review could never be approved again.
     /// </summary>
-    ReopenWouldStrandSlot
+    ReopenWouldStrandSlot,
+
+    /// <summary>
+    ///     A thread that is a Finding (its starting comment is included in the report) cannot be resolved without a
+    ///     note: the resolution is part of the signed report, so it must say what was done.
+    /// </summary>
+    ResolutionNoteRequired,
+
+    /// <summary>
+    ///     The report flag of the comment cannot be toggled on its own: it is the starting comment of the thread
+    ///     (promote or demote the thread instead) or a resolution note (it follows the thread).
+    /// </summary>
+    CommentNotTogglable,
+
+    /// <summary>
+    ///     The review conclusion text (the free text of the record, not the approved or rejected conclusion) is not
+    ///     acceptable: it is longer than <see cref="ReviewLimits.MaxConclusionTextLength"/> characters or contains
+    ///     control characters other than line breaks and tabs.
+    /// </summary>
+    ConclusionTextInvalid
 }
 
 /// <summary>

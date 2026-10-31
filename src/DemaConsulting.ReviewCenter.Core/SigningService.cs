@@ -42,7 +42,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     are returned as plain sentences. A signature is current only while its digest (see
 ///     <see cref="RecordDigest"/>) equals the digest of the record now. The status (Approved or In review) is
 ///     computed on demand and never stored.
-///     An approved review is locked: while every slot holds a current signature, the threads, checklist answers,
+///     An approved review is locked: while every slot holds a current signature and no thread is open, the threads,
+///     checklist answers,
 ///     applicability and the reviewer slots are refused with <see cref="DomainRule.ReviewLocked"/> (see
 ///     <see cref="ReviewLock"/>), and signing is refused too. Only <see cref="ReopenReviewAsync"/>, which needs an
 ///     administrator and a reason, unlocks it; the earlier signatures then stay as history and fresh ones are needed.
@@ -359,7 +360,7 @@ public sealed class SigningService
                 current?.SignedAt));
         }
 
-        var isApproved = ReviewLock.IsApproved(record, slots, signatures);
+        var isApproved = ReviewLock.IsConcluded(record, slots, signatures);
         var (checklist, blockers, failed) = Assess(record);
         return new ReviewApproval(
             isApproved,
@@ -630,7 +631,7 @@ public sealed class SigningService
             // What: only an approved review is locked; the digest of that approval goes into the history
             var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken)
                            ?? throw ReviewNotFound(reviewId);
-            if (!ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+            if (!ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
             {
                 throw new DomainRuleException(
                     DomainRule.ReviewNotLocked,

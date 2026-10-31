@@ -87,7 +87,8 @@ public sealed record SlotStatus(
 ///     cannot disagree with them. It is an immutable value holder and is safe to share between threads.
 /// </remarks>
 /// <param name="IsApproved">
-///     <c>true</c> when the review has at least one slot and every slot has a current signature. An approved review is
+///     <c>true</c> when the review is concluded: it has at least one slot, every slot has a current signature and no
+///     thread is open (see <see cref="ReviewLock.IsConcluded"/>). A concluded review is
 ///     also locked (see <see cref="ReviewLock"/>); there is no separate locked flag, so the two can never differ.
 /// </param>
 /// <param name="Digest">The digest of the review record as it is now.</param>

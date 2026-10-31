@@ -158,6 +158,35 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that a review whose every slot is signed but that has a thread open is not concluded: the author is told
+    ///     about the reply waiting, and the signer has nothing left to sign.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded()
+    {
+        // Arrange: ann signs, bob opens a chat thread, and bob's unsigned slot is removed
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann");
+        var second = await world.AddSlotAsync("r1", "bob");
+        await world.SignAsync("r1", first.Id, "ann");
+        await world.StartThreadAsync("r1", "bob");
+        await world.Signing.RemoveSlotAsync(
+            new Actor("author", "Author"), world.ProjectId, "r1", second.Id, TestContext.Current.CancellationToken);
+
+        // Act
+        var forAuthor = await world.InboxOfAsync("author");
+        var forAnn = await world.InboxOfAsync("ann");
+
+        // Assert: the author has a reply waiting, which an approved review would not show
+        var row = Assert.Single(forAuthor.Items, item => item.Section == InboxSection.RepliesWaiting);
+        Assert.Equal("1 waiting", row.Chip);
+        Assert.Equal(1, forAuthor.ActionCount);
+        Assert.DoesNotContain(forAnn.Items, item => item.Section == InboxSection.ToSign);
+    }
+
+    /// <summary>
     ///     Test that an auditor, who may only read, gets no To sign and no Replies waiting rows even for a review it
     ///     authored and a slot it is assigned to.
     /// </summary>

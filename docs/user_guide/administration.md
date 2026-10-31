@@ -497,7 +497,8 @@ ReviewCenter records every change that the application makes to projects, review
 slots, signatures, and users, and every sign-in, sign-out, failed sign-in, and lockout. An entry shows the time (UTC),
 the person, the action, and a short detail. A change and its entry are stored in one database transaction, so the
 application never leaves a change without its entry. A password is never recorded. The text of a comment or of a
-justification is not recorded either; the detail holds only a digest prefix (eight hexadecimal characters of its
+justification is not recorded either (nor is a resolution note); the detail holds only a digest prefix (eight
+hexadecimal characters of its
 SHA-256 hash), which lets you match an entry with a text without copying the text. Entries cannot be edited or
 deleted through the application.
 
@@ -633,6 +634,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Members   | `project.account-created`, `project.member-add-failed`                               |
 | Slots     | `slot.added`, `slot.updated`, `slot.removed`, `signature.added`                      |
 | Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`             |
+| Threads   | `thread.kind-changed`, `thread.comment-report-changed` (promote, demote, include)    |
 | Checklist | `checklist.answered`, `checklist.applicability-changed`                              |
 | Users     | `user.created`, `user.enabled`, `user.disabled`, `user.admin-changed`                |
 | Users     | `user.unlocked` (a system administrator ended the lockout of a user)                 |
@@ -653,6 +655,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Project   | `project.review-rule-changed` (a further review rule was switched)                   |
 | Reopening | `review.reopened` (an administrator reopened an approved review)                     |
 | Due date  | `review.due-date-changed` (the due date of a review was set, changed, or cleared)    |
+| Record    | `review.conclusion-changed` (conclusion text changed; lengths only, never the text)  |
 | Tokens    | `token.created`, `token.revoked`                                                     |
 | Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
 
@@ -719,7 +722,8 @@ user accounts, reviewer signatures, or the audit trail existed, does not have th
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
 start again, then create the first system administrator.** Do this only with development data. The repository registry and
 the reviews from a repository add tables and columns, and the record digest of a review is calculated in the
-format `ReviewCenter record v1` that includes the review-set and the side of every line comment, so a development
+format `ReviewCenter record v2` that includes the review-set, the side of every line comment, and the comments that
+are included in the report (the report block replaces the earlier coverage of every comment), so a development
 database created before them must be recreated in the same way. The personal access tokens add a table, and every
 review has new columns that tell who created it and whether it was created with an API token, so a development database
 created before them must be recreated as well. Project-based access control adds the project memberships, replaces the
@@ -728,7 +732,7 @@ created before it must be recreated too. Project member management adds the must
 (`Users.MustChangePassword`), so a development database created before it must be recreated as well. The evidence
 settings add seven columns to the projects (`EvidenceAnonymousIndex`, `EvidenceAnonymousAttestations`,
 `EvidenceIncludeThreads`, `EvidenceIncludeReviewerNames`, `EvidenceIncludeChecklistWording`, `EvidenceIncludeFiles`,
-and `EvidenceIncludeGitContext`), and the record digest is now labeled `ReviewCenter record v1`, a format private to
+and `EvidenceIncludeGitContext`), and the record digest is labeled `ReviewCenter record v2`, a format private to
 ReviewCenter that also covers the wording of the checklist questions and who answered them. The sign-in with an
 OpenID Connect provider adds two columns to the users (`Users.ExternalIssuer` and `Users.ExternalSubject`) with a unique
 index on the pair. The two-factor sign-in adds two tables (`UserTotps` and `TotpRecoveryCodes`). There is no migration:
@@ -745,7 +749,8 @@ The follow-up review adds the columns `Reviews.FollowsReviewId`, `Reviews.Carrie
 threads, again with no migration. A review that follows nothing keeps its record digest, because the lines for a
 followed review and for carried rows are added to the digest only when they exist. The time of the last sign-in adds the
 column `Users.LastSignInUtc`, again with no migration: a development database created before it must be deleted and
-created again.
+created again. The comments of a thread add the columns `Comments.IncludeInReport` and `Comments.Kind`, again with no
+migration: a development database created before them must be deleted and created again.
 
 ## Repositories and Credentials
 

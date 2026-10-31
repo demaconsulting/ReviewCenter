@@ -24,6 +24,8 @@ be loadable on the test platform.
 - A duplicate review key and a review of an unknown project are refused by the database.
 - The tables for comment threads and comments are created, and a thread for a file that is not in the review is
   refused by the database.
+- The kind of a comment is stored as text and defaults to Comment, and the report flag of a comment defaults to
+  false, so a comment without the new columns is chat. The kind of a thread is not stored but derived.
 - The tables for the checklist snapshot, section states, and answers are keyed so that a review has one state per
   section and one answer per check.
 - The comments, answers, and section states keep the user name of the person who made them next to the display name.
@@ -44,6 +46,7 @@ be loadable on the test platform.
   back with none, and a definition of the full size limit is stored and read back unchanged.
 - The `DueDate` column of a review is created as nullable text holding the calendar day: a review without a date reads
   back with none and a date reads back as the same day.
+- The `ReviewConclusionText` column of a review is created as optional text limited to 4000 characters.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
@@ -104,6 +107,11 @@ tested by `ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments`.
 **ReviewStore_AddThreadAsync_Side_IsStoredAsText**: A thread on the baseline side is stored, and a raw query of the
 `Side` column of the `Threads` table returns the text "Baseline", which verifies the mapping of the side to text.
 This scenario is tested by `ReviewStore_AddThreadAsync_Side_IsStoredAsText`.
+
+**ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment**: A comment row is inserted with a raw statement
+that names none of the new columns; it reads back as chat with the kind Comment, and the stored value of the `Kind`
+column is the text "Comment". This scenario is tested by
+`ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment`.
 
 **ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem**: A check is answered twice and another check once; the
 database holds one row per check, the first with the latest answer. This scenario is tested by
@@ -202,6 +210,10 @@ tested by `ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroug
 **Due date column**: A review added with a due date reads it back as the same calendar day, and one added without reads
 back with none, which is tested by `ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`, defined in
 `ReviewDueDateStoreTests.cs` and described with the `ReviewStore` unit.
+
+**Review conclusion text column**: The model has the `ReviewConclusionText` column of a review as optional with a
+maximum length of 4000, which is tested by `ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional`,
+defined in `ReviewStoreReviewConclusionTextTests.cs` and described with the `ReviewStore` unit.
 
 **Second factor tables**: The `UserTotps` and `TotpRecoveryCodes` tables are exercised by the tests of `TotpStore` in
 `TotpStoreTests.cs` over a real database file. The unique index on the user and the recovery code hash refuses a

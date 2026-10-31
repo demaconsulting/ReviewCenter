@@ -26,7 +26,9 @@ N/A - standard test environment.
   ignored.
 - An approval by someone else, or a reopening by someone else, after the user last saw the review is an update; it is
   not counted as action, and an own signature or an own reopening is no update.
-- An approved review has no action row, and a past due date marks an open review overdue and an approved one not.
+- An approved review has no action row (a review whose slots are all signed but that has an open thread is not
+  approved, so it still has the Replies waiting rows), and a past due date marks an open review overdue and an
+  approved one not.
 - An auditor, a non-member, a removed member, a disabled user, a user with a temporary password, no actor, the command
   line, and an unknown name get no sign or reply rows or an empty inbox without an error; a system administrator who is
   no member gets only what is their own.
@@ -57,6 +59,10 @@ sign row. This scenario is tested by `InboxService_GetInboxAsync_SlotSigned_HasN
 **InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems**: When every slot is signed and the review is approved,
 no reviewer has an action row; the other people get only an information row. This scenario is tested by
 `InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems`.
+
+**InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded**: Every slot is signed and a thread
+is open; the review is not concluded, so the person whose reply is waited for still finds it under Replies waiting.
+This scenario is tested by `InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded`.
 
 **InboxService_GetInboxAsync_Auditor_GetsNoSignOrReplyItems**: An auditor named in a slot and the author of a review
 gets no To sign and no Replies waiting row. This scenario is tested by

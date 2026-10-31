@@ -29,12 +29,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     The digest is SHA-256 over a canonical text of the record, written as lowercase hexadecimal. The format
-///     is private to ReviewCenter (no other tool is expected to reproduce it) and is versioned from v1 at the
-///     first release; any later change to it must bump the version. The text is built so that it never depends
+///     is private to ReviewCenter (no other tool is expected to reproduce it) and is versioned; this is v2, and
+///     nothing of an earlier version was released. Any later change to it must bump the version. The text is built so that it never depends
 ///     on storage row identities or on the order rows happen to be read in, and so that two different records
 ///     can never produce the same text:
 ///     <list type="number">
-///         <item>a version header line (<c>ReviewCenter record v1</c>);</item>
+///         <item>a version header line (<c>ReviewCenter record v2</c>);</item>
 ///         <item>the content fingerprint;</item>
 ///         <item>the source of the files: <c>source upload</c> for an upload, otherwise
 ///               <c>source git</c> with the repository identity, the baseline commit (or <c>-</c>), the head commit,
@@ -52,19 +52,30 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               the same value again as the same person does not invalidate a signature;</item>
 ///         <item>the sections that do not apply, sorted by section id: id and reason (not who marked the section or
 ///               when, which unlike an answer is not a statement the record makes);</item>
-///         <item>every thread rendered to one block (anchor with its side, state, creation time, and its comments in posting
-///               order with author display name, author user name, text and time); the blocks are sorted, so
-///               the order of threads does not matter, while the order of comments does;</item>
+///         <item>only when the review has a review conclusion text (see <see cref="ReviewRecord.ReviewConclusionText"/>), a
+///               <c>conclusion-text</c> line with the text, so a signature binds to the words the reviewers wrote as the
+///               conclusion of the record. The line is absent when there is no text, so the digest of a review without
+///               one is unchanged. It is unrelated to the review conclusion (approved or rejected) of the ballot;</item>
+///         <item>the report: a <c>report</c> marker line, then one block for every thread that has at least one comment
+///               included in the report (see <see cref="ReviewComment.IncludeInReport"/>). A block is a
+///               <c>thread file</c> line (the anchor: path, side, first and last line, so the anchor slot can later
+///               name a check instead of a file), then, in posting order, only the included comments with author
+///               display name, author user name, text and time: <c>claim</c> for the starting comment (a Finding),
+///               <c>comment</c> for an included reply and <c>resolution</c> for an included resolution note. Chat is
+///               not covered, and neither are the thread state (whether a thread is open is the separate rule of
+///               <see cref="ReviewLock"/>), the creation time of a thread and any identity; a thread without an
+///               included comment is absent. The blocks are sorted, so the order of threads does not matter, while the
+///               order of comments does;</item>
 ///         <item>only for a review that an administrator reopened, a final <c>reopens {count}</c> line. A review that
-///               was never reopened has no such line, so its digest is exactly what it was before reopening existed
-///               and the version header is not bumped; after a reopen the digest differs from every earlier one,
+///               was never reopened has no such line, so its digest does not contain it;
+///               after a reopen the digest differs from every earlier one,
 ///               whatever the content, so a signature given before a reopen can never be current again.</item>
 ///     </list>
 ///     A follow-up review (one created from an earlier review, see <see cref="ReviewService"/>) adds two kinds of
 ///     conditional text, in the same way as <c>reopens</c>: a <c>follows {id}</c> line straight after the source block,
 ///     and a <c>carried {id}</c> suffix at the end of an answer line, a not-applicable line and a thread line whose row
 ///     was carried over from that review. They are written only when present, so the digest of a review that is not a
-///     follow-up is byte-for-byte what it was and the version header is not bumped; a signature of a follow-up
+///     follow-up does not contain them; a signature of a follow-up
 ///     therefore also binds to which review it follows and to which rows were carried rather than given in it.
 ///     Strings are written as <c>{length}:{text}</c> (length in UTF-16 code units) and absent values as
 ///     <c>-</c>, so no text can imitate a delimiter; numbers use the invariant culture and times are written as
@@ -85,7 +96,7 @@ public static class RecordDigest
     /// <summary>
     ///     The first line of the canonical text; names the format version.
     /// </summary>
-    private const string Header = "ReviewCenter record v1";
+    private const string Header = "ReviewCenter record v2";
 
     /// <summary>
     ///     Builds the canonical text of a record.
@@ -132,9 +143,20 @@ public static class RecordDigest
             lines.Add($"not-applicable {Text(section.SectionId)} {Text(section.Reason)}{Carried(section.CarriedFromReviewId)}");
         }
 
-        // Each thread becomes one block; sorting the blocks removes any dependence on row order or identity
-        lines.Add("threads");
-        var blocks = record.Threads.Select(ThreadBlock).ToList();
+        // The review conclusion text is part of what the reviewers sign; the line is absent when there is none, which
+        // keeps the digest of every review without one as it was. It comes before the report, which ends the text
+        if (record.ReviewConclusionText is not null)
+        {
+            lines.Add("conclusion-text " + Text(record.ReviewConclusionText));
+        }
+
+        // The report holds only the threads with an included comment; each becomes one block, and sorting the blocks
+        // removes any dependence on row order or identity. Chat and the thread state are deliberately not covered
+        lines.Add("report");
+        var blocks = record.Threads
+            .Where(thread => thread.Comments.Any(comment => comment.IncludeInReport))
+            .Select(ThreadBlock)
+            .ToList();
         blocks.Sort(StringComparer.Ordinal);
         lines.AddRange(blocks);
 
@@ -221,24 +243,54 @@ public static class RecordDigest
     }
 
     /// <summary>
-    ///     Renders one thread with its comments to a block of lines.
+    ///     Renders one thread of the report to a block of lines.
     /// </summary>
-    /// <param name="thread">The thread.</param>
-    /// <returns>The block; the first line is the thread, each following line is one comment in posting order.</returns>
+    /// <param name="thread">The thread; it has at least one comment included in the report.</param>
+    /// <returns>
+    ///     The block; the first line is the anchor (<c>thread file</c>, with the carried marker when the thread was
+    ///     carried over), each following line is one included comment in posting order.
+    /// </returns>
     private static string ThreadBlock(ReviewThread thread)
     {
         var lines = new List<string>
         {
-            $"thread {Text(thread.FilePath)} {Text(thread.Side.ToString())} {Number(thread.StartLine)} {Number(thread.EndLine)} " +
-            $"{Text(thread.State.ToString())} {thread.Created.UtcTicks.ToString(CultureInfo.InvariantCulture)}" +
+            $"thread file {Text(thread.FilePath)} {Text(thread.Side.ToString())} {Number(thread.StartLine)} {Number(thread.EndLine)}" +
             Carried(thread.CarriedFromReviewId)
         };
 
-        // Comment order is meaningful, so it is kept exactly as stored (the store orders by identity)
-        lines.AddRange(thread.Comments.Select(comment =>
-            $"comment {Text(comment.Author)} {Text(comment.AuthorUsername)} {Text(comment.Text)} " +
-            comment.Created.UtcTicks.ToString(CultureInfo.InvariantCulture)));
+        // Comment order is meaningful, so it is kept exactly as stored (the store orders by identity). The starting
+        // comment is the claim of a Finding; a resolution note is named as such; chat is left out
+        for (var index = 0; index < thread.Comments.Count; index++)
+        {
+            var comment = thread.Comments[index];
+            if (!comment.IncludeInReport)
+            {
+                continue;
+            }
+
+            var label = LabelOf(index, comment);
+            lines.Add(
+                $"{label} {Text(comment.Author)} {Text(comment.AuthorUsername)} {Text(comment.Text)} " +
+                comment.Created.UtcTicks.ToString(CultureInfo.InvariantCulture));
+        }
+
         return string.Join('\n', lines);
+    }
+
+    /// <summary>
+    ///     Names the line of an included comment.
+    /// </summary>
+    /// <param name="index">The position of the comment in the thread, 0 for the starting comment.</param>
+    /// <param name="comment">The comment.</param>
+    /// <returns><c>resolution</c> for a resolution note, <c>claim</c> for the starting comment, otherwise <c>comment</c>.</returns>
+    private static string LabelOf(int index, ReviewComment comment)
+    {
+        if (comment.Kind == ReviewCommentKind.Resolution)
+        {
+            return "resolution";
+        }
+
+        return index == 0 ? "claim" : "comment";
     }
 
     /// <summary>

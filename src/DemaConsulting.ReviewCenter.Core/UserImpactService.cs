@@ -194,7 +194,7 @@ public sealed class UserImpactService
     private static void AddOpenWork(List<UserOpenWork> work, UserReviewSlot candidate, ReviewSnapshot snapshot)
     {
         var (record, slots, signatures) = snapshot;
-        if (ReviewLock.IsApproved(record, slots, signatures))
+        if (ReviewLock.IsConcluded(record, slots, signatures))
         {
             return;
         }

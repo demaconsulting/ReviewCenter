@@ -23,8 +23,10 @@ N/A - standard test environment.
 - A review without a slot is `Setup`, one with an unsigned or out-of-date slot is `InReview`, and one whose every slot has
   a valid signature and nothing blocks it is `Approved`; a project without reviews gives an empty list; a reopened review
   is `InReview` and flagged as reopened.
-- The signature counts equal the slots of the approval status; a comment after a signature turns that signature from
-  signed into out of date.
+- A review is `Approved` only when every slot has a valid signature, nothing blocks it, and no thread is open; a
+  review whose slots are all signed but that has an open thread is `InReview` and blocked.
+- The signature counts equal the slots of the approval status; a comment that is included in the report, added after a
+  signature, turns that signature from signed into out of date, while chat does not.
 - The open-thread, unanswered-check, and Fail counts equal the numbers in the blocker sentences; a review with any of
   them, or without a checklist, that is not approved is blocked, an approved review is not.
 - `WaitingOn` names the primary and a different alternate of every slot that is not signed, each person once, leaves out
@@ -63,9 +65,14 @@ same flag. The second has no flag and is not blocked. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked`.
 
 **ReviewProgressService_GetProgressAsync_CommentAfterSignature_CountsOutOfDate**: A review with two slots has the first
-signed (2 required, 1 signed, 0 out of date); a thread is started, which changes the record, and the progress shows 2
+signed (2 required, 1 signed, 0 out of date); a thread that is included in the report is started with the signature
+acknowledged, which changes the record, and the progress shows 2
 required, 0 signed, 1 out of date, one open thread, and the stage In review. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_CommentAfterSignature_CountsOutOfDate`.
+
+**ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked**: Every slot is signed and a thread
+is open; the stage is In review, the review is blocked with one open thread, and it is not approved. This scenario is
+tested by `ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked`.
 
 **ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved**: Two approved reviews; a project
 administrator reopens the first. It is flagged as reopened, not approved, In review, with one out-of-date signature; the
