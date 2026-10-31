@@ -27,6 +27,8 @@ N/A - standard test environment (everything runs in memory).
 - A problem of the key or of the signer is reported as an unavailable key, and nothing is recorded.
 - A complete review gives a signed PDF of the review, and its release is recorded with the digest, the chain head, the
   hash of the PDF, and the key; each request records its own event.
+- The PDF shows the time each answer was given. Giving the same answers again later changes that time but neither the
+  record digest nor the approval.
 - A user who cannot see the project is answered `NotFound`, like a missing review. The unit tests have no case for
   this guard; it is verified over HTTP by `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
   and `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` in the `Api` subsystem.
@@ -96,6 +98,12 @@ The status is `KeyUnavailable` and nothing is recorded. This scenario is tested 
 **AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview**: A complete review is asked for. The result
 is a PDF with a signature that verifies, with the content of the review and a file name. This scenario is tested by
 `AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview`.
+
+**AttestationService_GenerateAsync_ReAnsweredLaterWithSameValue_ShowsAnswerTimeAndKeepsDigestAndApproval**: A signed
+review is answered again three hours later with the same outcomes, and the attestation is asked for an hour after that.
+The record digest is the same as before, the status is `Ok` (the signatures are still current), and the PDF shows the
+time of the later answers, neither the time of the signature nor the time of the request. This scenario is tested by
+`AttestationService_GenerateAsync_ReAnsweredLaterWithSameValue_ShowsAnswerTimeAndKeepsDigestAndApproval`.
 
 **AttestationService_GenerateAsync_CompleteReview_RecordsAuditEventWithDigestAndPdfHash**: A complete review is asked for.
 An `attestation.generated` event of the actor has the record digest, the chain head, the SHA-256 of the PDF, and the key.

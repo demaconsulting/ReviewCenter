@@ -15,7 +15,8 @@ sections:
       - id: ReviewCenter-Evidence-Document
         title: >-
           The Evidence subsystem shall produce, for a completed review, a PDF document that states the review, its
-          content fingerprint, its files, its checklist answers, its threads, its reviewer sign-offs, the head of the
+          content fingerprint, its files, its checklist answers with who answered and when, its threads, its reviewer
+          sign-offs, the head of the
           audit trail, and the key that signed it, in the same bytes for the same input, with the files, checklist
           wording, threads, reviewer names, and git context left out as the evidence settings of the project say, and,
           for a review that was reopened after an approval, the history of the reopenings.
@@ -30,6 +31,7 @@ sections:
           - ReviewCenter-PdfDocumentWriter-Text
           - ReviewCenter-AttestationRenderer-Review
           - ReviewCenter-AttestationRenderer-Findings
+          - ReviewCenter-AttestationRenderer-AnswerTimes
           - ReviewCenter-AttestationRenderer-ThreadLimit
           - ReviewCenter-AttestationRenderer-SignOffs
           - ReviewCenter-AttestationRenderer-Output

@@ -663,7 +663,8 @@ someone.
 When a review is **Approved**, its page shows **Download attestation (PDF)** on a line of its own below the title, with
 a note about the key that signs the file. The PDF is made when you press the button and is not stored. It contains the
 review (project, review, repository and commits, the content fingerprint and the hash of every file), the checklist
-with every answer and justification in full (a comment is never shortened), the comment threads, the sign-off of every
+with every answer, who gave it and the UTC time of the answer (to the second), and every justification in full (a
+comment is never shortened), the comment threads, the sign-off of every
 reviewer slot with the record digest it was bound to, and the state of the audit trail (the number of entries, whether
 the chain is intact, and the head hash). The counts of open and resolved threads are exact. The first 100 resolved
 threads are listed, each with the start of its first comment (at most 300 characters), and a line says how many more

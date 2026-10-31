@@ -64,6 +64,9 @@ public class AttestationContentSettingsTests
         Assert.Contains("Reviewer 1 (primary)", lines);
         Assert.Contains("Reviewer 1 (alternate)", lines);
         Assert.Contains(lines, l => l.StartsWith("Participant 1", StringComparison.Ordinal));
+        Assert.Contains(
+            lines,
+            l => l.StartsWith("Answered by Participant", StringComparison.Ordinal) && l.EndsWith(" UTC", StringComparison.Ordinal));
         Assert.Contains(lines, l => l.Contains("by a signed-in user", StringComparison.Ordinal));
         Assert.Contains("Left out of this document: Reviewer names.", lines);
         Assert.Contains("Reviewer sign-offs", lines);
