@@ -73,8 +73,9 @@ the signers are done, or agree with them first (see *Sign Last* below).
 
 Do not answer N/A to avoid a Fail. If the check should hold and does not, it is a Fail.
 
-The time of every answer is shown on the checklist page, in the History, and in the attestation PDF, to the second. A
-lead or an auditor can therefore see when many checks were answered within a few seconds, and can ask the reviewer
+The time of every answer is shown on the checklist page (to the minute), in the History (the entry for the answer, to
+the second), and in the attestation PDF (to the second). A lead or an auditor can therefore see when many checks were
+answered within a few seconds, and can ask the reviewer
 about them or spot-check some of those checks. The time comes from the clock of the server and is not part of the
 record that the signatures bind to.
 
