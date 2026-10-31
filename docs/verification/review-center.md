@@ -284,8 +284,9 @@ thread leads a signed-out user back to the thread after the sign-in. This scenar
 
 **ReviewCenter_ApprovedReview_IsLockedUntilAnAdministratorReopensItWithAReason**: A review that the administrator
 created is approved by the signature of `second`. The administrator's review page shows Approved and Locked, with the
-reviewer slot selectors and the Add slot button, the comment text box and the Start thread button, and the checklist
-controls disabled; the checklist page says that it is read-only. The review page of `second`, a member who is not an
+reviewer slot selectors and the Add slot button and the checklist controls disabled, and no comment form (no new-thread
+form, text box, or Start thread button); the checklist page says that it is read-only. The review page of `second`, a
+member who is not an
 administrator, shows the lock but offers no reopen form. The administrator's attempt to reopen without a reason is
 refused with a message about the reason and leaves the review locked; with a reason the review shows In review and
 no longer Locked, lists the reopening with the administrator's name and the reason, shows the earlier signature of the
