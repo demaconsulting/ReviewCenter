@@ -2,8 +2,9 @@
 
 #### Verification Approach
 
-`ReviewService` is verified with unit tests defined in `ReviewServiceTests.cs`, and the freezing of the checklist of the
-project in `ReviewServiceChecklistTests.cs`, which sets the checklist through the real `ProjectChecklistService`. The
+`ReviewService` is verified with unit tests defined in `ReviewServiceTests.cs`, the freezing of the checklist of the
+project in `ReviewServiceChecklistTests.cs` (which sets the checklist through the real `ProjectChecklistService`), and
+the due date in `ReviewServiceDueDateTests.cs`. The
 tests use the real service and the real `Fingerprint` with a fake in-memory store (`FakeReviewStore`), the
 project-access double
 `AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit), and a fixed clock, so every rule
@@ -45,6 +46,11 @@ N/A - standard test environment.
   when the project has none); a stored definition that cannot be used refuses the review with
   `ChecklistDefinitionInvalid` and never falls back to the default; a later change of the checklist of the project
   changes neither the wording nor the record digest of an existing review, approved or not.
+- A review may carry an optional due date, a calendar day in UTC, that is not part of the record digest: it is
+  accepted at creation from today to two years ahead and refused outside that range with `DueDateInvalid`; it is
+  audited at creation, and changed or cleared with one entry `review.due-date-changed` by a project administrator, a
+  system administrator, or the creator, never through a token, never for an approved review (`ReviewLocked`); a review
+  is overdue only when the date has passed and it is not approved.
 
 #### Test Scenarios
 
@@ -273,3 +279,67 @@ the review is still locked. This scenario is tested by
 **ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview**: A review that the planner creates for a review-set
 carries the checklist of the project. This scenario is tested by
 `ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview`, which is defined in `ReviewPlannerTests.cs`.
+
+**The due date** is verified in `ReviewServiceDueDateTests.cs` with the real service, a fake store, and a fixed clock.
+
+**ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt**: A theory creates a review with a due date of
+today, one day ahead, and exactly two years ahead (UTC). Each is stored as the calendar day, is not part of the record
+digest, and the `review.created` entry ends with `, due yyyy-MM-dd`. This scenario is tested by
+`ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt`.
+
+**ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText**: A review without a due date has none, and its
+audit entry has no due text. This scenario is tested by `ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText`.
+
+**ReviewService_CreateDraftAsync_DueDateOutOfRange_IsRefusedAndStoresNothing**: A due date of yesterday, and one a day
+beyond two years ahead, are refused with `DueDateInvalid`; no review and no entry is stored. This scenario is tested by
+`ReviewService_CreateDraftAsync_DueDateOutOfRange_IsRefusedAndStoresNothing`.
+
+**ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew**: A project administrator sets, then changes,
+the date; the review shows it and each change is one entry `review.due-date-changed` with the old and the new date,
+written with the change. A date in the past is accepted. This scenario is tested by
+`ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew`.
+
+**ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed**: The creator of the review and a system
+administrator may set the date. This scenario is tested by `ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed`.
+
+**ReviewService_SetDueDateAsync_OtherMemberOrOutsider_IsRefusedAndChangesNothing**: A member who did not create the
+review, and a person outside the project, are refused (`ActorNotAllowed`, `ProjectNotFound`) and nothing changes. This
+scenario is tested by `ReviewService_SetDueDateAsync_OtherMemberOrOutsider_IsRefusedAndChangesNothing`.
+
+**ReviewService_SetDueDateAsync_CreatorNowReadOnly_IsRefused**: A creator who has since become a read-only member
+(Auditor) is refused (`ActorNotAllowed`), the date is unchanged and the edit control is not offered. This scenario is
+tested by `ReviewService_SetDueDateAsync_CreatorNowReadOnly_IsRefused`.
+
+**ReviewService_SetDueDateAsync_ApiToken_IsRefused**: An actor that came through a personal access token is refused,
+even when its owner is the creator or an administrator. This scenario is tested by
+`ReviewService_SetDueDateAsync_ApiToken_IsRefused`.
+
+**ReviewService_SetDueDateAsync_ClearAndUnchanged_AuditsOnlyTheChange**: Clearing removes the date and is audited as
+`<old> -> none`; setting the same value again returns false and writes no entry. This scenario is tested by
+`ReviewService_SetDueDateAsync_ClearAndUnchanged_AuditsOnlyTheChange`.
+
+**ReviewService_SetDueDateAsync_TooFarAhead_IsRefused**: A date beyond two years ahead is refused with
+`DueDateInvalid` on edit too. This scenario is tested by `ReviewService_SetDueDateAsync_TooFarAhead_IsRefused`.
+
+**ReviewService_SetDueDateAsync_MissingReview_IsNotFound**: A review that does not exist is refused with
+`ReviewNotFound`. This scenario is tested by `ReviewService_SetDueDateAsync_MissingReview_IsNotFound`.
+
+**ReviewService_SetDueDateAsync_ApprovedReview_IsLockedAndNeverOverdue**: An approved review refuses the change with
+`ReviewLocked` (reopen the review first), keeps its date, and is never overdue even when the date has passed. This
+scenario is tested by `ReviewService_SetDueDateAsync_ApprovedReview_IsLockedAndNeverOverdue`.
+
+**ReviewService_SetDueDateAsync_ChangedByOtherMeanwhile_FailsAsRecordChanged**: The date is changed through the store
+after the service read it; the compare-and-set fails with `RecordChanged` and the other value stays. This scenario is
+tested by `ReviewService_SetDueDateAsync_ChangedByOtherMeanwhile_FailsAsRecordChanged`.
+
+**ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature**: A review is signed before the date is
+changed (this applies while the review is not yet approved); the record digest is the same and the signature still
+verifies. This scenario is tested by `ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature`.
+
+**ReviewService_IsOverdue_PastDateAndNotApproved_IsTheOnlyOverdueCase**: Only a date before today (UTC) on a review
+that is not approved is overdue; no date, today, a future date, and an approved review are not. This scenario is tested
+by `ReviewService_IsOverdue_PastDateAndNotApproved_IsTheOnlyOverdueCase`.
+
+**ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses**: Missing, null, and blank text is no date; `yyyy-MM-dd`
+is read; any other text raises `DueDateInvalid`. This scenario is tested by
+`ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses`.

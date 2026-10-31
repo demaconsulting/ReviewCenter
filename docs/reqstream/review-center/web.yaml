@@ -641,6 +641,30 @@ sections:
           - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
           - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
 
+      - id: ReviewCenter-Web-DueDate
+        title: >-
+          The Web subsystem shall let a user give a review an optional due date, stated as a calendar day in UTC, when
+          creating it from files, from a repository, or from a plan (one date for all the planned reviews and one for
+          each), show the due date in the header of a review with an Overdue badge while it is past and the review
+          is not approved, and let the administrators of the project and the creator of the review, and nobody else,
+          change or clear the date of a review that is not locked, showing the message of the rule when a date is
+          refused.
+        justification: |
+          A lead plans reviews with dates and must see at a glance which are late. The pages must state the time basis
+          so that nobody reads the date in another zone, and must not offer a change that the rules refuse. The
+          behavior needs a live connection, so it is verified by the component tests of the units, and the whole
+          journey by a system test.
+        children:
+          - ReviewCenter-ProjectPage-NewReviewDueDate
+          - ReviewCenter-PlanPage-DueDate
+          - ReviewCenter-ReviewPage-DueDate
+          - ReviewCenter-ReviewPage-Overdue
+        tests:
+          - NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview
+          - PlanPage_Create_DueDates_DefaultAndRowDate
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+          - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+
       - id: ReviewCenter-Web-OidcSignIn
         title: >-
           The Web subsystem shall offer the sign-in with an OpenID Connect provider as a button beside the form for a

@@ -29,6 +29,7 @@ a project checklist, and sign the review with their credentials. Every action is
 
 - 🔍 **File-Set Reviews** - Review uploaded files or git revision changes
 - 🌿 **Git Sources** - Plan reviews from repository review-sets
+- 📅 **Due Dates** - Optional UTC due date per review, with an Overdue badge
 - 💬 **Threaded Comments** - Discuss files or line ranges inline
 - ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own template)
 - 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot

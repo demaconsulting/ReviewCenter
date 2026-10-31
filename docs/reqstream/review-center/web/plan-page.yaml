@@ -89,6 +89,18 @@ sections:
           - PlanPage_Create_OneRowGitAccessFailed_ShowsFixedSentenceWithoutGitText
           - PlanPage_Create_WholeBatchRefused_ShowsErrorNextToButtonAndKeepsPlan
 
+      - id: ReviewCenter-PlanPage-DueDate
+        title: >-
+          The PlanPage unit shall offer an optional due date, stated as a calendar day in UTC, for all the reviews
+          of the plan and one for each planned review, shall create each ticked review with the date of its row or,
+          when the row has none, the date for all, and shall show a refused date as the failure of that review only.
+        justification: |
+          A lead plans many reviews at once and normally wants one date for them, but one review may need another.
+          A wrong date on one row must not stop the others.
+        tests:
+          - PlanPage_Create_DueDates_DefaultAndRowDate
+          - PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow
+
       - id: ReviewCenter-PlanPage-Error
         title: >-
           The PlanPage unit shall show a failed plan as a plain-English message that says what to do next, for a

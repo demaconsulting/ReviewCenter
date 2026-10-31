@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
+
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
@@ -31,6 +33,16 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </remarks>
 public sealed class ReviewService
 {
+    /// <summary>
+    ///     The action recorded when the due date of a review is set, changed or cleared after creation.
+    /// </summary>
+    public const string DueDateChangedAction = "review.due-date-changed";
+
+    /// <summary>
+    ///     How many years ahead a due date may lie: a sanity bound that catches typing errors such as the wrong year.
+    /// </summary>
+    public const int MaxDueDateYearsAhead = 2;
+
     /// <summary>
     ///     The store that persists reviews.
     /// </summary>
@@ -104,10 +116,15 @@ public sealed class ReviewService
     /// </param>
     /// <param name="actor">The signed-in user creating the review; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="dueDate">
+    ///     The optional due date: a calendar day in UTC that is not before today and not more than
+    ///     <see cref="MaxDueDateYearsAhead"/> years ahead; <c>null</c> for none.
+    /// </param>
     /// <returns>The created review, including its fingerprint and file metadata.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="files"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
-    ///     Thrown when any rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
+    ///     Thrown when any rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.DueDateInvalid"/>; nothing is stored then.
     /// </exception>
     public async Task<Review> CreateDraftAsync(
         int projectId,
@@ -115,7 +132,8 @@ public sealed class ReviewService
         string? title,
         IReadOnlyList<UploadedFile> files,
         Actor actor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? dueDate = null)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(actor);
@@ -128,6 +146,7 @@ public sealed class ReviewService
         ValidateId(id);
         var trimmedTitle = ValidateTitle(title);
         ValidateFiles(files);
+        ValidateNewDueDate(dueDate);
 
         // The id must be free within the project. The store backs the id check up
         // with a uniqueness constraint, which covers two requests racing past this check
@@ -159,6 +178,7 @@ public sealed class ReviewService
             Created = _timeProvider.GetUtcNow(),
             CreatedBy = actor.Username,
             CreatedViaApi = actor.ViaApiToken,
+            DueDate = dueDate,
             ContentFingerprint = Fingerprint.Compute(reviewFiles.Select(file => file.Sha256)),
             Files = reviewFiles,
 
@@ -173,7 +193,7 @@ public sealed class ReviewService
             AuditDraft.By(
                 actor,
                 "review.created",
-                $"review '{trimmedTitle}', fingerprint {review.ContentFingerprint}, {reviewFiles.Count} file{(reviewFiles.Count == 1 ? string.Empty : "s")}{CreatedViaText(actor)}",
+                $"review '{trimmedTitle}', fingerprint {review.ContentFingerprint}, {reviewFiles.Count} file{(reviewFiles.Count == 1 ? string.Empty : "s")}{DueText(dueDate)}{CreatedViaText(actor)}",
                 projectId,
                 id),
             cancellationToken);
@@ -193,12 +213,14 @@ public sealed class ReviewService
     /// </param>
     /// <param name="actor">The signed-in user creating the review; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="dueDate">The optional due date; same rules as for <see cref="CreateDraftAsync"/>.</param>
     /// <returns>The created review and the entries that were skipped (symbolic links, submodules, unusable paths).</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the service was created without repository access.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
-    ///     <see cref="DomainRule.NothingToReview"/> when no file matching the selection changed; nothing is stored then.
+    ///     <see cref="DomainRule.NothingToReview"/> when no file matching the selection changed and
+    ///     <see cref="DomainRule.DueDateInvalid"/>; nothing is stored then.
     /// </exception>
     /// <remarks>
     ///     The server fetches the repository, resolves both revisions to commits, lists the changes, keeps those that
@@ -213,7 +235,8 @@ public sealed class ReviewService
         string? title,
         RepositorySource source,
         Actor actor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? dueDate = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(actor);
@@ -230,6 +253,7 @@ public sealed class ReviewService
         var head = RevisionValidator.Validate(source.HeadRevision?.Trim());
         var baseline = string.IsNullOrWhiteSpace(source.BaselineRevision) ? null : RevisionValidator.Validate(source.BaselineRevision.Trim());
         var (patterns, selectionText) = ParseSelection(source.Selection);
+        ValidateNewDueDate(dueDate);
 
         await EnsureFreeIdAsync(projectId, id!, cancellationToken);
         var access = await _repositories.GetAccessAsync(projectId, source.RepositoryId, cancellationToken);
@@ -242,7 +266,7 @@ public sealed class ReviewService
             session,
             access,
             projectId,
-            new SessionReviewRequest(id!, trimmedTitle, headSha, baselineSha, patterns, selectionText, null, head, baseline),
+            new SessionReviewRequest(id!, trimmedTitle, headSha, baselineSha, patterns, selectionText, null, head, baseline, dueDate),
             actor,
             cancellationToken);
     }
@@ -276,7 +300,11 @@ public sealed class ReviewService
         Actor actor,
         CancellationToken cancellationToken)
     {
-        var (id, trimmedTitle, headSha, baselineSha, patterns, selectionText, reviewSetId, headLabel, baselineLabel) = request;
+        var (id, trimmedTitle, headSha, baselineSha, patterns, selectionText, reviewSetId, headLabel, baselineLabel, dueDate) = request;
+
+        // The due date is checked here too, so every creation path (the planner calls this method directly) is covered
+        // and a bad date fails before the repository is read
+        ValidateNewDueDate(dueDate);
 
         // The set id is stored, bound by signatures and written to the audit trail, so it is bounded here
         if (reviewSetId is not null && (reviewSetId.Length == 0 || reviewSetId.Length > ReviewLimits.MaxReviewSetIdLength))
@@ -333,6 +361,7 @@ public sealed class ReviewService
             Created = _timeProvider.GetUtcNow(),
             CreatedBy = actor.Username,
             CreatedViaApi = actor.ViaApiToken,
+            DueDate = dueDate,
             ContentFingerprint = Fingerprint.Compute(files.Where(f => f.ChangeKind != ChangeKind.Deleted).Select(f => f.Sha256)),
             RepositoryId = access.RepositoryId,
             RepositoryName = access.Name,
@@ -359,7 +388,7 @@ public sealed class ReviewService
                 "review.created",
                 $"review '{titleText}'{viaText} from repository '{access.Name}', baseline {baselineSha ?? "none"}, head {headSha}, " +
                 $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")}: {added} added, {modified} modified, {deleted} deleted, " +
-                $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}{setText}",
+                $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}{setText}{DueText(dueDate)}",
                 projectId,
                 id),
             cancellationToken);
@@ -377,6 +406,233 @@ public sealed class ReviewService
     private static string CreatedViaText(Actor actor)
     {
         return actor.ViaApiToken ? $", created via API token '{AuditText.Clean(actor.ApiTokenId, 20)}'" : string.Empty;
+    }
+
+    /// <summary>
+    ///     Gets today's date in UTC, the day against which due dates are compared.
+    /// </summary>
+    /// <remarks>
+    ///     A due date is a calendar day without a time zone; the product reads it as a UTC day everywhere (creation
+    ///     rule, overdue badge, documentation), so that the answer never depends on the viewer's location.
+    /// </remarks>
+    public DateOnly TodayUtc => DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime);
+
+    /// <summary>
+    ///     Tells whether a review is overdue: it has a due date before today (UTC) and is not approved.
+    /// </summary>
+    /// <param name="review">The review. Must not be null.</param>
+    /// <param name="isApproved">
+    ///     Whether the review is approved now (see <see cref="ReviewLock.IsApproved"/>). An approved review is never
+    ///     overdue; its date is kept as history.
+    /// </param>
+    /// <returns><c>true</c> when the review has a due date that lies before today (UTC) and is not approved.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="review"/> is null.</exception>
+    public bool IsOverdue(Review review, bool isApproved)
+    {
+        ArgumentNullException.ThrowIfNull(review);
+        return !isApproved && review.DueDate is { } due && due < TodayUtc;
+    }
+
+    /// <summary>
+    ///     Reads the text of a due date as entered on a form or sent to the API.
+    /// </summary>
+    /// <param name="text">The text: an ISO calendar date (<c>yyyy-MM-dd</c>), or <c>null</c> or white space for no date.</param>
+    /// <returns>The date, or <c>null</c> when none was given.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.DueDateInvalid"/> when the text is not an ISO date.</exception>
+    public static DateOnly? ParseDueDate(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        // Exactly the form of the HTML date input and of the API, whatever the culture of the server
+        if (!DateOnly.TryParseExact(text.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            throw new DomainRuleException(
+                DomainRule.DueDateInvalid,
+                "The due date must be a calendar date in the form yyyy-MM-dd (a UTC day).");
+        }
+
+        return parsed;
+    }
+
+    /// <summary>
+    ///     Tells whether an actor may change the due date of a review.
+    /// </summary>
+    /// <remarks>
+    ///     Project administrators (and system administrators) own the oversight of a project, and the person who
+    ///     created the review owns the planning of it; nobody else may change it, and an API token never may (the date
+    ///     can only be set when a review is created through the API). The pages use this to show the edit control;
+    ///     <see cref="SetDueDateAsync"/> checks the same rule again, so the pages are never the only guard.
+    /// </remarks>
+    /// <param name="actor">The signed-in user; may be null, which is not allowed.</param>
+    /// <param name="review">The review. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the actor is a person who administers the project or created the review.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="review"/> is null.</exception>
+    public async Task<bool> CanSetDueDateAsync(Actor? actor, Review review, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(review);
+        if (actor is null || actor.ViaApiToken)
+        {
+            return false;
+        }
+
+        // The creator is recorded by user name, which is unique without regard to case; the right needs a project in
+        // which the actor can still work (a creator who has since become a read-only member cannot change the date)
+        var isCreator = review.CreatedBy is not null
+                        && string.Equals(review.CreatedBy, actor.Username, StringComparison.OrdinalIgnoreCase)
+                        && await _access.CanContributeAsync(actor, review.ProjectId, cancellationToken);
+        return isCreator || await _access.CanAdministerAsync(actor, review.ProjectId, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Sets, changes or clears the due date of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="dueDate">The new due date (a UTC calendar day), or <c>null</c> to clear it. A date in the past is allowed.</param>
+    /// <param name="actor">
+    ///     The signed-in user; must be a project administrator (or system administrator) or the user who created the
+    ///     review. An API token is refused. Must not be null.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the date was changed; <c>false</c> when it already had that value and nothing was recorded.</returns>
+    /// <remarks>
+    ///     The change and its audit entry <c>review.due-date-changed</c> (detail <c>"&lt;old|none&gt; -&gt; &lt;new|none&gt;"</c>)
+    ///     are stored in one transaction, as a compare-and-set on the value this method read, so the entry always names
+    ///     the value that was really replaced. The date is not part of the record digest, so no signature is affected.
+    ///     A past date is allowed (a lead may record that something was due last week); one that is more than
+    ///     <see cref="MaxDueDateYearsAhead"/> years ahead is not. An approved review is locked and refuses the change;
+    ///     after a reopen the date can be changed again.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project,
+    ///     <see cref="DomainRule.ReviewNotFound"/> when the review does not exist,
+    ///     <see cref="DomainRule.ActorNotAllowed"/> for an API token or a member who is neither administrator nor creator,
+    ///     <see cref="DomainRule.DueDateInvalid"/> for a date too far ahead, <see cref="DomainRule.ReviewLocked"/> when the
+    ///     review is approved, and <see cref="DomainRule.RecordChanged"/> when someone else changed the date at the same
+    ///     moment; nothing is stored then.
+    /// </exception>
+    public async Task<bool> SetDueDateAsync(
+        int projectId,
+        string reviewId,
+        DateOnly? dueDate,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        // Whoever may not see the project learns nothing about it, and nothing about its reviews
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken)
+                     ?? throw new DomainRuleException(DomainRule.ReviewNotFound, "The review does not exist.");
+
+        // Who may change it: a person who administers the project or created the review, never an API token
+        if (actor.ViaApiToken)
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "The due date cannot be changed with an API token; sign in to the web pages.");
+        }
+
+        if (!await CanSetDueDateAsync(actor, review, cancellationToken))
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "Only a project administrator or the creator of the review can change its due date.");
+        }
+
+        // A past date is fine here; a date far in the future is almost certainly a typing error
+        ValidateDueDateRange(dueDate, allowPast: true);
+
+        // Approved means locked: the date has no purpose then, and "locked means nothing changes" is easy to explain
+        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+        if (review.DueDate == dueDate)
+        {
+            return false;
+        }
+
+        var stored = await _store.UpdateDueDateAsync(
+            projectId,
+            reviewId,
+            review.DueDate,
+            dueDate,
+            AuditDraft.By(actor, DueDateChangedAction, $"{DueDateText(review.DueDate)} -> {DueDateText(dueDate)}", projectId, reviewId),
+            cancellationToken);
+        if (!stored)
+        {
+            throw new DomainRuleException(
+                DomainRule.RecordChanged,
+                "The due date was changed by someone else. The current date is shown; check it and save again.");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Checks the due date of a review that is being created.
+    /// </summary>
+    /// <param name="dueDate">The due date, or <c>null</c> for none.</param>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.DueDateInvalid"/> when the date is before today (UTC) or more than
+    ///     <see cref="MaxDueDateYearsAhead"/> years ahead.
+    /// </exception>
+    internal void ValidateNewDueDate(DateOnly? dueDate)
+    {
+        ValidateDueDateRange(dueDate, allowPast: false);
+    }
+
+    /// <summary>
+    ///     Checks a due date against the allowed range.
+    /// </summary>
+    /// <param name="dueDate">The due date, or <c>null</c> for none (always valid).</param>
+    /// <param name="allowPast">Whether a date before today is allowed (when changing a date, but not at creation).</param>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.DueDateInvalid"/> when the date is out of range.</exception>
+    private void ValidateDueDateRange(DateOnly? dueDate, bool allowPast)
+    {
+        if (dueDate is not { } due)
+        {
+            return;
+        }
+
+        // Both bounds are calendar days in UTC: today itself is allowed, and so is exactly the same day two years ahead
+        var today = TodayUtc;
+        if (!allowPast && due < today)
+        {
+            throw new DomainRuleException(
+                DomainRule.DueDateInvalid,
+                "The due date must not be before today (UTC).");
+        }
+
+        if (due > today.AddYears(MaxDueDateYearsAhead))
+        {
+            throw new DomainRuleException(
+                DomainRule.DueDateInvalid,
+                $"The due date must not be more than {MaxDueDateYearsAhead} years ahead.");
+        }
+    }
+
+    /// <summary>
+    ///     Writes a due date for the audit trail.
+    /// </summary>
+    /// <param name="dueDate">The due date, or <c>null</c>.</param>
+    /// <returns>The date as <c>yyyy-MM-dd</c>, or <c>none</c>.</returns>
+    private static string DueDateText(DateOnly? dueDate)
+    {
+        return dueDate is { } due ? due.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "none";
+    }
+
+    /// <summary>
+    ///     Builds the part of the <c>review.created</c> detail that names the due date.
+    /// </summary>
+    /// <param name="dueDate">The due date, or <c>null</c>.</param>
+    /// <returns><c>, due yyyy-MM-dd</c> when a date is set; otherwise an empty string, so a review without a date reads as before.</returns>
+    private static string DueText(DateOnly? dueDate)
+    {
+        return dueDate is null ? string.Empty : $", due {DueDateText(dueDate)}";
     }
 
     /// <summary>
@@ -806,6 +1062,7 @@ public sealed class ReviewService
 /// <param name="ReviewSetId">The review-set the review is planned from, or <c>null</c>.</param>
 /// <param name="HeadLabel">How the head is named in the "nothing to review" message.</param>
 /// <param name="BaselineLabel">How the baseline is named in that message, or <c>null</c> for none.</param>
+/// <param name="DueDate">The optional due date of the review (a UTC calendar day), or <c>null</c>.</param>
 internal sealed record SessionReviewRequest(
     string Id,
     string TrimmedTitle,
@@ -815,4 +1072,5 @@ internal sealed record SessionReviewRequest(
     string SelectionText,
     string? ReviewSetId,
     string HeadLabel,
-    string? BaselineLabel);
+    string? BaselineLabel,
+    DateOnly? DueDate = null);

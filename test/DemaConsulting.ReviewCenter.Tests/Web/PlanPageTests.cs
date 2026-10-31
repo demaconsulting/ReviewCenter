@@ -475,6 +475,50 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a default due date goes to every created review and that the date of a row wins over it.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Create_DueDates_DefaultAndRowDate()
+    {
+        // Arrange: a plan with a default due date and a date of its own on the docs row (the clock is 2025-03-04)
+        var (projectId, _) = await ArrangeAsync();
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut);
+        await cut.Find("[data-testid='plan-default-due-input']").InputAsync("2025-04-01");
+        await cut.Find("[data-testid='plan-row-due-docs']").InputAsync("2025-05-01");
+
+        // Act: create
+        await cut.Find("[data-testid='plan-create-button']").ClickAsync();
+
+        // Assert: the core row has the default and the docs row has its own date
+        var reviews = await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken);
+        Assert.Equal(new DateOnly(2025, 4, 1), reviews.Single(review => review.Id == "core").DueDate);
+        Assert.Equal(new DateOnly(2025, 5, 1), reviews.Single(review => review.Id == "docs").DueDate);
+    }
+
+    /// <summary>
+    ///     Test that a due date in the past on a row fails only that row, with a message about the due date.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow()
+    {
+        // Arrange: a plan with a past date on the core row only (the clock is 2025-03-04)
+        var (projectId, _) = await ArrangeAsync();
+        var second = RenderPage(projectId);
+        await ShowPlanAsync(second);
+        await second.Find("[data-testid='plan-row-due-core']").InputAsync("2025-03-03");
+
+        // Act: create
+        await second.Find("[data-testid='plan-create-button']").ClickAsync();
+
+        // Assert: the core row failed with a message about the due date and the docs row was created without one
+        Assert.Equal("Failed", TextOf(second, "plan-result-status-core"));
+        Assert.Contains("due date", TextOf(second, "plan-result-message-core"), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Created", TextOf(second, "plan-result-status-docs"));
+        Assert.Null(Assert.Single(await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken)).DueDate);
+    }
+
+    /// <summary>
     ///     Test that only the ticked rows are created.
     /// </summary>
     [Fact]

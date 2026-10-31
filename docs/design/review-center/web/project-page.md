@@ -174,7 +174,8 @@ the exact user name typed, the project admin checkbox, and the message of the la
 exist only in the memory of the page instance, are cleared by Done, by a lost right, and when the page is left, and are
 never stored or logged.
 
-**ReviewId**, **ReviewTitle**: the values typed into the form.
+**ReviewId**, **ReviewTitle**: the values typed into the form. **DueDateText**: the optional due date typed into the
+form (`yyyy-MM-dd`, empty for none), a calendar day in UTC that the form states next to the field.
 
 **SelectedFiles**: the files read from the file input, as `UploadedFile` values held in memory.
 
@@ -245,8 +246,8 @@ Test identifiers of `NewMemberAccountPage`: `new-account-page` (root), `breadcru
 `copy-account-password-button`, `account-password-copy-status`, and `done-account-button`.
 
 Test identifiers of `NewReviewPage`: `new-review-page` (root), `breadcrumb-projects-link`, `project-link`, `project-loading`,
-`project-not-found`, `new-review-form`, `review-id-input`, `review-title-input`, `review-source` (the source choice),
-`source-upload-radio`, `source-repository-radio`, `no-repository-hint`, `repository-select`, `head-revision-input`,
+`project-not-found`, `new-review-form`, `review-id-input`, `review-title-input`, `due-date-input`, `review-source`
+(the source choice), `source-upload-radio`, `source-repository-radio`, `no-repository-hint`, `repository-select`, `head-revision-input`,
 `baseline-revision-input`, `selection-input`, `review-files-input`, `selected-files-list`, `selected-file-{index}`,
 `selected-file-path-{index}`, `selected-file-size-{index}`, `review-error`, `create-review-button`,
 `cancel-new-review-link` (an outline link back to the project), `review-created`, `skipped-entries-list`,
@@ -417,6 +418,10 @@ rejection does nothing and leaves the rejection reason visible, rather than repl
 
 Before it creates anything the handler refuses the identifier `new`, compared without regard to letter case and ignoring
 surrounding blanks, with the message "The review id 'new' is reserved. Choose another id." and creates nothing.
+
+The optional due date is read with `ReviewService.ParseDueDate` and passed to both creation calls (as the `dueDate`
+argument); text that is not a date, or a date that `ReviewService` refuses (before today in UTC, more than two years
+ahead), is shown in `review-error` like any other rule, with every value kept and no review created.
 
 For the repository source the handler calls `ReviewService.CreateFromRepositoryAsync` with the chosen repository,
 the head and baseline revisions, and the selection. A missing choice of repository is reported as "Choose a

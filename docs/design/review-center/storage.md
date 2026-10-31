@@ -70,7 +70,11 @@ application; the rest of the system sees only the Core store interfaces.
   not approved and raise a `DomainRuleException` for `ReviewLocked` otherwise (nothing is stored). A reopen of an
   approved review (`ReopenReviewAsync`) is stored as a row of the append-only `ReviewReopens` table together with its
   audit entry, after the same transaction re-checked that the review is approved (`ReviewNotLocked` otherwise); the
-  number of reopens is part of the record that is read for the digest. The new table and the new column also have no
+  number of reopens is part of the record that is read for the digest. The due date of a review (`DueDate`, a nullable
+  date column of the `Reviews` table) is changed by a compare-and-set (`UpdateDueDateAsync`) that stores the new date
+  together with the audit entry `review.due-date-changed` in one transaction, after the same transaction re-checked
+  that the review is not approved (`ReviewLocked` otherwise), and otherwise changes nothing and returns `false`. The
+  new table and the new columns also have no
   migration: a development database that was created before them is recreated.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
@@ -177,7 +181,8 @@ after those, the tables of reviewer slots and signatures after those, the audit 
 the project of a repository and the system administrator flag of a user after that, and the `MustChangePassword` column
 of a user after that, and the external identity columns of a user after that, and the `ReviewReopens` table with
 the `RequireIndependentReviewers` column of a project after that, and the `RequireNonAuthorChecklistAnswers` and
-`RequireNonReopenerSigning` columns of a project after that, so a database
+`RequireNonReopenerSigning` columns of a project after that, and the `DueDate` column of a review after that, so a
+database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
@@ -186,8 +191,8 @@ databases created before the signature slice, before the audit trail, before the
 reviews from a repository, before the personal access tokens, before the project access control, before the
 project members management (the `MustChangePassword` column), before the sign-in with an identity provider (the
 external identity columns), and before the approval lock (the `ReviewReopens` table and the
-`RequireIndependentReviewers` column), and before the review rule switches (the `RequireNonAuthorChecklistAnswers` and
-`RequireNonReopenerSigning` columns); there is no
+`RequireIndependentReviewers` column), before the review rule switches (the `RequireNonAuthorChecklistAnswers` and
+`RequireNonReopenerSigning` columns), and before the review due date (the `Reviews.DueDate` column); there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide

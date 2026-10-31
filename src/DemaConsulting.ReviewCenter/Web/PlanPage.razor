@@ -176,6 +176,12 @@
                                 <button type="button" class="secondary" data-testid="plan-select-none" disabled="@Busy" @onclick="() => GuardedAsync(() => SetAllTicked(false))">Select none</button>
                             </p>
                         }
+                        <div class="field">
+                            <label for="plan-default-due">Due date for every review (optional)</label>
+                            <input id="plan-default-due" type="date" data-testid="plan-default-due-input" disabled="@Busy"
+                                   value="@DefaultDueText" @oninput="e => DefaultDueText = e.Value?.ToString() ?? string.Empty" />
+                            <span class="muted">A calendar day in UTC, from today up to two years ahead. A row can have its own date.</span>
+                        </div>
                         <ul class="item-list" data-testid="plan-todo-list">
                             @foreach (var row in TodoRows)
                             {
@@ -193,6 +199,9 @@
                                             <span class="muted" data-testid="plan-row-counts-@row.SetId">@CountsText(row)</span>
                                         </span>
                                     </label>
+                                    <input type="date" aria-label="Due date of @row.Title" data-testid="plan-row-due-@row.SetId"
+                                           disabled="@Busy" value="@RowDueText(row.SetId)"
+                                           @oninput="e => SetRowDue(row.SetId, e.Value?.ToString())" />
                                 </li>
                             }
                         </ul>

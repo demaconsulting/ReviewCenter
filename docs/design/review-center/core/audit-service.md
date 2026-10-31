@@ -86,7 +86,8 @@ administrator is not throttled but is a trusted actor).
 | `project.member-add-failed` | `user name '<typed>'` (failed add or account creation; best-effort; project id apart) |
 | `project.evidence-settings-changed` | `AnonymousIndex off->on; IncludeThreads on->off` (changed keys; project apart) |
 | `project.checklist-changed` | `version V, N sections, M items, sha256 {8 hex}, previous version P` (or reset) |
-| `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)` |
+| `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)`, plus `, due yyyy-MM-dd` if a due date is set |
+| `review.due-date-changed` | `none -> 2030-01-31` (old and new due date, `none` for no date; review in its own field) |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {number}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {number}, role {Primary or Alternate}, record digest <64 hex>` |
 | `thread.started` | `thread {id} on {path} {anchor}; comment {cid}, text sha256 {8 hex}` |

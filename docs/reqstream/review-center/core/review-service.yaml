@@ -269,3 +269,51 @@ sections:
           - ReviewService_CreateDraftAsync_ApiActor_FlagsReviewAndAuditText
           - ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag
           - ReviewService_CreateFromRepositoryAsync_ApiActor_FlagsReviewAndAuditText
+
+      - id: ReviewCenter-ReviewService-DueDate
+        title: >-
+          The ReviewService class shall let a review be created, from files, from a repository, or from a plan,
+          with an optional due date that is a calendar day in UTC, shall keep it outside the record digest, shall
+          refuse a date before today or more than two years ahead with the DueDateInvalid rule, storing nothing,
+          shall name the date in the audit entry of the creation only when one is set, and shall treat a review as
+          overdue only while its due date is before today (UTC) and the review is not approved.
+        justification: |
+          A lead needs to say when a review is expected without every review having a deadline. A date in the past
+          is a mistake at creation, and one far in the future is most likely a typing error. The date is planning
+          information, not review content, so it must not change what a signature covers, and a review that is
+          approved has met its purpose and must not be reported as late.
+        tests:
+          - ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt
+          - ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText
+          - ReviewService_CreateDraftAsync_DueDateOutOfRange_IsRefusedAndStoresNothing
+          - ReviewService_IsOverdue_PastDateAndNotApproved_IsTheOnlyOverdueCase
+          - ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses
+          - ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature
+
+      - id: ReviewCenter-ReviewService-DueDateChange
+        title: >-
+          The ReviewService class shall let only a project administrator, a system administrator, or the user who
+          created the review and can still contribute to the project (not a read-only member), and never an actor
+          that works through a personal access token, set, change, or clear
+          the due date of a review after its creation, accepting a date in the past but not one more than two years
+          ahead, shall refuse the change of an approved review with the ReviewLocked rule, shall store the change
+          only when the stored date is still the one it started from, and shall record in the audit trail, in the
+          same transaction, the old and the new date.
+        justification: |
+          The due date is a commitment that the people in charge of the project make, so a member who is neither
+          the creator nor an administrator, and a script, must not move it. A lead may record that something was
+          due last week, so the past is allowed on edit. An approved review is locked so that nothing changes, and
+          it is never overdue, so a change has no purpose until it is reopened. The comparison is part of the update
+          and the entry is stored with it, so two people cannot both succeed and the history cannot disagree with
+          the date.
+        tests:
+          - ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew
+          - ReviewService_SetDueDateAsync_CreatorAndSystemAdmin_AreAllowed
+          - ReviewService_SetDueDateAsync_OtherMemberOrOutsider_IsRefusedAndChangesNothing
+          - ReviewService_SetDueDateAsync_CreatorNowReadOnly_IsRefused
+          - ReviewService_SetDueDateAsync_ApiToken_IsRefused
+          - ReviewService_SetDueDateAsync_ClearAndUnchanged_AuditsOnlyTheChange
+          - ReviewService_SetDueDateAsync_TooFarAhead_IsRefused
+          - ReviewService_SetDueDateAsync_MissingReview_IsNotFound
+          - ReviewService_SetDueDateAsync_ApprovedReview_IsLockedAndNeverOverdue
+          - ReviewService_SetDueDateAsync_ChangedByOtherMeanwhile_FailsAsRecordChanged

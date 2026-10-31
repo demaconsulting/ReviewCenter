@@ -270,6 +270,18 @@ sections:
           - NewReviewPage_CreateForm_NoRepositoryChosen_AsksForOne
           - NewReviewPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing
 
+      - id: ReviewCenter-ProjectPage-NewReviewDueDate
+        title: >-
+          The ProjectPage unit shall offer on its page for a new review an optional due date, which it states is a
+          calendar day in UTC, for an upload and for a repository alike, shall create the review with that date, and
+          shall show the reason and create nothing when the date is not a date that the rules accept.
+        justification: |
+          The person who creates a review often knows when it is expected. Stating the time basis keeps a date
+          from being read in another time zone, and a refused date must be corrected, not dropped.
+        tests:
+          - NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview
+          - NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing
+
       - id: ReviewCenter-ProjectPage-Interactive
         title: >-
           The ProjectPage unit shall report that it is interactive, through a marker on its root element, once

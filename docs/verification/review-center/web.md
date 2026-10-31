@@ -316,6 +316,14 @@ verified by `HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAn
 the project page are verified by `ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary` and
 `ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary`.
 
+**Review due date**: The unit tests of `ProjectPage` (the form for a new review), `PlanPage`, and `ReviewPage` verify the
+subsystem requirement for the optional due date: the date is offered when a review is created or planned and is shown
+with its UTC label, the Overdue badge shows only for a past date on a review that is not approved, and the edit form is
+offered only to an administrator or the creator and never for an approved review. They are tested by
+`NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview`, `PlanPage_Create_DueDates_DefaultAndRowDate`,
+`ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc`, and
+`ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot`.
+
 **Temporary password**: A user who signed in with a temporary password is confined to the account page. The layout
 shows no navigation tabs and sends the browser to `/account` from every page except the account, help, and about pages,
 which is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`; the account page shows a banner and

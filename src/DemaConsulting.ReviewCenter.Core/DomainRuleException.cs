@@ -255,7 +255,13 @@ public enum DomainRule
     ///     or duplicate identifiers, titles or wording, or a changed definition keeps the version label of the
     ///     current one. The message lists the errors with their paths.
     /// </summary>
-    ChecklistDefinitionInvalid
+    ChecklistDefinitionInvalid,
+
+    /// <summary>
+    ///     A review due date is not valid: it is not an ISO calendar date, a new review's date is before today (UTC) or
+    ///     more than two years ahead.
+    /// </summary>
+    DueDateInvalid
 }
 
 /// <summary>

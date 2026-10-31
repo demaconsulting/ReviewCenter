@@ -18,8 +18,9 @@ review store (to list the reviews of a project), `ReviewService`, `RepositorySer
 `AlreadyFiled`, `NothingToReview`, `CannotPlan`); `PlanRow` (set id, title, normalized selection, status, baseline
 commit, a note, the numbers of added, modified, and deleted files, the id of an existing review, and a problem);
 `ReviewPlan` (repository, head revision and commit, mode, an explicit baseline, and the rows); `PlanCreateRequest` (set
-id, title, selection, baseline commit); `PlanCreateOutcome` (`Created`, `AlreadyFiled`, `Failed`); and `PlanCreateResult`.
-All are immutable records. `ReviewSetDefinition` and `IReviewSetParser` are defined with the planner.
+id, title, selection, baseline commit, and an optional due date); `PlanCreateOutcome` (`Created`, `AlreadyFiled`,
+`Failed`); and `PlanCreateResult`. All are immutable records. `ReviewSetDefinition` and `IReviewSetParser` are defined
+with the planner.
 
 **Limits**: a batch has at most `ReviewLimits.MaxReviewSets` requests. A generated review id is at most
 `ReviewLimits.MaxReviewIdLength` characters: the base is cut for each suffix so that base and suffix always fit, and at
@@ -68,7 +69,8 @@ most five suffixes are tried when a create is refused as a duplicate.
 **CreateAsync**: Creates the reviews that a user picked from a plan.
 
 - *Parameters*: `Actor actor`, `int projectId`, `int repositoryId`, `string headSha`,
-  `IReadOnlyList<PlanCreateRequest> requests`, and `CancellationToken cancellationToken`.
+  `IReadOnlyList<PlanCreateRequest> requests`, `CancellationToken cancellationToken`, and an optional
+  `DateOnly? defaultDueDate` (added last).
 - *Returns*: one `PlanCreateResult` for every request, in the same order.
 - *Preconditions*: `requests` and `actor` are not null; there are at most `MaxReviewSets` requests; `headSha` is a full
   commit id; the actor may work in the project and the repository is usable and belongs to the project.
@@ -81,7 +83,10 @@ most five suffixes are tried when a create is refused as a duplicate.
   page shares; an unexpected fault (any
   other exception except a cancellation) becomes a `Failed` result with a generic message; neither stops the others. A
   duplicate id (someone took it a moment ago) is retried with the next suffix, up to five times. The same range and
-  selection that already exists is an `AlreadyFiled` result.
+  selection that already exists is an `AlreadyFiled` result. Each review gets the due date of its own request or, when
+  that is null, `defaultDueDate`; the date is passed to `CreateFromSessionAsync` in the `SessionReviewRequest`, so the
+  rule of `ReviewService` (not before today, not more than two years ahead, `DueDateInvalid`) applies, and a refused
+  date fails that request only, with the message of the rule.
 
 **GenerateId** (internal): Makes the review id of a set: characters other than letters, digits, `.`, and `_` become `-`,
 runs of `-` collapse, a leading character that is not a letter or a digit and trailing `-`, `.`, and `_` are removed, an

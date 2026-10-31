@@ -131,6 +131,20 @@ sections:
           - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
           - ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn
 
+      - id: ReviewCenter-DbContext-DueDate
+        title: >-
+          The ReviewCenterDbContext class shall map the optional due date of a review to one nullable text column of
+          the review table that holds the calendar day as yyyy-MM-dd, so that a review that was not given a date reads
+          back with none and a date reads back as the same day. The
+          schema is created from the model without a migration, so a database that was created before the column
+          existed has to be recreated.
+        justification: |
+          The date belongs to exactly one review and is read with it, so it is a column of the review. A calendar day
+          has no time zone, so storing it as text keeps it from shifting. The schema is created from the model and not
+          migrated while the product is not released, so development databases are recreated.
+        tests:
+          - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
+
       - id: ReviewCenter-DbContext-Signatures
         title: >-
           The ReviewCenterDbContext class shall map reviewer slots and signatures to tables in which a slot and

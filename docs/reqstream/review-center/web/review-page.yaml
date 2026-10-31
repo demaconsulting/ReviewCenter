@@ -597,3 +597,33 @@ sections:
           choice.
         tests:
           - ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates
+
+      - id: ReviewCenter-ReviewPage-DueDate
+        title: >-
+          The ReviewPage unit shall show the due date of a review in its header, stated as a calendar day in UTC, or
+          that there is none, and shall show a form with a date field and buttons to save and to clear the date to
+          the administrators of the project, the system administrators, and the user who created the review, and to
+          nobody else, and never on a review that is locked, shall show the message of the rule when the service
+          refuses a date, including text that is not a date, and shall keep that message visible even when the review
+          was locked meanwhile and the form is gone, and shall show the new date after a change.
+        justification: |
+          The date is only useful when everyone sees it, and only the people in charge of the review may move it.
+          The form is a courtesy: the service decides who may change the date and refuses a stale page.
+        tests:
+          - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
+          - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+          - ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot
+          - ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited
+          - ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone
+
+      - id: ReviewCenter-ReviewPage-Overdue
+        title: >-
+          The ReviewPage unit shall show an Overdue badge next to the due date while the date is before today (UTC)
+          and the review is not approved, shall show no badge for a date that is today or later, and shall keep the
+          date of an approved review, without the badge, as history.
+        justification: |
+          A reader must see at a glance that a review is late. An approved review has done its work, so calling it
+          overdue would be wrong, but the date stays as the record of what was planned.
+        tests:
+          - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
+          - ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited

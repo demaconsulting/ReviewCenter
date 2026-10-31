@@ -533,7 +533,9 @@ public class ReviewStoreSigningTests
             ["answer"] = () => db.Store.SetChecklistAnswerAsync(answer, cancellationToken),
             ["add slot"] = () => db.Store.AddSlotAsync(NewSlot(projectId, 3, null), cancellationToken),
             ["update slot"] = () => db.Store.UpdateSlotAsync(projectId, "REV-1", slot.Id, 3, null, cancellationToken),
-            ["remove slot"] = () => db.Store.RemoveSlotAsync(projectId, "REV-1", slot.Id, cancellationToken)
+            ["remove slot"] = () => db.Store.RemoveSlotAsync(projectId, "REV-1", slot.Id, cancellationToken),
+            ["due date"] = () => db.Store.UpdateDueDateAsync(
+                projectId, "REV-1", null, new DateOnly(2030, 1, 1), AuditTestExtensions.Draft(), cancellationToken)
         };
 
         // Act, Assert: each write is refused as locked, and nothing changes

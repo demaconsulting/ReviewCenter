@@ -478,7 +478,9 @@ was created and the reason for each that failed. The page contains no planning r
 classification, the identifiers and the creation are in `ReviewPlanner`. A failure is shown in plain English with what
 to do next; the text git printed, a location, a credential and exception text are never shown. `ProjectPage` links to
 the plan page when an enabled repository of the project exists, and `ReviewPage` shows the review-set of a planned
-review in the details. `PlanPage` shows the not-found text of a project for a project the user may not see.
+review in the details. `PlanPage` shows the not-found text of a project for a project the user may not see. `PlanPage`
+also has an optional due date input (the default date of the reviews it creates, passed as `PlanCreateRequest.DueDate`),
+and `NewReviewPage` has the same optional input for both sources; both show a refusal (`DueDateInvalid`) in the form.
 
 The review page shows the reviewer slots of a review and lets a reviewer sign. A summary strip at its top (the
 state, the checklist progress with the link to the checklist, the reviewer slots with their signatures, and the open
@@ -517,6 +519,11 @@ answer the checklist of their own review; the person who reopened a review canno
 audited and are marked "Not applied yet." because no page or service enforces them. Reading, the attestation download,
 and the
 evidence index are unaffected by the lock.
+
+`ReviewPage` shows the due date of a review in the details, with an Overdue badge while `ReviewService.IsOverdue` says
+so (the page holds no date rule). A user who may change it (a project admin, a system administrator, or the creator of
+the review) gets a small form that sets or clears it through `ReviewService.SetDueDateAsync`; the form is not offered
+while the review is locked, and any refusal (`ReviewLocked`, `RecordChanged`, `DueDateInvalid`) is shown as text.
 
 #### Signed attestation
 

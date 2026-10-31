@@ -27,7 +27,11 @@
    An approved review is locked: a Locked badge and a banner explain it, and every control that would change the
    review (new thread, reply, resolve, line comments, reviewer slots) is disabled. A project or system administrator
    sees a reopen form (a reason of up to 250 characters is required); the reopen history is listed. When the project
-   requires independent reviewers the author of the review is not offered as a reviewer and is told so. *@
+   requires independent reviewers the author of the review is not offered as a reviewer and is told so.
+
+   An optional due date (a UTC calendar day) is shown under the title with an Overdue badge when it lies before today
+   (UTC) and the review is not approved. A project administrator or the creator of the review can set, change or
+   clear it while the review is not locked; the service checks the same rule again. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/files/{**FilePath}"
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/threads/{ThreadId:int}"
@@ -71,6 +75,43 @@
             }
             <a class="action outline" href="/projects/@ProjectId/reviews/@ReviewId/history" data-testid="history-link">History</a>
         </div>
+
+        @* The due date is a UTC calendar day. Overdue means "before today (UTC) and not approved"; an approved review
+           keeps its date as history. Only a project administrator or the creator sees the edit form, and only while
+           the review is not locked *@
+        <section class="due-date" data-testid="review-due-section">
+            @if (Review.DueDate is { } dueDate)
+            {
+                <p class="status">
+                    <span data-testid="review-due-date">Due @FormatDueDate(dueDate) (UTC)</span>
+                    @if (IsOverdue)
+                    {
+                        <span class="badge failed" data-testid="review-overdue">Overdue</span>
+                    }
+                </p>
+            }
+            else
+            {
+                <p class="status muted" data-testid="review-due-none">No due date</p>
+            }
+            @* The refusal is shown even when the form is gone: the review may have been approved meanwhile *@
+            @if (DueDateError is not null)
+            {
+                <p class="error" role="alert" data-testid="review-due-error">@DueDateError</p>
+            }
+            @if (CanEditDueDate)
+            {
+                <form data-testid="due-date-form" novalidate @onsubmit="SaveDueDateAsync">
+                    <div class="field">
+                        <label for="review-due-input">Due date (a calendar day in UTC)</label>
+                        <input id="review-due-input" type="date" data-testid="review-due-input" value="@DueDateInput"
+                               @oninput="e => DueDateInput = e.Value?.ToString() ?? string.Empty" />
+                    </div>
+                    <button type="submit" data-testid="review-due-save">Save</button>
+                    <button type="button" class="secondary" data-testid="review-due-clear" @onclick="ClearDueDateAsync">Clear</button>
+                </form>
+            }
+        </section>
 
         @if (IsLocked)
         {

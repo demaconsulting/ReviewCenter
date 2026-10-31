@@ -120,6 +120,12 @@ public partial class NewReviewPage : ComponentBase
     private string ReviewTitle { get; set; } = string.Empty;
 
     /// <summary>
+    ///     Gets or sets the optional due date typed into the form, as the text of the date input (<c>yyyy-MM-dd</c>);
+    ///     empty for none.
+    /// </summary>
+    private string DueDateText { get; set; } = string.Empty;
+
+    /// <summary>
     ///     Gets the files chosen in the file input, with their bytes already read.
     /// </summary>
     private IReadOnlyList<UploadedFile> SelectedFiles { get; set; } = [];
@@ -203,6 +209,7 @@ public partial class NewReviewPage : ComponentBase
             Project = null;
             ReviewId = string.Empty;
             ReviewTitle = string.Empty;
+            DueDateText = string.Empty;
             SelectedFiles = [];
             ErrorMessage = null;
             SelectionRejected = false;
@@ -358,6 +365,7 @@ public partial class NewReviewPage : ComponentBase
             {
                 // The actor is audited; asking for it also refuses an ended sign-in state
                 var actor = await AuthenticationState.GetActorAsync();
+                var dueDate = ReviewService.ParseDueDate(DueDateText);
                 if (FromRepository)
                 {
                     if (!int.TryParse(RepositoryIdText, out var repositoryId))
@@ -371,13 +379,15 @@ public partial class NewReviewPage : ComponentBase
                         ReviewId,
                         ReviewTitle,
                         new RepositorySource(repositoryId, HeadRevision, BaselineRevision, Selection),
-                        actor);
+                        actor,
+                        dueDate: dueDate);
                     review = result.Review;
                     skipped = result.Skipped;
                 }
                 else
                 {
-                    review = await ReviewService.CreateDraftAsync(ProjectId, ReviewId, ReviewTitle, SelectedFiles, actor);
+                    review = await ReviewService.CreateDraftAsync(
+                        ProjectId, ReviewId, ReviewTitle, SelectedFiles, actor, dueDate: dueDate);
                 }
             }
             catch (DomainRuleException ex)

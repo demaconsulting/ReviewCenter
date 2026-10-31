@@ -60,6 +60,7 @@ public class ApiEndpointsTests
     [InlineData(DomainRule.TooManyAttempts, 429)]
     [InlineData(DomainRule.PasswordChangeRequired, 403)]
     [InlineData(DomainRule.ChecklistDefinitionInvalid, 400)]
+    [InlineData(DomainRule.DueDateInvalid, 400)]
     public void ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus(DomainRule rule, int status)
     {
         // Arrange: nothing to prepare
@@ -434,6 +435,101 @@ public class ApiEndpointsTests
         Assert.True(readJson.RootElement.GetProperty("createdViaApi").GetBoolean());
         var entry = Assert.Single(await AuditAsync(app), e => e.Action == "review.created");
         Assert.Contains($"created via API token '{token.Token.DisplayId}'", entry.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a review created with a due date shows it in the details, the list and the audit entry, is not
+    ///     overdue, and becomes overdue (in both) once the date has passed; and that a review without one has none.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag()
+    {
+        // Arrange: a project, a token, and a due date a week ahead
+        await using var app = await StartAsync();
+        var token = await CreateTokenAsync(app);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        var due = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        object Body(string id, string? dueDate) => new
+        {
+            id,
+            title = "Dated",
+            dueDate,
+            files = new[] { new { path = "a.txt", contentBase64 = Convert.ToBase64String("one\n"u8.ToArray()) } }
+        };
+
+        // Act: create one review with a date and one without
+        var dated = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(Body("REV-1", due)), TestContext.Current.CancellationToken);
+        var plain = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(Body("REV-2", null)), TestContext.Current.CancellationToken);
+        using var datedJson = await JsonAsync(dated);
+
+        // Assert: the created answer carries the date and no overdue flag, and the audit entry names the date
+        Assert.Equal(HttpStatusCode.Created, dated.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, plain.StatusCode);
+        var review = datedJson.RootElement.GetProperty("review");
+        Assert.Equal(due, review.GetProperty("dueDate").GetString());
+        Assert.False(review.GetProperty("overdue").GetBoolean());
+        var entry = Assert.Single(await AuditAsync(app), e => e.Action == "review.created" && e.ReviewId == "REV-1");
+        Assert.Contains($"due {due}", entry.Detail, StringComparison.Ordinal);
+
+        // Act: read the list; then a project administrator moves the date into the past
+        var list = await client.GetAsync($"/api/projects/{project.Id}/reviews", TestContext.Current.CancellationToken);
+        using var listJson = await JsonAsync(list);
+        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        await app.Services.GetRequiredService<ReviewService>().SetDueDateAsync(
+            project.Id, "REV-1", yesterday, new Actor("ann", "Ann"), TestContext.Current.CancellationToken);
+        var after = await client.GetAsync($"/api/projects/{project.Id}/reviews/REV-1", TestContext.Current.CancellationToken);
+        var afterList = await client.GetAsync($"/api/projects/{project.Id}/reviews", TestContext.Current.CancellationToken);
+        using var afterJson = await JsonAsync(after);
+        using var afterListJson = await JsonAsync(afterList);
+
+        // Assert: the list shows the date for the first review and null for the second, overdue only after the move
+        var rows = listJson.RootElement.EnumerateArray().ToDictionary(r => r.GetProperty("id").GetString()!);
+        Assert.Equal(due, rows["REV-1"].GetProperty("dueDate").GetString());
+        Assert.False(rows["REV-1"].GetProperty("overdue").GetBoolean());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, rows["REV-2"].GetProperty("dueDate").ValueKind);
+        Assert.False(rows["REV-2"].GetProperty("overdue").GetBoolean());
+        Assert.Equal(yesterday.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), afterJson.RootElement.GetProperty("dueDate").GetString());
+        Assert.True(afterJson.RootElement.GetProperty("overdue").GetBoolean());
+        var overdueRow = afterListJson.RootElement.EnumerateArray().Single(r => r.GetProperty("id").GetString() == "REV-1");
+        Assert.True(overdueRow.GetProperty("overdue").GetBoolean());
+    }
+
+    /// <summary>
+    ///     Test that a due date that is not a date, is in the past or is too far ahead is a 400 problem naming the
+    ///     due date, and that no review is created.
+    /// </summary>
+    /// <param name="dueDate">The text sent as the due date.</param>
+    [Theory(Timeout = 120000)]
+    [InlineData("tomorrow")]
+    [InlineData("2020-01-01")]
+    [InlineData("2999-01-01")]
+    [InlineData("2030-02-30")]
+    public async Task ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing(string dueDate)
+    {
+        // Arrange: a project and a token
+        await using var app = await StartAsync();
+        var token = await CreateTokenAsync(app);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        var body = new
+        {
+            id = "REV-1",
+            title = "Dated",
+            dueDate,
+            files = new[] { new { path = "a.txt", contentBase64 = Convert.ToBase64String("one\n"u8.ToArray()) } }
+        };
+
+        // Act
+        var response = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(body), TestContext.Current.CancellationToken);
+
+        // Assert: a problem, and no review
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("due date", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.OrdinalIgnoreCase);
+        var list = await client.GetAsync($"/api/projects/{project.Id}/reviews", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(list);
+        Assert.Empty(json.RootElement.EnumerateArray());
     }
 
     /// <summary>

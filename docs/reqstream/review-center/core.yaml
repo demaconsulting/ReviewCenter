@@ -503,6 +503,28 @@ sections:
           - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
           - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
 
+      - id: ReviewCenter-Core-DueDate
+        title: >-
+          The Core subsystem shall let a review be created, by hand or from a plan, with an optional due date that is
+          a calendar day in UTC and that the rules accept only from today up to two years ahead, let the project
+          administrators, the system administrators, and the creator of the review, but not a personal access token,
+          change or clear it later (a date in the past included) unless the review is approved, treat a review as
+          overdue only while the date is past and the review is not approved, keep the date out of the record
+          digest, and record every setting and change in the audit trail.
+        justification: |
+          A lead needs to see which reviews are late without asking. The people in charge may move a date, a script
+          may not, and an approved review is never late. The date is planning information and not review content,
+          so it must not make a signature look out of date.
+        children:
+          - ReviewCenter-ReviewService-DueDate
+          - ReviewCenter-ReviewService-DueDateChange
+          - ReviewCenter-ReviewPlanner-DueDate
+        tests:
+          - ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt
+          - ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew
+          - ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature
+          - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow
+
       - id: ReviewCenter-Core-AccessTokens
         title: >-
           The Core subsystem shall let a user create personal access tokens with a name and an expiry, up to a limit,

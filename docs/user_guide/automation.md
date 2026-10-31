@@ -150,6 +150,10 @@ Limits to know about:
 `files` (uploaded files, each with a `path` and its `contentBase64`) or `repository` (a `repositoryId` of an enabled
 repository of that project, a `headRevision`, and optionally a `baselineRevision` and a `selection`, one pattern per
 line; without a `selection` (omitted or `null`) every changed file is reviewed, as with the pattern `**/*`).
+An optional `dueDate` (text `yyyy-MM-dd`, a calendar day in UTC; omitted, `null`, or blank means none) gives the review
+a due date. It must not be before today (UTC) or more than two years ahead; otherwise the answer is a **400** that names
+the due date and nothing is created. A token cannot change the date later: that is done on the review page by an
+administrator or the creator (see Due Dates in the Reviewing chapter).
 The same rules as on the web pages apply: the identifier and title rules, the upload limits, and the repository rules
 (see Projects and Reviews and Reviews from a Repository in the Reviewing chapter). The API refuses more than 200 `files`,
 or a `contentBase64` longer than the Base64 text of 2 MiB, with a **400** that names `files` or `files[i].contentBase64`,
@@ -174,6 +178,10 @@ Reviewing chapter).
 life-cycle value, and in this release it is always `Draft`, even after the review is signed; it is kept so that clients
 that read it keep working. Use `approved` (`true` while every reviewer slot has signed the current record, and the
 review is locked) to find out whether a review is approved.
+
+**`dueDate` and `overdue`.** The review data of the list and of one review has `dueDate` (`yyyy-MM-dd`, or `null` when
+the review has none) and `overdue` (`true` when the date is before today in UTC and the review is not approved; an
+approved review is never overdue, and keeps its date).
 
 ## Errors, Refusals, and the Throttle
 

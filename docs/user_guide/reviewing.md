@@ -24,7 +24,8 @@ unchanged, together with a fingerprint of that content.
 3. On the project page, press **+ New review**. On the form at `/projects/{id}/reviews/new`, enter a review
    identifier (1 to 100 letters, digits, `.`, `_`, or `-`, starting with a letter or digit; unique within the
    project; the identifier `new` is reserved and is refused) and a title (up to 200 characters), choose the files to
-   review, and press the create button. The chosen files are listed with their sizes before you submit. **Cancel**
+   review, and press the create button. The chosen files are listed with their sizes before you submit. You can also enter
+   an optional **Due date** (see [Due Dates](#due-dates)). **Cancel**
    goes back to the project.
 
    ![The New review form with three chosen files listed before the review is created.](images/new-review-upload.png)
@@ -48,6 +49,27 @@ on the page, and nothing is created.
 - At most 200 files per review, 2 MiB per file, and 20 MiB for all files of a review.
 - Only the file name of each chosen file is kept (not its folder), so two files with the same name cannot be in the
   same review; the page reports this when you submit.
+
+### Due Dates
+
+A review can have an optional **due date**, the day by which the review should be finished. The date is a calendar day
+in **UTC**, not a moment in your time zone: the day changes at midnight UTC, and the pages say "(UTC)" next to the date.
+
+- **At creation**: the form for a new review, the plan page (one date for all the reviews and, if you want, one for each
+  set), and the API (see the Automation chapter) take an optional date. At creation the date must be today or later,
+  and at most two years ahead; otherwise the review is not created and the page says that the due date is not valid.
+  On the plan page a date that is not valid fails only that review.
+- **On the review page**: the header shows "Due YYYY-MM-DD (UTC)" or "No due date". When the date is before today and
+  the review is not approved, an **Overdue** badge is shown next to it.
+- **Changing it**: a project administrator, a system administrator, or the person who created the review can change the
+  date in the header (a date input with **Save**, and **Clear** to remove it). A date in the past is accepted when you
+  change it, so you can record that a review is late; it is then shown as overdue. Other members see the date and the
+  badge but no form. A personal access token cannot change the date.
+- **Approved reviews**: an approved review is locked, so its date cannot be changed (the form is not shown) until an
+  administrator reopens it. It keeps its date as history and is never shown as overdue.
+- The date is not part of the signed record: changing it does not make a signature out of date. Every change is
+  recorded in the audit trail as `review.due-date-changed` with the old and the new date, and the creation entry names
+  the date when one was given.
 
 ### Reviews from a Repository
 
@@ -169,6 +191,9 @@ that:
 - **Already filed**: shown only when a review of a set at this head and baseline exists, with a link to that review. A
   set is not offered twice, so you cannot file the same review again by mistake.
 - **Nothing to review**: the sets whose files did not change. It is collapsed; open it to see which they are.
+
+Before you create, you can enter an optional **Due date for all reviews**, and a **Due** date on a row that should have
+its own (the row's date wins). The dates are UTC calendar days; see [Due Dates](#due-dates).
 
 Choose **Create N reviews**. The page then lists one result per set: a link to the new review, or the reason it could not
 be created. The others are still created. When a set fails because the repository could not be read, the reason is the

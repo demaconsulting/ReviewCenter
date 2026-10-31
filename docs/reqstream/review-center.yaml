@@ -106,6 +106,28 @@ sections:
         tests:
           - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
 
+      - id: ReviewCenter-System-DueDate
+        title: >-
+          The tool shall let a review be given an optional due date, a calendar day in UTC, when it is created by
+          hand, from a plan, or through the API, let the administrators of the project and the creator of the review
+          change or clear it until the review is approved, show the date on the review and the Overdue badge while the
+          date is past and the review is not approved, never show an approved review as overdue, keep the date out of
+          what a signature covers, and record every setting and change of the date in the audit trail.
+        tags: [system]
+        justification: |
+          A lead who answers for the reviews of a project must see which ones are late. A review that is approved has
+          done its work, so it is not late, and the date is planning information, so a change of it must not make a
+          signature look out of date. The audit trail shows who moved a date, as for every other change of a review
+          (21 CFR Part 11 section 11.10(e)).
+        children:
+          - ReviewCenter-Core-DueDate
+          - ReviewCenter-Storage-DueDate
+          - ReviewCenter-Web-DueDate
+          - ReviewCenter-Api-DueDate
+        tests:
+          - ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited
+          - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+
       # ----------------------------------------------------------------------------------------------
       # Review activity: the discussion and the checklist
       # ----------------------------------------------------------------------------------------------

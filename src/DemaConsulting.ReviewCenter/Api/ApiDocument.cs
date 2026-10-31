@@ -71,11 +71,12 @@ internal static class ApiDocument
     /// </summary>
     /// <remarks>
     ///     <c>files</c> and <c>repository</c> are alternatives (exactly one is given), and a repository source needs
-    ///     no baseline revision (every file is then reviewed as added) and no selection (every changed file).
+    ///     no baseline revision (every file is then reviewed as added) and no selection (every changed file). The
+    ///     <c>dueDate</c> of a review is always optional.
     /// </remarks>
     private static readonly Dictionary<Type, string[]> OptionalRequestMembers = new()
     {
-        [typeof(CreateReviewRequest)] = ["files", "repository"],
+        [typeof(CreateReviewRequest)] = ["files", "repository", "dueDate"],
         [typeof(RepositorySourceDto)] = ["baselineRevision", "selection"]
     };
 

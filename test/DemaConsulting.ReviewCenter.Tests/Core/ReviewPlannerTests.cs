@@ -771,6 +771,56 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
+    ///     Test that a default due date goes to every created review, that a date of its own on a request wins over
+    ///     it, and that a date the creation rule refuses fails only that row.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow()
+    {
+        // Arrange: a plan with two rows; the first has its own date, the second takes the default
+        var f = await CreateAsync();
+        var plan = await PlanAsync(f);
+        var rows = plan.Rows.Where(row => row.Status == PlanRowStatus.WillCreate).ToList();
+        var own = new DateOnly(2025, 6, 1);
+        var common = new DateOnly(2025, 5, 1);
+
+        // Act: create both with the default date, the first row asking for its own
+        var results = await f.Planner.CreateAsync(
+            f.ProjectId,
+            f.RepositoryId,
+            plan.HeadSha,
+            [RequestFor(rows[0]) with { DueDate = own }, RequestFor(rows[1])],
+            _actor,
+            TestContext.Current.CancellationToken,
+            defaultDueDate: common);
+
+        // Assert: both created, the first with its own date and the second with the default, named in the audit detail
+        Assert.All(results, result => Assert.Equal(PlanCreateOutcome.Created, result.Outcome));
+        Assert.Equal(own, f.Store.Reviews.Single(review => review.Id == results[0].ReviewId).DueDate);
+        Assert.Equal(common, f.Store.Reviews.Single(review => review.Id == results[1].ReviewId).DueDate);
+        Assert.Contains(", due 2025-06-01", f.Store.Audits.Single(entry => entry.ReviewId == results[0].ReviewId).Detail);
+        Assert.Contains(", due 2025-05-01", f.Store.Audits.Single(entry => entry.ReviewId == results[1].ReviewId).Detail);
+
+        // Act: file the same rows at the next head with a date in the past for the whole batch
+        var other = await CreateAsync();
+        var otherPlan = await PlanAsync(other);
+        var failed = await other.Planner.CreateAsync(
+            other.ProjectId,
+            other.RepositoryId,
+            otherPlan.HeadSha,
+            [RequestFor(otherPlan.Rows[0]), RequestFor(otherPlan.Rows[1]) with { DueDate = new DateOnly(2025, 6, 1) }],
+            _actor,
+            TestContext.Current.CancellationToken,
+            defaultDueDate: new DateOnly(2025, 3, 3));
+
+        // Assert: the first row fails with a due date message and stores nothing; the second row has a valid own date
+        Assert.Equal(PlanCreateOutcome.Failed, failed[0].Outcome);
+        Assert.Contains("due date", failed[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(PlanCreateOutcome.Created, failed[1].Outcome);
+        Assert.Equal(new DateOnly(2025, 6, 1), Assert.Single(other.Store.Reviews).DueDate);
+    }
+
+    /// <summary>
     ///     Test that a delta review gets the range in its title and the baseline commit.
     /// </summary>
     [Fact]

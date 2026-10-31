@@ -90,6 +90,10 @@ loopback TCP ports.
   a review is refused as a reviewer of it and as its signer, and an administrator can turn the requirement off and on
   with the change audited (`ReviewCenter-System-ReviewerIndependence`). The author is the user who created the review;
   git commit authors are not matched.
+- A review may carry an optional due date, a UTC calendar day that is not part of the record: it is set when the review
+  is created or planned and may be changed or cleared by an administrator or the creator, each change audited; the page
+  shows an Overdue badge once the date has passed unless the review is approved, and an approved review keeps its date
+  without a badge and without an edit form (`ReviewCenter-System-DueDate`).
 - A signature needs the password of the signer again for that signature; a wrong password is refused, signs nothing,
   and is audited without the password (`ReviewCenter-System-SignatureReauthentication`). The lockout count, the second
   factor, and the provider proof are verified at the level of the child requirements.
@@ -314,6 +318,14 @@ refused. In the Web scenario the real pipeline shows both switches, on by defaul
 a rule as off after it was changed. The rules are stored only, so no scenario here expects a refusal of a checklist
 answer or of a signature. These scenarios are tested by `CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale`
 and `WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches`.
+
+**ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited**: In the same setting, a review without a due
+date says so. A review that is planned with a due date a week ahead shows that date, labeled as UTC, without an Overdue
+badge. The administrator changes its date to yesterday, which is accepted on edit, and the page shows the Overdue
+badge; clearing the date removes the badge. The first review is given yesterday as its date and is then approved by
+the signature of `second`; it keeps its date as history, shows no Overdue badge, and offers no edit form. The audit
+page lists the `review.due-date-changed` entries. This scenario is tested by
+`ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited`.
 
 **ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne**: Three users are created
 with the `user add` verb on a temporary database, and `audit verify` reports an intact chain with exit code 0. One audit

@@ -104,6 +104,11 @@ stored choice is among the candidates.
 of the signed-in user, from the authentication state, used to tell which slots the user occupies.
 **IsLocked**: whether the review is locked, which is `Approval.IsApproved`; **LockedMarker**: the text `true` or `false`
 written to the `data-locked` attribute of the disabled controls, so that tests can tell a locked control.
+**CanSetDueDate**: whether the signed-in user may change the due date, asked with `ReviewService.CanSetDueDateAsync` in
+`RefreshAsync` (a project or system administrator, or the user who created the review, never an API token);
+**CanEditDueDate**: `CanSetDueDate` and not `IsLocked`, which decides whether the form is drawn; **IsOverdue**: the
+answer of `ReviewService.IsOverdue` for the review and `IsLocked`; **DueDateInput**, **DueDateError**: the text of the
+date field (`yyyy-MM-dd`) and the message of a refusal.
 **RequireIndependent**: the `RequireIndependentReviewers` setting of the project, read with the project
 in `RefreshAsync`; **VisibleCandidates**: `Candidates` without the review author (`Review.CreatedBy`) when
 `RequireIndependent` is on. **CanReopen**: whether the signed-in user is a project administrator of the project or a
@@ -149,7 +154,9 @@ every thread are not rendered at all (they could never be sent), the `+` and Com
 `data-locked="true"`, and the diff hint reads "This review is locked; comments are read-only."
 
 Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-link`, `review-loading`,
-`review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `reopen-form`,
+`review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `review-due-section`,
+`review-due-date`, `review-overdue`, `review-due-none`, `due-date-form`, `review-due-input`, `review-due-save`,
+`review-due-clear`, `review-due-error`, `reopen-form`,
 `reopen-reason`, `reopen-button`, `reopen-error`, `reopen-history`, and `reopen-entry-{n}`, `reopen-by-{n}`,
 `reopen-time-{n}`, `reopen-reason-{n}`, `reopen-digest-{n}` (by the position of the reopen, starting at 0),
 `author-independence-hint`, `slots-locked-hint`, `next-step`, `review-summary` (the summary strip),
@@ -384,6 +391,19 @@ block removes both after every
 attempt, whatever the outcome, and increments `PasswordKey`, which is part of the `@key` of the field so that the
 browser builds a new, empty input. It is never rendered as a value, logged, or kept. After the attempt the page calls
 `RefreshAsync`, so a signature shows as signed, locks the slot, and may turn the badge to Approved.
+
+**Due date**: Under the title the page shows the due date as `Due yyyy-MM-dd (UTC)` (`review-due-date`), or `No due
+date` (`review-due-none`); the date is a calendar day in UTC and the page says so. While the date is before today (UTC)
+and the review is not approved (`IsOverdue`) it also shows the Overdue badge `review-overdue`; an approved review keeps
+its date, without the badge, as history. The form `due-date-form` (a date input, Save, and Clear) is drawn only when
+`CanEditDueDate` holds, so never for a user who may not change the date and never for a locked review.
+
+**ChangeDueDateAsync** (behind `SaveDueDateAsync` and `ClearDueDateAsync`): after `GuardAsync`, reads the text with
+`ReviewService.ParseDueDate` (an empty text clears the date) and calls `ReviewService.SetDueDateAsync` with the
+signed-in user. A `DomainRuleException` (text that is not a date, a date too far ahead, a review that was locked
+meanwhile, a user who may not change it, a date that someone else changed) is shown in `review-due-error` with the typed
+text kept; for `RecordChanged` and `ReviewLocked` the page also reloads the review so that the stored date and the lock
+are shown. Success reloads the review and the approval through `RefreshAsync`.
 
 **ReopenAsync**: Reopens a locked review on behalf of the signed-in user through `SigningService.ReopenReviewAsync` with
 the typed reason. The form is drawn only for an administrator (`CanReopen`) of a locked review, and Core checks the same

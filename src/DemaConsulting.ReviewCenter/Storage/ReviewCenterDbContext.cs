@@ -36,8 +36,9 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     the repository source columns of reviews and review files, the personal access token table and the creator
 ///     columns of reviews). The same is true for the second factor tables (<c>UserTotps</c> and
 ///     <c>TotpRecoveryCodes</c>): a database from before them must be deleted and recreated. The same is true for
-///     the <c>ReviewReopens</c> table and the <c>RequireIndependentReviewers</c>,
-///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects. Instances are
+///     the <c>ReviewReopens</c> table, for the <c>RequireIndependentReviewers</c>,
+///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects, and for the
+///     <c>DueDate</c> column of reviews. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -243,6 +244,10 @@ internal sealed class ReviewCenterDbContext : DbContext
             // Who created the review and whether through the API (provenance only; null and false for older rows)
             review.Property(r => r.CreatedBy).HasMaxLength(ReviewLimits.MaxUsernameLength);
             review.Property(r => r.CreatedViaApi).HasDefaultValue(false);
+
+            // The optional due date: a calendar day (UTC), stored as text by the SQLite provider; null when none is set
+            review.Property(r => r.DueDate);
+
             // Source of a repository review (all null for an upload): the repository identity is a plain number,
             // not a foreign key, so the review keeps its reference whatever happens to the registration
             review.Property(r => r.RepositoryName).HasMaxLength(RepositoryService.MaxNameLength);

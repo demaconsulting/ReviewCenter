@@ -20,7 +20,10 @@ review-set of `.reviewmark.yaml` the review was planned from, null when it was n
 characters); all six are null for an uploaded review. Every review also records `CreatedBy` (the user name of the actor
 that created it, null for a review stored before this field existed) and `CreatedViaApi` (true when the actor
 authenticated with a personal access token). Both are metadata of the review: they are not part of the record digest,
-so a signature does not depend on them, and the review list and detail of the API show them.
+so a signature does not depend on them, and the review list and detail of the API show them. A review also has an
+optional `DueDate` (a `DateOnly?`, a calendar day that the product reads as a day in UTC; null when none was given).
+The due date is planning information and is likewise not part of the record digest, so a change of it never makes a
+signature out of date.
 
 **ReviewFile**: a data class (init-only properties) of `ProjectId`, `ReviewId`, `Path`, `Content` (the bytes), `Size`,
 and `Sha256`, and for a review from a repository `ChangeKind`, `BaselineContent`, `BaselineSize` and
@@ -51,8 +54,9 @@ constants are in `ReviewLimits`; see `ProjectService`).
 
 **CreateDraftAsync**: Creates a review in the draft state.
 
-- *Parameters*: `int projectId`, `string? id`, `string? title`, `IReadOnlyList<UploadedFile> files`, an `Actor`, and a
-  cancellation token.
+- *Parameters*: `int projectId`, `string? id`, `string? title`, `IReadOnlyList<UploadedFile> files`, an `Actor`, a
+  cancellation token, and an optional `DateOnly? dueDate` (added last, after the token, so that existing calls are
+  unchanged).
 - *Returns*: `Task<Review>` — the stored review with its fingerprint and the hash and size of each file.
 - *Preconditions*: `files` and `actor` are not null.
 - *Postconditions*: The review is stored in the `Draft` state with the creation time from the clock; the bytes
@@ -78,7 +82,8 @@ covers two requests that pass the check at the same time.
 - *Parameters*: `int projectId`, `string? id`, `string? title`, a `RepositorySource source` (the `RepositoryId`, the
   `HeadRevision`, the `BaselineRevision` - null or blank: no baseline, every file at the head counts as added - and
   the `Selection`; the four values of the repository source that the new-review form and the API request carry
-  together), an `Actor`, and a cancellation token. A null `source` or `actor` raises `ArgumentNullException`.
+  together), an `Actor`, a cancellation token, and an optional `DateOnly? dueDate`. A null `source` or `actor` raises
+  `ArgumentNullException`.
 - *Returns*: `Task<RepositoryReviewResult>`.
 - *Postconditions*: The review is stored with the frozen copies described below, or nothing is stored.
 
@@ -124,6 +129,41 @@ does not exist raises `ProjectNotFound`. The copy is stored with the review and 
 existing review, nor its checklist wording, nor its record digest.
 
 **GetAsync**: Reads one review with its files' metadata, ordered by path; returns null when it does not exist.
+
+**Due date at creation**: `CreateDraftAsync`, `CreateFromRepositoryAsync`, and (through `SessionReviewRequest.DueDate`)
+`CreateFromSessionAsync` check the optional date after the title and before the files and any I/O: a date before today
+or more than two years ahead (`MaxDueDateYearsAhead`) is refused with `DueDateInvalid`, and nothing is stored. Today is
+the date of the clock in UTC, so the same date means the same day to every user and to the server. The date is stored
+with the review. When a date is set the detail of `review.created` ends with `, due yyyy-MM-dd` (after the set and the
+token text); without a date the detail is exactly as before.
+
+**ParseDueDate**: a static helper that reads the text of the API and of the pages (`yyyy-MM-dd` only); null or blank
+text is no date, any other text raises `DueDateInvalid`.
+
+**IsOverdue**: `IsOverdue(Review review, bool isApproved)` is true only when the review has a date that is before
+today (UTC) and the review is not approved. The caller supplies `isApproved` (the pages and the API take it from
+`SigningService`), so an approved review keeps its date as history and is never overdue; the date `today` itself is
+not overdue.
+
+**CanSetDueDateAsync**: tells whether an actor may change the due date of a review: never for a missing actor or an
+actor that came through a personal access token (a token does not change the settings of a review), and for a project
+administrator or a system administrator (`IProjectAccess.CanAdministerAsync`) and for the user who created the review
+(`Review.CreatedBy`, compared without regard to case, and only while that user can still see the project). Pages use it
+to show or hide the form; `SetDueDateAsync` repeats it, so the pages are never the only guard.
+
+**SetDueDateAsync**: `SetDueDateAsync(int projectId, string reviewId, DateOnly? dueDate, Actor actor, CancellationToken)`
+sets, changes, or clears (`null`) the due date after creation and returns whether anything changed.
+
+- *Preconditions*: the actor may see the project (`ProjectNotFound` otherwise, as for every action), the review exists
+  (`ReviewNotFound`), and `CanSetDueDateAsync` holds (`ActorNotAllowed` otherwise).
+- *Rules*: a date in the past is accepted (a lead may record that something was due last week) but a date more than
+  two years ahead is `DueDateInvalid`; an approved review is refused with `ReviewLocked` and the message "reopen the
+  review first" (the lock is the same `ReviewLock` check as for every other change, and the store repeats it in its
+  transaction); a date that equals the stored one changes nothing and writes no entry.
+- *Postconditions*: `IReviewStore.UpdateDueDateAsync` stores the date and the audit entry `review.due-date-changed`
+  with the detail `<old|none> -> <new|none>` (each side `yyyy-MM-dd` or the word `none`) in one transaction, comparing
+  the stored date with the one the service read; when the store reports a different stored date the service raises
+  `RecordChanged`.
 
 **ListAsync**: Lists the reviews of a project ordered by identifier, without files.
 

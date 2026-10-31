@@ -445,7 +445,13 @@ history, are out of date, and the review needs new signatures. While the project
 is on (the default), the person who created the review in ReviewCenter cannot be one of its reviewers and cannot sign
 it; the authors of git commits are not matched. Two further project rules, on by default and switched by the same
 administrators, keep the review author from answering the checklist of the review and the person who reopened a review
-from signing it again; they are stored and audited but not applied yet. An
+from signing it again; they are stored and audited but not applied yet. A review can have an optional due date, a UTC
+calendar day that cannot
+be before today (UTC) or more than 2 years ahead when the review is created (the planner can give a default date). A
+review that is not approved and whose due date has passed is shown as Overdue. The date can be set or cleared later,
+also to a past day, by a project administrator, a system administrator, or the creator of the review, never with an API
+token, and not while the review is Approved (locked). The change is audited, and the date is not part of the record
+digest, so it does not make a signature out of date. An
 Approved review can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
 (a self-signed key by default, or a certificate from a certificate store), proves that the document is unchanged and
 comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
@@ -483,7 +489,8 @@ its reviews have no creator columns), or before project access control (it has n
 users have no system administrator flag, and its repositories have no project), or before project members management (its
 users have no `MustChangePassword` column), or before the approval lock (its projects have no
 `RequireIndependentReviewers` column and it has no `ReviewReopens` table), or before the review rule switches (its projects
-have no `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns) must be
+have no `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns), or before the review due date (its
+reviews have no `DueDate` column) must be
 deleted and created again, because there are no migrations (the schema is created with `EnsureCreated`, so a
 development database must be deleted and recreated whenever the schema changes).
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
@@ -645,7 +652,8 @@ is running.
   administrator flag, and its repositories lack the project), or before project members management (its users lack the
   `MustChangePassword` column), or before the approval lock (its projects lack the `RequireIndependentReviewers`
   column and it has no `ReviewReopens` table), or before the review rule switches (its projects lack the
-  `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns) must be deleted and
+  `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns), or before the review due date (its
+  reviews lack the `DueDate` column) must be deleted and
   created again; development databases are simply deleted and recreated. The audit table is append-only for the
   application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`

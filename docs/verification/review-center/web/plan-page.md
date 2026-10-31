@@ -32,6 +32,8 @@ N/A - standard test environment.
 - Creating shows one result per review, with a link for a created review and the reason for a failed one (which shows no
   raw git text, location, or credential), creates only the ticked rows, keeps the others when one fails, and offers to
   plan again.
+- Creating offers an optional due date for all the reviews and one for each row; the date of a row wins, and a date that
+  the creation rule refuses fails only its row with a message about the due date.
 - Every failure of a plan (unknown revision, no `.reviewmark.yaml`, invalid configuration, disabled repository, git
   access failure, unexpected fault) is explained in plain English with what to do next, shows no raw git text, location,
   credential, or exception text, and creates nothing; a refused creation keeps the plan.
@@ -96,6 +98,14 @@ tested by `PlanPage_Create_OneRowNotTicked_CreatesOnlyTheTickedRow`.
 contains a marker; the result says "1 review created, 1 failed.", shows a generic reason without the marker, and the other
 review exists. Planning again shows the created set as filed and offers the failed one once more. This scenario is tested
 by `PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers`.
+
+**PlanPage_Create_DueDates_DefaultAndRowDate**: A default due date is typed for all the reviews and a date of its own for
+the docs row. After creating, the core review has the default and the docs review has its own date. This scenario is
+tested by `PlanPage_Create_DueDates_DefaultAndRowDate`.
+
+**PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow**: A date before today on the core row fails that row with a
+message about the due date, the docs row is created without a date, and only one review exists. This scenario is
+tested by `PlanPage_Create_RowDueDateInThePast_FailsOnlyThatRow`.
 
 **PlanPage_Create_OneRowGitAccessFailed_ShowsFixedSentenceWithoutGitText**: One review fails with a git access failure
 whose text carries git output, the location, and a token; the failed row shows only the fixed sentence "The repository

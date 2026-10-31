@@ -70,6 +70,12 @@ public partial class PlanPage : ComponentBase
     private readonly HashSet<string> _ticked = new(StringComparer.Ordinal);
 
     /// <summary>
+    ///     The due date text typed for single rows, by review-set identifier; a row without an entry (or with an empty
+    ///     one) takes <see cref="DefaultDueText"/>.
+    /// </summary>
+    private readonly Dictionary<string, string> _rowDue = new(StringComparer.Ordinal);
+
+    /// <summary>
     ///     Backing field for <see cref="InteractiveMarker"/>; flips to <c>true</c> after the first render
     ///     on a live circuit.
     /// </summary>
@@ -203,6 +209,11 @@ public partial class PlanPage : ComponentBase
     ///     Gets the chosen baseline mode.
     /// </summary>
     private BaselineMode Mode => _mode;
+
+    /// <summary>
+    ///     Gets or sets the optional due date typed for every review of the plan (<c>yyyy-MM-dd</c>); empty for none.
+    /// </summary>
+    private string DefaultDueText { get; set; } = string.Empty;
 
     /// <summary>
     ///     Gets a value indicating whether the plan is being read or the reviews are being created.
@@ -651,9 +662,11 @@ public partial class PlanPage : ComponentBase
             var actor = await AuthenticationState.GetActorAsync();
             var requests = TodoRows
                 .Where(row => _ticked.Contains(row.SetId))
-                .Select(row => new PlanCreateRequest(row.SetId, row.Title, row.Selection, row.BaselineSha))
+                .Select(row => new PlanCreateRequest(
+                    row.SetId, row.Title, row.Selection, row.BaselineSha, ReviewService.ParseDueDate(RowDueText(row.SetId))))
                 .ToList();
-            var results = await Planner.CreateAsync(projectId, plan.RepositoryId, plan.HeadSha, requests, actor);
+            var results = await Planner.CreateAsync(
+                projectId, plan.RepositoryId, plan.HeadSha, requests, actor, defaultDueDate: ReviewService.ParseDueDate(DefaultDueText));
             if (version == _version)
             {
                 Results = results;
@@ -720,6 +733,23 @@ public partial class PlanPage : ComponentBase
     /// <param name="setId">The review-set identifier of the row.</param>
     /// <returns><c>true</c> when the row is ticked.</returns>
     private bool IsTicked(string setId) => _ticked.Contains(setId);
+
+    /// <summary>
+    ///     Gets the due date text typed for one row.
+    /// </summary>
+    /// <param name="setId">The review-set identifier of the row.</param>
+    /// <returns>The text; empty when the row has no date of its own.</returns>
+    private string RowDueText(string setId) => _rowDue.TryGetValue(setId, out var text) ? text : string.Empty;
+
+    /// <summary>
+    ///     Remembers the due date typed for one row.
+    /// </summary>
+    /// <param name="setId">The review-set identifier of the row.</param>
+    /// <param name="text">The text of the date input; empty clears the date of the row.</param>
+    private void SetRowDue(string setId, string? text)
+    {
+        _rowDue[setId] = text ?? string.Empty;
+    }
 
     /// <summary>
     ///     Gets the title of a review-set of the current plan, for the results list.
@@ -798,6 +828,8 @@ public partial class PlanPage : ComponentBase
         Plan = null;
         Results = null;
         _ticked.Clear();
+        _rowDue.Clear();
+        DefaultDueText = string.Empty;
         ErrorMessage = null;
         ErrorHint = null;
         ErrorKind = string.Empty;

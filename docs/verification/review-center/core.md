@@ -216,6 +216,15 @@ independence rule is still on. This scenario is tested by `CoreSubsystem_ReviewR
 owner of the token as its author, so that the owner is refused as reviewer of a slot while a different member is
 accepted. This scenario is tested by `CoreSubsystem_ApiTokenReview_AuthorIsTokenUser`.
 
+**Review due date**: The unit tests of `ReviewService` and `ReviewPlanner` verify the subsystem requirement for the
+optional due date of a review: the date from today to two years ahead at creation (also per planned review), the change
+by an administrator or the creator with one audit entry, the refusals (an actor of a token, another member, an approved
+review, a date too far ahead), the compare-and-set, and that the date is not part of the record digest, so a signature
+stays valid after a change. They are tested by `ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt`,
+`ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew`,
+`ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature`, and
+`ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow`.
+
 **Audit trail of the services**: The unit tests of `AuditService` and `UserService` verify the subsystem requirement
 for the audit trail. A draft recorded through `AuditService` is stored and the chain verifies, which is tested by
 `AuditService_RecordAsync_Draft_StoresEntryThatVerifies`, and the administration events of `UserService` (creation,

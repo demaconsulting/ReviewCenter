@@ -8,7 +8,8 @@ checklists), `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signa
 memberships), `ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
 the same time), `EvidenceSettingsStoreTests.cs` (the evidence settings of a project and their compare-and-set
 change), and `ProjectChecklistStoreTests.cs` (the checklist definition of a project, its compare-and-set change by the
-hash of the stored text, and the race of two writers). The tests use the real
+hash of the stored text, and the race of two writers), and `ReviewDueDateStoreTests.cs` (the due date of a review and
+its compare-and-set change). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
 Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
@@ -85,8 +86,11 @@ be loadable on the test platform.
 - A new project has no checklist definition; a definition of the full size limit is stored in its own project only,
   read back unchanged, and reset to none; the change is a compare-and-set on the hash of the stored text that is stored
   with one audit entry of the project (the chain verifies), a hash that is not the stored one or an unknown project
-  reports `false` and changes nothing and writes no entry, and of two writers that start from the same hash exactly one
   succeeds.
+- A review stores an optional due date as a calendar day that reads back unchanged; the change is a compare-and-set on
+  the stored date that is stored with one audit entry of the review (the chain verifies), a date that is not the
+  stored one or an unknown review reports `false` and changes nothing and writes no entry, and of two writers that start
+  from the same date exactly one succeeds. An approved review refuses the change with `ReviewLocked`.
 
 #### Test Scenarios
 
@@ -322,8 +326,9 @@ tested by `ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothin
 **ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction**: A review is signed in every slot, so
 that it is approved, with the store called directly (the services and their lock check are not involved). Adding a
 thread, adding a comment, changing the state of a thread, answering a check, changing the applicability of a section,
-and adding, updating, and removing a slot are each refused with `ReviewLocked`; the digest of the record, the slot, and
-the thread with its comment and state are as they were, no answer or section state exists, and the number of audit
+changing the due date, and adding, updating, and removing a slot are each refused with `ReviewLocked`; the digest of
+the record, the slot, and the thread with its comment and state are as they were, no answer or section state exists,
+and the number of audit
 entries is unchanged. After the review is reopened, the same answer is stored. This scenario is defined in
 `ReviewStoreSigningTests.cs` and is tested by `ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction`.
 
@@ -425,6 +430,25 @@ hash with different definitions are released together, once calling the store an
 wins, the stored definition is the winner's, one entry exists, and the chain verifies. This scenario is defined in
 `ProjectChecklistStoreTests.cs` and is tested by
 `ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins`.
+
+**The due date** is verified in `ReviewDueDateStoreTests.cs`.
+
+**ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay**: A review is stored with a due date and one without.
+The first reads back with the same calendar day, the second with none. This scenario is tested by
+`ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`.
+
+**ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited**: A due date is set and then cleared with a
+compare-and-set on the stored value. Each change is persisted, and each writes one entry `review.due-date-changed` of
+the review in the same transaction; the chain of the audit trail verifies. This scenario is tested by
+`ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited`.
+
+**ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing**: A change that expects no date, one that expects
+another date than the stored one, and one for a review that does not exist report `false`; the stored date is as it
+was and no entry is written. This scenario is tested by `ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing`.
+
+**ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins**: Two writers that start from the same stored date
+with different new dates are released together; exactly one wins, the stored date is the winner's, one entry exists,
+and the chain verifies. This scenario is tested by `ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

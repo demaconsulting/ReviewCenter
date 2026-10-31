@@ -145,7 +145,16 @@ public sealed record ReviewPlan(
 /// <param name="Title">The title of the review-set.</param>
 /// <param name="Selection">The normalized selection text of the row.</param>
 /// <param name="BaselineSha">The full baseline commit of the row, or <c>null</c> for none.</param>
-public sealed record PlanCreateRequest(string SetId, string Title, string Selection, string? BaselineSha);
+/// <param name="DueDate">
+///     The optional due date of the review that is created from the row (a UTC calendar day), or <c>null</c> for none.
+///     The planner checks it with the rule of <see cref="ReviewService"/>; a bad date fails that row only.
+/// </param>
+public sealed record PlanCreateRequest(
+    string SetId,
+    string Title,
+    string Selection,
+    string? BaselineSha,
+    DateOnly? DueDate = null);
 
 /// <summary>
 ///     What happened to one requested review.

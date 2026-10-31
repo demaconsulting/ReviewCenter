@@ -192,6 +192,14 @@ wins; these are tested by `ReviewStore_AddProjectAsync_ChecklistDefinition_IsNul
 `ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins`, all defined in
 `ProjectChecklistStoreTests.cs`.
 
+**Review due date**: A review keeps its optional due date as the same calendar day, a change is a compare-and-set that is
+stored together with its audit entry (the chain verifies), a change based on a date that is no longer stored changes
+nothing, and of two writers from the same date exactly one wins; these are tested by
+`ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`,
+`ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited`,
+`ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing`, and
+`ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`, all defined in `ReviewDueDateStoreTests.cs`.
+
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by
 `AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain`. The public surface of the audit store has no

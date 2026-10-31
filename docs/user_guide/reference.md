@@ -181,7 +181,8 @@ This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**. It loads the conf
 **read-only**, and compares its tables and columns with the ones this version expects. It never writes to the
 database and never creates it, and it never prints the connection string or other secrets; a problem is reported
 by table and column name. A development database created before the tables and columns of this version existed (for
-example `ReviewReopens` and `Projects.RequireIndependentReviewers`) is reported that way; delete it and let the server
+example `ReviewReopens`, `Projects.RequireIndependentReviewers`, and `Reviews.DueDate`) is reported that way; delete it
+and let the server
 create it again, because ReviewCenter has no migrations (see Database in the Administration chapter). If nothing is
 configured and there is no database at the default location, the test is
 **skipped**: the report shows `SKIPPED`, the summary counts it under `Skipped`, the results file records it as not
@@ -256,7 +257,8 @@ A development database created before the approval lock existed lacks the table 
 `Projects.RequireIndependentReviewers`, and one created before the review rule switches lacks the columns
 `Projects.RequireNonAuthorChecklistAnswers` and `Projects.RequireNonReopenerSigning`. ReviewCenter has no migrations,
 so delete such a database and let the server
-create it again (see Database in the Administration chapter).
+create it again (see Database in the Administration chapter). The same holds for a database created before the due date
+of a review existed: it lacks the column `Reviews.DueDate`, which is created only for a new database (no migration).
 
 ## Puppet Development Tool
 

@@ -119,6 +119,12 @@ documentation (see the `ApiDocument` verification). They are the evidence of the
 subsystem. These scenarios are tested by `ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme` and
 `ApiDocument_Get_MatchesCommittedSnapshot`.
 
+**Review due date**: The unit tests of `ApiEndpoints` verify the subsystem requirement for the optional due date: a
+review created with a `dueDate` shows `dueDate` and `overdue` in the answer, the list, and the details, and a date that
+is not valid is a 400 problem that creates nothing. They are tested by
+`ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag` and
+`ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing`.
+
 **Units**: The bearer sign-in, the refusals, the throttle, and the audit record are verified in the unit tests of
 `ApiTokenAuthentication`; the routes, the creation, and the problem documents in the unit tests of `ApiEndpoints`; the
 document in the unit tests of `ApiDocument`. The rules of the tokens are verified in the `Core` subsystem (the unit
