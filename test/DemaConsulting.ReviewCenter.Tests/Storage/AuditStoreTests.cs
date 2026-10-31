@@ -552,7 +552,38 @@ public class AuditStoreTests
         var names = storeMethods.Concat(interfaceMethods).Distinct().ToList();
 
         // Assert
-        Assert.Equal(["AppendAsync", "ListAsync", "ReadAfterAsync"], names.Order());
+        Assert.Equal(["AppendAsync", "LastActivityAsync", "ListAsync", "ReadAfterAsync"], names.Order());
         Assert.DoesNotContain(names, name => forbidden.Any(word => name.StartsWith(word, StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    ///     Test that the last activity of a project names, for each review that has entries, the time of its newest
+    ///     entry, leaves out entries without a review and entries of other projects, and leaves the chain intact.
+    /// </summary>
+    [Fact]
+    public async Task AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject()
+    {
+        // Arrange: three entries of "odd", two of "even", one of the project without a review, one of another project
+        using var db = new TestStore();
+        var token = TestContext.Current.CancellationToken;
+        await db.Audit.AppendAsync(Draft("odd 1", 1, "odd"), token);
+        await db.Audit.AppendAsync(Draft("even 1", 1, "even"), token);
+        await db.Audit.AppendAsync(Draft("odd 2", 1, "odd"), token);
+        await db.Audit.AppendAsync(Draft("project", 1), token);
+        await db.Audit.AppendAsync(Draft("other", 2, "foreign"), token);
+        await db.Audit.AppendAsync(Draft("odd 3", 1, "odd"), token);
+        await db.Audit.AppendAsync(Draft("even 2", 1, "even"), token);
+        var entries = await ReadAll(db);
+
+        // Act
+        var activity = await db.Audit.LastActivityAsync(1, token);
+        var none = await db.Audit.LastActivityAsync(3, token);
+
+        // Assert: the newest entry of each review of project 1 only, and the chain is untouched
+        Assert.Equal(["even", "odd"], activity.Keys.Order());
+        Assert.Equal(entries.Single(e => e.Detail == "odd 3").TimestampUtc, activity["odd"]);
+        Assert.Equal(entries.Single(e => e.Detail == "even 2").TimestampUtc, activity["even"]);
+        Assert.Empty(none);
+        Assert.True(AuditChain.Verify(await ReadAll(db)).IsIntact);
     }
 }

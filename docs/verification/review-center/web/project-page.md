@@ -41,8 +41,13 @@ N/A - standard test environment.
 - An unknown project shows a not-found message and no form, and so does a project the user is no member of (the same
   message, `project-not-found`, and nothing of the project, on the project page and on the page for a new review); a
   known project shows its name and description and
-  its reviews as rows with link, title, and an Approved or In review badge, or an empty message. A review
-  whose every slot has a current signature is Approved; a review without slots or with an unsigned slot is In review.
+  its reviews as rows with link, title, and a stage badge (Setup, In review, or Approved), or an empty message. A review
+  whose every slot has a current signature is Approved; a review without slots is in Setup; a review with an unsigned
+  slot is In review.
+- The reviews table shows, for each review, its signatures, its blockers, the people it waits on, its last activity, and
+  its due date with the Overdue badge; a summary strip counts the reviews per stage and the overdue ones; the filters
+  (stage, overdue, blocked, text), the sort, and the page (25 to a page) are read from the query string and kept by the
+  links; and a read-only auditor of the project sees the same table without the New review and Plan controls.
 - A member who is no administrator sees the reviews and the New review button, but no Members section, no add member
   button, no Audit trail button, and no Repositories button.
 - A system administrator or a project admin sees the Members section with each member, the role badge, a button that
@@ -362,13 +367,52 @@ page of the project, are shown. This scenario is tested by
 `ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage`.
 
 **ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval**: The page is rendered for a project with
-a review; the review is listed with a link to its page, its title, and the badge "In review" (it has
+a review; the review is listed with a link to its page, its title, and the badge "Setup" (it has
 no reviewer slot), and no state badge (`review-state-{id}`) is shown. This scenario is tested
 by `ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval`.
 
 **ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview**: A project has one review whose only slot was
-signed with the right password and one review without slots; the first is listed as "Approved" and the second as "In
-review". This scenario is tested by `ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview`.
+signed with the right password and one review without slots; the first is listed as "Approved" and the second as
+"Setup". This scenario is tested by `ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview`.
+
+**ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary**: A project has reviews in each stage,
+with a signed slot, an out-of-date signature, open threads, an unanswered check, a Fail answer, a due date, and a past
+due date. Each row shows its stage, its signatures (such as 2/3 and "1 out of date"), its blockers, the people it waits
+on, its last activity, and its due date with the Overdue badge only where it applies; the summary strip counts the
+reviews per stage and the overdue ones. This scenario is tested by
+`ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary`.
+
+**ProjectPage_Render_QueryFilters_NarrowTheTable**: The page is opened with the stage, overdue, blocked, and text
+parameters of the query string; the table shows only the matching reviews, the filter form shows the chosen values, and
+a message says when nothing matches. This scenario is tested by `ProjectPage_Render_QueryFilters_NarrowTheTable`.
+
+**ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle**: The page is opened with a sort and a direction;
+the rows are in that order, and the header of the sorted column links to the opposite direction while the other
+headers link to the ascending order. This scenario is tested by
+`ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle`.
+
+**ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters**: Thirty reviews are shown 25 to a page with the range
+and the previous and next links, which keep the filters and the sort of the query string. This scenario is tested by
+`ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters`.
+
+**ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView**: The page is opened with an unknown stage, an
+unknown sort, an unknown direction, overdue and blocked values other than `1`, and a page that is text; each is ignored
+and the default table of every review by identifier is shown, and a bad direction next to a valid sort falls back to the
+default direction of that column. This scenario is tested by
+`ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView`.
+
+**ProjectPage_Render_InvalidPageValues_ShowAValidPage**: A project of 30 reviews is opened with the page `abc`, `0`,
+`-3`, `99999999999`, `1.5`, and an empty page; each shows the first page (1-25 of 30). The pages `2` and `9` show the
+last page (26-30 of 30). This scenario is tested by `ProjectPage_Render_InvalidPageValues_ShowAValidPage`.
+
+**ProjectPage_Render_HostileMarkup_IsRenderedEncoded**: A review has a title with a script and an image element, and
+the query string carries the same markup in the search text and in the stage. The page has no script, image, or bold
+element, and the markup appears only as encoded text. This scenario is tested by
+`ProjectPage_Render_HostileMarkup_IsRenderedEncoded`.
+
+**ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing**: A read-only auditor of the project sees
+the same table as a member, without the New review and Plan controls; a user outside the project sees the not-found
+message and no table. This scenario is tested by `ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing`.
 
 **NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes**: Two files are chosen; each is listed with its name and
 size in bytes. This scenario is tested by `NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes`.

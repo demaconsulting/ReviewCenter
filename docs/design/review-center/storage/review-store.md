@@ -147,18 +147,6 @@ whose condition repeats the expected date (`WHERE ProjectId = p AND Id = r AND D
 leaves no change and no entry. Only the column of that review is written, and the date is not part of the record
 digest. `ReviewService` turns the `false` into `RecordChanged`.
 
-**ListApprovedReviewIdsAsync**: Tells which of several reviews of a project are approved, in one read transaction.
-
-- *Parameters*: the project identity and the review identifiers (not null, duplicates allowed).
-- *Returns*: `Task<IReadOnlySet<string>>` — the identifiers that are approved by the one definition of
-  `ReviewLock.IsApproved`; a review that does not exist is absent; an empty input gives an empty set.
-- *Postconditions*: Nothing is changed.
-
-The slots and the signatures of all the reviews are read with one query each. A review can only be approved when it has
-a slot and every slot holds some signature, so the record, which the current digest needs, is loaded only for the
-reviews that pass that test; the others cost nothing more. This lets a list show the overdue state of many reviews
-without a full snapshot read for each one.
-
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 
 **AddMembershipAsync**: Stores the membership of a user in a project with its audit entry (`project.member-added`,

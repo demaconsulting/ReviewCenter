@@ -112,6 +112,7 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Users);
         Services.AddSingleton(pageRepositories);
         Services.AddSingleton(pageSigning);
+        Services.AddSingleton(new ReviewProgressService(pageReviews, pageSigning, AuditStore, Access));
         Services.AddSingleton(new ReviewPlanner(store, pageReviews, pageRepositories, Git, pageSigning, SetParser, Access));
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
 

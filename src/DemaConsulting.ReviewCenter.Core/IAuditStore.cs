@@ -74,4 +74,18 @@ public interface IAuditStore
         long afterSequence,
         int count,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Finds when each review of a project last had an entry in the trail, for the progress overview.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The time of the newest entry of each review of the project that has one, by review identifier; a review
+    ///     without any entry is absent, and entries that name no review (project and global events) are not counted.
+    ///     "Newest" is the highest sequence, which is also the latest time because the chain is written in order.
+    /// </returns>
+    Task<IReadOnlyDictionary<string, DateTimeOffset>> LastActivityAsync(
+        int projectId,
+        CancellationToken cancellationToken = default);
 }

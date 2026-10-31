@@ -43,6 +43,11 @@ internal sealed record ProjectDto(int Id, string Name, string Description, DateT
 /// <param name="DueDate">The due date as a UTC calendar day in <c>yyyy-MM-dd</c> form, or <c>null</c> when there is none.</param>
 /// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not approved.</param>
 /// <param name="FollowsReviewId">The review this one follows up, or <c>null</c> when it is not a follow-up.</param>
+/// <param name="Approved"><c>true</c> when every reviewer slot holds a current signature (the review is approved and locked).</param>
+/// <param name="SlotsRequired">The number of reviewer slots, each of which must hold a current signature.</param>
+/// <param name="SlotsSigned">The number of slots that hold a signature of the current record.</param>
+/// <param name="SlotsOutOfDate">The number of slots whose signatures are all of an earlier record.</param>
+/// <param name="LastActivity">When the review last had an entry in the audit trail; the creation time when it has none.</param>
 internal sealed record ReviewSummaryDto(
     string Id,
     string Title,
@@ -54,7 +59,12 @@ internal sealed record ReviewSummaryDto(
     bool IsFromRepository,
     string? DueDate,
     bool Overdue,
-    string? FollowsReviewId = null);
+    string? FollowsReviewId = null,
+    bool Approved = false,
+    int SlotsRequired = 0,
+    int SlotsSigned = 0,
+    int SlotsOutOfDate = 0,
+    DateTimeOffset? LastActivity = null);
 
 /// <summary>
 ///     A reviewer slot of a review.

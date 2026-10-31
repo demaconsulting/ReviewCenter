@@ -589,6 +589,7 @@ reviews:
       - "src/**/Web/NewMemberAccountPage.razor"
       - "src/**/Web/NewMemberAccountPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
+      - "test/**/Web/ProjectPageOverviewTests.cs"
       - "test/**/Web/ProjectAccessPageTests.cs"
       - "test/**/Web/EvidenceSettingsPageTests.cs"
       - "test/**/Web/ProjectChecklistPageTests.cs"
@@ -861,6 +862,22 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ProjectChecklist.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ProjectChecklistService.cs"
       - "test/**/Core/ProjectChecklistServiceTests.cs"
+
+  - id: ReviewCenter-Core-ReviewProgressService
+    title: Review of ReviewCenter ReviewProgressService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/review-progress-service.yaml"
+      - "docs/design/review-center/core/review-progress-service.md"
+      - "docs/verification/review-center/core/review-progress-service.md"
+      - "docs/sysml2/model/review-center/core/review-progress-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewProgress.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewProgressService.cs"
+      - "test/**/Core/ReviewProgressServiceTests.cs"
 
   - id: ReviewCenter-Core-ProjectAccess
     title: Review of ReviewCenter ProjectAccess unit implementation

@@ -294,6 +294,12 @@ the requirement is off, and the requirement is then switched on. The author sign
 password, is refused with `ReviewerNotIndependent` and nothing is signed. This scenario is tested by
 `SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent`.
 
+**SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences**: A review has one Fail answer, the other
+checks unanswered, and one open thread; an approved review is arranged too. The structured counts of the status
+(`OpenThreads`, `UnansweredChecks`, `FailedChecks`) equal the numbers in the blocker sentences, in the single read and in
+the batch read, and are zero for the approved review. This scenario is tested by
+`SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences`.
+
 **SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked**: A review that every slot has signed is
 approved. Adding, changing, and removing a slot are each refused with `ReviewLocked`; the slots are unchanged and the
 review is still approved with the same digest. This scenario is tested by

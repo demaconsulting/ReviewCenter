@@ -30,6 +30,8 @@ a project checklist, and sign the review with their credentials. Every action is
 - 🔍 **File-Set Reviews** - Review uploaded files or git revision changes
 - 🌿 **Git Sources** - Plan reviews from repository review-sets
 - 📅 **Due Dates** - Optional UTC due date per review, with an Overdue badge
+- 📊 **Progress Overview** - Project page shows each review's stage, signatures, blockers, and who it waits on, with
+  filters and sorting
 - 🔁 **Follow-up Reviews** - A review after a failed one carries over the passed answers and open threads (web and API)
 - 💬 **Threaded Comments** - Discuss files or line ranges inline
 - ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own template)

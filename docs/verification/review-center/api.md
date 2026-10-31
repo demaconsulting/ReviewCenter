@@ -125,6 +125,12 @@ is not valid is a 400 problem that creates nothing. They are tested by
 `ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag` and
 `ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing`.
 
+**Review progress**: The unit tests of `ApiEndpoints` verify the subsystem requirement for the progress fields: the list
+of the reviews of a project shows `approved`, `slotsRequired`, `slotsSigned`, `slotsOutOfDate`, and `lastActivity`
+beside `dueDate` and `overdue`, and the committed copy of the document of the API contains them. They are tested by
+`ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity` and
+`ApiDocument_Get_MatchesCommittedSnapshot`.
+
 **Follow-up review**: The unit tests of `ApiEndpoints` verify the subsystem requirement for the follow-up review: a
 review created with a `followsReviewId` shows it in the answer, the list, and the details, a review that follows
 nothing shows null, and a source that does not exist or has no file in common is a 400 problem that creates nothing.

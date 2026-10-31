@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
@@ -26,21 +27,31 @@ using Microsoft.AspNetCore.Components.Authorization;
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
-///     Code-behind for the project page (<c>ProjectPage.razor</c>): shows one project and lists its reviews with
-///     their approval state. Reviews are created on the separate new review page. An administrator of the project (a
+///     Code-behind for the project page (<c>ProjectPage.razor</c>): shows one project and its reviews as a progress
+///     overview: the stage, the signatures, what blocks, who is waited on, the last activity and the due date of every
+///     review, with a summary strip, filters, sortable columns and paging whose state lives in the query string.
+///     Reviews are created on the separate new review page. An administrator of the project (a
 ///     project admin or a system administrator) also manages its members here and opens its audit trail.
 /// </summary>
 /// <remarks>
-///     The page talks to the domain only through <see cref="ProjectService"/>, <see cref="ReviewService"/>,
-///     <see cref="SigningService"/> and <see cref="RepositoryService"/>. A project the user may not see is shown
+///     The page talks to the domain only through <see cref="ProjectService"/>, <see cref="ReviewProgressService"/>
+///     and <see cref="RepositoryService"/>. The progress of all reviews comes from one call, which reads everything it
+///     needs in a constant number of queries. A project the user may not see is shown
 ///     exactly like a project that does not exist. Adding a member needs typing an exact user name and happens on
 ///     its own page, so no list of users is ever loaded here. Every handler asks the shared guard again before it
 ///     reads or changes anything, so a user who lost the right sees nothing stale. Each browser connection
 ///     (circuit) gets its own page instance, so the state here is per-user and needs no synchronization. The page
-///     requires a signed-in user.
+///     requires a signed-in user. Filters, sorting and paging are plain links and a plain form with a GET method, so
+///     every view of the overview has an address that can be bookmarked or shared; unknown or malformed query values
+///     are ignored rather than refused.
 /// </remarks>
 public partial class ProjectPage : ComponentBase
 {
+    /// <summary>
+    ///     The number of reviews on one page of the overview.
+    /// </summary>
+    public const int PageSize = 25;
+
     /// <summary>
     ///     Backing field for <see cref="InteractiveMarker"/>; flips to <c>true</c> after the first render
     ///     on a live circuit.
@@ -54,22 +65,67 @@ public partial class ProjectPage : ComponentBase
     public int ProjectId { get; set; }
 
     /// <summary>
+    ///     Gets or sets the stage filter, from the <c>stage</c> query value: <c>setup</c>, <c>in-review</c> or
+    ///     <c>approved</c>; anything else shows every stage.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "stage")]
+    public string? StageQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the "overdue only" filter, from the <c>overdue</c> query value (<c>1</c> switches it on).
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "overdue")]
+    public string? OverdueQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the "blocked only" filter, from the <c>blocked</c> query value (<c>1</c> switches it on).
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "blocked")]
+    public string? BlockedQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the sort column, from the <c>sort</c> query value: <c>id</c>, <c>stage</c>, <c>activity</c>,
+    ///     <c>due</c> or <c>signatures</c>; anything else sorts by review identifier.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "sort")]
+    public string? SortQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the sort direction, from the <c>dir</c> query value: <c>asc</c> or <c>desc</c>.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "dir")]
+    public string? DirectionQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the text search, from the <c>q</c> query value; matches the identifier and the title.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? SearchQuery { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the page of the overview, from the <c>page</c> query value; counted from 1.
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "page")]
+    public string? PageQuery { get; set; }
+
+    /// <summary>
     ///     Gets or sets the service that reads projects, supplied by dependency injection.
     /// </summary>
     [Inject]
     private ProjectService ProjectService { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the service that lists reviews, supplied by dependency injection.
+    ///     Gets or sets the service that computes the progress of the reviews, supplied by dependency injection.
     /// </summary>
     [Inject]
-    private ReviewService ReviewService { get; set; } = null!;
-
-    /// <summary>
-    ///     Gets or sets the service that computes the approval status of a review, supplied by dependency injection.
-    /// </summary>
-    [Inject]
-    private SigningService SigningService { get; set; } = null!;
+    private ReviewProgressService ProgressService { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the repository registry, supplied by dependency injection; used only to know whether any
@@ -108,19 +164,99 @@ public partial class ProjectPage : ComponentBase
     private Project? Project { get; set; }
 
     /// <summary>
-    ///     Gets the reviews of the project.
+    ///     Gets the progress of every review of the project, ordered by review identifier.
     /// </summary>
-    private IReadOnlyList<Review> Reviews { get; set; } = [];
+    private IReadOnlyList<ReviewProgress> Progress { get; set; } = [];
 
     /// <summary>
-    ///     Gets the identifiers of the reviews that are approved (every slot has a current signature).
+    ///     Gets the reviews that match the filters, in the chosen order (all pages).
     /// </summary>
-    private HashSet<string> ApprovedReviews { get; } = [];
+    private IReadOnlyList<ReviewProgress> Matching { get; set; } = [];
+
+    /// <summary>
+    ///     Gets the reviews of the page shown.
+    /// </summary>
+    private IReadOnlyList<ReviewProgress> PageRows { get; set; } = [];
+
+    /// <summary>
+    ///     Gets the page shown, counted from 1, after it was brought into range.
+    /// </summary>
+    private int CurrentPage { get; set; } = 1;
+
+    /// <summary>
+    ///     Gets the number of pages of the matching reviews; at least 1.
+    /// </summary>
+    private int PageCount { get; set; } = 1;
+
+    /// <summary>
+    ///     Gets the stage filter in effect, or <c>null</c> for every stage.
+    /// </summary>
+    private ReviewStage? StageFilter => StageQuery?.ToLowerInvariant() switch
+    {
+        "setup" => ReviewStage.Setup,
+        "in-review" => ReviewStage.InReview,
+        "approved" => ReviewStage.Approved,
+        _ => null
+    };
+
+    /// <summary>
+    ///     Gets a value indicating whether only overdue reviews are shown.
+    /// </summary>
+    private bool OverdueOnly => OverdueQuery == "1";
+
+    /// <summary>
+    ///     Gets a value indicating whether only blocked reviews are shown.
+    /// </summary>
+    private bool BlockedOnly => BlockedQuery == "1";
+
+    /// <summary>
+    ///     Gets the sort column in effect: <c>id</c>, <c>stage</c>, <c>activity</c>, <c>due</c> or <c>signatures</c>.
+    /// </summary>
+    private string SortColumn => SortQuery?.ToLowerInvariant() is "stage" or "activity" or "due" or "signatures"
+        ? SortQuery.ToLowerInvariant()
+        : "id";
+
+    /// <summary>
+    ///     Gets a value indicating whether the sort is descending; without a direction, the newest activity comes
+    ///     first and everything else ascends.
+    /// </summary>
+    private bool Descending => DirectionQuery?.ToLowerInvariant() switch
+    {
+        "desc" => true,
+        "asc" => false,
+        _ => SortColumn == "activity"
+    };
+
+    /// <summary>
+    ///     Gets the text search in effect; never null, trimmed.
+    /// </summary>
+    private string SearchText => SearchQuery?.Trim() ?? string.Empty;
+
+    /// <summary>
+    ///     Gets a value indicating whether any filter is in effect.
+    /// </summary>
+    private bool Filtered => StageFilter is not null || OverdueOnly || BlockedOnly || SearchText.Length > 0;
+
+    /// <summary>
+    ///     Gets the number of reviews of the project per stage and overdue, for the summary strip; not affected by the
+    ///     filters.
+    /// </summary>
+    private (int Setup, int InReview, int Approved, int Overdue) Summary =>
+        (Progress.Count(p => p.Stage == ReviewStage.Setup),
+            Progress.Count(p => p.Stage == ReviewStage.InReview),
+            Progress.Count(p => p.Stage == ReviewStage.Approved),
+            Progress.Count(p => p.IsOverdue));
 
     /// <summary>
     ///     Gets the enabled repositories (name only; never location or credentials).
     /// </summary>
     private IReadOnlyList<RepositorySummary> Repositories { get; set; } = [];
+
+    /// <summary>
+    ///     Gets a value indicating whether the user may work in this project (create and plan reviews); a member who
+    ///     may only read, such as an auditor, may not.
+    /// </summary>
+    private bool CanContribute { get; set; }
 
     /// <summary>
     ///     Gets a value indicating whether the user may manage this project (system administrator or project admin).
@@ -206,24 +342,243 @@ public partial class ProjectPage : ComponentBase
         RequireIndependentChoice = Project.RequireIndependentReviewers;
         RequireNonAuthorChoice = Project.RequireNonAuthorChecklistAnswers;
         RequireNonReopenerChoice = Project.RequireNonReopenerSigning;
-        Reviews = await ReviewService.ListAsync(ProjectId);
-        Repositories = await RepositoryService.ListEnabledAsync(actor, ProjectId);
+        try
+        {
+            // One call for all reviews: a constant number of reads however many reviews the project has
+            Progress = await ProgressService.GetProgressAsync(actor, ProjectId);
+        }
+        catch (DomainRuleException)
+        {
+            // The right to see the project was lost between the two reads: show what a stranger sees
+            ShowNoAccess();
+            return;
+        }
+
+        ApplyView();
+        CanContribute = await Access.CanContributeAsync(actor, ProjectId);
+
+        // A member who may only read (an auditor) cannot plan or create reviews, so the registry is not read for them
+        Repositories = CanContribute ? await RepositoryService.ListEnabledAsync(actor, ProjectId) : [];
         CanAdminister = await Access.CanAdministerAsync(actor, ProjectId);
         ChecklistSummary = CanAdminister ? await DescribeChecklistAsync(actor) : null;
         await LoadMembersAsync(actor);
 
-        // One approval lookup per review; the list of reviews of a project is short
-        ApprovedReviews.Clear();
-        foreach (var id in Reviews.Select(review => review.Id))
+        Loaded = true;
+    }
+
+    /// <summary>
+    ///     Applies the filters, the sort order and the paging of the query string to the progress of the reviews.
+    /// </summary>
+    private void ApplyView()
+    {
+        var rows = Progress.AsEnumerable();
+        if (StageFilter is { } stage)
         {
-            var approval = await SigningService.GetApprovalAsync(ProjectId, id);
-            if (approval?.IsApproved == true)
-            {
-                ApprovedReviews.Add(id);
-            }
+            rows = rows.Where(p => p.Stage == stage);
         }
 
-        Loaded = true;
+        if (OverdueOnly)
+        {
+            rows = rows.Where(p => p.IsOverdue);
+        }
+
+        if (BlockedOnly)
+        {
+            rows = rows.Where(p => p.IsBlocked);
+        }
+
+        if (SearchText.Length > 0)
+        {
+            rows = rows.Where(p =>
+                p.ReviewId.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                || p.Title.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Ties are always broken by the review identifier, so the order is stable and predictable
+        var ordered = SortColumn switch
+        {
+            "stage" => Order(rows, p => (int)p.Stage),
+            "activity" => Order(rows, p => p.LastActivity),
+            "due" => OrderDue(rows),
+            "signatures" => Order(rows, p => p.SlotsRequired == 0 ? -1.0 : (double)p.SlotsSigned / p.SlotsRequired),
+            _ => Order(rows, p => p.ReviewId, StringComparer.OrdinalIgnoreCase)
+        };
+        Matching = ordered.ToList();
+        PageCount = Math.Max(1, (Matching.Count + PageSize - 1) / PageSize);
+        CurrentPage = int.TryParse(PageQuery, NumberStyles.Integer, CultureInfo.InvariantCulture, out var requested)
+            ? Math.Clamp(requested, 1, PageCount)
+            : 1;
+        PageRows = Matching.Skip((CurrentPage - 1) * PageSize).Take(PageSize).ToList();
+    }
+
+    /// <summary>
+    ///     Orders reviews by a key in the chosen direction, then by review identifier.
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <param name="rows">The reviews.</param>
+    /// <param name="key">Reads the key of a review.</param>
+    /// <param name="comparer">The comparer of keys, or <c>null</c> for the default.</param>
+    /// <returns>The ordered reviews.</returns>
+    private IOrderedEnumerable<ReviewProgress> Order<TKey>(
+        IEnumerable<ReviewProgress> rows,
+        Func<ReviewProgress, TKey> key,
+        IComparer<TKey>? comparer = null)
+    {
+        var ordered = Descending ? rows.OrderByDescending(key, comparer) : rows.OrderBy(key, comparer);
+        return ordered.ThenBy(p => p.ReviewId, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Orders reviews by due date in the chosen direction with the reviews that have no due date last, whatever
+    ///     the direction, then by review identifier.
+    /// </summary>
+    /// <param name="rows">The reviews.</param>
+    /// <returns>The ordered reviews.</returns>
+    private IOrderedEnumerable<ReviewProgress> OrderDue(IEnumerable<ReviewProgress> rows)
+    {
+        var withoutDue = rows.OrderBy(p => p.DueDate is null);
+        return (Descending
+                ? withoutDue.ThenByDescending(p => p.DueDate ?? DateOnly.MinValue)
+                : withoutDue.ThenBy(p => p.DueDate ?? DateOnly.MinValue))
+            .ThenBy(p => p.ReviewId, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Builds the address of the overview with the filters and the sort order of the query string, except for the
+    ///     parts the caller changes.
+    /// </summary>
+    /// <param name="sort">The sort column, or <c>null</c> to keep the current one.</param>
+    /// <param name="descending">The sort direction when <paramref name="sort"/> is given.</param>
+    /// <param name="page">The page, or <c>null</c> for the first.</param>
+    /// <returns>The address, without the default values.</returns>
+    private string Address(string? sort = null, bool descending = false, int? page = null)
+    {
+        var column = sort ?? SortColumn;
+        var isDescending = sort is null ? Descending : descending;
+        var parts = new List<string>();
+        if (StageFilter is { } stage)
+        {
+            parts.Add("stage=" + StageToken(stage));
+        }
+
+        if (OverdueOnly)
+        {
+            parts.Add("overdue=1");
+        }
+
+        if (BlockedOnly)
+        {
+            parts.Add("blocked=1");
+        }
+
+        if (column != "id")
+        {
+            parts.Add("sort=" + column);
+        }
+
+        if (isDescending != (column == "activity"))
+        {
+            parts.Add("dir=" + (isDescending ? "desc" : "asc"));
+        }
+
+        if (SearchText.Length > 0)
+        {
+            parts.Add("q=" + Uri.EscapeDataString(SearchText));
+        }
+
+        if (page is > 1)
+        {
+            parts.Add("page=" + page);
+        }
+
+        return $"/projects/{ProjectId}" + (parts.Count == 0 ? string.Empty : "?" + string.Join('&', parts));
+    }
+
+    /// <summary>
+    ///     Builds the address a column header leads to: the column ascending, or flipped when it is the current one.
+    /// </summary>
+    /// <param name="column">The sort column of the header.</param>
+    /// <returns>The address.</returns>
+    private string SortAddress(string column)
+    {
+        var descending = column == SortColumn ? !Descending : column == "activity";
+        return Address(column, descending);
+    }
+
+    /// <summary>
+    ///     Gets the <c>aria-sort</c> value of a column header.
+    /// </summary>
+    /// <param name="column">The sort column of the header.</param>
+    /// <returns>The value; <c>none</c> for a column that is not the sort column.</returns>
+    private string AriaSort(string column)
+    {
+        if (column != SortColumn)
+        {
+            return "none";
+        }
+
+        return Descending ? "descending" : "ascending";
+    }
+
+    /// <summary>
+    ///     Gets the query token of a stage.
+    /// </summary>
+    /// <param name="stage">The stage.</param>
+    /// <returns>The token used in the <c>stage</c> query value.</returns>
+    private static string StageToken(ReviewStage stage)
+    {
+        return stage switch
+        {
+            ReviewStage.Setup => "setup",
+            ReviewStage.InReview => "in-review",
+            _ => "approved"
+        };
+    }
+
+    /// <summary>
+    ///     Gets the words of a stage for display.
+    /// </summary>
+    /// <param name="stage">The stage.</param>
+    /// <returns>The label.</returns>
+    private static string StageLabel(ReviewStage stage)
+    {
+        return stage switch
+        {
+            ReviewStage.Setup => "Setup",
+            ReviewStage.InReview => "In review",
+            _ => "Approved"
+        };
+    }
+
+    /// <summary>
+    ///     Words what blocks a review.
+    /// </summary>
+    /// <param name="progress">The progress of the review.</param>
+    /// <returns>The open threads, unanswered checks and Fail answers; a dash when none or the review is approved.</returns>
+    private static string BlockersText(ReviewProgress progress)
+    {
+        if (progress.IsApproved)
+        {
+            return "-";
+        }
+
+        var parts = new List<string>();
+        if (progress.OpenThreads > 0)
+        {
+            parts.Add(progress.OpenThreads + (progress.OpenThreads == 1 ? " open thread" : " open threads"));
+        }
+
+        if (progress.UnansweredChecks > 0)
+        {
+            parts.Add(progress.UnansweredChecks + " unanswered");
+        }
+
+        if (progress.FailedChecks > 0)
+        {
+            parts.Add(progress.FailedChecks + " Fail");
+        }
+
+        return parts.Count == 0 ? "-" : string.Join(", ", parts);
     }
 
     /// <summary>
@@ -246,16 +601,6 @@ public partial class ProjectPage : ComponentBase
             // An unreadable stored definition (or a right lost just now) must not break the page
             return "cannot be read";
         }
-    }
-
-    /// <summary>
-    ///     Tells whether a review is approved.
-    /// </summary>
-    /// <param name="reviewId">The review identifier.</param>
-    /// <returns><c>true</c> when the review has at least one slot and every slot has a current signature.</returns>
-    private bool IsApproved(string reviewId)
-    {
-        return ApprovedReviews.Contains(reviewId);
     }
 
     /// <summary>
@@ -288,9 +633,11 @@ public partial class ProjectPage : ComponentBase
     private void ShowNoAccess()
     {
         Project = null;
-        Reviews = [];
-        ApprovedReviews.Clear();
+        Progress = [];
+        Matching = [];
+        PageRows = [];
         Repositories = [];
+        CanContribute = false;
         ShowMembersLost();
         Loaded = true;
     }

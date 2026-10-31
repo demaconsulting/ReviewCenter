@@ -1268,6 +1268,49 @@
               "string"
             ],
             "description": "The review this one follows up, or `null` when it is not a follow-up."
+          },
+          "approved": {
+            "type": "boolean",
+            "description": "`true` when every reviewer slot holds a current signature (the review is approved and locked).",
+            "default": false
+          },
+          "slotsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of reviewer slots, each of which must hold a current signature.",
+            "format": "int32",
+            "default": 0
+          },
+          "slotsSigned": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of slots that hold a signature of the current record.",
+            "format": "int32",
+            "default": 0
+          },
+          "slotsOutOfDate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of slots whose signatures are all of an earlier record.",
+            "format": "int32",
+            "default": 0
+          },
+          "lastActivity": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the review last had an entry in the audit trail; the creation time when it has none.",
+            "format": "date-time"
           }
         },
         "description": "A review in a list, without its details."

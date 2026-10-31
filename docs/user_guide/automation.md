@@ -196,6 +196,12 @@ review is locked) to find out whether a review is approved.
 the review has none) and `overdue` (`true` when the date is before today in UTC and the review is not approved; an
 approved review is never overdue, and keeps its date).
 
+**Progress fields.** Each review of the list also has `approved` (the same as above), `slotsRequired` (the number of
+reviewer slots), `slotsSigned` (the slots with a valid signature on the current record), `slotsOutOfDate` (the slots
+whose signature went out of date), and `lastActivity` (the time of the newest audit entry of the review, or its
+creation time). They are the numbers that the project page shows, so a script that watches a project sees what a
+person sees.
+
 **`followsReviewId`.** The review data of the list has `followsReviewId` (the review that this review follows, or `null`
 when it follows none). The review data of one review has also `followsReviewId`, `carriedAnswerCount`, and
 `carriedThreadCount`, the numbers of answers and threads that were carried when the review was created (0 when it

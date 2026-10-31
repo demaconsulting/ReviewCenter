@@ -34,7 +34,16 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <c>false</c> when the user is no longer a member of the project of the review (so the user cannot sign until
 ///     added again); <c>true</c> for a current member and for the candidates of a slot, who are members by definition.
 /// </param>
-public sealed record SlotMember(int UserId, string Username, string DisplayName, bool IsMember = true);
+/// <param name="Enabled">
+///     <c>false</c> when the account of the user is disabled (so the user cannot sign); <c>true</c> for an enabled
+///     account and for the candidates of a slot, who are enabled by definition.
+/// </param>
+public sealed record SlotMember(
+    int UserId,
+    string Username,
+    string DisplayName,
+    bool IsMember = true,
+    bool Enabled = true);
 
 /// <summary>
 ///     Whether a reviewer slot holds a signature for the record as it is now.
@@ -89,10 +98,22 @@ public sealed record SlotStatus(
 ///     The history of reopens of the review, oldest first; <c>null</c> or empty for a review never reopened. It is
 ///     filled by <see cref="SigningService.GetApprovalAsync"/> and <see cref="SigningService.GetApprovalsAsync"/>.
 /// </param>
+/// <param name="OpenThreads">The number of comment threads that are open; the count behind the "threads are open" blocker.</param>
+/// <param name="UnansweredChecks">
+///     The number of checks of applicable sections that have no answer; the count behind the "checks are unanswered"
+///     blocker. Zero for a review without a checklist.
+/// </param>
+/// <param name="FailedChecks">
+///     The number of checks of applicable sections answered Fail; the count behind the "checks are answered Fail"
+///     blocker. Zero for a review without a checklist.
+/// </param>
 public sealed record ReviewApproval(
     bool IsApproved,
     string Digest,
     IReadOnlyList<SlotStatus> Slots,
     IReadOnlyList<string> Blockers,
     string NextStep,
-    IReadOnlyList<ReviewReopen>? Reopens = null);
+    IReadOnlyList<ReviewReopen>? Reopens = null,
+    int OpenThreads = 0,
+    int UnansweredChecks = 0,
+    int FailedChecks = 0);

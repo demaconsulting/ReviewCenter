@@ -68,6 +68,15 @@ index on project, review, and sequence serves both filters.
 **AuditStore.ReadAfterAsync**: Reads entries in ascending order after a sequence, at most a given number, so that
 verification can stream the trail in batches.
 
+**AuditStore.LastActivityAsync**: Returns, for one project and with one grouped query, the time of the newest entry of
+each review of that project, by review identifier. The newest entry of a review is the one with the highest sequence
+(the existing index on project, review, and sequence serves the grouping), and the time is read from those entries, so
+no time value is aggregated. Entries without a review and entries of other projects are not included, and a review
+without an entry is absent. The read is untracked, takes no gate, and changes nothing in the chain. The project overview
+uses it as the "last activity" of a review. This is the exact last activity because the audit entries of a review are
+never combined: only sign-in, token, and throttle events are coalesced (a window of one minute), and none of them
+names a review.
+
 #### Why The Design Is Safe
 
 - **No fork**: within the process, the single gate means two appends never read the same head. Across processes (the

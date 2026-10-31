@@ -1424,6 +1424,84 @@ button:disabled {
     margin-top: 0.75rem;
 }
 
+/* The review progress table of the project page: scrolls sideways on a narrow screen instead of squeezing */
+.review-scroll {
+    overflow-x: auto;
+}
+
+.review-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.review-table th,
+.review-table td {
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.review-table th {
+    background: var(--code-background);
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.review-table th a {
+    color: var(--muted);
+}
+
+.review-table th[aria-sort="ascending"] a::after {
+    content: " \25B2";
+}
+
+.review-table th[aria-sort="descending"] a::after {
+    content: " \25BC";
+}
+
+.review-table tbody tr:nth-child(even) {
+    background: var(--zebra);
+}
+
+.review-table tbody tr:hover {
+    background: var(--accent-soft);
+}
+
+.review-table td p {
+    margin: 0.1rem 0;
+}
+
+.review-table td.nowrap {
+    white-space: nowrap;
+}
+
+.summary-strip,
+.filter-bar,
+.review-paging {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+}
+
+.filter-bar {
+    margin-bottom: 0.75rem;
+}
+
+.filter-bar label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.review-paging {
+    margin-top: 0.75rem;
+}
+
 /* On a narrow screen each entry becomes a small card: two cells per line, the detail on its own full-width line */
 @media (max-width: 39.99rem) {
     .audit-table thead {

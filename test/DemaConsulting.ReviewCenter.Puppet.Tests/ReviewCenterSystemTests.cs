@@ -625,6 +625,96 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that the project page shows, for every review, its stage, signatures, who it is waiting on and the
+    ///     overdue badge, counts the stages and the overdue reviews in the summary, filters the table by stage, by
+    ///     overdue and by text through the query string and the filter form, and shows an approved review as such.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState()
+    {
+        // Arrange: a first review that waits for the reviewer second and is overdue, and a second review in setup
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var yesterday = today.AddDays(-1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var first = scenario.ReviewId;
+        var planned = await scenario.PlanNewReviewAsync();
+        await scenario.OpenReviewAsync();
+        await browser.OkAsync("fill", "review-due-input", yesterday);
+        await browser.OkAsync("click", "review-due-save");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("review-overdue"), "the Overdue badge");
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+
+        // Act: read the overview
+        await browser.GotoAsync("/projects/1", "project-page");
+        var rows = await browser.CountAsync("review-row-");
+        var stage = await browser.TextOfAsync($"review-approval-{first}");
+        var progress = await browser.TextOfAsync($"review-progress-{first}");
+        var waiting = await browser.TextOfAsync($"review-waiting-{first}");
+        var overdue = await browser.ExistsAsync($"review-overdue-{first}");
+        var plannedStage = await browser.TextOfAsync($"review-approval-{planned}");
+        var plannedOverdue = await browser.ExistsAsync($"review-overdue-{planned}");
+        var summaryOverdue = await browser.TextOfAsync("project-summary-overdue");
+        var summarySetup = await browser.TextOfAsync("project-summary-setup");
+
+        // Act: filter by the query string
+        await browser.GotoAsync("/projects/1?stage=setup", "project-page");
+        var setupRows = await browser.EvalAsync("Array.from(document.querySelectorAll('[data-testid^=\"review-row-\"]')).map(e => e.getAttribute('data-testid')).join('|')");
+        await browser.GotoAsync("/projects/1?overdue=1", "project-page");
+        var overdueRows = await browser.EvalAsync("Array.from(document.querySelectorAll('[data-testid^=\"review-row-\"]')).map(e => e.getAttribute('data-testid')).join('|')");
+        await browser.GotoAsync("/projects/1?stage=approved", "project-page");
+        var approvedBefore = await browser.CountAsync("review-row-");
+        var noMatch = await browser.ExistsAsync("reviews-no-match");
+
+        // Act: filter by the form, by text
+        await browser.GotoAsync("/projects/1", "project-page");
+        await browser.OkAsync("fill", "filter-search", planned);
+        await browser.OkAsync("click", "filter-apply");
+        await browser.WaitUntilAsync(async () => await browser.CountAsync("review-row-") == 1, "the filter form to narrow the table");
+        var searchRow = await browser.EvalAsync("document.querySelector('[data-testid^=\"review-row-\"]').getAttribute('data-testid')");
+
+        // Act: approve the first review as second, then read the overview again
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.OpenReviewAsync(reviewer);
+        await Scenario.SignAsync(reviewer, slot);
+        await browser.GotoAsync("/projects/1?stage=approved", "project-page");
+        var approvedRows = await browser.CountAsync("review-row-");
+        var approvedStage = await browser.TextOfAsync($"review-approval-{first}");
+        var approvedOverdue = await browser.ExistsAsync($"review-overdue-{first}");
+        var approvedWaiting = await browser.TextOfAsync($"review-waiting-{first}");
+        var summaryApproved = await browser.TextOfAsync("project-summary-approved");
+        var summaryOverdueAfter = await browser.TextOfAsync("project-summary-overdue");
+
+        // Assert: the first review waits for second and is overdue; the planned one is in setup and not overdue
+        Assert.Equal(2, rows);
+        Assert.Equal("In review", stage);
+        Assert.Equal("0/1", progress);
+        Assert.Equal("Second Reviewer", waiting);
+        Assert.True(overdue, "A review due yesterday that is not approved must show the Overdue badge.");
+        Assert.Equal("Setup", plannedStage);
+        Assert.False(plannedOverdue);
+        Assert.Equal("1 overdue", summaryOverdue);
+        Assert.Equal("1 in setup", summarySetup);
+
+        // Assert: the filters narrow the table
+        Assert.Equal($"review-row-{planned}", setupRows);
+        Assert.Equal($"review-row-{first}", overdueRows);
+        Assert.Equal(0, approvedBefore);
+        Assert.True(noMatch);
+        Assert.Equal($"review-row-{planned}", searchRow);
+
+        // Assert: once approved the review is in the approved stage, is not overdue and waits for nobody
+        Assert.Equal(1, approvedRows);
+        Assert.Equal("Approved", approvedStage);
+        Assert.False(approvedOverdue, "An approved review is never overdue.");
+        Assert.Equal("-", approvedWaiting);
+        Assert.Equal("1 approved", summaryApproved);
+        Assert.Equal("0 overdue", summaryOverdueAfter);
+    }
+
+    /// <summary>
     ///     Test that a follow-up review, created through the form from an earlier review that has a failed check, an
     ///     open thread and sections that do not apply, carries the Pass and N/A answers, the sections and the open
     ///     thread with visible marks, shows the earlier Fail for a new decision, can be signed once that is decided and

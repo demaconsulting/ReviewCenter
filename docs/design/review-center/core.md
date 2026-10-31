@@ -11,7 +11,7 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains twenty-two units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains twenty-three units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
@@ -30,7 +30,9 @@ repositories that reviews can be
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
 repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression;
 `LineDiff`, the comparison of the lines of two versions of a file and its division into shown and collapsed regions;
-`ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository; and
+`ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository;
+`ReviewProgressService`, the stage, signatures, waiting-on names, blockers, last activity, and overdue state of every
+review of a project, for the project overview and the API list; and
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
@@ -59,6 +61,19 @@ definition
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
+
+**ReviewProgressService**: The progress of the reviews of a project, used by the `Web` and `Api` subsystems.
+
+- *Type*: In-process .NET class.
+- *Role*: Provider.
+- *Contract*: Give, for every review of a project, its stage (Setup, In review, or Approved, derived from the approval
+  status and not from the stored state), the number of reviewer slots, valid signatures, and out-of-date signatures,
+  the names of the people it waits on (a disabled account is marked), the number of open threads, unanswered checks, and
+  Fail answers (the counts that `SigningService` also states in the blocker sentences, so the two cannot disagree),
+  the time of its last activity (the newest audit entry of the review, from one grouped read of the audit trail), and
+  its due date and overdue state by the rule of `ReviewService`. It reads the project with a constant number of
+  queries, and answers every actor who may see the project (and a project that the actor may not see as one that does
+  not exist).
 
 **ProjectAccess, ProjectService, EvidenceSettingsService, ProjectChecklistService, ReviewService, ThreadService,
 ChecklistService, UserService,

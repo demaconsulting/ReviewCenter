@@ -98,6 +98,11 @@ names the date. The list and the details show `dueDate` (null for the review wit
 administrator moves the date to yesterday, both show `overdue` true. This scenario is tested by
 `ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag`.
 
+**ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity**: A project has two signed reviews, and a
+third is created through the API without slots. The list shows `approved` true with one slot required, one signed, and
+none out of date for the signed reviews, `approved` false and no slots for the third, and a recent `lastActivity` for
+all three. This scenario is tested by `ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity`.
+
 **ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing**: A theory sends a `dueDate` that is not a date,
 one in the past, one beyond two years ahead, and one that does not exist on the calendar. Each answer is a 400 problem
 that names the due date, and no review is created. This scenario is tested by

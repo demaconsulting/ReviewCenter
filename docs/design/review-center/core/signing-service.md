@@ -213,6 +213,11 @@ not found.
   concurrent change cannot make the digest, the blockers, and the signature status describe different states. The
   members of the project are read through `ListMembershipsAsync` to fill `SlotMember.IsMember`. The reopen history is
   read through `ListReopensAsync` only when the record's reopen count is above zero.
+- *Blocker counts*: `ReviewApproval` also carries `OpenThreads`, `UnansweredChecks`, and `FailedChecks`. They are
+  counted in the one place that writes the blocker sentences (`ReadApprovalAsync`, one additive region), so each number
+  equals the one in its sentence; the sentences are unchanged. `ReviewProgressService` and any later list of work use
+  the counts and do not repeat the rule. `SlotMember.Enabled` tells whether the account of a person in a slot is enabled
+  (true by default).
 
 **GetApprovalsAsync**: Computes the status of several reviews of a project.
 

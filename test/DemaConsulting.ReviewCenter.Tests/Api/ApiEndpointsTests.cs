@@ -497,6 +497,48 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that the review list carries the progress of every review: whether it is approved, how many signatures
+    ///     are required, current and out of date, and when it last had activity.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity()
+    {
+        // Arrange: a project with two signed reviews, a token, and a third review created through the API
+        await using var app = await StartAsync();
+        var projectId = await ArrangeSignedReviewWithSetIdAsync(app);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+        var body = new
+        {
+            id = "REV-3",
+            title = "Open",
+            files = new[] { new { path = "a.txt", contentBase64 = Convert.ToBase64String("one\n"u8.ToArray()) } }
+        };
+        var created = await client.PostAsync($"/api/projects/{projectId}/reviews", Json(body), TestContext.Current.CancellationToken);
+
+        // Act
+        var response = await client.GetAsync($"/api/projects/{projectId}/reviews", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: the signed reviews are approved with 1 of 1 signatures, the new one has no slots, all have activity
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var rows = json.RootElement.EnumerateArray().ToDictionary(r => r.GetProperty("id").GetString()!);
+        Assert.Equal(3, rows.Count);
+        foreach (var id in new[] { "REV-1", "REV-2" })
+        {
+            Assert.True(rows[id].GetProperty("approved").GetBoolean());
+            Assert.Equal(1, rows[id].GetProperty("slotsRequired").GetInt32());
+            Assert.Equal(1, rows[id].GetProperty("slotsSigned").GetInt32());
+            Assert.Equal(0, rows[id].GetProperty("slotsOutOfDate").GetInt32());
+        }
+
+        Assert.False(rows["REV-3"].GetProperty("approved").GetBoolean());
+        Assert.Equal(0, rows["REV-3"].GetProperty("slotsRequired").GetInt32());
+        Assert.All(rows.Values, row => Assert.NotEqual(System.Text.Json.JsonValueKind.Null, row.GetProperty("lastActivity").ValueKind));
+        Assert.All(rows.Values, row => Assert.True(row.GetProperty("lastActivity").GetDateTimeOffset() > DateTimeOffset.UtcNow.AddMinutes(-10)));
+    }
+
+    /// <summary>
     ///     Test that a due date that is not a date, is in the past or is too far ahead is a 400 problem naming the
     ///     due date, and that no review is created.
     /// </summary>

@@ -73,6 +73,20 @@ sections:
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
           - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
 
+      - id: ReviewCenter-Api-Progress
+        title: >-
+          The Api subsystem shall show in every review of the list of the reviews of a project whether it is approved,
+          how many reviewer slots and valid and out-of-date signatures it has, when it last changed, its due date and
+          whether it is overdue, from the same service as the project page, and shall only add these fields.
+        justification: |
+          A script that watches a project must see the same progress as a person who opens the project page, and an
+          added field must not break a client that already reads the list.
+        children:
+          - ReviewCenter-ApiEndpoints-ListProgress
+        tests:
+          - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
+          - ApiDocument_Get_MatchesCommittedSnapshot
+
       - id: ReviewCenter-Api-FollowUp
         title: >-
           The Api subsystem shall let a client with a valid token create a review as a follow-up of an earlier review

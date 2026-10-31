@@ -128,6 +128,28 @@ sections:
           - ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
 
+      - id: ReviewCenter-System-Oversight
+        title: >-
+          The tool shall show a lead, on the page of a project and in the list of the API, for every review of the
+          project which stage it is in, how many of the needed signatures it has, who it waits on, what blocks its
+          approval, when it last changed, and whether it is overdue, let the lead filter and order the reviews and
+          keep the view in the link of the page, and show the same to a read-only auditor of the project and nothing
+          to a user outside it.
+        tags: [system]
+        justification: |
+          A lead who answers for the reviews of a project must be able to see who is holding each one up without
+          asking, to chase the right person and to show an auditor where the project stands. The progress is computed
+          from the record that the signatures and the audit trail already protect, so it cannot be edited and cannot
+          disagree with the review page.
+        children:
+          - ReviewCenter-Core-Progress
+          - ReviewCenter-Storage-Progress
+          - ReviewCenter-Web-Progress
+          - ReviewCenter-Api-Progress
+        tests:
+          - ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState
+          - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
+
       - id: ReviewCenter-System-FollowUpReview
         title: >-
           The tool shall let a review be created as a follow-up of an earlier review of the same project, by hand or

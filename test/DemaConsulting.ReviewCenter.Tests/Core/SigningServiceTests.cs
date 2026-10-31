@@ -768,6 +768,44 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the structured blocker counts of the approval status (open threads, unanswered checks and Fail
+    ///     answers) equal the numbers in the blocker sentences, for a single read and for the batch read, and are zero
+    ///     for an approved review.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences()
+    {
+        // Arrange: a review with one Fail answer, the rest unanswered and one open thread; and an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        var items = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ToList();
+        await fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, "rev-1", items[0].Id, ChecklistOutcome.Fail, "Wrong", TestActors.Ann, cancellationToken);
+        await fixture.Threads.StartThreadAsync(
+            fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Look", cancellationToken);
+        var (approvedFixture, _, _) = await CreateApprovedAsync();
+
+        // Act: read the status singly and in a batch
+        var single = await ApprovalAsync(fixture);
+        var batch = (await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-1"], cancellationToken))["rev-1"];
+        var approved = await ApprovalAsync(approvedFixture);
+
+        // Assert: the counts are those of the sentences, in both reads
+        foreach (var approval in new[] { single, batch })
+        {
+            Assert.Equal(1, approval.OpenThreads);
+            Assert.Equal(1, approval.FailedChecks);
+            Assert.Equal(items.Count - 1, approval.UnansweredChecks);
+            Assert.Contains("1 thread is open", approval.Blockers);
+            Assert.Contains("1 check is answered Fail", approval.Blockers);
+            Assert.Contains($"{items.Count - 1} checklist checks are unanswered", approval.Blockers);
+        }
+
+        Assert.True(approved.IsApproved);
+        Assert.Equal((0, 0, 0), (approved.OpenThreads, approved.UnansweredChecks, approved.FailedChecks));
+    }
+
+    /// <summary>
     ///     Test that a reopening of the review, which changes the record, makes the old signature out of date, which
     ///     can be signed again, and that the history stays.
     /// </summary>

@@ -353,7 +353,11 @@ public sealed class SigningService
             statuses,
             blockers,
             NextStepFor(isApproved, blockers, statuses.Count, record, checklist, failed),
-            reopens);
+            reopens,
+            // The structured counts behind the blocker sentences of Assess, so a list can show them without parsing
+            record.Threads.Count(thread => thread.State == ReviewThreadState.Open),
+            checklist?.Overall.Unanswered ?? 0,
+            failed);
     }
 
     /// <summary>
@@ -1309,7 +1313,7 @@ public sealed class SigningService
     {
         var isMember = memberIds.Contains(userId);
         return members.TryGetValue(userId, out var user)
-            ? new SlotMember(user.Id, user.Username, user.DisplayName, isMember)
+            ? new SlotMember(user.Id, user.Username, user.DisplayName, isMember, user.Enabled)
             : new SlotMember(userId, string.Empty, $"User {userId}", isMember);
     }
 

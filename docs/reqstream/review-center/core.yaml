@@ -525,6 +525,35 @@ sections:
           - ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature
           - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow
 
+      - id: ReviewCenter-Core-Progress
+        title: >-
+          The Core subsystem shall answer for every review of a project which stage it is in (Setup, In review, or
+          Approved, derived from the approval status and not from the stored state), how many signatures it has of
+          the number it needs and how many are out of date, whom it waits on (a disabled person marked), what blocks
+          its approval with the numbers that equal the blocker sentences of the approval status, whether it is
+          overdue, and when it last changed according to the audit trail, with a number of reads that does not grow
+          with the number of reviews, and shall give the answer to everyone who may see the project and to nobody
+          else.
+        justification: |
+          A lead who answers for the reviews of a project needs to see where each stands and who is holding it up,
+          without opening every review. The answer is computed from what is stored, so it cannot disagree with the
+          review page, and it must not tell a stranger that a project exists.
+        children:
+          - ReviewCenter-ReviewProgressService-Stage
+          - ReviewCenter-ReviewProgressService-SlotProgress
+          - ReviewCenter-ReviewProgressService-WaitingOn
+          - ReviewCenter-ReviewProgressService-Blockers
+          - ReviewCenter-ReviewProgressService-Overdue
+          - ReviewCenter-ReviewProgressService-LastActivity
+          - ReviewCenter-ReviewProgressService-ViewerRights
+          - ReviewCenter-ReviewProgressService-Performance
+          - ReviewCenter-ReviewProgressService-Arguments
+          - ReviewCenter-SigningService-ProgressCounts
+        tests:
+          - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
+          - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
+          - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
+
       - id: ReviewCenter-Core-FollowUp
         title: >-
           The Core subsystem shall let a review be created as a follow-up of an earlier review of the same project, by

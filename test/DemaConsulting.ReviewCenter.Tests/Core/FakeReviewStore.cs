@@ -806,25 +806,6 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
-        int projectId,
-        IReadOnlyCollection<string> reviewIds,
-        CancellationToken cancellationToken = default)
-    {
-        var approved = new HashSet<string>();
-        foreach (var reviewId in reviewIds.Distinct())
-        {
-            var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken);
-            if (snapshot is not null && ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
-            {
-                approved.Add(reviewId);
-            }
-        }
-
-        return approved;
-    }
-
-    /// <inheritdoc />
     public Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
         int projectId,
         string reviewId,

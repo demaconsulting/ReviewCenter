@@ -235,6 +235,7 @@ public class ProjectAccessGuardTests
         "ProjectChecklistService.GetAsync",
         "ProjectService.GetAsync",
         "ProjectService.ListAsync",
+        "ReviewProgressService.GetProgressAsync",
         "ReviewService.CanSetDueDateAsync",
         "ReviewService.PreviewFollowUpAsync",
         "SigningService.HasReauthProofAsync"
@@ -364,9 +365,13 @@ public class ProjectAccessGuardTests
         var approval = await world.Signing.GetApprovalAsync(world.Own, "rev-1", cancellationToken);
         var preview = await world.Reviews.PreviewFollowUpAsync(
             world.Own, "rev-1", [new UploadedFile("a.txt", [1])], actor, cancellationToken);
+        var progress = await new ReviewProgressService(
+            world.Reviews, world.Signing, new FakeAuditStore(TimeProvider.System), world.Access)
+            .GetProgressAsync(actor, world.Own, cancellationToken);
 
         // Assert
         Assert.True(canView);
+        Assert.Single(progress);
         Assert.NotNull(project);
         Assert.Equal([world.Own], projects.Select(p => p.Id));
         Assert.NotNull(review);
@@ -416,7 +421,7 @@ public class ProjectAccessGuardTests
         {
             typeof(ChecklistService), typeof(ThreadService), typeof(ReviewService), typeof(ReviewPlanner),
             typeof(SigningService), typeof(RepositoryService), typeof(ProjectService), typeof(ProjectChecklistService),
-            typeof(EvidenceSettingsService)
+            typeof(EvidenceSettingsService), typeof(ReviewProgressService)
         };
 
         // Act

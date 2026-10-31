@@ -410,9 +410,9 @@ mind, and answer again a check that the fix may affect, because the changes of t
 ## Review Signatures
 
 A review is approved when its reviewers have signed it. The review page shows an **Approved** or **In review** badge
-next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the same badge for
-each review, next to a second badge with the state of the review (see the known limitation at the end of this
-section). An Approved review is also locked (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
+next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the stage of each
+review (see [The Project Page Overview](#the-project-page-overview)). An Approved review is also locked (see
+[Locked Reviews and Reopening](#locked-reviews-and-reopening)).
 
 **Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
 members of the project. Either of the two can sign the slot. A review can have any number of slots, or none; a review
@@ -556,10 +556,41 @@ too long reason with "A reason of at most 250 characters is required to reopen a
 The review can be approved and locked again by new signatures, and reopened again; each reopen is one more entry of
 the history. A review that was reopened is not in the evidence index until it is approved again.
 
-**The project page shows the approval only.** Every review row of the project page shows the Approved or In review
-badge, which is the signature status computed from the record. The stored state of a review (`Draft`, the only state in
+**The project page shows who is holding a review up.** Every review row of the project page is described in
+[The Project Page Overview](#the-project-page-overview). The stored state of a review (`Draft`, the only state in
 this release) is not shown, because it has one value and no action changes it yet; a later release is planned to add
 more review states.
+
+## The Project Page Overview
+
+The project page (`/projects/{id}`) is where a lead sees all the reviews of a project at once. Every member, an
+administrator, and a system administrator see the same table; a member who may only read (a viewer) sees it without
+the **+ New review** and **Plan reviews** controls, and a user who is not a member of the project is told that the
+project does not exist.
+
+- **Summary.** Above the table, four counts: reviews in setup, in review, approved, and overdue.
+- **Columns.** *Review* (the identifier, the title, and the creation date; the identifier links to the review, and a
+  follow-up names the review it follows), *Stage*, *Signatures*, *Blockers*, *Waiting on*, *Last activity*, and *Due*.
+- **Stage.** **Setup** is a review without a reviewer slot. **In review** has slots that are not all signed, or a
+  signature that went out of date. **Approved** has every slot signed on the current record and nothing that blocks it.
+  A review that an administrator reopened also shows a **Reopened** badge. The stage is worked out from the
+  signatures, not stored.
+- **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature became out of date
+  (the record changed after it was given), `1 out of date`. A review without slots shows a dash.
+- **Blockers.** What prevents approval: the open comment threads, the unanswered checklist checks, and the checks
+  answered Fail. A dash means nothing blocks the review.
+- **Waiting on.** The people who still have to sign: the primary reviewer, and a different alternate, of each slot that
+  is not signed or is out of date. A disabled account is shown with "(disabled)". An approved review waits on nobody.
+- **Last activity.** The time (UTC) of the newest entry of the audit trail of the review, or its creation time.
+- **Due.** The due date, with the **Overdue** badge when it is before today in UTC and the review is not approved (see
+  [Due Dates](#due-dates)).
+
+Above the table a filter bar narrows the list by **stage**, **Overdue only**, **Blocked only**, and a text that is
+searched in the identifier and the title; **Clear filters** removes them. The headers *Review*, *Stage*,
+*Signatures*, *Last activity*, and *Due* sort the table; selecting the sorted header again reverses the order. The table
+shows 25 reviews to a page with **Previous** and **Next**. The filters, the sort, and the page are kept in the address
+(`?stage=in-review&overdue=1&blocked=1&q=text&sort=due&dir=desc&page=2`), so you can bookmark a view or send it to
+someone.
 
 ## Signed Attestation
 
