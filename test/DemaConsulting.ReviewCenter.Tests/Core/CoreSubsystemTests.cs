@@ -207,11 +207,11 @@ public class CoreSubsystemTests
         // only answers are those the re-authentication scenario needs to get as far as the password
         Assert.Equal(rule, exception.Rule);
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
-        Assert.Equal(rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned ? 2 : 1, (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
+        Assert.Equal(rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate ? 2 : 1, (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
         Assert.Single(store.Reviews);
         Assert.Empty(store.Threads);
         var overall = (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall;
-        Assert.Equal(rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned ? overall.Total : 0, overall.Answered);
+        Assert.Equal(rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate ? overall.Total : 0, overall.Answered);
     }
 
     /// <summary>
@@ -556,7 +556,8 @@ public class CoreSubsystemTests
         DomainRule.ReviewLocked,
         DomainRule.ReviewNotLocked,
         DomainRule.ReopenReasonInvalid,
-        DomainRule.ReviewerNotIndependent
+        DomainRule.ReviewerNotIndependent,
+        DomainRule.SignaturesWouldBecomeOutOfDate
     ];
 
     /// <summary>
@@ -630,6 +631,22 @@ public class CoreSubsystemTests
                 await signing.AddSlotAsync(actor, projectId, "rev-1", second.Id, null, cancellationToken);
                 await AnswerAllAndSignAsync(signing, checklists, actor, projectId, slot.Id, cancellationToken);
                 await signing.RemoveSlotAsync(actor, projectId, "rev-1", slot.Id, cancellationToken);
+                return;
+            case DomainRule.SignaturesWouldBecomeOutOfDate:
+                // A second slot nobody signs keeps the review from being approved and so from being locked; the
+                // first slot is signed, and then an answer changes without acknowledging that signature
+                var other = await users.CreateAsync("other", "Other", UserRole.Reviewer, ValidPassword, cancellationToken);
+                await store.AddMembershipAsync(other.Id, projectId, cancellationToken);
+                await signing.AddSlotAsync(actor, projectId, "rev-1", other.Id, null, cancellationToken);
+                await AnswerAllAndSignAsync(signing, checklists, actor, projectId, slot.Id, cancellationToken);
+                await checklists.SetAnswerAsync(
+                    projectId,
+                    "rev-1",
+                    DefaultChecklist.Current.Sections[0].Items[0].Id,
+                    ChecklistOutcome.Fail,
+                    "Found a problem.",
+                    actor,
+                    cancellationToken);
                 return;
             case DomainRule.ReviewLocked:
                 // Answer every check, sign, and then try to change the approved review
@@ -1015,6 +1032,63 @@ public class CoreSubsystemTests
         Assert.True(resigned!.IsApproved);
         Assert.Equal("Bob", resigned.Slots.Single().SignerName);
         Assert.Equal(2, (await store.ListSignaturesAsync(project.Id, "rev-1", cancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     Test that, across the services, a change to a partly signed review is refused until the person acknowledges
+    ///     the signature it would make out of date, that the refusal names the slot and the signer and changes nothing,
+    ///     and that the acknowledged change then goes through and the signature is out of date.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement()
+    {
+        // Arrange: two slots, every check answered, and only the first slot signed, so the review is not locked
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
+        var threads = TestServices.Threads(store, new FixedTimeProvider(_now));
+        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
+        var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var project = await projects.CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
+        await store.AddMembershipAsync(bob.Id, project.Id, cancellationToken);
+        await reviews.CreateDraftAsync(project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+        var annActor = new Actor("ann", "Ann");
+        var first = await signing.AddSlotAsync(annActor, project.Id, "rev-1", ann.Id, null, cancellationToken);
+        await signing.AddSlotAsync(annActor, project.Id, "rev-1", bob.Id, null, cancellationToken);
+        await AnswerAllAndSignAsync(signing, checklists, annActor, project.Id, first.Id, cancellationToken);
+        var itemId = DefaultChecklist.Current.Sections[0].Items[0].Id;
+
+        // Act: change an answer and start a thread without acknowledging
+        var answer = await Assert.ThrowsAsync<DomainRuleException>(() => checklists.SetAnswerAsync(
+            project.Id, "rev-1", itemId, ChecklistOutcome.Fail, "Found a problem.", annActor, cancellationToken));
+        var thread = await Assert.ThrowsAsync<DomainRuleException>(() => threads.StartThreadAsync(
+            project.Id, "rev-1", new ThreadAnchor("a.txt"), annActor, "A remark", cancellationToken));
+        var untouched = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+
+        // Assert: both refused naming slot 1 and its signer, and nothing was written
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, answer.Rule);
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, thread.Rule);
+        var affected = Assert.Single(answer.AffectedSlots);
+        Assert.Equal(new AffectedSignature(first.Id, 1, "Ann", ann.Id), affected);
+        Assert.Equal(first.Id, Assert.Single(thread.AffectedSlots).SlotId);
+        Assert.Contains("slot 1 (Ann)", answer.Message);
+        Assert.Empty(store.Threads);
+        Assert.Equal(SlotSignatureState.Signed, untouched!.Slots[0].State);
+
+        // Act: acknowledge the named slot and change the answer
+        await checklists.SetAnswerAsync(
+            project.Id, "rev-1", itemId, ChecklistOutcome.Fail, "Found a problem.", annActor, cancellationToken, [affected.SlotId]);
+        var changed = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+
+        // Assert: the change went through and the signature is kept but out of date
+        Assert.Equal(SlotSignatureState.OutOfDate, changed!.Slots[0].State);
+        Assert.False(changed.IsApproved);
+        Assert.Single(await store.ListSignaturesAsync(project.Id, "rev-1", cancellationToken));
     }
 
     /// <summary>

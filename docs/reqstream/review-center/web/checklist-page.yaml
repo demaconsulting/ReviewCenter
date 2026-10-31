@@ -55,6 +55,7 @@ sections:
           - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
           - ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy
           - ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy
+          - ChecklistPage_Answer_SignedReview_StoresTheAnswerAndMarksTheSignatureOutOfDate
 
       - id: ReviewCenter-ChecklistPage-Applicability
         title: >-

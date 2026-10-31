@@ -46,6 +46,10 @@ N/A - standard test environment.
   project the actor may not see (the rule itself is verified with the `ProjectAccess` unit).
 - On an approved review, starting a thread, replying, resolving, and reopening a thread are each refused with
   `ReviewLocked`, and nothing is stored.
+- A new thread, a reply, and a reopen of a resolved thread on a review with a current signature are refused with
+  `SignaturesWouldBecomeOutOfDate` unless the slot is acknowledged, and nothing is stored; a reply to a thread that does
+  not exist is `ThreadNotFound`, a resolve of a resolved thread changes nothing and is not refused, and an invalid
+  anchor is reported before the signature impact.
 
 #### Test Scenarios
 
@@ -189,6 +193,23 @@ resolve, and reopen) on a review whose every slot holds a current signature; eac
 threads and comments are as they were, and the review is still approved with the same digest. The fake store does not
 judge the lock itself, so the test shows that the service does. This scenario is tested by
 `ThreadService_Mutations_ApprovedReview_ThrowReviewLocked`.
+
+**ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement**: A thread is started on a review with a current
+signature; without an acknowledgement it is refused naming the slot and the signer and nothing is stored, and with the
+acknowledgement it is stored and the signature is out of date. This scenario is tested by
+`ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement`.
+
+**ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor**: A thread on a file that is not in the
+review is started on a signed review; the refusal is `ThreadAnchorInvalid`, not the signature impact. This scenario is
+tested by `ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor`.
+
+**ThreadService_ReplyAsync_Signed_NeedsAcknowledgement**: A reply to a resolved thread on a signed review is refused
+without the acknowledgement and stored with it; a reply to a thread that does not exist is `ThreadNotFound`. This
+scenario is tested by `ThreadService_ReplyAsync_Signed_NeedsAcknowledgement`.
+
+**ThreadService_ReopenAndResolveAsync_Signed_OnlyARealChangeNeedsAcknowledgement**: Resolving a resolved thread on a
+signed review changes nothing and is not refused; reopening it is refused without the acknowledgement, and stored with
+it. This scenario is tested by `ThreadService_ReopenAndResolveAsync_Signed_OnlyARealChangeNeedsAcknowledgement`.
 
 **ThreadService_Constructor_NullArguments_Throws**: A null store, a null project access, and a null clock are rejected
 with `ArgumentNullException`, so the service cannot be built without the check that the actor may see the project.

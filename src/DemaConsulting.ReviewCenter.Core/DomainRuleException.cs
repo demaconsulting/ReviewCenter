@@ -275,7 +275,13 @@ public enum DomainRule
     ///     An audit filter is not valid: its first day is after its last day, or a text is longer than the field it is
     ///     matched against.
     /// </summary>
-    AuditFilterInvalid
+    AuditFilterInvalid,
+
+    /// <summary>
+    ///     The change would make one or more current signatures out of date and the person making it did not
+    ///     acknowledge them; <see cref="DomainRuleException.AffectedSlots"/> lists the signatures not acknowledged.
+    /// </summary>
+    SignaturesWouldBecomeOutOfDate
 }
 
 /// <summary>
@@ -293,14 +299,29 @@ public sealed class DomainRuleException : Exception
     /// </summary>
     /// <param name="rule">The rule that was violated.</param>
     /// <param name="message">An operator-readable explanation of the violation.</param>
-    public DomainRuleException(DomainRule rule, string message)
+    /// <param name="affectedSlots">
+    ///     The signatures the change would make out of date, for <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/>;
+    ///     <c>null</c> (the default) for every other rule. The list is copied, so a later change to the caller's list does
+    ///     not change the exception.
+    /// </param>
+    public DomainRuleException(
+        DomainRule rule,
+        string message,
+        IReadOnlyList<AffectedSignature>? affectedSlots = null)
         : base(message)
     {
         Rule = rule;
+        AffectedSlots = affectedSlots is null ? [] : [.. affectedSlots];
     }
 
     /// <summary>
     ///     Gets the rule that was violated.
     /// </summary>
     public DomainRule Rule { get; }
+
+    /// <summary>
+    ///     Gets the signatures the change would make out of date; empty unless <see cref="Rule"/> is
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/>.
+    /// </summary>
+    public IReadOnlyList<AffectedSignature> AffectedSlots { get; }
 }

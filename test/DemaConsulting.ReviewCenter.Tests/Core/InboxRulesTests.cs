@@ -55,7 +55,8 @@ public class InboxRulesTests
         await world.SignAsync("r1", cySlot.Id, "cyd");
         var item = DefaultChecklist.Current.Sections[0].Items[0];
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("eve"), Ct);
+            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("eve"), Ct,
+            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1"));
         states.Add(("out of date", await RulesAsync(world)));
 
         // Act: compare with the signing service at both moments

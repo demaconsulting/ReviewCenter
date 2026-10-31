@@ -155,6 +155,7 @@ pass the `Host` header on. Every answer of the handler, including the 404 of an 
 **ApiProblems.StatusOf**: Maps a rule to a status: the not-found rules (including a missing token) to 404; a duplicate
 review identifier, an existing membership, the removal or demotion of the last project admin, a disabled repository,
 a change that the approval lock refuses (`ReviewLocked`), a reopen of a review that is not locked (`ReviewNotLocked`),
+a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`),
 and a changed record to 409; too many attempts to 429; an unavailable git to 503, a git access failure
 to
 502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, and a token action of a user who
@@ -171,6 +172,11 @@ the web pages with a re-authentication, and an API token is refused for them in 
 `ReviewNotLocked` to 409 is therefore defense in depth for a future endpoint, and no wire shape of the interface
 changed. The read endpoints (the review, the checklist and thread counts, the attestation, and the evidence index) are
 not affected by the lock; a reopened review simply reads as not approved.
+
+**Signature impact and the API**: the same holds for `SignaturesWouldBecomeOutOfDate`: no endpoint calls the methods
+that raise it, so the 409 mapping is defense in depth and the problem body is still the message of the rule. When an
+endpoint that changes the record is added, the contract is that its problem document carries the affected slots as an
+`affectedSlots` list (slot number and signer name) and that the request can acknowledge them; that is not built yet.
 
 #### Error Handling
 

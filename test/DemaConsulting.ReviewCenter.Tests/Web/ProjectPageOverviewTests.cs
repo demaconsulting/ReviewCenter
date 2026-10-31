@@ -111,7 +111,7 @@ public class ProjectPageOverviewTests : PageTestBase
         // After the signature the record changes, so the signature of Ann is out of date
         var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
         await Checklists.SetAnswerAsync(
-            project.Id, "REV-B", first.Id, ChecklistOutcome.Fail, "Wrong", TestActors.Ann, token);
+            project.Id, "REV-B", first.Id, ChecklistOutcome.Fail, "Wrong", TestActors.Ann, token, [slotB.Id]);
         await Threads.StartThreadAsync(project.Id, "REV-B", new ThreadAnchor("a.txt"), TestActors.Bob, "Look", token);
         await Reviews.SetDueDateAsync(project.Id, "REV-B", new DateOnly(2025, 3, 3), TestActors.Ann, token);
 

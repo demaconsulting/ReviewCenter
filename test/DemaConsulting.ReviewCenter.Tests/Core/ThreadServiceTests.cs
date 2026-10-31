@@ -86,6 +86,127 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Creates the signed-review world with one thread that was started and resolved before anybody signed, and
+    ///     slot 1 signed afterwards.
+    /// </summary>
+    /// <returns>The world and the identity of the resolved thread.</returns>
+    private static async Task<(SignedReviewWorld World, int ThreadId)> CreateSignedWithResolvedThreadAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var thread = await world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, new ThreadAnchor("a.txt"), TestActors.Ann, "First", cancellationToken);
+        await world.Threads.ResolveAsync(world.ProjectId, SignedReviewWorld.ReviewId, thread.Id, TestActors.Ann, cancellationToken);
+        await world.SignAsync(1);
+        return (world, thread.Id);
+    }
+
+    /// <summary>
+    ///     Test that starting a thread while a signature is current is refused naming the slot and storing nothing,
+    ///     and that acknowledging the slot stores the thread and leaves the signature out of date.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement()
+    {
+        // Arrange: slot 1 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        var anchor = new ThreadAnchor("a.txt");
+
+        // Act: start a thread without, and then with, the acknowledgement
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, anchor, TestActors.Bob, "A remark", cancellationToken));
+        var storedByRefusal = world.Store.Threads.Count;
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, anchor, TestActors.Bob, "A remark", cancellationToken, await world.SignedSlotIdsAsync());
+
+        // Assert: refused naming slot 1 and storing nothing, then stored with the signature out of date
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
+        Assert.Equal("Rita", Assert.Single(ex.AffectedSlots).SignerDisplayName);
+        Assert.Equal(0, storedByRefusal);
+        Assert.Single(world.Store.Threads);
+        Assert.Equal(SlotSignatureState.OutOfDate, (await world.ApprovalAsync()).Slots[0].State);
+    }
+
+    /// <summary>
+    ///     Test that a request that is not valid is reported as that error, not as the signature impact, so a person is
+    ///     never asked to confirm a change that would then fail.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor()
+    {
+        // Arrange: slot 1 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+
+        // Act: start a thread on a file that is not in the review
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, new ThreadAnchor("missing.txt"), TestActors.Bob, "A remark", cancellationToken));
+
+        // Assert: the anchor is reported
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, ex.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a reply while a signature is current needs the acknowledgement, that a reply to a thread that does
+    ///     not exist is still reported as not found, and that nothing is stored by a refusal.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReplyAsync_Signed_NeedsAcknowledgement()
+    {
+        // Arrange: a resolved thread and slot 1 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (world, threadId) = await CreateSignedWithResolvedThreadAsync();
+
+        // Act: reply without acknowledging, to a missing thread, and then with the acknowledgement
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ReplyAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, "More", cancellationToken));
+        var missing = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ReplyAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, 999, TestActors.Bob, "More", cancellationToken));
+        var commentsAfterRefusal = world.Store.Threads.Single().Comments.Count;
+        await world.Threads.ReplyAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, "More", cancellationToken, await world.SignedSlotIdsAsync());
+
+        // Assert: refused naming slot 1 with nothing stored, a missing thread is not found, and the acknowledged reply is stored
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
+        Assert.Equal(1, Assert.Single(ex.AffectedSlots).SlotNumber);
+        Assert.Equal(DomainRule.ThreadNotFound, missing.Rule);
+        Assert.Equal(1, commentsAfterRefusal);
+        Assert.Equal(2, world.Store.Threads.Single().Comments.Count);
+        Assert.Equal(SlotSignatureState.OutOfDate, (await world.ApprovalAsync()).Slots[0].State);
+    }
+
+    /// <summary>
+    ///     Test that reopening a resolved thread while a signature is current needs the acknowledgement, and that
+    ///     resolving a thread that is already resolved is a no-op that neither asks nor changes anything.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_ReopenAndResolveAsync_Signed_OnlyARealChangeNeedsAcknowledgement()
+    {
+        // Arrange: a resolved thread and slot 1 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (world, threadId) = await CreateSignedWithResolvedThreadAsync();
+
+        // Act: resolve again, reopen without acknowledging, then reopen with the acknowledgement
+        await world.Threads.ResolveAsync(world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken);
+        var stillSigned = (await world.ApprovalAsync()).Slots[0].State;
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ReopenAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken));
+        var stateAfterRefusal = world.Store.Threads.Single().State;
+        await world.Threads.ReopenAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, threadId, TestActors.Bob, cancellationToken, await world.SignedSlotIdsAsync());
+
+        // Assert: the no-op kept the signature, the refusal stored nothing, and the acknowledged reopen changed the thread
+        Assert.Equal(SlotSignatureState.Signed, stillSigned);
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
+        Assert.Equal(ReviewThreadState.Resolved, stateAfterRefusal);
+        Assert.Equal(ReviewThreadState.Open, world.Store.Threads.Single().State);
+        Assert.Equal(SlotSignatureState.OutOfDate, (await world.ApprovalAsync()).Slots[0].State);
+    }
+
+    /// <summary>
     ///     Test that every thread mutation is refused with <see cref="DomainRule.ReviewLocked"/> while the review is
     ///     approved, and that no thread or comment changes.
     /// </summary>

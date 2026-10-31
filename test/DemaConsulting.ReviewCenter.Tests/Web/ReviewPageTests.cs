@@ -1956,6 +1956,31 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a comment on a review with a current signature is stored by the page, because the page
+    ///     acknowledges the signature on the person's behalf for now, and that the signature then shows as out of
+    ///     date (temporary behavior until the page asks the person to acknowledge).
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate()
+    {
+        // Arrange: a review with two slots of which the first is signed, so that it is not yet approved
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        await Signing.AddSlotAsync(TestActors.Ann, projectId, "REV-1", ids["cyd"], null, TestContext.Current.CancellationToken);
+        await SignSlotAsync(projectId, slotId);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Act: start a thread
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Found something");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: the thread is stored without an error, and the signature is out of date
+        Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Empty(cut.FindAll("[data-testid='thread-error']"));
+        Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+    }
+
+    /// <summary>
     ///     Test that a review that is not complete does not offer the attestation.
     /// </summary>
     [Fact]

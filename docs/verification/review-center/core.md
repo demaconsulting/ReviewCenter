@@ -66,6 +66,9 @@ N/A - standard test environment.
   is refused with `ReviewLocked`, and its approval and digest stay as they were; only a project administrator reopens
   it, with a reason, which is audited with the previous digest, keeps the earlier signatures as out-of-date history,
   and needs fresh signatures; reopening a review that is not locked is refused with `ReviewNotLocked`.
+- A change of the checklist or of a thread that would make a current signature out of date is refused with
+  `SignaturesWouldBecomeOutOfDate`, naming the slot and its signer, and nothing is stored; with the slot acknowledged it
+  goes through and the signature is kept as out of date.
 - While a project requires independent reviewers (the default), the author of a review is refused as reviewer of a slot
   and as signer, also for a slot that was filled earlier and for a review created through a token (its author is the
   owner of the token); only a project administrator switches the rule, and every switch is audited.
@@ -139,7 +142,8 @@ signed slot, a signing by a user who is not in the slot, a signing that is block
 a signing of a record that changed; a token with an invalid name, an invalid lifetime, or beyond the limit of 20 active
 tokens, and an actor that came through a token that signs or names a reviewer; a change of an approved review, a
 reopen without a reason, a reopen of a review that is not approved, and a reviewer who is the author of the review
-(`ReviewLocked`, `ReopenReasonInvalid`, `ReviewNotLocked`, and `ReviewerNotIndependent`); a repository with an invalid name,
+(`ReviewLocked`, `ReopenReasonInvalid`, `ReviewNotLocked`, and `ReviewerNotIndependent`); a change after a signature that
+is not acknowledged (`SignaturesWouldBecomeOutOfDate`); a repository with an invalid name,
 location, or credential, a name already used,
 an unknown or disabled repository, or a token that cannot be decrypted; a revision that is not a safe name; and a
 selection with no valid pattern; and a selection that matches no changed file; and, over the real `TotpService` in a
@@ -176,6 +180,12 @@ administrator then reopens the approved review with a reason, which changes the 
 review is not approved, and the digest differs. The alternate signs the new record, and the review is approved again
 with the alternate as signer.
 This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.
+
+**CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement**: A review has two slots, every check is answered, and
+only the first slot is signed, so the review is not locked. Changing an answer and starting a thread without an
+acknowledgement are each refused with `SignaturesWouldBecomeOutOfDate`, naming slot 1 and its signer, nothing is stored,
+and the signature is still current. The same answer is then changed with slot 1 acknowledged; it is stored and the
+signature is out of date. This scenario is tested by `CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement`.
 
 **CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner**: A user is created and a token is made through
 `PersonalAccessTokenService`. The value authenticates the owner and a value with a changed ending does not; the list

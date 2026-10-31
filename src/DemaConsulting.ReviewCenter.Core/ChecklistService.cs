@@ -31,6 +31,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     never free text.
 ///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is approved (see
 ///     <see cref="ReviewLock"/>).
+///     A change that would make a current signature out of date is refused with
+///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> unless the caller acknowledges the affected slots.
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
 /// </remarks>
@@ -105,9 +107,17 @@ public sealed class ChecklistService
     /// </param>
     /// <param name="actor">The signed-in user who sets the applicability. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. Only needed when the change alters the record while a signature is current.
+    /// </param>
     /// <returns>A task that completes when the applicability is stored.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
+    ///     nothing is stored then.
+    /// </exception>
     public async Task SetSectionApplicabilityAsync(
         int projectId,
         string reviewId,
@@ -115,7 +125,8 @@ public sealed class ChecklistService
         bool applicable,
         string? reason,
         Actor actor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
@@ -131,20 +142,36 @@ public sealed class ChecklistService
         var trimmedReason = applicable ? null : ValidateJustification(reason, required: true, "reason");
 
         // An approved review is locked: the checklist is part of what the signatures cover
-        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+        var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+
+        var state = new ChecklistSectionState
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            SectionId = sectionId,
+            Applicable = applicable,
+            Reason = trimmedReason,
+            SetBy = actor.DisplayName,
+            SetByUsername = actor.Username,
+            SetAt = _timeProvider.GetUtcNow()
+        };
+
+        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date
+        SignatureImpact.RequireAcknowledged(
+            snapshot,
+            snapshot is null
+                ? null
+                : snapshot.Record with
+                {
+                    SectionStates = snapshot.Record.SectionStates
+                        .Where(s => s.SectionId != sectionId)
+                        .Append(state)
+                        .ToList()
+                },
+            acknowledgedSlotIds);
 
         await _store.SetChecklistSectionStateAsync(
-            new ChecklistSectionState
-            {
-                ProjectId = projectId,
-                ReviewId = reviewId,
-                SectionId = sectionId,
-                Applicable = applicable,
-                Reason = trimmedReason,
-                SetBy = actor.DisplayName,
-                SetByUsername = actor.Username,
-                SetAt = _timeProvider.GetUtcNow()
-            },
+            state,
             AuditDraft.By(
                 actor,
                 "checklist.applicability-changed",
@@ -170,10 +197,18 @@ public sealed class ChecklistService
     /// </param>
     /// <param name="actor">The signed-in user who answers. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. Only needed when the change alters the record while a signature is current.
+    /// </param>
     /// <returns>A task that completes when the answer is stored.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="outcome"/> is not a defined value.</exception>
-    /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
+    ///     nothing is stored then.
+    /// </exception>
     public async Task SetAnswerAsync(
         int projectId,
         string reviewId,
@@ -181,7 +216,8 @@ public sealed class ChecklistService
         ChecklistOutcome outcome,
         string? justification,
         Actor actor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
@@ -202,20 +238,36 @@ public sealed class ChecklistService
         var trimmed = ValidateJustification(justification, outcome != ChecklistOutcome.Pass, "justification");
 
         // An approved review is locked: the checklist is part of what the signatures cover
-        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+        var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+
+        var answer = new ChecklistAnswer
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            ItemId = itemId,
+            Outcome = outcome,
+            Justification = trimmed,
+            AnsweredBy = actor.DisplayName,
+            AnsweredByUsername = actor.Username,
+            AnsweredAt = _timeProvider.GetUtcNow()
+        };
+
+        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date
+        SignatureImpact.RequireAcknowledged(
+            snapshot,
+            snapshot is null
+                ? null
+                : snapshot.Record with
+                {
+                    Answers = snapshot.Record.Answers
+                        .Where(a => a.ItemId != itemId)
+                        .Append(answer)
+                        .ToList()
+                },
+            acknowledgedSlotIds);
 
         await _store.SetChecklistAnswerAsync(
-            new ChecklistAnswer
-            {
-                ProjectId = projectId,
-                ReviewId = reviewId,
-                ItemId = itemId,
-                Outcome = outcome,
-                Justification = trimmed,
-                AnsweredBy = actor.DisplayName,
-                AnsweredByUsername = actor.Username,
-                AnsweredAt = _timeProvider.GetUtcNow()
-            },
+            answer,
             AuditDraft.By(
                 actor,
                 "checklist.answered",
