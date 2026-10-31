@@ -1,0 +1,263 @@
+@* ProjectChecklistPage: the checklist template of one project, at "/projects/{id}/checklist". It shows which checklist
+   the project gives to its NEW reviews (version label, number of sections and checks, a badge while it is the
+   built-in default) and lets an administrator work with it in a fixed order: export the current or the built-in
+   default checklist as a JSON file, import another one (paste a small text or upload a file of up to 256 KiB),
+   validate it (every error is listed with its path), preview it with a short summary of what differs from the
+   current checklist, and replace the current one, or reset the project to the built-in default. Replacing and
+   resetting ask for a confirmation that says that existing reviews keep the checklist they were created with.
+   Only whoever may administer the project (a system administrator or a project admin of it) gets the page;
+   anybody else sees the not-found message of a missing project.
+
+   Presentation only; state and event handling live in ProjectChecklistPage.razor.cs. Every key value carries a
+   stable kebab-case data-testid, and the data-interactive marker on the root flips to "true" once the live
+   circuit is connected.
+
+   Human factors: (a) the current state first, then the import steps in the order a person does them; (b) all
+   errors at once, each with the path of the place to fix; (c) a change is confirmed in words and the consequence
+   (only new reviews) is said before the button that causes it is confirmed.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/projects/{ProjectId:int}/checklist"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using DemaConsulting.ReviewCenter.Core
+
+<PageTitle>Checklist template - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page narrow" data-testid="project-checklist-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="breadcrumb-project-link">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Checklist template</span>
+        }
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="project-checklist-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
+    <h1>Checklist template</h1>
+    <p class="page-lead">
+        The checklist that new reviews of this project start with. Existing reviews keep the checklist they were
+        created with. <a href="/help/checklist-template" data-testid="checklist-help-link">How this page works</a>
+    </p>
+
+    @if (ErrorMessage is not null)
+    {
+        <p class="error" role="alert" data-testid="project-checklist-error">@ErrorMessage</p>
+    }
+    @if (StatusMessage is not null)
+    {
+        <p class="notice" role="status" data-testid="project-checklist-status">@StatusMessage</p>
+    }
+
+    <section class="card" data-testid="checklist-current">
+        <h2 class="section-title">Current checklist</h2>
+        @if (Current is not null)
+        {
+            <p>
+                Version label <strong data-testid="checklist-current-version">@Current.Version</strong>:
+                <span data-testid="checklist-current-counts">@ProjectChecklistPage.Describe(Current)</span>
+                @if (Current.IsDefault)
+                {
+                    <span class="badge" data-testid="checklist-default-badge">built-in default</span>
+                }
+            </p>
+        }
+        else
+        {
+            <p class="error" role="alert" data-testid="checklist-unreadable">@UnreadableMessage</p>
+            <p class="muted hint">Replace it with a valid definition or reset it to the built-in default.</p>
+        }
+        <div class="plan-actions">
+            <button type="button" class="outline" disabled="@(Current is null)" @onclick="ExportCurrentAsync"
+                    data-testid="checklist-export">Export current checklist</button>
+            <button type="button" class="outline" @onclick="ExportDefaultAsync"
+                    data-testid="checklist-export-default">Export built-in default</button>
+            <button type="button" class="outline" disabled="@(!CanReset)" @onclick="AskResetAsync"
+                    data-testid="checklist-reset">Reset to built-in default</button>
+        </div>
+        @if (ConfirmingReset)
+        {
+            <div class="notice warning" role="alertdialog" data-testid="checklist-reset-confirmation">
+                <p>
+                    New reviews of this project will use the built-in default checklist
+                    (@DefaultChecklist.Version) again. Existing reviews keep the checklist they were created with.
+                    The change is recorded in the audit trail.
+                </p>
+                <div class="plan-actions">
+                    <button type="button" @onclick="ResetAsync" data-testid="checklist-reset-confirm">Reset to default</button>
+                    <button type="button" class="outline" @onclick="CancelConfirmation"
+                            data-testid="checklist-reset-cancel">Cancel</button>
+                </div>
+            </div>
+        }
+    </section>
+
+    <section class="card" data-testid="checklist-import">
+        <h2 class="section-title">Import a checklist</h2>
+        <p class="muted hint">
+            Paste a definition (up to @PasteLimit characters; a longer text is cut off, so upload it as a file) or upload
+            a JSON file of up to
+            @(ReviewLimits.MaxChecklistBytes / 1024) KiB. Nothing is stored until you replace the checklist.
+        </p>
+        <div class="field">
+            <label for="checklist-import-text">Pasted definition</label>
+            <textarea id="checklist-import-text" rows="8" maxlength="@PasteLimit"
+                      spellcheck="false" value="@PastedText" @onchange="PasteChangedAsync"
+                      data-testid="checklist-import-text"></textarea>
+        </div>
+        <div class="field">
+            <label for="checklist-import-file">Or a file</label>
+            <InputFile id="checklist-import-file" accept=".json,application/json" OnChange="FileSelectedAsync"
+                       data-testid="checklist-import-file" />
+        </div>
+        @if (ImportSource is not null)
+        {
+            <p class="muted" data-testid="checklist-import-source">Ready to check: @ImportSource</p>
+        }
+        <div class="plan-actions">
+            <button type="button" @onclick="ValidateAsync"
+                    data-testid="checklist-validate">Validate</button>
+        </div>
+
+        @if (Validation is not null)
+        {
+            @if (!Validation.IsValid)
+            {
+                <div class="error" role="alert" data-testid="checklist-validation-errors">
+                    <p>
+                        The definition is not valid: @Validation.Errors.Count
+                        @(Validation.Errors.Count == 1 ? "error" : "errors"). Nothing was changed.
+                    </p>
+                    <ul>
+                        @foreach (var error in Validation.Errors)
+                        {
+                            <li data-testid="checklist-error"><code data-testid="checklist-error-path">@error.Path</code>: <span data-testid="checklist-error-message">@error.Message</span></li>
+                        }
+                    </ul>
+                </div>
+            }
+            else if (Validation.Definition is { } candidate)
+            {
+                <p class="notice" role="status" data-testid="checklist-valid">
+                    The definition is valid: version label <strong data-testid="checklist-preview-version">@candidate.Version</strong>,
+                    @candidate.Sections.Count @(candidate.Sections.Count == 1 ? "section" : "sections"),
+                    @candidate.Sections.Sum(s => s.Items.Count) @(candidate.Sections.Sum(s => s.Items.Count) == 1 ? "check" : "checks").
+                </p>
+
+                @if (Diff is not null)
+                {
+                    <div data-testid="checklist-diff">
+                        <h3>Differences from the current checklist</h3>
+                        @if (!CanReplace)
+                        {
+                            <p class="muted" data-testid="checklist-diff-same">
+                                The definition has the same content as the current checklist; there is nothing to replace.
+                            </p>
+                        }
+                        else
+                        {
+                            <ul>
+                                <li data-testid="checklist-diff-version">
+                                    Version label:
+                                    @(Diff.VersionChanged ? $"{Diff.CurrentVersion} becomes {Diff.NewVersion}" : $"{Diff.NewVersion} (unchanged)")
+                                </li>
+                                @if (Diff.AddedSections.Count > 0)
+                                {
+                                    <li data-testid="checklist-diff-sections-added">Sections added: @string.Join(", ", Diff.AddedSections)</li>
+                                }
+                                @if (Diff.RemovedSections.Count > 0)
+                                {
+                                    <li data-testid="checklist-diff-sections-removed">Sections removed: @string.Join(", ", Diff.RemovedSections)</li>
+                                }
+                                @if (Diff.ChangedSections.Count > 0)
+                                {
+                                    <li data-testid="checklist-diff-sections-changed">Sections with another title or hint: @string.Join(", ", Diff.ChangedSections)</li>
+                                }
+                                @if (Diff.AddedItems.Count > 0)
+                                {
+                                    <li data-testid="checklist-diff-items-added">Checks added: @string.Join(", ", Diff.AddedItems)</li>
+                                }
+                                @if (Diff.RemovedItems.Count > 0)
+                                {
+                                    <li data-testid="checklist-diff-items-removed">Checks removed: @string.Join(", ", Diff.RemovedItems)</li>
+                                }
+                                @if (Diff.ChangedItems.Count > 0)
+                                {
+                                    <li data-testid="checklist-diff-items-changed">Checks with other wording or in another section: @string.Join(", ", Diff.ChangedItems)</li>
+                                }
+                            </ul>
+                            @if (KeepsVersionLabel)
+                            {
+                                <p class="notice warning" role="status" data-testid="checklist-diff-label-warning">
+                                    The content differs but the version label is the same. Give the new wording a new
+                                    version label, or the replace is refused.
+                                </p>
+                            }
+                        }
+                    </div>
+                }
+
+                <h3>Preview</h3>
+                <div data-testid="checklist-preview">
+                    @foreach (var section in candidate.Sections)
+                    {
+                        <section class="card" data-testid="checklist-preview-section-@section.Id">
+                            <h4>@section.Title <span class="muted">(@section.Id, @section.Items.Count @(section.Items.Count == 1 ? "check" : "checks"))</span></h4>
+                            @if (!string.IsNullOrEmpty(section.ApplicabilityHint))
+                            {
+                                <p class="muted hint">@section.ApplicabilityHint</p>
+                            }
+                            <ol>
+                                @foreach (var item in section.Items)
+                                {
+                                    <li data-testid="checklist-preview-item-@item.Id"><code>@item.Id</code> @item.Text</li>
+                                }
+                            </ol>
+                        </section>
+                    }
+                </div>
+
+                <div class="plan-actions">
+                    <button type="button" disabled="@(!CanReplace)" @onclick="AskReplaceAsync"
+                            data-testid="checklist-replace">Replace checklist</button>
+                </div>
+                @if (ConfirmingReplace)
+                {
+                    <div class="notice warning" role="alertdialog" data-testid="checklist-replace-confirmation">
+                        <p>
+                            New reviews of this project will use @candidate.Version instead of
+                            @(Current is null ? "the unreadable checklist" : Current.Version). Existing reviews keep the
+                            checklist they were created with; only reviews created afterwards use the new one. The
+                            change is recorded in the audit trail.
+                        </p>
+                        <div class="plan-actions">
+                            <button type="button" @onclick="ReplaceAsync" data-testid="checklist-replace-confirm">Replace checklist</button>
+                            <button type="button" class="outline" @onclick="CancelConfirmation"
+                                    data-testid="checklist-replace-cancel">Cancel</button>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    </section>
+
+    <div class="plan-actions">
+        <a class="action outline" href="/projects/@ProjectId" data-testid="project-checklist-back">Back to project</a>
+    </div>
+    }
+</main>
+</SessionGate>

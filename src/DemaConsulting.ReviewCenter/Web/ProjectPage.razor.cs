@@ -79,6 +79,13 @@ public partial class ProjectPage : ComponentBase
     private RepositoryService RepositoryService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that reads the checklist of a project, supplied by dependency injection; used
+    ///     only for the one-line summary of an administrator.
+    /// </summary>
+    [Inject]
+    private ProjectChecklistService Checklists { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the access service, supplied by dependency injection; decides what the user may do here.
     /// </summary>
     [Inject]
@@ -151,6 +158,12 @@ public partial class ProjectPage : ComponentBase
     private string? RulesStatus { get; set; }
 
     /// <summary>
+    ///     Gets the one-line summary of the project's checklist for the review rules card; <c>null</c> for someone
+    ///     who may not administer the project.
+    /// </summary>
+    private string? ChecklistSummary { get; set; }
+
+    /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
     /// </summary>
     /// <remarks>
@@ -183,6 +196,7 @@ public partial class ProjectPage : ComponentBase
         Reviews = await ReviewService.ListAsync(ProjectId);
         Repositories = await RepositoryService.ListEnabledAsync(actor, ProjectId);
         CanAdminister = await Access.CanAdministerAsync(actor, ProjectId);
+        ChecklistSummary = CanAdminister ? await DescribeChecklistAsync(actor) : null;
         await LoadMembersAsync(actor);
 
         // One approval lookup per review; the list of reviews of a project is short
@@ -197,6 +211,28 @@ public partial class ProjectPage : ComponentBase
         }
 
         Loaded = true;
+    }
+
+    /// <summary>
+    ///     Describes the checklist of the project in one line, for the review rules card.
+    /// </summary>
+    /// <param name="actor">The signed-in user, who may administer the project.</param>
+    /// <returns>
+    ///     The version label and size, and whether it is the built-in default; a sentence when the stored definition
+    ///     cannot be read.
+    /// </returns>
+    private async Task<string> DescribeChecklistAsync(Actor actor)
+    {
+        try
+        {
+            var checklist = await Checklists.GetAsync(actor, ProjectId);
+            return ProjectChecklistPage.Describe(checklist) + (checklist.IsDefault ? ", built-in default" : ", custom");
+        }
+        catch (DomainRuleException)
+        {
+            // An unreadable stored definition (or a right lost just now) must not break the page
+            return "cannot be read";
+        }
     }
 
     /// <summary>
@@ -252,6 +288,7 @@ public partial class ProjectPage : ComponentBase
     private void ShowMembersLost()
     {
         CanAdminister = false;
+        ChecklistSummary = null;
         Members = [];
         MemberError = null;
         MemberStatus = null;

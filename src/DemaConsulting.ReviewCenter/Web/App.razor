@@ -7,7 +7,8 @@
    helper that the review page calls to bring a thread's lines into view (Blazor cannot scroll by itself) and the
    helper that replaces the address in the address bar by the link of the file or thread shown (history.replaceState:
    no navigation and no history entry, so the page keeps its state) and the copy helper behind a thread's
-   "Copy link" button (clipboard API, with a textarea fallback outside secure contexts). A second script in the head applies the stored
+   "Copy link" button (clipboard API, with a textarea fallback outside secure contexts) and the download helper behind
+   the checklist template export (a Blob behind a temporary link). A second script in the head applies the stored
    light/dark/system appearance before the first paint. *@
 <!DOCTYPE html>
 <html lang="en">
@@ -98,6 +99,19 @@
                     return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return fallback(); });
                 }
                 return Promise.resolve(fallback());
+            },
+            downloadText: function (fileName, text, contentType) {
+                // Offers the text as a file download in the browser (a Blob behind a temporary link); nothing is
+                // sent to the server. The file name is a plain name chosen by the page, never a path.
+                var url = URL.createObjectURL(new Blob([text], { type: contentType || 'text/plain' }));
+                var link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(function () { URL.revokeObjectURL(url); }, 0);
             }
         });
     </script>

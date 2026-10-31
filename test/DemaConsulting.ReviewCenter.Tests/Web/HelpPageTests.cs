@@ -248,6 +248,42 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the checklist template topic is listed after the evidence settings topic and explains who may
+    ///     change the template, that reviews keep their copy, export, import with the validation errors and the
+    ///     preview, the version label rule, replace, reset and the audit action.
+    /// </summary>
+    [Fact]
+    public void HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies()
+    {
+        // Assert: the topic follows the evidence settings topic in the index
+        var slugs = HelpTopics.All.Select(topic => topic.Slug).ToList();
+        Assert.Equal(slugs.IndexOf("evidence-settings") + 1, slugs.IndexOf("checklist-template"));
+
+        // Act: render the topic page
+        var page = Render<HelpChecklistTemplatePage>();
+
+        // Assert: the title, who may change it, and that reviews keep the checklist they were created with
+        var text = page.Markup;
+        Assert.Equal("Checklist template", page.Find("h1").TextContent);
+        Assert.Contains("project admin", text, StringComparison.Ordinal);
+        Assert.Contains("built-in default", text, StringComparison.Ordinal);
+        Assert.Contains("only the reviews created afterwards", text, StringComparison.Ordinal);
+        Assert.Contains("keep exactly the checklist they were created with", text, StringComparison.Ordinal);
+
+        // Assert: the steps and the rules
+        foreach (var name in new[] { "Export current checklist", "Validate", "Replace checklist", "Reset to built-in default", "another version label" })
+        {
+            Assert.Contains($"<strong>{name}</strong>", text, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("256 KiB", text, StringComparison.Ordinal);
+        Assert.Contains("project.checklist-changed", text, StringComparison.Ordinal);
+        Assert.Contains("IEC 62304", text, StringComparison.Ordinal);
+        Assert.Contains("not make a record compliant", text, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
+    }
+
+    /// <summary>
     ///     Test that the two-factor topic is listed after the API tokens topic, explains enrolling, signing in, recovery
     ///     codes, the rules for signing, the reset and the setting that switches the feature off, and shows its
     ///     screenshot; and that the signing topic links to it.

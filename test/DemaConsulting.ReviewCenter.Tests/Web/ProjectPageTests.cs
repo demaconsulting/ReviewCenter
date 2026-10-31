@@ -768,6 +768,57 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a project administrator sees the link to the checklist template page and, in the review rules
+    ///     card, a summary of the checklist new reviews start with: the built-in default at first, then the label
+    ///     and size of the project's own checklist.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary()
+    {
+        // Arrange: a project administrator who is signed in
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+
+        // Act: render the page with the default, then with a checklist of the project's own
+        var withDefault = RenderProjectPage(projectId);
+        var current = await ChecklistTemplates.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken);
+        await ChecklistTemplates.SetAsync(
+            TestActors.Ann,
+            projectId,
+            current.Hash,
+            "{\"version\":\"custom-1\",\"sections\":[{\"id\":\"s\",\"title\":\"S\",\"items\":[{\"id\":\"s1\",\"text\":\"Ok?\"}]}]}",
+            TestContext.Current.CancellationToken);
+        var withCustom = RenderProjectPage(projectId);
+
+        // Assert: the links lead to the page
+        Assert.Equal($"/projects/{projectId}/checklist", withDefault.Find("[data-testid='checklist-link']").GetAttribute("href"));
+        Assert.Equal($"/projects/{projectId}/checklist", withDefault.Find("[data-testid='review-rules-checklist-link']").GetAttribute("href"));
+
+        // Assert: the summary says which checklist new reviews get
+        Assert.Equal("default-1 (14 sections, 58 checks), built-in default", withDefault.Find("[data-testid='project-checklist-summary']").TextContent);
+        Assert.Equal("custom-1 (1 section, 1 check), custom", withCustom.Find("[data-testid='project-checklist-summary']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a plain member sees neither the checklist link nor the checklist summary.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary()
+    {
+        // Arrange: a plain member who is signed in
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        SignInAs("mbr", "Zed Member", isSystemAdmin: false);
+
+        // Act: render the page
+        var cut = RenderProjectPage(projectId);
+
+        // Assert
+        Assert.Empty(cut.FindAll("[data-testid='checklist-link']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-rules-checklist-link']"));
+        Assert.Empty(cut.FindAll("[data-testid='project-checklist-summary']"));
+        Assert.DoesNotContain("default-1", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a project administrator can make a member a project admin and remove a member.
     /// </summary>
     [Fact]

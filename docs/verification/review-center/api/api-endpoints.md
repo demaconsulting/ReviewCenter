@@ -41,6 +41,9 @@ N/A - standard test environment (a temporary database and key folder are created
   `DELETE`, `OPTIONS`), and there is no route that signs or changes a slot.
 - A route of a project answers a non-member like a missing project, and the project list holds only the projects the
   owner of the token may see; these are verified over HTTP by `ApiProjectAccessTests.cs` (see the `Api` subsystem).
+- The checklist template of a project is a JSON document with the definition, the version label, the default flag, the
+  hash, and the counts; a project that cannot be seen is a 404 problem, an unreadable stored definition a 400 problem,
+  and no route changes the template.
 - The evidence index and the attestation PDF are the only two routes that serve a request without a token, when the
   project allows it, and the only two that are limited per address; the endpoint grouping, the policies, and the limit
   are verified by `AnonymousEvidenceAccessTests.cs` (see the `ApiTokenAuthentication` unit).
@@ -173,6 +176,26 @@ absolute, follows the request, and has the identifier escaped (`A%20B%2Fc%3Fd`).
 **ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost**: The index is requested with another `Host`
 header. The attestation address of the entry names that host. This scenario is tested by
 `ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost`.
+
+**ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition**: A member and a system administrator read the
+checklist of a project with a bearer token and with Basic credentials. At first the answer is 200 `application/json`
+with the built-in default (version `default-1`, `isDefault` true, 14 sections, 58 checks, the hash of the default, and
+the sections with their titles, hints, and checks); after the template is replaced the answer shows the custom version
+label, `isDefault` false, another 64-character hash, and the counts and checks of the custom definition. This scenario is
+tested by `ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition`.
+
+**ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint**: A project's own checklist has a section without the
+hint member (which the validator accepts); the answer has the field `applicabilityHint` as an empty string, not null.
+This scenario is tested by `ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint`.
+
+**ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems**: A user who is no member
+and a project that does not exist both get a 404 problem document; a stored definition that cannot be read is a 400
+problem whose detail names the checklist definition. This scenario is tested by
+`ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems`.
+
+**ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage**: The rule `ChecklistDefinitionInvalid` is mapped
+to status 400 and its exception becomes a problem result with that status and the message as the detail. This scenario
+is tested by `ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage`.
 
 **ApiEndpoints_Request_UnknownRoute_AnswersJsonNotFound**: An address under `/api` that does not exist is requested with
 `GET`, `POST`, and `DELETE`, with and without a token. Each answer is a 404 problem document, not a page. This scenario

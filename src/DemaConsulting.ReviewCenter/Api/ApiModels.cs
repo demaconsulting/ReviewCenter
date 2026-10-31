@@ -191,3 +191,43 @@ internal sealed record EvidenceIndexDto(IReadOnlyList<EvidenceEntryDto> Reviews)
 /// <param name="Review">The review that was created.</param>
 /// <param name="Skipped">The repository entries that were left out; empty for an upload.</param>
 internal sealed record CreatedReviewDto(ReviewDetailDto Review, IReadOnlyList<SkippedFileDto> Skipped);
+
+/// <summary>
+///     One check of a checklist definition.
+/// </summary>
+/// <param name="Id">The identifier of the check, unique within the definition.</param>
+/// <param name="Text">The wording of the check.</param>
+internal sealed record ChecklistItemDto(string Id, string Text);
+
+/// <summary>
+///     One section of a checklist definition: a group of checks that applies to a review as a whole or not at all.
+/// </summary>
+/// <param name="Id">The identifier of the section, unique within the definition.</param>
+/// <param name="Title">The title of the section.</param>
+/// <param name="ApplicabilityHint">A short hint when the section applies; empty when there is none.</param>
+/// <param name="Items">The checks of the section, in order.</param>
+internal sealed record ChecklistSectionDto(string Id, string Title, string ApplicabilityHint, IReadOnlyList<ChecklistItemDto> Items);
+
+/// <summary>
+///     A checklist definition: a version label and its sections.
+/// </summary>
+/// <param name="Version">The version label of the wording.</param>
+/// <param name="Sections">The sections, in order.</param>
+internal sealed record ChecklistDefinitionDto(string Version, IReadOnlyList<ChecklistSectionDto> Sections);
+
+/// <summary>
+///     The checklist template of a project: what new reviews of the project start with.
+/// </summary>
+/// <param name="Version">The version label of the definition.</param>
+/// <param name="IsDefault"><c>true</c> when the project uses the built-in default checklist.</param>
+/// <param name="Hash">The SHA-256 hash of the definition text, in lower-case hexadecimal; it changes when the definition changes.</param>
+/// <param name="SectionCount">The number of sections.</param>
+/// <param name="ItemCount">The number of checks in all sections.</param>
+/// <param name="Definition">The definition itself.</param>
+internal sealed record ProjectChecklistDto(
+    string Version,
+    bool IsDefault,
+    string Hash,
+    int SectionCount,
+    int ItemCount,
+    ChecklistDefinitionDto Definition);

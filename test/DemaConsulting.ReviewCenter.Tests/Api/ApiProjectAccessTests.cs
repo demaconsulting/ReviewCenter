@@ -203,7 +203,8 @@ public class ApiProjectAccessTests
             (HttpMethod.Get, $"/api/projects/{{p}}/reviews/{ReviewId}"),
             (HttpMethod.Post, "/api/projects/{p}/reviews"),
             (HttpMethod.Get, $"/api/projects/{{p}}/reviews/{ReviewId}/attestation.pdf"),
-            (HttpMethod.Get, "/api/projects/{p}/evidence/index.json")
+            (HttpMethod.Get, "/api/projects/{p}/evidence/index.json"),
+            (HttpMethod.Get, "/api/projects/{p}/checklist")
         ];
     }
 

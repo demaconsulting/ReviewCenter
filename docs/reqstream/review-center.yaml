@@ -149,6 +149,7 @@ sections:
           stated reason so that skipped checks are explained and not silent.
         children:
           - ReviewCenter-Web-Checklist
+          - ReviewCenter-Web-ChecklistTemplate
           - ReviewCenter-Core-Checklist
           - ReviewCenter-Core-ProjectChecklist
           - ReviewCenter-Storage-Checklist
@@ -157,6 +158,7 @@ sections:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
+          - ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault
 
       - id: ReviewCenter-System-Author
         title: >-

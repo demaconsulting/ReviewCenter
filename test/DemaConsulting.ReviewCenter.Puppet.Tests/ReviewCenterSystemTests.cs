@@ -451,6 +451,103 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that an administrator can check a checklist definition on the checklist template page (every error of an
+    ///     invalid one is listed with its path and nothing is stored), replace the checklist of the project with a valid
+    ///     one, so that only reviews created afterwards start with it while a review created before keeps the default,
+    ///     and reset the project to the built-in default, and that the audit trail records the changes.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault()
+    {
+        // Arrange: a review that exists before the checklist is replaced, and the checklist template page of the project
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        var oldReview = scenario.ReviewId;
+        await browser.GotoAsync("/projects/1/checklist", "project-checklist-page");
+        var defaultSummary = await browser.TextOfAsync("checklist-current-counts");
+        var defaultBadge = await browser.ExistsAsync("checklist-default-badge");
+
+        // Act: check an invalid definition with four problems
+        await Scenario.ValidateChecklistTextAsync(
+            browser,
+            "{\"version\":\"\",\"sections\":[{\"id\":\"a b\",\"title\":\"\",\"items\":[]}]}",
+            valid: false);
+        var errorPaths = await browser.EvalAsync(
+            "Array.from(document.querySelectorAll('[data-testid=\"checklist-error-path\"]')).map(e => e.textContent).join('|')");
+        var replaceOfferedForInvalid = await browser.ExistsAsync("checklist-replace");
+
+        // Act: check a valid definition of two sections, and replace the checklist with it
+        const string Valid = "{\"version\":\"system-test-1\",\"sections\":["
+            + "{\"id\":\"alpha\",\"title\":\"Alpha\",\"items\":[{\"id\":\"alpha-1\",\"text\":\"Is alpha one right?\"},{\"id\":\"alpha-2\",\"text\":\"Is alpha two right?\"}]},"
+            + "{\"id\":\"beta\",\"title\":\"Beta\",\"items\":[{\"id\":\"beta-1\",\"text\":\"Is beta right?\"}]}]}";
+        await Scenario.ValidateChecklistTextAsync(browser, Valid, valid: true);
+        var previewItems = await browser.CountAsync("checklist-preview-item-");
+        await browser.OkAsync("click", "checklist-replace");
+        await browser.OkAsync("wait", "checklist-replace-confirmation");
+        var confirmation = System.Text.RegularExpressions.Regex.Replace(await browser.TextOfAsync("checklist-replace-confirmation"), @"\s+", " ");
+        await browser.OkAsync("click", "checklist-replace-confirm");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("project-checklist-status"), "the confirmation of the replace");
+        var replacedSummary = await browser.TextOfAsync("checklist-current-counts");
+        var replacedBadge = await browser.ExistsAsync("checklist-default-badge");
+
+        // Act: the review of before still has the default, and a review created now has the new checklist
+        var oldAfterReplace = await Scenario.ReviewSectionIdsAsync(browser, scenario.ReviewId);
+        var newReview = await scenario.PlanNewReviewAsync();
+        var newAfterReplace = await Scenario.ReviewSectionIdsAsync(browser, newReview);
+        await Scenario.OpenSectionAsync(browser, "alpha");
+        var alphaChecks = await browser.CountAsync("check-alpha-");
+        await Scenario.OpenSectionAsync(browser, "beta");
+        var betaChecks = await browser.CountAsync("check-beta-");
+
+        // Act: reset the project to the built-in default
+        await browser.GotoAsync("/projects/1/checklist", "project-checklist-page");
+        await browser.OkAsync("click", "checklist-reset");
+        await browser.OkAsync("wait", "checklist-reset-confirmation");
+        await browser.OkAsync("click", "checklist-reset-confirm");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("checklist-default-badge"), "the default checklist to be back");
+        var resetSummary = await browser.TextOfAsync("checklist-current-counts");
+        var resetStatus = await browser.TextOfAsync("project-checklist-status");
+        var newAfterReset = await Scenario.ReviewSectionIdsAsync(browser, newReview);
+
+        // Act: read the audit trail of the server
+        await browser.GotoAsync("/audit", "audit-page");
+        var trail = await browser.TextOfAsync("audit-page");
+
+        // Assert: the project started with the built-in default
+        Assert.Equal("default-1 (14 sections, 58 checks)", defaultSummary);
+        Assert.True(defaultBadge, "The built-in default must be marked as such.");
+
+        // Assert: every error of the invalid definition is listed with its path, and it cannot be replaced in
+        Assert.Contains("version", errorPaths, StringComparison.Ordinal);
+        Assert.Contains("sections[0].id", errorPaths, StringComparison.Ordinal);
+        Assert.Contains("sections[0].title", errorPaths, StringComparison.Ordinal);
+        Assert.Contains("sections[0].items", errorPaths, StringComparison.Ordinal);
+        Assert.False(replaceOfferedForInvalid, "An invalid definition must offer no replace.");
+
+        // Assert: the valid definition was previewed, the replace said what it does to existing reviews, and took effect
+        Assert.Equal(3, previewItems);
+        Assert.Contains("Existing reviews keep the checklist", confirmation, StringComparison.Ordinal);
+        Assert.Equal("system-test-1 (2 sections, 3 checks)", replacedSummary);
+        Assert.False(replacedBadge);
+
+        // Assert: the review of before keeps the default, the new review starts with exactly the new checklist
+        Assert.Equal(14, oldAfterReplace.Length);
+        Assert.Equal(["alpha", "beta"], newAfterReplace);
+        Assert.Equal(2, alphaChecks);
+        Assert.Equal(1, betaChecks);
+        Assert.NotEqual(oldReview, newReview);
+
+        // Assert: the reset returns the project to the default for new reviews and leaves the existing reviews alone
+        Assert.Equal("default-1 (14 sections, 58 checks)", resetSummary);
+        Assert.Contains("built-in default", resetStatus, StringComparison.Ordinal);
+        Assert.Equal(["alpha", "beta"], newAfterReset);
+
+        // Assert: the audit trail shows both changes
+        Assert.Contains("project.checklist-changed", trail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Reads a JSON document from the API.
     /// </summary>
     /// <param name="http">The client, with its credentials.</param>
@@ -649,6 +746,11 @@ public class ReviewCenterSystemTests
         public string ReviewId { get; private set; } = string.Empty;
 
         /// <summary>
+        ///     Gets the location of the git repository of the project.
+        /// </summary>
+        public string Repository { get; private init; } = string.Empty;
+
+        /// <summary>
         ///     Creates the scenario; the test is skipped when git or the browser is not available.
         /// </summary>
         /// <param name="cancellationToken">Cancels the set-up.</param>
@@ -679,7 +781,7 @@ public class ReviewCenterSystemTests
                 gitCachePath: Path.Combine(directory.FullName, "git-cache"),
                 extraUsers: [("second", "Second Reviewer"), ("third", "Third Reviewer"), ("outsider", "Outside Person")]);
             var browser = new Browser(Path.Combine(directory.FullName, "control-main.json"), cancellationToken);
-            var scenario = new Scenario(server, directory, browser, cancellationToken);
+            var scenario = new Scenario(server, directory, browser, cancellationToken) { Repository = repository };
             try
             {
                 var start = await PuppetEndToEndTests.StartPuppetAsync(args => browser.RunAsync(args), server.Url);
@@ -802,6 +904,53 @@ public class ReviewCenterSystemTests
             await Browser.WaitUntilAsync(async () => (await Browser.TextOfAsync("new-slot-error")).Length > 0, "the refusal of the slot");
             Assert.Equal(before, await Browser.CountAsync("slot-status-"));
             return await Browser.TextOfAsync("new-slot-error");
+        }
+
+        /// <summary>
+        ///     Puts a text into the import box of the checklist template page and validates it.
+        /// </summary>
+        /// <param name="browser">The browser, showing the checklist template page.</param>
+        /// <param name="json">The definition text.</param>
+        /// <param name="valid">Whether the text is a valid definition, so which result to wait for.</param>
+        /// <returns>A task that completes when the page shows the result of the validation.</returns>
+        public static async Task ValidateChecklistTextAsync(Browser browser, string json, bool valid)
+        {
+            await browser.OkAsync("fill", "checklist-import-text", json);
+            await browser.OkAsync("click", "checklist-validate");
+            await browser.OkAsync("wait", valid ? "checklist-valid" : "checklist-validation-errors", "--timeout", "30000");
+        }
+
+        /// <summary>
+        ///     Opens the checklist page of a review and reads which sections it has.
+        /// </summary>
+        /// <param name="browser">The browser to use.</param>
+        /// <param name="reviewId">The identifier of the review.</param>
+        /// <returns>The lower-case identifiers of the sections, in the order of the page.</returns>
+        public static async Task<string[]> ReviewSectionIdsAsync(Browser browser, string reviewId)
+        {
+            await browser.GotoAsync($"/projects/1/reviews/{reviewId}/checklist", "checklist-page");
+            var ids = await browser.EvalAsync(
+                "Array.from(document.querySelectorAll('li[data-testid^=\"section-\"]')).map(e => e.getAttribute('data-testid').replace('section-', '')).join('|')");
+            return ids.Length == 0 ? [] : ids.Split('|');
+        }
+
+        /// <summary>
+        ///     Changes the documentation in the repository and plans a review of it, so that the project has one more review.
+        /// </summary>
+        /// <returns>The identifier of the new review.</returns>
+        public async Task<string> PlanNewReviewAsync()
+        {
+            await File.AppendAllTextAsync(Path.Combine(Repository, "docs", "guide.md"), "Third line.\n", _cancellationToken);
+            await PuppetEndToEndTests.RunGitAsync(Repository, _cancellationToken, "commit", "-a", "-m", "second");
+            await Browser.GotoAsync("/projects/1/plan", "plan-page");
+            await Browser.OkAsync("select", "plan-repository-select", "1");
+            await Browser.OkAsync("fill", "plan-head-input", "main");
+            await Browser.OkAsync("click", "plan-load-button");
+            await Browser.OkAsync("wait", $"plan-row-{SetId}", "--timeout", "30000");
+            await Browser.OkAsync("click", "plan-create-button");
+            await Browser.OkAsync("wait", $"plan-result-link-{SetId}", "--timeout", "30000");
+            var link = await Browser.EvalAsync($"document.querySelector('[data-testid=\"plan-result-link-{SetId}\"]').getAttribute('href')");
+            return link[(link.LastIndexOf('/') + 1)..];
         }
 
         /// <summary>
