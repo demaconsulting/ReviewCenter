@@ -267,6 +267,35 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that a section without an applicability hint (which the validator accepts) is returned with an empty
+    ///     string, not null, as the documented contract and the schema (a required string) say.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint()
+    {
+        // Arrange: a project whose own checklist has a section without the hint member
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        var adminToken = await CreateTokenAsync(app);
+        using var admin = ClientFor(app, adminToken.Value, basic: true);
+        var templates = app.Services.GetRequiredService<ProjectChecklistService>();
+        const string PlainSection = "{\"version\":\"plain-1\",\"sections\":[{\"id\":\"s1\",\"title\":\"First\","
+            + "\"items\":[{\"id\":\"s1-1\",\"text\":\"Is it right?\"}]}]}";
+        var current = await templates.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken);
+        Assert.True(await templates.SetAsync(TestActors.Ann, projectId, current.Hash, PlainSection, TestContext.Current.CancellationToken));
+
+        // Act
+        var response = await admin.GetAsync($"/api/projects/{projectId}/checklist", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: the field is present and is an empty string
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var hint = json.RootElement.GetProperty("definition").GetProperty("sections")[0].GetProperty("applicabilityHint");
+        Assert.Equal(System.Text.Json.JsonValueKind.String, hint.ValueKind);
+        Assert.Equal(string.Empty, hint.GetString());
+    }
+
+    /// <summary>
     ///     Test that a user who is no member of the project, and an unknown project, both get the 404 problem, and
     ///     that a stored definition that cannot be read is a 400 problem with the message of the rule.
     /// </summary>

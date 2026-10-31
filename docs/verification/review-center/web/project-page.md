@@ -569,8 +569,10 @@ current label shows the label warning and the changed check. This scenario is te
 shown as the source, and validating shows its preview. This scenario is tested by
 `ProjectChecklistPage_Import_File_IsReadValidatedAndPreviewed`.
 
-**ProjectChecklistPage_Import_FileTooLarge_IsRefused**: A file of one byte more than 256 KiB is refused with a message
-and is not kept. This scenario is tested by `ProjectChecklistPage_Import_FileTooLarge_IsRefused`.
+**ProjectChecklistPage_Import_FileTooLarge_IsRefused**: A definition is pasted and validated, then a file of one byte more
+than 256 KiB is chosen; it is refused with a message and is not kept, and the earlier import (its source, preview, and
+the replace) is dropped, so the page does not offer to replace the checklist with the old definition. This scenario is
+tested by `ProjectChecklistPage_Import_FileTooLarge_IsRefused`.
 
 **ProjectChecklistPage_Replace_Cancelled_ChangesNothing**: The confirmation states that existing reviews keep their
 checklist and only later reviews use the new one; cancelling stores nothing and records nothing. This scenario is

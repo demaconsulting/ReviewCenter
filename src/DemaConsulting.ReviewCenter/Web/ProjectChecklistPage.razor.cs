@@ -292,6 +292,14 @@ public partial class ProjectChecklistPage : ComponentBase
             return;
         }
 
+        // A file above the limit is refused before it is opened; an earlier import is dropped so the page matches the message
+        if (e.File.Size > ReviewLimits.MaxChecklistBytes)
+        {
+            ClearImport();
+            ErrorMessage = $"The file is larger than the limit of {ReviewLimits.MaxChecklistBytes / 1024} KiB.";
+            return;
+        }
+
         try
         {
             // The explicit limit is the domain maximum (256 KiB); the analyzer cannot see through the constant
@@ -307,8 +315,9 @@ public partial class ProjectChecklistPage : ComponentBase
         }
         catch (IOException)
         {
-            // The framework refuses a file above the limit with an IOException
-            ErrorMessage = $"The file is larger than the limit of {ReviewLimits.MaxChecklistBytes / 1024} KiB.";
+            // The framework also refuses a file that grows above the limit while it is read, and a file that cannot be read
+            ClearImport();
+            ErrorMessage = $"The file could not be read, or it is larger than the limit of {ReviewLimits.MaxChecklistBytes / 1024} KiB.";
         }
     }
 

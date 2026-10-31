@@ -144,7 +144,8 @@ sections:
           built-in default, the SHA-256 hash of the definition text, and the number of sections and checks, and shall
           answer 404 with the problem document of a missing project for a project that does not exist or that the
           owner may not see, answer 400 with a problem document for a stored definition that cannot be read, answer
-          401 to a request without a valid token, and offer no route that changes the template.
+          401 to a request without a valid token, return a section that has no applicability hint with an empty string
+          for the hint, and offer no route that changes the template.
         justification: |
           A pipeline that files reviews can need to know which checklist new reviews of the project start with, for
           example to check it against an approved version or to show it to the reviewers. Reading is the same right
@@ -152,6 +153,7 @@ sections:
           made on the web pages.
         tests:
           - ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition
+          - ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint
           - ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems
           - ApiEndpoints_Request_NoToken_Answers401
           - ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage

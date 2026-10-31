@@ -184,6 +184,10 @@ the sections with their titles, hints, and checks); after the template is replac
 label, `isDefault` false, another 64-character hash, and the counts and checks of the custom definition. This scenario is
 tested by `ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition`.
 
+**ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint**: A project's own checklist has a section without the
+hint member (which the validator accepts); the answer has the field `applicabilityHint` as an empty string, not null.
+This scenario is tested by `ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint`.
+
 **ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems**: A user who is no member
 and a project that does not exist both get a 404 problem document; a stored definition that cannot be read is a 400
 problem whose detail names the checklist definition. This scenario is tested by

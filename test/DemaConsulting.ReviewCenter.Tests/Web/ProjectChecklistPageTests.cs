@@ -483,23 +483,28 @@ public class ProjectChecklistPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a file above the size limit is refused with a message and is not kept for validation.
+    ///     Test that a file above the size limit is refused with a message, is not kept for validation, and drops an
+    ///     earlier import, so the page does not offer to replace the checklist with the old definition.
     /// </summary>
     [Fact]
     public async Task ProjectChecklistPage_Import_FileTooLarge_IsRefused()
     {
-        // Arrange
+        // Arrange: a valid definition is pasted and validated, so that the replace is offered
         var apollo = await ArrangeAsync();
         SignInAs("padm", "Padm", isSystemAdmin: false);
         var cut = RenderPage(apollo);
+        await PasteAndValidateAsync(cut, Definition("earlier"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='checklist-replace']"));
 
         // Act
         var bytes = new byte[ReviewLimits.MaxChecklistBytes + 1];
         cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(bytes, "big.json"));
 
-        // Assert
+        // Assert: the message, and nothing of the earlier import
         await cut.WaitForAssertionAsync(() => Assert.Contains("256 KiB", cut.Find("[data-testid='project-checklist-error']").TextContent, StringComparison.Ordinal));
         Assert.Empty(cut.FindAll("[data-testid='checklist-import-source']"));
+        Assert.Empty(cut.FindAll("[data-testid='checklist-replace']"));
+        Assert.Empty(cut.FindAll("[data-testid='checklist-preview-version']"));
     }
 
     /// <summary>

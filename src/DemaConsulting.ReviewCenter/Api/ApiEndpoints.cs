@@ -337,7 +337,7 @@ internal static class ApiEndpoints
                     .Select(s => new ChecklistSectionDto(
                         s.Id,
                         s.Title,
-                        s.ApplicabilityHint,
+                        s.ApplicabilityHint ?? string.Empty,
                         s.Items.Select(i => new ChecklistItemDto(i.Id, i.Text)).ToList()))
                     .ToList())));
     }
