@@ -87,7 +87,7 @@ public class AuditorRoleTests
         await SignDirectlyAsync(world, slot.Id, world.Ids["usr"]);
         var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.Own, "rev-1");
         await world.Threads.StartThreadAsync(
-            world.Own, "rev-1", new ThreadAnchor("a.txt"), root, "late remark", cancellationToken, acknowledged);
+            world.Own, "rev-1", new ThreadAnchor("a.txt"), root, "late remark", cancellationToken, acknowledged, true);
         var approval = await world.Signing.GetApprovalAsync(world.Own, "rev-1", cancellationToken);
 
         // Act
@@ -392,7 +392,7 @@ public class AuditorRoleTests
 
         var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), access, clock);
         var reviews = new ReviewService(store, access, clock, repositories, new FakeGitRepositoryProvider());
-        var threads = new ThreadService(store, access, clock);
+        var threads = new ThreadService(store, access, userStore, clock);
         var signing = new SigningService(store, users, access, clock);
         await reviews.CreateDraftAsync(
             own.Id, "rev-1", "First", [new UploadedFile("a.txt", [1, 2, 3])], root, cancellationToken);

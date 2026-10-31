@@ -44,7 +44,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     of answers, section states and threads). The same is true for the <c>ReviewUserStates</c> table and for the
 ///     indexes of the reviewer slots and of the creator of reviews (and for the case-insensitive collation of the
 ///     creator column) and of the audit trail (the project, actor and action indexes and the fixed-width UTC text
-///     form of the entry timestamp) and for the <c>LastSignInUtc</c> column of users: a database from before them
+///     form of the entry timestamp) and for the <c>LastSignInUtc</c> column of users, and for the <c>IncludeInReport</c>
+///     and <c>Kind</c> columns of comments: a database from before them
 ///     must be deleted and recreated. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
@@ -318,6 +319,9 @@ internal sealed class ReviewCenterDbContext : DbContext
 
             // A carried thread names the review and the thread it was copied from (plain values, no foreign keys)
             thread.Property(t => t.CarriedFromReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+
+            // The kind is derived from the flag of the starting comment, never stored
+            thread.Ignore(t => t.Kind);
             thread.HasOne<ReviewFile>()
                 .WithMany()
                 .HasForeignKey(t => new { t.ProjectId, t.ReviewId, t.FilePath })
@@ -419,6 +423,13 @@ internal sealed class ReviewCenterDbContext : DbContext
             comment.Property(c => c.Author).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
             comment.Property(c => c.AuthorUsername).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength);
             comment.Property(c => c.Text).IsRequired().HasMaxLength(ReviewLimits.MaxCommentLength);
+
+            // The report flag and the kind (stored by name) default to a plain chat comment
+            comment.Property(c => c.IncludeInReport).HasDefaultValue(false);
+            comment.Property(c => c.Kind)
+                .HasConversion<string>()
+                .HasMaxLength(StateColumnLength)
+                .HasDefaultValue(ReviewCommentKind.Comment);
         });
 
         // Checklists: one frozen snapshot per review, and the answers and section applicability keyed by the

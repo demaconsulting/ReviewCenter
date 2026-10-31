@@ -49,8 +49,9 @@ The service holds the injected collaborators and no other state, so it is safe f
 **Open work**: The store lists the slots of the user (`IReviewStore.ListSlotsOfUserAsync`), as primary or as alternate.
 For each project that has such slots, one batch read of the snapshots of those reviews
 (`IReviewStore.ListSnapshotsAsync`) gives the record, the slots, and the signatures, so the number of reads does not
-grow with the number of reviews. A slot is open work unless its review is approved (`ReviewLock.IsApproved`, so a
-locked review is never listed and an unlocked one is) or the slot has a current signature. The state of the slot is
+grow with the number of reviews. A slot is open work unless its review is concluded (`ReviewLock.IsConcluded`, so a
+locked review is never listed and an unlocked one is, also a fully signed one that has an open thread) or the slot has
+a current signature. The state of the slot is
 decided by `InboxRules.SlotState`, the same rule that the inbox uses for "to sign" and "sign again", against the digest
 of the record as it is now (`RecordDigest.Compute`). There is no second rule for "signed" or "out of date". The result
 is ordered by project name, project identity, review identifier, and slot number.

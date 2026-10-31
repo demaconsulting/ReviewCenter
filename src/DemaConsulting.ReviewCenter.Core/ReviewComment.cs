@@ -24,10 +24,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     One comment of a review thread: who wrote it, what, and when.
 /// </summary>
 /// <remarks>
-///     Comments are immutable records: once stored they are never edited or deleted, because a
-///     review record must show exactly what was said. Instances are created by
-///     <see cref="ThreadService"/>, which enforces the rules, and are populated by the storage
-///     layer. The type is not thread-safe.
+///     Comments are immutable records in what they say: once stored the text, author and time are never edited or
+///     deleted, because a review record must show exactly what was said. Only whether a comment is part of the signed
+///     report (<see cref="IncludeInReport"/>) can change, and only through <see cref="ThreadService"/>. Instances are
+///     created by <see cref="ThreadService"/>, which enforces the rules, and are populated by the storage layer. The
+///     type is not thread-safe.
 /// </remarks>
 public sealed class ReviewComment
 {
@@ -62,4 +63,21 @@ public sealed class ReviewComment
     ///     Gets the moment the comment was posted (UTC).
     /// </summary>
     public DateTimeOffset Created { get; init; }
+
+    /// <summary>
+    ///     Gets whether the comment is part of the signed report of the review. <c>false</c> (chat) by default: only
+    ///     included comments are covered by the record digest, so chat never makes a signature out of date.
+    /// </summary>
+    /// <remarks>
+    ///     For the starting comment of a thread this flag is the kind of the thread (see
+    ///     <see cref="ReviewThread.Kind"/>). A resolution note (<see cref="Kind"/>) always mirrors its thread: the store
+    ///     sets it when the note is written and again when the thread is promoted or demoted.
+    /// </remarks>
+    public bool IncludeInReport { get; init; }
+
+    /// <summary>
+    ///     Gets what the comment is for; <see cref="ReviewCommentKind.Comment"/> unless it is the note written when
+    ///     the thread was resolved.
+    /// </summary>
+    public ReviewCommentKind Kind { get; init; } = ReviewCommentKind.Comment;
 }

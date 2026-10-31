@@ -42,13 +42,15 @@ public class RecordDigestTests
     /// <param name="author">The display name of the author.</param>
     /// <param name="username">The user name of the author; the lowercase display name when omitted.</param>
     /// <param name="created">The time of the comment; the baseline instant when omitted.</param>
+    /// <param name="included">Whether the comment is part of the report; the tests below cover the report, so yes.</param>
     /// <returns>The comment.</returns>
     private static ReviewComment Comment(
         int id,
         string text = "Please fix",
         string author = "Ann",
         string? username = null,
-        DateTimeOffset? created = null)
+        DateTimeOffset? created = null,
+        bool included = true)
     {
         return new ReviewComment
         {
@@ -57,7 +59,8 @@ public class RecordDigestTests
             Author = author,
             AuthorUsername = username ?? author.ToLowerInvariant(),
             Text = text,
-            Created = created ?? _time
+            Created = created ?? _time,
+            IncludeInReport = included
         };
     }
 
@@ -233,10 +236,10 @@ public class RecordDigestTests
         // Act: build the canonical text
         var text = RecordDigest.Canonicalize(record);
 
-        // Assert: version line, fingerprint, answers, sections that do not apply, threads
+        // Assert: version line, fingerprint, answers, sections that do not apply, then the report with its one thread
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v1",
+            "ReviewCenter record v2",
             "fingerprint 3:abc",
             "source upload",
             "checklist -",
@@ -244,9 +247,9 @@ public class RecordDigestTests
             "answer 6:REQ-01 4:Fail 3:bad 3:Ann 3:ann",
             "sections",
             "not-applicable 3:DES 4:none",
-            "threads",
-            $"thread 5:a.txt 4:Head 1 2 4:Open {ticks}",
-            $"comment 3:Ann 3:ann 10:Please fix {ticks}");
+            "report",
+            "thread file 5:a.txt 4:Head 1 2",
+            $"claim 3:Ann 3:ann 10:Please fix {ticks}");
         Assert.Equal(expected, text);
     }
 
@@ -283,9 +286,9 @@ public class RecordDigestTests
         var digest = RecordDigest.Compute(record);
 
         // Assert: the SHA-256 of
-        // "ReviewCenter record v1\nfingerprint 3:abc\nsource upload\nchecklist -\nanswers\nsections\nthreads",
+        // "ReviewCenter record v2\nfingerprint 3:abc\nsource upload\nchecklist -\nanswers\nsections\nreport",
         // worked out with an independent tool (a separate script that builds the text from the documented layout)
-        Assert.Equal("9fee8bc5c8ddc1c908ed605ccb301bfa1be3e0499cc824d787275c7a783543f0", digest);
+        Assert.Equal("eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3", digest);
     }
 
     /// <summary>
@@ -368,7 +371,7 @@ public class RecordDigestTests
         // Assert: version, sections and checks sorted by id, then the answer with who answered
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v1",
+            "ReviewCenter record v2",
             "fingerprint 3:abc",
             "source upload",
             "checklist 9:default-1",
@@ -380,9 +383,9 @@ public class RecordDigestTests
             "answers",
             "answer 6:REQ-01 4:Pass - 3:Ann 3:ann",
             "sections",
-            "threads");
+            "report");
         Assert.Equal(expected, text);
-        Assert.Equal("5f6e64aa7091e4156ec43493c56d9f0cc2407a24a92efec3012ae02e1f954e43", digest);
+        Assert.Equal("2a6b6bc4de3a50d758ee5d5a9438c10c2f398576946ce3a828d5713ef70d91ef", digest);
     }
 
     /// <summary>
@@ -558,8 +561,8 @@ public class RecordDigestTests
     ///     digests for both sides worked out with an independent tool.
     /// </summary>
     [Theory]
-    [InlineData(ThreadSide.Head, "4:Head", "fe1a3eea5aab9f90922ebdea3caa92b637333d4f082eb7a80b44eb1335acc896")]
-    [InlineData(ThreadSide.Baseline, "8:Baseline", "68acc67bebb0c5decad4669037cc3f7618844cf0e59919cb911aef79e525cf0d")]
+    [InlineData(ThreadSide.Head, "4:Head", "00aacca477c6cb3b6e37c39f8252caa0852a4d28a9f2364c3865f632cc08651f")]
+    [InlineData(ThreadSide.Baseline, "8:Baseline", "2890acd760711bfee36a2319e0cb9c881fb0c21cf2d9b2ecb1c9b23e743b45aa")]
     public void RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue(ThreadSide side, string written, string expectedDigest)
     {
         // Arrange: an upload record with one thread on the given side
@@ -573,15 +576,15 @@ public class RecordDigestTests
         // Assert: the thread line carries the side after the path, and the digest is the known answer
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v1",
+            "ReviewCenter record v2",
             "fingerprint 3:abc",
             "source upload",
             "checklist -",
             "answers",
             "sections",
-            "threads",
-            $"thread 5:a.txt {written} 1 2 4:Open {ticks}",
-            $"comment 3:Ann 3:ann 10:Please fix {ticks}");
+            "report",
+            $"thread file 5:a.txt {written} 1 2",
+            $"claim 3:Ann 3:ann 10:Please fix {ticks}");
         Assert.Equal(expected, text);
         Assert.Equal(expectedDigest, digest);
     }
@@ -624,9 +627,9 @@ public class RecordDigestTests
         var empty = RecordDigest.Compute(Make(string.Empty));
 
         // Assert: known answers worked out with an independent tool, all different, and the line shape
-        Assert.Equal("b0eae44ae9062359375b7a361857794617e5c28b5a6a2b7ac732ec36549857d8", none);
-        Assert.Equal("27b7ef9d9b7303fc1c55808f00331469c99e8518e66af16a3317d1811e678059", core);
-        Assert.Equal("d44de252d6f0c7d7d878db59fedc2f21d20592d8669050216b5d77487cbf0760", empty);
+        Assert.Equal("bb2723058729bb669e8c8858e0b4f913fd786e59d68d9d785093994b08012842", none);
+        Assert.Equal("a595db28364f05ba194b28dfee6d5ab6668160f4fd1639dd98ddc043a8991c74", core);
+        Assert.Equal("8759a10e14651b6bb8e6b434f01dd6ac9d4de4cb0d8876dfd6eb8bfca8f6959a", empty);
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* 4:core\n", RecordDigest.Canonicalize(Make("core")));
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* -\n", RecordDigest.Canonicalize(Make(null)));
     }
@@ -662,7 +665,7 @@ public class RecordDigestTests
         // Assert: the source block comes after the fingerprint, with the changes sorted by path
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v1",
+            "ReviewCenter record v2",
             "fingerprint 3:abc",
             $"source git 7 40:{sha1} 40:{sha2} 4:**/* -",
             "changes",
@@ -671,9 +674,9 @@ public class RecordDigestTests
             "checklist -",
             "answers",
             "sections",
-            "threads");
+            "report");
         Assert.Equal(expected, text);
-        Assert.Equal("b0eae44ae9062359375b7a361857794617e5c28b5a6a2b7ac732ec36549857d8", RecordDigest.Compute(record));
+        Assert.Equal("bb2723058729bb669e8c8858e0b4f913fd786e59d68d9d785093994b08012842", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -774,14 +777,12 @@ public class RecordDigestTests
     [InlineData("section-not-applicable")]
     [InlineData("section-reason")]
     [InlineData("thread-added")]
-    [InlineData("thread-state")]
     [InlineData("thread-anchor")]
     [InlineData("thread-start-line")]
     [InlineData("thread-end-line")]
     [InlineData("thread-whole-file")]
     [InlineData("thread-start-removed")]
     [InlineData("thread-end-removed")]
-    [InlineData("thread-created")]
     [InlineData("thread-path")]
     [InlineData("comment-text")]
     [InlineData("comment-author")]
@@ -818,14 +819,12 @@ public class RecordDigestTests
             "section-not-applicable" => Record(sections: [.. baseSections, Section("DOC", false, "none")]),
             "section-reason" => Record(sections: [Section("DES", false, "different")]),
             "thread-added" => Record(sections: baseSections, threads: [Thread(1), resolved, Thread(3)]),
-            "thread-state" => Record(sections: baseSections, threads: [Thread(1, state: ReviewThreadState.Resolved), resolved]),
             "thread-anchor" => Record(sections: baseSections, threads: [WithLines(Thread(1), 3, 4), resolved]),
             "thread-start-line" => Record(sections: baseSections, threads: [WithLines(Thread(1), 3, 2), resolved]),
             "thread-end-line" => Record(sections: baseSections, threads: [WithLines(Thread(1), 1, 3), resolved]),
             "thread-whole-file" => Record(sections: baseSections, threads: [WithLines(Thread(1), null, null), resolved]),
             "thread-start-removed" => Record(sections: baseSections, threads: [WithLines(Thread(1), null, 2), resolved]),
             "thread-end-removed" => Record(sections: baseSections, threads: [WithLines(Thread(1), 1, null), resolved]),
-            "thread-created" => Record(sections: baseSections, threads: [WithCreated(Thread(1), _time.AddMinutes(1)), resolved]),
             "thread-path" => Record(sections: baseSections, threads: [Thread(1, "c.txt"), resolved]),
             "comment-text" => Record(sections: baseSections, threads: [Thread(1, comments: Comment(10, "Changed")), resolved]),
             "comment-author" => Record(sections: baseSections, threads: [Thread(1, comments: Comment(10, author: "Bob")), resolved]),
@@ -992,11 +991,11 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Test that a record that was never reopened has the digest it had before reopening existed: no
-    ///     <c>reopens</c> line is written, so the known digest holds and old signatures stay valid.
+    ///     Test that a record that was never reopened has no <c>reopens</c> line, so an explicit zero count and the
+    ///     default give the same digest, equal to the known digests of the other records.
     /// </summary>
     [Fact]
-    public void RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest()
+    public void RecordDigest_Compute_ZeroReopens_EqualsDigestWithoutReopensLine()
     {
         // Arrange: the known record, once with the default and once with an explicit zero count, and the other
         // known records (a repository review, a checklist review, a review with a thread) with an explicit zero count
@@ -1019,12 +1018,12 @@ public class RecordDigestTests
         var canonical = RecordDigest.Canonicalize(zero);
 
         // Assert: the same known digests as before, and no reopens line
-        Assert.Equal("9fee8bc5c8ddc1c908ed605ccb301bfa1be3e0499cc824d787275c7a783543f0", RecordDigest.Compute(zero));
+        Assert.Equal("eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3", RecordDigest.Compute(zero));
         Assert.Equal(RecordDigest.Compute(legacy), RecordDigest.Compute(zero));
         Assert.DoesNotContain("reopens", canonical);
-        Assert.Equal("b0eae44ae9062359375b7a361857794617e5c28b5a6a2b7ac732ec36549857d8", RecordDigest.Compute(git));
-        Assert.Equal("5f6e64aa7091e4156ec43493c56d9f0cc2407a24a92efec3012ae02e1f954e43", RecordDigest.Compute(checklist));
-        Assert.Equal("fe1a3eea5aab9f90922ebdea3caa92b637333d4f082eb7a80b44eb1335acc896", RecordDigest.Compute(sided));
+        Assert.Equal("bb2723058729bb669e8c8858e0b4f913fd786e59d68d9d785093994b08012842", RecordDigest.Compute(git));
+        Assert.Equal("2a6b6bc4de3a50d758ee5d5a9438c10c2f398576946ce3a828d5713ef70d91ef", RecordDigest.Compute(checklist));
+        Assert.Equal("00aacca477c6cb3b6e37c39f8252caa0852a4d28a9f2364c3865f632cc08651f", RecordDigest.Compute(sided));
     }
 
     /// <summary>
@@ -1072,7 +1071,6 @@ public class RecordDigestTests
     {
         // Arrange: the record with the less common values
         var record = CoveredFieldsRecord();
-        var threadTicks = _time.UtcTicks;
         var commentTicks = _time.AddHours(1).UtcTicks;
 
         // Act: build the canonical text and the digests
@@ -1083,7 +1081,7 @@ public class RecordDigestTests
         // Assert: the documented text and the known answers
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v1",
+            "ReviewCenter record v2",
             "fingerprint 3:abc",
             $"source git 7 40:{new string('a', 40)} 40:{new string('b', 40)} 4:**/* -",
             "changes",
@@ -1092,12 +1090,12 @@ public class RecordDigestTests
             "answers",
             "answer 6:REQ-01 13:NotApplicable 0: 3:Bob 3:bob",
             "sections",
-            "threads",
-            $"thread 5:a.txt 4:Head - - 8:Resolved {threadTicks}",
-            $"comment 3:Bob 3:bob 4:Done {commentTicks}");
+            "report",
+            "thread file 5:a.txt 4:Head - -",
+            $"claim 3:Bob 3:bob 4:Done {commentTicks}");
         Assert.Equal(expected, text);
-        Assert.Equal("cd2da19bd94a03706d356d3dbeb34261c8dc769fe4124eb2bd98c7b9c955f03e", digest);
-        Assert.Equal("b934cbd343bcd2766bd778b1549b2c282f25d23f303d54530b4c3337db07f10e", reopenedDigest);
+        Assert.Equal("c8bb5168eb86e1540291fe341d89c94ca71c711e0031112226508caf3358503e", digest);
+        Assert.Equal("1bd2f9a28c73eda31b0c1f71b1a3f07df4d09a1e1b5c2d58f3525070d170f4b8", reopenedDigest);
     }
 
     /// <summary>
@@ -1142,17 +1140,6 @@ public class RecordDigestTests
     private static ReviewThread WithLines(ReviewThread thread, int? start, int? end)
     {
         return WithAnchor(thread, start, end, thread.Created);
-    }
-
-    /// <summary>
-    ///     Copies a thread with another creation time.
-    /// </summary>
-    /// <param name="thread">The thread.</param>
-    /// <param name="created">The creation time.</param>
-    /// <returns>The copy.</returns>
-    private static ReviewThread WithCreated(ReviewThread thread, DateTimeOffset created)
-    {
-        return WithAnchor(thread, thread.StartLine, thread.EndLine, created);
     }
 
     /// <summary>

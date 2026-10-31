@@ -21,16 +21,20 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
-///     The one definition of when a review is approved, and therefore locked, and the guard the services call
+///     The one definition of when a review is concluded, and therefore locked, and the guard the services call
 ///     before they change reviewed content.
 /// </summary>
 /// <remarks>
-///     A review is approved when it has at least one reviewer slot and every slot holds a signature of the current
-///     record digest. An approved review is locked: nothing a signature covers (threads, comments, checklist answers
-///     and applicability) and nothing that decides who signs (the reviewer slots) may change until an administrator
-///     reopens it. Locked is not stored; it is computed from the same snapshot as the approval status, so the two can
-///     never disagree. The storage layer applies <see cref="IsApproved"/> again inside its write transactions, which
-///     closes the gap between this check and a concurrent final signature. The class is stateless and thread-safe.
+///     A review is concluded when it has at least one reviewer slot, every slot holds a signature of the current
+///     record digest, and no thread is open. The open-thread rule is deliberately separate from the digest: whether a
+///     thread is open or resolved is not part of the digest (so resolving chat never makes a signature out of date),
+///     but an open thread, chat or included, blocks signing and conclusion until somebody resolves it. A concluded
+///     review is locked: nothing a signature covers (the report, checklist answers and applicability), nothing the
+///     discussion consists of (threads and comments) and nothing that decides who signs (the reviewer slots) may
+///     change until an administrator reopens it. Locked is not stored; it is computed from the same snapshot as the
+///     approval status, so the two can never disagree. The storage layer applies <see cref="IsConcluded"/> again
+///     inside its write transactions, which closes the gap between this check and a concurrent final signature. The
+///     class is stateless and thread-safe.
 /// </remarks>
 public static class ReviewLock
 {
@@ -38,25 +42,35 @@ public static class ReviewLock
     ///     The message of the refusal; it names the way forward so a user is never left guessing.
     /// </summary>
     public const string LockedMessage =
-        "This review is approved and locked. A project administrator must reopen it before it can change.";
+        "This review is concluded and locked. A project administrator must reopen it before it can change.";
 
     /// <summary>
-    ///     Tells whether every reviewer slot holds a signature of the current record.
+    ///     Tells whether the review is concluded: every reviewer slot holds a signature of the current record and
+    ///     no thread is open.
     /// </summary>
     /// <param name="record">The record as it is now. Must not be null.</param>
     /// <param name="slots">The reviewer slots of the review. Must not be null.</param>
     /// <param name="signatures">The signatures of the review, current and out of date. Must not be null.</param>
-    /// <returns><c>true</c> when there is at least one slot and each slot has a signature of the current digest.</returns>
+    /// <returns>
+    ///     <c>true</c> when there is at least one slot, each slot has a signature of the current digest, and every
+    ///     thread of the record is resolved.
+    /// </returns>
     /// <remarks>
     ///     Pure and stateless, so the Storage subsystem can call it from inside a transaction with data it loaded
-    ///     itself.
+    ///     itself. The thread state is read from the record, not from the digest, which does not cover it.
     /// </remarks>
-    public static bool IsApproved(
+    public static bool IsConcluded(
         ReviewRecord record,
         IReadOnlyList<ReviewerSlot> slots,
         IReadOnlyList<ReviewSignature> signatures)
     {
         if (slots.Count == 0)
+        {
+            return false;
+        }
+
+        // An open thread keeps the review open, however many signatures are current
+        if (record.Threads.Any(t => t.State != ReviewThreadState.Resolved))
         {
             return false;
         }
@@ -67,7 +81,7 @@ public static class ReviewLock
     }
 
     /// <summary>
-    ///     Refuses the change when the review is approved.
+    ///     Refuses the change when the review is concluded.
     /// </summary>
     /// <param name="store">The store to read the snapshot from. Must not be null.</param>
     /// <param name="projectId">The project identity.</param>
@@ -80,7 +94,7 @@ public static class ReviewLock
     /// <remarks>
     ///     A review that does not exist is not locked: the caller's own not-found rule then applies, unchanged.
     /// </remarks>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is approved.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded.</exception>
     internal static async Task<ReviewSnapshot?> EnsureUnlockedAsync(
         IReviewStore store,
         int projectId,
@@ -88,7 +102,7 @@ public static class ReviewLock
         CancellationToken cancellationToken)
     {
         var snapshot = await store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
-        if (snapshot is not null && IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        if (snapshot is not null && IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
         {
             throw new DomainRuleException(DomainRule.ReviewLocked, LockedMessage);
         }

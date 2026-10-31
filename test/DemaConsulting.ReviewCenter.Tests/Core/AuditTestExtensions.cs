@@ -442,17 +442,49 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
-    ///     Sets a thread state in a store with a generic audit draft.
+    ///     Reopens a thread in a store with a generic audit draft.
     /// </summary>
-    public static Task<bool> SetThreadStateAsync(
+    public static Task<bool> ReopenThreadAsync(
         this IReviewStore store,
         int projectId,
         string reviewId,
         int threadId,
-        ReviewThreadState state,
         CancellationToken cancellationToken = default)
     {
-        return store.SetThreadStateAsync(projectId, reviewId, threadId, state, Draft(), cancellationToken);
+        return store.ReopenThreadAsync(projectId, reviewId, threadId, Draft(), cancellationToken);
+    }
+
+    /// <summary>
+    ///     Resolves a thread in a store through <see cref="IReviewStore.ResolveThreadAsync"/> with a generic audit
+    ///     draft, the way the service does, so the resolution-note rule applies: a Finding is resolved with a note
+    ///     (which adds a resolution comment to the thread), a Question without one.
+    /// </summary>
+    /// <param name="store">The store.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="threadId">The thread identity.</param>
+    /// <param name="kind">The kind of the thread, which the store checks again.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the thread was open and is now resolved.</returns>
+    public static Task<bool> ResolveThreadAsync(
+        this IReviewStore store,
+        int projectId,
+        string reviewId,
+        int threadId,
+        ThreadKind kind,
+        CancellationToken cancellationToken = default)
+    {
+        // A Finding can only be resolved with a note that says what was done
+        var note = kind == ThreadKind.Finding
+            ? new ReviewComment
+            {
+                Author = DefaultActor.DisplayName,
+                AuthorUsername = DefaultActor.Username,
+                Text = "Resolved by the test",
+                Created = DateTimeOffset.UnixEpoch
+            }
+            : null;
+        return store.ResolveThreadAsync(projectId, reviewId, threadId, kind, note, Draft(), cancellationToken);
     }
 
     /// <summary>

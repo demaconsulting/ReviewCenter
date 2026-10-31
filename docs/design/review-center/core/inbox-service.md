@@ -38,13 +38,16 @@ are assigned in posting order and never reused, so one integer per review tells 
 - *Algorithm*: Find the user from the actor. List the projects the user may see (through `IProjectAccess`) and the
   reviews in which the user is a reviewer or the creator (`IInboxStore.ListInvolvedReviewsAsync`), keep those of visible
   projects, and read the read-state rows of the user. For each such review load one snapshot, because the approval
-  depends on the record digest, and add rows by these rules:
+  depends on the record digest and on the open threads (a review is approved only when every slot is signed for the
+  current record and no thread is open), and add rows by these rules:
   - *To sign*: the user may contribute and is a member, the review is not approved, and a slot of the user (primary
     or alternate) is not signed. The chip is "Not signed", or "Out of date, sign again" when every such slot has a
     signature that no longer covers the record. The state of a slot is the one the approval of the review uses.
   - *Replies waiting*: the user may contribute, the review is not approved, and there is an open thread whose last
     comment is by someone else (a comment of the system counts as someone else) in which the user, holding a slot of
     the review, wrote a comment, or of whose review the user is the creator. The chip gives the number of such threads.
+    A thread counts whether its comments are chat or included in the report, and a review whose slots are all signed
+    but that has an open thread is not approved, so it still lists the thread here.
   - *Failed checks*: the user created the review, it is not approved, and it has checks answered Fail in a section
     that applies. The chip gives the number.
   - *Updates*: the review is approved and its completing signature (the latest of the current digest) is by someone
@@ -92,8 +95,8 @@ enters the record digest.
 - **IReviewStore** — the snapshot of a review: threads, answers, signatures, reopenings.
 - **IProjectAccess** — decides which projects the user may see and whether the user may contribute.
 - **IUserStore** — finds the user of an actor.
-- **RecordDigest** and **ReviewLock** — the current digest and the approval of a review, so the inbox and the review page
-  never disagree.
+- **RecordDigest** and **ReviewLock** — the current digest and the conclusion (`ReviewLock.IsConcluded`) of a review, so
+  the inbox and the review page never disagree.
 - **TimeProvider** — the read times and the due dates.
 
 #### Callers

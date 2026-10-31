@@ -741,8 +741,11 @@ public class SigningServiceTests
         var (fixture, slot) = await CreateReadyAsync();
         var seen = (await ApprovalAsync(fixture)).Digest;
         var thread = await fixture.Threads.StartThreadAsync(
-            fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Remark", TestContext.Current.CancellationToken);
-        await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
+            fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Remark", TestContext.Current.CancellationToken,
+            includeInReport: true);
+        await fixture.Threads.ResolveAsync(
+            fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, TestContext.Current.CancellationToken,
+            resolutionNote: "Done");
 
         // Act: ann signs what she saw
         var exception = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
@@ -908,7 +911,8 @@ public class SigningServiceTests
         else
         {
             thread = await fixture.Threads.StartThreadAsync(
-                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "A late remark", cancellationToken, acknowledged);
+                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "A late remark", cancellationToken,
+                acknowledged, true);
         }
 
         var outOfDate = await ApprovalAsync(fixture);
@@ -928,7 +932,8 @@ public class SigningServiceTests
             var blocked = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
                 TestActors.Bob, fixture.ProjectId, "rev-1", first.Id, outOfDate.Digest, Password, cancellationToken));
             Assert.Equal(DomainRule.SigningNotAllowed, blocked.Rule);
-            await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, cancellationToken);
+            await fixture.Threads.ResolveAsync(
+                fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, cancellationToken, resolutionNote: "Done");
         }
 
         var ready = await ApprovalAsync(fixture);

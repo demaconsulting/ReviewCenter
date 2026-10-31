@@ -58,19 +58,24 @@ N/A - standard test environment.
 - The page can ask whether a proof exists without spending it, and the check before a confirmation accepts only an
   external member who is a reviewer of the slot.
 - Signing is refused with the blockers named while a check is unanswered, a check of an applicable section is answered
-  Fail, or a thread is open; a Fail in a section that does not apply does not block.
+  Fail, or a thread is open (chat or included in the report); a Fail in a section that does not apply does not block.
 - Signing is refused when the record changed after the signer saw it, and when the slot already has a signature of the
-  current record.
+  current record. The open-thread check is separate from the comparison of digests and is repeated by the store inside
+  the transaction that saves the signature.
 - A signature goes out of date when the record changes, by the reopening of the review or by a change of the content
-  of a review that is not approved (a checklist answer or a comment) while a signature is current; the review is then
-  not approved, the slot can be signed again, and the earlier signature is kept.
-- A review is approved only when it has at least one slot and every slot has a current signature.
-- An approved review is locked: adding, changing, and removing a slot and signing are refused with `ReviewLocked`,
-  the message of which says that an administrator must reopen the review, and nothing is stored.
-- A change of the checklist or of a thread that would make a current signature out of date is refused with
-  `SignaturesWouldBecomeOutOfDate` unless every affected slot is acknowledged. The refusal names each affected slot by
-  its number and its signer, and a change that leaves the digest of the record as it is, or a review without a current
-  signature, needs no acknowledgement.
+  of a review that is not approved (a checklist answer or a comment that is included in the report) while a signature
+  is current; the review is then not approved, the slot can be signed again, and the earlier signature is kept. Chat
+  and the state of a thread do not change the record.
+- A review is approved only when it has at least one slot, every slot has a current signature, and no thread is open;
+  a review whose slots are all signed but that has an open thread is not approved, which the status shows with the
+  count of open threads.
+- A concluded review (all signed, no open thread) is locked: adding, changing, and removing a slot and signing are
+  refused with `ReviewLocked`, the message of which says that an administrator must reopen the review, and nothing is
+  stored. An administrator can reopen only a concluded review.
+- A change of the checklist or of a thread that would change the digest while a current signature exists is refused
+  with `SignaturesWouldBecomeOutOfDate` unless every affected slot is acknowledged. The refusal names each affected
+  slot by its number and its signer, and a change that leaves the digest of the record as it is, or a review without a
+  current signature, needs no acknowledgement.
 - A project administrator (a system administrator, who need not be a member, or an administrator of the project) reopens
   a locked review with a
   reason of 1 to 250 characters after trimming; a user who does not administer the project and an actor that came
@@ -221,8 +226,10 @@ the slot is Signed by the alternate, the review is approved, and both signatures
 `SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable`; it covers the change of the record by a
 reopening only.
 
-**SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable**: A theory over a checklist answer
-that is changed and a comment that is added. On a review with two slots, the first is signed, so the review is not
+**SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable**: A theory over a checklist
+answer
+that is changed and an included comment that is added. On a review with two slots, the first is signed, so the review
+is not
 approved and not locked. After the content change the digest differs, the first slot is OutOfDate, the second is not
 signed, the review is not approved, and the signature is kept. For the comment, the open thread blocks signing with
 `SigningNotAllowed` until it is resolved. The alternate then signs the new record, both signatures are kept, and the
@@ -382,7 +389,8 @@ alternate). They are tested by `ChecklistService_SetAnswerAsync_PrimaryAndAltern
 (slot numbers and the people who signed, the alternate included),
 `ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots` (only the slots that remain),
 `ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow` (no signature, and a change that leaves the digest as it is),
-and `ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement` (a new thread always counts). The effect on signatures
+and `ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement` (a new thread that is included in the
+report counts, while chat does not). The effect on signatures
 that already went out of date is checked by `SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable`,
 which acknowledges the signed slot before it changes the content.
 
@@ -512,3 +520,50 @@ carried open thread does, which is tested by `ReviewService_FollowUp_CarriedOpen
 the creator of the follow-up is still the author for the rule of independent reviewers, which is tested by
 `ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`; and a follow-up is locked when approved and can be
 reopened like any review, which is tested by `ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened`.
+
+**SigningService open-thread scenarios**: The rule that an open thread blocks signing and conclusion is verified in
+`SigningServiceOpenThreadTests.cs` with the real services and the fake store.
+
+**ReviewLock_IsConcluded_AllSignedNoThreads_IsTrue**: Every slot is signed for the current record and no thread
+exists; the review is concluded. This scenario is tested by `ReviewLock_IsConcluded_AllSignedNoThreads_IsTrue`.
+
+**ReviewLock_IsConcluded_AllSignedOpenChatThread_IsFalse**: Every slot is signed and a chat thread is open; the review
+is not concluded. This scenario is tested by `ReviewLock_IsConcluded_AllSignedOpenChatThread_IsFalse`.
+
+**ReviewLock_IsConcluded_AllSignedAllResolved_IsTrue**: Every slot is signed and every thread is resolved; the review
+is concluded. This scenario is tested by `ReviewLock_IsConcluded_AllSignedAllResolved_IsTrue`.
+
+**ReviewLock_IsConcluded_NoSlots_IsFalse**: A review without slots is not concluded. This scenario is tested by
+`ReviewLock_IsConcluded_NoSlots_IsFalse`.
+
+**ReviewLock_IsConcluded_OneSlotUnsigned_IsFalse**: A review with one unsigned slot is not concluded. This scenario is
+tested by `ReviewLock_IsConcluded_OneSlotUnsigned_IsFalse`.
+
+**ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations**: For every combination of slot states and
+thread states the answer of the lock equals the answer of the inbox rules. This scenario is tested by
+`ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations`.
+
+**SigningService_SignAsync_OpenChatThread_ThrowsSigningNotAllowed**: Signing with an open chat thread is refused with
+`SigningNotAllowed` even when the digest is current, and nothing is stored. This scenario is tested by
+`SigningService_SignAsync_OpenChatThread_ThrowsSigningNotAllowed`.
+
+**SigningService_RemoveSlotAsync_LastUnsignedSlotWithOpenThread_AllSignedButNotConcluded**: After the last unsigned slot
+is removed while a thread is open, every remaining slot is signed but the review is neither concluded nor locked. This
+scenario is tested by `SigningService_RemoveSlotAsync_LastUnsignedSlotWithOpenThread_AllSignedButNotConcluded`.
+
+**SigningService_ResolveLastThreadAfterSlotRemoval_ConcludesReview**: Resolving the last open thread concludes the
+review without a signature or a further entry. This scenario is tested by
+`SigningService_ResolveLastThreadAfterSlotRemoval_ConcludesReview`.
+
+**SigningService_ChatThreadAfterPartialSigning_KeepsSignaturesValidAndBlocksOthers**: A chat thread started after the
+first of two signatures keeps that signature current and blocks the second signature until the thread is resolved. This
+scenario is tested by `SigningService_ChatThreadAfterPartialSigning_KeepsSignaturesValidAndBlocksOthers`.
+
+**SigningService_GetApprovalAsync_OpenThreadAllSigned_IsNotApprovedAndCountsOpenThread**: With all slots signed and a
+thread open, the review is not approved and the status counts the open thread. This scenario is tested by
+`SigningService_GetApprovalAsync_OpenThreadAllSigned_IsNotApprovedAndCountsOpenThread`.
+
+**SigningService_ReopenReviewAsync_AllSignedButThreadOpen_ThrowsReviewNotLocked**: An administrator cannot reopen a
+review whose slots are all signed but that has an open thread, because it is not concluded; the refusal is
+`ReviewNotLocked`. This scenario is tested by
+`SigningService_ReopenReviewAsync_AllSignedButThreadOpen_ThrowsReviewNotLocked`.

@@ -201,9 +201,9 @@ internal sealed class FakeReviewStore : IReviewStore
         // that tests can arrange a record that the services would refuse to change
         var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken)
                        ?? throw new DomainRuleException(DomainRule.ReviewNotFound, "The review does not exist.");
-        if (!ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        if (!ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
         {
-            throw new DomainRuleException(DomainRule.ReviewNotLocked, "The review is not approved, so it cannot be reopened.");
+            throw new DomainRuleException(DomainRule.ReviewNotLocked, "The review is not concluded, so it cannot be reopened.");
         }
 
         _reopens.Add(reopen with { Id = _reopens.Count + 1 });
@@ -544,9 +544,9 @@ internal sealed class FakeReviewStore : IReviewStore
     {
         BeforeDueDateUpdate?.Invoke();
 
-        // Like the real store: an approved review refuses the change, and the date must still be the one expected
+        // Like the real store: a concluded review refuses the change, and the date must still be the one expected
         var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken);
-        if (snapshot is not null && ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        if (snapshot is not null && ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
         {
             throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
         }
@@ -684,11 +684,10 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public Task<bool> SetThreadStateAsync(
+    public Task<bool> ReopenThreadAsync(
         int projectId,
         string reviewId,
         int threadId,
-        ReviewThreadState state,
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
@@ -700,23 +699,133 @@ internal sealed class FakeReviewStore : IReviewStore
 
         Audits.Add(audit);
         // The state is init-only, so the stored thread is replaced by a copy with the new state
-        var old = _threads[index];
-        _threads[index] = new ReviewThread
-        {
-            Id = old.Id,
-            ProjectId = old.ProjectId,
-            ReviewId = old.ReviewId,
-            FilePath = old.FilePath,
-            Side = old.Side,
-            StartLine = old.StartLine,
-            EndLine = old.EndLine,
-            State = state,
-            Created = old.Created,
-            CarriedFromReviewId = old.CarriedFromReviewId,
-            CarriedFromThreadId = old.CarriedFromThreadId,
-            Comments = old.Comments
-        };
+        ReplaceThread(index, ReviewThreadState.Open, _threads[index].Comments);
         return Task.FromResult(true);
+    }
+
+    /// <summary>
+    ///     Gets or sets an action that runs just before a thread is resolved, so a test can simulate someone else
+    ///     promoting or demoting the thread between the service's check and the store's write.
+    /// </summary>
+    public Func<Task>? BeforeResolveThread { get; set; }
+
+    /// <inheritdoc />
+    public async Task<bool> ResolveThreadAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ThreadKind expectedKind,
+        ReviewComment? resolution,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        if (BeforeResolveThread is { } before)
+        {
+            await before();
+        }
+
+        await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
+        var index = _threads.FindIndex(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId);
+        if (index < 0 || _threads[index].State == ReviewThreadState.Resolved)
+        {
+            return false;
+        }
+
+        // The kind is read again and compared with the expected one, as the real store does inside its transaction
+        var isFinding = _threads[index].Kind == ThreadKind.Finding;
+        if (_threads[index].Kind != expectedKind)
+        {
+            throw new DomainRuleException(
+                DomainRule.RecordChanged,
+                "The thread was promoted or demoted while you were resolving it. Review it and try again.");
+        }
+
+        if (isFinding && resolution is null)
+        {
+            throw new DomainRuleException(
+                DomainRule.ResolutionNoteRequired,
+                "A finding can only be resolved with a note that says what was done.");
+        }
+
+        var comments = _threads[index].Comments.ToList();
+        if (resolution is not null)
+        {
+            comments.Add(new ReviewComment
+            {
+                Id = _nextCommentId++,
+                ThreadId = threadId,
+                Author = resolution.Author,
+                AuthorUsername = resolution.AuthorUsername,
+                Text = resolution.Text,
+                Created = resolution.Created,
+                IncludeInReport = isFinding,
+                Kind = ReviewCommentKind.Resolution
+            });
+        }
+
+        ReplaceThread(index, ReviewThreadState.Resolved, comments);
+        Audits.Add(audit);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetThreadKindAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ThreadKind kind,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
+        var index = _threads.FindIndex(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId);
+        if (index < 0 || _threads[index].Kind == kind)
+        {
+            return false;
+        }
+
+        // The starting comment and the resolution notes follow the thread; replies keep their own flags
+        var include = kind == ThreadKind.Finding;
+        var comments = _threads[index].Comments
+            .Select((c, i) => i == 0 || c.Kind == ReviewCommentKind.Resolution ? WithFlag(c, include) : c)
+            .ToList();
+        ReplaceThread(index, _threads[index].State, comments);
+        Audits.Add(audit);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetCommentReportAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        int commentId,
+        bool include,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
+        var index = _threads.FindIndex(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId);
+        var comment = index < 0 ? null : _threads[index].Comments.FirstOrDefault(c => c.Id == commentId);
+        if (comment is null)
+        {
+            return false;
+        }
+
+        if (_threads[index].Comments[0].Id == comment.Id || comment.Kind == ReviewCommentKind.Resolution)
+        {
+            throw new DomainRuleException(DomainRule.CommentNotTogglable, "Only a reply can be included on its own.");
+        }
+
+        if (comment.IncludeInReport == include)
+        {
+            return false;
+        }
+
+        var comments = _threads[index].Comments.Select(c => c.Id == commentId ? WithFlag(c, include) : c).ToList();
+        ReplaceThread(index, _threads[index].State, comments);
+        Audits.Add(audit);
+        return true;
     }
 
     /// <inheritdoc />
@@ -998,13 +1107,18 @@ internal sealed class FakeReviewStore : IReviewStore
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
-        // The same checks as the real store: the digest is recomputed from what is stored and the pair
-        // (slot, digest) is unique
+        // The same checks, in the same order, as the real store: the digest is recomputed from what is stored, an open
+        // thread is refused (thread state is not in the digest) and the pair (slot, digest) is unique
         var record = await GetRecordAsync(signature.ProjectId, signature.ReviewId, cancellationToken)
                      ?? throw new DomainRuleException(DomainRule.ReviewNotFound, "The review does not exist.");
         if (RecordDigest.Compute(record) != signature.RecordDigest)
         {
             throw new DomainRuleException(DomainRule.RecordChanged, "The record changed while you were signing.");
+        }
+
+        if (record.Threads.Any(t => t.State != ReviewThreadState.Resolved))
+        {
+            throw new DomainRuleException(DomainRule.SigningNotAllowed, "A thread is open; resolve it before signing.");
         }
 
         if (_signatures.Any(s => s.SlotId == signature.SlotId && s.RecordDigest == signature.RecordDigest))
@@ -1057,8 +1171,73 @@ internal sealed class FakeReviewStore : IReviewStore
             Author = comment.Author,
             AuthorUsername = comment.AuthorUsername,
             Text = comment.Text,
-            Created = comment.Created
+            Created = comment.Created,
+            IncludeInReport = comment.IncludeInReport,
+            Kind = comment.Kind
         };
+    }
+
+    /// <summary>
+    ///     Replaces a stored thread by a copy with another state and other comments (the classes are init-only).
+    /// </summary>
+    /// <param name="index">The position of the thread in the store.</param>
+    /// <param name="state">The state of the copy.</param>
+    /// <param name="comments">The comments of the copy.</param>
+    private void ReplaceThread(int index, ReviewThreadState state, List<ReviewComment> comments)
+    {
+        var old = _threads[index];
+        _threads[index] = new ReviewThread
+        {
+            Id = old.Id,
+            ProjectId = old.ProjectId,
+            ReviewId = old.ReviewId,
+            FilePath = old.FilePath,
+            Side = old.Side,
+            StartLine = old.StartLine,
+            EndLine = old.EndLine,
+            State = state,
+            Created = old.Created,
+            CarriedFromReviewId = old.CarriedFromReviewId,
+            CarriedFromThreadId = old.CarriedFromThreadId,
+            Comments = comments
+        };
+    }
+
+    /// <summary>
+    ///     Copies a comment with another report flag, keeping its identity.
+    /// </summary>
+    /// <param name="comment">The comment to copy.</param>
+    /// <param name="include">The report flag of the copy.</param>
+    /// <returns>The copy.</returns>
+    private static ReviewComment WithFlag(ReviewComment comment, bool include)
+    {
+        return new ReviewComment
+        {
+            Id = comment.Id,
+            ThreadId = comment.ThreadId,
+            Author = comment.Author,
+            AuthorUsername = comment.AuthorUsername,
+            Text = comment.Text,
+            Created = comment.Created,
+            IncludeInReport = include,
+            Kind = comment.Kind
+        };
+    }
+
+    /// <summary>
+    ///     Refuses the change when the stored review is concluded, as the real store does inside its transaction.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the review is known not to be locked.</returns>
+    private async Task EnsureNotConcludedAsync(int projectId, string reviewId, CancellationToken cancellationToken)
+    {
+        var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (snapshot is not null && ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        {
+            throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
+        }
     }
 
     /// <summary>

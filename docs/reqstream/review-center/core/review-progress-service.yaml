@@ -16,7 +16,8 @@ sections:
         title: >-
           The ReviewProgressService class shall derive the stage of every review from its approval status and not
           from the stored state of the review: Setup while it has no reviewer slot, Approved when every slot has a
-          valid signature and nothing blocks the approval, and In review otherwise, including a review that was
+          valid signature and nothing blocks the approval (an open thread is a blocker, so a review whose slots are
+          all signed but that has an open thread is In review), and In review otherwise, including a review that was
           reopened after an approval, which it shall flag as reopened.
         justification: |
           A lead wants to know whether a review has not started, is under way, or is done. The stored state only says
@@ -26,6 +27,7 @@ sections:
           - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
           - ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty
           - ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved
+          - ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked
 
       - id: ReviewCenter-ReviewProgressService-SlotProgress
         title: >-
@@ -64,6 +66,7 @@ sections:
         tests:
           - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
           - ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked
+          - ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked
 
       - id: ReviewCenter-ReviewProgressService-Overdue
         title: >-
