@@ -307,6 +307,12 @@ checks unanswered, and one open thread; an approved review is arranged too. The 
 the batch read, and are zero for the approved review. This scenario is tested by
 `SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences`.
 
+**SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence**: A review is stored without a
+checklist next to a review with the default checklist. In the single read and in the batch read the first has
+`MissingChecklist` set and the blocker "This review has no checklist."; the second has neither; the single and the batch
+status of the first are equal. This scenario is tested by
+`SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence`.
+
 **SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked**: A review that every slot has signed is
 approved. Adding, changing, and removing a slot are each refused with `ReviewLocked`; the slots are unchanged and the
 review is still approved with the same digest. This scenario is tested by

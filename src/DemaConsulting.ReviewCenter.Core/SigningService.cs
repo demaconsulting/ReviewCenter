@@ -371,7 +371,9 @@ public sealed class SigningService
             // The structured counts behind the blocker sentences of Assess, so a list can show them without parsing
             record.Threads.Count(thread => thread.State == ReviewThreadState.Open),
             checklist?.Overall.Unanswered ?? 0,
-            failed);
+            failed,
+            // Assess returns no checklist state exactly when it adds the "no checklist" blocker
+            checklist is null);
     }
 
     /// <summary>

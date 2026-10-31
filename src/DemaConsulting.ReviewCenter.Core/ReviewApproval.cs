@@ -107,6 +107,10 @@ public sealed record SlotStatus(
 ///     The number of checks of applicable sections answered Fail; the count behind the "checks are answered Fail"
 ///     blocker. Zero for a review without a checklist.
 /// </param>
+/// <param name="MissingChecklist">
+///     <c>true</c> when the review has no checklist; the structured form of the "This review has no checklist."
+///     blocker, so it is <c>true</c> exactly when that sentence is among <paramref name="Blockers"/>.
+/// </param>
 public sealed record ReviewApproval(
     bool IsApproved,
     string Digest,
@@ -116,4 +120,5 @@ public sealed record ReviewApproval(
     IReadOnlyList<ReviewReopen>? Reopens = null,
     int OpenThreads = 0,
     int UnansweredChecks = 0,
-    int FailedChecks = 0);
+    int FailedChecks = 0,
+    bool MissingChecklist = false);

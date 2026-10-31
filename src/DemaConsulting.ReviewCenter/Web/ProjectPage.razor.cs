@@ -554,7 +554,10 @@ public partial class ProjectPage : ComponentBase
     ///     Words what blocks a review.
     /// </summary>
     /// <param name="progress">The progress of the review.</param>
-    /// <returns>The open threads, unanswered checks and Fail answers; a dash when none or the review is approved.</returns>
+    /// <returns>
+    ///     The missing checklist, open threads, unanswered checks and Fail answers; a dash when none or the review is
+    ///     approved.
+    /// </returns>
     private static string BlockersText(ReviewProgress progress)
     {
         if (progress.IsApproved)
@@ -563,6 +566,11 @@ public partial class ProjectPage : ComponentBase
         }
 
         var parts = new List<string>();
+        if (progress.NoChecklist)
+        {
+            parts.Add("No checklist");
+        }
+
         if (progress.OpenThreads > 0)
         {
             parts.Add(progress.OpenThreads + (progress.OpenThreads == 1 ? " open thread" : " open threads"));

@@ -157,7 +157,10 @@ public sealed class ReviewProgressService
         }
 
         var blocked = !approval.IsApproved
-            && (approval.OpenThreads > 0 || approval.UnansweredChecks > 0 || approval.FailedChecks > 0);
+            && (approval.OpenThreads > 0
+                || approval.UnansweredChecks > 0
+                || approval.FailedChecks > 0
+                || approval.MissingChecklist);
 
         return new ReviewProgress(
             review.Id,
@@ -170,6 +173,7 @@ public sealed class ReviewProgressService
             approval.OpenThreads,
             approval.UnansweredChecks,
             approval.FailedChecks,
+            approval.MissingChecklist,
             review.Created,
             activity.TryGetValue(review.Id, out var last) ? last : review.Created,
             review.DueDate,

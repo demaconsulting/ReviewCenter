@@ -358,6 +358,39 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
+    ///     Test that a stored review without a checklist is blocked and flagged as having no checklist, while a review
+    ///     with a checklist and no blockers is neither.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked()
+    {
+        // Arrange: a review without a checklist (a stored review that has none) and a complete review with a slot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await world.Store.AddReviewAsync(
+            new Review { ProjectId = world.ProjectId, Id = "rev-none", Title = "No checklist", Created = _now },
+            cancellationToken);
+        await CreateReviewAsync(world, "rev-ok");
+        await AnswerAllAsync(world, "rev-ok");
+        await AddSlotAsync(world, "rev-ok", "reviewer1");
+
+        // Act: read the progress and the approval status
+        var none = await ProgressOfAsync(world, "rev-none");
+        var ok = await ProgressOfAsync(world, "rev-ok");
+        var approval = (await world.Signing.GetApprovalAsync(world.ProjectId, "rev-none", cancellationToken))!;
+
+        // Assert: blocked by the missing checklist alone, in line with the approval; the other is not blocked
+        Assert.True(none.NoChecklist);
+        Assert.True(none.IsBlocked);
+        Assert.False(none.IsApproved);
+        Assert.Equal((0, 0, 0), (none.OpenThreads, none.UnansweredChecks, none.FailedChecks));
+        Assert.Contains("This review has no checklist.", approval.Blockers);
+        Assert.Equal(approval.MissingChecklist, none.NoChecklist);
+        Assert.False(ok.NoChecklist);
+        Assert.False(ok.IsBlocked);
+    }
+
+    /// <summary>
     ///     Test that a comment made after a signature makes the signature out of date, which the progress counts
     ///     as out of date and not as signed.
     /// </summary>

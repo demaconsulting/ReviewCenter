@@ -304,7 +304,8 @@ The table shows 25 reviews to a page (`reviews-paging` with `reviews-range`, `re
 keep the filters), and `reviews-no-match` says so when the filters match nothing. Each row (`review-row-{id}`) shows the
 review (link `review-link-{id}` and title), its stage badge (`review-approval-{id}`: Setup, In review, or Approved, and
 a "Reopened" mark for a reopened review), the signatures (`review-progress-{id}`: signed of required, and "n out of
-date" when any), what blocks it (`review-blockers-{id}`: open threads, unanswered checks, Fail answers), the people it
+date" when any), what blocks it (`review-blockers-{id}`: "No checklist", open threads, unanswered checks, Fail
+answers), the people it
 waits on (`review-waiting-{id}`), the last activity, and the due date with the Overdue badge
 (`review-overdue-{id}`) of the rule of `ReviewService`. Everything is read-only, so the same table is shown to a member,
 a member who may only read (the Auditor role, which is declared but cannot be assigned yet), an administrator, and a

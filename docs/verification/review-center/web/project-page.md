@@ -382,6 +382,11 @@ on, its last activity, and its due date with the Overdue badge only where it app
 reviews per stage and the overdue ones. This scenario is tested by
 `ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary`.
 
+**ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked**: A review is stored without a
+checklist, and another has a checklist with every check answered. The first shows "No checklist" as its blockers and the
+second shows a dash; with `blocked=1` only the first is listed. This scenario is tested by
+`ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked`.
+
 **ProjectPage_Render_QueryFilters_NarrowTheTable**: The page is opened with the stage, overdue, blocked, and text
 parameters of the query string; the table shows only the matching reviews, the filter form shows the chosen values, and
 a message says when nothing matches. This scenario is tested by `ProjectPage_Render_QueryFilters_NarrowTheTable`.

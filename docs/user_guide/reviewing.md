@@ -577,8 +577,8 @@ project does not exist.
   signatures, not stored.
 - **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature became out of date
   (the record changed after it was given), `1 out of date`. A review without slots shows a dash.
-- **Blockers.** What prevents approval: the open comment threads, the unanswered checklist checks, and the checks
-  answered Fail. A dash means nothing blocks the review.
+- **Blockers.** What prevents approval: a missing checklist ("No checklist"), the open comment threads, the
+  unanswered checklist checks, and the checks answered Fail. A dash means nothing blocks the review.
 - **Waiting on.** The people who still have to sign: the primary reviewer, and a different alternate, of each slot that
   is not signed or is out of date. A disabled account is shown with "(disabled)". An approved review waits on nobody.
 - **Last activity.** The time (UTC) of the newest entry of the audit trail of the review, or its creation time.

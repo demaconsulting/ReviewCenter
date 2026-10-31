@@ -89,6 +89,7 @@ sections:
         tests:
           - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
           - SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock
+          - SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence
 
       - id: ReviewCenter-SigningService-Sign
         title: >-

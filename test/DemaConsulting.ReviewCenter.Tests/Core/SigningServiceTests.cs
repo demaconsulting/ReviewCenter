@@ -806,6 +806,35 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the structured <see cref="ReviewApproval.MissingChecklist"/> flag is true exactly when the "no
+    ///     checklist" blocker sentence is present, for a single read and for the batch read.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence()
+    {
+        // Arrange: a stored review without a checklist next to the review with the default checklist
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        await fixture.Store.AddReviewAsync(
+            new Review { ProjectId = fixture.ProjectId, Id = "rev-none", Title = "No checklist", Created = _now },
+            cancellationToken);
+
+        // Act: read both singly and in a batch
+        var without = await ApprovalAsync(fixture, "rev-none");
+        var with = await ApprovalAsync(fixture);
+        var batch = await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-none", "rev-1"], cancellationToken);
+
+        // Assert: the flag is set exactly with the sentence, in both reads
+        Assert.True(without.MissingChecklist);
+        Assert.Contains("This review has no checklist.", without.Blockers);
+        Assert.False(with.MissingChecklist);
+        Assert.DoesNotContain("This review has no checklist.", with.Blockers);
+        Assert.True(batch["rev-none"].MissingChecklist);
+        Assert.False(batch["rev-1"].MissingChecklist);
+        Assert.Equivalent(without, batch["rev-none"]);
+    }
+
+    /// <summary>
     ///     Test that a reopening of the review, which changes the record, makes the old signature out of date, which
     ///     can be signed again, and that the history stays.
     /// </summary>

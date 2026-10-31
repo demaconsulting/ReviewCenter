@@ -19,15 +19,17 @@ is derived and is never the stored state of the review, which only says whether 
 reopened after its approval is open again, so it is `InReview`.
 
 **ReviewProgress**: an immutable record with `ReviewId`, `Title`, `Stage`, `SlotsRequired`, `SlotsSigned`,
-`SlotsOutOfDate`, `WaitingOn` (display names), `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `Created`,
-`LastActivity`, `DueDate`, `IsOverdue`, `IsApproved`, `Reopened`, `IsBlocked`, and `FollowsReviewId`. `IsBlocked` is true
-for a review that is not approved and has any open thread, unanswered check, or Fail answer.
+`SlotsOutOfDate`, `WaitingOn` (display names), `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `NoChecklist`,
+`Created`, `LastActivity`, `DueDate`, `IsOverdue`, `IsApproved`, `Reopened`, `IsBlocked`, and `FollowsReviewId`.
+`IsBlocked` is true for a review that is not approved and has no checklist, or has any open thread, unanswered check,
+or Fail answer.
 
-**Blocker counts**: the three counts are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`, `FailedChecks`).
-`SigningService` calculates them in the one step that also writes the blocker sentences (`BuildApproval`), so the
-numbers and the sentences cannot disagree. This unit only copies them; it has no second rule for what blocks a review,
-and the later work list of the lead reuses the same counts. `SlotMember.Enabled` carries whether the account of a person
-in a slot is enabled.
+**Blocker counts**: the three counts and the flag are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`,
+`FailedChecks`, `MissingChecklist`; the flag is copied to `NoChecklist`). `SigningService` calculates them in the one
+step that also writes the blocker sentences (`BuildApproval`), so the numbers, the flag, and the sentences cannot
+disagree: `MissingChecklist` is true exactly when "This review has no checklist." is a blocker. This unit only copies
+them; it has no second rule for what blocks a review, and the later work list of the lead reuses the same counts.
+`SlotMember.Enabled` carries whether the account of a person in a slot is enabled.
 
 **Last activity**: the time of the newest audit entry that names the review, read for the whole project with one call of
 `IAuditStore.LastActivityAsync(projectId)` (a dictionary of review identifier to the time of the entry with the highest

@@ -26,7 +26,7 @@ N/A - standard test environment.
 - The signature counts equal the slots of the approval status; a comment after a signature turns that signature from
   signed into out of date.
 - The open-thread, unanswered-check, and Fail counts equal the numbers in the blocker sentences; a review with any of
-  them that is not approved is blocked, an approved review is not.
+  them, or without a checklist, that is not approved is blocked, an approved review is not.
 - `WaitingOn` names the primary and a different alternate of every slot that is not signed, each person once, leaves out
   signed slots, shows a disabled person with the suffix, and is empty for an approved review.
 - A review is overdue from the day after its due date and not on it, never without a date, and never when approved.
@@ -52,6 +52,12 @@ This scenario is tested by `ReviewProgressService_GetProgressAsync_ProjectWithou
 checks, and two open threads; the counts are compared with the numbers in the blocker sentences of the approval status
 and with the counts of the status, and the review is blocked. An approved review has no blockers and is not blocked. This
 scenario is tested by `ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers`.
+
+**ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked**: A review is stored without a checklist,
+and another review has a checklist, every check answered, and a slot. The first has `NoChecklist` set, is blocked, is
+not approved, and has no counted blockers; its approval status has the sentence "This review has no checklist." and the
+same flag. The second has no flag and is not blocked. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked`.
 
 **ReviewProgressService_GetProgressAsync_CommentAfterSignature_CountsOutOfDate**: A review with two slots has the first
 signed (2 required, 1 signed, 0 out of date); a thread is started, which changes the record, and the progress shows 2

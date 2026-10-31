@@ -62,6 +62,7 @@ public enum ReviewStage
 /// <param name="OpenThreads">The number of comment threads that are open.</param>
 /// <param name="UnansweredChecks">The number of checks of applicable sections that have no answer.</param>
 /// <param name="FailedChecks">The number of checks of applicable sections answered Fail.</param>
+/// <param name="NoChecklist"><c>true</c> when the review has no checklist, which blocks signing.</param>
 /// <param name="Created">When the review was created.</param>
 /// <param name="LastActivity">
 ///     When the review last had an entry in the audit trail; the creation time for a review without one.
@@ -71,7 +72,8 @@ public enum ReviewStage
 /// <param name="IsApproved"><c>true</c> when every slot holds a current signature.</param>
 /// <param name="Reopened"><c>true</c> when the review was reopened after an approval and is not approved now.</param>
 /// <param name="IsBlocked">
-///     <c>true</c> when the review is not approved and has an open thread, an unanswered check or a check answered Fail.
+///     <c>true</c> when the review is not approved and has no checklist, an open thread, an unanswered check or a
+///     check answered Fail.
 /// </param>
 /// <param name="FollowsReviewId">The review this one follows up, or <c>null</c> when it is not a follow-up.</param>
 public sealed record ReviewProgress(
@@ -85,6 +87,7 @@ public sealed record ReviewProgress(
     int OpenThreads,
     int UnansweredChecks,
     int FailedChecks,
+    bool NoChecklist,
     DateTimeOffset Created,
     DateTimeOffset LastActivity,
     DateOnly? DueDate,

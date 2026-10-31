@@ -173,6 +173,37 @@ public class ProjectPageOverviewTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a stored review without a checklist shows "No checklist" as its blocker and is listed by the
+    ///     blocked filter, while a complete review shows a dash and is not listed.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked()
+    {
+        // Arrange: a review stored without a checklist, and a complete review with an unsigned slot
+        var token = TestContext.Current.CancellationToken;
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, token);
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        await Store.AddMembershipAsync(ann.Id, project.Id, token);
+        await Store.AddReviewAsync(
+            new Review { ProjectId = project.Id, Id = "REV-NONE", Title = "No checklist", Created = DateTimeOffset.UtcNow },
+            token);
+        await Reviews.CreateDraftAsync(project.Id, "REV-OK", "Complete", [new("a.txt", TestContent.A)], token);
+        await AnswerAllAsync(project.Id, "REV-OK");
+        await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-OK", ann.Id, null, token);
+
+        // Act: render all rows, and the blocked rows
+        var cut = RenderAt(project.Id);
+        var text = cut.Find("[data-testid='review-blockers-REV-NONE']").TextContent;
+        var other = cut.Find("[data-testid='review-blockers-REV-OK']").TextContent;
+        var blocked = RowsAt(project.Id, "?blocked=1");
+
+        // Assert: the missing checklist is worded and the review is blocked; the complete one is neither
+        Assert.Equal("No checklist", text);
+        Assert.Equal("-", other);
+        Assert.Equal(["REV-NONE"], blocked);
+    }
+
+    /// <summary>
     ///     Test that the stage, overdue, blocked and text filters of the query string narrow the table, separately
     ///     and together, while the summary strip keeps counting the whole project.
     /// </summary>
