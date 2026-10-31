@@ -19,6 +19,8 @@ N/A - standard test environment (everything runs in memory).
   far as the evidence settings include them (see the criteria for the Content scope below).
 - A checklist comment is printed in full, however long, and runs over pages without loss; only the list of resolved
   threads is capped (100), with exact counts and a line that says how many are left out.
+- Every checklist answer shows who answered it and the time of the answer, in UTC to the second like the other times of
+  the document; an answer without a time shows no time.
 - A self-signed key gets the notice; an organization key gets its subject and issuer and no notice.
 - The statement of what the signature proves and does not prove is in the document.
 - The result is deterministic, grows over pages, and handles characters beyond WinAnsi and a missing document.
@@ -44,8 +46,15 @@ listed with its status, size, and hash. This scenario is tested by
 `AttestationRenderer_Render_Document_ListsFilesWithStatus`.
 
 **AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments**: A checklist with answers and comments is
-rendered. Every check shows its outcome, its comment, and who answered it. This scenario is tested by
+rendered. Every check shows its outcome, its comment, and who answered it and when (`Answered by Ann, 2025-03-04
+05:01:02 UTC`). This scenario is tested by
 `AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments`.
+
+**AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc**: Answers are rendered with a time that has an
+offset, with two times a second apart, with a carried answer, and with an answer that has no time. The offset time is
+printed in UTC, the two answers show distinct seconds, the carried answer shows its time and its "Carried from review"
+line, and the answer without a time is printed as `Answered by X` with no time. This scenario is tested by
+`AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc`.
 
 **AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull**: A comment of 400 numbered words (about 3,600
 characters) is rendered. Every word is in the text lines of the PDF, in order, and no line holds an ellipsis. This

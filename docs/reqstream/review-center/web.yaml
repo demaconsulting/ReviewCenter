@@ -58,12 +58,14 @@ sections:
           - ReviewCenter-HelpPage-Navigation
           - ReviewCenter-HelpPage-NotFound
           - ReviewCenter-HelpPage-MembersTopic
+          - ReviewCenter-HelpPage-SigningTopic
           - ReviewCenter-HelpPage-EvidenceSettingsTopic
           - ReviewCenter-App-HelpLink
         tests:
           - HelpPage_Render_ListsEveryTopicWithItsPageLink
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
           - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+          - HelpSigningPage_Render_ExplainsTheReopenerRule
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
           - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
 

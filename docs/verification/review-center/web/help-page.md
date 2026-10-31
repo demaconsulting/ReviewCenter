@@ -42,6 +42,8 @@ N/A - standard test environment.
   content switches, the regulatory warning, the Content scope section, and the audit trail, and contains no link that
   begins with `#`.
 - The Getting started, Reviewers and signing, and API tokens topics each mention the identity provider.
+- The Reviewers and signing topic says that the person who reopened a review cannot sign it again while the project
+  rule is on, and that a reopen that would leave a slot without a possible signer is refused.
 - The Two-factor sign-in topic follows the API tokens topic in the list, has its title, a screenshot with alternative
   text from `/help/`, and describes setting it up, the ten recovery codes shown once, signing in, recovery, signing a
   review (a recovery code cannot sign and a used code needs the next one), turning off, the administrator reset (not for
@@ -82,8 +84,14 @@ valid while the server runs is reported on the review page instead of the button
 certificate that the administrator supplied says that the administrator supplied it. It also says that the signature
 certifies the
 document with no changes allowed, that a certificate for code signing only is used, not refused for that reason, with
-a note in the PDF and a start-up warning, and that the server does not check the certificate chain or revocation. This
+a note in the PDF and a start-up warning, that the PDF lists who answered each check and when, and that the server
+does not check the certificate chain or revocation. This
 scenario is tested by `HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`.
+
+**HelpSigningPage_Render_ExplainsTheReopenerRule**: The Reviewers and signing page is rendered. The text says that,
+while the project rule is on, the person who reopened a review cannot sign it again, and that a reopen that would leave
+a slot without anyone who may sign is refused; no link begins with `#`. This scenario is tested by
+`HelpSigningPage_Render_ExplainsTheReopenerRule`.
 
 **HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors**: The API tokens page is rendered; the heading is
 "Automation and API tokens", the screenshot is served from `/help/` with alternative text, and the text names the

@@ -33,6 +33,9 @@ name when only that is known. Only the structured name fields (the author of a c
 signer, the slot members, who reopened the review, who asked) are replaced; names that people typed into a comment
 or a justification are the author's own text and stay.
 
+The check rows carry the time of the stored answer (`AnsweredAt`), which the names switch does not hide, because it is
+not personal data; it is outside the record digest, so it never affects the approval of the signatures.
+
 The document also carries what a follow-up review took over: `FollowsReviewId` and the two counts from the review
 (`CarriedAnswerCount`, `CarriedThreadCount`), and for every answer, not-applicable section, and listed thread the review
 it was carried from (`CarriedFromReviewId` of the record rows). They are all absent or zero for a review that follows

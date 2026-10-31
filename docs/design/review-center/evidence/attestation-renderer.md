@@ -14,8 +14,9 @@ not prove. It does not decide whether a review is complete and does not sign.
 The input is an `AttestationDocument`, built by `AttestationService` from the review, so that the renderer reads nothing
 and has no access to the database. It holds the project and the review (identifier and title, and for a repository
 review the repository, the baseline and head commits, and the review-set), the content fingerprint, the record digest and
-its version, the files (path, status, SHA-256, and size), the checklist sections with their items, answers, and
-comments, the count of open threads and the summaries of the resolved ones, the reviewer slots with their signatures
+its version, the files (path, status, SHA-256, and size), the checklist sections with their items, answers, comments,
+and the time of each answer (`AttestationCheck.AnsweredAt`), the count of open threads and the summaries of the
+resolved ones, the reviewer slots with their signatures
 (signer, role, time, the digest signed, and its meaning), the reopen history of the review (time, who, reason, and the
 digest of the record that was reopened; none when the review was never reopened), the head of the audit chain with
 its length and whether it is intact, the version of the tool, the time of the creation, who asked for it (a name,
@@ -52,6 +53,12 @@ reopen history only appears when the review was reopened at least once.
     not git context and stays.
   - *Reviewer names* off: nothing is hidden by the renderer, because the labels are already in the input; the switch is
     only reported in the content scope.
+
+**Answer time**: Below a check that has an answer, a small italic line reads `Answered by X, yyyy-MM-dd HH:mm:ss UTC`,
+with the time in UTC to the second, formatted like every other time of the document. An answer without a time prints
+`Answered by X` only, and a time without a name prints `Answered at <time>`. A carried answer shows the time it was
+originally given, followed by its "Carried from review X" line. The time is not personal data, so the reviewer names
+switch does not hide it. It is not part of the record digest (see below), so showing it changes no signature.
 
 **Follow-up review**: A review that was created as a follow-up has one more row in the review section, "Follows review",
 with the text `X (N answers and M threads carried)` (the followed review and the numbers of carried answers and open
@@ -107,8 +114,11 @@ identifier and wording); every checklist answer (check identifier, outcome, just
 name and user name); the sections that do not apply (identifier and reason); and every thread with its comments (anchor,
 state, time, and for each comment the author, the user name, the text, and the time); and, only when the review was
 reopened, the number of reopens.
-It does **not** cover the time an answer was given (`Answered at`), the review title, the project name, the repository
-name, the reviewer slots, and the audit chain head, which the PDF may also show. The reopen history (who reopened the
+It does **not** cover the time an answer was given (`AnsweredAt`), the review title, the project name, the repository
+name, the reviewer slots, and the audit chain head, which the PDF may also show. The PDF does print the time of every
+answer (see the checklist rendering above), so a burst of answers within seconds is visible to a reader, and the time is
+protected by the PDF signature, not by the reviewers' own signatures; it is the clock of the server, not a trusted
+timestamp. The reopen history (who reopened the
 review, when, and why) is shown by the PDF but only its count is bound by the digest. The signature over the PDF covers
 every byte of the PDF, so these extra items are protected by the PDF signature (and, for what the audit event holds,
 by the audit chain); they are not bound by the reviewers' own signatures on the record.
