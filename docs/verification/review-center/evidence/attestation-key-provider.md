@@ -142,6 +142,11 @@ that may not create is asked for a key in a folder that does not exist. The erro
 first start, the status is unavailable, and the folder does not exist. This scenario is tested by
 `SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing`.
 
+**SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting**: A regular file stands
+where the folder should be, and a provider that may not create is asked for the key. The error is not "will be created"
+but names `Attestation:SelfSignedFolder`, the path-free message holds no path, and the file is left as it was. This
+scenario is tested by `SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting`.
+
 **SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing**: A provider that may
 not create is asked for an expired key. It describes the key as it is, and the folder holds only the original file. This
 scenario is tested by

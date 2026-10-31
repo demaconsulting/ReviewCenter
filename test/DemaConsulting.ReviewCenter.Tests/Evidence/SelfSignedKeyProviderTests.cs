@@ -502,6 +502,31 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     }
 
     /// <summary>
+    ///     Test that a provider that may not create anything still detects a regular file where the folder should
+    ///     be, so the inspection does not report a key that will be created when the start would fail.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting()
+    {
+        // Arrange: a regular file at the configured folder path, and a provider that may not create
+        var blocked = NewFolder();
+        File.WriteAllText(blocked, "not a folder");
+        using var provider = new SelfSignedKeyProvider(
+            Options(blocked), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring, allowCreate: false);
+
+        // Act
+        var exception = Assert.Throws<AttestationKeyException>(provider.GetSigningKey);
+
+        // Assert: a failure of the setting, not "will be created", and the path-free message holds no path
+        Assert.False(exception.WillBeCreated);
+        Assert.Contains("Attestation:SelfSignedFolder", exception.Message, StringComparison.Ordinal);
+        Assert.NotNull(exception.MessageWithoutPath);
+        Assert.DoesNotContain(blocked, exception.MessageWithoutPath, StringComparison.Ordinal);
+        Assert.Contains("Attestation:SelfSignedFolder", exception.MessageWithoutPath, StringComparison.Ordinal);
+        Assert.True(File.Exists(blocked), "The inspection must leave the file as it was");
+    }
+
+    /// <summary>
     ///     Test that a provider that may not create anything still describes a key that exists, and neither changes
     ///     the folder nor replaces an expired key.
     /// </summary>

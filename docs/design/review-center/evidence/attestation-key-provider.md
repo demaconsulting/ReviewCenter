@@ -59,7 +59,8 @@ assumes one server per folder. **The key is still a self-signed key, for develop
 The factory and the provider take a flag `allowCreate`. With `false` (the mode of `--validate --check-config`) the
 provider only describes: it creates no folder and no file, does not archive an expired key, and, when no protected file
 exists, throws an `AttestationKeyException` with `WillBeCreated` set, whose message is "will be created on first
-start".
+start". Before that, a regular file at the configured folder path is reported as an error that names
+`Attestation:SelfSignedFolder` in both modes, because the start would fail there too.
 
 The **certificate store provider** opens the configured store read-only and without creating it, finds the
 certificate by its thumbprint (the text is normalized, so a thumbprint copied from a dialog with spaces and the invisible

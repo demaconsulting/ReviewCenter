@@ -114,6 +114,17 @@ internal sealed class SelfSignedKeyProvider(
 
         try
         {
+            // Startup would fail on a regular file at this path too, so the inspect-only mode must not hide it
+            if (File.Exists(folder))
+            {
+                throw new AttestationKeyException(
+                    $"Attestation:SelfSignedFolder '{folder}' is a file, not a folder. Set it to a folder the server can write to.")
+                {
+                    MessageWithoutPath =
+                        "Attestation:SelfSignedFolder is a file, not a folder. Set it to a folder the server can write to."
+                };
+            }
+
             if (allowCreate)
             {
                 CreateFolder(folder);

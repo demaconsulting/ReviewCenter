@@ -65,13 +65,16 @@ sections:
       - id: ReviewCenter-AttestationKeyProvider-NoCreate
         title: >-
           The AttestationKeyProvider unit shall, when it is told not to create a key, describe an existing key
-          without changing any file, and when no key exists report that a key will be created on first start without
-          creating the folder or a file.
+          without changing any file, when no key exists report that a key will be created on first start without
+          creating the folder or a file, and when a regular file stands where the folder should be report an error
+          that names Attestation:SelfSignedFolder instead.
         justification: |
           A configuration check must be safe to run on a production installation. A check that created the key as a
-          side effect would hide the very state the operator wants to see and would write with the wrong account.
+          side effect would hide the very state the operator wants to see and would write with the wrong account. A
+          check that reports a key that will be created where the start would fail would be wrong.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing
+          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting
           - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing
           - AttestationKeyProviderFactory_Create_CreationNotAllowed_ProviderCreatesNothing
 
