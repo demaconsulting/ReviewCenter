@@ -95,7 +95,8 @@ public class InboxServiceTests
         Assert.Empty(await world.RowsAsync("ann", InboxSection.ToSign));
         var item = DefaultChecklist.Current.Sections[0].Items[0];
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("eve"), Ct);
+            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("eve"), Ct,
+            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1"));
 
         // Act
         var rows = await world.RowsAsync("ann", InboxSection.ToSign);

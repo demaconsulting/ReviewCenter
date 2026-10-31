@@ -456,8 +456,9 @@ public partial class ChecklistPage : ComponentBase
     {
         try
         {
-            await ChecklistService.SetAnswerAsync(
-                ProjectId, ReviewId, itemId, outcome, justification, await AuthenticationState.GetActorAsync());
+            var actor = await AuthenticationState.GetActorAsync();
+            await SignatureAcknowledgement.RunAsync(acknowledged => ChecklistService.SetAnswerAsync(
+                ProjectId, ReviewId, itemId, outcome, justification, actor, acknowledgedSlotIds: acknowledged));
         }
         catch (DomainRuleException ex)
         {
@@ -484,8 +485,9 @@ public partial class ChecklistPage : ComponentBase
     {
         try
         {
-            await ChecklistService.SetSectionApplicabilityAsync(
-                ProjectId, ReviewId, sectionId, applicable, reason, await AuthenticationState.GetActorAsync());
+            var actor = await AuthenticationState.GetActorAsync();
+            await SignatureAcknowledgement.RunAsync(acknowledged => ChecklistService.SetSectionApplicabilityAsync(
+                ProjectId, ReviewId, sectionId, applicable, reason, actor, acknowledgedSlotIds: acknowledged));
         }
         catch (DomainRuleException ex)
         {

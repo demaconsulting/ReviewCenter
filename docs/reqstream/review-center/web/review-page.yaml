@@ -319,6 +319,7 @@ sections:
           - ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues
           - ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing
           - ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused
+          - ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate
 
       - id: ReviewCenter-ReviewPage-ThreadShow
         title: >-

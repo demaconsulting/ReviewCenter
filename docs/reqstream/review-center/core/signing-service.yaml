@@ -318,3 +318,22 @@ sections:
         tests:
           - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
           - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
+
+      - id: ReviewCenter-SigningService-SignatureImpact
+        title: >-
+          The SigningService unit shall compute, from the record of a review and the record that a change would
+          produce, which current signatures the change would make out of date, shall number each affected slot in the
+          order of the slots and name its signer, and shall refuse the change with the SignaturesWouldBecomeOutOfDate
+          rule, before anything is stored, unless the caller has acknowledged every affected slot, with a change that
+          leaves the digest of the record as it is, or a review without a current signature, needing no
+          acknowledgement.
+        justification: |
+          Whether a signature stays valid is decided by the digest of the record, so comparing the digest before and
+          after the change finds the affected signatures exactly, without a trial write. Naming the slot number and
+          the signer lets a person see whose approval they are about to withdraw.
+        tests:
+          - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+          - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
+          - ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement
+          - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable

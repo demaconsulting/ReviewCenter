@@ -269,7 +269,13 @@ public enum DomainRule
     ///     repository, or no file in common), or open threads of the earlier review would be dropped because their file
     ///     is not in the new review and the creator did not acknowledge that.
     /// </summary>
-    FollowUpInvalid
+    FollowUpInvalid,
+
+    /// <summary>
+    ///     The change would make one or more current signatures out of date and the person making it did not
+    ///     acknowledge them; <see cref="DomainRuleException.AffectedSlots"/> lists the signatures not acknowledged.
+    /// </summary>
+    SignaturesWouldBecomeOutOfDate
 }
 
 /// <summary>
@@ -287,14 +293,28 @@ public sealed class DomainRuleException : Exception
     /// </summary>
     /// <param name="rule">The rule that was violated.</param>
     /// <param name="message">An operator-readable explanation of the violation.</param>
-    public DomainRuleException(DomainRule rule, string message)
+    /// <param name="affectedSlots">
+    ///     The signatures the change would make out of date, for <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/>;
+    ///     <c>null</c> (the default) for every other rule.
+    /// </param>
+    public DomainRuleException(
+        DomainRule rule,
+        string message,
+        IReadOnlyList<AffectedSignature>? affectedSlots = null)
         : base(message)
     {
         Rule = rule;
+        AffectedSlots = affectedSlots ?? [];
     }
 
     /// <summary>
     ///     Gets the rule that was violated.
     /// </summary>
     public DomainRule Rule { get; }
+
+    /// <summary>
+    ///     Gets the signatures the change would make out of date; empty unless <see cref="Rule"/> is
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/>.
+    /// </summary>
+    public IReadOnlyList<AffectedSignature> AffectedSlots { get; }
 }

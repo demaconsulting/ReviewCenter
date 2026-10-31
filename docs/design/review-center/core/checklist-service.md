@@ -110,6 +110,16 @@ actor).
 inside its write transaction. `GetAsync` is not affected. After an administrator reopens the review the checklist can
 change again.
 
+**Signature impact**: a change after somebody has signed makes that signature out of date (see "Signature impact" in
+the `SigningService` unit). `SetAnswerAsync` and `SetSectionApplicabilityAsync` therefore take an optional last
+argument `IReadOnlyCollection<int>? acknowledgedSlotIds`, after the cancellation token. Each builds the record as it
+would be after the change in memory, and passes it with the snapshot that `ReviewLock.EnsureUnlockedAsync` returned to
+`SignatureImpact.RequireAcknowledged`, which throws `SignaturesWouldBecomeOutOfDate` for the current signatures whose
+slots are not acknowledged. The digest decides: the same person saving the same value again, or marking a section
+applicable that has no row, does not change the record and needs no acknowledgement, while another person saving the
+same value does, because the person who answered is part of the digest. The check is the last one, after
+`ReviewLocked`, and nothing is stored when it fails.
+
 **GetAsync**: Reads the checklist of a review.
 
 - *Parameters*: `int projectId`, `string reviewId`, and a cancellation token.
@@ -119,7 +129,7 @@ change again.
 **SetSectionApplicabilityAsync**: Records whether a section applies.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string sectionId`, `bool applicable`, `string? reason`,
-  `Actor actor`, and a cancellation token.
+  `Actor actor`, a cancellation token, and the optional `acknowledgedSlotIds`.
 - *Returns*: `Task`.
 - *Postconditions*: The section has one state; the reason is stored (trimmed) when the section does not apply and
   cleared when it applies. Nothing is stored when a rule fails (including `ReviewLocked`).
@@ -127,7 +137,7 @@ change again.
 **SetAnswerAsync**: Records the answer to one check.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string itemId`, `ChecklistOutcome outcome`,
-  `string? justification`, `Actor actor`, and a cancellation token.
+  `string? justification`, `Actor actor`, a cancellation token, and the optional `acknowledgedSlotIds`.
 - *Returns*: `Task`.
 - *Postconditions*: The check has exactly one answer, with the display name and user name of the actor and the UTC
   time from the clock; an
@@ -135,8 +145,9 @@ change again.
 
 The rules are checked in this order, and the first violation is reported: that the review has a checklist
 (`ChecklistNotFound`); that the section or check is in the frozen checklist
-(`ChecklistItemNotFound`); the justification or reason (`ChecklistJustificationInvalid`); and that the review is not
-locked (`ReviewLocked`). An outcome that is not
+(`ChecklistItemNotFound`); the justification or reason (`ChecklistJustificationInvalid`); that the review is not
+locked (`ReviewLocked`); and that no current signature would silently become out of date
+(`SignaturesWouldBecomeOutOfDate`). An outcome that is not
 a defined value is a programming error and throws `ArgumentOutOfRangeException` before any rule is checked.
 
 **Carried answers and sections**: a review that was created as a follow-up starts with answers and not-applicable
@@ -161,7 +172,8 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 
 - **IReviewStore** — reads the frozen checklist, section states and answers, and saves the changes (injected).
 - **IProjectAccess** — requires that the actor may work in the project (injected).
-- **ReviewLock** (part of the `SigningService` unit) — refuses a change while the review is approved.
+- **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
+  approved, and refuse one that would make a current signature out of date without acknowledgement.
 - **TimeProvider** — supplies the answer times (injected).
 
 #### Callers

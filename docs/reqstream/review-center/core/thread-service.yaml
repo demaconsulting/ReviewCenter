@@ -183,3 +183,20 @@ sections:
           describe a record that no longer exists, so the service refuses until an administrator reopens the review.
         tests:
           - ThreadService_Mutations_ApprovedReview_ThrowReviewLocked
+
+      - id: ReviewCenter-ThreadService-SignatureImpact
+        title: >-
+          The ThreadService class shall refuse to start a thread, to reply, to resolve, and to reopen a thread when
+          the change would make a current signature out of date and the caller has not acknowledged the affected
+          slots, with the SignaturesWouldBecomeOutOfDate rule that names each affected slot number and signer, after
+          the validation of the request and before anything is stored, shall report a thread that does not exist with
+          the existing not-found rule, and shall not refuse a resolve or reopen that leaves the state as it is.
+        justification: |
+          A person who comments after somebody has signed silently withdraws that signature. The service says which
+          signatures would be lost and asks the caller to confirm, so that the consequence is never hidden. A request
+          that is not valid is reported as that error, and a request that changes nothing needs no confirmation.
+        tests:
+          - ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement
+          - ThreadService_StartThreadAsync_SignedAndInvalidAnchor_ReportsTheAnchor
+          - ThreadService_ReplyAsync_Signed_NeedsAcknowledgement
+          - ThreadService_ReopenAndResolveAsync_Signed_OnlyARealChangeNeedsAcknowledgement

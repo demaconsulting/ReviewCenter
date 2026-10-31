@@ -333,6 +333,12 @@ thread.
 **ToggleThreadAsync**: Resolves an open thread or reopens a resolved one, then reloads the threads. Resolving also
 collapses the thread. A thread that no longer exists is reported inside the thread.
 
+**Temporary acknowledgement**: `StartThreadAsync`, `ReplyAsync`, and `ToggleThreadAsync` call the service through the
+internal `SignatureAcknowledgement.RunAsync` helper. It calls the service without an acknowledgement and, when the
+service refuses with `SignaturesWouldBecomeOutOfDate`, calls it once more acknowledging the slots named in the
+exception, so that the change still proceeds and the signature goes out of date, as it did before the service asked.
+This is a temporary shim; the follow-up slice removes it and shows the affected signatures for confirmation.
+
 **SetFilter**: Sets the state the thread index shows. Each index row is a button whose accessible name states the
 anchor, file, state, comment count, first author, and last activity, so a screen-reader user hears what a sighted
 user sees. **ToggleThreadExpanded**: Expands or collapses a resolved

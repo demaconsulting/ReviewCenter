@@ -181,6 +181,27 @@ sections:
         tests:
           - ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked
 
+      - id: ReviewCenter-ChecklistService-SignatureImpact
+        title: >-
+          The ChecklistService class shall refuse to answer a check and to change the applicability of a section when
+          the change would make a current signature out of date and the caller has not acknowledged the affected
+          slots, with the SignaturesWouldBecomeOutOfDate rule that names each affected slot number and signer, before
+          anything is stored, shall let a change that does not alter the record, or a review without a current
+          signature, pass without acknowledgement, shall refuse again only for the slots that remain
+          unacknowledged, and shall report a locked review with the ReviewLocked rule first.
+        justification: |
+          The answers are part of what a signature approves. A change after the signing silently withdraws the
+          signature, so the service tells the caller which signatures would be lost and refuses until the caller
+          confirms. Saving the same answer again by the same person changes nothing, so it needs no confirmation.
+        tests:
+          - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
+          - ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing
+          - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+          - ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate
+          - ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement
+          - ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact
+
       - id: ReviewCenter-ChecklistService-CarriedMarking
         title: >-
           The ChecklistService class shall store an answer, and the applicability of a section, that a person gives or

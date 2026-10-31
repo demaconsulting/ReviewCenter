@@ -138,6 +138,8 @@ N/A - standard test environment.
   the form under a diff row, and the reply box of a thread) are not rendered; reading, copying a link, and the
   attestation download keep working; a
   review that is not approved shows no badge and no banner.
+- A thread started on a review with a current signature is stored by the page, which acknowledges the affected
+  signatures for now, and the signature is then out of date.
 - Ctrl+Enter in the new-thread field or a reply field presses the enabled submit button named by the field, a hint
   next to the button says so, and a `+` or Comment button moves the focus to the comment field it opens.
 - A primary or alternate reviewer who is disabled or no longer a member of the project is kept as a labeled choice in
@@ -453,6 +455,11 @@ that line and the target text names it. This scenario is tested by
 whole file and created by the signed-in user with the text only, with no author field on the page; it is shown, and
 the text is cleared. This scenario is tested by
 `ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText`.
+
+**ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate**: A review has two slots and only the
+first is signed. A thread is started on the page; the page acknowledges the signature for now (temporary behavior until
+the page asks for confirmation), so the thread is stored without an error and the slot shows "Signature out of date".
+This scenario is tested by `ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate`.
 
 **ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines**: A range and a single line are stored with the
 entered anchors and shown with the matching labels. This scenario is tested by

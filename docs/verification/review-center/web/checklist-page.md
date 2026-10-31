@@ -24,6 +24,8 @@ N/A - standard test environment.
   progress, and only the first section open; a partly answered review opens the first section with unanswered
   checks; opening a section closes the one that was open.
 - A Pass is stored at once with the signed-in user and the time, and the progress follows.
+- A change on a review with a current signature is stored by the page, which acknowledges the affected signatures for
+  now, and the signature is then out of date.
 - A Fail or N/A shows a justification box marked as required; saving it empty shows an error next to the box and
   stores nothing; saving it with text stores the answer and shows who answered it and when.
 - The page has no field for a name; an answer is recorded under the user name and display name of the signed-in
@@ -130,6 +132,12 @@ slot holds a current signature; the notice `checklist-locked` is shown, the chec
 save buttons, and the applicability switches are disabled and marked `data-locked="true"`, and a section can still be
 opened. The same page for a review that is not approved shows no notice and no disabled control. This scenario is
 tested by `ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls`.
+
+**ChecklistPage_Answer_SignedReview_StoresTheAnswerAndMarksTheSignatureOutOfDate**: A review is fully answered, has two
+slots, and only the first is signed. A check is changed to Fail with a justification on the page; the page acknowledges
+the signature for now (temporary behavior until the page asks for confirmation), so the answer is stored and the first
+slot's signature is out of date. This scenario is tested by
+`ChecklistPage_Answer_SignedReview_StoresTheAnswerAndMarksTheSignatureOutOfDate`.
 
 **ChecklistPage_Render_NonMember_LooksLikeAMissingReview**: A review is opened by a user who is no member of the
 project. The not-found text equals the text for a project that does not exist (apart from the project number), and no

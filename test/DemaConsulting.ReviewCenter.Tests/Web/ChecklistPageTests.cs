@@ -241,6 +241,43 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that an answer that changes a review with a current signature is stored by the page, because the page
+    ///     acknowledges the signature on the person's behalf for now, and that the signature is then out of date
+    ///     (temporary behavior until the page asks the person to acknowledge).
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Answer_SignedReview_StoresTheAnswerAndMarksTheSignatureOutOfDate()
+    {
+        // Arrange: a fully answered review with two slots, of which the first is signed, so it is not yet approved
+        const string password = "correct horse battery";
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        await PassSectionsAsync(projectId, [.. DefaultChecklist.Current.Sections.Select(s => s.Id)]);
+        var first = await Users.CreateAsync("rita", "Rita", UserRole.Reviewer, password, cancellationToken);
+        var second = await Users.CreateAsync("sam", "Sam", UserRole.Reviewer, password, cancellationToken);
+        await Store.AddMembershipAsync(first.Id, projectId, cancellationToken);
+        await Store.AddMembershipAsync(second.Id, projectId, cancellationToken);
+        var rita = new Actor("rita", "Rita");
+        var slot = await Signing.AddSlotAsync(rita, projectId, "REV-1", first.Id, null, cancellationToken);
+        await Signing.AddSlotAsync(rita, projectId, "REV-1", second.Id, null, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        await Signing.SignAsync(rita, projectId, "REV-1", slot.Id, approval!.Digest, password, cancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
+
+        // Act: change the first answer to a fail with a justification
+        await cut.Find("[data-testid='check-fail-req-01']").ClickAsync();
+        await cut.Find("[data-testid='check-justification-req-01']").InputAsync("Not good enough");
+        await cut.Find("[data-testid='check-save-req-01']").ClickAsync();
+
+        // Assert: the answer is stored and the first slot's signature is out of date
+        var state = await Checklists.GetAsync(projectId, "REV-1", cancellationToken);
+        Assert.Equal(ChecklistOutcome.Fail, state!.AnswerFor("REQ-01")!.Outcome);
+        var after = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        Assert.Equal(SlotSignatureState.OutOfDate, after!.Slots.Single(s => s.SlotId == slot.Id).State);
+    }
+
+    /// <summary>
     ///     Test that a pass is saved at once, with the name and time, and updates the progress.
     /// </summary>
     [Fact]

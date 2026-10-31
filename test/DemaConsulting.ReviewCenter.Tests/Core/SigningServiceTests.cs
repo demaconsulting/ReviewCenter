@@ -448,7 +448,13 @@ public class SigningServiceTests
         if (outOfDate)
         {
             await fixture.Threads.StartThreadAsync(
-                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "A late remark", TestContext.Current.CancellationToken);
+                fixture.ProjectId,
+                "rev-1",
+                new ThreadAnchor("a.txt"),
+                TestActors.Bob,
+                "A late remark",
+                TestContext.Current.CancellationToken,
+                await fixture.Store.CurrentlySignedSlotIdsAsync(fixture.ProjectId, "rev-1"));
         }
 
         // Act: try to change and to remove the slot
@@ -815,7 +821,8 @@ public class SigningServiceTests
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", first.Id, signedDigest, Password, cancellationToken);
         var current = await ApprovalAsync(fixture);
 
-        // Act: the content changes while the signature is current
+        // Act: the content changes while the signature is current; the signed slots are acknowledged
+        var acknowledged = await fixture.Store.CurrentlySignedSlotIdsAsync(fixture.ProjectId, "rev-1");
         ReviewThread? thread = null;
         if (change == "answer")
         {
@@ -826,12 +833,13 @@ public class SigningServiceTests
                 ChecklistOutcome.NotApplicable,
                 "Does not apply to this change.",
                 TestActors.Bob,
-                cancellationToken);
+                cancellationToken,
+                acknowledged);
         }
         else
         {
             thread = await fixture.Threads.StartThreadAsync(
-                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "A late remark", cancellationToken);
+                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "A late remark", cancellationToken, acknowledged);
         }
 
         var outOfDate = await ApprovalAsync(fixture);

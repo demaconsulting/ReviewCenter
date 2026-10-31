@@ -30,7 +30,8 @@ N/A - standard test environment (a temporary database and key folder are created
 - An invalid body is a 400 problem that names the field, a body that is not JSON of the right shape is a 400 problem, a
   body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status; the rule
   for the last project administrator is 409, too many attempts 429, a required password change 403, and the rules for a
-  locked review (`ReviewLocked`) and for a review that is not locked (`ReviewNotLocked`) are 409.
+  locked review (`ReviewLocked`) and for a review that is not locked (`ReviewNotLocked`) are 409, and so is the rule
+  for a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`).
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
   is a 413, and no review is created in these cases. A file count above the limit, or a Base64 text longer than that of
   the largest file, is a 400 validation problem that is answered before anything is decoded.
@@ -152,6 +153,10 @@ scenario is tested by `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus`.
 `ReviewNotLocked` is asked of `ApiProblems`; both answers are 409, while `ReviewerNotIndependent` and
 `ReopenReasonInvalid` keep the default 400. This scenario is tested by
 `ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409`.
+
+**ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409**: The status of the rule `SignaturesWouldBecomeOutOfDate`
+is asked of `ApiProblems`, and the exception is turned into a result; the status is 409 and the problem detail holds the
+message that names the slot. This scenario is tested by `ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409`.
 
 **ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem**: The attestation of a complete review and of a review that
 does

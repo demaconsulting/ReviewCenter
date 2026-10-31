@@ -39,7 +39,8 @@ internal static class ApiProblems
     /// <param name="rule">The rule that failed.</param>
     /// <returns>
     ///     404 for a missing thing, 409 for a conflict with the current state (a stale record, a duplicate, or a
-    ///     review that is locked by its approval, or that is not locked when a reopen is asked), 429 when too many
+    ///     review that is locked by its approval, or that is not locked when a reopen is asked, or a change that would
+    ///     make a signature out of date without being acknowledged), 429 when too many
     ///     attempts were made, 502, 503 or 504 when git cannot be used, 403 when the caller is not allowed, 500 when
     ///     a stored credential cannot be read, otherwise 400 (a checklist definition that is not valid is 400 explicitly).
     /// </returns>
@@ -64,7 +65,8 @@ internal static class ApiProblems
                 or DomainRule.RepositoryDisabled
                 or DomainRule.ReviewLocked
                 or DomainRule.ReviewNotLocked
-                or DomainRule.RecordChanged => StatusCodes.Status409Conflict,
+                or DomainRule.RecordChanged
+                or DomainRule.SignaturesWouldBecomeOutOfDate => StatusCodes.Status409Conflict,
             DomainRule.TooManyAttempts => StatusCodes.Status429TooManyRequests,
             DomainRule.GitUnavailable => StatusCodes.Status503ServiceUnavailable,
             DomainRule.GitAccessFailed => StatusCodes.Status502BadGateway,

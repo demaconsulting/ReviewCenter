@@ -224,6 +224,17 @@ sections:
         tests:
           - ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409
 
+      - id: ReviewCenter-ApiEndpoints-OutOfDateConflict
+        title: >-
+          The ApiEndpoints unit shall answer a request that a service refuses because the change would make a
+          current signature out of date and has not been acknowledged (SignaturesWouldBecomeOutOfDate) with status
+          409 and a problem document that carries the message of the rule, which names the affected slots.
+        justification: |
+          A script that changes an approved-in-part review must be able to tell the refusal from a mistake in its
+          request, and learn whose signatures it would withdraw, in a form it can act on.
+        tests:
+          - ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409
+
       - id: ReviewCenter-ApiEndpoints-OpenRoutes
         title: >-
           The ApiEndpoints unit shall put exactly two routes, the evidence index and the attestation PDF, behind a

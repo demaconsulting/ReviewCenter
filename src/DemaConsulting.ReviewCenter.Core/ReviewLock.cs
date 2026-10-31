@@ -73,12 +73,15 @@ public static class ReviewLock
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the review is known not to be locked.</returns>
+    /// <returns>
+    ///     A task with the snapshot that was read to decide, so the caller can reuse it; <c>null</c> when the review
+    ///     does not exist.
+    /// </returns>
     /// <remarks>
     ///     A review that does not exist is not locked: the caller's own not-found rule then applies, unchanged.
     /// </remarks>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is approved.</exception>
-    internal static async Task EnsureUnlockedAsync(
+    internal static async Task<ReviewSnapshot?> EnsureUnlockedAsync(
         IReviewStore store,
         int projectId,
         string reviewId,
@@ -89,5 +92,7 @@ public static class ReviewLock
         {
             throw new DomainRuleException(DomainRule.ReviewLocked, LockedMessage);
         }
+
+        return snapshot;
     }
 }

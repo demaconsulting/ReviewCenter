@@ -286,11 +286,14 @@ sections:
           alternate, let a reviewer sign the review only when nothing blocks it and only after confirming the
           password again, bind each signature to a digest of the review record, keep every signature unchanged,
           and show a signature as out of date, and the review as not approved, as soon as the record changes
-          until every slot has signed the new record.
+          until every slot has signed the new record, and refuse a change of the record that would make a current
+          signature out of date until the caller acknowledges the affected slots.
         justification: |
           A signature is only worth something if it says who approved which content. Binding it to a digest of
           the record, and computing the approval from the record each time, means an approval can never outlive
           the content it approved, and asking for the password again shows the approval came from the person.
+          Naming the signatures that a change would withdraw, and refusing until the caller confirms, keeps a
+          signature from being lost unnoticed.
         children:
           - ReviewCenter-RecordDigest-Format
           - ReviewCenter-RecordDigest-NullRecord
@@ -310,8 +313,12 @@ sections:
           - ReviewCenter-SigningService-Reauthenticate
           - ReviewCenter-SigningService-Current
           - ReviewCenter-SigningService-Status
+          - ReviewCenter-SigningService-SignatureImpact
+          - ReviewCenter-ChecklistService-SignatureImpact
+          - ReviewCenter-ThreadService-SignatureImpact
         tests:
           - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
+          - CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement
 
       - id: ReviewCenter-Core-ApprovalLock
         title: >-

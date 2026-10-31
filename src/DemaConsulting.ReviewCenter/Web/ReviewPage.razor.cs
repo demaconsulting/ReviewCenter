@@ -1698,10 +1698,10 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         try
         {
-            await ThreadService.StartThreadAsync(
-                ProjectId, ReviewId,
-                new ThreadAnchor(SelectedPath, start, end ?? start, start is null ? ThreadSide.Head : NewSide),
-                await AuthenticationState.GetActorAsync(), NewText);
+            var actor = await AuthenticationState.GetActorAsync();
+            var anchor = new ThreadAnchor(SelectedPath, start, end ?? start, start is null ? ThreadSide.Head : NewSide);
+            await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.StartThreadAsync(
+                ProjectId, ReviewId, anchor, actor, NewText, acknowledgedSlotIds: acknowledged));
         }
         catch (DomainRuleException ex)
         {
@@ -1729,9 +1729,10 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         try
         {
-            await ThreadService.ReplyAsync(
-                ProjectId, ReviewId, threadId, await AuthenticationState.GetActorAsync(),
-                ReplyTexts.GetValueOrDefault(threadId));
+            var actor = await AuthenticationState.GetActorAsync();
+            var text = ReplyTexts.GetValueOrDefault(threadId);
+            await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.ReplyAsync(
+                ProjectId, ReviewId, threadId, actor, text, acknowledgedSlotIds: acknowledged));
         }
         catch (DomainRuleException ex)
         {
@@ -1766,12 +1767,14 @@ public partial class ReviewPage : ComponentBase, IDisposable
             var actor = await AuthenticationState.GetActorAsync();
             if (thread.State == ReviewThreadState.Open)
             {
-                await ThreadService.ResolveAsync(ProjectId, ReviewId, thread.Id, actor);
+                await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.ResolveAsync(
+                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: acknowledged));
                 ExpandedThreads.Remove(thread.Id);
             }
             else
             {
-                await ThreadService.ReopenAsync(ProjectId, ReviewId, thread.Id, actor);
+                await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.ReopenAsync(
+                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: acknowledged));
             }
         }
         catch (DomainRuleException ex)

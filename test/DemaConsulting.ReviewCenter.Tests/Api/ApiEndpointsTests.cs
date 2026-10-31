@@ -97,6 +97,29 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that a change that would make a signature out of date without being acknowledged is a conflict (409)
+    ///     whose problem answer carries the message that names the slots.
+    /// </summary>
+    [Fact]
+    public void ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409()
+    {
+        // Arrange: the refusal of a service
+        var exception = new DomainRuleException(
+            DomainRule.SignaturesWouldBecomeOutOfDate,
+            "This change makes signatures out of date: slot 1 (Ann). Acknowledge them to continue.",
+            [new AffectedSignature(7, 1, "Ann", 3)]);
+
+        // Act
+        var status = ApiProblems.StatusOf(exception.Rule);
+        var problem = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult>(ApiProblems.ToResult(exception));
+
+        // Assert: 409 with the message as the detail
+        Assert.Equal(409, status);
+        Assert.Equal(409, problem.StatusCode);
+        Assert.Contains("slot 1 (Ann)", problem.ProblemDetails.Detail);
+    }
+
+    /// <summary>
     ///     Test that the project list returns every project with its details in camel-case JSON.
     /// </summary>
     [Fact(Timeout = 120000)]

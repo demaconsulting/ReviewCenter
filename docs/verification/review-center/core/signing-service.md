@@ -67,6 +67,10 @@ N/A - standard test environment.
 - A review is approved only when it has at least one slot and every slot has a current signature.
 - An approved review is locked: adding, changing, and removing a slot and signing are refused with `ReviewLocked`,
   the message of which says that an administrator must reopen the review, and nothing is stored.
+- A change of the checklist or of a thread that would make a current signature out of date is refused with
+  `SignaturesWouldBecomeOutOfDate` unless every affected slot is acknowledged. The refusal names each affected slot by
+  its number and its signer, and a change that leaves the digest of the record as it is, or a review without a current
+  signature, needs no acknowledgement.
 - A project administrator (a system administrator, who need not be a member, or an administrator of the project) reopens
   a locked review with a
   reason of 1 to 250 characters after trimming; a user who does not administer the project and an actor that came
@@ -301,6 +305,16 @@ review is still approved with the same digest. This scenario is tested by
 
 **SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked**: Signing an approved review again is refused with
 `ReviewLocked` (not with the "already signed" message), and the signatures are unchanged. This scenario is tested by `SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked`.
+
+**Signature impact**: `SignatureImpact` is used through `ChecklistService` and `ThreadService`, so its scenarios run in
+the tests of those units, with the signed review of the test world (three slots, slot 1 with a primary reviewer and an
+alternate). They are tested by `ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners`
+(slot numbers and the people who signed, the alternate included),
+`ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots` (only the slots that remain),
+`ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow` (no signature, and a change that leaves the digest as it is),
+and `ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement` (a new thread always counts). The effect on signatures
+that already went out of date is checked by `SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable`,
+which acknowledges the signed slot before it changes the content.
 
 **SigningService_ReopenReviewAsync_NotAdmin_ThrowsActorNotAllowed**: A member of the project who does not administer it
 asks to reopen an approved review; the request is refused with `ActorNotAllowed`, and the review is still approved with
