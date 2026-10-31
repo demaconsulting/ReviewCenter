@@ -21,23 +21,35 @@
 namespace DemaConsulting.ReviewCenter.Hosting;
 
 /// <summary>
-///     The settings of the persisted Data Protection key ring, bound from the <c>DataProtection</c> section.
+///     How the key files of the Data Protection key ring are protected at rest; the values of the
+///     <c>DataProtection:Protection</c> setting.
 /// </summary>
 /// <remarks>
-///     The key ring encrypts repository tokens and also signs the sign-in cookie and the antiforgery tokens.
-///     Losing it makes the stored tokens unreadable (administrators must enter them again) and signs everybody
-///     out once. The class is a plain settings holder that is only read after start-up.
+///     <see cref="Auto"/> is only a request: <see cref="KeyRingProtection.ResolveMode"/> turns it into one of the
+///     other three, which are the modes that are actually applied.
 /// </remarks>
-internal sealed class DataProtectionSettings
+internal enum KeyRingProtectionMode
 {
     /// <summary>
-    ///     The name of the configuration section the settings are bound from.
+    ///     Choose the mode: a certificate when <c>DataProtection:CertificatePath</c> is set, otherwise Windows DPAPI on
+    ///     Windows and owner-only permissions elsewhere.
     /// </summary>
-    public const string SectionName = "DataProtection";
+    Auto,
 
     /// <summary>
-    ///     Gets or sets the folder that holds the key ring files, or <c>null</c> or empty for the default folder,
-    ///     <c>keys</c> beside the database.
+    ///     Encrypt the key files with Windows DPAPI, bound to the account (or, by choice, the machine) of the server.
+    ///     Only available on Windows.
     /// </summary>
-    public string? KeysPath { get; set; }
+    Dpapi,
+
+    /// <summary>
+    ///     Encrypt the key files with the public key of a certificate that the operator supplies as a file; the
+    ///     private key is needed to read them.
+    /// </summary>
+    Certificate,
+
+    /// <summary>
+    ///     Leave the key files unencrypted and rely on the owner-only permissions of the key folder and files.
+    /// </summary>
+    PermissionsOnly
 }

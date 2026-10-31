@@ -152,3 +152,31 @@ after a restart, unprotects it.
 **Expected**: The framework cannot decrypt it.
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+
+#### KeyRingProtection_CertificateRing_KeyFileIsEncryptedAndRestartReadsIt
+
+**Scenario**: A key ring is created in a temporary folder with the certificate encryptor of the framework and an
+in-memory RSA certificate, a value is protected, and a new provider over the same folder and certificate, as after a
+restart, unprotects it.
+
+**Expected**: The key file holds an encrypted secret and not the key, and the value is returned unchanged.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+
+#### KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
+
+**Scenario**: A ring that a first certificate protected is read with a second certificate that lists the first one as
+a previous certificate.
+
+**Expected**: The framework decrypts the key file with the previous certificate and the value is returned unchanged.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+
+#### KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt
+
+**Scenario**: On Windows only (the test is skipped elsewhere), a key ring is created in a temporary folder with the
+DPAPI encryptor of the framework, a value is protected, and a new provider over the same folder unprotects it.
+
+**Expected**: The key file holds an encrypted secret and not the key, and the value is returned unchanged.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.

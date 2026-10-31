@@ -47,6 +47,10 @@ N/A - standard test environment.
   non-member (`ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`).
 - A key ring folder that cannot be written stops the start of the server with an error that names the
   `DataProtection:KeysPath` setting and the folder.
+- A certificate key ring is read again after a restart; invalid key ring settings, a certificate that cannot be loaded
+  (never naming the password), a certificate that does not open the existing ring (without a second key being
+  created), and a plain ring with `DataProtection:RequireEncryptedKeys` each stop the start with an error that names
+  the setting at fault; `PermissionsOnly` logs a warning at every start.
 - The personal access token service is one shared instance, the routes under `/api` are mapped, the OpenAPI document is
   served without a token, a protected route without a token is answered 401, and an unknown address under `/api` is
   answered with a JSON problem document instead of a page.
@@ -199,6 +203,43 @@ path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRing
 **ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder**: A configured key ring folder is used as given; a
 missing or blank setting gives a `keys` folder beside the database. This scenario is tested by
 `ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`.
+
+**ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable**: An application is built with
+`DataProtection:Protection` Auto and a certificate in a temporary folder; a value is protected, the application is
+disposed, and a second application over the same key ring unprotects it. The key file holds an encrypted secret. This
+scenario is tested by `ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable`.
+
+**ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError**: An unknown protection, an unknown DPAPI
+scope, and a certificate protection without a certificate each stop the build with an `InvalidOperationException` that
+starts "Invalid key ring settings:" and names the setting. This scenario is tested by
+`ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError`.
+
+**ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword**: A missing
+certificate file and a wrong password each stop the build with a message that names
+`DataProtection:CertificatePath` and does not contain the password. This scenario is tested by
+`ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword`.
+
+**ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey**: A ring that one
+certificate protects is opened with another; the build fails with a message that names
+`DataProtection:CertificatePath` and `DataProtection:PreviousCertificatePaths`, and no second key file exists. This
+scenario is tested by `ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey`.
+
+**ServerHost_CreateApplication_PermissionsOnly_WarnsAtEveryStart**: The build with `PermissionsOnly` is made twice over
+the same folder; each start logs the warning that the ring is not encrypted at rest. This scenario is tested by
+`ServerHost_CreateApplication_PermissionsOnly_WarnsAtEveryStart`.
+
+**ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError**: A ring with a plain key file
+is started with `DataProtection:RequireEncryptedKeys` true; the build fails with a message that names the setting.
+This scenario is tested by `ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError`.
+
+**ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError** and
+**ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles**: On Linux and macOS only (skipped on
+Windows), explicit DPAPI is refused with a message that names `DataProtection:Protection`, and the key folder gets mode
+0700 and the key files mode 0600. These scenarios are tested by the tests of the same names.
+
+**SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection**: The settings of the isolated hosts of the
+self-validation choose `PermissionsOnly`, so that they never use the key store of the operating system. This scenario
+is tested by `SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection`.
 
 **ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys**: The pipeline
 is started twice on the same database folder with no attestation setting. The key file exists in the

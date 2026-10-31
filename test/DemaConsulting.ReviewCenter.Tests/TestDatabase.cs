@@ -147,6 +147,8 @@ internal static class TestDatabase
     {
         Environment.SetEnvironmentVariable(ConnectionStringVariable, NewConnectionString());
 
+        // The tests that start a server without isolated settings never touch the real key store of the machine
+        Environment.SetEnvironmentVariable("DataProtection__Protection", "PermissionsOnly");
         // Best-effort cleanup: files that are still locked are left for the operating system's temp cleanup
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {

@@ -258,8 +258,23 @@ reviews:
       - "docs/verification/review-center/hosting/server-host.md"
       - "src/**/Hosting/ServerHost.cs"
       - "src/**/Hosting/ServerHostOptions.cs"
-      - "src/**/Hosting/DataProtectionSettings.cs"
       - "test/**/Hosting/ServerHostTests.cs"
+
+  - id: ReviewCenter-Hosting-KeyRingProtection
+    title: Review of ReviewCenter KeyRingProtection unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/hosting.md
+      - docs/reqstream/review-center/hosting.yaml
+    paths:
+      - "docs/reqstream/review-center/hosting/key-ring-protection.yaml"
+      - "docs/design/review-center/hosting/key-ring-protection.md"
+      - "docs/verification/review-center/hosting/key-ring-protection.md"
+      - "src/**/Hosting/KeyRingProtection.cs"
+      - "src/**/Hosting/KeyRingProtectionMode.cs"
+      - "test/**/Hosting/KeyRingProtectionTests.cs"
+      - "test/**/Hosting/KeyRingTestCertificates.cs"
 
   - id: ReviewCenter-Hosting-UserCommand
     title: Review of ReviewCenter UserCommand unit implementation

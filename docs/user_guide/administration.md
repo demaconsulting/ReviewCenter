@@ -580,9 +580,13 @@ only in the environment of the git process (never on the command line and never 
 encoded forms are removed from every error message and log line. Git never asks for a password interactively.
 
 - **Back up the key ring** (the `DataProtection:KeysPath` folder) separately from the database. If it is lost, the
-  stored tokens become unreadable, and a project or system administrator must enter them again.
-- **The keys are not encrypted at rest.** On Linux the server creates the folder readable only by its own account;
-  keep it that way. Anyone who can read both the key folder and the database can read the tokens.
+  stored tokens become unreadable, and a project or system administrator must enter them again. When the key files are
+  encrypted with a certificate, also back up the certificate and its password (see Key Ring Protection below).
+- **The keys are encrypted at rest only when the platform or you provide a protection.** On Windows they are encrypted
+  with DPAPI by default; with a certificate (`DataProtection:CertificatePath`) on any system; and otherwise (Linux and
+  macOS without a certificate) only the permissions of the folder (owner only) and of the key files protect them, and
+  the server logs a warning at every start. Anyone who can read both the key folder and the database can then read
+  the tokens.
 - **The first start of this version signs every user out once**, because the cookie keys now persist in the key folder.
 - The server checks at start that the key folder can be written; if it cannot, it refuses to start and names the
   folder.
@@ -592,6 +596,95 @@ encoded forms are removed from every error message and log line. Git never asks 
 | `DataProtection:KeysPath` | `DataProtection__KeysPath` | Key ring folder (default `keys` beside the database)    |
 | `Git:CachePath`           | `Git__CachePath`           | Mirror folder (default `git-cache` beside the database) |
 | `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Git call time limit in seconds (default 120; 1 to 3600) |
+
+### Key Ring Protection
+
+The key ring decrypts every stored token, so the server protects its key files at rest. `DataProtection:Protection`
+chooses how (the names are not case sensitive):
+
+| Value             | Meaning                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| `Auto` (default)  | The certificate if `CertificatePath` is set; else DPAPI on Windows, permissions elsewhere   |
+| `Dpapi`           | Windows DPAPI for the account (`CurrentUser`) or the machine (`LocalMachine`); Windows only |
+| `Certificate`     | The key files are encrypted with the public key of an RSA certificate that you supply       |
+| `PermissionsOnly` | No encryption: folder mode 0700 and key files mode 0600 (owner only)                        |
+
+| Setting                                   | Meaning                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `DataProtection:Protection`               | `Auto`, `Dpapi`, `Certificate`, or `PermissionsOnly`               |
+| `DataProtection:DpapiScope`               | `CurrentUser` (default) or `LocalMachine`; DPAPI on Windows only   |
+| `DataProtection:CertificatePath`          | A PFX, PKCS#12, or PEM file with the certificate and an RSA key    |
+| `DataProtection:CertificateKeyPath`       | A PEM file with the private key, if not in the certificate file    |
+| `DataProtection:CertificatePassword`      | Password of the certificate or key file (prefer the file setting)  |
+| `DataProtection:CertificatePasswordFile`  | A file that holds the password; set only one of the two            |
+| `DataProtection:PreviousCertificatePaths` | A list of earlier certificates that can still decrypt the ring     |
+| `DataProtection:RequireEncryptedKeys`     | When true, the server refuses a ring that is not encrypted at rest |
+
+Set the list with indexed environment variables, for example `DataProtection__PreviousCertificatePaths__0`.
+
+Certificates are read from files only; the certificate store is not used. A wrong certificate, a wrong password, a
+missing file, and a certificate without an RSA private key each stop the start with a message that names the setting.
+The password is never logged.
+
+**The honest limit on Linux and macOS.** Without a secret that you supply there is no facility of the operating system
+that binds the keys to the machine, so `PermissionsOnly` is only owner-only permissions on the folder and the files.
+The server says so with a warning at every start ("The key ring is not encrypted at rest ..."). Set
+`DataProtection:CertificatePath` to encrypt the key files, and `DataProtection:RequireEncryptedKeys` to refuse to start
+without it. The certificate and its password must be kept where the service account can read them and an intruder who
+copies the key folder cannot; a certificate and its password beside the keys is no protection.
+
+**Windows DPAPI cannot be moved.** A ring that DPAPI protects can be read only by the same account (or machine, with
+`LocalMachine`). Restoring it elsewhere makes the stored tokens unreadable, so use a certificate for a ring that must
+be restored on another machine.
+
+**The server never replaces a ring that it cannot read.** Data Protection answers a key that it cannot decrypt by
+creating a new key, which would make the stored tokens unreadable. At start the server therefore checks the ring first:
+when the newest key (or every key) cannot be decrypted, it refuses to start and names `DataProtection:CertificatePath`
+and `DataProtection:PreviousCertificatePaths`. A key that was written before encryption was set stays in plain text
+until Data Protection replaces it (every 90 days); with `RequireEncryptedKeys` such a ring is refused.
+
+**Replacing the certificate.** Set the new certificate in `DataProtection:CertificatePath` and list the old one in
+`DataProtection:PreviousCertificatePaths`. The older keys stay encrypted with the old certificate, so keep it listed for
+as long as they are in the ring (there is no command yet that encrypts them again). An old certificate is opened with
+the password of the current certificate, or without a password, so give both certificates the same password.
+
+**Recipe: a certificate with OpenSSL** (Linux and macOS; the project did not run these commands):
+
+```bash
+umask 077
+openssl req -x509 -newkey rsa:3072 -sha256 -days 3650 -nodes -subj "/CN=ReviewCenter key ring" \
+  -keyout keyring.key -out keyring.crt
+openssl rand -base64 32 > keyring.password
+openssl pkcs12 -export -inkey keyring.key -in keyring.crt -passout file:keyring.password -out keyring.pfx
+shred -u keyring.key   # keep keyring.crt, keyring.pfx and keyring.password; back them up apart from the key ring
+```
+
+**Recipe: a certificate with PowerShell** (Windows; the project did not run these commands):
+
+```powershell
+$cert = New-SelfSignedCertificate -Subject "CN=ReviewCenter key ring" -KeyExportPolicy Exportable `
+  -KeySpec KeyExchange -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10)
+$password = Read-Host -AsSecureString
+Export-PfxCertificate -Cert $cert -FilePath C:\ProgramData\ReviewCenter\keyring.pfx -Password $password
+Remove-Item $cert.PSPath   # the server reads the file, not the store
+```
+
+**Recipe: the password as a systemd credential** (Linux; the project did not run this). Keep the password in a file
+that only root can read, and let systemd hand it to the service in a private directory:
+
+```ini
+[Service]
+LoadCredential=keyring-password:/etc/reviewcenter/keyring.password
+Environment=DataProtection__Protection=Certificate
+Environment=DataProtection__CertificatePath=/etc/reviewcenter/keyring.pfx
+Environment=DataProtection__CertificatePasswordFile=%d/keyring-password
+Environment=DataProtection__RequireEncryptedKeys=true
+```
+
+A setting for `DataProtection` is read from the host configuration (`appsettings.json`, environment variables, and the
+command line) once, when the services are registered. The commands `user add` and `audit
+verify` register the same services and the same protection but do not use the key ring, so the server is the only
+command that checks it.
 
 ### How Repositories Are Read
 
@@ -631,5 +724,6 @@ meaning all files.
 
 - A review from a repository has the same limits as an upload, counted over the baseline and head content of the
   changed files.
-- There is no Linux or Windows secret store for the key ring, no credential helper or SSH key support, and no
-  repository deletion.
+- There is no credential helper or SSH key support and no repository deletion. The key ring has no secret store of its
+  own: its protection is DPAPI, a certificate whose password you provide, or file permissions (see Key Ring
+  Protection).

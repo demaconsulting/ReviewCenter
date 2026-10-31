@@ -45,7 +45,8 @@ reaches a page or a log. Null arguments raise `ArgumentNullException`.
 
 - **ICredentialProtector**, **DomainRuleException**, **DomainRule** — Core.
 - **ASP.NET Core Data Protection** — the provider, the key ring, and the algorithms. The key ring is a folder that
-  `Hosting` creates and checks (see the `ContentSources` and `ServerHost` designs); its keys are not encrypted at rest.
+  `Hosting` creates and checks (see the `ContentSources` and `ServerHost` designs); its keys are encrypted at rest
+  when the operator allows it (see `KeyRingProtection`).
 
 #### Callers
 

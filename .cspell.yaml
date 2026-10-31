@@ -21,6 +21,16 @@ words:
   - hanko
   - appsettings
   - offadm
+  - dpapi
+  - encryptor
+  - encryptors
+  - decryptor
+  - permissionsonly
+  - localmachine
+  - newkey
+  - keyout
+  - inkey
+  - passout
   - padm
   - Blazor
   - TOTP

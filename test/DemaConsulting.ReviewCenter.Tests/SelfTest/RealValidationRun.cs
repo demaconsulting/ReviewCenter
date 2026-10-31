@@ -183,6 +183,10 @@ internal static class RealValidationRun
             ["Database__Provider"] = "Oracle",
             [TestDatabase.ConnectionStringVariable] = $"Data Source={Path.Combine(sentinel.DirectoryPath, "ambient.db")}",
             ["DataProtection__KeysPath"] = Path.Combine(sentinel.DirectoryPath, "keys"),
+
+            // An ambient request for a certificate that does not exist: the validation must ignore it
+            ["DataProtection__Protection"] = "Certificate",
+            ["DataProtection__CertificatePath"] = Path.Combine(sentinel.DirectoryPath, "missing.pfx"),
             ["Git__CachePath"] = Path.Combine(sentinel.DirectoryPath, "git"),
             ["Attestation__SelfSignedFolder"] = Path.Combine(sentinel.DirectoryPath, "attestation"),
             ["TEMP"] = privateTemp.DirectoryPath,

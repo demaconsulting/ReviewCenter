@@ -428,6 +428,10 @@ public class PuppetEndToEndTests
                 WorkingDirectory = Path.GetDirectoryName(dll)!
             };
             info.Environment["Database__ConnectionString"] = $"Data Source={databaseFile};Pooling=False";
+
+            // The key ring lives beside the temporary database, protected by its permissions only: the test never
+            // uses the key store of the operating system
+            info.Environment["DataProtection__Protection"] = "PermissionsOnly";
             if (gitCachePath is not null)
             {
                 info.Environment["Git__CachePath"] = gitCachePath;

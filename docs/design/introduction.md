@@ -74,8 +74,8 @@ The ReviewCenter system is divided as follows:
 - **Program** (unit): entry point and execution orchestrator
 - **Cli** (subsystem): argument parsing and output; contains the Context unit
 - **Hosting** (subsystem): builds and runs the ASP.NET Core web host for the `serve` verb, creates users for the
-  `user add` verb, and verifies the audit trail for the `audit verify` verb; contains the ServerHost, UserCommand, and
-  AuditCommand units
+  `user add` verb, and verifies the audit trail for the `audit verify` verb; contains the ServerHost,
+  KeyRingProtection, UserCommand, and AuditCommand units
 - **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization, and the periodic re-check
   of the user of an open page, the in-memory limit on failed sign-in attempts, sign-in with an OpenID Connect
   provider, and the optional one-time password second factor of local accounts; contains the PasswordHasher, SignIn,

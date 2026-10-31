@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Runtime.Versioning;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
@@ -891,9 +892,9 @@ public class ServerHostTests
         var database = new DatabaseOptions { ConnectionString = Path.Combine(folder, "x.db") };
 
         // Act: resolve with and without a configured folder
-        var configured = ServerHost.ResolveKeysPath(new DataProtectionSettings { KeysPath = Path.Combine(folder, "custom") }, database);
-        var fallback = ServerHost.ResolveKeysPath(new DataProtectionSettings(), database);
-        var blank = ServerHost.ResolveKeysPath(new DataProtectionSettings { KeysPath = "  " }, database);
+        var configured = ServerHost.ResolveKeysPath(new KeyRingSettings { KeysPath = Path.Combine(folder, "custom") }, database);
+        var fallback = ServerHost.ResolveKeysPath(new KeyRingSettings(), database);
+        var blank = ServerHost.ResolveKeysPath(new KeyRingSettings { KeysPath = "  " }, database);
 
         // Assert: configured wins; otherwise keys beside the database
         Assert.Equal(Path.Combine(folder, "custom"), configured);
@@ -1238,5 +1239,311 @@ public class ServerHostIsolationTests
         // Assert: the empty list is refused and the IPv6 loopback address with its port is returned
         Assert.IsType<ValidationFailedException>(none);
         Assert.Equal(5001, address.Port);
+    }
+}
+
+/// <summary>
+///     Tests of the protection of the key ring at the level of the host: the settings, the check at start-up, and a
+///     restart over a protected ring. The hosts are fully isolated (<see cref="ServerHostOptions.IsolatedSettings"/>),
+///     because the key ring settings are read when the services are registered; they are never started, and they
+///     never use the key store of the operating system.
+/// </summary>
+public class ServerHostKeyRingTests
+{
+    /// <summary>
+    ///     A password that must never appear in a message.
+    /// </summary>
+    private const string Password = "Pa55-word-for-host-tests";
+
+    /// <summary>
+    ///     Makes the isolated settings of a host over a temporary folder, with changes.
+    /// </summary>
+    /// <param name="folder">The temporary folder.</param>
+    /// <param name="changes">The settings that are added or replaced.</param>
+    /// <returns>The settings.</returns>
+    private static Dictionary<string, string?> Settings(TemporaryDirectory folder, params (string Key, string? Value)[] changes)
+    {
+        var settings = SelfTestServices.CreateSettings(folder);
+        foreach (var (key, value) in changes)
+        {
+            settings[key] = value;
+        }
+
+        return settings;
+    }
+
+    /// <summary>
+    ///     Builds the application, which checks the key ring; it is not started.
+    /// </summary>
+    /// <param name="settings">The isolated settings.</param>
+    /// <param name="logs">Receives the log entries.</param>
+    /// <returns>The application; the caller disposes it.</returns>
+    private static WebApplication Create(Dictionary<string, string?> settings, CapturingLoggerProvider logs)
+    {
+        using var context = Context.Create(["serve", "--silent"]);
+        return ServerHost.CreateApplication(context, new ServerHostOptions
+        {
+            IsolatedSettings = settings,
+            ConfigureBuilder = builder => builder.Logging.AddProvider(logs)
+        });
+    }
+
+    /// <summary>
+    ///     Gets the key files of the key ring of the settings.
+    /// </summary>
+    /// <param name="folder">The temporary folder.</param>
+    /// <returns>The paths of the key files.</returns>
+    private static string[] KeyFiles(TemporaryDirectory folder)
+    {
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+        return Directory.Exists(keys) ? Directory.GetFiles(keys, "key-*.xml") : [];
+    }
+
+    /// <summary>
+    ///     Test that the settings of the self-validation and of the isolated hosts choose permissions only, so that no
+    ///     test and no self-validation ever uses the key store of the operating system.
+    /// </summary>
+    [Fact]
+    public void SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection()
+    {
+        // Arrange
+        using var folder = new TemporaryDirectory();
+
+        // Act
+        var settings = SelfTestServices.CreateSettings(folder);
+
+        // Assert
+        Assert.Equal("PermissionsOnly", settings["DataProtection:Protection"]);
+    }
+
+    /// <summary>
+    ///     Test that a token encrypted before a restart is readable after it when the key ring is protected with a
+    ///     certificate, that the key file is encrypted, and that the protection is logged.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable()
+    {
+        // Arrange: a certificate, and a host that encrypts a token with a ring protected by it
+        using var folder = new TemporaryDirectory();
+        var certificate = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
+        var logs = new CapturingLoggerProvider();
+        string cipher;
+        await using (var first = Create(Settings(
+            folder,
+            ("DataProtection:CertificatePath", certificate),
+            ("DataProtection:CertificatePassword", Password),
+            ("DataProtection:Protection", "Auto")), logs))
+        {
+            cipher = first.Services.GetRequiredService<ICredentialProtector>().Protect("tkn-HostCertificate");
+        }
+
+        // Act: start a second host with the same certificate, now requiring encrypted keys
+        await using var second = Create(Settings(
+            folder,
+            ("DataProtection:CertificatePath", certificate),
+            ("DataProtection:CertificatePassword", Password),
+            ("DataProtection:Protection", "Auto"),
+            ("DataProtection:RequireEncryptedKeys", "true")), logs);
+        var plain = second.Services.GetRequiredService<ICredentialProtector>().Unprotect(cipher);
+
+        // Assert: readable, encrypted at rest, and logged without the password
+        Assert.Equal("tkn-HostCertificate", plain);
+        var text = await File.ReadAllTextAsync(Assert.Single(KeyFiles(folder)), TestContext.Current.CancellationToken);
+        Assert.Contains("<encryptedSecret", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("<masterKey", text, StringComparison.Ordinal);
+        var entries = logs.Entries.Where(entry => entry.Category == typeof(KeyRingProtection).FullName).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, entry => Assert.Equal(LogLevel.Information, entry.Level));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains(Password, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that settings that cannot work stop the start with an error that names the setting at fault.
+    /// </summary>
+    /// <param name="key">The setting to change.</param>
+    /// <param name="value">Its value.</param>
+    /// <param name="expected">What the message holds.</param>
+    [Theory]
+    [InlineData("DataProtection:Protection", "Magic", "DataProtection:Protection 'Magic' is not supported. Use Auto, Dpapi, Certificate or PermissionsOnly.")]
+    [InlineData("DataProtection:Protection", "Certificate", "DataProtection:CertificatePath")]
+    [InlineData("DataProtection:DpapiScope", "Everyone", "DataProtection:DpapiScope 'Everyone' is not supported.")]
+    [InlineData("DataProtection:RequireEncryptedKeys", "true", "The key ring is not encrypted at rest and DataProtection:RequireEncryptedKeys is true.")]
+    public void ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError(string key, string value, string expected)
+    {
+        // Arrange: settings with one wrong value; the rest are those of the isolated host
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder, (key, value));
+
+        // Act
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(settings, new CapturingLoggerProvider()));
+
+        // Assert: the message names the setting, and nothing was written to the key ring
+        Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
+        Assert.Empty(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Test that a certificate file that is missing, or that has another password, stops the start with an error
+    ///     that names the setting and never shows the password.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword()
+    {
+        // Arrange: a missing file, and a file with another password
+        using var folder = new TemporaryDirectory();
+        var missing = folder.GetFilePath("missing.pfx");
+        var present = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
+
+        // Act
+        var missingException = Assert.Throws<InvalidOperationException>(() => Create(
+            Settings(folder, ("DataProtection:Protection", "Auto"), ("DataProtection:CertificatePath", missing), ("DataProtection:CertificatePassword", Password)),
+            new CapturingLoggerProvider()));
+        var wrongException = Assert.Throws<InvalidOperationException>(() => Create(
+            Settings(folder, ("DataProtection:CertificatePath", present), ("DataProtection:CertificatePassword", "other-password"), ("DataProtection:Protection", "Certificate")),
+            new CapturingLoggerProvider()));
+
+        // Assert
+        Assert.Contains($"DataProtection:CertificatePath '{missing}' could not be loaded", missingException.Message, StringComparison.Ordinal);
+        Assert.Contains("wrong password or not a certificate with a private key", wrongException.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Password, wrongException.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("other-password", wrongException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a start with another certificate than the one that protects the ring is refused and creates no
+    ///     second key, so that the stored tokens are not lost silently.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey()
+    {
+        // Arrange: a ring protected with one certificate
+        using var folder = new TemporaryDirectory();
+        var right = KeyRingTestCertificates.WritePfx(folder, "right", Password);
+        var wrong = KeyRingTestCertificates.WritePfx(folder, "wrong", Password);
+        var logs = new CapturingLoggerProvider();
+        await using (var first = Create(Settings(
+            folder,
+            ("DataProtection:Protection", "Auto"),
+            ("DataProtection:CertificatePath", right),
+            ("DataProtection:CertificatePassword", Password)), logs))
+        {
+            Assert.Single(KeyFiles(folder));
+        }
+
+        // Act: start with the other certificate
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(
+            Settings(folder, ("DataProtection:Protection", "Auto"), ("DataProtection:CertificatePath", wrong), ("DataProtection:CertificatePassword", Password)),
+            logs));
+
+        // Assert: refused, naming the settings, and still one key file
+        Assert.Contains("DataProtection:CertificatePath", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("DataProtection:PreviousCertificatePaths", exception.Message, StringComparison.Ordinal);
+        Assert.Single(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Test that a ring protected only by permissions is reported with a warning at every start.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_PermissionsOnly_WarnsAtEveryStart()
+    {
+        // Arrange: two starts over the same folder
+        using var folder = new TemporaryDirectory();
+        var logs = new CapturingLoggerProvider();
+
+        // Act
+        await using (var first = Create(Settings(folder), logs))
+        {
+            Assert.Single(KeyFiles(folder));
+        }
+
+        await using (var second = Create(Settings(folder), logs))
+        {
+            Assert.Single(KeyFiles(folder));
+        }
+
+        // Assert: one warning per start, naming the settings that fix it
+        var warnings = logs.Entries.Where(entry => entry.Level == LogLevel.Warning && entry.Message.Contains("not encrypted at rest", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, warnings.Count);
+        Assert.All(warnings, warning =>
+        {
+            Assert.Contains("DataProtection:CertificatePath", warning.Message, StringComparison.Ordinal);
+            Assert.Contains("DataProtection:RequireEncryptedKeys", warning.Message, StringComparison.Ordinal);
+        });
+    }
+
+    /// <summary>
+    ///     Test that a ring with an unencrypted key file stops the start when encryption is required, so that a
+    ///     required protection is never claimed while a clear key is on the disk.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError()
+    {
+        // Arrange: a ring that an earlier start without a certificate left unencrypted
+        using var folder = new TemporaryDirectory();
+        var certificate = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
+        await using (var first = Create(Settings(folder), new CapturingLoggerProvider()))
+        {
+            var plaintext = await File.ReadAllTextAsync(Assert.Single(KeyFiles(folder)), TestContext.Current.CancellationToken);
+            Assert.Contains("<masterKey", plaintext, StringComparison.Ordinal);
+        }
+
+        // Act: start with a certificate and the requirement
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(
+            Settings(
+                folder,
+                ("DataProtection:Protection", "Certificate"),
+                ("DataProtection:CertificatePath", certificate),
+                ("DataProtection:CertificatePassword", Password),
+                ("DataProtection:RequireEncryptedKeys", "true")),
+            new CapturingLoggerProvider()));
+
+        // Assert
+        Assert.Contains("DataProtection:RequireEncryptedKeys", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(Path.GetFileName(KeyFiles(folder).Single()), exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that DPAPI off Windows stops the start with an error that names the setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError()
+    {
+        // Arrange: DPAPI requested on a machine that does not have it
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "DPAPI is available on Windows.");
+        using var folder = new TemporaryDirectory();
+
+        // Act
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(
+            Settings(folder, ("DataProtection:Protection", "Dpapi")),
+            new CapturingLoggerProvider()));
+
+        // Assert
+        Assert.Contains("DataProtection:Protection Dpapi is only available on Windows.", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that on Unix the key folder is private to the owner and the key files are readable and writable by the
+    ///     owner only.
+    /// </summary>
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles()
+    {
+        // Arrange: a key folder that exists with loose permissions
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file permissions are only enforced on Linux and macOS.");
+        using var folder = new TemporaryDirectory();
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+        Directory.CreateDirectory(keys);
+        File.SetUnixFileMode(keys, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+
+        // Act
+        await using var app = Create(Settings(folder), new CapturingLoggerProvider());
+
+        // Assert: 0700 for the folder and 0600 for every key file
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(keys));
+        var files = KeyFiles(folder);
+        Assert.NotEmpty(files);
+        Assert.All(files, file => Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file)));
     }
 }

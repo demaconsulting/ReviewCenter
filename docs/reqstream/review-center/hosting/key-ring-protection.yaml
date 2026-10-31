@@ -1,0 +1,140 @@
+---
+# Software Unit Requirements for the KeyRingProtection Class
+#
+# The KeyRingProtection class decides how the Data Protection key ring is protected at rest (Windows DPAPI, a
+# certificate, or the permissions of its folder), wires the encryption of the key files, and checks the ring before
+# the server starts, so that a wrong setting or a wrong certificate stops the start with a message that names the
+# setting instead of silently replacing the keys.
+
+sections:
+  - title: KeyRingProtection Unit Requirements
+    requirements:
+      - id: ReviewCenter-KeyRingProtection-Auto
+        title: >-
+          The KeyRingProtection class shall, for DataProtection:Protection Auto (the default, in any case), choose
+          the certificate when DataProtection:CertificatePath is set, otherwise Windows DPAPI on Windows and the
+          permissions of the key folder on Linux and macOS, and shall log which protection is in force.
+        justification: |
+          A new installation must be protected as well as its operating system allows without any setting: Windows
+          offers a key store that needs no secret, while Linux and macOS offer none and need a certificate that the
+          operator supplies. An operator who supplies a certificate has asked for it to be used, on any platform.
+        tests:
+          - KeyRingProtection_ResolveMode_AutoOnWindowsWithoutCertificate_ChoosesDpapi
+          - KeyRingProtection_ResolveMode_AutoOnUnixWithoutCertificate_ChoosesPermissionsOnly
+          - KeyRingProtection_ResolveMode_AutoWithCertificatePath_ChoosesCertificate
+          - KeyRingProtection_ResolveMode_ExplicitChoice_IsHonoredInAnyCase
+          - KeyRingProtection_LogProtection_EachMode_LogsTheProtectionInForce
+
+      - id: ReviewCenter-KeyRingProtection-Dpapi
+        title: >-
+          The KeyRingProtection class shall, for DataProtection:Protection Dpapi on Windows, encrypt the key files
+          with Windows DPAPI for the current user or, with DataProtection:DpapiScope LocalMachine, for the machine,
+          and shall refuse Dpapi on another operating system with a message that names DataProtection:Protection.
+        justification: |
+          DPAPI binds the keys to an account or machine without any secret to keep, which is the strongest protection
+          available on Windows with no operator effort. It does not exist elsewhere, and silently using another
+          protection when the operator asked for DPAPI would leave the keys weaker than the operator believes.
+        tests:
+          - KeyRingProtection_Apply_Dpapi_CreatesTheEncryptorForTheScope
+          - KeyRingProtection_ResolveMode_DpapiOnUnix_ThrowsNamingTheSetting
+          - KeyRingProtection_Prepare_DpapiScope_IsCheckedAndCarried
+          - windows@KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt
+          - ubuntu@ServerHost_CreateApplication_DpapiOnUnix_ThrowsClearError
+
+      - id: ReviewCenter-KeyRingProtection-Certificate
+        title: >-
+          The KeyRingProtection class shall, for DataProtection:Protection Certificate, load an RSA certificate with
+          a private key from the PFX, PKCS#12, or PEM file that DataProtection:CertificatePath names (with an optional
+          DataProtection:CertificateKeyPath and a password from DataProtection:CertificatePassword or
+          DataProtection:CertificatePasswordFile), encrypt the key files with it so that a key file holds an encrypted
+          secret and not the key, read the ring again after a restart, and refuse a missing, unreadable, wrong-password,
+          non-RSA, or private-key-less certificate with a message that names the setting and never holds the password.
+        justification: |
+          A certificate that the operator supplies is the only way to bind the keys to a secret on Linux and macOS,
+          and it also lets a ring move between machines. A start that falls back to plain keys when the certificate
+          fails would leave the keys unprotected without telling the operator.
+        tests:
+          - KeyRingProtection_CertificateRing_KeyFileIsEncryptedAndRestartReadsIt
+          - KeyRingProtection_Apply_CertificateAndOthers_WiresTheCertificateEncryptorOnly
+          - KeyRingProtection_Prepare_SupportedFormats_LoadWithPrivateKey
+          - KeyRingProtection_Prepare_MissingCertificateFile_ReturnsProblemNamingTheSetting
+          - KeyRingProtection_Prepare_WrongPassword_ReturnsProblemWithoutThePassword
+          - KeyRingProtection_Prepare_NotACertificateWithPrivateKey_ReturnsProblem
+          - KeyRingProtection_Prepare_EcdsaCertificate_ReturnsProblemNamingRsa
+          - KeyRingProtection_LoadCertificate_PlatformCannotLoadPfx_ThrowsNamingTheSetting
+          - KeyRingProtection_Prepare_PasswordAndPasswordFile_ReturnsProblemWithoutThePassword
+          - KeyRingProtection_ResolveMode_CertificateWithoutPath_ThrowsNamingTheSettings
+
+      - id: ReviewCenter-KeyRingProtection-PermissionsOnly
+        title: >-
+          The KeyRingProtection class shall, for DataProtection:Protection PermissionsOnly, which Auto chooses on
+          Linux and macOS without a certificate, restrict the key files to the owner (mode 0600) in addition to the
+          key folder (mode 0700), and shall log a warning at every start that the key ring is not encrypted at rest
+          and name DataProtection:CertificatePath and DataProtection:RequireEncryptedKeys as the remedies.
+        justification: |
+          Without a secret from the operator there is no operating system facility that binds the keys to the
+          machine, so the permissions of the files are the only protection, and the operator must be told every time
+          that it is not encryption; a warning that appeared once would be forgotten.
+        tests:
+          - ubuntu@KeyRingProtection_RestrictKeyFiles_UnixKeyFiles_AreOwnerReadWriteOnly
+          - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
+          - ServerHost_CreateApplication_PermissionsOnly_WarnsAtEveryStart
+          - KeyRingProtection_LogProtection_EachMode_LogsTheProtectionInForce
+
+      - id: ReviewCenter-KeyRingProtection-Require
+        title: >-
+          The KeyRingProtection class shall refuse to start when DataProtection:RequireEncryptedKeys is true and the
+          protection chosen is PermissionsOnly, or the ring holds a key file that is not encrypted, with a message
+          that names DataProtection:RequireEncryptedKeys.
+        justification: |
+          An operator who must not run with plain keys needs the server to enforce that, rather than to rely on a
+          log line, so that a missing certificate or a ring made before encryption was enabled stops the start.
+        tests:
+          - KeyRingProtection_Prepare_PermissionsOnlyWithRequireEncryptedKeys_ReturnsProblem
+          - KeyRingProtection_Prepare_AutoOnUnixWithRequireEncryptedKeys_ReturnsProblem
+          - KeyRingProtection_CheckRing_RequireEncryptedKeysWithPlaintextKeyFile_Refuses
+          - ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError
+
+      - id: ReviewCenter-KeyRingProtection-PreviousCertificates
+        title: >-
+          The KeyRingProtection class shall let the key files that were encrypted with a certificate listed in
+          DataProtection:PreviousCertificatePaths be decrypted, using the password of the current certificate or none,
+          so that the certificate can be replaced without losing the ring, and shall name the entry of such a
+          certificate that cannot be loaded.
+        justification: |
+          A certificate expires or is replaced; the keys it protects must stay readable until Data Protection has
+          rolled to a key that the new certificate protects, and the operator must be told which old certificate
+          is at fault.
+        tests:
+          - KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
+          - KeyRingProtection_Prepare_PreviousCertificates_LoadWithSharedPasswordOrNone
+
+      - id: ReviewCenter-KeyRingProtection-WrongKeyGuard
+        title: >-
+          The KeyRingProtection class shall refuse to start, with a message that names DataProtection:CertificatePath
+          and DataProtection:PreviousCertificatePaths, when the ring already holds key files and the newest key, or
+          every key, cannot be decrypted, and shall not create a new key in that case.
+        justification: |
+          Data Protection answers a key that it cannot read by silently creating a new one, after which every stored
+          token and secret is unreadable. Starting with the wrong certificate, or with none after a certificate was
+          used, must therefore stop before any key is created, and an old key that cannot be read must be reported.
+        tests:
+          - KeyRingProtection_CheckRing_WrongCertificate_RefusesWithoutCreatingASecondKey
+          - KeyRingProtection_CheckRing_EncryptedRingWithoutCertificate_Refuses
+          - KeyRingProtection_CheckRing_EmptyRing_Passes
+          - KeyRingProtection_CheckRing_OlderKeyUnreadable_LogsErrorAndPasses
+          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+
+      - id: ReviewCenter-KeyRingProtection-Validation
+        title: >-
+          The KeyRingProtection class shall refuse a DataProtection:Protection value that is not Auto, Dpapi,
+          Certificate, or PermissionsOnly and a DataProtection:DpapiScope value that is not CurrentUser or
+          LocalMachine, with a message that names the setting and lists the choices, and shall report every problem
+          as one message that starts with the words invalid key ring settings.
+        justification: |
+          A misspelled protection must not fall back to a default that is weaker than the operator intended; the
+          operator must be told at the start which setting is wrong and what the choices are.
+        tests:
+          - KeyRingProtection_ResolveMode_UnknownProtection_ThrowsListingTheChoices
+          - KeyRingProtection_Prepare_UnknownProtection_ReturnsProblemWithPrefix
+          - KeyRingProtection_Prepare_Configuration_BindsTheSectionAndReportsBadValues

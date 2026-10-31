@@ -73,6 +73,7 @@ folder (see below). The folder holds these items:
 | Database `reviewcenter.db`       | The `ReviewCenter` folder of the account | `Database:ConnectionString`    |
 | Write-ahead log (`-wal`, `-shm`) | Beside the database file                 | Moves with the database        |
 | Data Protection key ring         | `keys` folder beside the database        | `DataProtection:KeysPath`      |
+| Protection of the key ring       | DPAPI, certificate, or permissions       | `DataProtection:Protection`    |
 | Self-signed attestation key      | `keys/attestation-selfsigned` folder     | `Attestation:SelfSignedFolder` |
 | Git mirrors                      | `git-cache` folder beside the database   | `Git:CachePath`                |
 
@@ -95,6 +96,12 @@ On a Windows machine the following was observed with a new database, a running s
 
 The git cache can be rebuilt (the server fetches the repositories again). The database and the keys cannot be
 rebuilt; see Back Up and Restore.
+
+The key files of the ring are encrypted at rest when the platform or you provide a protection (see Key Ring Protection
+in the Administration chapter). **A key ring that Windows DPAPI protects can be read only by the same account on the
+same machine (with `DpapiScope` `LocalMachine`, by any account on the same machine).** A copy of the `keys` folder
+restored on another machine or under another account is unreadable and the stored tokens are lost, so use a
+certificate (`DataProtection:CertificatePath`) for a ring that must move or be restored elsewhere.
 
 ## Configuration
 
@@ -127,6 +134,13 @@ that is not part of the release archive. The defaults are:
 | `Identity:Oidc:*`                         | off                            | Sign In with an OpenID Connect Provider |
 | `Identity:Oidc:ClientSecretFile`          | empty (use `ClientSecret`)     | Identity Providers                      |
 | `DataProtection:KeysPath`                 | `keys` in the data folder      | Repositories and Credentials            |
+| `DataProtection:Protection`               | `Auto`                         | Key Ring Protection (Administration)    |
+| `DataProtection:DpapiScope`               | `CurrentUser` (Windows only)   | Key Ring Protection (Administration)    |
+| `DataProtection:CertificatePath`          | empty (no certificate)         | Key Ring Protection (Administration)    |
+| `DataProtection:CertificateKeyPath`       | empty (key in the certificate) | Key Ring Protection (Administration)    |
+| `DataProtection:CertificatePasswordFile`  | empty (no password file)       | Key Ring Protection (Administration)    |
+| `DataProtection:PreviousCertificatePaths` | empty list                     | Key Ring Protection (Administration)    |
+| `DataProtection:RequireEncryptedKeys`     | false                          | Key Ring Protection (Administration)    |
 | `Attestation:*`                           | a self-signed key              | The Signing Key (Reviewing)             |
 | `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
 | `Git:TimeoutSeconds`                      | 120 seconds (1 to 3600)        | Repositories and Credentials            |
@@ -410,8 +424,15 @@ Why the keys matter, and what was observed on Windows:
   so the signatures of new attestation PDFs come from a new key, and a verifier that trusts the old key does not trust
   them. A key of the `CertificateStore` provider is not in the data folder; it stays in the certificate store, and the
   server does not generate one (a missing certificate stops the start with a message).
-- The keys and the pfx file are not encrypted at rest. Protect the backup like the live data, and let only the service
-  account and the backup operator read the files.
+- The keys and the pfx file are not encrypted at rest unless the key ring is protected (see Key Ring Protection in the
+  Administration chapter; the pfx file of the attestation key has no password). Protect the backup like the live data,
+  and let only the service account and the backup operator read the files. **Back up the certificate of a certificate
+  protected key ring, and its password, apart from the keys:** the ring cannot be read without it, and a ring that
+  DPAPI protects cannot be restored on another machine or account.
+- A more complete description of backing up, restoring, and moving a protected key ring is still to come; until then,
+  restore the folder, the certificate, and the settings together, and start the server once by hand. If the server
+  refuses to start with a message that names `DataProtection:CertificatePath`, it has not created a new key: fix the
+  certificate or list the old one in `DataProtection:PreviousCertificatePaths`.
 
 A plain copy of a database that is in use (the server running) may be inconsistent, because recent changes can be
 in the `-wal` file that the copy does not take together with the database file. Back up a stopped server, or use a
@@ -455,8 +476,14 @@ because no release has been published yet.
 - Let the proxy accept only your host names, redirect HTTP to HTTPS, and add HSTS where you need it; the server does
   none of these (see Host Filtering, HTTPS Redirection, and HSTS).
 - Run the server under an account of its own that can write only to the data folder, and let only that account read the
-  database, the `keys` folder, and the attestation pfx file. These files are not encrypted at rest.
-- Back up the database and the key folder together, and test a restore.
+  database, the `keys` folder, and the attestation pfx file. On Windows the key ring is encrypted with DPAPI by
+  default; on Linux and macOS it is not encrypted unless you set `DataProtection:CertificatePath` (the server warns at
+  every start), and the attestation pfx file is never encrypted.
+- Set `DataProtection:RequireEncryptedKeys` to true where the key ring must be encrypted: the server then refuses to
+  start with a ring that is not encrypted at rest. Protect the disk or volume with disk encryption as well, because
+  encrypted keys do not protect the database, the logs, or a running process.
+- Back up the database and the key folder together, and test a restore. Back up a certificate of the key ring apart from
+  the keys.
 - Keep the built-in protections on: the sign-in throttle (5 attempts per user name and 20 per address in 300 seconds by
   default), passwords of 12 to 128 characters, the optional two-factor sign-in, and the limit of 30 requests a minute
   for each address on anonymous evidence downloads (see Password Rules and Lockout in the Users and Sign-in chapter,
@@ -490,8 +517,28 @@ the project produced on purpose with a wrong setting, and what to do:
   the message names.
 - `Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600 seconds.`: correct the `Git` setting that the
   message names.
-- `The Data Protection key ring folder '<folder>' is not writable: ...`: set `DataProtection:KeysPath` to a folder that
-  the account can write and that is kept. The message was produced with a path that is an existing file.
+- `The Data Protection key ring folder '<folder>' could not be read or written: ...`: set `DataProtection:KeysPath` to
+  a folder that the account can read and write and that is kept. The message was produced with a path that is an
+  existing file.
+- `Invalid key ring settings: DataProtection:Protection 'X' is not supported. Use Auto, Dpapi, Certificate or
+  PermissionsOnly.`: correct `DataProtection:Protection` (or `DataProtection:DpapiScope`: `CurrentUser` or
+  `LocalMachine`).
+- `Invalid key ring settings: DataProtection:Protection Dpapi is only available on Windows.`: use `Certificate` or
+  `PermissionsOnly`, or `Auto`, on Linux and macOS.
+- `Invalid key ring settings: DataProtection:CertificatePath '<file>' could not be loaded: wrong password or not a
+  certificate with a private key.`: check the file, its password (`DataProtection:CertificatePassword` or
+  `CertificatePasswordFile`), and that the certificate is an RSA certificate with a private key. The message never
+  holds the password.
+- `The key ring is not encrypted at rest and DataProtection:RequireEncryptedKeys is true.`: set
+  `DataProtection:CertificatePath` (or, on Windows, leave `Protection` at `Auto`), or turn `RequireEncryptedKeys` off.
+- `The key ring '<folder>' holds key files that are not encrypted (...) and DataProtection:RequireEncryptedKeys is
+  true.`: the ring was made before encryption was set, and a key stays plain until Data Protection replaces it
+  (every 90 days). Move the plain key files away only if you accept that what they protected (the stored tokens and
+  second-factor secrets) is lost.
+- `The key ring '<folder>' holds N key(s), but the newest key cannot be decrypted: ...`: the ring was made with another
+  certificate, or with none, or by DPAPI for another account or machine. Set the right certificate in
+  `DataProtection:CertificatePath`, or list the old certificate in `DataProtection:PreviousCertificatePaths`. The
+  server stopped before it created a new key; a new key would have made the stored tokens unreadable.
 - `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned or
   CertificateStore.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
 

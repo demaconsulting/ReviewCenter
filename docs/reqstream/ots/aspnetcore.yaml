@@ -56,15 +56,22 @@ sections:
             title: >-
               ASP.NET Core shall encrypt and decrypt text with keys kept in a key ring in a folder, so that text
               protected with a purpose can be read again after a restart with the same key ring, and cannot be read
-              with another purpose or another key ring.
+              with another purpose or another key ring, and shall encrypt the key files of the ring with a
+              certificate or, on Windows, with DPAPI, so that a key file holds an encrypted secret and not the key.
             justification: |
               The access tokens of git repositories are stored only encrypted. The service depends on the Data
               Protection of the framework, which is part of the same shared framework as the web platform, to encrypt
               them, to keep its keys in a folder that survives restarts, and to keep text protected for one purpose
-              unreadable for another. Passing tests of the credential code confirm that the framework does so.
+              unreadable for another. The service also depends on the key encryptors of the framework to protect the
+              key files at rest: the certificate encryptor with a certificate that the operator supplies, and the
+              DPAPI encryptor on Windows. Passing tests of the credential code and of the key ring confirm that the
+              framework does so; the DPAPI test runs only on Windows, where DPAPI exists.
             tags: [ots]
             tests:
               - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
               - CredentialProtector_PersistedKeyRing_SurvivesRestart
               - CredentialProtector_Unprotect_OtherKeyRing_ThrowsCredentialsUnreadable
               - CredentialProtector_Purpose_IsolatesTokensFromOtherUses
+              - KeyRingProtection_CertificateRing_KeyFileIsEncryptedAndRestartReadsIt
+              - KeyRingProtection_CertificateRing_PreviousCertificateAndPasswordFile_StillReadTheRing
+              - windows@KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt

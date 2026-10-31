@@ -256,8 +256,9 @@ It is a minimal helper and is kept as small and simple as possible; see
 19. **Git credentials**: kept in an admin-only repository registry (a repository has a location and an optional user
     name and token; projects pick a registered repository), encrypted at rest with ASP.NET Data Protection, with the
     key ring stored outside the DB. The token is write-only in the UI and reaches git only through the environment of
-    the git child process. The key ring is not encrypted at rest, so its folder must be protected by file permissions,
-    and losing it makes the stored tokens unreadable. Reason: a database leak alone must not expose repository
+    the git child process. The key ring is protected at rest by Windows DPAPI or by an operator-supplied certificate;
+    where neither is available (Linux and macOS) only the permissions of its folder protect it, with a warning at every
+    start, and losing it makes the stored tokens unreadable. Reason: a database leak alone must not expose repository
     credentials.
 20. **Hosting**: single instance behind a reverse proxy that terminates TLS. Re-authentication is application-level,
     so the proxy does not affect it. Forwarded headers must be configured so redirect URLs and cookies use the public

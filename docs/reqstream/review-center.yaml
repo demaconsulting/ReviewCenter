@@ -740,18 +740,42 @@ sections:
       - id: ReviewCenter-System-Credentials
         title: >-
           The tool shall keep the access tokens of repositories only encrypted with a key ring that survives
-          restarts, hand a token to git only through the environment of the git process, never in its arguments,
-          the logs, the pages, or the audit trail, and refuse to start when the key ring cannot be saved.
+          restarts and is itself protected at rest (see the key protection requirement), hand a token to git only
+          through the environment of the git process, never in its arguments, the logs, the pages, or the audit
+          trail, and refuse to start when the key ring cannot be saved.
         tags: [system]
         justification: |
           A token gives access to source code. It must not be readable in a copy of the database, in a process
-          list, in a log, or on a page, and the keys must not be lost silently at a restart.
+          list, in a log, or on a page, and the keys must not be lost silently at a restart. A token that is
+          encrypted with keys that lie beside it in plain text would be no better than a plain token, so the
+          protection of the keys is part of the promise.
         children:
           - ReviewCenter-ContentSources-Credentials
           - ReviewCenter-Hosting-KeyRingFailure
         tests:
           - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
           - ServerHost_Restart_KeyRingPersisted_TokenStaysReadable
+
+      - id: ReviewCenter-System-KeyProtection
+        title: >-
+          The tool shall protect the Data Protection key ring, which is the root of trust of the stored access
+          tokens, at rest with Windows DPAPI, with a certificate that the operator supplies, or, where neither is
+          available, with the permissions of its folder and a warning at every start, refuse to start when the
+          protection settings are invalid, when the certificate does not open the existing ring, or when the
+          operator requires encrypted keys and the ring is not encrypted, and never replace an unreadable ring
+          silently with a new one.
+        tags: [system, security]
+        justification: |
+          Whoever can read the key ring and the database can read every stored token. Encrypting the keys with a
+          secret that is not stored beside them, or binding them to the account or machine, raises the cost of a
+          stolen backup or disk image. The tool must be honest where the platform offers no such facility, and
+          must stop rather than quietly create keys that make the stored tokens unreadable.
+        children:
+          - ReviewCenter-Hosting-KeyRingProtection
+          - ReviewCenter-Utilities-SecretSource
+        tests:
+          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
 
       # ----------------------------------------------------------------------------------------------
       # Automation: pipelines and tests

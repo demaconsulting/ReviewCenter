@@ -183,6 +183,33 @@ sections:
         tests:
           - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError
 
+      - id: ReviewCenter-Hosting-KeyRingProtection
+        title: >-
+          The Hosting subsystem shall protect the key ring at rest with Windows DPAPI, a certificate that the operator
+          supplies, or, where neither is available, the permissions of its folder with a warning at every start,
+          shall refuse to start with a message that names the setting at fault when the protection settings are
+          invalid, when the certificate does not open the existing ring, or when DataProtection:RequireEncryptedKeys
+          is true and the ring is not encrypted, and shall register the same protection of the key files wherever the
+          services are registered, while only the server start checks and probes the key ring.
+        justification: |
+          The key ring is the root of trust of every stored token and secret, so its protection must be strong by
+          default where the platform allows it, honest where it does not, and must never be replaced silently by a
+          new ring that makes the stored data unreadable.
+        children:
+          - ReviewCenter-KeyRingProtection-Auto
+          - ReviewCenter-KeyRingProtection-Dpapi
+          - ReviewCenter-KeyRingProtection-Certificate
+          - ReviewCenter-KeyRingProtection-PermissionsOnly
+          - ReviewCenter-KeyRingProtection-Require
+          - ReviewCenter-KeyRingProtection-PreviousCertificates
+          - ReviewCenter-KeyRingProtection-WrongKeyGuard
+          - ReviewCenter-KeyRingProtection-Validation
+          - ReviewCenter-ServerHost-KeyProtection
+        tests:
+          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+          - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
+          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+
       - id: ReviewCenter-Hosting-AttestationServices
         title: >-
           The Hosting subsystem shall make the signed attestation available to the pages and to clients, mapping the

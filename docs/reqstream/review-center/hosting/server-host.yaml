@@ -167,8 +167,8 @@ sections:
 
       - id: ReviewCenter-ServerHost-KeyRing
         title: >-
-          The ServerHost class shall keep the Data Protection key ring in a folder, so that a token encrypted before a
-          restart is readable after it.
+          The ServerHost class shall keep the Data Protection key ring in a folder, protected as the key ring
+          settings say, so that a token encrypted before a restart is readable after it.
         justification: |
           Without a persisted key ring the keys would be new at every start, and every stored token would become
           unreadable.
@@ -184,6 +184,27 @@ sections:
           operator must learn that at start-up and correct the setting.
         tests:
           - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-KeyProtection
+        title: >-
+          The ServerHost class shall, wherever it registers the services (the server and the command-line verbs), apply
+          the protection that the KeyRingProtection class chose to the key files, and shall, at the server start only,
+          check the ring before the probe round trip creates a key and fail with an error that names the setting at
+          fault, before serving requests, when the key ring settings are invalid, the certificate cannot be loaded, the
+          certificate does not open the existing ring, or DataProtection:RequireEncryptedKeys is true and the ring is
+          not encrypted.
+        justification: |
+          The composition root is the one place that connects the key ring to the settings and to the start-up
+          checks. The check must run before the probe because the probe would create a new key, hiding a wrong
+          certificate behind a start that appears to work. The command-line verbs register the same services but do
+          not use the key ring, so they do not check it.
+        tests:
+          - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
+          - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
+          - ServerHost_CreateApplication_MissingOrWrongPasswordCertificate_ThrowsClearErrorWithoutPassword
+          - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+          - ServerHost_CreateApplication_RequireEncryptedKeysWithPlaintextRing_ThrowsClearError
+          - SelfTestServices_CreateSettings_ChoosesPermissionsOnlyProtection
 
       - id: ReviewCenter-ServerHost-AttestationServices
         title: >-

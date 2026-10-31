@@ -98,7 +98,9 @@ internal static class SelfTestServices
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="folder"/> is null.</exception>
     /// <remarks>
     ///     The host check applies the same settings to a real web host, so both checks share one definition of
-    ///     "everything inside the temporary folder".
+    ///     "everything inside the temporary folder". The key ring is only protected by the permissions of its
+    ///     temporary folder (<c>DataProtection:Protection</c> is <c>PermissionsOnly</c>), so the checks never use the
+    ///     key store of the operating system or a certificate of the operator.
     /// </remarks>
     public static Dictionary<string, string?> CreateSettings(TemporaryDirectory folder)
     {
@@ -108,6 +110,7 @@ internal static class SelfTestServices
             ["Database:Provider"] = DatabaseSetup.SqliteProvider,
             ["Database:ConnectionString"] = $"Data Source={folder.GetFilePath("selftest.db")};Pooling=False",
             ["DataProtection:KeysPath"] = Path.Combine(folder.DirectoryPath, "keys"),
+            ["DataProtection:Protection"] = "PermissionsOnly",
             ["Git:CachePath"] = Path.Combine(folder.DirectoryPath, "git-cache"),
             ["Git:TimeoutSeconds"] = "60",
             ["Attestation:SelfSignedFolder"] = Path.Combine(folder.DirectoryPath, "attestation")

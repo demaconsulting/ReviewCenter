@@ -300,8 +300,12 @@ internal static class ServerHost
         services.AddSingleton<ReauthProofStore>();
 
         // The repository registry and the git content source. Tokens are encrypted with Data Protection, whose key
-        // ring is persisted in a folder so that the tokens survive a restart
-        services.AddOptions<DataProtectionSettings>().Bind(configuration.GetSection(DataProtectionSettings.SectionName));
+        // ring is persisted in a folder so that the tokens survive a restart. The key files are encrypted at rest as
+        // KeyRingProtection decides: the plan is made here, once, from the configuration as it is now, because the
+        // certificates are needed when Data Protection is registered; the start-up check reports a plan that is refused
+        services.AddOptions<KeyRingSettings>().Bind(configuration.GetSection(KeyRingSettings.SectionName));
+        var keyRingPlan = KeyRingProtection.Prepare(configuration, KeyProtectionPlatform.Current);
+        services.AddSingleton(_ => keyRingPlan);
         services.AddOptions<GitOptions>()
             .Bind(configuration.GetSection(GitOptions.SectionName))
             .Validate(
@@ -314,9 +318,10 @@ internal static class ServerHost
                     git.CachePath = Path.Combine(DatabaseSetup.ResolveDataDirectory(database.Value), "git-cache");
                 }
             });
-        services.AddDataProtection().SetApplicationName("DemaConsulting.ReviewCenter");
+        var dataProtection = services.AddDataProtection().SetApplicationName("DemaConsulting.ReviewCenter");
+        KeyRingProtection.Apply(dataProtection, keyRingPlan);
         services.AddOptions<KeyManagementOptions>()
-            .Configure<IOptions<DataProtectionSettings>, IOptions<DatabaseOptions>, ILoggerFactory>(
+            .Configure<IOptions<KeyRingSettings>, IOptions<DatabaseOptions>, ILoggerFactory>(
                 (keys, settings, database, loggerFactory) =>
                     keys.XmlRepository = new FileSystemXmlRepository(
                         new DirectoryInfo(ResolveKeysPath(settings.Value, database.Value)),
@@ -335,7 +340,7 @@ internal static class ServerHost
         // subfolder of the Data Protection keys folder, which is known to be writable and private to the server
         services.AddOptions<AttestationOptions>()
             .Bind(configuration.GetSection(AttestationOptions.SectionName))
-            .PostConfigure<IOptions<DataProtectionSettings>, IOptions<DatabaseOptions>>((attestation, settings, database) =>
+            .PostConfigure<IOptions<KeyRingSettings>, IOptions<DatabaseOptions>>((attestation, settings, database) =>
             {
                 if (string.IsNullOrWhiteSpace(attestation.SelfSignedFolder))
                 {
@@ -361,7 +366,7 @@ internal static class ServerHost
     /// <param name="settings">The configured settings.</param>
     /// <param name="database">The database options, whose folder is the default base.</param>
     /// <returns>The absolute folder: the configured one, or <c>keys</c> beside the database.</returns>
-    internal static string ResolveKeysPath(DataProtectionSettings settings, DatabaseOptions database) =>
+    internal static string ResolveKeysPath(KeyRingSettings settings, DatabaseOptions database) =>
         string.IsNullOrWhiteSpace(settings.KeysPath)
             ? Path.Combine(DatabaseSetup.ResolveDataDirectory(database), "keys")
             : Path.GetFullPath(settings.KeysPath);
@@ -654,22 +659,35 @@ internal static class ServerHost
     }
 
     /// <summary>
-    ///     Checks that the Data Protection key ring folder is writable and that a token can be encrypted and read back.
+    ///     Checks that the Data Protection key ring is protected as configured, that it can be read, that its folder is
+    ///     writable, and that a token can be encrypted and read back.
     /// </summary>
     /// <param name="app">The built application whose services provide the settings and the protector.</param>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when the key ring cannot be written; the application is disposed before the exception is thrown.
-    ///     The message names the folder and the <c>DataProtection:KeysPath</c> setting.
+    ///     Thrown when the key ring settings are invalid, the ring cannot be read or does not meet
+    ///     <c>DataProtection:RequireEncryptedKeys</c>, or cannot be written; the application is disposed before the
+    ///     exception is thrown. The message names the setting at fault, or the folder and
+    ///     <c>DataProtection:KeysPath</c> for a ring that cannot be written.
     /// </exception>
     /// <remarks>
-    ///     A key ring that cannot be saved would silently fall back to keys that are lost at the next restart,
-    ///     and every stored token would become unreadable, so the server refuses to start instead.
+    ///     A key ring that cannot be saved would silently fall back to keys that are lost at the next restart, and
+    ///     every stored token would become unreadable, so the server refuses to start instead. For the same reason the
+    ///     existing ring is read (<see cref="KeyRingProtection.CheckRing"/>) before the probe, which creates a key
+    ///     when the ring has none that works. The protection that is in force is logged at the end of every start.
     /// </remarks>
     private static void ValidateDataProtection(WebApplication app)
     {
-        var settings = app.Services.GetRequiredService<IOptions<DataProtectionSettings>>().Value;
+        var plan = app.Services.GetRequiredService<KeyRingPlan>();
+        if (plan.Problem is not null)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException(plan.Problem);
+        }
+
+        var settings = app.Services.GetRequiredService<IOptions<KeyRingSettings>>().Value;
         var database = app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
         var folder = ResolveKeysPath(settings, database);
+        var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(KeyRingProtection).FullName!);
         try
         {
             Directory.CreateDirectory(folder);
@@ -683,8 +701,14 @@ internal static class ServerHost
             File.WriteAllText(probe, "probe");
             File.Delete(probe);
 
+            // Before anything is protected: a ring that cannot be read must not be replaced by a new one
+            KeyRingProtection.CheckRing(plan, app.Services.GetRequiredService<IKeyManager>(), folder, logger);
+
             var protector = app.Services.GetRequiredService<ICredentialProtector>();
             ProbeRoundTrip(protector);
+
+            // The probe may have created the first key file, so the files are restricted last
+            KeyRingProtection.RestrictKeyFiles(folder);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or CryptographicException
                                        or DomainRuleException or ArgumentException or NotSupportedException)
@@ -692,10 +716,18 @@ internal static class ServerHost
             ((IDisposable)app).Dispose();
             var cause = ex.InnerException is null ? string.Empty : $" ({ex.InnerException.Message})";
             throw new InvalidOperationException(
-                $"The Data Protection key ring folder '{folder}' is not writable: {ex.Message}{cause} " +
+                $"The Data Protection key ring folder '{folder}' could not be read or written: {ex.Message}{cause} " +
                 "Set DataProtection:KeysPath to a folder the server can write to and keep.",
                 ex);
         }
+        catch (InvalidOperationException)
+        {
+            // A ring that cannot be read or does not meet the settings: the message is already the explanation
+            ((IDisposable)app).Dispose();
+            throw;
+        }
+
+        KeyRingProtection.LogProtection(plan, logger);
     }
 
     /// <summary>
