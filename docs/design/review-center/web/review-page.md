@@ -95,7 +95,9 @@ that user is still a member of the project; the page shows a badge "No longer a 
 alternate who is not, with a hint under the names that such a reviewer cannot sign until added to the project again.
 The candidate lists offer enabled members only, so a primary or alternate who is disabled or no longer a member would
 have no matching option and the select would show blank; in the change fields the page therefore adds one extra option
-for the stored choice (`UnavailableLabel`: "{display name} ({user name}), disabled or no longer a member"), with the
+for the stored choice (`UnavailableLabel`: "{display name} ({user name}), disabled or no longer a member", or, for an
+enabled member who is left out only because of the independence rule, that is, the review author who holds a slot
+(the rule is not retroactive), "{display name} ({user name}), not offered for a new choice (review author)"), with the
 test ids `slot-primary-unavailable-{id}` and `slot-alternate-unavailable-{id}`, and offers no extra option when the
 stored choice is among the candidates.
 **CurrentUsername**: the user name

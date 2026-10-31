@@ -490,6 +490,12 @@ selected one, so the select is not blank. This scenario is tested by
 **ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption**: A slot of enabled members has no `unavailable` option.
 This scenario is tested by `ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption`.
 
+**ReviewPage_EditSlot_AuthorHoldingSlotUnderIndependence_LabelNamesTheRule**: The review author holds the primary slot
+taken while the independence rule was off, and the rule is switched on afterwards. The author is an enabled member, so
+the extra option is labeled "not offered for a new choice (review author)", not "disabled", and the alternate, who is
+offered, has no extra option. This scenario is tested by
+`ReviewPage_EditSlot_AuthorHoldingSlotUnderIndependence_LabelNamesTheRule`.
+
 **ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm**: The approved review is rendered for a project member who
 is not an administrator; the banner is shown, but neither the reopen form (reason field and button) nor its error is
 rendered. This scenario is tested by `ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm`.

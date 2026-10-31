@@ -1346,7 +1346,34 @@ public partial class ReviewPageTests : PageTestBase
 
         // Assert: both reviewers are among the regular options
         Assert.Empty(cut.FindAll($"[data-testid='slot-primary-unavailable-{slotId}']"));
-        Assert.Empty(cut.FindAll($"[data-testid='slot-alternate-unavailable-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that an enabled member who is the review author and holds a slot (the independence rule is not
+    ///     retroactive) is kept in the lists with a label that names the rule, not "disabled".
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_EditSlot_AuthorHoldingSlotUnderIndependence_LabelNamesTheRule()
+    {
+        // Arrange: ann creates the review and takes the primary slot while the rule is off, then the rule is switched on
+        var ids = await CreateUsersAsync();
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
+        await Projects.SetRequireIndependentReviewersAsync(TestActors.Ann, project.Id, true, false, TestContext.Current.CancellationToken);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        var slot = await Signing.AddSlotAsync(
+            TestActors.Ann, project.Id, "REV-1", ids["ann"], ids["bob"], TestContext.Current.CancellationToken);
+        await Projects.SetRequireIndependentReviewersAsync(TestActors.Ann, project.Id, false, true, TestContext.Current.CancellationToken);
+
+        // Act: render the page as ann
+        var cut = RenderPage(project.Id);
+
+        // Assert: ann keeps her place in the list, labeled for the rule; bob, who is offered, needs no extra option
+        Assert.Equal(
+            "Ann (ann), not offered for a new choice (review author)",
+            cut.Find($"[data-testid='slot-primary-unavailable-{slot.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='slot-alternate-unavailable-{slot.Id}']"));
     }
 
     /// <summary>

@@ -1852,8 +1852,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </summary>
     /// <param name="member">The primary or alternate reviewer of a slot.</param>
     /// <returns>
-    ///     <c>false</c> for a reviewer who is disabled or no longer a member, so the list needs an extra option for
-    ///     the current choice (otherwise the list would show nothing as selected).
+    ///     <c>false</c> for a reviewer who is not offered (disabled, no longer a member, or the review author while
+    ///     independent reviewers are required), so the list needs an extra option for the current choice (otherwise
+    ///     the list would show nothing as selected).
     /// </returns>
     private bool IsOffered(SlotMember member)
     {
@@ -1864,10 +1865,15 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     Gets the text of the extra list option for a reviewer who cannot be chosen any more.
     /// </summary>
     /// <param name="member">The reviewer.</param>
-    /// <returns>The display name and user name, and why the reviewer is not in the list.</returns>
-    private static string UnavailableLabel(SlotMember member)
+    /// <returns>
+    ///     The display name and user name, and why the reviewer is not in the list: an enabled member is only left
+    ///     out because of the independence rule (the review author), anyone else is disabled or no longer a member.
+    /// </returns>
+    private string UnavailableLabel(SlotMember member)
     {
-        return $"{member.DisplayName} ({member.Username}), disabled or no longer a member";
+        var enabledMember = Candidates.Any(candidate => candidate.UserId == member.UserId);
+        var reason = enabledMember ? "not offered for a new choice (review author)" : "disabled or no longer a member";
+        return $"{member.DisplayName} ({member.Username}), {reason}";
     }
 
     /// <summary>

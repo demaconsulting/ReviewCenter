@@ -375,6 +375,7 @@ sections:
           - ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem
           - ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists
           - ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption
+          - ReviewPage_EditSlot_AuthorHoldingSlotUnderIndependence_LabelNamesTheRule
 
       - id: ReviewCenter-ReviewPage-Sign
         title: >-

@@ -545,6 +545,7 @@ a.action:active {
 }
 
 .line-no {
+    min-width: 2.75rem;
     padding-right: 0.5rem;
     color: var(--muted);
     text-align: right;
