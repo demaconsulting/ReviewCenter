@@ -13,8 +13,8 @@ enforces the integrity of an approved review: an approved review is locked, only
 (by default) the author of a review cannot review it. It is also
 the home of the supporting types of signing: `SlotRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewRecord`,
 `ReviewApproval`, `SlotStatus`, `SlotMember`, `SlotSignatureState`, `ReviewLock`, and `ReviewReopen`, together with
-the signing rules of `DomainRule`. `ReviewLock` and `ReviewReopen` live in the files of this unit; they are not units
-of their own. The service is a singleton, as `UserService` is.
+the signing rules of `DomainRule`. `ReviewLock`, `ReviewReopen`, and `SignatureImpact` live in the files of this unit;
+they are not units of their own. The service is a singleton, as `UserService` is.
 
 #### Data Model
 
@@ -72,6 +72,43 @@ never stored. The Core check is `ReviewLock.EnsureUnlockedAsync(store, projectId
 check inside its write transactions (see `ReviewStore`), which closes the gap between the check and a concurrent final
 signature. A review that does not exist is not locked, so the not-found rule of the caller applies unchanged. Reading,
 the attestation, and the evidence index are not affected.
+
+**Signature impact**: a change that is allowed can still make a current signature out of date, and the person who
+makes it should know which signatures they withdraw. `SignatureImpact` (an internal helper in the files of this unit)
+decides this for `ThreadService` and `ChecklistService`, from the snapshot that `ReviewLock.EnsureUnlockedAsync` has
+already loaded (the method returns that snapshot, or `null` for a review that does not exist), so it costs no further
+read and no trial write:
+
+1. `CurrentSignatures` numbers the slots by their identity order (slot 1 is the first added, as the page shows them)
+   and keeps, for each slot, its latest signature whose digest equals the digest of the record now. A slot without
+   such a signature is not affected by anything.
+2. `RequireAcknowledged(snapshot, changed, acknowledged)` returns when the review does not exist, when no signature is
+   current, or when `changed` has the same `RecordDigest` as the current record. A new thread or comment passes
+   `changed = null`, which always counts as a change. A checklist change passes the record as it would be after the
+   change, so a save that changes nothing (the same person saving the same value again, or marking a section
+   applicable that has no row) is not a change. The answer time is not part of the digest; the person who answered is.
+3. Otherwise every current signature whose slot identity is not in `acknowledged` is affected. When there is one,
+   `DomainRuleException` is thrown with `SignaturesWouldBecomeOutOfDate`, the message "This change makes signatures
+   out of date: slot 1 (Rita), slot 3 (Tess). Acknowledge them to continue.", and `AffectedSlots`, a copy of the list of
+   `AffectedSignature` (slot identity, slot number, signer display name, signer identity). The signer is the person who
+   actually signed, which is the alternate when the alternate signed.
+
+The caller passes the slot identities it acknowledges as the optional last argument `acknowledgedSlotIds` of the
+service methods (`null` means none). A partial acknowledgement leaves the others in the exception, and an identity that
+is not affected is ignored. The check sits after the lock check and after all validation of the request, and before
+anything is stored, so `ReviewLocked` and validation errors win, and a refusal changes nothing. `DomainRule` gets the
+one value `SignaturesWouldBecomeOutOfDate`, added at the end.
+
+**Known limitation**: the check and the write are two steps without a common transaction. A signature that is added
+between them is not named in the refusal and goes out of date silently. This is accepted: the signature does become out
+of date, as the digest rule always does, so the record stays correct, and the warning is best effort. Closing the gap
+would need the store to repeat the check inside its transaction.
+
+**Temporary behavior of the pages**: until the confirmation is offered on the pages, `ReviewPage` and `ChecklistPage`
+acknowledge on the person's behalf. The internal `SignatureAcknowledgement` helper of the `Web` subsystem calls the
+service without an acknowledgement and, when `SignaturesWouldBecomeOutOfDate` is raised, calls it once more
+acknowledging the slots that the exception names, so a change after a partial signing still proceeds and the signature
+goes out of date, as before. The follow-up slice removes the helper and shows the warning instead.
 
 **Reopen**: `ReopenReviewAsync` is the only way out of the lock. It needs a project administrator or a system
 administrator (anyone else: `ActorNotAllowed`; an API token is always refused) and a reason of 1 to 250 characters after
@@ -195,7 +232,8 @@ as a singleton. The store transaction of step 8 covers changes of the record tha
 **DomainRule values** added for signing: `ReviewNotFound`, `SlotNotFound`, `SlotUserInvalid`, `SlotSigned`,
 `ActorNotAllowed`, `SigningNotAllowed`, `ReauthenticationFailed`, and `RecordChanged`. `ActorNotAllowed` is the rule
 that every change made by an actor is re-authorized by the service, whatever the caller showed. The integrity rules add
-`ReviewLocked`, `ReviewNotLocked`, `ReopenReasonInvalid`, and `ReviewerNotIndependent`.
+`ReviewLocked`, `ReviewNotLocked`, `ReopenReasonInvalid`, and `ReviewerNotIndependent`. The impact check adds
+`SignaturesWouldBecomeOutOfDate`.
 
 **Interface additions of IReviewStore**: `GetRecordAsync`, `GetSnapshotAsync`, `ListSlotsAsync`, `AddSlotAsync`,
 `UpdateSlotAsync`, `RemoveSlotAsync`, `ListSignaturesAsync`, `AddSignatureAsync`, `ReopenReviewAsync`, and
@@ -338,7 +376,7 @@ never contain a password or a hash. An infrastructure failure of the store passe
 - **TotpService** — tells whether the signer has a second factor and checks the code (optional, injected; without it a
   signer who needs a code cannot sign).
 - **RecordDigest** — calculates the digest of the record.
-- **ReviewLock** and **ReviewReopen** — the helper and the history record of this unit (see above).
+- **ReviewLock**, **ReviewReopen**, and **SignatureImpact** — the helpers and the history record of this unit (see above).
 - **ThreadService** — `NextStep` words the next step when signing is blocked.
 - **ChecklistState** — decides which sections apply and what the answers are.
 - **.NET runtime library** — `TimeProvider` for the signing time and `SemaphoreSlim` for the serialization.
@@ -349,7 +387,7 @@ never contain a password or a hash. An infrastructure failure of the store passe
   changes of the signed-in user; the review page also asks `HasReauthProofAsync` for an external user and offers the
   reopen to an administrator.
 - **ThreadService** and **ChecklistService** (`Core` subsystem) — call `ReviewLock.EnsureUnlockedAsync` before they
-  change a thread or the checklist.
+  change a thread or the checklist, and `SignatureImpact.RequireAcknowledged` with the snapshot it returns.
 - **ReviewStore** (`Storage` subsystem) — calls `ReviewLock.IsApproved` inside its write transactions.
 - **AttestationService** (`Evidence` subsystem) — reads the approval, including the reopen history.
 - **ReviewWorkflowCheck** (`SelfTest` subsystem) — signs, shows the lock, and reopens.

@@ -37,6 +37,10 @@ N/A - standard test environment.
   section are found.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
+- A change that would make a current signature out of date is refused with `SignaturesWouldBecomeOutOfDate` naming
+  each affected slot number and signer, unless the slot is acknowledged, and nothing is stored; a review without a
+  current signature, a save that leaves the record as it is, and a locked review (`ReviewLocked` first) behave as
+  described.
 - Answers and not-applicable sections that a follow-up review carried count like the others (a review whose checks are
   all carried is complete); answering a carried check again, or setting a carried section again, stores a row without
   the carried mark and with the new person.
@@ -123,6 +127,41 @@ answer and the applicability of a section) on a review whose every slot holds a 
 with `ReviewLocked` and the answers and sections are as they were. The fake store does not judge the lock itself, so
 the test shows that the service does. This scenario is tested by
 `ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked`.
+
+**ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow**: A review without a signature, and a review whose slot is
+signed, take a first answer, the same answer again by the same person, and the applicability of a section that has no
+row; none is refused and the signature stays current, because the digest of the record does not change. This scenario
+is tested by `ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow`.
+
+**ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing**: Another person saves the same value
+that a signed answer has; the person is part of the digest, so the change is refused with
+`SignaturesWouldBecomeOutOfDate` and the stored answer is unchanged. This scenario is tested by
+`ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing`.
+
+**ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners**: Slots 1 (signed by its
+alternate) and 3 are signed and slot 2 is not; the refusal names slot 1 and slot 3 with the people who signed, and
+their identities. This
+scenario is tested by `ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners`.
+
+**ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots**: Only some of the signed slots are
+acknowledged; the refusal names the others and nothing is stored. This scenario is tested by
+`ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots`.
+
+**ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate**: Every signed slot is acknowledged;
+the answer is stored and each signature is out of date. This scenario is tested by
+`ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate`.
+
+**ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement**: A section is switched to not applicable
+on a signed review; it is refused until the slots are acknowledged, and then it is stored. This scenario is tested by
+`ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement`.
+
+**ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact**: On an approved review the refusal is
+`ReviewLocked`, not the signature impact. This scenario is tested by
+`ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact`.
+
+**ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource**: The exception copies the list of
+affected slots it is given, so a later change to the caller's list does not change it, and an exception without slots
+has an empty list. This scenario is tested by `ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource`.
 
 **ChecklistService_Constructor_NullArguments_Throws**: The service is created with a missing store, project access, or
 clock; the constructor throws, so the service cannot exist without the check that the actor may see the project. This

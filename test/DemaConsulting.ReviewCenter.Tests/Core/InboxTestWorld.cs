@@ -209,11 +209,20 @@ internal sealed class InboxTestWorld
     /// <param name="by">The user name of the user who answers.</param>
     /// <param name="itemIndex">The position of the check within the first section.</param>
     /// <returns>A task that completes when the answer is stored.</returns>
-    public Task FailCheckAsync(string reviewId, string by, int itemIndex = 0)
+    public async Task FailCheckAsync(string reviewId, string by, int itemIndex = 0)
     {
         var item = DefaultChecklist.Current.Sections[0].Items[itemIndex];
-        return Checklists.SetAnswerAsync(
-            ProjectId, reviewId, item.Id, ChecklistOutcome.Fail, "It is wrong", ActorOf(by), TestContext.Current.CancellationToken);
+
+        // The change may make a signature out of date; the signed slots are acknowledged
+        await Checklists.SetAnswerAsync(
+            ProjectId,
+            reviewId,
+            item.Id,
+            ChecklistOutcome.Fail,
+            "It is wrong",
+            ActorOf(by),
+            TestContext.Current.CancellationToken,
+            await Store.CurrentlySignedSlotIdsAsync(ProjectId, reviewId));
     }
 
     /// <summary>

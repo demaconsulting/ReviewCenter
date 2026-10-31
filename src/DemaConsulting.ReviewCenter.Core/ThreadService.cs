@@ -32,6 +32,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <see cref="Actor"/>, never free text, so it cannot be spoofed by a form field.
 ///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is approved (see
 ///     <see cref="ReviewLock"/>), because the threads are part of what the signatures cover.
+///     A change that would make a current signature out of date is refused with
+///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> unless the caller acknowledges the affected slots.
 ///     Two pure static helpers shape threads for display (<see cref="BuildIndex"/>, <see cref="NextStep"/>).
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
@@ -95,11 +97,17 @@ public sealed class ThreadService
     ///     exceed <see cref="ReviewLimits.MaxCommentLength"/> characters.
     /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. A new thread always alters the record, so every current signature must be listed.
+    /// </param>
     /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="anchor"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the side of <paramref name="anchor"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
-    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
+    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
+    ///     nothing is stored then.
     /// </exception>
     public async Task<ReviewThread> StartThreadAsync(
         int projectId,
@@ -107,7 +115,8 @@ public sealed class ThreadService
         ThreadAnchor anchor,
         Actor actor,
         string? text,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ArgumentNullException.ThrowIfNull(anchor);
@@ -141,7 +150,7 @@ public sealed class ThreadService
         }
 
         // An approved review is locked: nothing a signature covers may change until an administrator reopens it
-        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+        var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
         // Which side may carry line anchors depends on the kind of change
         if (startLine is not null)
@@ -151,6 +160,9 @@ public sealed class ThreadService
             // Only a line range needs the bytes, to count lines the way the page shows them
             await ValidateRangeWithinFileAsync(projectId, reviewId, filePath, side, endLine!.Value, cancellationToken);
         }
+
+        // A new thread always alters the record; ask for the acknowledgement only once the request is valid
+        SignatureImpact.RequireAcknowledged(snapshot, null, acknowledgedSlotIds);
 
         var now = _timeProvider.GetUtcNow();
         var thread = new ReviewThread
@@ -222,13 +234,19 @@ public sealed class ThreadService
     /// <param name="actor">The signed-in user who writes the reply. Must not be null.</param>
     /// <param name="text">The reply text; same rules as for a new thread.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. A new comment always alters the record, so every current signature must be listed.
+    /// </param>
     /// <returns>
     ///     The stored comment. Earlier comments are untouched and the thread state does not change, so a
     ///     resolved thread can still receive replies.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
-    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
+    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
+    ///     nothing is stored then.
     /// </exception>
     public async Task<ReviewComment> ReplyAsync(
         int projectId,
@@ -236,7 +254,8 @@ public sealed class ThreadService
         int threadId,
         Actor actor,
         string? text,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
@@ -249,7 +268,13 @@ public sealed class ThreadService
         };
 
         // An approved review is locked: replies, like every other change to a thread, wait for a reopen
-        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+        var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+
+        // A comment always alters the record; a thread that does not exist is reported by the store as before
+        if (snapshot is not null && snapshot.Record.Threads.Any(t => t.Id == threadId))
+        {
+            SignatureImpact.RequireAcknowledged(snapshot, null, acknowledgedSlotIds);
+        }
 
         return await _store.AddCommentAsync(
                    projectId,
@@ -274,17 +299,32 @@ public sealed class ThreadService
     /// <param name="threadId">The identity of the thread; it must belong to the given review.</param>
     /// <param name="actor">The signed-in user who resolves the thread; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. Only needed when the thread is open and a signature is current.
+    /// </param>
     /// <returns>A task that completes when the state is stored; resolving a resolved thread does nothing.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist in the review.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist in the review, or with
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged.
+    /// </exception>
     public Task ResolveAsync(
         int projectId,
         string reviewId,
         int threadId,
         Actor actor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
-        return SetStateAsync(projectId, reviewId, threadId, ReviewThreadState.Resolved, actor, cancellationToken);
+        return SetStateAsync(
+            projectId,
+            reviewId,
+            threadId,
+            ReviewThreadState.Resolved,
+            actor,
+            acknowledgedSlotIds,
+            cancellationToken);
     }
 
     /// <summary>
@@ -295,17 +335,32 @@ public sealed class ThreadService
     /// <param name="threadId">The identity of the thread; it must belong to the given review.</param>
     /// <param name="actor">The signed-in user who reopens the thread; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. Only needed when the thread is resolved and a signature is current.
+    /// </param>
     /// <returns>A task that completes when the state is stored; reopening an open thread does nothing.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist in the review.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist in the review, or with
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged.
+    /// </exception>
     public Task ReopenAsync(
         int projectId,
         string reviewId,
         int threadId,
         Actor actor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
-        return SetStateAsync(projectId, reviewId, threadId, ReviewThreadState.Open, actor, cancellationToken);
+        return SetStateAsync(
+            projectId,
+            reviewId,
+            threadId,
+            ReviewThreadState.Open,
+            actor,
+            acknowledgedSlotIds,
+            cancellationToken);
     }
 
     /// <summary>
@@ -444,23 +499,35 @@ public sealed class ThreadService
     /// <param name="threadId">The identity of the thread.</param>
     /// <param name="state">The state to store.</param>
     /// <param name="actor">The signed-in user; recorded in the audit trail.</param>
+    /// <param name="acknowledgedSlotIds">The slot identities the person acknowledged, or <c>null</c> for none.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the state is stored.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist, or with
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged.
+    /// </exception>
     private async Task SetStateAsync(
         int projectId,
         string reviewId,
         int threadId,
         ReviewThreadState state,
         Actor actor,
+        IReadOnlyCollection<int>? acknowledgedSlotIds,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
 
         // An approved review is locked: a thread can neither be resolved nor reopened until the review is reopened
-        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+        var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+
+        // Only a real change of state alters the record; a missing thread is reported by the store as before
+        var existing = snapshot?.Record.Threads.FirstOrDefault(t => t.Id == threadId);
+        if (existing is not null && existing.State != state)
+        {
+            SignatureImpact.RequireAcknowledged(snapshot, null, acknowledgedSlotIds);
+        }
 
         // The store saves the entry only when the thread exists, so a refused call leaves no trace
         var action = state == ReviewThreadState.Resolved ? "thread.resolved" : "thread.reopened";

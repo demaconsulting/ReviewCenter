@@ -407,8 +407,15 @@ public partial class ReviewProgressServiceTests
         await SignAsync(world, "rev-1", first, _reviewerOne);
         var before = await ProgressOfAsync(world, "rev-1");
 
-        // Act: somebody comments, which changes the record
-        await world.Threads.StartThreadAsync(world.ProjectId, "rev-1", new ThreadAnchor("a.txt"), _member, "Look", cancellationToken);
+        // Act: somebody comments, acknowledging the signature this withdraws, which changes the record
+        await world.Threads.StartThreadAsync(
+            world.ProjectId,
+            "rev-1",
+            new ThreadAnchor("a.txt"),
+            _member,
+            "Look",
+            cancellationToken,
+            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "rev-1"));
         var after = await ProgressOfAsync(world, "rev-1");
 
         // Assert: one signed before; afterwards that signature is out of date and the thread blocks

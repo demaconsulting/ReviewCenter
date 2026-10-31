@@ -84,6 +84,12 @@ before choosing. Choosing the stored outcome again leaves nothing unsaved.
 behalf of the signed-in user, who comes from the authentication state (`SignIn.GetActorAsync`); there is no field in
 which a name could be typed.
 
+**Temporary acknowledgement**: `SaveAsync` and the applicability saves call the service through the internal
+`SignatureAcknowledgement.RunAsync` helper. It calls the service without an acknowledgement and, when the service
+refuses with `SignaturesWouldBecomeOutOfDate`, calls it once more acknowledging the slots named in the exception, so
+that the change still proceeds and the signature goes out of date, as it did before the service asked. This is a
+temporary shim; the follow-up slice removes it and shows the affected signatures for confirmation.
+
 **SetApplicableAsync** and **SaveNotApplicableAsync**: Switching a section to "applies" is stored at once; switching
 it off shows a required reason field, and the section is stored as not applicable when the reason is saved. Until then
 the section is still stored as applying, so its progress label reads "Reason needed" (`SectionProgressLabel`), its

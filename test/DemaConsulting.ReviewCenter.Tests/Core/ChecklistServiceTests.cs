@@ -84,6 +84,204 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that a change is stored without any acknowledgement while no signature is current, and that saving the
+    ///     same answer again as the same person is a no-op that does not touch a current signature.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow()
+    {
+        // Arrange: nobody has signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var sectionId = DefaultChecklist.Current.Sections[0].Id;
+
+        // Act: change an answer and a section while there is no signature, then sign and save the same value again
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken);
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        await world.SignAsync(1);
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        await world.Checklists.SetSectionApplicabilityAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, true, null, TestActors.Ann, cancellationToken);
+
+        // Assert: the signature is still current
+        Assert.Equal(SlotSignatureState.Signed, (await world.ApprovalAsync()).Slots[0].State);
+    }
+
+    /// <summary>
+    ///     Test that saving the same answer again as a different person is refused: the person who answered is part of
+    ///     the record, so the signature would become out of date. Nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing()
+    {
+        // Arrange: slot 1 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+
+        // Act: bob saves the value that ann gave
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken));
+
+        // Assert: refused naming slot 1, the answer is still ann's and the signature is current
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
+        var state = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!;
+        Assert.Equal("Ann", state.AnswerFor(SignedReviewWorld.FirstItemId)!.AnsweredBy);
+        Assert.Equal(SlotSignatureState.Signed, (await world.ApprovalAsync()).Slots[0].State);
+    }
+
+    /// <summary>
+    ///     Test that a refusal names every current signature with its slot number and signer, whether the primary or the
+    ///     alternate signed, and that slots without a signature are not named.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners()
+    {
+        // Arrange: the alternate signed slot 1 and the primary signed slot 3; slot 2 is not signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1, alternate: true);
+        await world.SignAsync(3);
+
+        // Act: change an answer without acknowledging
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken));
+
+        // Assert: slot 1 (Alex) and slot 3 (Tess), with the slot identities, in the message and in the payload
+        Assert.Equal(
+            [(world.Slots[0].Id, 1, "Alex"), (world.Slots[2].Id, 3, "Tess")],
+            ex.AffectedSlots.Select(s => (s.SlotId, s.SlotNumber, s.SignerDisplayName)));
+        Assert.Contains("slot 1 (Alex), slot 3 (Tess)", ex.Message);
+    }
+
+    /// <summary>
+    ///     Test that an acknowledgement that does not cover every current signature is refused naming only the
+    ///     signatures that remain, that an acknowledgement of an unrelated slot suppresses nothing, and that nothing
+    ///     is stored by a refusal.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots()
+    {
+        // Arrange: slots 1 and 2 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.SignAsync(2);
+
+        // Act: acknowledge slot 1 only, and then only the unsigned slot 3
+        var partial = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken, [world.Slots[0].Id]));
+        var wrongSlot = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken, [world.Slots[2].Id]));
+
+        // Assert: only slot 2 remains in the first refusal, both remain in the second, and nothing was written
+        Assert.Equal([2], partial.AffectedSlots.Select(s => s.SlotNumber));
+        Assert.Equal([1, 2], wrongSlot.AffectedSlots.Select(s => s.SlotNumber));
+        var state = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!;
+        Assert.Equal(ChecklistOutcome.Pass, state.AnswerFor(SignedReviewWorld.FirstItemId)!.Outcome);
+        Assert.All((await world.ApprovalAsync()).Slots.Take(2), slot => Assert.Equal(SlotSignatureState.Signed, slot.State));
+    }
+
+    /// <summary>
+    ///     Test that a change acknowledging every current signature is stored and leaves those signatures out of date.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate()
+    {
+        // Arrange: slots 1 and 2 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.SignAsync(2);
+
+        // Act: change the answer acknowledging both
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken, await world.SignedSlotIdsAsync());
+
+        // Assert: stored, and both signatures are kept but out of date
+        var state = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!;
+        Assert.Equal(ChecklistOutcome.Fail, state.AnswerFor(SignedReviewWorld.FirstItemId)!.Outcome);
+        var approval = await world.ApprovalAsync();
+        Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots[0].State);
+        Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots[1].State);
+        Assert.Equal(SlotSignatureState.NotSigned, approval.Slots[2].State);
+    }
+
+    /// <summary>
+    ///     Test that marking a section as not applicable is refused while a signature is current, is stored once
+    ///     acknowledged, and that marking a section applicable when it has no stored state changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement()
+    {
+        // Arrange: slot 1 signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        var sectionId = DefaultChecklist.Current.Sections[0].Id;
+
+        // Act: mark the section applicable (already is), not applicable without acknowledging, then acknowledged
+        await world.Checklists.SetSectionApplicabilityAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, true, null, TestActors.Ann, cancellationToken);
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetSectionApplicabilityAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, false, "Not relevant.", TestActors.Ann, cancellationToken));
+        var untouched = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.IsApplicable(sectionId);
+        await world.Checklists.SetSectionApplicabilityAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, false, "Not relevant.", TestActors.Ann, cancellationToken, await world.SignedSlotIdsAsync());
+
+        // Assert: refused naming slot 1 and storing nothing, then stored and the signature is out of date
+        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
+        Assert.Equal(1, Assert.Single(ex.AffectedSlots).SlotNumber);
+        Assert.True(untouched);
+        Assert.False((await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.IsApplicable(sectionId));
+        Assert.Equal(SlotSignatureState.OutOfDate, (await world.ApprovalAsync()).Slots[0].State);
+    }
+
+    /// <summary>
+    ///     Test that the lock of an approved review is reported before the signature impact.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact()
+    {
+        // Arrange: every slot signed, so the review is approved and locked
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.SignAsync(2);
+        await world.SignAsync(3);
+
+        // Act: change an answer without acknowledging
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken));
+
+        // Assert: refused as locked, with no slots listed
+        Assert.Equal(DomainRule.ReviewLocked, ex.Rule);
+        Assert.Empty(ex.AffectedSlots);
+    }
+
+    /// <summary>
+    ///     Test that the exception keeps its own copy of the affected slots.
+    /// </summary>
+    [Fact]
+    public void ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource()
+    {
+        // Arrange: a list of one affected signature
+        var source = new List<AffectedSignature> { new(10, 1, "Riley Reviewer", 7) };
+
+        // Act: build the exception, then change the source list
+        var ex = new DomainRuleException(DomainRule.SignaturesWouldBecomeOutOfDate, "Out of date.", source);
+        source.Add(new AffectedSignature(11, 2, "Joan Alternate", 8));
+        source.RemoveAt(0);
+
+        // Assert: the exception still lists the one original signature
+        Assert.Equal(new AffectedSignature(10, 1, "Riley Reviewer", 7), Assert.Single(ex.AffectedSlots));
+        Assert.Empty(new DomainRuleException(DomainRule.ReviewLocked, "Locked.").AffectedSlots);
+    }
+
+    /// <summary>
     ///     Test that the default checklist has the 14 sections of the template with the known number of checks.
     /// </summary>
     [Fact]

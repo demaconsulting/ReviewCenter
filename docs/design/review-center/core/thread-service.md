@@ -81,12 +81,24 @@ thread (and a reply, a resolve, a reopen of a thread) cannot change what the sig
 check inside its write transaction. `ListAsync` is not affected. After an administrator reopens the review, threads can
 change again.
 
+**Signature impact**: a new comment or a change of state after somebody has signed makes that signature out of date
+(see "Signature impact" in the `SigningService` unit). `StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, and
+`ReopenAsync` therefore take an optional last argument `IReadOnlyCollection<int>? acknowledgedSlotIds`, after the
+cancellation token, and call `SignatureImpact.RequireAcknowledged` with the snapshot that
+`ReviewLock.EnsureUnlockedAsync` returned. A new thread always counts as a change. A reply counts when the thread
+exists (a thread that does not exist is still `ThreadNotFound`). A resolve or reopen counts only when the thread is in
+the other state, so repeating a request needs no acknowledgement. The check comes after all validation, including
+the anchor of a new thread, so a request that is not valid is reported as that error, and before the store write, so
+nothing is stored when it fails. Because an open thread blocks signing, a resolve in practice meets no current
+signature, so the new thread, the reply, and the reopen are the cases that are met.
+
 #### Key Methods
 
 **StartThreadAsync**: Starts a thread with its first comment.
 
 - *Parameters*: `int projectId`, `string reviewId`, a `ThreadAnchor anchor` (the file path, the optional start and end
-  lines, and the `ThreadSide`, which is `Head` unless named), `Actor actor`, `string? text`, and a cancellation token.
+  lines, and the `ThreadSide`, which is `Head` unless named), `Actor actor`, `string? text`, a cancellation token, and
+  the optional `acknowledgedSlotIds`.
   The anchor groups the four values that always travel together (the review page collects them from one selection and
   `ReviewThread` stores them side by side). A null anchor is a programming error and raises `ArgumentNullException`,
   and an undefined side raises `ArgumentOutOfRangeException` for the `anchor` parameter.
@@ -102,13 +114,14 @@ before start (`ThreadAnchorInvalid`); that a whole-file anchor does not name the
 for this file (`ThreadAnchorInvalid`: a `Head` range on a deleted file, "A deleted file has no head lines; comment on
 its baseline lines or on the whole file instead."; a `Baseline` range on a review without a baseline commit or on an
 added file, "This file has no baseline lines to comment on."); and, only when a range is given, that the content of
-the chosen side is text and the end line is within its line count (`ThreadAnchorInvalid`). Checks that
+the chosen side is text and the end line is within its line count (`ThreadAnchorInvalid`); and, last, that no current
+signature would silently become out of date (`SignaturesWouldBecomeOutOfDate`). Checks that
 need no I/O come first so that a bad request fails cheaply, and file content is read only when a range needs it.
 
 **ReplyAsync**: Appends a comment to an existing thread of the review.
 
-- *Parameters*: `int projectId`, `string reviewId`, `int threadId`, `Actor actor`, `string? text`, and a
-  cancellation token.
+- *Parameters*: `int projectId`, `string reviewId`, `int threadId`, `Actor actor`, `string? text`, a
+  cancellation token, and the optional `acknowledgedSlotIds`.
 - *Returns*: `Task<ReviewComment>` — the stored comment.
 - *Postconditions*: Earlier comments are unchanged and the state of the thread does not change, so a resolved thread
   still accepts replies. A thread that does not exist in the review is reported as `ThreadNotFound`. A locked review
@@ -116,7 +129,9 @@ need no I/O come first so that a bad request fails cheaply, and file content is 
 
 **ResolveAsync** and **ReopenAsync**: Set the state of a thread to `Resolved` or `Open`. Repeating a request leaves
 the state as requested. A thread that does not exist in the review is reported as `ThreadNotFound`. A locked review
-refuses both with `ReviewLocked`.
+refuses both with `ReviewLocked`. Both take the optional `acknowledgedSlotIds` after the cancellation token, and a
+request that changes the state of a thread with a current signature is refused with `SignaturesWouldBecomeOutOfDate`
+unless acknowledged.
 
 **ListAsync**: Lists all threads of a review, for every file, in creation order, each with its comments in posting
 order; the list is empty when there are none or the review does not exist.
@@ -164,7 +179,8 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 
 - **IReviewStore** — checks the review, reads file content, and stores and reads threads (injected).
 - **IProjectAccess** — requires that the actor may work in the project (injected).
-- **ReviewLock** (part of the `SigningService` unit) — refuses a change while the review is approved.
+- **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
+  approved, and refuse one that would make a current signature out of date without acknowledgement.
 - **TimeProvider** — supplies the creation times (injected).
 
 #### Callers
