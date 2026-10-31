@@ -10,7 +10,8 @@ checklist, and lets reviewers sign a review with their password (or by signing i
 every action recorded under the signed-in
 user. A review is Approved when it has at least one reviewer slot and every slot is signed for the current record; it
 is then locked, and a project administrator can reopen it. Every change is also recorded in a hash-chained audit trail
-that can be read and verified.
+that can be read and verified. Project roles include a read-only Auditor, who can read a project and its audit trail
+and change nothing.
 The web interface has a built-in Help with short
 guides to the main tasks. The command-line
 interface is documented in

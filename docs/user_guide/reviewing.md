@@ -630,8 +630,9 @@ more review states.
 ## The Project Page Overview
 
 The project page (`/projects/{id}`) is where a lead sees all the reviews of a project at once. Every member, an
-administrator, and a system administrator see the same table; a member who may only read (a viewer) sees it without
-the **+ New review** and **Plan reviews** controls, and a user who is not a member of the project is told that the
+administrator, and a system administrator see the same table; a member who may only read (an Auditor) sees it without
+the **+ New review** and **Plan reviews** controls, with a read-only notice, and a user who is not a member of the
+project is told that the
 project does not exist.
 
 - **Summary.** Above the table, four counts: reviews in setup, in review, approved, and overdue.

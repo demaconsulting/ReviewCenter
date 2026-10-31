@@ -12,9 +12,10 @@ memberships or the administrator flag itself, so one rule holds on every page, r
 
 **ProjectRole**: an enumeration of what a member may do in one project: `User` (a member: sees the project, creates
 reviews, comments, answers checklists, and signs), `ProjectAdmin` (a member who also manages the members and the
-repositories of the project and reads its audit trail), and `Auditor` (reserved and read-only: sees everything a
-member sees and reads the audit trail, but changes nothing). The `Auditor` role is declared so that access can be
-enforced and tested, but it cannot be assigned yet: `ProjectService` refuses it until the role is offered.
+repositories of the project and reads its audit trail), and `Auditor` (read-only: sees everything a member sees and
+reads and exports the audit trail, but changes nothing and cannot be named in a reviewer slot or sign). Project
+administrators and system administrators assign the role through `ProjectService` like any other; no API route manages
+members.
 
 **ProjectMembership**: an immutable record of `UserId`, `ProjectId`, and `Role`. A user has at most one membership
 per project; the pair (user, project) is its identity.
@@ -37,13 +38,17 @@ The rules are:
 | member with role `User` | member projects | member projects | nothing | nothing |
 | member with role `ProjectAdmin` | member projects | member projects | member projects | member projects |
 | member with role `Auditor` | member projects | nothing | nothing | member projects |
-| member with a stored role that is not defined | member projects | nothing | nothing | member projects |
+| member with a stored role that is not defined | nothing | nothing | nothing | nothing |
 | enabled user without a membership | nothing | nothing | nothing | nothing |
 
-"Member projects" means the projects of the actor's memberships with that role.
+"Member projects" means the projects of the actor's memberships with that role. In terms of the access levels,
+`Read` is the level of an `Auditor` (the project and its audit trail), `Contribute` is that of a `User`, and
+`Administer` is that of a `ProjectAdmin`; so an Auditor reads everything that a member reads, plus the audit trail and
+its export, and changes nothing. The Auditor does not see the member list, the repositories page, or the users page,
+which stay with those who administer.
 
-A stored role that is not defined fails closed: it is treated like `Auditor`, so it never gains the right to work or
-to administer.
+A stored role that is not defined fails closed: it is treated like no membership at all (`RoleOfAsync` answers null),
+so it gains no right, the project reads as not found, `IsMemberAsync` is false, and the project is not listed.
 
 The unit holds the injected `IUserStore` and `IReviewStore` and no other state. A user is found by `Actor.Username`
 on every call and nothing is cached.

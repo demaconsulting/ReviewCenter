@@ -97,7 +97,12 @@ record digest, the slots with their signature state, the blockers that prevent s
 It is `null` until loaded. **Candidates**: the members of the project that can be chosen for a slot (`SlotMember` values
 from
 `SigningService.ListCandidatesAsync(actor, projectId)`, so a user who is no member is never offered, and no password
-hash ever reaches the page). Each assignee of a slot (a `SlotMember` of the approval) also carries `IsMember`, whether
+hash ever reaches the page). **ReadOnly**: true for a member who may not contribute (the Auditor role); the page then
+shows a `readonly-notice` and none of the controls that change the review (the slot and signing forms, the new
+comment form, the reply box, the resolve toggle, and the line comment controls); the reopening and due date forms
+stay hidden by their own rights. The diff gets `ReadOnlyAccess` so that it says "read-only access" instead of "review
+is locked", the inline composer is never selected while `ReadOnly`, and a reload that finds `ReadOnly` clears the
+new comment form and its draft. Each assignee of a slot (a `SlotMember` of the approval) also carries `IsMember`, whether
 that user is still a member of the project; the page shows a badge "No longer a project member" next to a primary or
 alternate who is not, with a hint under the names that such a reviewer cannot sign until added to the project again.
 The candidate lists offer enabled members only, so a primary or alternate who is disabled or no longer a member would

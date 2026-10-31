@@ -1103,6 +1103,77 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that a member whose role is auditor can read the review and the audit trail of the project but change
+    ///     nothing: the review page shows a read-only notice and no reopening, slot or comment controls, the auditor is
+    ///     not offered as a reviewer, an API token of the auditor reads but is refused every write, and a user who is
+    ///     no member does not find the project.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_Auditor_CanReadEverythingAndChangeNothing()
+    {
+        // Arrange: puppet (the administrator) makes the member third an auditor; third holds an API token
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await browser.GotoAsync("/projects/1", "project-page");
+        await browser.OkAsync("click", "member-set-role-third-auditor");
+        await browser.WaitUntilAsync(
+            async () => (await browser.TextOfAsync("member-role-third")).Contains("Auditor", StringComparison.Ordinal),
+            "the role to change");
+        await using var auditor = await scenario.StartSignedInBrowserAsync("auditor", "third");
+        await using var outsider = await scenario.StartSignedInBrowserAsync("outsider", "outsider");
+        var token = await Scenario.CreateTokenAsync(auditor);
+        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(scenario.Server.Url) };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var reviewUrl = $"/api/projects/1/reviews/{scenario.ReviewId}";
+
+        // Act: the auditor reads the project, the review and the audit trail of the project
+        await auditor.GotoAsync("/projects/1", "project-page");
+        var projectNotice = await auditor.ExistsAsync("readonly-notice");
+        var newReview = await auditor.ExistsAsync("new-review-button");
+        var members = await auditor.ExistsAsync("members-list");
+        await scenario.OpenReviewAsync(auditor);
+        var reviewNotice = await auditor.ExistsAsync("readonly-notice");
+        var reopen = await auditor.ExistsAsync("reopen-form") || await auditor.ExistsAsync("reopen-button");
+        var slotForm = await auditor.ExistsAsync("slot-add-form");
+        var commentForm = await auditor.ExistsAsync("new-thread-form");
+        await auditor.GotoAsync("/projects/1/audit", "project-audit-page");
+        var trailRows = await auditor.CountAsync("audit-row");
+
+        // Act: as an administrator, the auditor is not offered in the slot form
+        await scenario.OpenReviewAsync();
+        var offered = await Scenario.OfferedReviewersAsync(browser);
+
+        // Act: the token reads and is refused every write
+        var read = await http.GetAsync(reviewUrl, TestContext.Current.CancellationToken);
+        var write = await http.PostAsync(
+            "/api/projects/1/reviews",
+            new StringContent(
+                "{\"id\":\"REV-9\",\"title\":\"Nope\",\"files\":[{\"path\":\"a.txt\",\"contentBase64\":\"b25lCg==\"}]}",
+                System.Text.Encoding.UTF8,
+                "application/json"),
+            TestContext.Current.CancellationToken);
+
+        // Act: the user who is no member does not find the project
+        await outsider.OkAsync("goto", "/projects/1");
+        await outsider.OkAsync("wait", "project-not-found");
+
+        // Assert: everything can be read and nothing can be changed
+        Assert.True(projectNotice, "The project page must say that it is read-only.");
+        Assert.False(newReview, "An auditor must not be offered to create a review.");
+        Assert.False(members, "An auditor must not see the members.");
+        Assert.True(reviewNotice, "The review page must say that it is read-only.");
+        Assert.False(reopen, "An auditor must not be offered the reopening.");
+        Assert.False(slotForm, "An auditor must not be offered to edit slots.");
+        Assert.False(commentForm, "An auditor must not be offered to comment.");
+        Assert.True(trailRows > 0, "An auditor reads the audit trail of the project.");
+        Assert.DoesNotContain("(third)", offered, StringComparison.Ordinal);
+        Assert.Contains("(second)", offered, StringComparison.Ordinal);
+        Assert.Equal(System.Net.HttpStatusCode.OK, read.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, write.StatusCode);
+    }
+
+    /// <summary>
     ///     Answers a check as Pass and waits until the answer is stored.
     /// </summary>
     /// <param name="browser">The browser, showing the checklist with the section of the check open.</param>

@@ -39,6 +39,14 @@
     else
     {
         <h1>New review</h1>
+        @if (!CanContribute)
+        {
+            <p class="notice" role="status" data-testid="readonly-notice">
+                Your access to this project is read-only, so you cannot create reviews.
+            </p>
+        }
+        else
+        {
         <p class="page-lead">Choose the files to review: upload them, or read them from a registered git repository.</p>
 
         <section class="card">
@@ -230,6 +238,7 @@
                 </div>
             }
         </section>
+        }
     }
 </main>
 </SessionGate>

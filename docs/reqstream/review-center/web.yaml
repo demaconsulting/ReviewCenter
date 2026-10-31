@@ -114,7 +114,7 @@ sections:
           every project; shall show a project the user may not see exactly as a project that does not exist, so that
           a user cannot tell a hidden project from a missing one; shall let only a system administrator create
           projects, and only whoever administers a project, a system administrator or a project admin of it, manage
-          its members, on the project page and the two pages for a new member, with a role of project admin or
+          its members, on the project page and the two pages for a new member, with a role of project admin, auditor or
           member for each member, where a member is added by the exact user name, with no list of users, or as a new
           account together with its membership; shall let only whoever manages a project
           open its repositories, and offer in a new review only the repositories of that project; and shall keep
@@ -141,6 +141,10 @@ sections:
           - ReviewCenter-ProjectPage-MemberChange
           - ReviewCenter-ProjectPage-AddMember
           - ReviewCenter-ProjectPage-CreateAccount
+          - ReviewCenter-ProjectPage-MemberRoles
+          - ReviewCenter-ReviewPage-ReadOnly
+          - ReviewCenter-ChecklistPage-ReadOnly
+          - ReviewCenter-PlanPage-ReadOnly
           - ReviewCenter-ProjectPage-RepositoriesLink
           - ReviewCenter-ProjectPage-RepositoryForm
           - ReviewCenter-RepositoriesPage-Admin
@@ -154,6 +158,10 @@ sections:
           - ProjectPage_Render_NonMember_LooksLikeAMissingProject
           - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
           - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+          - ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly
+          - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
+          - ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl
+          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
           - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
           - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
           - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly

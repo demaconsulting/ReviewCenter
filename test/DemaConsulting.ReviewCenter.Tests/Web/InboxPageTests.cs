@@ -213,11 +213,18 @@ public class InboxPageTests : InboxWebTestBase
     [Fact]
     public async Task InboxPage_Render_Auditor_ShowsNoSignItems()
     {
-        // Arrange: the auditor is named as reviewer of r1
+        // Arrange: the auditor was named as reviewer of r1 while a member, and then became an auditor
         await ArrangeProjectAsync();
         await CreateInboxReviewAsync("r1");
-        await AddSlotAsync("r1", "aud");
-        SignInAs("aud", "Aud", false);
+        await AddSlotAsync("r1", "ann");
+        await Store.SetMembershipRoleAsync(
+            ProjectId,
+            UserIds["ann"],
+            global::DemaConsulting.ReviewCenter.Core.ProjectRole.Auditor,
+            AuditTestExtensions.Draft(),
+            false,
+            Ct);
+        SignInAs("ann", "Ann", false);
 
         // Act
         var cut = Render<InboxPage>();

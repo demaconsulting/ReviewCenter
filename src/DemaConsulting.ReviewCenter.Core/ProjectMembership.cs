@@ -32,8 +32,9 @@ public enum ProjectRole
     ProjectAdmin,
 
     /// <summary>
-    ///     An auditor: reserved, read-only. Sees everything a member sees and reads the audit trail, but changes
-    ///     nothing. The role cannot be assigned yet; <c>ProjectService</c> refuses it until it is offered.
+    ///     An auditor: read-only. Sees everything a member sees and reads the audit trail (and exports it), but
+    ///     changes nothing, signs nothing and can not be chosen as a reviewer. A project administrator or a system
+    ///     administrator assigns the role; the role is refused while the user holds open review work.
     /// </summary>
     Auditor
 }

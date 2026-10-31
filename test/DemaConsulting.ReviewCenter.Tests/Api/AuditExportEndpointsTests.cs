@@ -308,6 +308,36 @@ public class AuditExportEndpointsTests
     }
 
     /// <summary>
+    ///     Test that a member whose role is auditor may read and export the audit trail of the project (200 with the
+    ///     file) but only that of the project, while a plain member still gets 403.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task AuditExportEndpoints_ProjectExport_Auditor_ServesTheProjectTrailOnly()
+    {
+        // Arrange: an auditor of Apollo
+        await using var app = await StartAsync();
+        var arranged = await ArrangeAsync(app);
+        var aud = await app.Services.GetRequiredService<UserService>().CreateAsync(
+            "aud", "Aud", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<IReviewStore>().AddMembershipAsync(
+            aud.Id, arranged.Apollo, ProjectRole.Auditor, TestContext.Current.CancellationToken);
+        using var browser = await TestBrowser.SignedInAsync(app, "aud", UserRole.Reviewer);
+
+        // Act
+        var own = await browser.Client.GetAsync($"/projects/{arranged.Apollo}/audit/export", TestContext.Current.CancellationToken);
+        var other = await browser.Client.GetAsync($"/projects/{arranged.Gemini}/audit/export", TestContext.Current.CancellationToken);
+        var everything = await browser.Client.GetAsync("/audit/export", TestContext.Current.CancellationToken);
+        var text = await TextAsync(own);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, own.StatusCode);
+        Assert.Contains("apollo event", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("gemini event", text, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, everything.StatusCode);
+    }
+
+    /// <summary>
     ///     Test that a visitor who is not signed in is sent to the login page by both routes and gets no file.
     /// </summary>
     /// <param name="path">The route to request.</param>

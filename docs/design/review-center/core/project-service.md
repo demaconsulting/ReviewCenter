@@ -111,7 +111,7 @@ an administrator of the project (`ProjectNotFound` when it is not visible, `Acto
 - *Returns*: `Task<ProjectMember>` — the new member.
 - *Preconditions*: The actor administers the project or is a system administrator (`ProjectNotFound` or
   `ActorNotAllowed` otherwise, as `RequireAdministerAsync` decides); the role is defined and offered
-  (`ArgumentOutOfRangeException`; `Auditor` is declared but refused until it is offered); a non-exempt actor has fewer
+  (`ArgumentOutOfRangeException`; `Auditor` is a valid role for a new member); a non-exempt actor has fewer
   than `MaxFailedAttempts` reserved attempts in the last `ThrottleWindow` (`TooManyAttempts` otherwise); the attempt is
   reserved atomically before the user lookup and stays counted unless the add succeeds.
 - *Postconditions*: The membership is stored with the audit event `project.member-added`. The name is trimmed and looked
@@ -147,14 +147,28 @@ account can never be a system administrator and cannot exist without the members
 - *Parameters*: the `Actor`, the project identity, the user name, the `ProjectRole` where one is needed, and a
   cancellation token. `SetMemberRoleAsync` returns the `ProjectMember` as it is now; `RemoveMemberAsync` returns a task.
 - *Preconditions*: The actor administers the project or is a system administrator. The role passed to
-  `SetMemberRoleAsync` is defined and offered (`ArgumentOutOfRangeException`; `Auditor` is refused until it is
-  offered). An unknown name and a non-member are
+  `SetMemberRoleAsync` is defined (`ArgumentOutOfRangeException`; `Auditor` is a valid role). A member can be changed
+  to `Auditor` only while the member holds no open review work, see below. An unknown name and a non-member are
   refused with `MembershipNotFound` and one message, so the name of an unrelated user is never confirmed.
 - *Postconditions*: A project administrator may not remove or demote the last enabled project administrator, themselves
   included (`LastProjectAdmin`, with a friendly message); a system administrator may. The service passes
   `requireAnotherAdmin` as the opposite of the system administrator exemption, and the store makes the check and the
   change one atomic step inside its serialized audit transaction, so two concurrent changes cannot empty the project.
-  Nothing is changed when a rule fails.
+  Nothing is changed when a rule fails. The audit event is `project.member-role-changed` with the role name in the
+  detail (`user 'name', role Auditor`).
+
+**Open review work** (private `EnsureNoOpenReviewWorkAsync`, used by `SetMemberRoleAsync` when the new role is
+`Auditor` and by `AddMemberAsync` for a user who is not a member yet, since a removed member keeps the slots; an
+existing member is left to the store, which reports `MembershipExists`): an auditor cannot be named in a slot or sign,
+so a user who still owes a signature must not become one. The check calls the one shared definition of open work
+(`UserImpactService.FindOpenWorkAsync`, the same read as the offboarding impact query: `ListSlotsOfUserAsync` and
+`ListSnapshotsAsync` limited to this project, `ReviewLock.IsApproved`, `InboxRules.SlotState`), so a slot whose review
+is not approved and that is not signed and current is open work. If one exists the
+call is refused with `MemberHasOpenReviewWork`, whose message lists up to five reviews as `'id' (title)`, and nothing is
+changed. To resolve it, a member who can work in the project reassigns or removes the slot, or the member signs. The
+check is a service-level read made before the store change and not
+in the same transaction as the role change; a slot assigned in the gap between the two is not caught, and the auditor
+then simply cannot sign it (`SigningService` refuses), so the review shows that slot as waiting until it is reassigned.
 
 **SetRequireIndependentReviewersAsync**: Switches the "require independent reviewers" rule of a project.
 

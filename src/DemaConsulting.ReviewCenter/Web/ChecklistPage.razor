@@ -48,7 +48,14 @@
         <h1>Checklist</h1>
         <p class="muted" data-testid="checklist-review-title">@Review.Title</p>
 
-        @if (IsLocked)
+        @if (ReadOnly)
+        {
+            <p class="notice" role="status" data-testid="readonly-notice">
+                Your access to this project is read-only, so you can read the checklist but not change it.
+            </p>
+        }
+
+        @if (IsApproved)
         {
             <p class="notice" role="status" data-testid="checklist-locked">
                 This review is approved and locked, so the checklist is read-only. A project administrator can reopen the

@@ -311,12 +311,19 @@ waits on (`review-waiting-{id}`), the last activity, and the due date with the O
 (`review-overdue-{id}`) of the rule of `ReviewService`. The created, last activity, and due dates, and their `datetime`
 attributes, are written with `CultureInfo.InvariantCulture` (Gregorian digits such as `2026-03-04`), like the review page
 and the API, so the culture of the request, for example the Thai Buddhist calendar, never changes the year. Everything
-is read-only, so the same table is shown to a member, a member who may only read (the Auditor role, which is declared
-but cannot be assigned yet), an administrator, and a system administrator; the "+ New review" button, the "Plan
-reviews" link, and the repository hint are shown only to a user who may contribute.
+is read-only, so the same table is shown to a member, a member who may only read (the Auditor role), an
+administrator, and a system administrator; the "+ New review" button, the "Plan
+reviews" link, and the repository hint are shown only to a user who may contribute, and a read-only member sees a
+`readonly-notice` instead.
 
-**RemoveMemberAsync**, **ToggleRoleAsync** (`ProjectPage`): Remove a member (`ProjectService.RemoveMemberAsync`) and
-switch a member between `ProjectRole.User` and `ProjectRole.ProjectAdmin` (`SetMemberRoleAsync`). Each goes through one
+**RemoveMemberAsync**, **ToggleRoleAsync**, **SetRoleAsync** (`ProjectPage`): Remove a member
+(`ProjectService.RemoveMemberAsync`), switch a member between `ProjectRole.User` and `ProjectRole.ProjectAdmin`, and set
+a role explicitly (`SetMemberRoleAsync`). The role label of a member (`member-role-{username}`) reads "Member",
+"Auditor", or "Project admin". An `Auditor` row offers only explicit buttons (`member-set-role-{username}-user` and
+`-projectadmin`), never a toggle, so an auditor is never promoted by accident; other rows keep the toggle
+(`member-toggle-role-{username}`) and offer `member-set-role-{username}-auditor`. The new member pages have an auditor
+checkbox (`new-member-auditor-checkbox`, `new-account-auditor-checkbox`) that cannot be combined with the project admin
+box. Each goes through one
 shared step (`RunMemberChangeAsync`) that first runs `GuardMembersAsync`, then asks for the current user, runs the
 change, shows the outcome in `member-status` (only after the members were reloaded) or the message of a
 `DomainRuleException` in `member-error` (only when the guard, asked again, still allows it), and reloads the members.
@@ -346,7 +353,10 @@ when not, `ShowNoAccess` drops the project, the progress, the repositories, and 
 the page shows the not-found message. Then it asks `ProjectViewGuard.GuardAdministerAsync` whether the user still
 administers the project; when not, `ShowMembersLost` clears `CanAdminister`, the members, and the member messages (and
 with them the Members section and the administration buttons), and the reviews stay, because the user may still be a
-member. The action is then not run. The members are data only an administrator may read, so an error shown above them
+member. Because the demotion may have changed the other rights too (an administrator who made themselves an Auditor
+no longer contributes), `RefreshRightsAsync` recomputes `CanContribute` and `CanAudit` from `ProjectAccess` (and
+clears the repositories without the contribute right), while a plain-member demotion keeps contribution. The action
+is then not run. The members are data only an administrator may read, so an error shown above them
 would not be enough.
 
 **OnParametersSetAsync** (`NewMemberPage`, `NewMemberAccountPage`): Reset the form values and messages (the router

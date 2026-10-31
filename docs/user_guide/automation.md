@@ -5,7 +5,9 @@ reviews or creates a draft review for a release. The API is authenticated with a
 acts as the user who created it, with that user's access: the token carries the owner's project memberships (or the
 system administrator flag), so the API sees only the projects the owner can see. A token is for the API only: it does
 not sign in to the web
-pages, and the session cookie of the web pages is not accepted by the API.
+pages, and the session cookie of the web pages is not accepted by the API. The token of an **Auditor** (a read-only
+member, see Access and Visibility in the Administration chapter) can read everything that user may see, and every
+write, such as creating a review, is refused with **403**.
 
 A token **never signs**. Signing a review, and adding, changing, or removing a reviewer slot, are not available in the
 API: there is no route for them, and the service refuses a token even if one existed. A signature always needs a

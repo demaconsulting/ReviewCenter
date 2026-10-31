@@ -115,6 +115,12 @@ public partial class NewReviewPage : ComponentBase
     private bool Loaded { get; set; }
 
     /// <summary>
+    ///     Gets a value indicating whether the user may work in this project; a member who may only read (an auditor)
+    ///     sees a read-only notice instead of the form.
+    /// </summary>
+    private bool CanContribute { get; set; }
+
+    /// <summary>
     ///     Gets the project the review is created in, or <c>null</c> when it does not exist.
     /// </summary>
     private Project? Project { get; set; }
@@ -290,12 +296,13 @@ public partial class NewReviewPage : ComponentBase
 
         var actor = await AuthenticationState.GetActorOrNullAsync();
         Project = await ProjectService.GetAsync(actor, ProjectId);
-        Repositories = actor is not null && Project is not null
-            ? await RepositoryService.ListEnabledAsync(actor, ProjectId)
-            : [];
+
+        // A member who may only read (an auditor) gets a read-only notice instead of the form and no registry read
+        CanContribute = actor is not null && Project is not null && await Access.CanContributeAsync(actor, ProjectId);
+        Repositories = CanContribute ? await RepositoryService.ListEnabledAsync(actor!, ProjectId) : [];
 
         // The shortlist of reviews to follow up; the service re-checks every choice when the review is created
-        Candidates = Project is null
+        Candidates = !CanContribute
             ? []
             : (await ReviewService.ListAsync(ProjectId)).OrderByDescending(review => review.Created).ToList();
         Loaded = true;

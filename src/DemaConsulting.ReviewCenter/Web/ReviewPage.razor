@@ -76,6 +76,13 @@
             <a class="action outline" href="/projects/@ProjectId/reviews/@ReviewId/history" data-testid="history-link">History</a>
         </div>
 
+        @if (ReadOnly)
+        {
+            <p class="notice" role="status" data-testid="readonly-notice">
+                Your access to this project is read-only, so you can read this review but not change it.
+            </p>
+        }
+
         @* The due date is a UTC calendar day. Overdue means "before today (UTC) and not approved"; an approved review
            keeps its date as history. Only a project administrator or the creator sees the edit form, and only while
            the review is not locked *@
@@ -278,7 +285,7 @@
                         }
                         <p><span class="badge @SlotBadgeClass(slot)" data-testid="slot-status-@slotId">@SlotStatusLabel(slot)</span></p>
 
-                        @if (slot.State == SlotSignatureState.NotSigned)
+                        @if (slot.State == SlotSignatureState.NotSigned && !ReadOnly)
                         {
                             <details class="slot-edit">
                                 <summary>Change reviewers</summary>
@@ -317,7 +324,7 @@
                             <p class="error" role="alert" data-testid="slot-error-@slotId">@slotError</p>
                         }
 
-                        @if (occupant && slot.State != SlotSignatureState.Signed)
+                        @if (occupant && slot.State != SlotSignatureState.Signed && !ReadOnly)
                         {
                             @if (approval.Blockers.Count > 0)
                             {
@@ -410,6 +417,8 @@
                     </div>
                 }
 
+                @if (!ReadOnly)
+                {
                 <form class="slot-add" data-testid="slot-add-form" novalidate @onsubmit="AddSlotAsync">
                     <details open="@(approval.Slots.Count == 0 || NewSlotError is not null)">
                     <summary>Add a slot</summary>
@@ -442,6 +451,7 @@
                     <button type="submit" disabled="@IsLocked" data-locked="@LockedMarker" class="@(approval.Slots.Count == 0 ? null : "secondary")" data-testid="new-slot-add-button">Add slot</button>
                     </details>
                 </form>
+                }
             </section>;
         }
 
@@ -524,7 +534,7 @@
             // In the diff the threads are drawn under their lines; only whole-file threads are listed below it
             var hasLineDiff = HasLineDiff;
             var listedThreads = hasLineDiff ? fileThreads.Where(t => t.StartLine is null).ToList() : fileThreads;
-            var composerRange = hasLineDiff && !IsLocked ? ComposerRange() : null;
+            var composerRange = hasLineDiff && !IsLocked && !ReadOnly ? ComposerRange() : null;
             var inlineComposer = composerRange is not null;
             ThreadSide? composerSide = inlineComposer ? NewSide : null;
 
@@ -574,7 +584,7 @@
                                 aria-label="@(expanded ? "Collapse" : "Expand") thread @threadId"
                                 @onclick="() => GuardedAsync(() => ToggleThreadExpanded(threadId))">@(expanded ? "Collapse" : "Expand")</button>
                     }
-                    @if (expanded)
+                    @if (expanded && !ReadOnly)
                     {
                         <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
                                 disabled="@IsLocked" data-locked="@LockedMarker"
@@ -599,7 +609,7 @@
                             <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
                         </div>
                     }
-                    @if (!IsLocked)
+                    @if (!IsLocked && !ReadOnly)
                     {
                         <div class="reply">
                             <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
@@ -742,7 +752,8 @@
                                   ThreadTemplate="threadCard"
                                   Composer="newThreadForm"
                                   OnComment="request => GuardedAsync(() => CommentOnDiffLine(request))"
-                                  CommentsDisabled="IsLocked"
+                                  CommentsDisabled="IsLocked || ReadOnly"
+                                  ReadOnlyAccess="ReadOnly && !IsLocked"
                                   CanReveal="GuardChildAsync" />
                     }
                 }
@@ -789,7 +800,7 @@
                             <div class="code-line @(anchoredLines.Contains(number) ? "anchored" : null) @(IsFocusedLine(focusedThread, number) || (HighlightLine == number && HighlightSide == ThreadSide.Head) ? "focused" : null)" data-testid="code-line-@number">
                                 <span class="gutter">
                                     <button type="button" class="line-comment" data-testid="line-comment-@number"
-                                            disabled="@IsLocked" data-locked="@LockedMarker"
+                                            disabled="@(IsLocked || ReadOnly)" data-locked="@LockedMarker"
                                             aria-label="Comment on line @number" title="Comment on line @number"
                                             @onclick="() => GuardedAsync(() => CommentOnLine(lineNumber))">+</button>
                                     <span class="line-no" data-testid="line-no-@number">@number</span>
@@ -827,7 +838,7 @@
                 </section>
             }
 
-            @if (!inlineComposer && !IsLocked)
+            @if (!inlineComposer && !IsLocked && !ReadOnly)
             {
                 <section class="card">
                     <h2>@(CurrentView == FileView.Head ? "New thread" : "Comment on the whole file")</h2>

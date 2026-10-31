@@ -106,7 +106,7 @@ public sealed class UserImpactService
             throw new DomainRuleException(DomainRule.UserNotFound, "The user does not exist.");
         }
 
-        var openWork = await FindOpenWorkAsync(userId, scope, cancellationToken);
+        var openWork = await FindOpenWorkAsync(_reviews, userId, scope, cancellationToken);
         var soleAdmin = (await _reviews.ListSoleAdminProjectsAsync(userId, cancellationToken))
             .Where(project => scope is null || scope.Contains(project.Id))
             .Select(project => new SoleAdminProject(project.Id, project.Name))
@@ -144,18 +144,21 @@ public sealed class UserImpactService
     }
 
     /// <summary>
-    ///     Finds the slots of unlocked reviews that still wait for a user.
+    ///     Finds the slots of unlocked reviews that still wait for a user. This is the one definition of "open review
+    ///     work", shared with the membership change of <see cref="ProjectService"/> (making a member an auditor).
     /// </summary>
+    /// <param name="reviews">The store of the reviews.</param>
     /// <param name="userId">The identity of the user.</param>
     /// <param name="scope">The projects to consider, or <c>null</c> for all.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The open work ordered by project name, review identifier and slot number.</returns>
-    private async Task<IReadOnlyList<UserOpenWork>> FindOpenWorkAsync(
+    internal static async Task<IReadOnlyList<UserOpenWork>> FindOpenWorkAsync(
+        IReviewStore reviews,
         int userId,
         HashSet<int>? scope,
         CancellationToken cancellationToken)
     {
-        var candidates = (await _reviews.ListSlotsOfUserAsync(userId, cancellationToken))
+        var candidates = (await reviews.ListSlotsOfUserAsync(userId, cancellationToken))
             .Where(slot => scope is null || scope.Contains(slot.ProjectId))
             .ToList();
 
@@ -164,7 +167,7 @@ public sealed class UserImpactService
         foreach (var project in candidates.GroupBy(slot => slot.ProjectId))
         {
             var reviewIds = project.Select(slot => slot.ReviewId).Distinct().ToList();
-            var snapshots = await _reviews.ListSnapshotsAsync(project.Key, reviewIds, cancellationToken);
+            var snapshots = await reviews.ListSnapshotsAsync(project.Key, reviewIds, cancellationToken);
             foreach (var candidate in project)
             {
                 if (snapshots.TryGetValue(candidate.ReviewId, out var snapshot))

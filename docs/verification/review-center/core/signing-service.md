@@ -260,6 +260,14 @@ never read. This scenario is tested by `SigningService_GetApprovalsAsync_NoRevie
 member of the project, the candidates are the other enabled members. This scenario is tested by
 `SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly`.
 
+**SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable**: An Auditor member is not among the candidates, and
+`AddSlotAsync` and `UpdateSlotAsync` refuse the Auditor as primary or alternate with `SlotUserInvalid`. This scenario is
+tested by `SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable`.
+
+**SigningService_SignAsync_AuditorStillNamedInASlot_IsRefused**: A user who became an Auditor while still named in a
+slot is refused at the signature with `ActorNotAllowed`, and nothing is stored. This scenario is tested by
+`SigningService_SignAsync_AuditorStillNamedInASlot_IsRefused`.
+
 **SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember**: A slot has a primary and an
 alternate reviewer who are both members; a control read marks both as members. After both memberships are removed
 from the fake store, the single read and the batch read keep the slot assigned to the same users and mark the primary

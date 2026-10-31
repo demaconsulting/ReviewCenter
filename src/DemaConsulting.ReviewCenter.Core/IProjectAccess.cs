@@ -28,7 +28,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     itself. A system administrator sees, works in and administers every project; any other user sees only the
 ///     projects they are a member of, works in those where they are a user or a project administrator, and
 ///     administers those where they are a project administrator. A member whose role is auditor sees the project
-///     and reads its audit trail but may not work in it. A missing actor, the
+///     and reads its audit trail but may not work in it. A membership with a role that is not defined (a stored
+///     value no code knows) gives no access at all: the user is treated as a non-member. A missing actor, the
 ///     command line, an unknown user and a disabled user have no access at all. The rules are evaluated from the
 ///     stored user and memberships on every call, so removing a member or disabling a user takes effect at once.
 ///     The <c>Require...</c> methods throw <see cref="DomainRuleException"/> with <see cref="DomainRule.ProjectNotFound"/>
@@ -99,7 +100,7 @@ public interface IProjectAccess
     /// <param name="userId">The identity of the user.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns><c>true</c> when the user has a membership in the project.</returns>
+    /// <returns><c>true</c> when the user has a membership with a defined role in the project.</returns>
     Task<bool> IsMemberAsync(int userId, int projectId, CancellationToken cancellationToken = default);
 
     /// <summary>
