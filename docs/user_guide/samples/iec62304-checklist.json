@@ -1,0 +1,75 @@
+{
+  "version": "iec62304-example-1",
+  "sections": [
+    {
+      "id": "req",
+      "title": "Requirements and risk",
+      "applicabilityHint": "Applies when the change adds or changes a requirement, a hazard or a risk control.",
+      "items": [
+        { "id": "req-01", "text": "Is every changed or new software requirement unambiguous, testable and traceable to a user need or system requirement?" },
+        { "id": "req-02", "text": "Are the software requirements consistent with each other and free of conflicts with existing requirements?" },
+        { "id": "req-03", "text": "Is the software safety classification of the affected items recorded and still justified by the change?" },
+        { "id": "req-04", "text": "Are new or changed hazards, hazardous situations and risk controls identified and recorded in the risk management file?" },
+        { "id": "req-05", "text": "Is each risk control implemented in software defined as a requirement and traced to its verification?" }
+      ]
+    },
+    {
+      "id": "des",
+      "title": "Design, architecture and SOUP",
+      "applicabilityHint": "Applies when the change affects the software architecture, a detailed design or a third-party component.",
+      "items": [
+        { "id": "des-01", "text": "Does the architecture show how the affected software items and their interfaces satisfy the requirements?" },
+        { "id": "des-02", "text": "Are the interfaces between software items and to external systems specified completely and consistently?" },
+        { "id": "des-03", "text": "Is the segregation of items of different safety classifications still effective after the change?" },
+        { "id": "des-04", "text": "For each new or changed third-party component (SOUP): are its purpose, version, functional and performance needs and known anomalies recorded and evaluated?" },
+        { "id": "des-05", "text": "Does the detailed design of each changed unit describe its behavior well enough to implement and verify it?" }
+      ]
+    },
+    {
+      "id": "imp",
+      "title": "Implementation",
+      "applicabilityHint": "Applies to every change of source code.",
+      "items": [
+        { "id": "imp-01", "text": "Does the code implement the design and requirements it is traced to, and nothing beyond them?" },
+        { "id": "imp-02", "text": "Does the code follow the coding standard of the project, and are deviations justified?" },
+        { "id": "imp-03", "text": "Are errors, invalid inputs and resource limits handled in a way that matches the design?" },
+        { "id": "imp-04", "text": "Are the results of static analysis and compiler warnings reviewed, and any suppression justified?" },
+        { "id": "imp-05", "text": "Have the units that were changed been reviewed against the acceptance criteria that were set for them?" }
+      ]
+    },
+    {
+      "id": "ver",
+      "title": "Verification",
+      "applicabilityHint": "Applies when tests or other verification evidence are added or changed.",
+      "items": [
+        { "id": "ver-01", "text": "Does every changed requirement have verification that is traced to it and that covers its acceptance criteria?" },
+        { "id": "ver-02", "text": "Are unit, integration and system test cases specific about inputs, expected results and pass criteria?" },
+        { "id": "ver-03", "text": "Are the test results recorded, with the version of the software and the environment they were obtained with?" },
+        { "id": "ver-04", "text": "Are failed, blocked or skipped tests and anomalies analyzed, and are their resolutions recorded?" },
+        { "id": "ver-05", "text": "Was regression verification chosen to cover the areas that the change can affect?" }
+      ]
+    },
+    {
+      "id": "cfg",
+      "title": "Configuration management",
+      "applicabilityHint": "Applies to every change; some checks may not apply to a documentation-only change.",
+      "items": [
+        { "id": "cfg-01", "text": "Are all changed items, including documents and third-party components, identified and under version control?" },
+        { "id": "cfg-02", "text": "Is the change traceable to a change request or problem report, with its approval recorded?" },
+        { "id": "cfg-03", "text": "Is the impact of the change on other items and on the released software analyzed and recorded?" },
+        { "id": "cfg-04", "text": "Can the build be reproduced from the identified versions of the sources and tools?" }
+      ]
+    },
+    {
+      "id": "doc",
+      "title": "Documentation",
+      "applicabilityHint": "Applies when user-facing behavior, interfaces or the development records change.",
+      "items": [
+        { "id": "doc-01", "text": "Are the software development plan and the records that the change affects updated?" },
+        { "id": "doc-02", "text": "Are the user documentation, labeling and instructions for use updated for the changed behavior?" },
+        { "id": "doc-03", "text": "Do the traceability records connect needs, requirements, design, implementation and verification for the change?" },
+        { "id": "doc-04", "text": "Are the review records complete: who reviewed what, the findings, and how each finding was resolved?" }
+      ]
+    }
+  ]
+}

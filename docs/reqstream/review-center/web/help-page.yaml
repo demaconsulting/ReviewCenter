@@ -117,6 +117,22 @@ sections:
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
 
+      - id: ReviewCenter-HelpPage-ChecklistTemplateTopic
+        title: >-
+          The HelpPage unit shall serve a topic, Checklist template, at /help/checklist-template, that explains that
+          only a project admin or a system administrator can change the checklist template of a project from the
+          Checklist button, that a token can only read it, that a review keeps the checklist it was created with and
+          only new reviews use a replaced or reset template, how to export the current and the built-in default
+          checklist, how to import, validate, and preview a definition and read its errors by path, that a changed
+          definition needs another version label, what replace and reset do, that every change is recorded in the audit
+          trail, and that the shipped example is a structure to adapt and does not make a record compliant.
+        justification: |
+          Replacing the checklist changes what later reviews are checked against, so the person who does it must be
+          able to read what it changes and what it leaves alone, in one place, before using the page.
+        tests:
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
       - id: ReviewCenter-HelpPage-OidcSignIn
         title: >-
           The HelpPage unit shall explain, in the topics for getting started, for signing, and for API tokens, that

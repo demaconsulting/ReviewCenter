@@ -25,11 +25,13 @@ N/A - standard test environment.
 ### Test Scenarios
 
 **PuppetProgram_ParseCommand_ValidCommands_BuildRequests**: Representative command lines (`goto`, `press` with and
-without a selector, `wait --timeout`, `screenshot --full --selector`, `theme`, `start --url --viewport --headed`)
+without a selector, `wait --timeout`, `screenshot --full --selector`, `theme`, `start --url --viewport --headed
+--control-file`)
 become the expected requests. Tested by `PuppetProgram_ParseCommand_ValidCommands_BuildRequests`.
 
 **PuppetProgram_Run_BadArguments_ExitsTwoWithUsage**: Bad command lines each return exit code 2 and a message
-containing the expected text; `--help` returns 0 and lists the commands. Tested by
+containing the expected text (including a blank `--control-file`, which would otherwise resolve to the current folder);
+`--help` returns 0 and lists the commands. Tested by
 `PuppetProgram_Run_BadArguments_ExitsTwoWithUsage`.
 
 **PuppetProgram_Run_NotRunning_ExitsTwoWithStartHint**: A command with an absent control file and one with a stale

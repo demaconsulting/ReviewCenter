@@ -12,7 +12,7 @@ and prints the result. The hidden verb `daemon` runs `BrowserDaemon` in the same
 
 **Command table**: one entry per command with its usage text, the minimum and maximum number of positional
 arguments, and the options it accepts. It drives both validation and `--help`. Flags (`--full`, `--headed`) take no
-value; every other option takes one.
+value; every other option takes one. Every command also accepts `--control-file <path>`, which is not listed per entry.
 
 **Exit codes**: 0 the command worked; 1 it failed (including `start` when Puppet is already running or the daemon
 could not start); 2 a usage error, Puppet is not running, or the daemon process could not be spawned.
@@ -26,7 +26,8 @@ could not start); 2 a usage error, Puppet is not running, or the daemon process 
 **ParseCommand**: Splits the arguments into positionals and options, rejects unknown options and wrong argument
 counts, validates values (viewport, theme, coordinates, timeout, base URL), and makes screenshot and upload paths
 absolute because the daemon runs in another working directory. An option name begins with `--`, so a `fill` text that
-begins with `--` must be set with `eval` instead.
+begins with `--` must be set with `eval` instead. A blank `--control-file` value is rejected here, before the path is
+made absolute (a blank path would otherwise resolve to the current folder).
 
 **Format**: Prints the result, then `@ <url>  "<title>"`, then one `! <event>` line per new browser error. Output of
 a failed command goes to the error writer. Returns 0 or 1.

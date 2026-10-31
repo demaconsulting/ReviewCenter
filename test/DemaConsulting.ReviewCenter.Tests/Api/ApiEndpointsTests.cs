@@ -59,6 +59,7 @@ public class ApiEndpointsTests
     [InlineData(DomainRule.LastProjectAdmin, 409)]
     [InlineData(DomainRule.TooManyAttempts, 429)]
     [InlineData(DomainRule.PasswordChangeRequired, 403)]
+    [InlineData(DomainRule.ChecklistDefinitionInvalid, 400)]
     public void ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus(DomainRule rule, int status)
     {
         // Arrange: nothing to prepare
@@ -182,6 +183,156 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that an invalid checklist definition is a 400 (explicitly, not by default) whose problem answer
+    ///     carries the message of the rule.
+    /// </summary>
+    [Fact]
+    public void ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage()
+    {
+        // Arrange: the refusal of the checklist service
+        var exception = new DomainRuleException(DomainRule.ChecklistDefinitionInvalid, "The checklist definition is not valid (1 error).");
+
+        // Act
+        var status = ApiProblems.StatusOf(DomainRule.ChecklistDefinitionInvalid);
+        var problem = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult>(ApiProblems.ToResult(exception));
+
+        // Assert
+        Assert.Equal(400, status);
+        Assert.Equal(400, problem.StatusCode);
+        Assert.Equal("The checklist definition is not valid (1 error).", problem.ProblemDetails.Detail);
+    }
+
+    /// <summary>
+    ///     Test that the checklist template of a project is returned with its definition, version label, default
+    ///     flag, hash and counts: the built-in default at first, then the project's own checklist; and that a member
+    ///     (who may not change it) and a system administrator may read it.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition()
+    {
+        // Arrange: a project, a member with a token and a system administrator with a token
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        await EnsureUserAsync(app, "mem", UserRole.Reviewer);
+        var mem = (await app.Services.GetRequiredService<UserService>().GetAsync("mem", TestContext.Current.CancellationToken))!;
+        await app.Services.GetRequiredService<IReviewStore>().AddMembershipAsync(mem.Id, projectId, TestContext.Current.CancellationToken);
+        var memberToken = await CreateTokenAsync(app, "mem");
+        var adminToken = await CreateTokenAsync(app);
+        using var member = ClientFor(app, memberToken.Value);
+        using var admin = ClientFor(app, adminToken.Value, basic: true);
+
+        // Act: read the default as the member
+        var first = await member.GetAsync($"/api/projects/{projectId}/checklist", TestContext.Current.CancellationToken);
+        using var firstJson = await JsonAsync(first);
+
+        // Act: give the project a checklist of its own, and read it as the system administrator
+        var templates = app.Services.GetRequiredService<ProjectChecklistService>();
+        const string Custom = "{\"version\":\"custom-1\",\"sections\":[{\"id\":\"s1\",\"title\":\"First\",\"applicabilityHint\":\"Always\","
+            + "\"items\":[{\"id\":\"s1-1\",\"text\":\"Is it right?\"},{\"id\":\"s1-2\",\"text\":\"Is it complete?\"}]}]}";
+        var current = await templates.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken);
+        Assert.True(await templates.SetAsync(TestActors.Ann, projectId, current.Hash, Custom, TestContext.Current.CancellationToken));
+        var second = await admin.GetAsync($"/api/projects/{projectId}/checklist", TestContext.Current.CancellationToken);
+        using var secondJson = await JsonAsync(second);
+
+        // Assert: the default, with camel-case names, its hash and its counts
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal("application/json", first.Content.Headers.ContentType?.MediaType);
+        var root = firstJson.RootElement;
+        Assert.Equal("default-1", root.GetProperty("version").GetString());
+        Assert.True(root.GetProperty("isDefault").GetBoolean());
+        Assert.Equal(ProjectChecklistService.HashOf(null), root.GetProperty("hash").GetString());
+        Assert.Equal(14, root.GetProperty("sectionCount").GetInt32());
+        Assert.Equal(58, root.GetProperty("itemCount").GetInt32());
+        var definition = root.GetProperty("definition");
+        Assert.Equal("default-1", definition.GetProperty("version").GetString());
+        Assert.Equal(14, definition.GetProperty("sections").GetArrayLength());
+        var firstSection = definition.GetProperty("sections")[0];
+        Assert.False(string.IsNullOrEmpty(firstSection.GetProperty("id").GetString()));
+        Assert.False(string.IsNullOrEmpty(firstSection.GetProperty("title").GetString()));
+        Assert.True(firstSection.TryGetProperty("applicabilityHint", out _));
+        Assert.False(string.IsNullOrEmpty(firstSection.GetProperty("items")[0].GetProperty("text").GetString()));
+
+        // Assert: the project's own checklist, with another hash, as the system administrator with Basic credentials
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var custom = secondJson.RootElement;
+        Assert.Equal("custom-1", custom.GetProperty("version").GetString());
+        Assert.False(custom.GetProperty("isDefault").GetBoolean());
+        Assert.NotEqual(current.Hash, custom.GetProperty("hash").GetString());
+        Assert.Equal(64, custom.GetProperty("hash").GetString()!.Length);
+        Assert.Equal(1, custom.GetProperty("sectionCount").GetInt32());
+        Assert.Equal(2, custom.GetProperty("itemCount").GetInt32());
+        var section = custom.GetProperty("definition").GetProperty("sections")[0];
+        Assert.Equal("Always", section.GetProperty("applicabilityHint").GetString());
+        Assert.Equal(["s1-1", "s1-2"], section.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString()).ToArray());
+    }
+
+    /// <summary>
+    ///     Test that a section without an applicability hint (which the validator accepts) is returned with an empty
+    ///     string, not null, as the documented contract and the schema (a required string) say.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_GetChecklist_SectionWithoutHint_ReturnsEmptyHint()
+    {
+        // Arrange: a project whose own checklist has a section without the hint member
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        var adminToken = await CreateTokenAsync(app);
+        using var admin = ClientFor(app, adminToken.Value, basic: true);
+        var templates = app.Services.GetRequiredService<ProjectChecklistService>();
+        const string PlainSection = "{\"version\":\"plain-1\",\"sections\":[{\"id\":\"s1\",\"title\":\"First\","
+            + "\"items\":[{\"id\":\"s1-1\",\"text\":\"Is it right?\"}]}]}";
+        var current = await templates.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken);
+        Assert.True(await templates.SetAsync(TestActors.Ann, projectId, current.Hash, PlainSection, TestContext.Current.CancellationToken));
+
+        // Act
+        var response = await admin.GetAsync($"/api/projects/{projectId}/checklist", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: the field is present and is an empty string
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var hint = json.RootElement.GetProperty("definition").GetProperty("sections")[0].GetProperty("applicabilityHint");
+        Assert.Equal(System.Text.Json.JsonValueKind.String, hint.ValueKind);
+        Assert.Equal(string.Empty, hint.GetString());
+    }
+
+    /// <summary>
+    ///     Test that a user who is no member of the project, and an unknown project, both get the 404 problem, and
+    ///     that a stored definition that cannot be read is a 400 problem with the message of the rule.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems()
+    {
+        // Arrange: a project, an outsider with a token, and a system administrator with a token
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        await EnsureUserAsync(app, "out", UserRole.Reviewer);
+        var outsiderToken = await CreateTokenAsync(app, "out");
+        var adminToken = await CreateTokenAsync(app);
+        using var outsider = ClientFor(app, outsiderToken.Value);
+        using var admin = ClientFor(app, adminToken.Value);
+
+        // Act
+        var hidden = await outsider.GetAsync($"/api/projects/{projectId}/checklist", TestContext.Current.CancellationToken);
+        var missing = await admin.GetAsync("/api/projects/9999/checklist", TestContext.Current.CancellationToken);
+        Assert.True(await app.Services.GetRequiredService<IReviewStore>().UpdateChecklistDefinitionAsync(
+            projectId,
+            ProjectChecklistService.HashOf(null),
+            "this is not a checklist",
+            AuditDraft.By(TestActors.Ann, ProjectChecklistService.ChangedAction, "x", projectId),
+            TestContext.Current.CancellationToken));
+        var unreadable = await admin.GetAsync($"/api/projects/{projectId}/checklist", TestContext.Current.CancellationToken);
+        using var problem = await JsonAsync(unreadable);
+
+        // Assert: 404 problems for the outsider and the missing project, 400 for the unreadable definition
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        Assert.Equal("application/problem+json", hidden.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Equal("application/problem+json", missing.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.BadRequest, unreadable.StatusCode);
+        Assert.Contains("checklist definition", problem.RootElement.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     ///     Test that every endpoint of the API refuses a request without a token with 401.
     /// </summary>
     /// <param name="method">The HTTP method.</param>
@@ -190,6 +341,7 @@ public class ApiEndpointsTests
     [InlineData("GET", "/api/projects")]
     [InlineData("GET", "/api/projects/1/reviews")]
     [InlineData("GET", "/api/projects/1/reviews/REV-1")]
+    [InlineData("GET", "/api/projects/1/checklist")]
     [InlineData("POST", "/api/projects/1/reviews")]
     [InlineData("GET", "/api/projects/1/reviews/REV-1/attestation.pdf")]
     [InlineData("GET", "/api/projects/1/evidence/index.json")]

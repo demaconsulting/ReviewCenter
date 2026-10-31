@@ -2,8 +2,10 @@
 
 #### Verification Approach
 
-`ReviewService` is verified with unit tests defined in `ReviewServiceTests.cs`. The tests use the real service and
-the real `Fingerprint` with a fake in-memory store (`FakeReviewStore`), the project-access double
+`ReviewService` is verified with unit tests defined in `ReviewServiceTests.cs`, and the freezing of the checklist of the
+project in `ReviewServiceChecklistTests.cs`, which sets the checklist through the real `ProjectChecklistService`. The
+tests use the real service and the real `Fingerprint` with a fake in-memory store (`FakeReviewStore`), the
+project-access double
 `AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit), and a fixed clock, so every rule
 and every
 limit can be exercised without a database. Failures are checked through the rule carried by the
@@ -39,6 +41,10 @@ N/A - standard test environment.
   both for a draft from files and for a review from a repository; a review created from the web pages is not flagged.
 - The diff of a file is computed from the stored content only, never from git; it reports no baseline, a binary
   side, or a file that is too large instead of rows, and flags content that differs only in line endings.
+- A new review, from files or from a repository or a plan, freezes the checklist of its project (the built-in default
+  when the project has none); a stored definition that cannot be used refuses the review with
+  `ChecklistDefinitionInvalid` and never falls back to the default; a later change of the checklist of the project
+  changes neither the wording nor the record digest of an existing review, approved or not.
 
 #### Test Scenarios
 
@@ -239,3 +245,31 @@ entry ends with `, set '{id}'` (`ReviewPlanner_CreateAsync_PlanRows_CreatesRevie
 overlong set identifier is refused (`ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest`), and the longest title,
 repository name, and set identifier still fit in the audit detail
 (`ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits`).
+
+**ReviewService_Create_ProjectChecklist_IsFrozenAtBothCreatePaths**: The project is given a checklist of its own; a
+review is created from uploaded files and another from a repository. Both carry that definition in its normal form with
+its version label, and the checklist service shows its wording. This scenario is tested by
+`ReviewService_Create_ProjectChecklist_IsFrozenAtBothCreatePaths`.
+
+**ReviewService_Create_NoProjectChecklist_FreezesTheDefaultAtBothCreatePaths**: A project that never had a checklist,
+and one that was reset to the default, give the built-in default to reviews created from files and from a repository.
+This scenario is tested by `ReviewService_Create_NoProjectChecklist_FreezesTheDefaultAtBothCreatePaths`.
+
+**ReviewService_Create_UnusableProjectChecklist_FailsClosed**: A theory over a stored definition that is not JSON and one
+that has no sections, at both create paths; each raises `ChecklistDefinitionInvalid` with a message that names the
+project, stores no review and no entry, and never falls back to the default. This scenario is tested by
+`ReviewService_Create_UnusableProjectChecklist_FailsClosed`.
+
+**ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected**: A review from files and a review from a
+repository are created; the project then changes its checklist, goes back to the default, and changes it again. The two
+reviews keep their version, their wording, and their record digest; a review created afterwards has the newest definition.
+This scenario is tested by `ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected`.
+
+**ReviewService_ProjectChecklistChangedLater_ApprovedReviewIsUnaffected**: An approved review is made under the default;
+the project then replaces its checklist. The record digest, the checklist version, and the answers are unchanged, and
+the review is still locked. This scenario is tested by
+`ReviewService_ProjectChecklistChangedLater_ApprovedReviewIsUnaffected`.
+
+**ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview**: A review that the planner creates for a review-set
+carries the checklist of the project. This scenario is tested by
+`ReviewPlanner_CreateAsync_ProjectChecklist_IsFrozenIntoTheReview`, which is defined in `ReviewPlannerTests.cs`.

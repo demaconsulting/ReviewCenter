@@ -51,6 +51,7 @@ status, and for a request that is not valid a list of the fields at fault.
 | GET    | `/api/projects`                                 | List your projects (all for a system admin)      |
 | GET    | `/api/projects/{p}/reviews`                     | List the reviews of project `{p}`                |
 | GET    | `/api/projects/{p}/reviews/{r}`                 | One review: slots, approval, progress, next step |
+| GET    | `/api/projects/{p}/checklist`                   | Checklist template new reviews start with        |
 | POST   | `/api/projects/{p}/reviews`                     | Create a draft review (201 with the review)      |
 | GET    | `/api/projects/{p}/reviews/{r}/attestation.pdf` | Signed attestation PDF (token or anonymous)      |
 | GET    | `/api/projects/{p}/evidence/index.json`         | Evidence index (token or anonymous)              |
@@ -58,6 +59,12 @@ status, and for a request that is not valid a list of the fields at fault.
 
 In the addresses `{p}` is the project number and `{r}` the review identifier. A project that the token's owner cannot
 see is answered 404, as if it did not exist, never 403.
+
+The checklist route is read-only. It returns the checklist that new reviews of the project start with, as `version`
+(the version label), `isDefault` (true for the built-in default), `hash` (the SHA-256 of the stored definition text),
+`sectionCount`, `itemCount`, and `definition` (the version label and the sections with their checks). A review keeps
+the checklist it was created with, so the answer says nothing about existing reviews. The template is replaced and reset
+on the web pages only (see Checklist Template in the Administration chapter); no token can change it.
 
 Two routes are an exception to the rule that every route needs a token: the evidence index and the attestation PDF.
 A project administrator can open each of them to callers without a token in the evidence settings of the project (see
@@ -125,6 +132,12 @@ Limits to know about:
 - There are no `fail` entries. A review with a failed answer cannot be completed, so it is simply missing.
 - A review made from the **changes since a baseline** holds only the changed files, so its fingerprint is not the one
   ReviewMark computes for the whole review-set, and ReviewMark reports it as stale.
+- **Line endings.** The fingerprint of a review from a repository is calculated from the exact bytes that are committed
+  in git, and ReviewMark calculates its fingerprint from the bytes of the files in your working folder. On Windows,
+  `core.autocrlf=true` turns the working files into CRLF, so the two fingerprints differ and ReviewMark reports the
+  review as stale. Check the repository out with LF line endings: set `core.autocrlf=false` and check out again, or
+  commit a `.gitattributes` file with `* text=auto eol=lf`. ReviewCenter does not normalize line endings, because
+  its fingerprint must equal the one of ReviewMark.
 - ReviewMark only prints the `file` address. Following it needs a token (it is an API address) unless the project allows
   anonymous attestation PDFs, and records an `attestation.generated` event in the audit trail.
 - The host of `file` is the `Host` of the request. Behind a reverse proxy, the proxy must keep the `Host` header,
@@ -157,6 +170,11 @@ its reviewers and cannot sign it, just as if the owner had created it in the bro
 locked and cannot change until an administrator reopens it in the web pages (see Locked Reviews and Reopening in the
 Reviewing chapter).
 
+**`state` and `approved`.** The review data has both a `state` and an `approved` field. `state` is the stored
+life-cycle value, and in this release it is always `Draft`, even after the review is signed; it is kept so that clients
+that read it keep working. Use `approved` (`true` while every reviewer slot has signed the current record, and the
+review is locked) to find out whether a review is approved.
+
 ## Errors, Refusals, and the Throttle
 
 - A request without a token, or with a token that is wrong, malformed, expired, or revoked, or whose owner is disabled or
@@ -170,7 +188,8 @@ Reviewing chapter).
   answered **429 Too many requests** with a `Retry-After` header (the seconds to wait) for the rest of the window,
   even with a good token. A good token does not use up attempts. Give each build agent its own address where you can,
   so that one agent with a wrong token does not lock out the others.
-- A request that is not valid is answered **400** with the fields at fault; a project, review, or repository that does
+- A request that is not valid is answered **400** with the fields at fault (a stored checklist definition that cannot be
+  read is also **400**); a project, review, or repository that does
   not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
   repository, an attestation of a review that is not complete, or a change that is refused because the review is
   approved and locked (or a reopen of a review that is not locked) **409** (a request without a token, possible on the

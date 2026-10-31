@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Net;
+using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Identity;
@@ -110,11 +111,21 @@ internal sealed class OidcOptions
 
     /// <summary>
     ///     Gets or sets the secret of this server at the provider. It is required while sign-in with a provider is
-    ///     enabled: the server is a confidential client that proves itself at the token endpoint, so a public client
-    ///     that relies on PKCE alone is not supported. Supply it through an environment variable
-    ///     (<c>Identity__Oidc__ClientSecret</c>) or a secret store rather than a file that is checked in.
+    ///     enabled (this setting or <see cref="ClientSecretFile"/>): the server is a confidential client that proves
+    ///     itself at the token endpoint, so a public client that relies on PKCE alone is not supported. Supply it
+    ///     through an environment variable (<c>Identity__Oidc__ClientSecret</c>) or a secret store rather than a file
+    ///     that is checked in, or use <see cref="ClientSecretFile"/>. Setting both is refused.
     /// </summary>
     public string ClientSecret { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the path of a file that holds the client secret instead of <see cref="ClientSecret"/>, for
+    ///     example a file that systemd (<c>LoadCredential</c>) or a secret mount provides. The file is read as UTF-8
+    ///     and trimmed of surrounding white space; see <see cref="SecretSource"/>. It must exist, be readable, not be
+    ///     empty and not be larger than <see cref="SecretSource.MaxFileBytes"/> bytes, and it may not be used together
+    ///     with <see cref="ClientSecret"/>.
+    /// </summary>
+    public string ClientSecretFile { get; set; } = string.Empty;
 
     /// <summary>
     ///     Gets or sets the scopes to request, separated by spaces; must contain <c>openid</c>.
@@ -144,6 +155,41 @@ internal sealed class OidcOptions
     ///     <see cref="MaxReauthMaxAgeSeconds"/>.
     /// </summary>
     public int ReauthMaxAgeSeconds { get; set; } = 120;
+
+    /// <summary>
+    ///     Resolves the client secret from <see cref="ClientSecret"/> or from the file named by
+    ///     <see cref="ClientSecretFile"/>.
+    /// </summary>
+    /// <returns>The secret; <c>null</c> when neither setting is set.</returns>
+    /// <remarks>
+    ///     The file is read at each call, so the start-up check and the registration of the provider both see the
+    ///     file as it is at that moment. Every read applies the same contract: the length and control-character
+    ///     bounds are checked here, so a file that changes after the start-up check cannot slip past them. The
+    ///     secret is never logged or put in a message.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when both settings are set, when the file cannot be used (see
+    ///     <see cref="SecretSource.Resolve"/>), or when the secret is longer than
+    ///     <see cref="MaxClientSecretLength"/> characters or holds a control character; the message names the
+    ///     setting and never holds the secret.
+    /// </exception>
+    internal string? ResolveClientSecret()
+    {
+        var useFile = !string.IsNullOrWhiteSpace(ClientSecretFile);
+        var secret = SecretSource.Resolve(
+            ClientSecret,
+            $"{SectionName}:{nameof(ClientSecret)}",
+            ClientSecretFile,
+            $"{SectionName}:{nameof(ClientSecretFile)}");
+        if (secret is not null && (secret.Length > MaxClientSecretLength || secret.Any(char.IsControl)))
+        {
+            var key = $"{SectionName}:{(useFile ? nameof(ClientSecretFile) : nameof(ClientSecret))}";
+            throw new InvalidOperationException(
+                $"{key} must be at most {MaxClientSecretLength} characters without control characters.");
+        }
+
+        return secret;
+    }
 
     /// <summary>
     ///     Tells whether the provider is reached over a plain loopback address, where http is accepted.
@@ -201,12 +247,7 @@ internal sealed class OidcOptionsValidator : IValidateOptions<OidcOptions>
                    OidcOptions.MaxClientIdLength,
                    required: true,
                    allowSpace: false)
-               ?? CheckText(
-                   options.ClientSecret,
-                   $"{section}:ClientSecret",
-                   OidcOptions.MaxClientSecretLength,
-                   required: true,
-                   allowSpace: true)
+               ?? CheckClientSecret(options)
                ?? CheckScopes(options.Scopes)
                ?? CheckText(
                    options.DisplayName,
@@ -253,6 +294,44 @@ internal sealed class OidcOptionsValidator : IValidateOptions<OidcOptions>
         }
 
         return null;
+    }
+
+    /// <summary>
+    ///     Checks the client secret, whether it is set inline or in a file.
+    /// </summary>
+    /// <param name="options">The settings.</param>
+    /// <returns>The message of the problem; <c>null</c> when the secret is usable.</returns>
+    /// <remarks>
+    ///     Both settings at once, a file that is missing, unreadable, empty or too large, and a secret that is too
+    ///     long or has a control character are all reported by <see cref="OidcOptions.ResolveClientSecret"/>, the
+    ///     one resolver that the provider registration also uses, and end the start-up like any other invalid
+    ///     setting. No message holds the secret.
+    /// </remarks>
+    private static string? CheckClientSecret(OidcOptions options)
+    {
+        const string section = OidcOptions.SectionName;
+        string? secret;
+        try
+        {
+            secret = options.ResolveClientSecret();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
+
+        // Neither form is set: the server is a confidential client, so a secret is required
+        if (secret is null)
+        {
+            return $"{section}:ClientSecret or {section}:ClientSecretFile is required when sign-in with " +
+                   "OpenID Connect is enabled.";
+        }
+
+        // The bounds apply to the secret itself; the message names the form the operator used
+        var key = string.IsNullOrWhiteSpace(options.ClientSecretFile)
+            ? $"{section}:ClientSecret"
+            : $"{section}:ClientSecretFile";
+        return CheckText(secret, key, OidcOptions.MaxClientSecretLength, required: true, allowSpace: true);
     }
 
     /// <summary>

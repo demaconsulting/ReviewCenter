@@ -48,7 +48,8 @@ reads are not affected.
 name, description, and creation time into a new entity, so an identity supplied by the caller is ignored and can
 neither be persisted nor collide with an existing project; the returned project is the stored entity. The evidence
 settings of the project are copied too, and a project that was not given others has the defaults
-(`EvidenceSettings.Default`). So is `RequireIndependentReviewers` (true unless the caller gave another value).
+(`EvidenceSettings.Default`). So is `RequireIndependentReviewers` (true unless the caller gave another value), and the
+checklist definition (none unless the caller gave one).
 
 **GetProjectAsync**: Reads one project by identity, with its evidence settings and its `RequireIndependentReviewers`
 value; null when absent.
@@ -86,6 +87,26 @@ holds the value the caller started from (compare-and-set), in the same way.
 The comparison is part of one `ExecuteUpdate` statement (`WHERE Id = projectId AND RequireIndependentReviewers =
 expected`), so two administrators who save at the same time cannot both succeed. `ProjectService` turns the `false`
 into `RecordChanged`.
+
+**UpdateChecklistDefinitionAsync**: Changes the checklist definition of one project if the hash of the stored text still
+equals the hash the caller started from (compare-and-set).
+
+- *Parameters*: the project identity, the expected hash (`ProjectChecklistService.HashOf` of the stored text, which
+  for no definition is the hash of the default's text), the new JSON text or `null` for the built-in default, and the
+  audit draft of the change.
+- *Returns*: `Task<bool>` — `true` when the definition was changed; `false` when the project does not exist or the
+  stored text no longer has the expected hash.
+- *Preconditions*: the expected hash and the audit draft are not null (`ArgumentNullException` otherwise).
+- *Postconditions*: Either the new definition and the audit entry (`project.checklist-changed`, carrying the project)
+  are stored in the same serialized transaction, so the hash chain stays intact, or nothing is.
+
+A hash cannot be compared inside SQL, so the change reads the stored text inside the transaction of the audit gate,
+compares its hash, and then writes with one `ExecuteUpdate` statement whose condition repeats the text that was
+compared (`WHERE Id = projectId AND ChecklistDefinition = the text read`; a null text compares as `IS NULL`). The
+transaction takes the write lock when it begins and the gate is process-wide, so two administrators who save at the same
+time cannot both succeed: the second finds a different text, gets `false`, and leaves no change and no entry. Only the
+column of that project is written. `ProjectChecklistService` turns the `false` into `RecordChanged`; a project that does
+not exist is refused earlier by the access check and never reaches the store.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 
@@ -257,7 +278,8 @@ refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.
 
 #### Callers
 
-- **EvidenceSettingsService**, **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**,
+- **EvidenceSettingsService**, **ProjectChecklistService**, **ProjectService**, **ReviewService**, **ThreadService**,
+  **ChecklistService**,
   **SigningService**, and
   **ProjectAccess** — through the
   Core interface.

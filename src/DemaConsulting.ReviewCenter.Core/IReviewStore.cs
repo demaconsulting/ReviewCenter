@@ -118,6 +118,37 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Changes the checklist definition of a project, if it still is the one whose hash the caller based its
+    ///     change on.
+    /// </summary>
+    /// <remarks>
+    ///     The comparison and the update are one atomic step (compare-and-set) inside the transaction that also
+    ///     stores the audit entry, like <see cref="UpdateEvidenceSettingsAsync"/>, so two administrators who save
+    ///     at the same time cannot silently overwrite each other and the audit chain never misses a change. The
+    ///     store keeps the text as given; whoever calls it has validated the definition (see
+    ///     <see cref="ChecklistValidator"/>). The version label is part of the JSON, so it is not passed separately.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="expectedHash">
+    ///     The hash the caller read for the stored definition (see <see cref="ProjectChecklistService.HashOf"/>; the
+    ///     hash of the built-in default when the project has no definition of its own). Must not be null.
+    /// </param>
+    /// <param name="definitionJson">The new definition as JSON; <c>null</c> removes the project's own definition, so
+    ///     the built-in default applies again.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the definition was changed; <c>false</c> (and nothing recorded) when the project does not
+    ///     exist or its definition no longer has the <paramref name="expectedHash"/>.
+    /// </returns>
+    Task<bool> UpdateChecklistDefinitionAsync(
+        int projectId,
+        string expectedHash,
+        string? definitionJson,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Stores a new project membership.
     /// </summary>
     /// <param name="membership">The membership to store. Must not be null.</param>

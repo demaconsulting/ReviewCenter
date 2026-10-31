@@ -26,6 +26,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 /// <summary>
 ///     Unit tests for the <see cref="ControlChannel"/> protocol.
 /// </summary>
+[Collection("Sequential")]
 public class ControlChannelTests
 {
     /// <summary>
@@ -76,5 +77,45 @@ public class ControlChannelTests
 
         // Act and assert: nothing answers
         Assert.False(await ControlChannel.IsAnsweringAsync(port));
+    }
+
+    /// <summary>
+    ///     Test that the control file path comes from the environment variable when it is set, and from the temporary
+    ///     folder otherwise.
+    /// </summary>
+    [Fact]
+    public void ControlChannel_ResolveControlFile_VariableSetOrBlank_ChoosesPath()
+    {
+        // Arrange: a configured path
+        var configured = Path.Combine(Path.GetTempPath(), "session-b.json");
+
+        // Act and assert: the variable wins; null and blank fall back to the well-known file
+        Assert.Equal(configured, ControlChannel.ResolveControlFile(configured));
+        Assert.Equal(Path.Combine(Path.GetTempPath(), "reviewcenter-puppet.json"), ControlChannel.ResolveControlFile(null));
+        Assert.Equal(Path.Combine(Path.GetTempPath(), "reviewcenter-puppet.json"), ControlChannel.ResolveControlFile("  "));
+    }
+
+    /// <summary>
+    ///     Test that the default control file really comes from the process environment variable, and that the variable
+    ///     is restored afterward.
+    /// </summary>
+    [Fact]
+    public void ControlChannel_DefaultControlFile_EnvironmentVariable_IsHonored()
+    {
+        // Arrange: remember the current value and choose a path for this test
+        var original = Environment.GetEnvironmentVariable(ControlChannel.ControlFileVariable);
+        var configured = Path.Combine(Path.GetTempPath(), $"puppet-env-{Guid.NewGuid():N}.json");
+        try
+        {
+            // Act and assert: set, then cleared, the real lookup follows the variable
+            Environment.SetEnvironmentVariable(ControlChannel.ControlFileVariable, configured);
+            Assert.Equal(configured, ControlChannel.DefaultControlFile);
+            Environment.SetEnvironmentVariable(ControlChannel.ControlFileVariable, null);
+            Assert.Equal(Path.Combine(Path.GetTempPath(), "reviewcenter-puppet.json"), ControlChannel.DefaultControlFile);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(ControlChannel.ControlFileVariable, original);
+        }
     }
 }

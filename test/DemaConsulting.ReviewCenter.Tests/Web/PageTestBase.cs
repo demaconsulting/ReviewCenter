@@ -118,6 +118,10 @@ public abstract class PageTestBase : BunitContext
         // The evidence settings page enforces the real access rules; EvidenceSettingsService is exposed for arranging
         SettingsService = new EvidenceSettingsService(store, allowAll);
         Services.AddSingleton(new EvidenceSettingsService(store, Access));
+
+        // The checklist template page enforces the real access rules; ProjectChecklistService is exposed for arranging
+        ChecklistTemplates = new ProjectChecklistService(store, allowAll);
+        Services.AddSingleton(new ProjectChecklistService(store, Access));
         // The review page offers the attestation; the default key is an in-memory self-signed key, and a test that
         // needs another key or a problem registers its own provider before the first render
         Services.AddSingleton<IAttestationKeyProvider>(_ => new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa()));
@@ -279,6 +283,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the evidence settings service that allows everything, for arranging the settings of a project.
     /// </summary>
     protected EvidenceSettingsService SettingsService { get; }
+
+    /// <summary>
+    ///     Gets the project checklist service that allows everything, for arranging the checklist of a project.
+    /// </summary>
+    protected ProjectChecklistService ChecklistTemplates { get; }
 
     /// <summary>
     ///     Gets the signing service the pages use.

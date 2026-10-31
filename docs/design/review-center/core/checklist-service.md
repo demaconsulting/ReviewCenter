@@ -18,11 +18,33 @@ applicability hint, and a list of `ChecklistItem` with `Id` and `Text`). It seri
 the sections, a section with its id, title or items, or an item with its id or text, raises `JsonException`, so no
 reader of a stored definition meets a null part. The applicability hint is display help and is not required.
 
-**DefaultChecklist**: the checklist given to every new review, `DefaultChecklist.Current`, with version
-`default-1`. It is seeded from the Continuous Compliance review template: 14 sections and 58 checks, with the
+**DefaultChecklist**: the built-in checklist, `DefaultChecklist.Current`, with version `default-1`. It is the checklist
+of every project that has not been given a definition of its own (see `ProjectChecklistService`) and the fallback of
+a project without one, and it is the starting point for a project that wants its own. It is seeded from the Continuous
+Compliance review template: 14 sections and 58 checks, with the
 section and check identifiers and the wording of the template. A check identifier starts with the identifier of its
 section (for example `REQ-01` in section `REQ`). Changing the wording means a new version label; reviews are not
-affected (see Frozen copy below).
+affected (see Frozen copy below). The default passes `ChecklistValidator`.
+
+**ChecklistValidator**: the strict check of a definition that a project administrator enters (see
+`ProjectChecklistService`) and that `ReviewService` repeats when it takes a project's definition for a new review. It
+reads a JSON text and reports every violation, each with the path of the value in the definition (for example
+`sections[2].items[1].id: duplicate "code-03"`; indexes start at zero), in the lists of a `ChecklistValidationResult`
+(`Errors`, and the parsed `Definition` when there are none), not only the first. The rules: the text is JSON and at most
+`ReviewLimits.MaxChecklistBytes` (256 KiB; a larger text is not parsed and only the size is reported); the version is not
+empty and at most 64 characters; there are 1 to 50 sections and 1 to 500 checks in all; a section has at least one
+check; every identifier of a section or a check has 1 to 32 letters, digits, dots, underscores, and hyphens and starts
+with a letter or digit; identifiers are unique across the whole definition, sections and checks together, and compared
+without regard to case (the default's own identifiers use upper case, so the rule allows it); a section title and a
+check title are not empty and at most 200 characters; the wording of a check is not empty and at most 1000 characters;
+the applicability hint has at most 500 characters. The names of the members are read without regard to case, because
+`ToJson` writes them in Pascal case; the paths use the lower-case names. A duplicate is reported at its later use.
+An error that the reader finds (a value of the wrong type) is reported at the same kind of path: the parser's path
+(`$.Sections[0].Items[1].Id`) is converted by removing the `$` prefix and spelling the known member names in their
+canonical form, so every consumer sees one path format; a path that names no member is `json`.
+`ParseOrThrow` returns the definition or raises `ChecklistDefinitionInvalid`, with the first ten errors in the message.
+The limits are in `ReviewLimits`. `FromJson` stays lenient: it is the reader of frozen copies and of stored text, and
+the strict rules apply only where a definition enters the system or is taken for a new review.
 
 **ReviewChecklist**: the frozen copy stored for a review: `ProjectId`, `ReviewId`, `Version`, and `Definition`
 (the JSON text of the definition). `Parse` returns the definition.
@@ -53,9 +75,12 @@ Rules for the input: a justification (for Fail and N/A) or a reason (for a secti
 after trimming and has at most 2000 characters (`ReviewLimits.MaxJustificationLength`); it is stored trimmed. A
 Pass needs no justification and any text given is stored trimmed, or not stored when empty.
 
-**Frozen copy**: `ReviewService` gives every review a `ReviewChecklist` made from `DefaultChecklist.Current` when
-the review is created, and the store saves it in the same transaction as the review. Every later read of the
-checklist uses that copy, so changing the default wording never changes an existing review, and the version
+**Frozen copy**: `ReviewService` gives every review a `ReviewChecklist` made from the checklist of the project when
+the review is created (the definition stored with the project, parsed and validated with `ChecklistValidator`, or
+`DefaultChecklist.Current` when the project has none), and the store saves it in the same transaction as the review.
+Every later read of the
+checklist uses that copy, so changing the default wording, or the checklist of the project, never changes an existing
+review, and the version
 recorded with the copy tells which wording a review was done against. Reviews created before checklists existed
 have no copy; the service reports that they have no checklist rather than inventing one. The database of such
 a review does not have the checklist tables either (see the `Storage` design), so development databases must be
@@ -132,5 +157,7 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 
 - **ChecklistPage** — reads, answers, and sets applicability.
 - **ReviewPage** — reads the progress for the summary and the next-step line.
-- **ReviewService** — takes `DefaultChecklist.Current` as the copy for a new review.
+- **ReviewService** — takes the checklist of the project (validated with `ChecklistValidator`), or
+  `DefaultChecklist.Current`, as the copy for a new review.
+- **ProjectChecklistService** — validates every definition that it stores with `ChecklistValidator`.
 - **ServerHost** — registers the service for the pages.

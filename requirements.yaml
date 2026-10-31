@@ -31,6 +31,7 @@ includes:
   - docs/reqstream/review-center/utilities.yaml
   - docs/reqstream/review-center/utilities/path-helpers.yaml
   - docs/reqstream/review-center/utilities/temporary-directory.yaml
+  - docs/reqstream/review-center/utilities/secret-source.yaml
   - docs/reqstream/review-center/content-sources.yaml
   - docs/reqstream/review-center/content-sources/git-runner.yaml
   - docs/reqstream/review-center/content-sources/git-source.yaml
@@ -70,6 +71,7 @@ includes:
   - docs/reqstream/review-center/core/project-service.yaml
   - docs/reqstream/review-center/core/project-access.yaml
   - docs/reqstream/review-center/core/evidence-settings-service.yaml
+  - docs/reqstream/review-center/core/project-checklist-service.yaml
   - docs/reqstream/review-center/core/review-service.yaml
   - docs/reqstream/review-center/core/thread-service.yaml
   - docs/reqstream/review-center/core/checklist-service.yaml

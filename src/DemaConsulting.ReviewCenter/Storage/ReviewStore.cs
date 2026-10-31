@@ -75,7 +75,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     Description = project.Description,
                     Created = project.Created,
                     Evidence = project.Evidence,
-                    RequireIndependentReviewers = project.RequireIndependentReviewers
+                    RequireIndependentReviewers = project.RequireIndependentReviewers,
+                    ChecklistDefinition = project.ChecklistDefinition
                 };
                 context.Projects.Add(entity);
                 await context.SaveChangesAsync(cancellationToken);
@@ -161,6 +162,44 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 var rows = await context.Projects
                     .Where(p => p.Id == projectId && p.RequireIndependentReviewers == expected)
                     .ExecuteUpdateAsync(p => p.SetProperty(x => x.RequireIndependentReviewers, updated), cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateChecklistDefinitionAsync(
+        int projectId,
+        string expectedHash,
+        string? definitionJson,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(expectedHash);
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // Read the stored text: a hash cannot be compared inside SQL. The write lock of the transaction is held
+                // from its start, so nobody else can change the row between this read and the update
+                var stored = await context.Projects
+                    .Where(p => p.Id == projectId)
+                    .Select(p => new { p.ChecklistDefinition })
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (stored is null
+                    || !string.Equals(ProjectChecklistService.HashOf(stored.ChecklistDefinition), expectedHash, StringComparison.Ordinal))
+                {
+                    return (false, null);
+                }
+
+                // The text that was compared is repeated in the update statement, so the change stays atomic even if
+                // the lock above were ever not enough
+                var current = stored.ChecklistDefinition;
+                var rows = await context.Projects
+                    .Where(p => p.Id == projectId && p.ChecklistDefinition == current)
+                    .ExecuteUpdateAsync(p => p.SetProperty(x => x.ChecklistDefinition, definitionJson), cancellationToken);
                 return rows > 0 ? (true, audit) : (false, null);
             },
             cancellationToken);

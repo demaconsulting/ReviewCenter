@@ -30,6 +30,7 @@ input-files:
   - docs/design/review-center/utilities.md
   - docs/design/review-center/utilities/path-helpers.md
   - docs/design/review-center/utilities/temporary-directory.md
+  - docs/design/review-center/utilities/secret-source.md
   - docs/design/review-center/hosting.md
   - docs/design/review-center/hosting/server-host.md
   - docs/design/review-center/hosting/user-command.md
@@ -59,6 +60,7 @@ input-files:
   - docs/design/review-center/core/project-service.md
   - docs/design/review-center/core/project-access.md
   - docs/design/review-center/core/evidence-settings-service.md
+  - docs/design/review-center/core/project-checklist-service.md
   - docs/design/review-center/core/review-service.md
   - docs/design/review-center/core/thread-service.md
   - docs/design/review-center/core/checklist-service.md

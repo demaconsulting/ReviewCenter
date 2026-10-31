@@ -115,6 +115,22 @@ sections:
           - ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
 
+      - id: ReviewCenter-DbContext-ProjectChecklist
+        title: >-
+          The ReviewCenterDbContext class shall map the checklist definition of a project to one nullable text
+          column of the project table with no length limit, so that a project that was not given a definition reads
+          back with none, which stands for the built-in default checklist, and a definition of any size the Core
+          validation allows is stored and read back unchanged. The schema is created from the model without a
+          migration, so a database that was created before the column existed has to be recreated.
+        justification: |
+          The definition belongs to exactly one project and is read with it, so it is a column of the project. A
+          definition is a document of up to several hundred kilobytes, so the column must not be bounded. The
+          schema is created from the model and not migrated while the product is not released, so development
+          databases are recreated.
+        tests:
+          - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
+          - ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn
+
       - id: ReviewCenter-DbContext-Signatures
         title: >-
           The ReviewCenterDbContext class shall map reviewer slots and signatures to tables in which a slot and

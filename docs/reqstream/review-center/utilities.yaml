@@ -3,7 +3,8 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Utilities subsystem
-# - The Utilities subsystem spans PathHelpers.cs (safe path-combination utilities)
+# - The Utilities subsystem spans PathHelpers.cs (safe path-combination utilities), TemporaryDirectory.cs (scratch
+#   directories), and SecretSource.cs (secrets given inline or in a file)
 # - Subsystem requirements describe the shared utility behavior available to all other subsystems
 
 sections:
@@ -42,3 +43,22 @@ sections:
           - ReviewCenter-TemporaryDirectory-BoundedRetry
         tests:
           - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose
+
+      - id: ReviewCenter-Utilities-SecretSource
+        title: >-
+          The Utilities subsystem shall resolve a secret that is given inline or as the path of a file, so that a
+          service can take its secrets from a file that the operating system or a secret store provides, and shall
+          refuse a wrong setting with a message that names the setting and never holds the secret.
+        justification: |
+          Every service that holds a secret needs the same rules: one source, a file that is trimmed and bounded, and
+          a clear message at start-up. Keeping them in one shared unit keeps the services from each deciding it
+          differently, and keeps the secret out of the messages. This requirement captures that guarantee for the
+          consumers of the Utilities subsystem.
+        children:
+          - ReviewCenter-SecretSource-Inline
+          - ReviewCenter-SecretSource-File
+          - ReviewCenter-SecretSource-Conflict
+          - ReviewCenter-SecretSource-FileProblems
+          - ReviewCenter-SecretSource-NoDisclosure
+        tests:
+          - UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret

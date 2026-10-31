@@ -302,8 +302,10 @@ appears later offers a sign-in link to the address the page was first opened at.
 
 ## Review Checklist
 
-Every new review gets a checklist: a copy of the default checklist, taken from the Continuous Compliance review
-template, with 14 sections and 58 checks. The review page shows a Checklist card with a summary such as "37 of 58
+Every new review gets a checklist: a copy of the checklist of its project. A project uses the default checklist,
+taken from the Continuous Compliance review template (14 sections and 58 checks), until a project administrator
+replaces it (see [Checklist Template](administration.md#checklist-template)). The review page shows a Checklist card
+with a summary such as "37 of 58
 checks answered" and a link to the checklist page; the review page's next-step line also counts the unanswered
 checks (for example "12 checklist checks unanswered, 1 open thread to resolve.") and says "Checklist complete and
 all threads resolved." when nothing is left.
@@ -329,10 +331,13 @@ and the first section with unanswered checks is open when you arrive.
    Switch it on again to answer its checks; the reason is then cleared.
 
 The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it
-counts as answered, and its justification records the finding.
+counts as answered, and its justification records the finding. A review with a Fail cannot be signed, and the files
+of a review never change, so the usual way on is a new review of the fixed revision (see When a Check Fails in the
+Review Practices chapter). Any later change to the record, including a checklist answer of another reviewer, makes the
+signatures given so far out of date, so answer first and sign last (see Sign Last in the same chapter).
 
-The checklist of a review is fixed when the review is created: a later release with a different default checklist
-does not change reviews that already exist, and there is no project-level checklist editor or import yet. Checklist
+The checklist of a review is fixed when the review is created: a later release with a different default checklist, or
+a project checklist that is replaced afterwards, does not change reviews that already exist. Checklist
 answers are not linked to comment threads. The checklist
 page is made for narrow screens too.
 
@@ -385,7 +390,8 @@ and after that the slot offers **Sign** (see
 Sign In with an OpenID Connect Provider in the Users and Sign-in chapter). A review can be signed only when:
 
 - it has a checklist, and every check of an applicable section is answered;
-- no check of an applicable section is answered Fail; and
+- no check of an applicable section is answered Fail (the files of a review never change, so after a Fail the usual
+  way on is a new review of the fixed revision; see When a Check Fails in the Review Practices chapter); and
 - no thread is open.
 
 While one of these holds back the signature, the slot lists what is left instead of the form (for example "2 threads
@@ -402,7 +408,9 @@ baseline and head commits, the selection, and every changed file with its change
 and head content, so a signature cannot look current for a different selection or a different change. The
 **Record digest** in the Details section (shortened; the full
 value is its tooltip) identifies that record. The time an answer was given is not part of it, but who gave it is: if
-somebody else answers a check again, even with the same value, the earlier signatures go out of date. If the record
+somebody else answers a check again, even with the same value, the earlier signatures go out of date. In general, any
+change to the record, including another reviewer's checklist answer, a new comment, or a resolved thread, makes the
+signatures given so far out of date. If the record
 changes while you are signing, the signature is refused and you are asked to review it and try again.
 
 **Out of date and Approved.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the current

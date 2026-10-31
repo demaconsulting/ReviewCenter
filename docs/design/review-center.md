@@ -22,6 +22,7 @@ flowchart TD
     subgraph Utilities
         PathHelpers
         TemporaryDirectory
+        SecretSource
     end
     subgraph Hosting
         ServerHost
@@ -60,6 +61,7 @@ flowchart TD
         Fingerprint
         ProjectService
         EvidenceSettingsService
+        ProjectChecklistService
         ReviewService
         ThreadService
         ChecklistService
@@ -135,6 +137,7 @@ flowchart TD
     ServerHost --> ReauthProofStore
     ServerHost --> ProjectService
     ServerHost --> EvidenceSettingsService
+    ServerHost --> ProjectChecklistService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
     ServerHost --> ChecklistService
@@ -176,6 +179,7 @@ flowchart TD
     OidcSignIn --> UserService
     OidcSignIn --> SigningService
     OidcSignIn --> ReauthProofStore
+    OidcSignIn --> SecretSource
     RevalidatingAuthenticationStateProvider --> SignIn
     RevalidatingAuthenticationStateProvider --> UserService
     PasswordHasher --> UserService

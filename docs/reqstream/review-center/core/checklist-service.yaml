@@ -9,25 +9,30 @@ sections:
     requirements:
       - id: ReviewCenter-ChecklistService-Default
         title: >-
-          The ChecklistService class shall provide a default checklist of 14 sections and 58 checks, with the
-          section and check identifiers, titles, and wording of the Continuous Compliance review template, each
+          The ChecklistService class shall provide a built-in default checklist of 14 sections and 58 checks, with
+          the section and check identifiers, titles, and wording of the Continuous Compliance review template, each
           check identifier unique and starting with the identifier of its section, and a version that names the
-          wording.
+          wording, which is the checklist of every project that has not been given a checklist of its own and
+          which passes the validation of a project checklist.
         justification: |
           Reviewers follow the same checks in every review, and a check keeps one stable identifier. A version
           names which wording a review was done against, so that the wording can be improved later without
-          changing what earlier reviews recorded.
+          changing what earlier reviews recorded. The default is the starting point and the fallback of every
+          project, so it must itself satisfy the rules that a project checklist has to satisfy.
         tests:
           - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
           - ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection
           - ChecklistService_DefaultChecklist_RoundTripsThroughJson
           - ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException
+          - ChecklistValidator_Validate_DefaultChecklist_IsValid
 
       - id: ReviewCenter-ChecklistService-Freeze
         title: >-
           The ChecklistService class shall read the checklist of a review from the copy that the review received
-          when it was created, so that a later change to the default checklist does not change an existing
-          review, and shall report that a review without such a copy has no checklist.
+          when it was created, taken from the checklist of the project at that time or from the default checklist
+          when the project has none, so that a later change to the default checklist or to the checklist of the
+          project does not change an existing review, and shall report that a review without such a copy has no
+          checklist.
         justification: |
           A review is a record. Changing the questions after the answers were given would change the meaning of
           the answers, so each review keeps the checklist it was started with.
@@ -35,6 +40,44 @@ sections:
           - ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot
           - ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot
           - ChecklistService_Get_UnknownReview_ReturnsNull
+          - ReviewService_ProjectChecklistChangedLater_ExistingReviewsAreUnaffected
+
+      - id: ReviewCenter-ChecklistService-Validation
+        title: >-
+          The ChecklistValidator class shall accept a checklist definition only when it is valid JSON of at most
+          256 KiB with a version of 1 to 64 characters, 1 to 50 sections and 1 to 500 checks in all, no empty
+          section, identifiers of 1 to 32 letters, digits, dots, underscores, and hyphens that start with a letter
+          or digit and are unique across all sections and checks, section titles and check titles of 1 to 200
+          characters, check wording of 1 to 1000 characters, and an applicability hint of at most 500 characters,
+          and shall report every violation it finds, each with the path of the value in the definition, such as
+          sections[2].items[1].id, and not only the first, using the same canonical path format (lower-case member
+          names, no JSON-path prefix) for the errors found while reading the text as for the errors of the structure.
+        justification: |
+          A checklist is entered by a person and then frozen into every review. A definition that is too large,
+          has the same identifier twice, or leaves a section empty would corrupt the answers or the page, so it is
+          refused before it is stored. Naming every problem with its place lets the person correct the definition
+          in one pass.
+        tests:
+          - ChecklistValidator_Validate_DefaultChecklist_IsValid
+          - ChecklistValidator_Validate_SmallDefinition_IsValid
+          - ChecklistValidator_Validate_EmptyText_GivesOneError
+          - ChecklistValidator_Validate_BadJson_GivesOneError
+          - ChecklistValidator_Validate_ParserError_UsesTheCanonicalPath
+          - ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes
+          - ChecklistValidator_Validate_Version_BoundariesAndPresence
+          - ChecklistValidator_Validate_NoSections_IsRefused
+          - ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections
+          - ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems
+          - ChecklistValidator_Validate_EmptySection_IsRefused
+          - ChecklistValidator_Validate_IdForm_AcceptsOnlyTheAllowedCharacters
+          - ChecklistValidator_Validate_IdLength_LimitsAtMaxIdLength
+          - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
+          - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+          - ChecklistValidator_Validate_NullEntries_AreReported
+          - ChecklistValidator_Validate_ManyProblems_AreAllReportedTogether
+          - ChecklistValidator_Validate_MemberNamesInAnyCase_AreRead
+          - ChecklistValidator_ParseOrThrow_Invalid_ThrowsWithPathsAndAtMostTenErrors
+          - ChecklistValidationError_ToString_IsPathAndMessage
 
       - id: ReviewCenter-ChecklistService-Applicability
         title: >-

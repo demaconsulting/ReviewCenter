@@ -3,11 +3,14 @@
    that leads to the separate creation page at "/projects/{id}/reviews/new" and a "Plan reviews" button. Whoever
    may administer the project (a system administrator or a project admin) also gets a "Repositories" button to the
    repository page of the project, an "Audit trail" button to the project audit page and an "Evidence settings"
-   button to the page that decides who may read the evidence anonymously and what the attestation PDFs contain. Whoever may administer the
+   button to the page that decides who may read the evidence anonymously and what the attestation PDFs contain, and a
+   "Checklist" button to the page that imports, exports, replaces and resets the checklist new reviews start with.
+   Whoever may administer the
    project also sees a Members section below the reviews: the members with a role button and a Remove button, and a
    "+ Add member" button that leads to its own page (members are rarely changed, so the form is not here and no list
    of users is ever shown). Above the members an administrator also sees a "Review rules" card with the switch
-   "Require independent reviewers" (the author of a review cannot be its reviewer or sign it). A project the user may not see looks exactly like a project that does not exist.
+   "Require independent reviewers" (the author of a review cannot be its reviewer or sign it) and a one-line summary
+   of the project's checklist (version label, size, built-in default or custom) that leads to the checklist page. A project the user may not see looks exactly like a project that does not exist.
 
    Presentation only; state lives in ProjectPage.razor.cs. Every interactive element and every key value carries a
    stable kebab-case data-testid (row-level ids carry the review id or the user name), and the data-interactive
@@ -57,6 +60,8 @@
                     <a class="action outline" href="/projects/@ProjectId/repositories" data-testid="repositories-link">Repositories</a>
                     <a class="action outline" href="/projects/@ProjectId/evidence-settings"
                        data-testid="evidence-settings-link">Evidence settings</a>
+                    <a class="action outline" href="/projects/@ProjectId/checklist"
+                       data-testid="checklist-link">Checklist</a>
                 }
                 @if (Repositories.Count > 0)
                 {
@@ -131,6 +136,15 @@
                     <button type="button" class="outline small" data-testid="independent-reviewers-save"
                             @onclick="SaveReviewRulesAsync">Save review rules</button>
                 </p>
+                <div class="field setting" data-testid="review-rule-checklist">
+                    <p>
+                        Checklist: <span data-testid="project-checklist-summary">@ChecklistSummary</span>
+                    </p>
+                    <p class="muted hint">
+                        The checklist that new reviews start with; existing reviews keep theirs.
+                        <a href="/projects/@ProjectId/checklist" data-testid="review-rules-checklist-link">Change the checklist template</a>
+                    </p>
+                </div>
             </section>
 
             <h2 class="section-title">Members</h2>

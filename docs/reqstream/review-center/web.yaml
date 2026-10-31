@@ -592,6 +592,40 @@ sections:
           - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
 
+      - id: ReviewCenter-Web-ChecklistTemplate
+        title: >-
+          The Web subsystem shall let only whoever administers a project (a system administrator or a project admin of
+          it) open the checklist template page of the project from a Checklist button on the project page, and
+          show anybody else the page of a project that does not exist; shall show on the project page a line that says
+          which checklist new reviews start with; shall let the administrator export the current and the built-in
+          default checklist, import a definition by pasting or from a file, check it with every error and its path
+          shown, preview it and its differences from the current checklist, replace the checklist of the project after
+          a confirmation that says that existing reviews keep their checklist, and reset it to the built-in default;
+          shall record every change in the audit trail of the project, and refuse a change over a change made by
+          someone else or after the right was lost; and shall explain the template in a help topic.
+        justification: |
+          The checklist is how a formal review shows what was examined, and projects in a regulated setting need their
+          own wording. Letting the people who answer for the project change it, with the consequences and the
+          differences shown before they confirm, with the existing reviews untouched, and accountable afterwards, makes
+          that possible without access to the server. The behavior needs a live connection, so it is verified by the
+          component tests of the units, and the whole journey by a system test.
+        children:
+          - ReviewCenter-ProjectPage-ChecklistLink
+          - ReviewCenter-ProjectPage-ChecklistAccess
+          - ReviewCenter-ProjectPage-ChecklistExport
+          - ReviewCenter-ProjectPage-ChecklistImport
+          - ReviewCenter-ProjectPage-ChecklistPreview
+          - ReviewCenter-ProjectPage-ChecklistReplace
+          - ReviewCenter-ProjectPage-ChecklistReset
+          - ReviewCenter-ProjectPage-ChecklistConflict
+          - ReviewCenter-ProjectPage-ChecklistRightLost
+          - ReviewCenter-HelpPage-ChecklistTemplateTopic
+        tests:
+          - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
+          - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
+          - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+          - HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies
+
       - id: ReviewCenter-Web-OidcSignIn
         title: >-
           The Web subsystem shall offer the sign-in with an OpenID Connect provider as a button beside the form for a

@@ -220,6 +220,29 @@ sections:
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
           - ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing
 
+      - id: ReviewCenter-Storage-ProjectChecklist
+        title: >-
+          The Storage subsystem shall keep the checklist definition of each project with the project in the
+          database file, with no definition for a project that was not given one, so that it is still there,
+          unchanged, when the database is opened again, change it only by an atomic compare-and-set against the
+          definition the caller started from, store each change together with its audit entry in one transaction,
+          and change nothing and record nothing for a project that does not exist or a definition that was changed
+          meanwhile. The schema is created without a migration, so a development database that was created before
+          the column existed has to be recreated.
+        justification: |
+          The definition decides the wording of the checklist of every review created later, so it must survive a
+          restart and must not be lost when two administrators save at the same time. The history of a change must
+          stay true, so the entry is stored with the change or not at all.
+        children:
+          - ReviewCenter-ReviewStore-ProjectChecklist
+          - ReviewCenter-DbContext-ProjectChecklist
+        tests:
+          - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
+          - ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn
+          - ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited
+          - ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing
+          - ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins
+
       - id: ReviewCenter-Storage-ReviewIntegrity
         title: >-
           The Storage subsystem shall keep the reopenings of a review, with the reason and the digest of the approved

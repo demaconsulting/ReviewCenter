@@ -217,6 +217,20 @@ reviews:
       - "src/**/Utilities/TemporaryDirectory.cs"
       - "test/**/Utilities/TemporaryDirectoryTests.cs"
 
+  - id: ReviewCenter-Utilities-SecretSource
+    title: Review of ReviewCenter SecretSource unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/utilities.md
+      - docs/reqstream/review-center/utilities.yaml
+    paths:
+      - "docs/reqstream/review-center/utilities/secret-source.yaml"
+      - "docs/design/review-center/utilities/secret-source.md"
+      - "docs/verification/review-center/utilities/secret-source.md"
+      - "src/**/Utilities/SecretSource.cs"
+      - "test/**/Utilities/SecretSourceTests.cs"
+
   # ReviewCenter - Hosting
   - id: ReviewCenter-Hosting
     title: Review of ReviewCenter Hosting subsystem architecture and interfaces
@@ -533,6 +547,9 @@ reviews:
       - "src/**/Web/ProjectPage.razor.cs"
       - "src/**/Web/EvidenceSettingsPage.razor"
       - "src/**/Web/EvidenceSettingsPage.razor.cs"
+      - "src/**/Web/ProjectChecklistPage.razor"
+      - "src/**/Web/ProjectChecklistPage.razor.cs"
+      - "src/**/Web/ChecklistDiff.cs"
       - "src/**/Web/NewReviewPage.razor"
       - "src/**/Web/NewReviewPage.razor.cs"
       - "src/**/Web/NewMemberPage.razor"
@@ -542,6 +559,8 @@ reviews:
       - "test/**/Web/ProjectPageTests.cs"
       - "test/**/Web/ProjectAccessPageTests.cs"
       - "test/**/Web/EvidenceSettingsPageTests.cs"
+      - "test/**/Web/ProjectChecklistPageTests.cs"
+      - "test/**/Web/ChecklistDiffTests.cs"
       - "test/**/Web/NewMemberPageTests.cs"
       - "test/**/Web/NewMemberAccountPageTests.cs"
       - "test/**/Web/NewReviewPageRepositoryTests.cs"
@@ -792,6 +811,22 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/EvidenceSettingsService.cs"
       - "test/**/Core/EvidenceSettingsServiceTests.cs"
 
+  - id: ReviewCenter-Core-ProjectChecklistService
+    title: Review of ReviewCenter ProjectChecklistService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/project-checklist-service.yaml"
+      - "docs/design/review-center/core/project-checklist-service.md"
+      - "docs/verification/review-center/core/project-checklist-service.md"
+      - "docs/sysml2/model/review-center/core/project-checklist-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/ProjectChecklist.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ProjectChecklistService.cs"
+      - "test/**/Core/ProjectChecklistServiceTests.cs"
+
   - id: ReviewCenter-Core-ProjectAccess
     title: Review of ReviewCenter ProjectAccess unit implementation
     context:
@@ -831,6 +866,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/RepositoryReviewResult.cs"
       - "test/**/Core/ReviewServiceTests.cs"
       - "test/**/Core/ReviewServiceRepositoryTests.cs"
+      - "test/**/Core/ReviewServiceChecklistTests.cs"
       - "test/**/ContentSources/ReviewFromGitTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -869,6 +905,8 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistService.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistState.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistDefinition.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistValidator.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistValidationResult.cs"
       - "src/DemaConsulting.ReviewCenter.Core/DefaultChecklist.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewChecklist.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistSectionState.cs"
@@ -876,6 +914,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistOutcome.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistProgress.cs"
       - "test/**/Core/ChecklistServiceTests.cs"
+      - "test/**/Core/ChecklistValidatorTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-UserService
@@ -1170,6 +1209,7 @@ reviews:
       - "test/**/Storage/ReviewStoreSigningTests.cs"
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
+      - "test/**/Storage/ProjectChecklistStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-UserStore

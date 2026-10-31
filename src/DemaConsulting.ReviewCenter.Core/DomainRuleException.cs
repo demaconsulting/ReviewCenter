@@ -248,7 +248,14 @@ public enum DomainRule
     ///     The user created the review and the project requires independent reviewers, so the user can neither be
     ///     chosen as a reviewer of it nor sign it.
     /// </summary>
-    ReviewerNotIndependent
+    ReviewerNotIndependent,
+
+    /// <summary>
+    ///     A checklist definition is not valid: it is not well-formed JSON, breaks a limit, or has missing, malformed
+    ///     or duplicate identifiers, titles or wording, or a changed definition keeps the version label of the
+    ///     current one. The message lists the errors with their paths.
+    /// </summary>
+    ChecklistDefinitionInvalid
 }
 
 /// <summary>

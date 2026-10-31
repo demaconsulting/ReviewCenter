@@ -65,9 +65,27 @@ internal static class ControlChannel
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    ///     Gets the well-known control file path, shared by every Puppet command of this user.
+    ///     The environment variable that overrides the control file path, so separate sessions can each run their own Puppet.
     /// </summary>
-    public static string DefaultControlFile => Path.Combine(Path.GetTempPath(), "reviewcenter-puppet.json");
+    public const string ControlFileVariable = "REVIEWCENTER_PUPPET_CONTROL_FILE";
+
+    /// <summary>
+    ///     Gets the control file path shared by every Puppet command of this user: the value of
+    ///     <see cref="ControlFileVariable"/> when it is set, otherwise a well-known file in the temporary folder.
+    /// </summary>
+    public static string DefaultControlFile => ResolveControlFile(Environment.GetEnvironmentVariable(ControlFileVariable));
+
+    /// <summary>
+    ///     Chooses the control file path.
+    /// </summary>
+    /// <param name="configured">The value of <see cref="ControlFileVariable"/>, or <c>null</c> when it is not set.</param>
+    /// <returns>The full path of <paramref name="configured"/>, or the well-known path when it is null or blank.</returns>
+    public static string ResolveControlFile(string? configured)
+    {
+        return string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(Path.GetTempPath(), "reviewcenter-puppet.json")
+            : Path.GetFullPath(configured);
+    }
 
     /// <summary>
     ///     Reads the control file.

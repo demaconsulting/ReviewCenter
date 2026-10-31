@@ -4,14 +4,17 @@
 
 #### Purpose
 
-The `ProjectPage` unit consists of five pages. `ProjectPage` is the page at `/projects/{id}`: its responsibilities are
+The `ProjectPage` unit consists of six pages. `ProjectPage` is the page at `/projects/{id}`: its responsibilities are
 to show one project and its reviews as clickable rows, each with its approval status, to lead to the page
 that creates a review, to lead to the plan page and, for whoever administers the project, to the repositories page, the
-audit trail of the project, and the evidence settings page, to let an administrator of the project (a project admin or a
+audit trail of the project, the evidence settings page, and the checklist template page, to let an administrator of the
+project (a project admin or a
 system administrator)
 manage the members of the project (change a role, remove, and lead to the page that adds one), and to report when it is
 interactive. `EvidenceSettingsPage` is the page at `/projects/{id}/evidence-settings`: it shows and changes the
-evidence settings of the project (see below). `NewMemberPage` is the page at `/projects/{id}/members/new`: it adds an
+evidence settings of the project (see below). `ProjectChecklistPage` is the page at `/projects/{id}/checklist`: it
+shows the checklist template of the project and lets an administrator export, import, check, replace, and reset it (see
+below). `NewMemberPage` is the page at `/projects/{id}/members/new`: it adds an
 existing user to the project by
 the exact user name. `NewMemberAccountPage` is the page at `/projects/{id}/members/account`, reached by a button of
 `NewMemberPage`: it creates a local account as part of adding it to the project and shows the generated temporary
@@ -22,24 +25,61 @@ project.
 All of them require a signed-in user, and all show only the message "Project N does not exist." for a project that does
 not exist and, in just the same way, for a project the user may not see (the project is read with
 `ProjectService.GetAsync(actor, id)`, which returns nothing for it), so a user who is no member cannot tell a hidden
-project from a missing one; the two member pages and the evidence settings page show the same message to a user who
-sees the project but does not administer it. The response is a normal page with HTTP status 200. Each is a Razor
+project from a missing one; the two member pages, the evidence settings page, and the checklist template page show the
+same message to a user who sees the project but does not administer it. The response is a normal page with HTTP status
+200. Each is a Razor
 component split into
 presentation (`ProjectPage.razor`, `NewReviewPage.razor`, `NewMemberPage.razor`, `NewMemberAccountPage.razor`,
-`EvidenceSettingsPage.razor`) and
+`EvidenceSettingsPage.razor`, `ProjectChecklistPage.razor`) and
 behavior (the matching `.razor.cs` files). Next to the heading,
 `ProjectPage` shows a "+ New review" button that leads to the form page, an outline "Plan reviews" link to the
 plan page (`/projects/{id}/plan`) when at least one repository of the project is enabled, and, for a system
 administrator and a project admin of the project, a "Repositories" button to `/projects/{id}/repositories`, an
-"Audit trail" button to `/projects/{id}/audit`, and an "Evidence settings" button to
-`/projects/{id}/evidence-settings`; when the project has
+"Audit trail" button to `/projects/{id}/audit`, an "Evidence settings" button to
+`/projects/{id}/evidence-settings`, and a "Checklist" button to `/projects/{id}/checklist`; when the project has
 no enabled repository, a short note says to add one with the Repositories button (to whoever manages the project) or
 to ask a project administrator (to anybody else). The rare actions sit on their own pages behind buttons, so the
 members section holds only a "+ Add member" button, and the page never loads a list of users. For an administrator
 `ProjectPage` also shows a "Review rules" card above the members: the switch "Require independent reviewers" with a
 hint that the person who created a review cannot be one of its reviewers and cannot sign it, that the switch can be
 turned off for a project where one person has to do both, and that ReviewCenter only knows who created the review in
-this tool and does not match the authors of commits, and a "Save review rules" button.
+this tool and does not match the authors of commits, and a "Save review rules" button. The card also holds one line,
+"Checklist: ...", that names the version label of the checklist new reviews start with, its number of sections and
+checks, and whether it is the built-in default or custom, with a link to the checklist template page; the line is read
+with `ProjectChecklistService.GetAsync` for an administrator only, and a stored definition that cannot be read shows a
+short note instead of the counts.
+
+`ProjectChecklistPage` (`ProjectChecklistPage.razor` and `.razor.cs`) is the page of the checklist template of a
+project, which only a project admin or a system administrator can see and change. It shows the current checklist (the
+version label, the number of sections and checks, and a "built-in default" badge when the project has no checklist of
+its own) and offers five things:
+
+- **Export**: "Export current checklist" and "Export built-in default" download the definition as an indented JSON file
+  named `checklist-{version label}.json` (characters other than letters, digits, dot, underscore, and hyphen of the label
+  become a hyphen). The download is started with the script `reviewCenter.downloadText` of `App.razor`, which makes a
+  `Blob` and clicks a temporary link; the file never passes through an endpoint, and the text is made by the page from
+  the checklist it has just read, after the access has been checked again.
+- **Import**: the definition is pasted into a text box (up to `PasteLimit`, 20,000 characters, because the text
+  travels in one message of the live connection) or read from a file chosen with a file input, which is limited to
+  `ReviewLimits.MaxChecklistBytes` (256 KiB) and refused before it is read when larger.
+- **Validate**: checks the imported text with `ProjectChecklistService.Validate` and lists every error with its path.
+  Text that is not JSON, or nothing imported, gives one error. Nothing is stored. The button is always enabled so that
+  the change of the text box (which the browser sends only on blur) has arrived before the check runs.
+- **Preview and differences**: for a valid definition the page shows the sections and checks read-only with their
+  counts, and the differences from the current checklist computed by `ChecklistDiff.Compare` (a pure helper in the
+  unit): whether the version label changed, and the sections and checks added, removed, or changed, by identifier. A
+  definition with the same content as the current one is reported as "nothing to replace"; a definition with other
+  content but the same version label gets a warning, because the service would refuse it.
+- **Replace** and **Reset to built-in default**: each asks for a confirmation that says that existing reviews keep the
+  checklist they were created with and only new reviews use the new one, and only then calls
+  `ProjectChecklistService.SetAsync` (with the hash of the checklist the page loaded, and the imported text) or
+  `ResetAsync` (with the same hash). Replace is enabled only for a valid definition that differs from the current one,
+  and Reset only while the project has a checklist of its own. The service stores the change and the audit entry
+  `project.checklist-changed` in one step.
+
+The page follows the same human-factors rules as the evidence settings page: the heading and breadcrumb say where the
+user is, a link leads to the help topic, a refusal or a confirmation is shown in words, and the stale-save refusal
+(`ProjectChecklistService.ChangedByOthersMessage`) is shown with the checklist that is stored now.
 
 Because `/projects/{id}/reviews/new` is the address of the form, the review identifier `new` (in any letter case) is
 reserved: `NewReviewPage` refuses it, so a review that could never be opened is never created.
@@ -97,7 +137,22 @@ membership change. **RequireIndependentChoice** (`ProjectPage`): the state of th
 stored `Project.RequireIndependentReviewers`. **RulesError**, **RulesStatus**: the refusal or the outcome of the last
 save of the review rules.
 
-The remaining state belongs to `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, and `EvidenceSettingsPage`.
+The remaining state belongs to `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, `EvidenceSettingsPage`, and
+`ProjectChecklistPage`.
+
+**ChecklistSummary** (`ProjectPage`): the one line about the checklist for the Review rules card; null unless the user
+administers the project.
+
+**Project**, **Loaded** (`ProjectChecklistPage`): the project, which is null unless the user administers it, and
+whether the lookup finished. **Current**: the `ProjectChecklist` as read when the page loaded or last changed; its hash
+is what a
+replace or a reset is based on. **UnreadableMessage**: set instead of **Current** when the stored definition cannot be
+read; the page then shows the message, still offers the built-in default for export, and can replace or reset the
+definition from the stored text's hash. **PastedText**, **ImportText**, **ImportSource**: what is in the paste box, the
+text that was imported (pasted or read from a file) and where it came from. **Validation**, **Diff**: the result of the
+last validation and the differences from the current checklist; both are dropped when the import changes.
+**ConfirmingReplace**, **ConfirmingReset**: which confirmation is waiting. **ErrorMessage**, **StatusMessage**: the
+message of the last refused change, and the confirmation of the last change.
 
 **Project**, **Loaded** (`EvidenceSettingsPage`): the project, which is null unless the user administers it, and whether
 the lookup finished. **Saved** (`EvidenceSettingsPage`): the `EvidenceSettings` as stored when the page loaded or last
@@ -141,7 +196,24 @@ of `reviews-list`: the identifier is the link, followed by the title, the approv
 date. `evidence-settings-link` is the "Evidence settings" button, shown to whoever administers the project. The Review
 rules card of an administrator has `review-rules-card`, `review-rule-independent-reviewers` (the row),
 `independent-reviewers-switch` (the checkbox), `independent-reviewers-save`, `review-rules-status`, and
-`review-rules-error`.
+`review-rules-error`. `checklist-link` is the "Checklist" button, shown to whoever administers the project; the
+Review rules card also has `review-rule-checklist` (the row), `project-checklist-summary` (the one line), and
+`review-rules-checklist-link`.
+
+Test identifiers of `ProjectChecklistPage`: `project-checklist-page` (root), `breadcrumb-projects-link`,
+`breadcrumb-project-link`, `project-checklist-loading`, `project-not-found`, `project-checklist-error`,
+`project-checklist-status`, `checklist-help-link`, `project-checklist-back`; the current checklist: `checklist-current`,
+`checklist-current-version`, `checklist-current-counts`, `checklist-default-badge`, `checklist-unreadable`,
+`checklist-export`, `checklist-export-default`, `checklist-reset`, `checklist-reset-confirmation`,
+`checklist-reset-confirm`, and `checklist-reset-cancel`; the import: `checklist-import`, `checklist-import-text`,
+`checklist-import-file`, `checklist-import-source`, and `checklist-validate`; the result of a check:
+`checklist-validation-errors` with one `checklist-error` per error (with `checklist-error-path` and
+`checklist-error-message`), or `checklist-valid`, `checklist-preview-version`, `checklist-diff` (with
+`checklist-diff-same`, `checklist-diff-version`, `checklist-diff-sections-added`, `checklist-diff-sections-removed`,
+`checklist-diff-sections-changed`, `checklist-diff-items-added`, `checklist-diff-items-removed`,
+`checklist-diff-items-changed`, and `checklist-diff-label-warning`), `checklist-preview`, per section
+`checklist-preview-section-{id}`, per check `checklist-preview-item-{id}`, and `checklist-replace`,
+`checklist-replace-confirmation`, `checklist-replace-confirm`, and `checklist-replace-cancel`.
 
 Test identifiers of `EvidenceSettingsPage`: `evidence-settings-page` (root), `breadcrumb-projects-link`,
 `breadcrumb-project-link`, `evidence-settings-loading`, `project-not-found`, `evidence-settings-form`,
@@ -263,6 +335,43 @@ its regulatory warning (the content switches only), and how it reads and writes 
 and the test identifiers come from one table. A change first re-checks the access (`ChangeAsync`) and then replaces
 `Draft` and changes nothing else; saving is the only action that reaches the service.
 
+**OnParametersSetAsync** (`ProjectChecklistPage`): Resets all state (the router reuses the component), asks
+`GuardAdministerAsync` of the shared guard whether the user administers the project, and only then loads the project
+and the checklist (`ProjectChecklistService.GetAsync`); anyone else sees the same "does not exist" message and nothing
+of the checklist.
+
+**PasteChangedAsync**, **FileSelectedAsync** (`ProjectChecklistPage`): Each runs `GuardAsync` first and then takes the
+text as the imported text. The file is read with the read limit `ReviewLimits.MaxChecklistBytes`; a larger file is an
+`IOException` of the framework and is shown as a message, the text of a file is never put into the paste box, and a byte
+order mark is removed. A new import drops the earlier validation, differences, and confirmation.
+
+**ValidateAsync** (`ProjectChecklistPage`): Runs `GuardAsync`, then `ProjectChecklistService.Validate` on the imported
+text (or one `json` error when nothing was imported) and, for a valid definition, `ChecklistDiff.Compare` against the
+current checklist. It stores nothing.
+
+**ReplaceAsync**, **ResetAsync** (`ProjectChecklistPage`): Each is reached through a confirmation (`AskReplaceAsync`,
+`AskResetAsync`; the replace is possible only for a valid definition that differs from the current one) and starts with
+`GuardAsync`; when the right is gone `ShowNoAccess` clears everything and the page shows the not-found message. Then
+the handler asks for the current user and calls `ProjectChecklistService.SetAsync` or `ResetAsync` with the hash of
+`Current`, reloads the checklist, and confirms the change in words (new reviews use the new checklist; existing reviews
+keep theirs). A `DomainRuleException` is handled by `HandleRefusalAsync` only while the guard, asked again, still
+passes: for `DomainRule.RecordChanged` the page says that someone else changed the checklist
+(`ProjectChecklistService.ChangedByOthersMessage`), loads the stored checklist again, and checks the imported text
+against it again; any other rule (for example `ChecklistDefinitionInvalid` for a changed wording under the same version
+label) is shown in `project-checklist-error` with nothing stored.
+
+**ExportCurrentAsync**, **ExportDefaultAsync** (`ProjectChecklistPage`): Run `GuardAsync` first, then make the indented
+JSON of the definition with `ChecklistDiff.ToIndentedJson` and call the script `reviewCenter.downloadText` with the file
+name, the text, and `application/json`; a user who lost the right gets nothing.
+
+**ChecklistDiff** (`ChecklistDiff.cs`): A pure, immutable helper that compares two `ChecklistDefinition` values by
+identifier: whether the version label differs, the identifiers of the sections added and removed, the sections whose
+title or applicability hint changed, and the checks added, removed, or changed (another wording or another section).
+Letter case and order of identifiers do not matter and a missing hint equals an empty one; `VersionChanged` and
+`HasContentChanges` tell what differs. `ToIndentedJson` produces the export text through the normal JSON of the
+definition, so an exported file passes
+the validator when imported again.
+
 **OnParametersSetAsync** (`NewReviewPage`): Loads the project (for the actor, so a project the user may not see shows
 the not-found message and no form) and the enabled repositories of the project. When the project
 identity differs from the one already loaded (the router reuses the component), it first discards the previous
@@ -313,7 +422,10 @@ and its message shown in the page; a `DomainRuleException` from `ProjectService`
 the member changes of `ProjectPage` and shown next to the form or the list, but only while the access re-check still
 passes (otherwise the page drops its data and shows the not-found message). `EvidenceSettingsPage` does the same for a
 `DomainRuleException` of `EvidenceSettingsService`, including the refusal of a save over a change by someone else, which
-also reloads the stored settings. A selection that breaks an upload limit is
+also reloads the stored settings. `ProjectChecklistPage` does the same for a `DomainRuleException` of
+`ProjectChecklistService` (the refusal of a changed definition under the same version label, and of a change over a
+change by someone else, which also reloads the stored checklist); a file above the size limit is shown as a message.
+A selection that breaks an upload limit is
 shown as an error message. Other exceptions are not handled by the pages.
 
 **Access re-check (`NewReviewPage`)**: The creation of the review, and the choice of the source, start with
@@ -339,11 +451,15 @@ the subsystem.
   settings page).
 - **EvidenceSettingsService** and **EvidenceSettings** (Core) — read and change the evidence settings of the project
   (`EvidenceSettingsPage`); the service holds the rules, the audit entry, and the refusal of a stale save.
+- **ProjectChecklistService**, **ChecklistValidator**, and **ChecklistDefinition** (Core) — read, validate, replace, and
+  reset the checklist template of the project (`ProjectChecklistPage`, and the summary line of `ProjectPage`); the
+  service holds the rules, the audit entry, and the refusal of a stale change.
 - **SigningService** — computes whether each review is approved (`ProjectPage`).
 - **AnonymousRateLimit** (Api) — the request limit named in the exposure warning.
 - **ReviewLimits** (Core) — the upload limits.
 - **JavaScript runtime** — the `reviewCenter.copyText` script that copies the temporary password
-  (`NewMemberAccountPage`).
+  (`NewMemberAccountPage`), and the `reviewCenter.downloadText` script that saves an exported checklist as a file
+  (`ProjectChecklistPage`).
 - **ASP.NET Core Blazor components** — the component base class, file input, navigation, the authorization
   attribute, and the interactive server render mode.
 
@@ -351,5 +467,6 @@ the subsystem.
 
 - **App** — the router renders `ProjectPage` for `/projects/{id}`, `NewReviewPage` for
   `/projects/{id}/reviews/new`, `NewMemberPage` for `/projects/{id}/members/new`, `NewMemberAccountPage` for
-  `/projects/{id}/members/account`, and `EvidenceSettingsPage` for `/projects/{id}/evidence-settings`; an anonymous
+  `/projects/{id}/members/account`, `EvidenceSettingsPage` for `/projects/{id}/evidence-settings`, and
+  `ProjectChecklistPage` for `/projects/{id}/checklist`; an anonymous
   visitor is sent to the login page first.

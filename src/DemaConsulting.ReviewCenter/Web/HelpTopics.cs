@@ -68,6 +68,10 @@ internal static class HelpTopics
             "evidence-settings",
             "Evidence settings",
             "Open the evidence index and PDFs to anonymous readers and choose what the PDFs contain."),
+        new(
+            "checklist-template",
+            "Checklist template",
+            "Export, import, replace or reset the checklist that new reviews of a project start with."),
     ];
 
     /// <summary>

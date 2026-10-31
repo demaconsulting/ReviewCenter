@@ -42,6 +42,13 @@ define a function or alias for it in your shell if you like.
 1280x800), and `--headed` (show the browser window). `puppet start` while Puppet is already running fails with exit
 code 1.
 
+By default every command of one user shares one Puppet (one control file, `reviewcenter-puppet.json` in the
+temporary folder). To give each agent or persona its own browser, set the environment variable
+`REVIEWCENTER_PUPPET_CONTROL_FILE` to a different file path in each session (for example
+`$env:REVIEWCENTER_PUPPET_CONTROL_FILE = "$env:TEMP\puppet-alice.json"`) before the first command; every later
+command in that session then finds its own daemon. The option `--control-file <path>` does the same for a single
+command, but the variable is easier because it applies to `start` and to all the commands that follow.
+
 ## Commands
 
 - `goto <url-or-path>`, `reload`, `back`: navigate; waits until the Blazor circuit is interactive. `goto` and
@@ -123,5 +130,6 @@ afterward.
 ## Known limitation
 
 If the daemon or Chromium is killed or crashes, a Chromium process or a stale control file
-(`reviewcenter-puppet.json` in the temporary folder) may be left behind. `puppet start` replaces a stale control
+(`reviewcenter-puppet.json` in the temporary folder, unless you chose another path) may be left behind.
+`puppet start` replaces a stale control
 file; kill a stray process manually.

@@ -50,7 +50,9 @@ flowchart TD
 
 ### Lifecycle
 
-1. `puppet start [--url <base>] [--viewport <WxH>] [--headed]` reads the control file. When it names a port that
+1. `puppet start [--url <base>] [--viewport <WxH>] [--headed] [--control-file <path>]` reads the control file (the
+   option, else the `REVIEWCENTER_PUPPET_CONTROL_FILE` variable, else the well-known file in the temporary folder).
+   When it names a port that
    answers a ping, Puppet is already running and `start` fails with exit code 1. Otherwise a stale file is deleted.
 2. `PuppetProgram` spawns the daemon: the same executable run by `dotnet` with the verb `daemon`. On Windows the
    process is started through the shell, hidden, with nothing redirected, so it inherits none of the caller's pipe
@@ -59,6 +61,8 @@ flowchart TD
 3. `BrowserDaemon` launches Chromium, opens a loopback listener on a free port, and only then writes the control
    file. `start` polls for the file (30 second limit), pings the port, and prints one line.
 4. Each later command opens one connection, sends one JSON line, and reads one JSON line (see the control channel).
+   A later command must use the same control file as its `start` (the same variable or option), or it does not find
+   the daemon.
 5. `puppet stop` closes the browser, deletes the control file, and ends the daemon.
 
 ### Known Limitation
@@ -77,8 +81,10 @@ standard error, never a stack trace. Actions time out after 5 seconds so that a 
 takes `--timeout <ms>` and is the way to wait for an asynchronous Blazor update, because Puppet contains no fixed
 sleeps.
 
-**Control File**: `reviewcenter-puppet.json` in the temporary folder, holding the daemon port and the base URL, or
-an error message when the daemon could not start. Its existence is the "Puppet is running" signal.
+**Control File**: `reviewcenter-puppet.json` in the temporary folder by default, or the path in the environment variable
+`REVIEWCENTER_PUPPET_CONTROL_FILE` or given with `--control-file` (a blank value is a usage error). It holds the daemon
+port and the base URL, or an error message when the daemon could not start. Its existence is the "Puppet is running"
+signal for that session.
 
 **Screenshot Files**: PNG files at the path given to `puppet screenshot`. Screenshots use CSS pixels so that images
 stay modest in size.
@@ -110,7 +116,10 @@ N/A - Puppet is a development tool and is not a safety-classified software item.
 - Distribution: Puppet is not packed, published, or shipped with ReviewCenter and must not be referenced by it.
 - Network exposure: the daemon listens only on the loopback interface, on a port chosen by the operating system,
   without authentication; it is a local development tool and any local process can send it commands.
-- One daemon: the single control file allows one running Puppet per user temporary folder; `start` refuses a second.
+- One daemon per control file: the control file allows one running Puppet for each file; `start` refuses a second one
+  for the same file. By default every command of a user shares one file in the temporary folder, so one Puppet runs per
+  user. Separate sessions (for example one agent each) set `REVIEWCENTER_PUPPET_CONTROL_FILE`, or pass `--control-file`,
+  to a different path each, and then each session has its own daemon and browser.
 - No hardening: no locks, process IDs, or race handling beyond the ping that tells a live daemon from a stale file.
 - Hover persistence: the mouse position lives in the Playwright page, so a hover stays until the mouse moves again;
   `screenshot`, `viewport`, and `theme` do not move the mouse. Only `reset`, which creates a new browser context and

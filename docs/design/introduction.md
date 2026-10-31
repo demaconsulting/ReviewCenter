@@ -92,7 +92,8 @@ The ReviewCenter system is divided as follows:
   users, personal access tokens, second factor enrollments, reviewer signatures, the hash-chained audit trail, and the
   registry of git
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
-  ProjectService, EvidenceSettingsService, ReviewService, ThreadService, ChecklistService, UserService,
+  ProjectService, EvidenceSettingsService, ProjectChecklistService, ReviewService, ThreadService, ChecklistService,
+  UserService,
   PersonalAccessTokenService,
   SigningService, ReauthProofStore, TotpService, TotpChallengeStore, RepositoryService, SelectionMatcher,
   RevisionValidator, ReviewPlanner, and LineDiff
@@ -114,7 +115,7 @@ The ReviewCenter system is divided as follows:
   including the evidence index for ReviewMark, and its OpenAPI document; contains the
   ApiTokenAuthentication, ApiEndpoints, and ApiDocument units
 - **SelfTest** (subsystem): self-validation; contains the Validation and ValidationChecks units
-- **Utilities** (subsystem): shared helpers; contains the PathHelpers and TemporaryDirectory units
+- **Utilities** (subsystem): shared helpers; contains the PathHelpers, TemporaryDirectory, and SecretSource units
 
 The ReviewCenterPuppet system is a flat set of units that drive one persistent headless browser, one command per
 invocation, against a ReviewCenter server and write screenshots.

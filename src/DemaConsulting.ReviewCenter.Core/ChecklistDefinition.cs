@@ -51,6 +51,13 @@ public sealed record ChecklistSection(string Id, string Title, string Applicabil
 public sealed record ChecklistDefinition(string Version, IReadOnlyList<ChecklistSection> Sections)
 {
     /// <summary>
+    ///     The options every reader of a definition uses: member names are matched without regard to case, so a
+    ///     definition written by hand with <c>version</c> and <c>sections</c> reads like one written by
+    ///     <see cref="ToJson"/> (which uses the member names of the types).
+    /// </summary>
+    internal static readonly JsonSerializerOptions ReadOptions = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>
     ///     Serializes the definition to JSON.
     /// </summary>
     /// <returns>The JSON text; <see cref="FromJson"/> reads it back.</returns>
@@ -62,6 +69,12 @@ public sealed record ChecklistDefinition(string Version, IReadOnlyList<Checklist
     /// <summary>
     ///     Reads a definition from JSON written by <see cref="ToJson"/>.
     /// </summary>
+    /// <remarks>
+    ///     This reader is deliberately lenient about content: it is how the frozen copy of an existing review is read,
+    ///     and an existing review must stay readable whatever rules are applied to new definitions. The strict rules
+    ///     (unique identifiers, limits, lengths) are in <see cref="ChecklistValidator"/>, which every definition
+    ///     passes before it is stored in a project or frozen into a new review.
+    /// </remarks>
     /// <param name="json">The JSON text. Must not be null.</param>
     /// <returns>The definition.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="json"/> is null.</exception>
@@ -73,7 +86,7 @@ public sealed record ChecklistDefinition(string Version, IReadOnlyList<Checklist
     public static ChecklistDefinition FromJson(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
-        var definition = JsonSerializer.Deserialize<ChecklistDefinition>(json)
+        var definition = JsonSerializer.Deserialize<ChecklistDefinition>(json, ReadOptions)
                          ?? throw new JsonException("The checklist definition is empty.");
         Validate(definition);
         return definition;

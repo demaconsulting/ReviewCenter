@@ -8,7 +8,9 @@
 # existing user by the exact user name, and /projects/{project}/members/account, which creates a new account together
 # with its membership, and the page /projects/{project}/evidence-settings (EvidenceSettingsPage), where whoever
 # administers the project decides who may read its evidence without signing in and what its attestation PDFs
-# contain. A project the user may not see, or may not administer where it matters, looks like a missing one.
+# contain, and the page /projects/{project}/checklist (ProjectChecklistPage), where whoever administers the project
+# exports, imports, checks, replaces, and resets the checklist template that new reviews start with. A project the
+# user may not see, or may not administer where it matters, looks like a missing one.
 
 sections:
   - title: ProjectPage Unit Requirements
@@ -280,6 +282,7 @@ sections:
           - NewMemberPage_AfterRender_Interactive_SetsMarker
           - NewMemberAccountPage_AfterRender_Interactive_SetsMarker
           - EvidenceSettingsPage_AfterRender_Interactive_SetsMarker
+          - ProjectChecklistPage_AfterRender_Interactive_SetsMarker
 
       - id: ReviewCenter-ProjectPage-PlanLink
         title: >-
@@ -396,6 +399,153 @@ sections:
           - EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage
           - EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange
           - EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject
+
+      - id: ReviewCenter-ProjectPage-ChecklistLink
+        title: >-
+          The ProjectPage unit shall show a Checklist button that leads to the checklist template page of the
+          project to a system administrator and to a project admin of the project only, and shall show them in the
+          Review rules card one line that names the version label of the checklist that new reviews start with, its
+          number of sections and checks, and whether it is the built-in default or a custom checklist, with a link to
+          that page, and shall show a plain member neither the button nor the line.
+        justification: |
+          The checklist that new reviews start with is decided by the people who answer for the project, so the page
+          that changes it is reached from the project page by them only. The summary tells them at a glance whether
+          the project still uses the default, without opening the page. A plain member does not change the template
+          and is not offered a page that would show only a not-found message.
+        tests:
+          - ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary
+          - ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistAccess
+        title: >-
+          The ProjectPage unit shall provide the page /projects/{project}/checklist, which shows whoever administers
+          the project (a system administrator or a project admin of it) the current checklist template of the project
+          with its version label, its number of sections and checks, a badge when it is the built-in default, and a Back
+          to project button, and shows the not-found message and nothing of the template to a plain member, to a user
+          who is no member, and for a project that does not exist.
+        justification: |
+          The wording of the checklist is a decision of the people who answer for the project, so nobody else may see
+          or change it there. The same message as for a missing project keeps the page from revealing that the project
+          exists.
+        tests:
+          - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
+          - ProjectChecklistPage_Render_CustomChecklist_ShowsLabelWithoutBadgeAndOffersReset
+          - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
+
+      - id: ReviewCenter-ProjectPage-ChecklistExport
+        title: >-
+          The ProjectPage unit shall let whoever may open the checklist template page download the checklist template
+          of the project, and the built-in default checklist, as indented JSON files named after the version label,
+          and shall download nothing once the right to administer the project was lost while the page was open.
+        justification: |
+          An export is the starting point for a custom template and the way to keep a copy of what the project uses.
+          The built-in default is offered too, so a project that still uses the default can start from it. A page
+          that stayed open after the user was demoted must not hand out the wording.
+        tests:
+          - ProjectChecklistPage_Export_Current_DownloadsTheDefinition
+          - ProjectChecklistPage_Export_Default_DownloadsTheBuiltInDefault
+          - ProjectChecklistPage_Export_RightLostWhileOpen_DownloadsNothing
+          - ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator
+
+      - id: ReviewCenter-ProjectPage-ChecklistImport
+        title: >-
+          The ProjectPage unit shall let an administrator of the project bring a checklist definition into the page by
+          pasting JSON text or by choosing a file of at most the size limit of a checklist (256 KiB), refuse a larger
+          file, check the definition with the checklist validator when the Validate button is used, show every error
+          with its path in a list (a single error for text that is not JSON or when nothing was imported), and store
+          nothing while it only checks.
+        justification: |
+          A checklist is written outside the tool, so it must be possible to bring it in and to learn everything that
+          is wrong with it at once, with the place of each error, instead of one error per attempt. Checking must not
+          change what new reviews use.
+        tests:
+          - ProjectChecklistPage_Validate_InvalidDefinition_ShowsAllErrorsWithPaths
+          - ProjectChecklistPage_Validate_NothingImported_ShowsOneError
+          - ProjectChecklistPage_Validate_NotJson_ShowsOneError
+          - ProjectChecklistPage_Import_File_IsReadValidatedAndPreviewed
+          - ProjectChecklistPage_Import_FileTooLarge_IsRefused
+          - ProjectChecklistPage_Sample_Iec62304ExampleIsValid
+
+      - id: ReviewCenter-ProjectPage-ChecklistPreview
+        title: >-
+          The ProjectPage unit shall show, for a definition that is valid, a read-only preview of its sections and
+          checks with their counts, and a short summary of the differences from the current checklist (the version
+          label, and the sections and checks that are added, removed, or reworded, by identifier), and shall say that
+          there is nothing to replace, and offer no replacement, when the definition is the same as the current one.
+        justification: |
+          An administrator replaces the wording that new reviews use, so they must see what they are about to
+          introduce and how it differs from what is in use before they confirm. A compact summary by identifier is
+          enough to notice an unintended change.
+        tests:
+          - ProjectChecklistPage_Validate_ValidDefinition_ShowsPreviewAndDifferencesAndStoresNothing
+          - ProjectChecklistPage_Validate_SameAsCurrent_SaysNothingToReplaceAndDisablesReplace
+          - ProjectChecklistPage_Validate_SameLabelOtherWording_WarnsAboutTheLabel
+          - ChecklistDiff_Compare_Identical_FindsNoChange
+          - ChecklistDiff_Compare_OnlyVersion_ReportsVersionChange
+          - ChecklistDiff_Compare_AddedAndRemoved_ListsIdentifiers
+          - ChecklistDiff_Compare_OtherWording_ListsChangedSectionsAndItems
+          - ChecklistDiff_Compare_MovedItem_IsChangedNotAddedOrRemoved
+          - ChecklistDiff_Compare_CaseOrderAndMissingHint_AreNotDifferences
+          - ChecklistDiff_Compare_NullArgument_Throws
+
+      - id: ReviewCenter-ProjectPage-ChecklistReplace
+        title: >-
+          The ProjectPage unit shall enable the Replace button only for a definition that is valid and differs from the
+          current one, ask for a confirmation that says that existing reviews keep the checklist they were created with
+          and only new reviews use the new one, store nothing when the confirmation is declined, replace the checklist
+          of the project through the project checklist service from the hash that was read when the page loaded when it
+          is confirmed, confirm the replacement in words and show the new checklist, cause one audit entry of the
+          project with the action project.checklist-changed, and show the message of the rule, with nothing stored,
+          when the service refuses the definition (for example a changed wording that keeps the version label).
+        justification: |
+          The replacement changes what every later review of the project is checked against, so it must be deliberate,
+          must say what it does not change, and must be accountable. A review that exists keeps its own copy, which the
+          confirmation states so that nobody expects the open reviews to change.
+        tests:
+          - ProjectChecklistPage_Replace_Cancelled_ChangesNothing
+          - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
+          - ProjectChecklistPage_Replace_SameLabelOtherWording_ShowsTheRefusalAndStoresNothing
+
+      - id: ReviewCenter-ProjectPage-ChecklistReset
+        title: >-
+          The ProjectPage unit shall offer, for a project that has a checklist of its own, a Reset to default button
+          that asks for a confirmation that says that existing reviews keep their checklist, returns the project to
+          the built-in default checklist through the project checklist service when it is confirmed, confirms it in
+          words, and causes one audit entry of the project with the action project.checklist-changed; the button is
+          disabled while the project uses the default.
+        justification: |
+          A project must be able to go back to the standard wording without help from the person who runs the server.
+          The change is recorded like a replacement, and the confirmation says what it does not touch.
+        tests:
+          - ProjectChecklistPage_Reset_Confirmed_ReturnsToTheDefaultAndAudits
+          - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
+
+      - id: ReviewCenter-ProjectPage-ChecklistConflict
+        title: >-
+          The ProjectPage unit shall, when the checklist template was changed by someone else after the page read it,
+          store nothing on replace or reset, say that the checklist was changed by someone else, and show the
+          checklist that is stored now.
+        justification: |
+          Two administrators must not overwrite each other without knowing it. Showing the current checklist lets the
+          person decide again with the real state in front of them.
+        tests:
+          - ProjectChecklistPage_Replace_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+          - ProjectChecklistPage_Reset_ChangedByOthers_ShowsMessageAndTheCurrentChecklist
+
+      - id: ReviewCenter-ProjectPage-ChecklistRightLost
+        title: >-
+          The ProjectPage unit shall check on every validation, replacement, and reset that the user still administers
+          the project and, when the right was lost while the page was open (the membership was revoked, the user was
+          demoted, or the sign-in state ended), store and record nothing and replace the page with the not-found message
+          and none of the checklist or messages, and shall drop the imported text and the project when the page is
+          reused for another project.
+        justification: |
+          An open page keeps its state after the user is demoted or removed, and a stale page must not be able to change
+          what the reviews of a project are checked against. Text imported for one project must not follow the user to
+          another.
+        tests:
+          - ProjectChecklistPage_Action_RightLostWhileOpen_DropsThePageAndChangesNothing
+          - ProjectChecklistPage_Load_OtherProject_DropsTheImportAndTheProject
 
       - id: ReviewCenter-ProjectPage-ReviewRules
         title: >-

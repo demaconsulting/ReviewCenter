@@ -39,6 +39,13 @@ who resolves it, and how it is worded.
 
 Do not answer N/A to avoid a Fail. If the check should hold and does not, it is a Fail.
 
+## Sign Last
+
+Any change to the record, including a checklist answer of another reviewer (even an identical one), a new comment, or
+a resolved thread, makes the signatures given so far out of date. So agree who is still to answer or comment, let them
+finish, and only then sign; the signature of the last reviewer is the one that approves the review. If a late change
+is needed, the reviewers who already signed sign the new record again.
+
 ## When a Check Fails
 
 A Fail is a valid, recorded answer, but a review with a Fail cannot be signed. The product has no signed "review

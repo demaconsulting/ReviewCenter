@@ -58,7 +58,10 @@ that the `reviewcenter` file is executable.
 
 No release has been published yet. Until one is, publish the server from source with the .NET 10 SDK, for example
 `dotnet publish src/DemaConsulting.ReviewCenter -c Release -r win-x64 --self-contained -p:PublishSingleFile=true`
-(use `linux-x64` for Linux). The release archives are built the same way.
+(use `linux-x64` for Linux). The release archives are built the same way, but the release workflow renames the
+executable to `reviewcenter.exe` (`reviewcenter` on Linux). A build from source produces
+`DemaConsulting.ReviewCenter.exe` (`DemaConsulting.ReviewCenter` on Linux); use that name wherever this guide says
+`reviewcenter`.
 
 ## Where the Data Lives
 
@@ -122,6 +125,7 @@ that is not part of the release archive. The defaults are:
 | `Identity:Throttle:WindowSeconds`         | 300 seconds (1 to 86400)       | Password Rules and Lockout (Sign-in)    |
 | `Identity:Totp:Enabled`                   | true                           | Two-Factor Sign-in (Sign-in)            |
 | `Identity:Oidc:*`                         | off                            | Sign In with an OpenID Connect Provider |
+| `Identity:Oidc:ClientSecretFile`          | empty (use `ClientSecret`)     | Identity Providers                      |
 | `DataProtection:KeysPath`                 | `keys` in the data folder      | Repositories and Credentials            |
 | `Attestation:*`                           | a self-signed key              | The Signing Key (Reviewing)             |
 | `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
@@ -369,7 +373,8 @@ The run takes a few seconds. It checks that git is available (and its version), 
 attestation, and a short start of the web server on a free loopback port, and last opens the configured database
 **read-only** and compares its tables and columns with what this version expects. On the Windows machine of the
 project it ended with `Passed: 10` and exit code 0, and the last line read `ReviewCenter_ConfiguredDatabase - Passed
-(...): provider Sqlite; opened read-only; schema matches (17 tables, 138 columns)`. A non-zero exit code means that a
+(...): provider Sqlite; opened read-only; schema matches (18 tables, 148 columns)`; the numbers are those of this
+version and grow when a release adds tables or columns. A non-zero exit code means that a
 check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter). A fresh
 installation has no database file yet: the check is then **skipped** (the report shows `SKIPPED` and the run does not
 fail), and the server creates the file at the first start.

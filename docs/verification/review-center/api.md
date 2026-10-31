@@ -69,8 +69,9 @@ tests of `AnonymousRateLimitTests.cs`). The details are in the `ApiTokenAuthenti
 The two operations in the document are verified by `ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme`.
 
 **ApiProjectAccess scenarios**: The tests in `ApiProjectAccessTests.cs` run the real application and call every route
-of a project with a token (the list of reviews, a review, the creation of a review, the attestation, and the evidence
-index). `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` (a theory over the bearer scheme
+of a project with a token (the list of reviews, a review, the creation of a review, the attestation, the evidence
+index, and the checklist template). `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
+(a theory over the bearer scheme
 and the Basic credentials of ReviewMark) sends each route for a project the owner of the token is no member of and for
 a project that does not exist, and compares the status, the content type, and the body, with the project number
 replaced. `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` shows that a member and a system

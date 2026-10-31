@@ -8,8 +8,10 @@ verb. The current release lets you sign in, create projects and draft reviews ma
 content fingerprint of each review, lets you discuss the files in threaded comments, gives each review a
 checklist, and lets reviewers sign a review with their password (or by signing in again at an identity provider), with
 every action recorded under the signed-in
-user. Every change is also recorded in a hash-chained audit trail that can be read and verified. The remaining review
-feature (review states beyond Draft) is still under development. The web interface has a built-in Help with short
+user. A review is Approved when it has at least one reviewer slot and every slot is signed for the current record; it
+is then locked, and a project administrator can reopen it. Every change is also recorded in a hash-chained audit trail
+that can be read and verified.
+The web interface has a built-in Help with short
 guides to the main tasks. The command-line
 interface is documented in
 this guide. A separate development tool,
@@ -47,10 +49,11 @@ Each chapter of this guide serves a group of readers:
 
 These items are planned but not yet implemented:
 
-- The remaining review features of the ReviewCenter web service: review states beyond Draft
+- Further review states (for example a signed "rejected" outcome); today a review is In review or Approved and locked
 - External anchoring, export, and retention of the audit trail
-- Password reset, a required second factor (enforced for system administrators, or by a policy of a project), a QR
-  code for the setup, and a connection to several identity providers at once
+- Self-service password reset (an administrator can already set a new password), a required second factor (enforced for
+  system administrators, or by a policy of a project), a QR code for the setup, and a connection to several identity
+  providers at once
 - EF Core database migrations with an explicit `migrate` command, and further database providers (PostgreSQL,
   SQL Server)
 - PDF/A evidence export of review records

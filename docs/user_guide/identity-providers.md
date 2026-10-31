@@ -19,7 +19,8 @@ A provider works with ReviewCenter when it gives the first four items below; the
    `Identity:Oidc:Authority`. The `iss` claim of every identity token must be exactly the issuer named in the
    document, and ReviewCenter stores that issuer with the account.
 2. **The authorization code flow with PKCE** for a confidential client. ReviewCenter always sends a PKCE challenge,
-   and it always has a client secret (`Identity:Oidc:ClientSecret`); a public client is not supported.
+   and it always has a client secret (`Identity:Oidc:ClientSecret` or `Identity:Oidc:ClientSecretFile`); a public
+   client is not supported.
 3. **A stable `sub` claim** that is unique for each person at that issuer. Accounts are found by the pair of issuer
    and subject (see Why the Subject Matters).
 4. **An `auth_time` claim on a fresh login.** When a person confirms a signature, ReviewCenter sends `prompt=login`
@@ -85,6 +86,38 @@ Identity__Oidc__ClientSecret=<client-secret>
 `Scopes` keeps its default (`openid profile email`); it must contain `openid`. `RequireEmailVerified` stays `false`
 unless your provider reliably sends `email_verified`. `ReauthMaxAgeSeconds` is the age that the login at the
 provider may have when a signature is confirmed (default 120; 10 to 900).
+
+### Keeping the Client Secret in a File
+
+Instead of `Identity__Oidc__ClientSecret`, a recipe may name a file that holds the client secret, with the setting
+`Identity:Oidc:ClientSecretFile` (environment variable `Identity__Oidc__ClientSecretFile`). This keeps the secret out
+of the settings and of the environment of the process, and fits a file that the operating system or a secret store
+provides. Give the secret in one form only: when both `ClientSecret` and `ClientSecretFile` are set, the server does
+not start and the message names both settings.
+
+- The file holds the secret as UTF-8 text. The server removes the line break and the spaces around it, so a file
+  written with `echo` or an editor works. It may be at most 8 KB.
+- The server does not start when the file is missing, cannot be read, or is empty. The message names
+  `Identity:Oidc:ClientSecretFile` and the path of the file, and never the secret.
+- The file is read when the server starts. After you replace the secret, restart the server.
+- Let only the account of the service read the file (for example mode `0400` and the owner of the service on Linux).
+  The server does not check the permissions of the file.
+
+With systemd, store the secret in a file that only root can read, and pass it as a credential. The service then finds
+it in a private folder whose path is in the variable `CREDENTIALS_DIRECTORY`:
+
+```ini
+[Service]
+LoadCredential=oidc-client-secret:/etc/reviewcenter/oidc-client-secret
+Environment=Identity__Oidc__ClientSecretFile=%d/oidc-client-secret
+```
+
+In a container platform that mounts a secret as a file, set the setting to the path of the mounted file, for example
+`Identity__Oidc__ClientSecretFile=/run/secrets/oidc-client-secret`.
+
+When the secret is an environment variable instead, use `Identity__Oidc__ClientSecret=<client-secret>` and no file
+setting. The configuration of ASP.NET Core reads the variable into the same setting as the key `ClientSecret` of the
+file `appsettings.json`.
 
 ## Microsoft Entra ID
 
@@ -406,8 +439,10 @@ reasons below; for every other reason it shows a general message so that it does
   Deployment chapter. Otherwise it sends an `http` address, or the cookie is lost, and the sign-in fails.
 - **An expired or wrong client secret.** The provider refuses the exchange of the code, and the sign-in fails
   (recorded as `provider-error` or `other`). Create a new secret at the provider, set `Identity__Oidc__ClientSecret`
-  and restart the server.
-- **The server does not start.** A setting is not valid. The message names the setting and never shows its value.
+  (or replace the contents of the file named by `Identity__Oidc__ClientSecretFile`) and restart the server.
+- **The server does not start.** A setting is not valid. The message names the setting and never shows its value. For
+  the client secret this includes a secret set both inline and in a file, and a secret file that is missing, empty,
+  unreadable, or larger than 8 KB.
 - **Clock skew.** ReviewCenter compares the `auth_time` of the provider and the lifetime of the identity token with
   the clock of its own server. The clock of the person's computer or browser is not used. A large difference between
   the clock of the provider and the clock of the ReviewCenter server causes `stale-auth-time` or `token-invalid`.

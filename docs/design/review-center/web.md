@@ -84,8 +84,10 @@ all domain behavior and never access the database.
 **Project routes** (`GET /projects`, `GET /projects/new`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
 `GET /projects/{id}/reviews/new`, `GET /projects/{id}/reviews/{reviewId}`,
 `GET /projects/{id}/reviews/{reviewId}/checklist`, `GET /projects/{id}/members/new`,
-`GET /projects/{id}/members/account`, `GET /projects/{id}/evidence-settings`): The
-pages for projects, planning, reviews, review checklists, project members, and evidence settings.
+`GET /projects/{id}/members/account`, `GET /projects/{id}/evidence-settings`,
+`GET /projects/{id}/checklist`): The
+pages for projects, planning, reviews, review checklists, project members, evidence settings, and the checklist
+template.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
@@ -96,7 +98,11 @@ pages for projects, planning, reviews, review checklists, project members, and e
   administers the project (a project admin or a system administrator), a Members section that lists the members with
   their role, switches a role, removes a member, and has a + Add member button, and Repositories, Audit trail, and
   Evidence settings buttons that lead to `/projects/{id}/repositories`, `/projects/{id}/audit`, and
-  `/projects/{id}/evidence-settings`;
+  `/projects/{id}/evidence-settings`, and a Checklist button that leads to `/projects/{id}/checklist`;
+  `/projects/{id}/checklist` shows the label and size of the checklist that new reviews start with, exports it and the
+  built-in default as JSON files, validates an imported definition (every error with its path), previews it and
+  compares it with the current one, and replaces the checklist or resets it to the built-in default after a
+  confirmation, for whoever administers the project;
   `/projects/{id}/evidence-settings` shows seven switches: whether the evidence index and the attestation PDFs of the
   project may be read without signing in (both off by default) and what every attestation PDF contains (review
   discussion threads, reviewer names, checklist wording, file list and hashes, git context; all on by default), with
@@ -117,6 +123,7 @@ pages for projects, planning, reviews, review checklists, project members, and e
   is approved), and lets a reviewer sign and, to whoever administers the project, reopen a locked review with a reason;
   the project route also has a Review rules card for whoever administers the project (the switch "Require independent
   reviewers");
+  the project route also shows, in that card, the checklist that new reviews start with;
   the checklist route shows the checklist, where each check is answered. A project that
   does not exist, and equally a project the user may not see, is reported on the page itself with the same
   message, "Project N does not exist.", with HTTP status 200, so that a user who is no member cannot tell a hidden
@@ -530,6 +537,19 @@ summary of what is left out, and an exposure warning while an anonymous switch i
 together on one button, and to say what happened. A change made by someone else after the page loaded is never
 overwritten: the page shows the stored settings and says so. Every switch change and every save re-checks that the user
 still administers the project. The Help topic `evidence-settings` explains the switches and their consequences.
+
+#### Checklist template
+
+`ProjectChecklistPage` (`/projects/{id}/checklist`, reached from the Checklist button of the project page) lets whoever
+administers a project export, import, replace, and reset the checklist that new reviews of the project start with. The
+page contains no rule about a checklist: `ChecklistValidator` and `ProjectChecklistService` in `Core` validate, store,
+and audit it, and refuse a change over a change by someone else. The page's part is to show the current label and size,
+to take the text from a text area or a file of at most 256 KiB, to show every validation error with its path, to show
+a preview and a compact comparison with the current checklist (`ChecklistDiff`), to ask for a confirmation that
+existing reviews keep the checklist they were created with, and to say what happened. The export hands the text to the
+browser script `reviewCenter.downloadText` of `App`, which saves it as a file. Every action re-checks that the user
+still administers the project. The project page shows the same label and counts in the Review rules card. The Help
+topic `checklist-template` explains the steps.
 
 #### Personal access tokens
 
