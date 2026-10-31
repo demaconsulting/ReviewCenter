@@ -74,12 +74,12 @@ internal static class PuppetProgram
 
     /// <summary>
     ///     The commands: usage text, the minimum and maximum positional arguments, and the allowed options.
-    ///     <c>daemon</c> is the hidden verb that <c>start</c> spawns.
+    ///     <c>daemon</c> is the hidden verb that <c>start</c> spawns. Every command also accepts <c>--control-file</c>.
     /// </summary>
     private static readonly Dictionary<string, (string Usage, int Min, int Max, string Options)> Commands = new()
     {
         ["start"] = ("[--url <base-url>] [--viewport <WxH>] [--headed]", 0, 0, "url viewport headed"),
-        [DaemonCommand] = (string.Empty, 0, 0, "url viewport headed control-file"),
+        [DaemonCommand] = (string.Empty, 0, 0, "url viewport headed"),
         ["goto"] = ("<url-or-path>", 1, 1, string.Empty),
         ["reload"] = (string.Empty, 0, 0, string.Empty),
         ["back"] = (string.Empty, 0, 0, string.Empty),
@@ -143,10 +143,11 @@ internal static class PuppetProgram
         {
             var request = ParseCommand(args);
             var o = request.Options;
+            controlFile = Path.GetFullPath(o.GetValueOrDefault("control-file", controlFile));
             return request.Command switch
             {
                 DaemonCommand => await BrowserDaemon.RunAsync(
-                    o.GetValueOrDefault("control-file", controlFile),
+                    controlFile,
                     o.GetValueOrDefault("url"),
                     o.GetValueOrDefault(ViewportName, PlaywrightBrowser.DefaultViewport),
                     o.ContainsKey("headed")),
@@ -186,7 +187,7 @@ internal static class PuppetProgram
             {
                 positional.Add(arg);
             }
-            else if (!spec.Options.Split(' ').Contains(option))
+            else if (option != "control-file" && !spec.Options.Split(' ').Contains(option))
             {
                 throw new PuppetException($"Unknown option '{arg}' for '{name}'. Usage: puppet {name} {spec.Usage}");
             }
@@ -252,6 +253,11 @@ internal static class PuppetProgram
     /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
     private static void ValidateOptions(Dictionary<string, string> options)
     {
+        if (options.TryGetValue("control-file", out var controlFile) && string.IsNullOrWhiteSpace(controlFile))
+        {
+            throw new PuppetException("--control-file must be a file path, not empty.");
+        }
+
         if (options.TryGetValue("timeout", out var timeout) && !(int.TryParse(timeout, out var ms) && ms > 0))
         {
             throw new PuppetException($"--timeout must be a positive number of milliseconds, not '{timeout}'.");
@@ -325,7 +331,7 @@ internal static class PuppetProgram
         // Whatever is left over is stale or an old start-up error
         File.Delete(controlFile);
         var arguments = new List<string> { typeof(PuppetProgram).Assembly.Location, DaemonCommand, "--control-file", controlFile };
-        foreach (var (key, value) in request.Options)
+        foreach (var (key, value) in request.Options.Where(o => o.Key != "control-file"))
         {
             arguments.Add($"--{key}");
             arguments.AddRange(value == "true" ? [] : [value]);
@@ -446,6 +452,7 @@ internal static class PuppetProgram
 
         writer.WriteLine();
         writer.WriteLine("Selectors: testid:foo or foo (data-testid), css=..., text=..., role=...");
+        writer.WriteLine("Control file: --control-file <path> on any command, or REVIEWCENTER_PUPPET_CONTROL_FILE, selects the session");
         writer.WriteLine("Exit codes: 0 ok, 1 the command failed, 2 usage error or Puppet is not running");
         writer.WriteLine("First-time setup: pwsh <output folder>/playwright.ps1 install chromium");
     }

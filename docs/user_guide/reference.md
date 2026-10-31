@@ -256,4 +256,5 @@ create it again (see Database in the Administration chapter).
 Puppet is a small developer helper for AI agents, not part of the distributed ReviewCenter executables. It keeps one
 persistent headless Chromium open and drives it one command per shell call (go to a page, click, hover, fill, read
 text, screenshot) against a running ReviewCenter web interface. See `tools/puppet/README.md` for the setup, the
-commands, and the workflow.
+commands, and the workflow. Each agent session can run its own browser by setting the environment variable
+`REVIEWCENTER_PUPPET_CONTROL_FILE` to its own file path.

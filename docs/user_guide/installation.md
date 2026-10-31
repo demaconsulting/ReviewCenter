@@ -1,6 +1,6 @@
 # Installation
 
-ReviewCenter is distributed as self-contained single-file executables for win-x64 and linux-x64, so no .NET runtime
+The release archives hold self-contained single-file executables for win-x64 and linux-x64, so no .NET runtime
 needs to be installed. Download the archive for your platform from the project's GitHub Releases page:
 
 - `reviewcenter-<version>-win-x64.zip` (Windows)
@@ -34,7 +34,9 @@ dotnet build
 dotnet run --project src/DemaConsulting.ReviewCenter -- serve
 ```
 
-The examples in this guide use `reviewcenter`, the command name of the published executable; when running from
+The examples in this guide use `reviewcenter`, the command name of the executable in a release archive (the release
+workflow renames the file; a build from source produces `DemaConsulting.ReviewCenter.exe`, or
+`DemaConsulting.ReviewCenter` on Linux). When running from
 source, replace `reviewcenter` with `dotnet run --project src/DemaConsulting.ReviewCenter --`.
 
 ## Display Version

@@ -38,7 +38,7 @@ public class PuppetProgramTests
         var wait = PuppetProgram.ParseCommand(["wait", "text=Saved", "--timeout", "1500"]);
         var shot = PuppetProgram.ParseCommand(["screenshot", "shot.png", "--full", "--selector", "projects-link"]);
         var theme = PuppetProgram.ParseCommand(["theme", "dark"]);
-        var start = PuppetProgram.ParseCommand(["start", "--url", "http://127.0.0.1:5199/", "--viewport", "390x800", "--headed"]);
+        var start = PuppetProgram.ParseCommand(["start", "--url", "http://127.0.0.1:5199/", "--viewport", "390x800", "--headed", "--control-file", "session-a.json"]);
 
         // Assert: arguments and options are split, files are absolute, and the start URL loses its trailing slash
         Assert.Equal("goto", go.Command);
@@ -51,6 +51,7 @@ public class PuppetProgramTests
         Assert.Equal(["dark"], theme.Args);
         Assert.Equal("http://127.0.0.1:5199", start.Options["url"]);
         Assert.Equal(("390x800", "true"), (start.Options["viewport"], start.Options["headed"]));
+        Assert.Equal("session-a.json", start.Options["control-file"]);
     }
 
     /// <summary>
@@ -93,6 +94,12 @@ public class PuppetProgramTests
             Assert.Equal(2, exitCode);
             Assert.Contains(message, error.ToString(), StringComparison.Ordinal);
         }
+
+        // Assert: a blank control file (which would otherwise resolve to the current folder) is a usage error too
+        using var blankError = new StringWriter();
+        using var blankOutput = new StringWriter();
+        Assert.Equal(2, await PuppetProgram.RunAsync(["start", "--control-file", " "], blankOutput, blankError, NoControlFile(), TestContext.Current.CancellationToken));
+        Assert.Contains("--control-file must be a file path", blankError.ToString(), StringComparison.Ordinal);
 
         // Assert: help prints the usage and succeeds
         using var output = new StringWriter();
