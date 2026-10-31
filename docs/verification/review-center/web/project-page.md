@@ -47,7 +47,8 @@ N/A - standard test environment.
 - The reviews table shows, for each review, its signatures, its blockers, the people it waits on, its last activity, and
   its due date with the Overdue badge; a summary strip counts the reviews per stage and the overdue ones; the filters
   (stage, overdue, blocked, text), the sort, and the page (25 to a page) are read from the query string and kept by the
-  links; and a read-only auditor of the project sees the same table without the New review and Plan controls.
+  links; the created, last activity, and due dates are written in Gregorian digits whatever the culture of the request;
+  and a read-only auditor of the project sees the same table without the New review and Plan controls.
 - A member who is no administrator sees the reviews and the New review button, but no Members section, no add member
   button, no Audit trail button, and no Repositories button.
 - A system administrator or a project admin sees the Members section with each member, the role badge, a button that
@@ -381,6 +382,13 @@ due date. Each row shows its stage, its signatures (such as 2/3 and "1 out of da
 on, its last activity, and its due date with the Overdue badge only where it applies; the summary strip counts the
 reviews per stage and the overdue ones. This scenario is tested by
 `ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary`.
+
+**ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates**: The current culture and the current UI culture
+are set to `th-TH` (restored afterwards); the test first checks that this culture writes another year than 2025 for a
+2025 date, so it cannot pass vacuously when culture data is missing. The page of the seeded project shows the due date
+`2025-03-03`, a created date and a last activity (`yyyy-MM-dd HH:mm`) that start with `2025-`, and `datetime`
+attributes in the round-trip format with Gregorian digits. This scenario is tested by
+`ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates`.
 
 **ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked**: A review is stored without a
 checklist, and another has a checklist with every check answered. The first shows "No checklist" as its blockers and the

@@ -621,6 +621,118 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
+    ///     Test that the overload that is given the list of reviews returns the same progress as the one that lists
+    ///     them itself, and reads the review list no further time: the original lists once, the overload not at all.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList()
+    {
+        // Arrange: a project with an unsigned, a signed and a dated review, and the list a caller already holds
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1", _today.AddDays(1));
+        await CreateReviewAsync(world, "rev-2");
+        await AddSlotAsync(world, "rev-2", "reviewer1", "reviewer2");
+        await CreateReviewAsync(world, "rev-3");
+        await AnswerAllAsync(world, "rev-3");
+        var slot = await AddSlotAsync(world, "rev-3", "reviewer1");
+        await SignAsync(world, "rev-3", slot, _reviewerOne);
+        var list = await world.Reviews.ListAsync(world.ProjectId, cancellationToken);
+
+        // Act: the original overload (one list read), then the overload that is given the list
+        var before = world.Store.ListReviewsCalls;
+        var original = await world.Progress.GetProgressAsync(_projectAdmin, world.ProjectId, cancellationToken);
+        var afterOriginal = world.Store.ListReviewsCalls;
+        var given = await world.Progress.GetProgressAsync(_projectAdmin, world.ProjectId, list, cancellationToken);
+        var afterGiven = world.Store.ListReviewsCalls;
+
+        // Assert: the same rows, the original read the list once, the overload made no list read
+        Assert.Equal(1, afterOriginal - before);
+        Assert.Equal(afterOriginal, afterGiven);
+        Assert.Equal(3, given.Count);
+        Assert.Equal(Describe(original), Describe(given));
+        Assert.Equal(_today.AddDays(1), given[0].DueDate);
+        Assert.Equal(["reviewer1", "reviewer2"], given[1].WaitingOn);
+
+        static List<string> Describe(IReadOnlyList<ReviewProgress> rows)
+        {
+            return [.. rows.Select(p => string.Join(
+                "|",
+                p.ReviewId, p.Title, p.Stage, p.SlotsRequired, p.SlotsSigned, p.SlotsOutOfDate,
+                string.Join(",", p.WaitingOn), p.OpenThreads, p.UnansweredChecks, p.FailedChecks, p.NoChecklist,
+                p.Created.UtcTicks, p.LastActivity.UtcTicks, p.DueDate, p.IsOverdue, p.IsApproved, p.Reopened,
+                p.IsBlocked, p.FollowsReviewId))];
+        }
+    }
+
+    /// <summary>
+    ///     Test that the overload that is given the list uses exactly that list: a subset gives only those reviews, in
+    ///     the order given.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder()
+    {
+        // Arrange: three reviews and a list with two of them, the later one first
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await CreateReviewAsync(world, "rev-2");
+        await CreateReviewAsync(world, "rev-3");
+        var all = await world.Reviews.ListAsync(world.ProjectId, cancellationToken);
+        IReadOnlyList<Review> subset = [all.Single(r => r.Id == "rev-3"), all.Single(r => r.Id == "rev-1")];
+
+        // Act
+        var progress = await world.Progress.GetProgressAsync(_projectAdmin, world.ProjectId, subset, cancellationToken);
+
+        // Assert: only the given reviews, in the given order
+        Assert.Equal(["rev-3", "rev-1"], progress.Select(p => p.ReviewId));
+    }
+
+    /// <summary>
+    ///     Test that an empty list gives an empty result without reading the approvals or the last activity.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse()
+    {
+        // Arrange: a project with a review, but an empty list from the caller
+        CountingAuditStore? counting = null;
+        var world = await WorldAsync(fake => counting = new CountingAuditStore(fake));
+        await CreateReviewAsync(world, "rev-1");
+
+        // Act
+        var progress = await world.Progress.GetProgressAsync(_projectAdmin, world.ProjectId, [], TestContext.Current.CancellationToken);
+
+        // Assert: nothing, and the last activity was not read
+        Assert.Empty(progress);
+        Assert.Equal(0, counting!.LastActivityCalls);
+    }
+
+    /// <summary>
+    ///     Test that the overload that is given the list still checks the access, and refuses a stranger or a missing
+    ///     actor as if the project did not exist, and that a null list is refused.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList()
+    {
+        // Arrange: a project with a review and its list
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        var list = await world.Reviews.ListAsync(world.ProjectId, cancellationToken);
+
+        // Act: a stranger and nobody ask with a valid list
+        var stranger = await Record.ExceptionAsync(() => world.Progress.GetProgressAsync(_stranger, world.ProjectId, list, cancellationToken));
+        var nobody = await Record.ExceptionAsync(() => world.Progress.GetProgressAsync(null, world.ProjectId, list, cancellationToken));
+
+        // Assert: both get the project-not-found refusal; a member may look; a null list is an argument error
+        Assert.Equal(DomainRule.ProjectNotFound, Assert.IsType<DomainRuleException>(stranger).Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, Assert.IsType<DomainRuleException>(nobody).Rule);
+        Assert.Single(await world.Progress.GetProgressAsync(_member, world.ProjectId, list, cancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => world.Progress.GetProgressAsync(_projectAdmin, world.ProjectId, null!, cancellationToken));
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses missing collaborators.
     /// </summary>
     [Fact]

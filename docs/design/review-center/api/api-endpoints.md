@@ -29,7 +29,9 @@ next
 step. A summary carries `dueDate` and `overdue` as well, and the progress of the review: `approved`, `slotsRequired`,
 `slotsSigned`, `slotsOutOfDate`, and `lastActivity` (the time of the newest audit entry of the review, or its creation
 time). The list takes all of them from `ReviewProgressService` (the same service as the project page), which reads the
-approvals and the last activity of all reviews of the project at once; the fields were added and none was changed. The
+approvals and the last activity of all reviews of the project at once; the list endpoint reads the reviews of the project
+once and hands that list to `ReviewProgressService.GetProgressAsync` (the overload that takes the list), so the reviews
+are not read a second time; the fields were added and none was changed. The
 details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over.
 
 #### Key Methods

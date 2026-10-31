@@ -29,6 +29,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using static DemaConsulting.ReviewCenter.Tests.Api.ApiTestSupport;
 
 namespace DemaConsulting.ReviewCenter.Tests.Api;
@@ -536,6 +537,37 @@ public class ApiEndpointsTests
         Assert.Equal(0, rows["REV-3"].GetProperty("slotsRequired").GetInt32());
         Assert.All(rows.Values, row => Assert.NotEqual(System.Text.Json.JsonValueKind.Null, row.GetProperty("lastActivity").ValueKind));
         Assert.All(rows.Values, row => Assert.True(row.GetProperty("lastActivity").GetDateTimeOffset() > DateTimeOffset.UtcNow.AddMinutes(-10)));
+    }
+
+    /// <summary>
+    ///     Test that the review list endpoint reads the list of reviews of the project once, although both the
+    ///     summaries and the progress need it, and still returns every review with its progress.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce()
+    {
+        // Arrange: the real review store behind a counting proxy, a project with two reviews and a token
+        CountingReviewStore? counting = null;
+        await using var app = await StartAsync(configureServices: services => services.Replace(ServiceDescriptor.Singleton(sp =>
+        {
+            var store = CountingReviewStore.Wrap(ActivatorUtilities.CreateInstance<DemaConsulting.ReviewCenter.Storage.ReviewStore>(sp));
+            counting = (CountingReviewStore)(object)store;
+            return store;
+        })));
+        var projectId = await ArrangeSignedReviewWithSetIdAsync(app);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+        var before = counting!.ListCalls;
+
+        // Act: list the reviews once through the API
+        var response = await client.GetAsync($"/api/projects/{projectId}/reviews", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: both reviews with their progress, and exactly one read of the review list
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(["REV-1", "REV-2"], json.RootElement.EnumerateArray().Select(r => r.GetProperty("id").GetString()));
+        Assert.All(json.RootElement.EnumerateArray(), row => Assert.True(row.GetProperty("approved").GetBoolean()));
+        Assert.Equal(1, counting.ListCalls - before);
     }
 
     /// <summary>

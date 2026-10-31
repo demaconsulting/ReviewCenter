@@ -686,6 +686,7 @@ sections:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_QueryFilters_NarrowTheTable
           - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
 
       - id: ReviewCenter-Web-FollowUp
         title: >-

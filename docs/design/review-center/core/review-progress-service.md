@@ -56,7 +56,20 @@ The service holds the injected collaborators and no other state, so it is safe f
   `ProjectNotFound`, with the same message for each.
 - *Postconditions*: nothing is changed and nothing is recorded.
 
-The number of reads does not depend on the number of reviews: one read of the reviews (`ReviewService.ListAsync`), one
+**GetProgressAsync (with the list of reviews)**: The same answer for a caller that already holds the review list, such
+as the API list, which needs the list itself for the review fields. The caller passes the list that
+`ReviewService.ListAsync` returned and the service does not read it again, so the reviews are still read once.
+
+- *Parameters*: the `Actor` (may be null), the project identity, the list of `Review` (not null), and a cancellation
+  token.
+- *Returns*: the progress of each given review that still exists, in the order given; empty for an empty list.
+- *Preconditions*: the same access check as above, made before anything is computed; a null list raises
+  `ArgumentNullException`. The caller must pass the reviews of that project; the service does not check it.
+- *Postconditions*: nothing is changed and nothing is recorded; the audit trail and the approvals are not read for an
+  empty list.
+
+The number of reads does not depend on the number of reviews: one read of the reviews (`ReviewService.ListAsync`, made
+by the caller that passes the list in), one
 batch read of the approval statuses (`SigningService.GetApprovalsAsync`, which itself takes one set-based read of the
 snapshots of all the reviews, `IReviewStore.ListSnapshotsAsync`, and one of the reopen history of the reviews that were
 reopened), and one read of the last activity. A review

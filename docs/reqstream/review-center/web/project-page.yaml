@@ -167,14 +167,18 @@ sections:
           as given of needed with the number that are out of date, what blocks the approval (a missing checklist, open
           threads, unanswered checks, checks answered Fail), the people it waits on, the time of the last activity,
           and the due date with the Overdue badge of the rule while the review is overdue, all taken from the
-          progress service in one read for the whole project.
+          progress service in one read for the whole project, and shall write the creation date, the last activity,
+          the due date, and their machine-readable time attributes in the invariant culture, in Gregorian digits,
+          whatever culture the request has.
         justification: |
           A lead opens the project page to see who is holding each review up. Showing the reason a review is not
           approved and the names to ask turns the list into a work list, and reading it in one step keeps the page
-          fast for a project with many reviews.
+          fast for a project with many reviews. A date in the calendar of the visitor's culture (such as the Buddhist
+          year) would disagree with the review page and the API.
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
 
       - id: ReviewCenter-ProjectPage-Summary
         title: >-

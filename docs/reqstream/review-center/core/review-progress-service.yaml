@@ -100,18 +100,24 @@ sections:
           must read like a missing one, so that its existence does not leak.
         tests:
           - ReviewProgressService_GetProgressAsync_ActorKinds_AreAllowedOrNotFound
+          - ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList
 
       - id: ReviewCenter-ReviewProgressService-Performance
         title: >-
           The ReviewProgressService class shall need a number of reads that does not grow with the number of reviews
-          of the project: one read of the reviews, one batch read of the approval statuses (itself one set-based read
-          of the snapshots of all the reviews), and one read of the last
+          of the project: one read of the reviews (none when the caller already has the list and passes it in), one
+          batch read of the approval statuses (itself one set-based read of the snapshots of all the reviews), and
+          one read of the last
           activity, so that a project with 300 reviews is answered within a loose time bound on a test database.
         justification: |
           The overview is the page that every user opens first. A read per review would make it slow exactly for the
-          projects that most need an overview.
+          projects that most need an overview. A caller that needs the list itself, such as the API list, passes it
+          in so that the reviews are still read once.
         tests:
           - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
+          - ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList
+          - ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder
+          - ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse
 
       - id: ReviewCenter-ReviewProgressService-Arguments
         title: >-

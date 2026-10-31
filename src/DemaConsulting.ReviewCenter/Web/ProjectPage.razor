@@ -178,7 +178,7 @@
                                         {
                                             <p class="muted" data-testid="review-follows-@review.ReviewId">Follow-up to <a href="/projects/@ProjectId/reviews/@follows" data-testid="review-follows-link-@review.ReviewId">@follows</a></p>
                                         }
-                                        <time class="muted" datetime="@review.Created.UtcDateTime.ToString("O")" data-testid="review-created-@review.ReviewId">@review.Created.UtcDateTime.ToString("yyyy-MM-dd")</time>
+                                        <time class="muted" datetime="@review.Created.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" data-testid="review-created-@review.ReviewId">@review.Created.UtcDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)</time>
                                     </td>
                                     <td>
                                         <span class="badge @(review.IsApproved ? "approved" : null)" data-testid="review-approval-@review.ReviewId">@StageLabel(review.Stage)</span>
@@ -204,10 +204,10 @@
                                     <td data-testid="review-blockers-@review.ReviewId">@BlockersText(review)</td>
                                     <td data-testid="review-waiting-@review.ReviewId">@(review.WaitingOn.Count == 0 ? "-" : string.Join(", ", review.WaitingOn))</td>
                                     <td class="nowrap">
-                                        <time datetime="@review.LastActivity.UtcDateTime.ToString("O")" data-testid="review-activity-@review.ReviewId">@review.LastActivity.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</time>
+                                        <time datetime="@review.LastActivity.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" data-testid="review-activity-@review.ReviewId">@review.LastActivity.UtcDateTime.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)</time>
                                     </td>
                                     <td class="nowrap">
-                                        <span data-testid="review-due-@review.ReviewId">@(review.DueDate is { } due ? due.ToString("yyyy-MM-dd") : "-")</span>
+                                        <span data-testid="review-due-@review.ReviewId">@(review.DueDate is { } due ? due.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "-")</span>
                                         @if (review.IsOverdue)
                                         {
                                             <span class="badge failed" data-testid="review-overdue-@review.ReviewId">Overdue</span>

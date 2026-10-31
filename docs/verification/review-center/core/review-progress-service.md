@@ -36,6 +36,9 @@ N/A - standard test environment.
   project and no actor at all get `ProjectNotFound`.
 - The progress of a project with 300 reviews reads the audit trail once, is complete, and is produced within a loose time
   bound of ten seconds (a guard against one query per review, not a benchmark).
+- The overload that is given the review list returns the same progress as the one that lists the reviews, makes no
+  further read of the review list, uses exactly the given list (a subset, in the given order; an empty list gives an
+  empty answer without reading the last activity), still checks the access, and refuses a null list.
 - A null collaborator is refused with an argument exception.
 
 #### Test Scenarios
@@ -96,6 +99,24 @@ single row, the last two get `ProjectNotFound`. This scenario is tested by
 an audit store that counts the reads of the last activity. All 300 are returned, 100 are In review, the audit trail was
 read once, and the call finished within ten seconds. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast`.
+
+**ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList**: Three reviews (one with a due date, one
+with a primary and an alternate, one signed) are read with the overload that lists them and then with the one that is
+given the list, over a `FakeReviewStore` that counts the list reads. The two answers are equal field by field, the first
+made one list read and the second none. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList`.
+
+**ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder**: A list of two of three reviews, the
+later one first, gives exactly those two in that order. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder`.
+
+**ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse**: An empty list gives an empty answer
+and the audit store counts no read of the last activity. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse`.
+
+**ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList**: With a valid list a user outside the
+project and no actor get `ProjectNotFound`, a member gets the row, and a null list raises `ArgumentNullException`. This
+scenario is tested by `ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList`.
 
 **ReviewProgressService_Constructor_NullArgument_Throws**: A null review service, signing service, audit store, or access
 rule each raise `ArgumentNullException`. This scenario is tested by `ReviewProgressService_Constructor_NullArgument_Throws`.

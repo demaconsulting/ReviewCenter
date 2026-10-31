@@ -34,7 +34,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     </para>
 ///     <para>
 ///         A project overview needs a constant number of reads however many reviews the project has: one read of the
-///         review list, one batch read of all approvals (<see cref="SigningService.GetApprovalsAsync"/>, itself one
+///         review list (none when a caller that already has the list passes it to the overload that takes it), one
+///         batch read of all approvals (<see cref="SigningService.GetApprovalsAsync"/>, itself one
 ///         set-based read of the snapshots of all reviews, <see cref="IReviewStore.ListSnapshotsAsync"/>, plus one of
 ///         the reopen history of the reviews that were reopened) and one read
 ///         of the last activity of all reviews (<see cref="IAuditStore.LastActivityAsync"/>). Reading is open to
@@ -108,8 +109,44 @@ public sealed class ReviewProgressService
         CancellationToken cancellationToken = default)
     {
         await _access.RequireViewAsync(actor, projectId, cancellationToken);
-
         var reviews = await _reviews.ListAsync(projectId, cancellationToken);
+        return await ComputeAsync(projectId, reviews, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Gets the progress of reviews of a project that the caller has already listed, so a caller that needs the
+    ///     list itself reads it once.
+    /// </summary>
+    /// <param name="actor">The caller; must be allowed to see the project.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviews">The reviews of the project, as <see cref="ReviewService.ListAsync"/> returned them. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The progress of each of the given reviews that still exists, in the order given.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="reviews"/> is null.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project (or it does not exist).</exception>
+    public async Task<IReadOnlyList<ReviewProgress>> GetProgressAsync(
+        Actor? actor,
+        int projectId,
+        IReadOnlyList<Review> reviews,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviews);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        return await ComputeAsync(projectId, reviews, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Computes the progress of the given reviews; the caller has checked the access.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviews">The reviews of the project.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The progress of each review that still exists, in the order given.</returns>
+    private async Task<IReadOnlyList<ReviewProgress>> ComputeAsync(
+        int projectId,
+        IReadOnlyList<Review> reviews,
+        CancellationToken cancellationToken)
+    {
         if (reviews.Count == 0)
         {
             return [];

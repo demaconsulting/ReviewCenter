@@ -103,6 +103,11 @@ third is created through the API without slots. The list shows `approved` true w
 none out of date for the signed reviews, `approved` false and no slots for the third, and a recent `lastActivity` for
 all three. This scenario is tested by `ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity`.
 
+**ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce**: The application runs with the real review store behind a
+pass-through proxy that counts the calls of `ListReviewsAsync` (`CountingReviewStore`). Two signed reviews are listed
+with one request; both are returned with `approved` true, and exactly one list read was made during the request. This
+scenario is tested by `ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce`.
+
 **ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing**: A theory sends a `dueDate` that is not a date,
 one in the past, one beyond two years ahead, and one that does not exist on the calendar. Each answer is a 400 problem
 that names the due date, and no review is created. This scenario is tested by

@@ -377,9 +377,9 @@ internal static class ApiEndpoints
         }
 
         // The review fields come from the list, the progress (signatures, approval, overdue, last activity) from the
-        // progress service, which reads all reviews at once
+        // progress service, which is given that same list so the reviews are read once
         var list = await reviews.ListAsync(projectId, cancellationToken);
-        var byId = (await progress.GetProgressAsync(actor, projectId, cancellationToken))
+        var byId = (await progress.GetProgressAsync(actor, projectId, list, cancellationToken))
             .ToDictionary(p => p.ReviewId);
         return TypedResults.Ok(list
             .Where(r => byId.ContainsKey(r.Id))

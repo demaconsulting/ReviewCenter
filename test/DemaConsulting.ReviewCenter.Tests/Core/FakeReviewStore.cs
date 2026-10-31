@@ -572,9 +572,16 @@ internal sealed class FakeReviewStore : IReviewStore
         return Task.FromResult(review is null ? null : WithoutContent(review));
     }
 
+    /// <summary>
+    ///     Gets the number of times the reviews of a project were listed, so a test can show that a caller reads the
+    ///     list once.
+    /// </summary>
+    public int ListReviewsCalls { get; private set; }
+
     /// <inheritdoc />
     public Task<IReadOnlyList<Review>> ListReviewsAsync(int projectId, CancellationToken cancellationToken = default)
     {
+        ListReviewsCalls++;
         IReadOnlyList<Review> list = _reviews
             .Where(review => review.ProjectId == projectId)
             .Select(WithoutContent)

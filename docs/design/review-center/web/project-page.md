@@ -307,10 +307,12 @@ a "Reopened" mark for a reopened review), the signatures (`review-progress-{id}`
 date" when any), what blocks it (`review-blockers-{id}`: "No checklist", open threads, unanswered checks, Fail
 answers), the people it
 waits on (`review-waiting-{id}`), the last activity, and the due date with the Overdue badge
-(`review-overdue-{id}`) of the rule of `ReviewService`. Everything is read-only, so the same table is shown to a member,
-a member who may only read (the Auditor role, which is declared but cannot be assigned yet), an administrator, and a
-system administrator; the "+ New review" button, the "Plan reviews" link, and the repository hint are shown only to a
-user who may contribute.
+(`review-overdue-{id}`) of the rule of `ReviewService`. The created, last activity, and due dates, and their `datetime`
+attributes, are written with `CultureInfo.InvariantCulture` (Gregorian digits such as `2026-03-04`), like the review page
+and the API, so the culture of the request, for example the Thai Buddhist calendar, never changes the year. Everything
+is read-only, so the same table is shown to a member, a member who may only read (the Auditor role, which is declared
+but cannot be assigned yet), an administrator, and a system administrator; the "+ New review" button, the "Plan
+reviews" link, and the repository hint are shown only to a user who may contribute.
 
 **RemoveMemberAsync**, **ToggleRoleAsync** (`ProjectPage`): Remove a member (`ProjectService.RemoveMemberAsync`) and
 switch a member between `ProjectRole.User` and `ProjectRole.ProjectAdmin` (`SetMemberRoleAsync`). Each goes through one

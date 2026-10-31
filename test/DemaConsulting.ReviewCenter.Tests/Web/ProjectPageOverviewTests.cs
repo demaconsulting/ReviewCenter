@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
@@ -170,6 +171,48 @@ public class ProjectPageOverviewTests : PageTestBase
         Assert.Equal("2 in review", cut.Find("[data-testid='project-summary-in-review']").TextContent);
         Assert.Equal("1 approved", cut.Find("[data-testid='project-summary-approved']").TextContent);
         Assert.Equal("1 overdue", cut.Find("[data-testid='project-summary-overdue']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the dates of the table (created, last activity, due) and their <c>datetime</c> attributes are
+    ///     written in the invariant culture, as the review page and the API do, whatever calendar the culture of the
+    ///     request uses: with the Thai Buddhist calendar the current culture would write 2568 for 2025.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates()
+    {
+        // Arrange: the seeded project, and a culture whose own formatting would differ (the test must not be vacuous)
+        var projectId = await SeedAsync();
+        var review = (await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken)).Single(r => r.Id == "REV-B");
+        var thai = new CultureInfo("th-TH");
+        Assert.NotEqual("2025", review.Created.UtcDateTime.ToString("yyyy", thai));
+        var savedCulture = CultureInfo.CurrentCulture;
+        var savedUiCulture = CultureInfo.CurrentUICulture;
+        var invariant = CultureInfo.InvariantCulture;
+
+        try
+        {
+            // Act: render the page under the Thai culture
+            CultureInfo.CurrentCulture = thai;
+            CultureInfo.CurrentUICulture = thai;
+            var cut = RenderAt(projectId);
+
+            // Assert: Gregorian invariant digits in the three cells and their datetime attributes
+            Assert.Equal("2025-03-03", cut.Find("[data-testid='review-due-REV-B']").TextContent);
+            var created = cut.Find("[data-testid='review-created-REV-B']");
+            Assert.Equal(review.Created.UtcDateTime.ToString("yyyy-MM-dd", invariant), created.TextContent);
+            Assert.StartsWith("2025-", created.TextContent, StringComparison.Ordinal);
+            Assert.Equal(review.Created.UtcDateTime.ToString("O", invariant), created.GetAttribute("datetime"));
+            var activity = cut.Find("[data-testid='review-activity-REV-B']");
+            Assert.StartsWith("2025-", activity.TextContent, StringComparison.Ordinal);
+            Assert.Matches(@"^2025-\d\d-\d\d \d\d:\d\d$", activity.TextContent);
+            Assert.StartsWith("2025-", activity.GetAttribute("datetime"), StringComparison.Ordinal);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = savedCulture;
+            CultureInfo.CurrentUICulture = savedUiCulture;
+        }
     }
 
     /// <summary>
