@@ -31,5 +31,6 @@ package ReviewCenter {
         part lineDiff : LineDiff;
         part personalAccessTokenService : PersonalAccessTokenService;
         part inboxService : InboxService;
+        part userImpactService : UserImpactService;
     }
 }

@@ -101,7 +101,8 @@ response.
   and `ProjectService`, `ReviewService`,
   `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, `ReauthProofStore`
   (the single-use proofs of users of an identity provider, shared by the sign-in and the signing service),
-  `TotpChallengeStore` and `TotpService` (the second factor), `InboxService` (the inbox and the read state), and
+  `TotpChallengeStore` and `TotpService` (the second factor), `InboxService` (the inbox and the read state),
+  `UserImpactService` (the offboarding impact of a user), and
   `AuditService`
   as singletons are registered. `TotpSignIn.AddTotpSignIn` binds the `Identity:Totp` settings.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
@@ -330,6 +331,7 @@ always disposed.
   **RepositoryStore** — the database configuration, context, and stores registered for the pages.
 - **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**,
   **PersonalAccessTokenService**, **SigningService**, **TotpService**, **TotpChallengeStore**, **InboxService**,
+  **UserImpactService**,
   **AuditService**, **RepositoryService** — the Core services registered for the pages and the API.
 - **ProjectAccess**, **IProjectAccess** — Core; the one place that decides which project a user may see, registered as a
   singleton for the services, the pages, and the API.

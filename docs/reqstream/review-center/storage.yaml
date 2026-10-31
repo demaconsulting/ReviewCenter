@@ -191,6 +191,7 @@ sections:
         children:
           - ReviewCenter-ReviewStore-Memberships
           - ReviewCenter-ReviewStore-LastAdmin
+          - ReviewCenter-ReviewStore-UserImpact
           - ReviewCenter-UserStore-AddToProject
           - ReviewCenter-DbContext-Memberships
         tests:

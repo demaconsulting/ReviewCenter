@@ -82,6 +82,7 @@ input-files:
   - docs/verification/review-center/core/review-planner.md
   - docs/verification/review-center/core/line-diff.md
   - docs/verification/review-center/core/inbox-service.md
+  - docs/verification/review-center/core/user-impact-service.md
   - docs/verification/review-center/storage.md
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md

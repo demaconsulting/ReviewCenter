@@ -451,6 +451,26 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<Project>> ListSoleAdminProjectsAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        // Like the real store: only an enabled administrator counts, and only other enabled administrators count as another
+        IReadOnlyList<Project> list = !IsUserEnabled(userId)
+            ? []
+            : _projects
+                .Where(p => _memberships.Any(m => m.ProjectId == p.Id && m.UserId == userId && m.Role == ProjectRole.ProjectAdmin)
+                            && !_memberships.Any(m => m.ProjectId == p.Id
+                                                      && m.UserId != userId
+                                                      && m.Role == ProjectRole.ProjectAdmin
+                                                      && IsUserEnabled(m.UserId)))
+                .OrderBy(p => p.Name, StringComparer.Ordinal)
+                .ThenBy(p => p.Id)
+                .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
     public Task<bool> ReviewExistsAsync(int projectId, string reviewId, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(_reviews.Any(review => review.ProjectId == projectId && review.Id == reviewId));
@@ -870,6 +890,27 @@ internal sealed class FakeReviewStore : IReviewStore
         IReadOnlyList<ReviewerSlot> list = _slots
             .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
             .OrderBy(s => s.Id)
+            .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<UserReviewSlot>> ListSlotsOfUserAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<UserReviewSlot> list = _slots
+            .Where(s => s.PrimaryUserId == userId || s.AlternateUserId == userId)
+            .Select(s => new UserReviewSlot(
+                s.ProjectId,
+                _projects.First(p => p.Id == s.ProjectId).Name,
+                s.ReviewId,
+                _reviews.First(r => r.ProjectId == s.ProjectId && r.Id == s.ReviewId).Title,
+                s.Id,
+                s.PrimaryUserId == userId ? SlotRole.Primary : SlotRole.Alternate))
+            .OrderBy(s => s.ProjectId)
+            .ThenBy(s => s.ReviewId, StringComparer.Ordinal)
+            .ThenBy(s => s.SlotId)
             .ToList();
         return Task.FromResult(list);
     }

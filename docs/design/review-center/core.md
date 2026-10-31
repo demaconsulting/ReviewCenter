@@ -35,7 +35,9 @@ repository; `RevisionValidator`, the check that a revision name cannot be taken 
 review of a project, for the project overview and the API list;
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner; and
 `InboxService`, the inbox of a user (the reviews that wait for the user, in four groups, which also serves as the list
-of notifications) and the read state that marks what is new. The
+of notifications) and the read state that marks what is new;
+`UserImpactService`, the offboarding impact of a user
+(the reviewer slots that still wait for the user and the projects the user alone administers). The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
@@ -52,7 +54,8 @@ revisions and selection a creation request names, before they are resolved), `Ch
 types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the second factor types
 (`UserTotp`, `TotpRecoveryCode`, `TotpSettings`, `TotpEnrollment`, `TotpStatus`, `TotpSignInOutcome`,
 `TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the inbox types (`InboxSection`, `InboxItem`, `InboxView`,
-`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the text and line
+`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the offboarding types (`UserImpact`, `UserOpenWork`,
+`SoleAdminProject`, and `UserReviewSlot`), the text and line
 definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
@@ -267,6 +270,17 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   empty inbox without an error.
 - *Constraints*: Read state is stored in one row per user and review, never moves back, is not audited, and is not part
   of the record digest. There is no notification record: the inbox is computed from the review data.
+
+**UserImpactService**: The offboarding impact of a user. It is consumed by the Users page and the Members card in later
+slices; no page uses it yet.
+
+- *Type*: In-process .NET class.
+- *Role*: Provider.
+- *Contract*: Give, for a user, the reviewer slots of unlocked reviews that still wait for the user (as primary or
+  alternate, not signed or out of date) and the projects in which the user is the only enabled project administrator. A
+  system administrator may ask about every user and sees every project; a project administrator sees only the
+  projects the asker administers; every other actor is refused as not allowed and an unknown user is not found.
+- *Constraints*: Reads only; nothing is stored or audited. The signature rule is the one of the inbox.
 
 **IInboxStore**: The store interface the subsystem requires for the read state and for finding the reviews of a user.
 

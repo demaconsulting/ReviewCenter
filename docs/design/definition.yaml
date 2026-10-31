@@ -82,6 +82,7 @@ input-files:
   - docs/design/review-center/core/review-planner.md
   - docs/design/review-center/core/line-diff.md
   - docs/design/review-center/core/inbox-service.md
+  - docs/design/review-center/core/user-impact-service.md
   - docs/design/review-center/storage.md
   - docs/design/review-center/storage/review-center-db-context.md
   - docs/design/review-center/storage/review-store.md

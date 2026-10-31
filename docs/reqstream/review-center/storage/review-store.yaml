@@ -405,3 +405,22 @@ sections:
           - ReviewStore_MembershipChanges_RemoveRacesDemote_LeavesAnAdministrator
           - ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnlessExempt
           - ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused
+
+      - id: ReviewCenter-ReviewStore-UserImpact
+        title: >-
+          The ReviewStore class shall list the reviewer slots in which a user is the primary or the alternate reviewer
+          with the project name, the review identifier and title, the slot identity and the role of the user, ordered
+          by project, review and slot, using the indexes of the slot users and leaving out the slots of other users, and
+          shall list the projects in which an enabled user is a project administrator and no other enabled user is,
+          ordered by name, so that a disabled administrator, a member who is not an administrator, and a disabled user
+          are not counted.
+        justification: |
+          The offboarding impact of a user is built from these two reads, so they must find the slots without scanning
+          the slot table and must decide who counts as another administrator by the same rule as the last-administrator
+          check that protects the project at the moment of the change.
+        tests:
+          - ReviewStore_ListSlotsOfUserAsync_PrimaryAndAlternate_AreFoundInOrder
+          - ReviewStore_ListSlotsOfUserAsync_NoSlot_IsEmpty
+          - ReviewStore_ListSoleAdminProjectsAsync_OnlyEnabledAdministrator_IsFound
+          - ReviewStore_ListSoleAdminProjectsAsync_DisabledOrOrdinaryOthers_DoNotCount
+          - DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes
