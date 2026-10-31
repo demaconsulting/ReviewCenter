@@ -30,6 +30,7 @@ input-files:
   - docs/verification/review-center/utilities.md
   - docs/verification/review-center/utilities/path-helpers.md
   - docs/verification/review-center/utilities/temporary-directory.md
+  - docs/verification/review-center/utilities/secret-source.md
   - docs/verification/review-center/hosting.md
   - docs/verification/review-center/hosting/server-host.md
   - docs/verification/review-center/hosting/user-command.md

@@ -217,6 +217,20 @@ reviews:
       - "src/**/Utilities/TemporaryDirectory.cs"
       - "test/**/Utilities/TemporaryDirectoryTests.cs"
 
+  - id: ReviewCenter-Utilities-SecretSource
+    title: Review of ReviewCenter SecretSource unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/utilities.md
+      - docs/reqstream/review-center/utilities.yaml
+    paths:
+      - "docs/reqstream/review-center/utilities/secret-source.yaml"
+      - "docs/design/review-center/utilities/secret-source.md"
+      - "docs/verification/review-center/utilities/secret-source.md"
+      - "src/**/Utilities/SecretSource.cs"
+      - "test/**/Utilities/SecretSourceTests.cs"
+
   # ReviewCenter - Hosting
   - id: ReviewCenter-Hosting
     title: Review of ReviewCenter Hosting subsystem architecture and interfaces

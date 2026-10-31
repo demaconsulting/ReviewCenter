@@ -122,6 +122,7 @@ that is not part of the release archive. The defaults are:
 | `Identity:Throttle:WindowSeconds`         | 300 seconds (1 to 86400)       | Password Rules and Lockout (Sign-in)    |
 | `Identity:Totp:Enabled`                   | true                           | Two-Factor Sign-in (Sign-in)            |
 | `Identity:Oidc:*`                         | off                            | Sign In with an OpenID Connect Provider |
+| `Identity:Oidc:ClientSecretFile`          | empty (use `ClientSecret`)     | Identity Providers                      |
 | `DataProtection:KeysPath`                 | `keys` in the data folder      | Repositories and Credentials            |
 | `Attestation:*`                           | a self-signed key              | The Signing Key (Reviewing)             |
 | `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |

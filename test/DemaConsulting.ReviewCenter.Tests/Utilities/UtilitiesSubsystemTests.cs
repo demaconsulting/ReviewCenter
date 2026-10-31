@@ -23,11 +23,39 @@ using DemaConsulting.ReviewCenter.Utilities;
 namespace DemaConsulting.ReviewCenter.Tests;
 
 /// <summary>
-///     Subsystem tests for the Utilities subsystem covering PathHelpers integration workflows.
+///     Subsystem tests for the Utilities subsystem covering PathHelpers, TemporaryDirectory, and SecretSource
+///     integration workflows.
 /// </summary>
 [Collection("Sequential")]
 public class UtilitiesSubsystemTests
 {
+    /// <summary>
+    ///     Test that utilities subsystem resolves a secret from a file kept in a temporary directory, trimmed, and
+    ///     refuses the file once it is gone.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret()
+    {
+        // Arrange: a secret file with a trailing newline inside a temporary directory
+        string path;
+        using (var directory = new TemporaryDirectory())
+        {
+            path = directory.GetFilePath("secrets/client.txt");
+            File.WriteAllText(path, "workflow-secret\n");
+
+            // Act: resolve from the file
+            var secret = SecretSource.Resolve(null, "Test:Secret", path, "Test:SecretFile");
+
+            // Assert: the secret is the trimmed contents
+            Assert.Equal("workflow-secret", secret);
+        }
+
+        // Assert: after the directory is gone the file is refused, naming the setting
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => SecretSource.Resolve(null, "Test:Secret", path, "Test:SecretFile"));
+        Assert.Contains("Test:SecretFile", exception.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>
     ///     Test that utilities subsystem can handle path combination workflows.
     /// </summary>

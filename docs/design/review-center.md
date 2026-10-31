@@ -22,6 +22,7 @@ flowchart TD
     subgraph Utilities
         PathHelpers
         TemporaryDirectory
+        SecretSource
     end
     subgraph Hosting
         ServerHost
@@ -178,6 +179,7 @@ flowchart TD
     OidcSignIn --> UserService
     OidcSignIn --> SigningService
     OidcSignIn --> ReauthProofStore
+    OidcSignIn --> SecretSource
     RevalidatingAuthenticationStateProvider --> SignIn
     RevalidatingAuthenticationStateProvider --> UserService
     PasswordHasher --> UserService

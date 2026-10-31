@@ -32,7 +32,8 @@ sections:
         title: >-
           The OidcSignIn unit shall read the provider settings (address, client identifier, client secret, scopes,
           display name, user name claim, whether the e-mail address must be verified, and the age allowed for a
-          confirmation of identity) from the Identity:Oidc settings, and shall register and map nothing while the
+          confirmation of identity) from the Identity:Oidc settings, shall take the client secret from the setting or
+          from a file, and shall register and map nothing while the
           sign-in is off.
         justification: |
           The provider settings belong to the person who runs the server and are read from the settings and the
@@ -68,6 +69,28 @@ sections:
           - OidcOptionsValidator_Validate_Scheme_HttpOnlyForLoopback
           - OidcOptionsValidator_Validate_Null_Throws
           - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-OidcSignIn-ClientSecretFile
+        title: >-
+          The OidcSignIn unit shall accept the client secret in a file named by the Identity:Oidc:ClientSecretFile
+          setting, use the trimmed contents of the file as the secret, refuse a secret that is set both inline and in a
+          file, and stop the server from starting, naming the setting and never the secret, when the file is missing,
+          cannot be read, is empty, or is too large.
+        justification: |
+          A client secret in a settings file or in the environment is easy to leak, while a file that a secret store
+          or the service manager provides (a mounted secret, a systemd credential) is the safer way to hand it to the
+          server. Two sources would leave it unclear which one is in force, and a file that is wrong must be found
+          when the server starts and not when the first person cannot sign in. The reading and the rules of the file
+          are those of the shared SecretSource unit.
+        children:
+          - ReviewCenter-Utilities-SecretSource
+        tests:
+          - OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret
+          - OidcOptionsValidator_Validate_ClientSecretAndFileBothSet_FailsNamingBothSettings
+          - OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret
+          - OidcOptions_ResolveClientSecret_FileChangedAfterValidation_RefusesOutOfBoundsSecret
+          - ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret
+          - OidcSignIn_ClientSecretFile_SignsInAndHandlerUsesTheTrimmedSecret
 
       - id: ReviewCenter-OidcSignIn-Account
         title: >-

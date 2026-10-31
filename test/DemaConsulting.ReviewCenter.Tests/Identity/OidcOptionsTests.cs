@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Identity;
+using DemaConsulting.ReviewCenter.Utilities;
 
 namespace DemaConsulting.ReviewCenter.Tests.Identity;
 
@@ -196,6 +197,134 @@ public class OidcOptionsTests
         Assert.Contains("Identity:Oidc:ClientSecret", result.FailureMessage, StringComparison.Ordinal);
         Assert.DoesNotContain(Secret, result.FailureMessage, StringComparison.Ordinal);
         Assert.DoesNotContain("xxxx", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a client secret in a file is accepted: it is trimmed, it replaces the inline secret, and the
+    ///     inline setting may stay empty.
+    /// </summary>
+    [Fact]
+    public void OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret()
+    {
+        // Arrange: valid settings with the secret in a file (with the newline an editor adds) and none inline
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, Secret + "\n");
+        var options = Valid();
+        options.ClientSecret = string.Empty;
+        options.ClientSecretFile = path;
+
+        // Act
+        var result = Validate(options);
+        var resolved = options.ResolveClientSecret();
+
+        // Assert
+        Assert.True(result.Succeeded, result.FailureMessage);
+        Assert.Equal(Secret, resolved);
+    }
+
+    /// <summary>
+    ///     Test that a secret both inline and in a file is refused, naming both settings and no secret.
+    /// </summary>
+    [Fact]
+    public void OidcOptionsValidator_Validate_ClientSecretAndFileBothSet_FailsNamingBothSettings()
+    {
+        // Arrange: a file that exists, and the inline secret of the valid settings
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, "secret-in-the-file");
+        var options = Valid();
+        options.ClientSecretFile = path;
+
+        // Act
+        var result = Validate(options);
+
+        // Assert
+        Assert.True(result.Failed);
+        Assert.Contains("Identity:Oidc:ClientSecret ", result.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("Identity:Oidc:ClientSecretFile", result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-in-the-file", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a secret file that is missing or empty, or a secret in it that is out of bounds, is refused
+    ///     naming the file setting, without the secret in the message.
+    /// </summary>
+    /// <param name="problem">The kind of problem: <c>missing</c>, <c>empty</c>, <c>oversize</c>, <c>tooLong</c>
+    ///     or <c>control</c>.</param>
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("empty")]
+    [InlineData("oversize")]
+    [InlineData("tooLong")]
+    [InlineData("control")]
+    public void OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret(
+        string problem)
+    {
+        // Arrange: valid settings whose secret comes from a file with the given problem
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        switch (problem)
+        {
+            case "empty":
+                File.WriteAllText(path, "\n");
+                break;
+            case "oversize":
+                File.WriteAllText(path, Secret + new string('x', SecretSource.MaxFileBytes));
+                break;
+            case "tooLong":
+                File.WriteAllText(path, Secret + new string('x', OidcOptions.MaxClientSecretLength));
+                break;
+            case "control":
+                File.WriteAllText(path, Secret + "\u0007");
+                break;
+        }
+
+        var options = Valid();
+        options.ClientSecret = string.Empty;
+        options.ClientSecretFile = path;
+
+        // Act
+        var result = Validate(options);
+
+        // Assert
+        Assert.True(result.Failed);
+        Assert.Contains("Identity:Oidc:ClientSecretFile", result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("xxxx", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the resolver the provider registration uses applies the same bounds as the start-up check: a
+    ///     file that passes the check and then changes to an out-of-bounds secret is refused on the second read,
+    ///     naming the file setting and not holding the secret.
+    /// </summary>
+    /// <param name="change">The change made after the check: <c>tooLong</c> or <c>control</c>.</param>
+    [Theory]
+    [InlineData("tooLong")]
+    [InlineData("control")]
+    public void OidcOptions_ResolveClientSecret_FileChangedAfterValidation_RefusesOutOfBoundsSecret(string change)
+    {
+        // Arrange: settings that validate, with the secret in a file
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, Secret);
+        var options = Valid();
+        options.ClientSecret = string.Empty;
+        options.ClientSecretFile = path;
+        Assert.True(Validate(options).Succeeded);
+
+        // Act: the file changes, then the secret is read again as the provider registration does
+        var changed = change == "tooLong"
+            ? Secret + new string('x', OidcOptions.MaxClientSecretLength)
+            : Secret + "\u0007";
+        File.WriteAllText(path, changed);
+        var ex = Assert.Throws<InvalidOperationException>(() => options.ResolveClientSecret());
+
+        // Assert
+        Assert.Contains("Identity:Oidc:ClientSecretFile", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, ex.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

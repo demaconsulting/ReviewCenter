@@ -22,8 +22,11 @@ using System.Net;
 using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
+using DemaConsulting.ReviewCenter.Utilities;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Tests.Identity;
 
@@ -661,6 +664,41 @@ public partial class OidcSignInTests : IClassFixture<IdentityProviderFixture>
         {
             Assert.DoesNotContain(ClientSecret, entry.Detail, StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>
+    ///     Test that a client secret read from a file signs a person in: the handler of the framework receives the
+    ///     trimmed contents of the file, and the secret is not logged.
+    /// </summary>
+    [Fact]
+    public async Task OidcSignIn_ClientSecretFile_SignsInAndHandlerUsesTheTrimmedSecret()
+    {
+        // Arrange: the secret in a file with a trailing newline, none inline
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        const string fileSecret = "secret-from-the-file";
+        await File.WriteAllTextAsync(path, fileSecret + "\n", TestContext.Current.CancellationToken);
+        var logs = new CapturingLoggerProvider();
+        await using var app = await OidcTestApp.StartAsync(
+            _idp,
+            logs,
+            new Dictionary<string, string?>
+            {
+                ["Identity:Oidc:ClientSecret"] = string.Empty,
+                ["Identity:Oidc:ClientSecretFile"] = path
+            });
+        using var browser = new TestBrowser(app);
+
+        // Act
+        var landing = await OidcTestApp.SignInAsync(browser, _idp, "/projects");
+
+        // Assert: signed in, the handler holds the trimmed secret, and no log entry holds it
+        Assert.Equal(HttpStatusCode.Redirect, landing.StatusCode);
+        Assert.Equal("/projects", landing.Headers.Location?.OriginalString);
+        var handler = app.Services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>()
+            .Get(OidcSignIn.ProviderScheme);
+        Assert.Equal(fileSecret, handler.ClientSecret);
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains(fileSecret, StringComparison.Ordinal));
     }
 
     /// <summary>
