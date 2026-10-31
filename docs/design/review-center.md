@@ -75,6 +75,7 @@ flowchart TD
         RecordDigest
         SigningService
         InboxService
+        UserImpactService
         ReauthProofStore
         TotpService
         TotpChallengeStore
@@ -151,6 +152,7 @@ flowchart TD
     ServerHost --> ThreadService
     ServerHost --> InboxStore
     ServerHost --> InboxService
+    ServerHost --> UserImpactService
     ServerHost --> ChecklistService
     ServerHost --> UserService
     ServerHost --> SigningService
@@ -269,6 +271,9 @@ flowchart TD
     InboxService --> ReviewStore
     InboxService --> UserStore
     InboxService --> RecordDigest
+    UserImpactService --> ReviewStore
+    UserImpactService --> UserStore
+    UserImpactService --> RecordDigest
     InboxStore --> ReviewCenterDbContext
     ReviewService --> Fingerprint
     ProjectService --> ReviewStore

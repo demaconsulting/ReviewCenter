@@ -408,6 +408,33 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Project>> ListSoleAdminProjectsAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // The same rule as the last-administrator check: only an enabled administrator is one, and only other
+        // enabled administrators count as another
+        if (!await context.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.Enabled, cancellationToken))
+        {
+            return [];
+        }
+
+        return await context.Projects.AsNoTracking()
+            .Where(p => context.ProjectMemberships.Any(
+                            m => m.ProjectId == p.Id && m.UserId == userId && m.Role == ProjectRole.ProjectAdmin)
+                        && !context.ProjectMemberships.Any(
+                            m => m.ProjectId == p.Id
+                                 && m.UserId != userId
+                                 && m.Role == ProjectRole.ProjectAdmin
+                                 && context.Users.Any(u => u.Id == m.UserId && u.Enabled)))
+            .OrderBy(p => p.Name)
+            .ThenBy(p => p.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<bool> ReviewExistsAsync(
         int projectId,
         string reviewId,
@@ -855,6 +882,44 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
             .OrderBy(s => s.Id)
             .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<UserReviewSlot>> ListSlotsOfUserAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // The two slot indexes serve the OR; only titles and names are read, never review content
+        var rows = await (
+            from slot in context.ReviewerSlots.AsNoTracking()
+            where slot.PrimaryUserId == userId || slot.AlternateUserId == userId
+            join review in context.Reviews.AsNoTracking()
+                on new { slot.ProjectId, slot.ReviewId } equals new { review.ProjectId, ReviewId = review.Id }
+            join project in context.Projects.AsNoTracking() on slot.ProjectId equals project.Id
+            select new
+            {
+                slot.ProjectId,
+                ProjectName = project.Name,
+                slot.ReviewId,
+                review.Title,
+                SlotId = slot.Id,
+                slot.PrimaryUserId
+            })
+            .ToListAsync(cancellationToken);
+        return rows
+            .Select(row => new UserReviewSlot(
+                row.ProjectId,
+                row.ProjectName,
+                row.ReviewId,
+                row.Title,
+                row.SlotId,
+                row.PrimaryUserId == userId ? SlotRole.Primary : SlotRole.Alternate))
+            .OrderBy(row => row.ProjectId)
+            .ThenBy(row => row.ReviewId, StringComparer.Ordinal)
+            .ThenBy(row => row.SlotId)
+            .ToList();
     }
 
     /// <inheritdoc />

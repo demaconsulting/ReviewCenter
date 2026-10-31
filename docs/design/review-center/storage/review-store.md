@@ -169,6 +169,14 @@ when it is a demotion (the new role is not `ProjectAdmin`).
 project (null when absent), the memberships of a project ordered by user, and the memberships of a user ordered by
 project. The reads use no tracking and no gate.
 
+**ListSoleAdminProjectsAsync**: Lists, for the offboarding impact of a user, the projects in which the user is an
+enabled project administrator and no other enabled project administrator exists, ordered by name and then identity. A
+disabled
+user, a user who is no administrator, and an unknown user give an empty list. It applies the rule of
+`EnsureAnotherAdminAsync` (a plain member, a disabled administrator, and a system administrator who is not a member
+do not count as another administrator), in one query with no tracking, so a project in the list is one where removing or
+demoting the user with the check required would be refused.
+
 **AddReviewAsync**: Stores a review, all its files, and its checklist snapshot (when it has one) in one save, which
 is one transaction.
 
@@ -271,6 +279,15 @@ all its reviews in a constant number of round trips.
 
 **ListSlotsAsync**: Lists the reviewer slots of one review ordered by identity, which is the order they were added.
 
+**ListSlotsOfUserAsync**: Lists the reviewer slots in which a user is the primary or the alternate reviewer, across all
+projects, as `UserReviewSlot` rows (project identity and name, review identifier and title, slot identity, and the role
+of the user: primary when the user is the primary reviewer of the slot, otherwise alternate), ordered by project,
+review, and slot identity. It is one join of the slots with their review and project, using the indexes of the primary
+and the alternate user of the slots (`IX_ReviewerSlots_PrimaryUserId` and `IX_ReviewerSlots_AlternateUserId`, which
+already exist for the inbox), with no tracking and without loading files. The store does not decide whether a slot is
+open: that depends on the signatures and the record digest, which `UserImpactService` decides with the snapshot of the
+review.
+
 **AddSlotAsync**: Stores a slot and returns it. A fresh entity is copied from the argument (project, review, primary
 user, alternate user), so an identity supplied by the caller is ignored and the database assigns it. A slot for a
 review that does not exist is refused by the relationship constraint of the database and surfaces as a
@@ -355,7 +372,7 @@ refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.
 
 - **EvidenceSettingsService**, **ProjectChecklistService**, **ProjectService**, **ReviewService**, **ThreadService**,
   **ChecklistService**,
-  **SigningService**, and
+  **SigningService**, **UserImpactService**, and
   **ProjectAccess** — through the
   Core interface.
 - **ServerHost** — registers the store as the implementation of the Core interface.

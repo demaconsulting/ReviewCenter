@@ -1,0 +1,74 @@
+---
+# Software Unit Requirements for the UserImpactService Class
+#
+# The UserImpactService class answers, for one user, what would be left behind if the user left: the reviewer slots of
+# unlocked reviews that still wait for the user, and the projects in which the user is the only enabled project
+# administrator. It computes this on demand from what is stored, by the signature rules of the InboxRules and
+# ReviewLock classes, and stores nothing. The UserImpact records that carry the answer are verified with it. The two
+# store reads behind it are verified in the ReviewStore unit, and the project administrator rule it shares with the
+# last-administrator rule of the membership store is in the same unit.
+
+sections:
+  - title: UserImpactService Unit Requirements
+    requirements:
+      - id: ReviewCenter-UserImpactService-OpenWork
+        title: >-
+          The UserImpactService class shall report, for a user, every reviewer slot of an unlocked (not approved)
+          review in which the user is the primary or the alternate reviewer and which is not currently signed, with the
+          project, the review, its title, the number of the slot, the role of the user, and whether the slot is not
+          signed or out of date, decided by the same signature rule as the inbox, and shall leave out the slots of
+          approved reviews and the slots that have a current signature.
+        justification: |
+          When a person leaves, the review work that still waits for them has to be handed over, and a lead needs the
+          list. A slot that is signed or whose review is approved needs nothing, and a list that showed it would hide
+          the real work. The rule for "signed" and "out of date" is the one the inbox and the review page already use,
+          so the list cannot disagree with them.
+        tests:
+          - UserImpactService_GetImpactAsync_PrimaryAndAlternateSlots_AreOpenWork
+          - UserImpactService_GetImpactAsync_SignedSlot_IsNotOpenWork
+          - UserImpactService_GetImpactAsync_OutOfDateSlot_IsOpenWorkAsOutOfDate
+          - UserImpactService_GetImpactAsync_ApprovedReviewExcluded_UnlockedReviewIncluded
+          - UserImpactService_GetImpactAsync_DisabledUserWithSlot_StillShowsOpenWork
+          - UserImpactService_GetImpactAsync_ManyReviews_AreOrderedAndReadInOneBatchPerProject
+
+      - id: ReviewCenter-UserImpactService-SoleAdmin
+        title: >-
+          The UserImpactService class shall report, for a user, every project in which the user is an enabled project
+          administrator and no other enabled project administrator exists, and shall not count a disabled account, a
+          member who is not a project administrator, or a system administrator who is not a project administrator as
+          another administrator.
+        justification: |
+          A project without an enabled project administrator can no longer have members, reviewers, or settings
+          changed by anyone but a system administrator. The report warns before the last administrator is disabled
+          or removed. It uses the rule of the last-administrator check of the membership store, so a warning means
+          the change would really be refused.
+        tests:
+          - UserImpactService_GetImpactAsync_OnlyEnabledProjectAdministrator_IsSoleAdmin
+          - UserImpactService_GetImpactAsync_AnotherEnabledAdministrator_IsNotSoleAdmin
+          - UserImpactService_GetImpactAsync_DisabledSecondAdministrator_DoesNotCount
+
+      - id: ReviewCenter-UserImpactService-Scope
+        title: >-
+          The UserImpactService class shall answer a system administrator for every project, answer a project
+          administrator for any user but only for the projects the asker administers, refuse every other actor
+          (a member, a read-only member, a user outside every project, a disabled user, an unknown actor, and the
+          command line) as not allowed, and report a user that does not exist as not found.
+        justification: |
+          The impact of a leaver tells who works on what, so it is for the people who run projects. A project
+          administrator has to see the part that concerns the project, and must not learn about the work of the
+          user in other projects. A refused actor is told nothing about whether the user exists.
+        tests:
+          - UserImpactService_GetImpactAsync_SystemAdministrator_SeesEveryProject
+          - UserImpactService_GetImpactAsync_ProjectAdministrator_SeesOnlyOwnProjects
+          - UserImpactService_GetImpactAsync_ActorWithoutAdministration_IsRefused
+          - UserImpactService_GetImpactAsync_DisabledProjectAdministrator_IsRefused
+          - UserImpactService_GetImpactAsync_UnknownUser_IsNotFoundForAnAdministratorOnly
+
+      - id: ReviewCenter-UserImpactService-Arguments
+        title: >-
+          The UserImpactService class shall refuse a null actor and a null review store, user store, or access rule.
+        justification: |
+          A missing collaborator or actor is a programming error that must show at once, not later as a null reference
+          in the middle of a request.
+        tests:
+          - UserImpactService_NullArguments_AreRefused

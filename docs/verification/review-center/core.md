@@ -78,6 +78,10 @@ N/A - standard test environment.
   the updates (approval and reopening by others), counts the distinct reviews that need action, marks the comments of
   others after the last seen one as unread, and gives nothing to users who may not act (see the unit tests of
   `InboxService`).
+- The offboarding impact of a user lists the reviewer slots of unlocked reviews that still wait for the user and the
+  projects in which the user is the only enabled project administrator, to a system administrator for every project and
+  to a project administrator for the projects the asker administers, and refuses everyone else (see the unit tests of
+  `UserImpactService`).
 - A repository registry that only the administrator of the project (or a system administrator) can change: names,
   locations, and credentials are validated, tokens are stored encrypted and are never part of a listed registration,
   every repository belongs to one project, and every change is audited without a secret (see the unit tests of
@@ -304,3 +308,11 @@ verified by the unit tests of `TotpChallengeStore`.
 Replies waiting, Failed checks, and Updates, the count of the distinct reviews that need action, and the unread rules
 are tested over in-memory stores, and the whole path over the real services is tested by
 `CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts`. The rules class is tested by `InboxRules`.
+
+**User impact**: The unit tests of `UserImpactService` verify the subsystem requirement for the offboarding impact over
+in-memory stores and the real access rules: the open work as primary and as alternate, the exclusion of signed slots
+and of approved reviews, the out-of-date state, the sole administrator rule with another enabled and a disabled
+administrator, and the scope by actor. This is tested by
+`UserImpactService_GetImpactAsync_PrimaryAndAlternateSlots_AreOpenWork`,
+`UserImpactService_GetImpactAsync_OnlyEnabledProjectAdministrator_IsSoleAdmin`, and
+`UserImpactService_GetImpactAsync_ProjectAdministrator_SeesOnlyOwnProjects`.

@@ -5,7 +5,8 @@
 `ReviewStore` is verified with unit tests defined in `ReviewStoreTests.cs` (projects, reviews, threads, and
 checklists), `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures), and
 `ReviewStoreRepositoryTests.cs` (reviews from a repository), `ReviewStoreMembershipTests.cs` (project
-memberships), `ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
+memberships), `ReviewStoreUserImpactTests.cs` (the slots of a user and the projects the user alone administers),
+`ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
 the same time), `EvidenceSettingsStoreTests.cs` (the evidence settings of a project and their compare-and-set
 change), and `ProjectChecklistStoreTests.cs` (the checklist definition of a project, its compare-and-set change by the
 hash of the stored text, and the race of two writers), and `ReviewDueDateStoreTests.cs` (the due date of a review and
@@ -64,6 +65,11 @@ be loadable on the test platform.
   administrator with the rule `LastProjectAdmin`, stores nothing and no audit entry for the refusal, does not count a
   disabled administrator as the other one, lets exactly one of two administrators who remove each other at the same
   time succeed, and applies the same change without the check when it is not told to require one.
+- The slots of a user are listed as primary and as alternate with the project, the review, the title, the slot, and the
+  role, ordered by project, review, and slot, without the slots of other users and with none for a user without a slot;
+  the projects a user alone administers are listed by name, without a project that has another enabled administrator,
+  counting neither a disabled administrator nor an ordinary member as another administrator, and with none for a
+  disabled or unknown user.
 - A new project has the default evidence settings; a change of the settings is stored for its own project only, is read
   back with the project, and is stored with one audit entry of the project whose chain verifies; a change that names
   settings which are no longer stored, and a change of an unknown project, change nothing and write no entry.
@@ -328,6 +334,28 @@ tested by `ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnles
 **ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused**: The other administrator is disabled, so the
 removal of the remaining one with the check required throws `LastProjectAdmin` and both memberships remain. This
 scenario is tested by `ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused`.
+
+**ReviewStore_ListSlotsOfUserAsync_PrimaryAndAlternate_AreFoundInOrder**: `ann` is primary of a slot of Apollo/r2 and of
+Gemini/g1 and alternate of Apollo/r1; a slot of Apollo/r3 is `bob`'s alone. The call lists the three slots of `ann`
+ordered by project, review, and slot with the project name, the title, the slot identity, and the role, and not the
+slot of `bob`.
+This scenario is tested by `ReviewStore_ListSlotsOfUserAsync_PrimaryAndAlternate_AreFoundInOrder`.
+
+**ReviewStore_ListSlotsOfUserAsync_NoSlot_IsEmpty**: A user without a slot and an unknown identity give an empty list.
+This scenario is tested by `ReviewStore_ListSlotsOfUserAsync_NoSlot_IsEmpty`.
+
+**ReviewStore_ListSoleAdminProjectsAsync_OnlyEnabledAdministrator_IsFound**: `ann` alone administers Gemini and Apollo,
+is a plain member of Borealis, and shares Cygnus with another enabled administrator. Only Apollo and Gemini are listed,
+in that order. This scenario is tested by `ReviewStore_ListSoleAdminProjectsAsync_OnlyEnabledAdministrator_IsFound`.
+
+**ReviewStore_ListSoleAdminProjectsAsync_DisabledOrOrdinaryOthers_DoNotCount**: A project whose other administrator is
+disabled and a project whose other member is an ordinary member are both listed for `ann`; the disabled administrator
+of a third project is not listed for that administrator, and an ordinary member and an unknown identity get an empty
+list. This scenario is tested by `ReviewStore_ListSoleAdminProjectsAsync_DisabledOrOrdinaryOthers_DoNotCount`.
+
+**DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes**: A new database has the indexes on the
+primary and the alternate user of the reviewer slots that the read of the slots of a user relies on. This scenario is
+defined in the `DatabaseSetup` unit and is tested by `DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`.
 
 **ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings**: A project is stored without other settings; it
 is read back with the default evidence settings (the two anonymous switches off and the five content switches on). This

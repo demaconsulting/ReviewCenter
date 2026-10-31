@@ -266,6 +266,24 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Lists the projects in which a user is the only enabled project administrator.
+    /// </summary>
+    /// <remarks>
+    ///     The user counts only while enabled, and only other enabled project administrators count as "another"
+    ///     administrator; this is the same rule the last-administrator check of the membership changes uses. A system
+    ///     administrator who is not a member does not count as a project administrator.
+    /// </remarks>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The projects ordered by name and then identity; empty when the user is not an enabled project administrator
+    ///     anywhere or every such project has another enabled project administrator.
+    /// </returns>
+    Task<IReadOnlyList<Project>> ListSoleAdminProjectsAsync(
+        int userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Reports whether a review with the given id exists in a project.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
@@ -532,6 +550,25 @@ public interface IReviewStore
     Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
         int projectId,
         string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the reviewer slots in which a user is the primary or the alternate reviewer, across all projects,
+    ///     with the review and project they belong to.
+    /// </summary>
+    /// <remarks>
+    ///     This is the candidate list for the open work of a user: whether a slot still needs the user depends on the
+    ///     signatures and the record digest, so the caller decides that from the snapshot of the review. The read
+    ///     uses the slot indexes on the primary and the alternate user and loads no review content. A slot in which
+    ///     the user is both primary and alternate is listed once, as primary.
+    /// </remarks>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The slots ordered by project, review identifier and slot identity; empty when the user holds no slot.
+    /// </returns>
+    Task<IReadOnlyList<UserReviewSlot>> ListSlotsOfUserAsync(
+        int userId,
         CancellationToken cancellationToken = default);
 
     /// <summary>

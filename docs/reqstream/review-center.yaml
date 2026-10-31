@@ -754,16 +754,18 @@ sections:
           The tool shall let a system administrator list the users and create a user, make a user a system
           administrator or an ordinary user, enable and disable a user, and set a password, let every user change
           the own password, require a password of 12 to 128 characters, lock a user out for 5 minutes after 5
-          failed sign-ins in a row, never disable or demote the last enabled system administrator, and keep the
-          users, with only a hash of the password, in the database across restarts.
+          failed sign-ins in a row, never disable or demote the last enabled system administrator, tell an
+          administrator which open review work and which projects depend on a user, and keep the users, with only
+          a hash of the password, in the database across restarts.
         tags: [system]
         justification: |
           Users are the accountable parties of a review. A password policy and a lockout make guessing hard (21
           CFR Part 11 section 11.300(d), safeguards against unauthorized use), the rule for the last system
-          administrator keeps the system manageable, and a password hash means a copy of the database does not
-          reveal the passwords.
+          administrator keeps the system manageable, the impact of a user shows what an offboarding leaves
+          behind, and a password hash means a copy of the database does not reveal the passwords.
         children:
           - ReviewCenter-Core-Users
+          - ReviewCenter-Core-UserImpact
           - ReviewCenter-Storage-Users
           - ReviewCenter-Web-SignIn
         tests:

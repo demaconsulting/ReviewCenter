@@ -94,6 +94,7 @@ This document covers the verification design for the following software items:
     - **ReviewPlanner** — review planning from review-sets, baselines, and fallbacks
     - **PersonalAccessTokenService** — personal access token rules
     - **InboxService** — inbox of a user, read state, and the unread rules
+    - **UserImpactService** — open review work and sole administrator projects of a user who may leave
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface
