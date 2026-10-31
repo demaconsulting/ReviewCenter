@@ -11,7 +11,9 @@ the same time), `EvidenceSettingsStoreTests.cs` (the evidence settings of a proj
 change), and `ProjectChecklistStoreTests.cs` (the checklist definition of a project, its compare-and-set change by the
 hash of the stored text, and the race of two writers), `ReviewDueDateStoreTests.cs` (the due date of a review and
 its compare-and-set change), `ReviewStoreReviewConclusionTextTests.cs` (the review conclusion text of a review, its
-compare-and-set change, and the approval lock), and `ReviewStoreRecordContentTests.cs` (the included comments, the
+compare-and-set change, and the approval lock), `ReviewStoreBallotTests.cs` (the ballots of the reviewer slots, their
+hand-in, and their seeding, reassignment, and removal with the slots), and `ReviewStoreRecordContentTests.cs`
+(the included comments, the
 resolution notes, the
 kind of a thread, the report flag of a comment, and the open-thread rule of the signature). The tests use the real
 store over a real
@@ -113,6 +115,13 @@ be loadable on the test platform.
   the stored date that is stored with one audit entry of the review (the chain verifies), a date that is not the
   stored one or an unknown review reports `false` and changes nothing and writes no entry, and of two writers that start
   from the same date exactly one succeeds. An approved review refuses the change with `ReviewLocked`.
+- The answers and section states of a slot are stored as that slot's ballot (a draft or handed-in status row), apart from
+  the rows of other slots and from the review-level rows, which the older methods, the listings, the record, and its
+  digest still use alone; the identity 0 is never a slot; a concluded review, an unknown slot, and an incomplete
+  hand-in are refused without a row or an entry; a hand-in is a compare-and-set, an edit reverts a handed-in ballot, and
+  a single-slot review hands in a complete ballot by itself, each with one audit entry that holds the slot number and
+  counts only; a slot added to a follow-up review is seeded with the carried rows, a reassignment removes the rows of
+  the departed reviewers, a removal removes all rows (a signed slot is refused and rolled back), and the chain verifies.
 
 #### Test Scenarios
 
@@ -604,6 +613,109 @@ reports `false` and writes no entry. This scenario is tested by
 **ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked**: A change of a review that is
 concluded at that moment is refused with `ReviewLocked`; nothing is stored and no entry is written. This scenario is
 tested by `ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked`.
+
+**The ballots** are verified in `ReviewStoreBallotTests.cs` against a real SQLite database file, with the real
+`AuditAppender`. Only the new ballot methods and the slot methods read and write the rows of a slot; the older methods and
+the record keep the review-level rows (slot identity 0).
+
+**ReviewStore_SetBallotAnswerAsync_FirstAnswer_CreatesDraftBallot**: The first answer of a slot creates a draft ballot
+with the answer and the supplied audit entry. This scenario is tested by
+`ReviewStore_SetBallotAnswerAsync_FirstAnswer_CreatesDraftBallot`.
+
+**ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot**: The same check answered in two slots is
+stored as two rows, one in each ballot. This scenario is tested by
+`ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot`.
+
+**ReviewStore_SetBallotAnswerAsync_SameSlotAgain_ReplacesTheAnswer**: A second answer to the same check in the same slot
+replaces the first. This scenario is tested by `ReviewStore_SetBallotAnswerAsync_SameSlotAgain_ReplacesTheAnswer`.
+
+**ReviewStore_SetBallotAnswerAsync_UnknownOrForeignSlot_ThrowsSlotNotFound**: A slot that does not exist or belongs to
+another review is refused with `SlotNotFound` and nothing is stored. This scenario is tested by
+`ReviewStore_SetBallotAnswerAsync_UnknownOrForeignSlot_ThrowsSlotNotFound`.
+
+**ReviewStore_SetBallotAnswerAsync_BaselineSlotId_IsRefused**: The identity 0 is refused by the ballot methods and the
+review-level rows are unchanged. This scenario is tested by `ReviewStore_SetBallotAnswerAsync_BaselineSlotId_IsRefused`.
+
+**ReviewStore_SetBallotAnswerAsync_ConcludedReview_ThrowsReviewLocked**: A concluded review refuses a ballot edit with
+`ReviewLocked` and keeps the ballot and the audit trail as they were. This scenario is tested by
+`ReviewStore_SetBallotAnswerAsync_ConcludedReview_ThrowsReviewLocked`.
+
+**ReviewStore_SetBallotSectionStateAsync_PerSlotRows_RoundTrip**: The section states of two slots are kept apart and
+read back with every column. This scenario is tested by `ReviewStore_SetBallotSectionStateAsync_PerSlotRows_RoundTrip`.
+
+**ReviewStore_ListBallotsAsync_TwoSlots_ReturnsOwnRowsInSlotOrder**: The listing returns each ballot with its own rows
+in the order of the slots. This scenario is tested by
+`ReviewStore_ListBallotsAsync_TwoSlots_ReturnsOwnRowsInSlotOrder`.
+
+**ReviewStore_GetBallotAsync_NotStartedSlot_ReturnsNull**: A slot without a ballot, and a slot that does not exist, read
+as no ballot. This scenario is tested by `ReviewStore_GetBallotAsync_NotStartedSlot_ReturnsNull`.
+
+**ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows**: The review-level listings return the
+review-level rows only. This scenario is tested by
+`ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows`.
+
+**ReviewStore_GetRecordAsync_BallotRows_DoNotChangeTheRecordOrItsDigest**: Ballot rows and statuses change neither the
+record nor its digest. This scenario is tested by
+`ReviewStore_GetRecordAsync_BallotRows_DoNotChangeTheRecordOrItsDigest`.
+
+**ReviewStore_SetBallotAnswerAsync_SubmittedBallot_RevertsToDraftWithAudit**: An edit of a handed-in ballot makes it a
+draft again and records `ballot.reopened` with the slot number only. This scenario is tested by
+`ReviewStore_SetBallotAnswerAsync_SubmittedBallot_RevertsToDraftWithAudit`.
+
+**ReviewStore_SetBallotAnswerAsync_SingleSlotCompleteBallot_AutoSubmitsWithAudit**: In a review with one slot a complete
+ballot is handed in by the edit, with the time and user of the edit and a `ballot.submitted` entry. This scenario is
+tested by `ReviewStore_SetBallotAnswerAsync_SingleSlotCompleteBallot_AutoSubmitsWithAudit`.
+
+**ReviewStore_SetBallotAnswerAsync_SingleSlotSubmittedBallotEdited_StaysSubmittedWithoutTransitionAudit**: An edit of a
+handed-in single-slot ballot with a complete result keeps it handed in and adds no transition entry. This scenario is
+tested by `ReviewStore_SetBallotAnswerAsync_SingleSlotSubmittedBallotEdited_StaysSubmittedWithoutTransitionAudit`.
+
+**ReviewStore_SetBallotAnswerAsync_TwoSlots_NeverAutoSubmits**: With two slots an edit never hands in a ballot. This
+scenario is tested by `ReviewStore_SetBallotAnswerAsync_TwoSlots_NeverAutoSubmits`.
+
+**ReviewStore_SubmitBallotAsync_CompleteDraft_SubmitsWithAudit**: A complete draft is handed in with the time and user
+and the supplied audit entry. This scenario is tested by `ReviewStore_SubmitBallotAsync_CompleteDraft_SubmitsWithAudit`.
+
+**ReviewStore_SubmitBallotAsync_IncompleteBallot_ThrowsBallotIncompleteAndStoresNothing**: An incomplete ballot is
+refused with `BallotIncomplete`, stays a draft, and writes no entry. This scenario is tested by
+`ReviewStore_SubmitBallotAsync_IncompleteBallot_ThrowsBallotIncompleteAndStoresNothing`.
+
+**ReviewStore_SubmitBallotAsync_AlreadySubmitted_ReturnsBallotWithoutAudit**: Handing in twice is a compare-and-set that
+does nothing the second time: no write, no entry. This scenario is tested by
+`ReviewStore_SubmitBallotAsync_AlreadySubmitted_ReturnsBallotWithoutAudit`.
+
+**ReviewStore_SubmitBallotAsync_NoBallotAndNothingToAnswer_StoresSubmittedBallot**: A slot without any row hands in an
+empty ballot when nothing needs an answer. This scenario is tested by
+`ReviewStore_SubmitBallotAsync_NoBallotAndNothingToAnswer_StoresSubmittedBallot`.
+
+**ReviewStore_AddSlotAsync_FollowUpBaseline_SeedsDraftBallotWithCarriedRows**: A slot added to a follow-up review starts
+from a draft ballot with copies of the carried rows. This scenario is tested by
+`ReviewStore_AddSlotAsync_FollowUpBaseline_SeedsDraftBallotWithCarriedRows`.
+
+**ReviewStore_AddSlotAsync_NoBaseline_CreatesNoBallot**: A slot added to a review without carried rows creates no
+ballot. This scenario is tested by `ReviewStore_AddSlotAsync_NoBaseline_CreatesNoBallot`.
+
+**ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft**: A reviewer who leaves a slot takes the
+rows along, a handed-in ballot becomes a draft, and `ballot.reassigned` records the counts only. This scenario is
+tested by `ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft`.
+
+**ReviewStore_UpdateSlotAsync_CarriedRowsOfDepartingUser_AreKept**: The rows carried from an earlier review stay when the
+reviewer named on them leaves. This scenario is tested by
+`ReviewStore_UpdateSlotAsync_CarriedRowsOfDepartingUser_AreKept`.
+
+**ReviewStore_UpdateSlotAsync_RoleSwapOnly_KeepsBallot**: A role swap keeps a handed-in ballot and records no ballot
+entry. This scenario is tested by `ReviewStore_UpdateSlotAsync_RoleSwapOnly_KeepsBallot`.
+
+**ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows**: Removing a slot deletes its answers, section states,
+and status and leaves the other slots alone. This scenario is tested by
+`ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows`.
+
+**ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedAndKeepsBallotRows**: The database refuses to remove a signed slot and
+the refusal rolls the deletion of the rows back. This scenario is tested by
+`ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedAndKeepsBallotRows`.
+
+**ReviewStore_BallotTransitions_KeepTheAuditChainIntact**: A run of edits, hand-ins, reopens, reassignments, and removals
+keeps the audit chain verifiable. This scenario is tested by `ReviewStore_BallotTransitions_KeepTheAuditChainIntact`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

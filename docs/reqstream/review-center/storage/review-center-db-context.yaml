@@ -165,6 +165,22 @@ sections:
         tests:
           - ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional
 
+      - id: ReviewCenter-DbContext-Ballots
+        title: >-
+          The ReviewCenterDbContext class shall map the answers and the section states with the reviewer slot in their
+          key (the identity 0 for the review-level rows) and a ballot status row for each slot, keyed by project, review
+          and slot, that holds the status and the time and the user name of the hand-in, and that is deleted together
+          with its review or its slot. The schema is created from the model without a migration, so a development
+          database that was created before the tables changed has to be recreated.
+        justification: |
+          Each reviewer's answer is a row of its own, so the slot is part of the key. The status row follows the life of
+          its review and slot so that no ballot can outlive them. The schema is created from the model and not migrated
+          while the product is not released, so development databases are recreated.
+        tests:
+          - ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot
+          - ReviewStore_SetBallotSectionStateAsync_PerSlotRows_RoundTrip
+          - ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows
+
       - id: ReviewCenter-DbContext-FollowUp
         title: >-
           The ReviewCenterDbContext class shall map the review that a review follows, with the numbers of answers and

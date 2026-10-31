@@ -834,6 +834,7 @@ reviews:
       - "docs/verification/review-center/core.md"
       - "test/**/Core/CoreSubsystemTests.cs"
       - "test/**/Core/FakeReviewStore.cs"
+      - "test/**/Core/FakeReviewStoreBallotTests.cs"
       - "test/**/Core/FakeUserStore.cs"
       - "test/**/Core/FakeAuditStore.cs"
       - "test/**/Core/FakeRepositoryStore.cs"
@@ -1027,6 +1028,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewChecklist.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistSectionState.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistAnswer.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistBallot.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistOutcome.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistProgress.cs"
       - "test/**/Core/ChecklistServiceTests.cs"
@@ -1401,6 +1403,7 @@ reviews:
       - "test/**/Storage/ProjectChecklistStoreTests.cs"
       - "test/**/Storage/ReviewDueDateStoreTests.cs"
       - "test/**/Storage/ReviewStoreReviewConclusionTextTests.cs"
+      - "test/**/Storage/ReviewStoreBallotTests.cs"
       - "test/**/Storage/ReviewFollowUpStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 

@@ -70,16 +70,25 @@ repository registry is the one exception, see `Repositories`).
 - **ReviewChecklists** (`ReviewChecklist`): key `ProjectId` plus `ReviewId`, one frozen snapshot per review.
   `Version` is required, at most 64; `Definition` is required text (the JSON of the checklist). It belongs to its
   review (a one-to-one relationship, so the snapshot is saved with the review) and is deleted with it.
-- **ChecklistSectionStates** (`ChecklistSectionState`): key `ProjectId`, `ReviewId`, and `SectionId` (at most 32),
-  so a review has at most one state per section. `Applicable`; `Reason` at most 2000; `SetBy` (the display name) is
+- **ChecklistSectionStates** (`ChecklistSectionState`): key `ProjectId`, `ReviewId`, `SlotId`, and `SectionId` (at most
+  32), so a review has at most one state per section and slot. `SlotId` is 0 (`ChecklistAnswer.BaselineSlotId`) for the
+  review-level rows that the record is built from, and the identity of a reviewer slot for the rows of its ballot; it
+  is a plain column without a foreign key, so the store deletes the rows of a removed slot itself. `Applicable`;
+  `Reason` at most 2000; `SetBy` (the display name) is
   required, at most 100; `SetByUsername` is required, at most 50; `SetAt`; `CarriedFromReviewId` (at most 100, null
   unless the state was carried into a follow-up review). It belongs to a review and is deleted
   with it.
-- **ChecklistAnswers** (`ChecklistAnswer`): key `ProjectId`, `ReviewId`, and `ItemId` (at most 32), so a check has at
-  most one answer. `Outcome` is stored as text, at most 32; `Justification` at most 2000; `AnsweredBy` (the display
+- **ChecklistAnswers** (`ChecklistAnswer`): key `ProjectId`, `ReviewId`, `SlotId`, and `ItemId` (at most 32), so a check
+  has at most one answer per slot (`SlotId` as for the section states). `Outcome` is stored as text, at most 32;
+  `Justification` at most 2000; `AnsweredBy` (the display
   name) is required, at most 100; `AnsweredByUsername` is required, at most 50; `AnsweredAt`; `CarriedFromReviewId`
   (at most 100, null unless the answer was carried into a follow-up review). It belongs to a review
   and is deleted with it.
+- **ChecklistBallots** (`ChecklistBallot`): key `ProjectId`, `ReviewId`, and `SlotId`, one status row for each reviewer
+  slot that started a ballot (no row means not started; slot 0 never has one). `Status` is stored as text, at most 32
+  (`Draft` or `Submitted`); `SubmittedAt` and `SubmittedByUsername` (at most 50) are set for a submitted ballot and null
+  for a draft. The row is deleted with its review and with its slot (cascade), and an index on `SlotId` serves the
+  cascade.
 - **Users** (`User`): key `Id`, assigned by the database. `Username` is required, at most 50, with the
   case-insensitive collation of SQLite and a unique index, so a user name is unique without regard to case and a
   lookup by user name

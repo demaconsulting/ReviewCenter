@@ -50,15 +50,23 @@ the strict rules apply only where a definition enters the system or is taken for
 **ReviewChecklist**: the frozen copy stored for a review: `ProjectId`, `ReviewId`, `Version`, and `Definition`
 (the JSON text of the definition). `Parse` returns the definition.
 
-**ChecklistSectionState**: whether a section applies to a review: `ProjectId`, `ReviewId`, `SectionId`,
+**ChecklistSectionState**: whether a section applies to a review: `ProjectId`, `ReviewId`, `SlotId`, `SectionId`,
 `Applicable`, `Reason`, `SetBy` (the display name of the person at that time), `SetByUsername` (the user name), and
 `SetAt` (UTC), and `CarriedFromReviewId` (the identifier of the earlier review the state was carried over from when the
-review was created as a follow-up, otherwise null; see `ReviewService`). A section without a row applies.
+review was created as a follow-up, otherwise null; see `ReviewService`). A section without a row applies. `SlotId` is 0
+(`ChecklistAnswer.BaselineSlotId`) for the review-level rows that the record is built from, and the identity of a
+reviewer slot for the rows of that slot's ballot.
 
-**ChecklistAnswer**: the answer to one check: `ProjectId`, `ReviewId`, `ItemId`, `Outcome`, `Justification`,
+**ChecklistAnswer**: the answer to one check: `ProjectId`, `ReviewId`, `SlotId`, `ItemId`, `Outcome`, `Justification`,
 `AnsweredBy` (the display name of the person at that time), `AnsweredByUsername` (the user name), `AnsweredAt`
 (UTC), and `CarriedFromReviewId` (the earlier review the answer was carried over from, otherwise null; a carried
-answer keeps the original answerer and time). A check has at most one answer; answering again replaces it.
+answer keeps the original answerer and time). A check has at most one answer per slot; answering again replaces it.
+`SlotId` is 0 (`BaselineSlotId`) for the review-level answers; the services keep reading and writing only those.
+
+**ChecklistBallot**: the status of the ballot of one reviewer slot: `ProjectId`, `ReviewId`, `SlotId` (always above 0),
+`Status` (`BallotStatus`: `Draft` or `Submitted`), and, for a submitted ballot, `SubmittedAt` (UTC) and
+`SubmittedByUsername`. A slot without a row has not started a ballot. The type is stored by `ReviewStore` and is not
+yet used by a service.
 
 **ChecklistOutcome**: a closed enumeration with the values `Pass`, `Fail`, and `NotApplicable` (shown as N/A). It
 is stored as text.

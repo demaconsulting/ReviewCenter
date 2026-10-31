@@ -636,6 +636,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`             |
 | Threads   | `thread.kind-changed`, `thread.comment-report-changed` (promote, demote, include)    |
 | Checklist | `checklist.answered`, `checklist.applicability-changed`                              |
+| Ballots   | `ballot.submitted`, `ballot.reopened`, `ballot.reassigned` (slot and counts only)    |
 | Users     | `user.created`, `user.enabled`, `user.disabled`, `user.admin-changed`                |
 | Users     | `user.unlocked` (a system administrator ended the lockout of a user)                 |
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                |

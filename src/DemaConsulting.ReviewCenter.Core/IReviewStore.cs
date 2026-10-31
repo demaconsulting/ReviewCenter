@@ -36,12 +36,20 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The methods that change reviewed content (<see cref="AddThreadAsync"/>, <see cref="AddCommentAsync"/>,
 ///     <see cref="ReopenThreadAsync"/>, <see cref="ResolveThreadAsync"/>, <see cref="SetThreadKindAsync"/>,
 ///     <see cref="SetCommentReportAsync"/>, <see cref="SetChecklistSectionStateAsync"/>,
-///     <see cref="SetChecklistAnswerAsync"/>,
+///     <see cref="SetChecklistAnswerAsync"/>, <see cref="SetBallotAnswerAsync"/>, <see cref="SetBallotSectionStateAsync"/>,
+///     <see cref="SubmitBallotAsync"/>,
 ///     <see cref="AddSlotAsync"/>, <see cref="UpdateSlotAsync"/>, <see cref="RemoveSlotAsync"/> and, for the same reason of
 ///     "concluded means nothing changes", <see cref="UpdateDueDateAsync"/> and <see cref="UpdateReviewConclusionTextAsync"/>) must also refuse with
 ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded (see <see cref="ReviewLock"/>), checked inside
 ///     the same transaction as the change, so a signature that completes the conclusion at the same moment cannot be
 ///     overtaken by a change; nothing is stored then.
+///     The checklist answers and section states are held per reviewer slot: the legacy list and set methods
+///     (<see cref="ListChecklistAnswersAsync"/>, <see cref="ListChecklistSectionStatesAsync"/>,
+///     <see cref="SetChecklistAnswerAsync"/>, <see cref="SetChecklistSectionStateAsync"/>) and the record see only the
+///     review-level rows (<see cref="ChecklistAnswer.BaselineSlotId"/>), while the ballot methods
+///     (<see cref="ListBallotsAsync"/>, <see cref="GetBallotAsync"/>, <see cref="SetBallotAnswerAsync"/>,
+///     <see cref="SetBallotSectionStateAsync"/>, <see cref="SubmitBallotAsync"/>) work on the rows of one slot and
+///     never touch the review-level rows.
 /// </remarks>
 public interface IReviewStore
 {
@@ -586,8 +594,12 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Lists the stored applicability of the checklist sections of a review.
+    ///     Lists the stored review-level applicability of the checklist sections of a review.
     /// </summary>
+    /// <remarks>
+    ///     Only the rows with <see cref="ChecklistSectionState.SlotId"/> equal to <see cref="ChecklistAnswer.BaselineSlotId"/>
+    ///     are listed; the states of a ballot are read with <see cref="ListBallotsAsync"/>.
+    /// </remarks>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -598,8 +610,12 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Lists the stored checklist answers of a review.
+    ///     Lists the stored review-level checklist answers of a review.
     /// </summary>
+    /// <remarks>
+    ///     Only the rows with <see cref="ChecklistAnswer.SlotId"/> equal to <see cref="ChecklistAnswer.BaselineSlotId"/>
+    ///     are listed; the answers of a ballot are read with <see cref="ListBallotsAsync"/>.
+    /// </remarks>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -610,27 +626,171 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Stores the applicability of a checklist section, replacing an earlier one.
+    ///     Stores the review-level applicability of a checklist section, replacing an earlier one.
     /// </summary>
-    /// <param name="state">The state to store. Must not be null; the review must exist.</param>
+    /// <param name="state">
+    ///     The state to store. Must not be null; the review must exist; its <see cref="ChecklistSectionState.SlotId"/>
+    ///     must be <see cref="ChecklistAnswer.BaselineSlotId"/>.
+    /// </param>
     /// <param name="audit">The audit draft of the change.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the state is stored.</returns>
+    /// <exception cref="ArgumentException">
+    ///     Thrown when the state belongs to a slot; ballot rows are written with <see cref="SetBallotSectionStateAsync"/>.
+    /// </exception>
     Task SetChecklistSectionStateAsync(
         ChecklistSectionState state,
         AuditDraft audit,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Stores the answer to a checklist check, replacing an earlier answer.
+    ///     Stores the review-level answer to a checklist check, replacing an earlier answer.
     /// </summary>
-    /// <param name="answer">The answer to store. Must not be null; the review must exist.</param>
+    /// <param name="answer">
+    ///     The answer to store. Must not be null; the review must exist; its <see cref="ChecklistAnswer.SlotId"/> must be
+    ///     <see cref="ChecklistAnswer.BaselineSlotId"/>.
+    /// </param>
     /// <param name="audit">The audit draft of the change.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the answer is stored.</returns>
+    /// <exception cref="ArgumentException">
+    ///     Thrown when the answer belongs to a slot; ballot rows are written with <see cref="SetBallotAnswerAsync"/>.
+    /// </exception>
     Task SetChecklistAnswerAsync(
         ChecklistAnswer answer,
         AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the stored ballots of a review, drafts and submitted ones, each with its answers and section states.
+    /// </summary>
+    /// <remarks>
+    ///     Nothing is masked here: hiding the content of other reviewers' drafts is the duty of the caller. A slot
+    ///     that was never started has no ballot and is not listed. The read uses a constant number of queries.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ballots ordered by slot identity (creation order of the slots); empty when there are none.</returns>
+    Task<IReadOnlyList<Ballot>> ListBallotsAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Reads the ballot of one reviewer slot.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ballot, or <c>null</c> when the slot has none (never started, or no such slot).</returns>
+    Task<Ballot?> GetBallotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Stores an answer in the ballot of a reviewer slot, replacing an earlier answer to the same check.
+    /// </summary>
+    /// <remarks>
+    ///     The change, the status of the ballot and the audit entries are one transaction. A ballot that does not exist
+    ///     is created as a draft, and an edit of a submitted ballot makes it a draft again, so the ballot leaves the
+    ///     consolidated record until it is handed in again. When the review has exactly one slot and
+    ///     <paramref name="completesBallot"/> returns <c>true</c> for the ballot as it now is, the ballot is submitted
+    ///     in the same transaction (the single-slot flow has no separate submit step). The audit entry
+    ///     <paramref name="audit"/> is recorded first; when the status of the ballot ends up different from before the
+    ///     call, a second entry follows (<c>ballot.reopened</c> for submitted to draft, <c>ballot.submitted</c> for an
+    ///     automatic submit). A submitted ballot that is edited and automatically submitted again is no net change and
+    ///     adds no second entry. The entries name the 1-based slot number and counts, never answers or reasons. The
+    ///     store does not check who owns the slot or the checklist definition; the service does.
+    /// </remarks>
+    /// <param name="answer">
+    ///     The answer to store. Must not be null; <see cref="ChecklistAnswer.SlotId"/> must be greater than 0 and name a
+    ///     slot of the review.
+    /// </param>
+    /// <param name="audit">The audit draft of the change (the second entry copies its actor, project and review).</param>
+    /// <param name="completesBallot">
+    ///     Tells whether a ballot is complete; evaluated only when the review has exactly one slot. <c>null</c> turns
+    ///     the automatic submit off.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ballot as stored after the change.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the slot identity of the answer is 0 or negative.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded and with
+    ///     <see cref="DomainRule.SlotNotFound"/> when the slot is not part of the review; nothing is stored then.
+    /// </exception>
+    Task<Ballot> SetBallotAnswerAsync(
+        ChecklistAnswer answer,
+        AuditDraft audit,
+        Func<Ballot, bool>? completesBallot,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Stores a section state in the ballot of a reviewer slot, replacing an earlier state of the same section.
+    /// </summary>
+    /// <remarks>
+    ///     Works exactly like <see cref="SetBallotAnswerAsync"/> (draft creation, revert of a submitted ballot, automatic
+    ///     submit of a one-slot review, audit entries); the automatic submit is stamped with <see cref="ChecklistSectionState.SetAt"/>
+    ///     and <see cref="ChecklistSectionState.SetByUsername"/>.
+    /// </remarks>
+    /// <param name="state">
+    ///     The state to store. Must not be null; <see cref="ChecklistSectionState.SlotId"/> must be greater than 0 and
+    ///     name a slot of the review.
+    /// </param>
+    /// <param name="audit">The audit draft of the change (the second entry copies its actor, project and review).</param>
+    /// <param name="completesBallot">
+    ///     Tells whether a ballot is complete; evaluated only when the review has exactly one slot. <c>null</c> turns
+    ///     the automatic submit off.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ballot as stored after the change.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the slot identity of the state is 0 or negative.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded and with
+    ///     <see cref="DomainRule.SlotNotFound"/> when the slot is not part of the review; nothing is stored then.
+    /// </exception>
+    Task<Ballot> SetBallotSectionStateAsync(
+        ChecklistSectionState state,
+        AuditDraft audit,
+        Func<Ballot, bool>? completesBallot,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Hands in the ballot of a reviewer slot (compare-and-set from draft to submitted).
+    /// </summary>
+    /// <remarks>
+    ///     The completeness test runs inside the write transaction on the rows read there, so an edit that arrives
+    ///     between the caller's own read and the submit cannot slip an incomplete ballot into the record. A ballot that is
+    ///     already submitted is returned as it is, without a write or an audit entry (a double click is harmless). A slot
+    ///     without a ballot counts as an empty one, which a checklist without checks accepts.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity; must be greater than 0 and name a slot of the review.</param>
+    /// <param name="submittedAt">The moment of the submit (UTC).</param>
+    /// <param name="submittedByUsername">The user name of the person who hands the ballot in.</param>
+    /// <param name="audit">The audit draft of the submit; recorded only when the ballot was handed in by this call.</param>
+    /// <param name="isComplete">Tells whether a ballot is complete (normally against the checklist of the review).</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The submitted ballot.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="slotId"/> is 0 or negative.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded, with
+    ///     <see cref="DomainRule.SlotNotFound"/> when the slot is not part of the review, and with
+    ///     <see cref="DomainRule.BallotIncomplete"/> when <paramref name="isComplete"/> returns <c>false</c>; nothing is
+    ///     stored then.
+    /// </exception>
+    Task<Ballot> SubmitBallotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        DateTimeOffset submittedAt,
+        string submittedByUsername,
+        AuditDraft audit,
+        Func<Ballot, bool> isComplete,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -703,6 +863,12 @@ public interface IReviewStore
     /// <summary>
     ///     Stores a new reviewer slot and assigns its identity.
     /// </summary>
+    /// <remarks>
+    ///     When the review has carried review-level rows (a follow-up review, see
+    ///     <see cref="ChecklistAnswer.CarriedFromReviewId"/>), they are copied into rows of the new slot and a draft ballot
+    ///     is stored for it, in the same transaction; a carried answer never submits a ballot. A review without carried
+    ///     rows gets no ballot. The carry is recorded by the audit entry of the review, so no entry is added for it.
+    /// </remarks>
     /// <param name="slot">The slot to store. Must not be null; its <see cref="ReviewerSlot.Id"/> is ignored and the review must exist.</param>
     /// <param name="audit">Builds the audit draft from the stored slot (so the draft can name the assigned identity). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -715,6 +881,13 @@ public interface IReviewStore
     /// <summary>
     ///     Changes the primary and alternate reviewer of a slot.
     /// </summary>
+    /// <remarks>
+    ///     A reviewer who leaves the slot (the old primary or alternate who is neither of the new ones) takes the
+    ///     contribution to the ballot along: the answers and section states of the slot's ballot that this reviewer gave
+    ///     (never the ones carried from an earlier review) are removed, the ballot becomes a draft, and the entry
+    ///     <c>ballot.reassigned</c> follows the supplied one, all in the same transaction. A swap of the roles or an added
+    ///     alternate leaves the ballot untouched.
+    /// </remarks>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="slotId">The slot identity; the slot must belong to the given review.</param>
@@ -743,7 +916,8 @@ public interface IReviewStore
     /// <returns><c>true</c> when the slot existed and was removed; otherwise <c>false</c>.</returns>
     /// <remarks>
     ///     A slot that has a signature cannot be removed; the store refuses with a database error. The service
-    ///     checks first and gives the operator a clear message.
+    ///     checks first and gives the operator a clear message. The answers, section states and ballot of the slot
+    ///     are removed in the same transaction, so the refusal for a signed slot leaves them in place.
     /// </remarks>
     Task<bool> RemoveSlotAsync(
         int projectId,

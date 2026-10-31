@@ -105,7 +105,11 @@ sections:
           is stored with the review so that the questions never change under the answers.
         children:
           - ReviewCenter-ReviewStore-Checklist
+          - ReviewCenter-ReviewStore-Ballots
+          - ReviewCenter-ReviewStore-BallotSubmit
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle
           - ReviewCenter-DbContext-Checklist
+          - ReviewCenter-DbContext-Ballots
         tests:
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
 

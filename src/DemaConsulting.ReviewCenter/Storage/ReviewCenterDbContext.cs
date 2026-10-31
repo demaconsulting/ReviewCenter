@@ -148,6 +148,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<ChecklistAnswer> ChecklistAnswers => Set<ChecklistAnswer>();
 
     /// <summary>
+    ///     Gets the table of the ballot status rows, one per reviewer slot that has started a ballot.
+    /// </summary>
+    public DbSet<ChecklistBallot> ChecklistBallots => Set<ChecklistBallot>();
+
+    /// <summary>
     ///     Gets the users table.
     /// </summary>
     public DbSet<User> Users => Set<User>();
@@ -438,7 +443,9 @@ internal sealed class ReviewCenterDbContext : DbContext
         });
 
         // Checklists: one frozen snapshot per review, and the answers and section applicability keyed by the
-        // check or section identifier within it; all go away with the review
+        // reviewer slot (0 for the review-level baseline, which has no slot and so no foreign key to one) and the
+        // check or section identifier within it; all go away with the review, and the rows of a removed slot are
+        // deleted by the store
         modelBuilder.Entity<ReviewChecklist>(checklist =>
         {
             checklist.HasKey(c => new { c.ProjectId, c.ReviewId });
@@ -455,7 +462,7 @@ internal sealed class ReviewCenterDbContext : DbContext
 
         modelBuilder.Entity<ChecklistSectionState>(section =>
         {
-            section.HasKey(s => new { s.ProjectId, s.ReviewId, s.SectionId });
+            section.HasKey(s => new { s.ProjectId, s.ReviewId, s.SlotId, s.SectionId });
             section.Property(s => s.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             section.Property(s => s.SectionId).HasMaxLength(ChecklistIdColumnLength);
             section.Property(s => s.Reason).HasMaxLength(ReviewLimits.MaxJustificationLength);
@@ -470,7 +477,7 @@ internal sealed class ReviewCenterDbContext : DbContext
 
         modelBuilder.Entity<ChecklistAnswer>(answer =>
         {
-            answer.HasKey(a => new { a.ProjectId, a.ReviewId, a.ItemId });
+            answer.HasKey(a => new { a.ProjectId, a.ReviewId, a.SlotId, a.ItemId });
             answer.Property(a => a.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             answer.Property(a => a.ItemId).HasMaxLength(ChecklistIdColumnLength);
             answer.Property(a => a.Outcome).HasConversion<string>().HasMaxLength(StateColumnLength);
@@ -497,6 +504,25 @@ internal sealed class ReviewCenterDbContext : DbContext
             slot.HasOne<Review>()
                 .WithMany()
                 .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Ballot status: one row per reviewer slot that started a ballot (no row means not started). It goes away with
+        // the review or with the slot; a Submitted row carries who handed it in and when, a Draft row carries neither
+        modelBuilder.Entity<ChecklistBallot>(ballot =>
+        {
+            ballot.HasKey(b => new { b.ProjectId, b.ReviewId, b.SlotId });
+            ballot.Property(b => b.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            ballot.Property(b => b.Status).HasConversion<string>().HasMaxLength(StateColumnLength);
+            ballot.Property(b => b.SubmittedByUsername).HasMaxLength(ReviewLimits.MaxUsernameLength);
+            ballot.HasIndex(b => b.SlotId);
+            ballot.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(b => new { b.ProjectId, b.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
+            ballot.HasOne<ReviewerSlot>()
+                .WithMany()
+                .HasForeignKey(b => b.SlotId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -41,6 +41,12 @@ public sealed class ChecklistSectionState
     public string ReviewId { get; init; } = string.Empty;
 
     /// <summary>
+    ///     Gets the identity of the reviewer slot whose ballot holds the state, or
+    ///     <see cref="ChecklistAnswer.BaselineSlotId"/> (the default) for a review-level state.
+    /// </summary>
+    public int SlotId { get; init; } = ChecklistAnswer.BaselineSlotId;
+
+    /// <summary>
     ///     Gets the identifier of the section within the frozen checklist.
     /// </summary>
     public string SectionId { get; init; } = string.Empty;

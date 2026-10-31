@@ -31,6 +31,16 @@ namespace DemaConsulting.ReviewCenter.Core;
 public sealed class ChecklistAnswer
 {
     /// <summary>
+    ///     The value of <see cref="SlotId"/> for a review-level answer, one that belongs to no reviewer slot.
+    /// </summary>
+    /// <remarks>
+    ///     Today every answer is a review-level answer. Later, such a row is only the baseline that a follow-up review
+    ///     carries from the earlier review before any slot exists, and from which the ballot of a new slot is seeded.
+    ///     It is never a ballot, because no reviewer slot has the identity 0.
+    /// </remarks>
+    public const int BaselineSlotId = 0;
+
+    /// <summary>
     ///     Gets the identity of the owning project.
     /// </summary>
     public int ProjectId { get; init; }
@@ -39,6 +49,12 @@ public sealed class ChecklistAnswer
     ///     Gets the identifier of the owning review.
     /// </summary>
     public string ReviewId { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the identity of the reviewer slot whose ballot holds the answer, or <see cref="BaselineSlotId"/> (the
+    ///     default) for a review-level answer.
+    /// </summary>
+    public int SlotId { get; init; } = BaselineSlotId;
 
     /// <summary>
     ///     Gets the identifier of the check within the frozen checklist (for example <c>REQ-01</c>).

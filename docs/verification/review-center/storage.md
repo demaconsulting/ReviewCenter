@@ -216,6 +216,15 @@ review exists. They are tested by `ReviewStore_AddReviewAsync_FollowUp_RoundTrip
 `ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`, and
 `ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview`, all defined in `ReviewFollowUpStoreTests.cs`.
 
+**Ballots**: The answers and section states of a reviewer slot are stored as the ballot of that slot with a status row,
+apart from the review-level rows that the record uses; a hand-in is a compare-and-set that refuses an incomplete ballot;
+and the slot methods seed, reassign, and remove the ballot rows in their own transactions with one audit entry for each
+transition. They are tested by `ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot`,
+`ReviewStore_SubmitBallotAsync_CompleteDraft_SubmitsWithAudit`,
+`ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft`,
+`ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows`, and
+`ReviewStore_BallotTransitions_KeepTheAuditChainIntact`, all defined in `ReviewStoreBallotTests.cs`.
+
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by
 `AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain`. The public surface of the audit store has no

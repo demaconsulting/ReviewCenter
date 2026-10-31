@@ -32,7 +32,10 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     Each operation uses its own short-lived context from the factory, so the store is safe for
 ///     concurrent use by all browser sessions. Read operations are untracked, and listing a review
 ///     never loads file bytes. The checklist snapshot is stored in the same transaction as its review.
-///     Answers and section states are replaced in place (one row per check or section). Slots are plain rows.
+///     Answers and section states are replaced in place (one row per check or section and slot; the rows without a slot are
+///     the review-level rows the record is built from, the rows of a slot make its ballot). Ballot changes run in one
+///     transaction with the status row of the ballot and up to two audit entries (the change, then a status change of the
+///     ballot). Slots are plain rows.
 ///     Signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness
 ///     violation on the review key is translated to a <see cref="DomainRuleException"/> so callers see the same
 ///     error as for the service pre-check.
@@ -908,8 +911,10 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         CancellationToken cancellationToken = default)
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Only the review-level rows: the rows of a slot belong to its ballot
         return await context.ChecklistSectionStates.AsNoTracking()
-            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == ChecklistAnswer.BaselineSlotId)
             .ToListAsync(cancellationToken);
     }
 
@@ -920,8 +925,10 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         CancellationToken cancellationToken = default)
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Only the review-level rows: the rows of a slot belong to its ballot
         return await context.ChecklistAnswers.AsNoTracking()
-            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId)
+            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == ChecklistAnswer.BaselineSlotId)
             .ToListAsync(cancellationToken);
     }
 
@@ -934,6 +941,12 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(audit);
 
+        // A ballot row must go through the ballot rules (status, audit), so it cannot enter by this door
+        if (state.SlotId != ChecklistAnswer.BaselineSlotId)
+        {
+            throw new ArgumentException("A section state of a ballot is stored with SetBallotSectionStateAsync.", nameof(state));
+        }
+
         // Replace the row when there is one; otherwise insert it. The write lock is held for the whole
         // transaction, so no other request can insert the row between the update and the insert
         await appender.ExecuteAsync<bool>(
@@ -941,12 +954,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             async context =>
             {
                 await EnsureNotLockedAsync(context, state.ProjectId, state.ReviewId, cancellationToken);
-                if (await UpdateSectionStateAsync(context, state, cancellationToken) == 0)
-                {
-                    context.ChecklistSectionStates.Add(state);
-                    await context.SaveChangesAsync(cancellationToken);
-                }
-
+                await UpsertSectionStateAsync(context, state, cancellationToken);
                 return (true, audit);
             },
             cancellationToken);
@@ -961,19 +969,180 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         ArgumentNullException.ThrowIfNull(answer);
         ArgumentNullException.ThrowIfNull(audit);
 
+        // A ballot row must go through the ballot rules (status, audit), so it cannot enter by this door
+        if (answer.SlotId != ChecklistAnswer.BaselineSlotId)
+        {
+            throw new ArgumentException("An answer of a ballot is stored with SetBallotAnswerAsync.", nameof(answer));
+        }
+
         // Same replace-or-insert approach as for the section state
         await appender.ExecuteAsync<bool>(
             factory,
             async context =>
             {
                 await EnsureNotLockedAsync(context, answer.ProjectId, answer.ReviewId, cancellationToken);
-                if (await UpdateAnswerAsync(context, answer, cancellationToken) == 0)
+                await UpsertAnswerAsync(context, answer, cancellationToken);
+                return (true, audit);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Ballot>> ListBallotsAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // A read transaction, so the status rows and the answers come from one state of the database
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+
+        // One query per table, not per slot
+        var rows = await context.ChecklistBallots.AsNoTracking()
+            .Where(b => b.ProjectId == projectId && b.ReviewId == reviewId)
+            .OrderBy(b => b.SlotId)
+            .ToListAsync(cancellationToken);
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
+        var answers = (await context.ChecklistAnswers.AsNoTracking()
+                .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId > ChecklistAnswer.BaselineSlotId)
+                .OrderBy(a => a.ItemId)
+                .ToListAsync(cancellationToken))
+            .ToLookup(a => a.SlotId);
+        var sections = (await context.ChecklistSectionStates.AsNoTracking()
+                .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId > ChecklistAnswer.BaselineSlotId)
+                .OrderBy(s => s.SectionId)
+                .ToListAsync(cancellationToken))
+            .ToLookup(s => s.SlotId);
+        return rows.Select(row => ToBallot(row, answers[row.SlotId].ToList(), sections[row.SlotId].ToList())).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<Ballot?> GetBallotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // A read transaction, so the status row and the answers come from one state of the database
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+        return await LoadBallotAsync(context, projectId, reviewId, slotId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Ballot> SetBallotAnswerAsync(
+        ChecklistAnswer answer,
+        AuditDraft audit,
+        Func<Ballot, bool>? completesBallot,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        ArgumentNullException.ThrowIfNull(audit);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(answer.SlotId, ChecklistAnswer.BaselineSlotId);
+
+        return await appender.ExecuteAsync<Ballot>(
+            factory,
+            context => StoreBallotRowAsync(
+                context,
+                new BallotEdit(
+                    answer.ProjectId,
+                    answer.ReviewId,
+                    answer.SlotId,
+                    answer.AnsweredAt,
+                    answer.AnsweredByUsername,
+                    audit,
+                    completesBallot,
+                    () => UpsertAnswerAsync(context, answer, cancellationToken)),
+                cancellationToken),
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Ballot> SetBallotSectionStateAsync(
+        ChecklistSectionState state,
+        AuditDraft audit,
+        Func<Ballot, bool>? completesBallot,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(audit);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(state.SlotId, ChecklistAnswer.BaselineSlotId);
+
+        return await appender.ExecuteAsync<Ballot>(
+            factory,
+            context => StoreBallotRowAsync(
+                context,
+                new BallotEdit(
+                    state.ProjectId,
+                    state.ReviewId,
+                    state.SlotId,
+                    state.SetAt,
+                    state.SetByUsername,
+                    audit,
+                    completesBallot,
+                    () => UpsertSectionStateAsync(context, state, cancellationToken)),
+                cancellationToken),
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Ballot> SubmitBallotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        DateTimeOffset submittedAt,
+        string submittedByUsername,
+        AuditDraft audit,
+        Func<Ballot, bool> isComplete,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(submittedByUsername);
+        ArgumentNullException.ThrowIfNull(audit);
+        ArgumentNullException.ThrowIfNull(isComplete);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(slotId, ChecklistAnswer.BaselineSlotId);
+
+        return await appender.ExecuteAsync<Ballot>(
+            factory,
+            async context =>
+            {
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+                await RequireSlotNumberAsync(context, projectId, reviewId, slotId, cancellationToken);
+
+                // An already submitted ballot is returned as it is: no write and no entry
+                var current = await LoadBallotAsync(context, projectId, reviewId, slotId, cancellationToken);
+                if (current is { Status: BallotStatus.Submitted })
                 {
-                    context.ChecklistAnswers.Add(answer);
-                    await context.SaveChangesAsync(cancellationToken);
+                    return (current, null);
                 }
 
-                return (true, audit);
+                // The completeness test sees the rows of this transaction, so no edit can slip in after it
+                var ballot = current ?? new Ballot(slotId, BallotStatus.Draft, null, null, [], []);
+                if (!isComplete(ballot))
+                {
+                    throw new DomainRuleException(
+                        DomainRule.BallotIncomplete,
+                        "The ballot cannot be submitted while a check that applies has no answer.");
+                }
+
+                await WriteBallotStatusAsync(
+                    context, projectId, reviewId, slotId, current is not null, BallotStatus.Submitted, submittedAt, submittedByUsername, cancellationToken);
+                var submitted = ballot with
+                {
+                    Status = BallotStatus.Submitted,
+                    SubmittedAt = submittedAt,
+                    SubmittedByUsername = submittedByUsername
+                };
+                return (submitted, audit);
             },
             cancellationToken);
     }
@@ -1143,6 +1312,9 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 };
                 context.ReviewerSlots.Add(entity);
                 await context.SaveChangesAsync(cancellationToken);
+
+                // A follow-up review carries review-level rows; the new slot starts from them as a draft ballot
+                await SeedBallotFromBaselineAsync(context, entity, cancellationToken);
                 return (entity, audit(entity));
             },
             cancellationToken);
@@ -1165,13 +1337,40 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             async context =>
             {
                 await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
-                var rows = await context.ReviewerSlots
+
+                // The reviewers before the change decide which contributions leave with a departing reviewer
+                var old = await context.ReviewerSlots.AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId,
+                        cancellationToken);
+                if (old is null)
+                {
+                    return (false, null);
+                }
+
+                await context.ReviewerSlots
                     .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
                     .ExecuteUpdateAsync(
                         s => s.SetProperty(x => x.PrimaryUserId, primaryUserId)
                             .SetProperty(x => x.AlternateUserId, alternateUserId),
                         cancellationToken);
-                return rows > 0 ? (true, audit) : (false, null);
+
+                // A swap of the roles or an added alternate changes nobody out of the slot, so the ballot stays
+                var departing = DepartingUserIds(old, primaryUserId, alternateUserId);
+                if (departing.Count == 0)
+                {
+                    return (true, audit);
+                }
+
+                // The slot entry is saved first, then the reassignment entry is the audit of the transaction
+                var reassigned = await ReassignBallotAsync(context, old, departing, audit, cancellationToken);
+                if (reassigned is null)
+                {
+                    return (true, audit);
+                }
+
+                await AppendAndSaveAsync(context, audit, cancellationToken);
+                return (true, reassigned);
             },
             cancellationToken);
     }
@@ -1191,6 +1390,23 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             async context =>
             {
                 await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+                var exists = await context.ReviewerSlots.AnyAsync(
+                    s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId,
+                    cancellationToken);
+                if (!exists)
+                {
+                    return (false, null);
+                }
+
+                // The rows of the slot's ballot have no foreign key to the slot, so they are deleted here, in the
+                // same transaction; the ballot status row follows the slot by cascade. When the database refuses to
+                // remove a signed slot, the exception rolls these deletes back with everything else
+                await context.ChecklistAnswers
+                    .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == slotId)
+                    .ExecuteDeleteAsync(cancellationToken);
+                await context.ChecklistSectionStates
+                    .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == slotId)
+                    .ExecuteDeleteAsync(cancellationToken);
 
                 // The foreign key from the signatures makes the database refuse to remove a slot that was signed
                 var rows = await context.ReviewerSlots
@@ -1526,12 +1742,13 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     .Where(c => c.ProjectId == projectId && ids.Contains(c.ReviewId))
                     .ToListAsync(cancellationToken))
                 .ToLookup(c => c.ReviewId);
+            // The record holds the review-level rows only; the rows of a slot belong to its ballot (see ListBallotsAsync)
             var sections = (await context.ChecklistSectionStates.AsNoTracking()
-                    .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+                    .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId) && s.SlotId == ChecklistAnswer.BaselineSlotId)
                     .ToListAsync(cancellationToken))
                 .ToLookup(s => s.ReviewId);
             var answers = (await context.ChecklistAnswers.AsNoTracking()
-                    .Where(a => a.ProjectId == projectId && ids.Contains(a.ReviewId))
+                    .Where(a => a.ProjectId == projectId && ids.Contains(a.ReviewId) && a.SlotId == ChecklistAnswer.BaselineSlotId)
                     .ToListAsync(cancellationToken))
                 .ToLookup(a => a.ReviewId);
             var threads = (await context.Threads.AsNoTracking()
@@ -1594,7 +1811,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         CancellationToken cancellationToken)
     {
         return context.ChecklistSectionStates
-            .Where(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId && s.SectionId == state.SectionId)
+            .Where(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId && s.SlotId == state.SlotId && s.SectionId == state.SectionId)
             .ExecuteUpdateAsync(
                 s => s.SetProperty(x => x.Applicable, state.Applicable)
                     .SetProperty(x => x.Reason, state.Reason)
@@ -1618,7 +1835,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         CancellationToken cancellationToken)
     {
         return context.ChecklistAnswers
-            .Where(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId && a.ItemId == answer.ItemId)
+            .Where(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId && a.SlotId == answer.SlotId && a.ItemId == answer.ItemId)
             .ExecuteUpdateAsync(
                 s => s.SetProperty(x => x.Outcome, answer.Outcome)
                     .SetProperty(x => x.Justification, answer.Justification)
@@ -1628,6 +1845,452 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     .SetProperty(x => x.CarriedFromReviewId, answer.CarriedFromReviewId),
                 cancellationToken);
     }
+
+    /// <summary>
+    ///     Replaces the stored row of a section state, or inserts it when there is none.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="state">The state to store; its slot decides which row it replaces.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the row is stored.</returns>
+    private static async Task UpsertSectionStateAsync(
+        ReviewCenterDbContext context,
+        ChecklistSectionState state,
+        CancellationToken cancellationToken)
+    {
+        if (await UpdateSectionStateAsync(context, state, cancellationToken) == 0)
+        {
+            context.ChecklistSectionStates.Add(state);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Replaces the stored row of an answer, or inserts it when there is none.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="answer">The answer to store; its slot decides which row it replaces.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the row is stored.</returns>
+    private static async Task UpsertAnswerAsync(
+        ReviewCenterDbContext context,
+        ChecklistAnswer answer,
+        CancellationToken cancellationToken)
+    {
+        if (await UpdateAnswerAsync(context, answer, cancellationToken) == 0)
+        {
+            context.ChecklistAnswers.Add(answer);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Appends an audit entry and saves it at once, so that a second entry of the same transaction reads the right
+    ///     head of the chain.
+    /// </summary>
+    /// <param name="context">The context of the open transaction; the caller holds the audit gate.</param>
+    /// <param name="draft">What to record.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the entry is saved (not yet committed).</returns>
+    private async Task AppendAndSaveAsync(
+        ReviewCenterDbContext context,
+        AuditDraft draft,
+        CancellationToken cancellationToken)
+    {
+        // The appender reads the head from the database, so the first entry must be saved before the second is built
+        await appender.AppendAsync(context, draft, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    ///     Finds the position of a slot among the slots of its review and how many slots the review has.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The 1-based number of the slot by identity, the number the slot audits and the pages use, and the number of slots.
+    /// </returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.SlotNotFound"/> when the slot does not exist or belongs to another review.
+    /// </exception>
+    private static async Task<(int Number, int Count)> RequireSlotNumberAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken)
+    {
+        var ids = await context.ReviewerSlots.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .OrderBy(s => s.Id)
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
+        var index = ids.IndexOf(slotId);
+        if (index < 0)
+        {
+            throw new DomainRuleException(DomainRule.SlotNotFound, $"The slot {slotId} does not exist in this review.");
+        }
+
+        return (index + 1, ids.Count);
+    }
+
+    /// <summary>
+    ///     Builds a ballot from its status row and the rows of its slot.
+    /// </summary>
+    /// <param name="row">The status row.</param>
+    /// <param name="answers">The answers of the slot.</param>
+    /// <param name="sections">The section states of the slot.</param>
+    /// <returns>The ballot.</returns>
+    private static Ballot ToBallot(
+        ChecklistBallot row,
+        IReadOnlyList<ChecklistAnswer> answers,
+        IReadOnlyList<ChecklistSectionState> sections)
+    {
+        return new Ballot(row.SlotId, row.Status, row.SubmittedAt, row.SubmittedByUsername, answers, sections);
+    }
+
+    /// <summary>
+    ///     Reads the ballot of a slot with its answers and section states, from the rows of one transaction.
+    /// </summary>
+    /// <param name="context">The context to read with.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ballot, or <c>null</c> when the slot has no status row.</returns>
+    private static async Task<Ballot?> LoadBallotAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken)
+    {
+        var row = await context.ChecklistBallots.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.ProjectId == projectId && b.ReviewId == reviewId && b.SlotId == slotId, cancellationToken);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var answers = await context.ChecklistAnswers.AsNoTracking()
+            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == slotId)
+            .OrderBy(a => a.ItemId)
+            .ToListAsync(cancellationToken);
+        var sections = await context.ChecklistSectionStates.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == slotId)
+            .OrderBy(s => s.SectionId)
+            .ToListAsync(cancellationToken);
+        return ToBallot(row, answers, sections);
+    }
+
+    /// <summary>
+    ///     Stores the status of a ballot: inserts the status row, or updates the existing one.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <param name="exists">Whether the status row exists already.</param>
+    /// <param name="status">The status to store.</param>
+    /// <param name="submittedAt">When the ballot was handed in; <c>null</c> for a draft.</param>
+    /// <param name="submittedByUsername">Who handed the ballot in; <c>null</c> for a draft.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the status is stored.</returns>
+    private static async Task WriteBallotStatusAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        string reviewId,
+        int slotId,
+        bool exists,
+        BallotStatus status,
+        DateTimeOffset? submittedAt,
+        string? submittedByUsername,
+        CancellationToken cancellationToken)
+    {
+        // The two columns of the hand-in always change together with the status, so a Draft never keeps them
+        if (exists)
+        {
+            await context.ChecklistBallots
+                .Where(b => b.ProjectId == projectId && b.ReviewId == reviewId && b.SlotId == slotId)
+                .ExecuteUpdateAsync(
+                    b => b.SetProperty(x => x.Status, status)
+                        .SetProperty(x => x.SubmittedAt, submittedAt)
+                        .SetProperty(x => x.SubmittedByUsername, submittedByUsername),
+                    cancellationToken);
+            return;
+        }
+
+        context.ChecklistBallots.Add(new ChecklistBallot
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            SlotId = slotId,
+            Status = status,
+            SubmittedAt = submittedAt,
+            SubmittedByUsername = submittedByUsername
+        });
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    ///     Stores one edit of a ballot together with the status the edit leads to.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="edit">The edit.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ballot as stored and the audit draft the transaction ends with.</returns>
+    /// <remarks>
+    ///     The edit makes the ballot a draft; a review with exactly one slot then submits it at once when the caller's
+    ///     test says it is complete. Only a net change of the status adds the second audit entry.
+    /// </remarks>
+    private async Task<(Ballot Result, AuditDraft? Audit)> StoreBallotRowAsync(
+        ReviewCenterDbContext context,
+        BallotEdit edit,
+        CancellationToken cancellationToken)
+    {
+        var (projectId, reviewId, slotId) = (edit.ProjectId, edit.ReviewId, edit.SlotId);
+        await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+        var (slotNumber, slotCount) = await RequireSlotNumberAsync(context, projectId, reviewId, slotId, cancellationToken);
+        var before = await context.ChecklistBallots.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.ProjectId == projectId && b.ReviewId == reviewId && b.SlotId == slotId, cancellationToken);
+
+        // Store the row, then make the ballot a draft: an edit takes a submitted ballot out of the consolidated record
+        await edit.StoreRow();
+        if (before is not { Status: BallotStatus.Draft })
+        {
+            await WriteBallotStatusAsync(
+                context, projectId, reviewId, slotId, before is not null, BallotStatus.Draft, null, null, cancellationToken);
+        }
+
+        // The single-slot flow has no separate submit step: a complete ballot is handed in by the edit itself, judged on
+        // the rows as they are in this transaction
+        if (slotCount == 1 && edit.CompletesBallot is { } completes)
+        {
+            var draft = await LoadBallotAsync(context, projectId, reviewId, slotId, cancellationToken);
+            if (draft is not null && completes(draft))
+            {
+                await WriteBallotStatusAsync(
+                    context, projectId, reviewId, slotId, true, BallotStatus.Submitted, edit.EditedAt, edit.EditedByUsername, cancellationToken);
+            }
+        }
+
+        var ballot = (await LoadBallotAsync(context, projectId, reviewId, slotId, cancellationToken))!;
+
+        // A second entry only for a net change of the status; draft to draft and submitted to submitted add none
+        var wasSubmitted = before is { Status: BallotStatus.Submitted };
+        var isSubmitted = ballot.Status == BallotStatus.Submitted;
+        if (wasSubmitted == isSubmitted)
+        {
+            return (ballot, edit.Audit);
+        }
+
+        var transition = isSubmitted
+            ? edit.Audit with
+            {
+                Action = "ballot.submitted",
+                Detail = $"slot {slotNumber}: ballot submitted ({ballot.Answers.Count} answers, {ballot.SectionStates.Count} section states)"
+            }
+            : edit.Audit with
+            {
+                Action = "ballot.reopened",
+                Detail = $"slot {slotNumber}: ballot reverted to draft by an edit"
+            };
+        await AppendAndSaveAsync(context, edit.Audit, cancellationToken);
+        return (ballot, transition);
+    }
+
+    /// <summary>
+    ///     Copies the carried review-level rows of a review into rows of a new slot and stores a draft ballot for it.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="slot">The stored slot.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the rows are stored.</returns>
+    /// <remarks>
+    ///     Only rows that a follow-up review carried from the earlier review (<c>CarriedFromReviewId</c> is set) seed the
+    ///     ballot; they keep their answerer, time and marker. A review without such rows gets no ballot. A carried answer
+    ///     never submits the ballot.
+    /// </remarks>
+    private static async Task SeedBallotFromBaselineAsync(
+        ReviewCenterDbContext context,
+        ReviewerSlot slot,
+        CancellationToken cancellationToken)
+    {
+        var answers = await context.ChecklistAnswers.AsNoTracking()
+            .Where(a => a.ProjectId == slot.ProjectId && a.ReviewId == slot.ReviewId
+                && a.SlotId == ChecklistAnswer.BaselineSlotId && a.CarriedFromReviewId != null)
+            .ToListAsync(cancellationToken);
+        var sections = await context.ChecklistSectionStates.AsNoTracking()
+            .Where(s => s.ProjectId == slot.ProjectId && s.ReviewId == slot.ReviewId
+                && s.SlotId == ChecklistAnswer.BaselineSlotId && s.CarriedFromReviewId != null)
+            .ToListAsync(cancellationToken);
+        if (answers.Count == 0 && sections.Count == 0)
+        {
+            return;
+        }
+
+        context.ChecklistAnswers.AddRange(answers.Select(a => new ChecklistAnswer
+        {
+            ProjectId = a.ProjectId,
+            ReviewId = a.ReviewId,
+            SlotId = slot.Id,
+            ItemId = a.ItemId,
+            Outcome = a.Outcome,
+            Justification = a.Justification,
+            AnsweredBy = a.AnsweredBy,
+            AnsweredByUsername = a.AnsweredByUsername,
+            AnsweredAt = a.AnsweredAt,
+            CarriedFromReviewId = a.CarriedFromReviewId
+        }));
+        context.ChecklistSectionStates.AddRange(sections.Select(s => new ChecklistSectionState
+        {
+            ProjectId = s.ProjectId,
+            ReviewId = s.ReviewId,
+            SlotId = slot.Id,
+            SectionId = s.SectionId,
+            Applicable = s.Applicable,
+            Reason = s.Reason,
+            SetBy = s.SetBy,
+            SetByUsername = s.SetByUsername,
+            SetAt = s.SetAt,
+            CarriedFromReviewId = s.CarriedFromReviewId
+        }));
+        context.ChecklistBallots.Add(new ChecklistBallot
+        {
+            ProjectId = slot.ProjectId,
+            ReviewId = slot.ReviewId,
+            SlotId = slot.Id,
+            Status = BallotStatus.Draft
+        });
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    ///     Works out which reviewers a slot change takes out of the slot.
+    /// </summary>
+    /// <param name="old">The slot before the change.</param>
+    /// <param name="primaryUserId">The new primary reviewer.</param>
+    /// <param name="alternateUserId">The new alternate reviewer, or <c>null</c>.</param>
+    /// <returns>The identities of the old reviewers who are neither of the new ones; empty for a swap or an addition.</returns>
+    private static List<int> DepartingUserIds(ReviewerSlot old, int primaryUserId, int? alternateUserId)
+    {
+        var departing = new List<int>();
+        foreach (var userId in new int?[] { old.PrimaryUserId, old.AlternateUserId })
+        {
+            if (userId is { } id && id != primaryUserId && id != alternateUserId && !departing.Contains(id))
+            {
+                departing.Add(id);
+            }
+        }
+
+        return departing;
+    }
+
+    /// <summary>
+    ///     Removes the contributions of departing reviewers from the ballot of a slot and makes the ballot a draft.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="slot">The slot before the change.</param>
+    /// <param name="departing">The identities of the reviewers who leave the slot; not empty.</param>
+    /// <param name="audit">The audit draft of the slot change, whose actor, project and review the new entry copies.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The <c>ballot.reassigned</c> draft when a row was removed or the status changed; otherwise <c>null</c>.
+    /// </returns>
+    /// <remarks>
+    ///     Rows carried from an earlier review stay, because their author is a third party, not the departing reviewer.
+    ///     The entry names the slot number and counts only.
+    /// </remarks>
+    private static async Task<AuditDraft?> ReassignBallotAsync(
+        ReviewCenterDbContext context,
+        ReviewerSlot slot,
+        List<int> departing,
+        AuditDraft audit,
+        CancellationToken cancellationToken)
+    {
+        var (projectId, reviewId, slotId) = (slot.ProjectId, slot.ReviewId, slot.Id);
+
+        // The user names of the departing reviewers (the answer rows hold names; the comparison ignores case)
+        var names = await context.Users.AsNoTracking()
+            .Where(u => departing.Contains(u.Id))
+            .Select(u => u.Username)
+            .ToListAsync(cancellationToken);
+
+        // Only rows the departing reviewers gave themselves go; carried rows are not theirs
+        var answerIds = (await context.ChecklistAnswers.AsNoTracking()
+                .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == slotId && a.CarriedFromReviewId == null)
+                .ToListAsync(cancellationToken))
+            .Where(a => names.Contains(a.AnsweredByUsername, StringComparer.OrdinalIgnoreCase))
+            .Select(a => a.ItemId)
+            .ToList();
+        var sectionIds = (await context.ChecklistSectionStates.AsNoTracking()
+                .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == slotId && s.CarriedFromReviewId == null)
+                .ToListAsync(cancellationToken))
+            .Where(s => names.Contains(s.SetByUsername, StringComparer.OrdinalIgnoreCase))
+            .Select(s => s.SectionId)
+            .ToList();
+        if (answerIds.Count > 0)
+        {
+            await context.ChecklistAnswers
+                .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == slotId && answerIds.Contains(a.ItemId))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        if (sectionIds.Count > 0)
+        {
+            await context.ChecklistSectionStates
+                .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == slotId && sectionIds.Contains(s.SectionId))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        // The ballot is no longer what the departed reviewer handed in, so it is a draft again
+        var ballot = await context.ChecklistBallots.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.ProjectId == projectId && b.ReviewId == reviewId && b.SlotId == slotId, cancellationToken);
+        var reverted = ballot is { Status: BallotStatus.Submitted };
+        if (reverted)
+        {
+            await WriteBallotStatusAsync(
+                context, projectId, reviewId, slotId, true, BallotStatus.Draft, null, null, cancellationToken);
+        }
+
+        if (answerIds.Count == 0 && sectionIds.Count == 0 && !reverted)
+        {
+            return null;
+        }
+
+        // The slot number counts the slots of the review by identity, as the slot entries do
+        var (slotNumber, _) = await RequireSlotNumberAsync(context, projectId, reviewId, slotId, cancellationToken);
+        return audit with
+        {
+            Action = "ballot.reassigned",
+            Detail = $"slot {slotNumber}: ballot reverted to draft after a reassignment "
+                + $"({answerIds.Count} answers, {sectionIds.Count} section states of departed reviewers removed)"
+        };
+    }
+
+    /// <summary>
+    ///     One edit of a ballot: the row to store and what the store needs to settle the status of the ballot.
+    /// </summary>
+    /// <param name="ProjectId">The project identity.</param>
+    /// <param name="ReviewId">The review identifier.</param>
+    /// <param name="SlotId">The slot whose ballot is edited.</param>
+    /// <param name="EditedAt">When the row was written, which stamps an automatic submit.</param>
+    /// <param name="EditedByUsername">Who wrote the row, which stamps an automatic submit.</param>
+    /// <param name="Audit">The audit draft of the edit.</param>
+    /// <param name="CompletesBallot">The completeness test for the single-slot automatic submit, or <c>null</c> for none.</param>
+    /// <param name="StoreRow">Stores the answer or section state row in the open transaction.</param>
+    private sealed record BallotEdit(
+        int ProjectId,
+        string ReviewId,
+        int SlotId,
+        DateTimeOffset EditedAt,
+        string EditedByUsername,
+        AuditDraft Audit,
+        Func<Ballot, bool>? CompletesBallot,
+        Func<Task> StoreRow);
 
     /// <summary>
     ///     Copies a carried thread into a fresh entity without identities, so the database assigns them.

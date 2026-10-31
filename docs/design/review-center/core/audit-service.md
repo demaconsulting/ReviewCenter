@@ -98,6 +98,9 @@ administrator is not throttled but is a trusted actor).
 | `review.conclusion-changed` | `length 0 -> 42` (old and new length of the review conclusion text, never the text) |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {number}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {number}, role {Primary or Alternate}, record digest <64 hex>` |
+| `ballot.submitted` | `slot {number}: ballot submitted (N answers, M section states)` |
+| `ballot.reopened` | `slot {number}: ballot reverted to draft by an edit` (not `review.reopened`) |
+| `ballot.reassigned` | `slot {n}: ballot reverted to draft after a reassignment (answer and section counts)` |
 | `thread.started` | `thread {id} on {path} {anchor}; comment {cid}, text sha256 {8 hex}` (`; in report` if included) |
 | `thread.replied` | `thread {id}, comment {cid}, text sha256 {8 hex}` (`; in report` if included) |
 | `thread.resolved` | `thread {id}` (`; note sha256 {8 hex}` when a resolution note was stored) |
@@ -129,6 +132,14 @@ administrator is not throttled but is a trusted actor).
 | `auth.totp-recovery-regenerated` | `10 new recovery codes issued` (same transaction as the change) |
 | `auth.totp-failed` | `wrong or reused code (sign-in)`, `(enrollment)`, or `(account page)` (fixed text; best-effort) |
 | `audit.events-suppressed` | `tracking table full, events of new keys are not recorded` (see below) |
+
+The three `ballot.` actions are recorded by the store in the transaction of the change that causes them. The slot number
+is the position of the slot among the slots of the review, ordered by identity, as in the `slot.` entries. The details
+hold the slot number and counts only, never an answer, a justification, a reason or a user name. `ballot.submitted` is
+the hand-in of a ballot (also the automatic one in a review with a single slot), `ballot.reopened` is the return of a
+submitted ballot to a draft by an edit of its rows (it is not `review.reopened`, which reopens a concluded review), and
+`ballot.reassigned` is the return to a draft after a reviewer left the slot, with the counts of the rows of the departed
+reviewers that were removed (the full detail ends with `(N answers, M section states of departed reviewers removed)`).
 
 The detail of `review.created` has, after the file text, the text `, follows 'X'; carried N answers, M threads` for a
 follow-up (`X` is the whole identifier of the earlier review), with `, R resolved threads not carried` and
