@@ -18,8 +18,10 @@ thread-safe. It holds the clock (`TimeProvider`, injected so tests control time)
 
 **The table** is `AuditEntries`, mapped by `ReviewCenterDbContext`: `Sequence` is the primary key and is never generated
 by the database (`ValueGeneratedNever`), `ActorName`, `Action`, and `Detail` are required with the maximum lengths of
-`AuditText`, `PreviousHash` and `Hash` are required and 64 characters long, and an index on project, review, and
-sequence serves the history of one review. There are **no foreign keys**: an entry is a snapshot of text and must survive
+`AuditText`, `PreviousHash` and `Hash` are required and 64 characters long, `TimestampUtc` is stored as fixed-width UTC
+text (see *Decision on the date range* below), and four indexes serve the reads: project, review, and sequence for the
+history of one review, and project and sequence, actor and sequence, and action and sequence for the filters of the audit
+pages. There are **no foreign keys**: an entry is a snapshot of text and must survive
 whatever happens to the rows it describes.
 
 #### Key Methods
@@ -58,12 +60,40 @@ whatever happens to the rows it describes.
 `AppendAsync`, save, commit, release. Used through `AuditService.TryRecordAsync` for sign-in, sign-out, failed sign-in,
 and lockout.
 
-**AuditStore.ListAsync**: Reads entries newest first, optionally of one project, of one review of it (project and review
-together), before or after a sequence, at most a given number. A review filter is always inside one project; a project
-filter alone returns every event of that project, whether or not it names a review, and never an entry without a
-project, which is what the project audit view relies on. The newer direction reads the nearest entries above the
-position in ascending order and returns them newest first. Reads are untracked and never take the gate; the existing
-index on project, review, and sequence serves both filters.
+**AuditStore.ListAsync**: Reads entries newest first, narrowed by an `AuditFilter`, before or after a sequence, at most
+a given number. Every set condition of the filter must hold:
+
+- *Project and review*: a project filter returns every event of that project, whether or not it names a review, and
+  never an entry without a project (the comparison is `ProjectId == x`, which is never true for `NULL`), which is what
+  the project audit view relies on. The review is an exact comparison; with no project in the filter (the global audit
+  page, for system administrators only) it matches that review identifier in every project.
+- *Actor*: the identity is an exact comparison. The text is a case-insensitive substring of the stored actor name,
+  written as `EF.Functions.Like(ActorName, '%' + escaped + '%', '\')`; the escape function doubles `\` first and then
+  escapes `%` and `_`, so a typed percent sign or underscore is a literal. The `LIKE` of SQLite folds ASCII letters
+  only, which is how the case-insensitivity of the filter is defined.
+- *Action*: one exact action, or a group by prefix (`StartsWith`, whose translation also escapes the wildcards).
+- *Date range*: `TimestampUtc >= start of the From day` and `TimestampUtc < start of the day after To`, in UTC. The
+  upper bound is exclusive, so an entry at 23:59:59.9999999 of the To day is inside and one at 00:00:00 of the next day
+  is outside.
+
+The newer direction reads the nearest entries above the position in ascending order and returns them newest first.
+Reads are untracked and never take the gate, and no count of the trail is made. The indexes that serve the filters
+are `(ProjectId, ReviewId, Sequence)` for one review, `(ProjectId, Sequence)` for a project, `(ActorUserId, Sequence)`
+for an actor and `(Action, Sequence)` for an action; each ends with `Sequence` so the keyset order needs no sort. The
+actor text and the date range are residual conditions on the entries that the other conditions and the cursor leave,
+and the page ends as soon as it is full.
+
+**Decision on the date range (the spike).** `AuditEntry.TimestampUtc` is a `DateTimeOffset`, which the EF Core SQLite
+provider stores as text with the offset, and it cannot translate a comparison of such a value (the query raises an
+`InvalidOperationException`); text with offsets would not sort or compare correctly in any case. The design therefore
+maps the property with a value converter to fixed-width UTC text (year, month, day, `T`, hour, minute, second, seven
+fractional digits, and `Z`), which sorts
+lexicographically in time order and reads back as the same instant with offset zero. The converter changes only the
+stored form: the hash of an entry is computed in code from the ticks of the instant (`AuditChain.ComputeHash`), never
+from the stored text, so no hash changes and the chain verifies as before (a test writes entries with offsets, reads the
+raw text, and verifies the chain). The alternative, to map the days to a range of sequences with two lookups, was
+rejected as more code for the same result. Databases created before this change store the time in the old form and must
+be deleted and created again, like for every change of the schema (there are no migrations).
 
 **AuditStore.ReadAfterAsync**: Reads entries in ascending order after a sequence, at most a given number, so that
 verification can stream the trail in batches.

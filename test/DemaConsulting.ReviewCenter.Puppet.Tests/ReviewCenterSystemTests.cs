@@ -715,6 +715,63 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that the audit page filters the trail through its form by action and by actor, keeps the choice in the
+    ///     address, offers to clear it, and says so when nothing matches.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_AuditTrail_FiltersByActionAndActor()
+    {
+        // Arrange: the scenario has signed in as the user puppet and created a review, so the trail holds both
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        const string actionsOfRows = "Array.from(document.querySelectorAll('[data-testid=\"audit-action\"]')).map(e => e.textContent).filter((v, i, a) => a.indexOf(v) === i).join('|')";
+        const string interactive = "css=[data-testid=audit-page][data-interactive=true]";
+
+        // Act: read the whole trail
+        await browser.GotoAsync("/audit", "audit-page");
+        var allRows = await browser.CountAsync("audit-row");
+        var clearAtFirst = await browser.ExistsAsync("audit-filter-clear");
+
+        // Act: choose an action in the form and apply it
+        await browser.OkAsync("select", "audit-filter-action", "review.created");
+        await browser.OkAsync("click", "audit-filter-apply");
+        await browser.OkAsync("wait", "css=[data-testid=audit-filter-clear]", "--timeout", "30000");
+        await browser.OkAsync("wait", interactive, "--timeout", "30000");
+        var actionsShown = await browser.EvalAsync(actionsOfRows);
+        var actionRows = await browser.CountAsync("audit-row");
+        var address = await browser.EvalAsync("location.pathname + location.search");
+
+        // Act: filter by the actor through the address, then by an actor nobody has
+        await browser.GotoAsync($"/audit?actor={PuppetEndToEndTests.UserName}&action=auth.", "audit-page");
+        var authActions = await browser.EvalAsync(actionsOfRows);
+        var actorNames = await browser.EvalAsync("Array.from(document.querySelectorAll('[data-testid=\"audit-actor\"]')).every(e => e.textContent.includes('" + PuppetEndToEndTests.UserName + "')) ? 'all' : 'other'");
+        await browser.GotoAsync("/audit?actor=nobody-has-this-name", "audit-page");
+        var noMatch = await browser.ExistsAsync("audit-empty");
+        var noMatchRows = await browser.CountAsync("audit-row");
+
+        // Act: clear the filters
+        await browser.OkAsync("click", "audit-filter-clear");
+        await browser.OkAsync("wait", "css=[data-testid=audit-table]", "--timeout", "30000");
+        await browser.OkAsync("wait", interactive, "--timeout", "30000");
+        var clearedRows = await browser.CountAsync("audit-row");
+
+        // Assert: the form narrows the trail to the chosen action, and the choice is in the address
+        Assert.False(clearAtFirst, "Nothing is filtered at first, so there is nothing to clear.");
+        Assert.True(actionRows > 0, "The review that was created must be in the trail.");
+        Assert.True(actionRows < allRows, "The filter must leave out the entries of other actions.");
+        Assert.Equal("review.created", actionsShown);
+        Assert.Contains("action=review.created", address, StringComparison.Ordinal);
+
+        // Assert: the actor and the group narrow it, and a text nobody matches shows the no-match state
+        Assert.StartsWith("auth.", authActions, StringComparison.Ordinal);
+        Assert.Equal("all", actorNames);
+        Assert.True(noMatch);
+        Assert.Equal(0, noMatchRows);
+        Assert.Equal(allRows, clearedRows);
+    }
+
+    /// <summary>
     ///     Test that a follow-up review, created through the form from an earlier review that has a failed check, an
     ///     open thread and sections that do not apply, carries the Pass and N/A answers, the sections and the open
     ///     thread with visible marks, shows the earlier Fail for a new decision, can be signed once that is decided and

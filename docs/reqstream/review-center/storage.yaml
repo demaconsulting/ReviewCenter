@@ -143,6 +143,7 @@ sections:
           - ReviewCenter-AuditStore-Atomic
           - ReviewCenter-AuditStore-Concurrency
           - ReviewCenter-AuditStore-Read
+          - ReviewCenter-AuditStore-Filter
           - ReviewCenter-ReviewStore-Audit
           - ReviewCenter-UserStore-Audit
           - ReviewCenter-RepositoryStore-Audit

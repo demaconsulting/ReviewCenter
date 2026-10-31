@@ -56,9 +56,19 @@ public sealed record AuditEntryPage(IReadOnlyList<AuditEntry> Entries, bool HasO
 public sealed class AuditService
 {
     /// <summary>
-    ///     The number of entries on one page.
+    ///     The number of entries on one page when the caller does not choose.
     /// </summary>
-    public const int PageSize = 50;
+    public const int DefaultPageSize = 50;
+
+    /// <summary>
+    ///     The most entries one page can hold, whatever the caller asks for.
+    /// </summary>
+    public const int MaxPageSize = 200;
+
+    /// <summary>
+    ///     Gets the page sizes the audit pages offer, smallest first; all are within <see cref="MaxPageSize"/>.
+    /// </summary>
+    public static IReadOnlyList<int> PageSizes { get; } = [25, DefaultPageSize, 100];
 
     /// <summary>
     ///     The number of entries read from the store at once while verifying.
@@ -295,36 +305,54 @@ public sealed class AuditService
     /// <summary>
     ///     Reads one page of the trail, newest first.
     /// </summary>
-    /// <param name="projectId">
-    ///     Limits the page to one project (every event of the project, or with <paramref name="reviewId"/> only the
-    ///     events of one review); <c>null</c> for the whole trail. The caller must have checked the right to see the
-    ///     project first.
-    /// </param>
-    /// <param name="reviewId">
-    ///     The review of <paramref name="projectId"/> to limit to, or <c>null</c> for no review limit.
+    /// <param name="filter">
+    ///     What to look for; validated here (see <see cref="AuditFilter.Validated"/>). With a project set the page
+    ///     holds only entries of that project and never an entry that names no project; the caller must have
+    ///     checked the right to see the project (or, with no project, the right to see the whole trail) first.
+    ///     Must not be null.
     /// </param>
     /// <param name="beforeSequence">Start with the entries older than this sequence (the "Older" page), or <c>null</c>.</param>
     /// <param name="afterSequence">Start with the entries newer than this sequence (the "Newer" page), or <c>null</c>.</param>
+    /// <param name="pageSize">
+    ///     The most entries on the page; a value below 1 means <see cref="DefaultPageSize"/> and a value above
+    ///     <see cref="MaxPageSize"/> is lowered to it.
+    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The page, <see cref="PageSize"/> entries at most. When both positions are given, <paramref name="beforeSequence"/> wins.</returns>
+    /// <returns>
+    ///     The page of entries that match the filter. When both positions are given, <paramref name="beforeSequence"/>
+    ///     wins.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="filter"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.AuditFilterInvalid"/> when the filter is not valid.
+    /// </exception>
+    /// <remarks>
+    ///     Paging is by position (the sequence of the last or first entry shown), never by a count of rows, so a read
+    ///     costs the same on page one and page one thousand and no total is computed; whether an older or a newer
+    ///     page exists is learned by looking one entry past each end of the page with the same filter.
+    /// </remarks>
     public async Task<AuditEntryPage> ListAsync(
-        int? projectId,
-        string? reviewId,
+        AuditFilter filter,
         long? beforeSequence,
         long? afterSequence,
+        int pageSize = DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(filter);
+        var valid = filter.Validated();
+        var take = pageSize < 1 ? DefaultPageSize : Math.Min(pageSize, MaxPageSize);
+
         // Only one direction at a time
         var after = beforeSequence is null ? afterSequence : null;
-        var entries = await _store.ListAsync(projectId, reviewId, beforeSequence, after, PageSize, cancellationToken);
+        var entries = await _store.ListAsync(valid, beforeSequence, after, take, cancellationToken);
         if (entries.Count == 0)
         {
             return new AuditEntryPage(entries, false, false);
         }
 
         // One cheap look past each end of the page tells whether a link is needed
-        var older = await _store.ListAsync(projectId, reviewId, entries[^1].Sequence, null, 1, cancellationToken);
-        var newer = await _store.ListAsync(projectId, reviewId, null, entries[0].Sequence, 1, cancellationToken);
+        var older = await _store.ListAsync(valid, entries[^1].Sequence, null, 1, cancellationToken);
+        var newer = await _store.ListAsync(valid, null, entries[0].Sequence, 1, cancellationToken);
         return new AuditEntryPage(entries, older.Count > 0, newer.Count > 0);
     }
 

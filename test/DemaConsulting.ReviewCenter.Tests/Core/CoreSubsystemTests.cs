@@ -756,6 +756,11 @@ public class CoreSubsystemTests
             DomainRule.FollowUpInvalid => reviews.CreateDraftAsync(
                 projectId, "rev-2", "T", oneFile, TestActors.Ann, cancellationToken, followsReviewId: "no-such-review"),
             DomainRule.LastAdmin => users.SetEnabledAsync("root", false, cancellationToken),
+            DomainRule.AuditFilterInvalid => new AuditService(new FakeAuditStore(TimeProvider.System)).ListAsync(
+                new AuditFilter(From: new DateOnly(2025, 2, 1), To: new DateOnly(2025, 1, 1)),
+                null,
+                null,
+                cancellationToken: cancellationToken),
             _ => throw new NotSupportedException($"No violation is defined for the rule '{rule}'.")
         };
     }

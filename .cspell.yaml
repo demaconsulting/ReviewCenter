@@ -15,6 +15,9 @@ language: en
 # Project-specific technical terms and tool names
 words:
   - pypdf
+  - seqno
+  - optgroup
+  - fffffff
   - selftest
   - unpooled
   - pyhanko

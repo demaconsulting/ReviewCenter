@@ -768,14 +768,13 @@ public partial class ReviewProgressServiceTests
 
         /// <inheritdoc />
         public Task<IReadOnlyList<AuditEntry>> ListAsync(
-            int? projectId,
-            string? reviewId,
+            AuditFilter filter,
             long? beforeSequence,
             long? afterSequence,
             int take,
             CancellationToken cancellationToken = default)
         {
-            return inner.ListAsync(projectId, reviewId, beforeSequence, afterSequence, take, cancellationToken);
+            return inner.ListAsync(filter, beforeSequence, afterSequence, take, cancellationToken);
         }
 
         /// <inheritdoc />

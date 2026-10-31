@@ -365,4 +365,215 @@ public class AuditPageTests : PageTestBase
         Assert.NotNull(cut.Find("[data-testid='audit-verify']"));
         Assert.Empty(cut.FindAll("[data-testid='access-denied']"));
     }
+
+    /// <summary>
+    ///     Test that the page shows the filter form with every field and the project selector, with all projects the
+    ///     administrator can see, and no Clear link while nothing is filtered.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_Admin_ShowsFilterFormWithProjectSelector()
+    {
+        // Arrange
+        await SignInAsAdminAsync();
+        await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+
+        // Act
+        var cut = Render<AuditPage>();
+
+        // Assert
+        Assert.Equal("get", cut.Find("[data-testid='audit-filter-form']").GetAttribute("method"));
+        foreach (var id in new[] { "actor", "action", "review", "from", "to", "size", "project" })
+        {
+            Assert.NotNull(cut.Find($"[data-testid='audit-filter-{id}']"));
+        }
+
+        Assert.Equal(
+            ["All projects", "Apollo", "Gemini"],
+            cut.FindAll("[data-testid='audit-filter-project'] option").Select(o => o.TextContent));
+        Assert.Equal(
+            ["25", "50", "100"],
+            cut.FindAll("[data-testid='audit-filter-size'] option").Select(o => o.TextContent));
+        Assert.Contains(
+            "review.created",
+            cut.FindAll("[data-testid='audit-filter-action'] optgroup[label='review'] option").Select(o => o.GetAttribute("value")));
+        Assert.Empty(cut.FindAll("[data-testid='audit-filter-clear']"));
+    }
+
+    /// <summary>
+    ///     Test that the actor, the action, the group and the review in the address limit the entries, and that the
+    ///     form shows the values back and offers to clear them.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm()
+    {
+        // Arrange
+        await SignInAsAdminAsync();
+        var token = TestContext.Current.CancellationToken;
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "review.created", "first", 1, "REV-1"), token);
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Bob, "review.locked", "second", 1, "REV-2"), token);
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Bob, "project.created", "third", 1), token);
+
+        // Act: every view is read right after it is rendered, because the next navigation re-renders the earlier ones
+        var byActor = Snapshot(RenderAt("/audit?actor=bob"));
+        var byAction = Snapshot(RenderAt("/audit?action=review.created"));
+        var byGroup = Snapshot(RenderAt("/audit?action=review."));
+        var byReview = Snapshot(RenderAt("/audit?review=REV-2&actor=Bob&size=25"));
+
+        // Assert
+        Assert.Equal(["third", "second"], byActor.Details);
+        Assert.Equal(["first"], byAction.Details);
+        Assert.Equal(["second", "first"], byGroup.Details);
+        Assert.Equal(["second"], byReview.Details);
+        Assert.Equal("bob", byActor.Actor);
+        Assert.Equal("REV-2", byReview.Review);
+        Assert.Equal("/audit", byActor.Clear);
+        Assert.Equal("25", byReview.Size);
+    }
+
+    /// <summary>
+    ///     Reads what a test checks from a rendered page.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    /// <returns>The entry details, the form values and the target of the Clear link.</returns>
+    private static (List<string> Details, string? Actor, string? Review, string? Clear, string? Size) Snapshot(
+        IRenderedComponent<AuditPage> cut)
+    {
+        return (
+            cut.FindAll("[data-testid='audit-detail']").Select(e => e.TextContent).ToList(),
+            cut.Find("[data-testid='audit-filter-actor']").GetAttribute("value"),
+            cut.Find("[data-testid='audit-filter-review']").GetAttribute("value"),
+            cut.FindAll("[data-testid='audit-filter-clear']").FirstOrDefault()?.GetAttribute("href"),
+            cut.Find("[data-testid='audit-filter-size'] option[selected]").GetAttribute("value"));
+    }
+
+    /// <summary>
+    ///     Test that the project selector limits the whole-trail page to that project, and never shows the entries
+    ///     that belong to no project.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_ProjectQuery_ShowsOnlyThatProjectsEntries()
+    {
+        // Arrange
+        await SignInAsAdminAsync();
+        var token = TestContext.Current.CancellationToken;
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "of project 1", 1), token);
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "of project 2", 2), token);
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "of no project"), token);
+
+        // Act
+        var cut = RenderAt("/audit?project=2");
+
+        // Assert
+        Assert.Equal(["of project 2"], cut.FindAll("[data-testid='audit-detail']").Select(e => e.TextContent));
+    }
+
+    /// <summary>
+    ///     Test that the Older and Newer links carry the filter and the page size, and that following them pages
+    ///     through the matching entries only.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter()
+    {
+        // Arrange: 60 matching entries between non-matching ones
+        await SignInAsAdminAsync();
+        var token = TestContext.Current.CancellationToken;
+        for (var i = 1; i <= 60; i++)
+        {
+            await Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "review.created", $"match {i}", 1, "REV-1"), token);
+            await Audit.RecordAsync(AuditDraft.By(TestActors.Bob, "review.created", $"other {i}", 1, "REV-1"), token);
+        }
+
+        // Act
+        var first = RenderAt("/audit?actor=ann&size=25");
+        var older = first.Find("[data-testid='audit-older']").GetAttribute("href")!;
+        var firstRows = first.FindAll("[data-testid='audit-row']").Count;
+        var second = RenderAt(older);
+
+        // Assert
+        Assert.Equal(25, firstRows);
+        Assert.StartsWith("/audit?actor=ann&size=25&before=", older, StringComparison.Ordinal);
+        Assert.Equal(25, second.FindAll("[data-testid='audit-row']").Count);
+        Assert.All(second.FindAll("[data-testid='audit-detail']"), e => Assert.StartsWith("match ", e.TextContent, StringComparison.Ordinal));
+        Assert.StartsWith("/audit?actor=ann&size=25&after=", second.Find("[data-testid='audit-newer']").GetAttribute("href"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a filter that matches nothing says so, and still offers the Clear link.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_FilterMatchesNothing_ShowsNoMatchStateAndClearLink()
+    {
+        // Arrange
+        await SignInAsAdminAsync();
+        await RecordAsync(2);
+
+        // Act
+        var cut = RenderAt("/audit?actor=nobody-has-this-name");
+
+        // Assert
+        Assert.Equal("No entry matches the filters.", cut.Find("[data-testid='audit-empty']").TextContent);
+        Assert.NotNull(cut.Find("[data-testid='audit-filter-clear']"));
+    }
+
+    /// <summary>
+    ///     Test that hostile query values never break the page: markup is encoded, huge texts are cut, and bad
+    ///     dates, sizes and projects fall back to the defaults.
+    /// </summary>
+    /// <param name="query">The query string.</param>
+    [Theory]
+    [InlineData("?actor=<marquee>text</marquee>&review='><blink>")]
+    [InlineData("?from=garbage&to=2025-99-99&size=-1&project=-3&action=%27%3B%20drop%20table")]
+    [InlineData("?size=99999999999999999999&project=99999999999999999999&after=-4")]
+    public async Task AuditPage_Render_HostileQueryValues_AreHandledAndEncoded(string query)
+    {
+        // Arrange
+        await SignInAsAdminAsync();
+        await RecordAsync(2);
+
+        // Act
+        var cut = RenderAt("/audit" + query);
+
+        // Assert
+        Assert.Empty(cut.FindAll("marquee"));
+        Assert.Empty(cut.FindAll("blink"));
+        Assert.Empty(cut.FindAll("[data-testid='audit-error']"));
+        Assert.NotNull(cut.Find("[data-testid='audit-filter-form']"));
+    }
+
+    /// <summary>
+    ///     Test that a huge actor text is cut to the stored width instead of failing the page.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_HugeActorText_IsCutAndPageRenders()
+    {
+        // Arrange
+        await SignInAsAdminAsync();
+        await RecordAsync(1);
+
+        // Act
+        var cut = RenderAt("/audit?actor=" + new string('a', 5000));
+
+        // Assert
+        Assert.True(cut.Find("[data-testid='audit-filter-actor']").GetAttribute("value")!.Length <= AuditText.MaxActorNameLength);
+        Assert.Empty(cut.FindAll("[data-testid='audit-error']"));
+    }
+
+    /// <summary>
+    ///     Test that a start date after the end date is ignored with a message instead of failing, and the entries show.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_FromAfterTo_ShowsMessageAndIgnoresTheDates()
+    {
+        // Arrange
+        await SignInAsAdminAsync();
+        await RecordAsync(2);
+
+        // Act
+        var cut = RenderAt("/audit?from=2030-01-02&to=2030-01-01");
+
+        // Assert
+        Assert.Contains("ignored", cut.Find("[data-testid='audit-filter-message']").TextContent, StringComparison.Ordinal);
+        Assert.Equal(2, cut.FindAll("[data-testid='audit-row']").Count);
+    }
 }

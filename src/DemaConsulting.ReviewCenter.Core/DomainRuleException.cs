@@ -269,7 +269,13 @@ public enum DomainRule
     ///     repository, or no file in common), or open threads of the earlier review would be dropped because their file
     ///     is not in the new review and the creator did not acknowledge that.
     /// </summary>
-    FollowUpInvalid
+    FollowUpInvalid,
+
+    /// <summary>
+    ///     An audit filter is not valid: its first day is after its last day, or a text is longer than the field it is
+    ///     matched against.
+    /// </summary>
+    AuditFilterInvalid
 }
 
 /// <summary>

@@ -1,15 +1,19 @@
-@* ProjectAuditPage: the audit trail of one project for whoever administers it, at "/projects/{id}/audit".
+@* ProjectAuditPage: the audit trail of one project for whoever may read its audit trail, at "/projects/{id}/audit".
 
    Presentation only; state and loading live in ProjectAuditPage.razor.cs. The entries recorded for the project
-   (member changes, repositories, reviews and signatures of that project), newest first, 50 per page, with Older /
-   Newer buttons that carry the position in the address. Entries of other projects and entries without a project are
-   never shown here; the whole trail and the button that verifies its hash chain stay on the page for system
-   administrators at "/audit". The entries and the paging are drawn by the shared AuditEntryTable component. All
+   (member changes, repositories, reviews and signatures of that project), newest first, 25, 50 or 100 per page, with
+   a filter bar (actor, action, review, from and to date, page size; the state lives in the query string) and Older /
+   Newer buttons that carry the position and the filter in the address. Entries of other projects and entries
+   without a project are never shown here; the whole trail and the button that verifies its hash chain stay on the
+   page for system administrators at "/audit". The filter bar is drawn by the shared AuditFilterForm component, the
+   entries and the paging by the shared AuditEntryTable component. Who may open the page is the audit-read right of
+   the project (project administrators and system administrators; Auditors once that role can be assigned). All
    text comes from the audit trail and is rendered as plain text. Every key value carries a stable kebab-case
    data-testid, and the data-interactive marker on the root flips to "true" once the live circuit is connected.
 
-   Human factors: (a) one table, nothing else; (b) the page is a read-only view, so the only buttons are the paging
-   ones; (c) an empty trail says so instead of showing an empty table.
+   Human factors: (a) one filter bar and one table; (b) the page is a read-only view, so the only buttons are the
+   filter and paging ones; (c) an empty trail says so, and a filter that matches nothing says that instead of
+   showing an empty table.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
@@ -44,7 +48,8 @@
     {
         <h1>Audit trail</h1>
         <p class="page-lead">A tamper-evident record of what happened in this project, newest first.</p>
-        <AuditEntryTable Page="Page" BasePath="@BasePath"
+        <AuditFilterForm State="Filter" BasePath="@BasePath" />
+        <AuditEntryTable Page="Page" BasePath="@BasePath" Filter="Filter"
                          EmptyText="Nothing has been recorded for this project yet." />
     }
 </main>

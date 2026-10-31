@@ -414,7 +414,8 @@ sections:
         title: >-
           The Web subsystem shall show system administrators the whole audit trail on an audit page
           that is reached from the header, and let them verify the hash chain and read the entry count and the head
-          hash of an intact chain or the first broken entry, and shall show whoever administers a project, a system
+          hash of an intact chain or the first broken entry, and shall let them narrow the trail by project, actor,
+          action, review, and date, and shall show whoever may read the audit trail of a project, a system
           administrator or a project admin of it, and nobody else, the audit trail of that project only on a page
           that is reached from the project page.
         justification: |
@@ -427,6 +428,8 @@ sections:
           - ReviewCenter-AuditPage-Verify
           - ReviewCenter-AuditPage-Admin
           - ReviewCenter-AuditPage-ProjectView
+          - ReviewCenter-AuditPage-Filter
+          - ReviewCenter-AuditPage-Paging
           - ReviewCenter-App-AuditLink
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash

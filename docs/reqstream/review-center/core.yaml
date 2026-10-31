@@ -380,7 +380,8 @@ sections:
           The Core subsystem shall record every change of projects, reviews, threads, checklists, reviewer slots,
           signatures, and users, and every sign-in event, as an entry of a hash-chained audit trail that names the
           actor, the action, and a short detail without passwords or free text, read the trail back newest first
-          in pages, for the whole trail, for one project, or for one review, and verify the chain by streaming, so
+          in pages, for the whole trail, for one project, or for one review, narrowed by actor, action, and date range,
+          and verify the chain by streaming, so
           that an edit, a deletion, an insertion, or a reordering
           in the middle of the history is detected.
         justification: |
@@ -396,6 +397,7 @@ sections:
           - ReviewCenter-AuditService-Coalesce
           - ReviewCenter-AuditService-CoalesceOverflow
           - ReviewCenter-AuditService-List
+          - ReviewCenter-AuditService-Filter
           - ReviewCenter-AuditService-Verify
           - ReviewCenter-ProjectService-Audit
           - ReviewCenter-ProjectService-MemberAudit

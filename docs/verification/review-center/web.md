@@ -278,9 +278,13 @@ shows the entry count and the full head hash of an intact chain, which is tested
 audit route gets an access
 denied message and no entries, which is tested by `Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail`.
 The audit page of a project shows a project admin the events of that project only, which is tested by
-`ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents`, and anybody who does not administer the project
+`ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents`, and anybody who may not read its audit trail
 the not-found message and no entries, which is tested by
-`ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries`.
+`ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries`. The filter form of both audit pages and the
+Older and Newer links that carry it are tested by `AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm`,
+`AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter`, and
+`ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries`; hostile values in the address are tested by
+`AuditPage_Render_HostileQueryValues_AreHandledAndEncoded`.
 The subsystem test of all pages does not include the two new routes; their `data-testid` attributes are checked in
 the unit tests.
 

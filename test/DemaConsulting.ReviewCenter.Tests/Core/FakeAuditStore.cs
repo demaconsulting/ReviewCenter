@@ -133,24 +133,14 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
 
     /// <inheritdoc />
     public Task<IReadOnlyList<AuditEntry>> ListAsync(
-        int? projectId,
-        string? reviewId,
+        AuditFilter filter,
         long? beforeSequence,
         long? afterSequence,
         int take,
         CancellationToken cancellationToken = default)
     {
         // Query a snapshot, so a parallel append cannot change the list while it is enumerated
-        var query = Entries.AsEnumerable();
-        if (reviewId is not null)
-        {
-            query = query.Where(e => e.ProjectId == projectId && e.ReviewId == reviewId);
-        }
-        else if (projectId is { } project)
-        {
-            // Like the real store: a project alone selects every entry of that project (never global entries)
-            query = query.Where(e => e.ProjectId == project);
-        }
+        var query = Entries.Where(e => Matches(e, filter));
 
         if (beforeSequence is { } before)
         {
@@ -163,6 +153,23 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
             : query.OrderByDescending(e => e.Sequence).Take(take).ToList();
 
         return Task.FromResult(result);
+    }
+
+    /// <summary>
+    ///     Tells whether an entry matches a filter, like the real store: a project selects only entries of that
+    ///     project (never global entries), the actor text is a case-insensitive literal substring.
+    /// </summary>
+    private static bool Matches(AuditEntry entry, AuditFilter filter)
+    {
+        return (filter.ProjectId is null || entry.ProjectId == filter.ProjectId)
+               && (filter.ReviewId is null || entry.ReviewId == filter.ReviewId)
+               && (filter.ActorUserId is null || entry.ActorUserId == filter.ActorUserId)
+               && (filter.ActorText is null
+                   || entry.ActorName.Contains(filter.ActorText, StringComparison.OrdinalIgnoreCase))
+               && (filter.Action is null || entry.Action == filter.Action)
+               && (filter.ActionPrefix is null || entry.Action.StartsWith(filter.ActionPrefix, StringComparison.Ordinal))
+               && (filter.FromUtc is null || entry.TimestampUtc >= filter.FromUtc)
+               && (filter.ToExclusiveUtc is null || entry.TimestampUtc < filter.ToExclusiveUtc);
     }
 
     /// <inheritdoc />

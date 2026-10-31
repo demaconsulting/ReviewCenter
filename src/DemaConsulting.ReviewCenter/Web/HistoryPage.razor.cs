@@ -144,7 +144,7 @@ public partial class HistoryPage : ComponentBase
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         if (Review is not null)
         {
-            Page = await AuditService.ListAsync(ProjectId, ReviewId, Before, After);
+            Page = await AuditService.ListAsync(new AuditFilter(ProjectId: ProjectId, ReviewId: ReviewId), Before, After);
         }
 
         Loaded = true;

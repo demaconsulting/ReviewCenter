@@ -50,7 +50,10 @@ that the table is full. The state is
 in memory of one process and is lost on restart. The service takes an optional `TimeProvider` (the system clock when
 none is given) so tests can move time.
 
-**PageSize**: `int` (constant) — 50 entries on a page.
+**DefaultPageSize**: `int` (constant) — 50 entries on a page when the caller gives no size. **MaxPageSize**: `int`
+(constant) — 200; no page is ever larger. **PageSizes**: the sizes the pages offer (25, 50 and 100).
+
+**AuditFilter**: the record of the conditions of a listing (see the **AuditFilter** and **AuditActions** section below).
 
 **MaxCoalescedKeys**: `int` (constant) — 500; the most keys the coalescing table holds.
 
@@ -62,9 +65,9 @@ either end), and the cursors `OlderBefore` (the sequence of the last entry of th
 the first entry), each `null` for an empty page.
 
 **IAuditStore**: the contract the Storage subsystem implements. It has three operations: `AppendAsync` (one entry in its
-own transaction), `ListAsync` (newest first, optionally of one review, before or after a sequence, with a size limit),
-and `ReadAfterAsync` (ascending batches for verification). `ListAsync` is the read behind both the project-level and
-the review-level view; the hash chain is unchanged by the project view (a filtered read of the same chain), and the
+own transaction), `ListAsync` (newest first, narrowed by an `AuditFilter`, before or after a sequence, with a size
+limit), and `ReadAfterAsync` (ascending batches for verification). `ListAsync` is the read behind the whole-trail, the
+project-level and the review-level view; the hash chain is unchanged by a filtered read of the same chain, and the
 whole chain still verifies. There is deliberately **no operation that updates or deletes
 an entry**.
 
@@ -204,13 +207,34 @@ the update of the table happen under the lock; the store is called after the loc
 
 **ListAsync**: Reads one page of the trail, newest first.
 
-- *Parameters*: `int? projectId` and `string? reviewId` (a `null` project gives the whole trail; a project alone gives
-  every event of that project, whether or not it names a review, and never an event without a project; a project with a
-  review gives the events of that review), `long? beforeSequence` (the Older page), `long? afterSequence` (the Newer
-  page), and a cancellation token. The caller must have checked the right to see the project first.
-- *Returns*: An `AuditEntryPage` of at most 50 entries.
+- *Parameters*: an `AuditFilter` (see below; `AuditFilter.None` gives the whole trail), `long? beforeSequence` (the
+  Older page), `long? afterSequence` (the Newer page), an optional page size, and a cancellation token. A filter with a
+  project gives every event of that project, whether or not it names a review, and never an event without a project;
+  events without a project are reached only by a filter without a project, which only the whole audit page uses. The
+  caller must have checked the right to see the project first.
+- *Returns*: An `AuditEntryPage` of at most the page size: `DefaultPageSize` (50) when the size is less than 1 or not
+  given, and never more than `MaxPageSize` (200); the pages offer 25, 50 and 100.
 - *Postconditions*: When both positions are given, `beforeSequence` wins. `HasOlder` and `HasNewer` come from one cheap
-  look past each end of the page, so a link is shown only when there is something behind it.
+  look past each end of the page (one more entry is asked for), so a link is shown only when there is something
+  behind it, and no count of the trail is ever made. The filter is validated first, so a store is never given an
+  invalid one.
+- *Errors*: `DomainRuleException` with `DomainRule.AuditFilterInvalid` for an invalid filter (see below);
+  `ArgumentNullException` for a missing filter.
+
+**AuditFilter** (record, with the static `AuditFilter.None`): `ProjectId`, `ReviewId`, `ActorUserId` (exact),
+`ActorText` (a case-insensitive text in the stored actor name), `Action` (exact), `ActionPrefix` (every action that
+starts with it, for example `review.`), and `From` and `To` (UTC days, both included). All set conditions must hold.
+`Validated()` trims the texts, turns an empty text into `null`, refuses a text longer than the stored field it is
+compared with, and refuses `From` after `To` (the invalid-filter rule); `FromUtc` is the start of the From day and
+`ToExclusiveUtc` the start of the day after To (`null` for the last day that exists), so the end day is included up
+to its last instant.
+
+**AuditActions** (static): the vocabulary of the action codes the product records, `All` (sorted, without the
+`selftest.` entries of the self test, which never reach an installation), the groups `Prefixes` (`account.`,
+`attestation.`, `audit.`, `auth.`, `checklist.`, `project.`, `repository.`, `review.`, `signature.`, `slot.`,
+`thread.`, `token.`, `user.`), and the lookups `InGroup`, `IsKnownAction` and `IsKnownPrefix`. The pages offer these as
+the choices of the action filter and accept no other value from an address. The list is kept in step with the code by
+a test that scans the product sources for the action codes passed to an audit draft.
 
 **VerifyAsync**: Verifies the whole chain.
 
@@ -258,8 +282,9 @@ sign-in event can be missing from the trail when the write fails. Null arguments
   through `TryRecordAsync` and `TryRecordCoalescedAsync` (when an `AuditService` was supplied).
 - **SignIn** (Identity) — records sign-in and sign-out through `TryRecordAsync`, and refusals by the throttle through
   `TryRecordCoalescedAsync`.
-- **HistoryPage**, **AuditPage**, and **ProjectAuditPage** (Web) — list entries (the project audit page lists the
-  events of one project for its administrators); the audit page also verifies the chain.
+- **HistoryPage**, **AuditPage**, and **ProjectAuditPage** (Web) — list entries with an `AuditFilter` (the project audit
+  page lists the events of one project for the project administrators and the system administrators, through the
+  audit-read access); the audit page also verifies the chain.
 - **ProjectService** — records failed member adds through `TryRecordAsync` (when an `AuditService` was supplied).
 - **AuditCommand** (Hosting) — verifies the chain for the `audit verify` verb.
 - **Services that change data** (`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`,

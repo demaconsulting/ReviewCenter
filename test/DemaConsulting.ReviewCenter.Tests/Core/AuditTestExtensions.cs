@@ -96,6 +96,46 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
+    ///     Reads one page of the trail by project and review, with the default page size (the shape of the call
+    ///     before the audit filter existed).
+    /// </summary>
+    public static Task<AuditEntryPage> ListAsync(
+        this AuditService service,
+        int? projectId,
+        string? reviewId,
+        long? beforeSequence,
+        long? afterSequence,
+        CancellationToken cancellationToken = default)
+    {
+        return service.ListAsync(
+            new AuditFilter(ProjectId: projectId, ReviewId: reviewId),
+            beforeSequence,
+            afterSequence,
+            AuditService.DefaultPageSize,
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Lists entries of a store by project and review (the shape of the call before the audit filter existed).
+    /// </summary>
+    public static Task<IReadOnlyList<AuditEntry>> ListAsync(
+        this IAuditStore store,
+        int? projectId,
+        string? reviewId,
+        long? beforeSequence,
+        long? afterSequence,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        return store.ListAsync(
+            new AuditFilter(ProjectId: projectId, ReviewId: reviewId),
+            beforeSequence,
+            afterSequence,
+            take,
+            cancellationToken);
+    }
+
+    /// <summary>
     ///     Builds a generic audit draft.
     /// </summary>
     /// <returns>The draft.</returns>

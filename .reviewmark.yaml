@@ -757,8 +757,13 @@ reviews:
       - "src/**/Web/ProjectAuditPage.razor.cs"
       - "src/**/Web/AuditEntryTable.razor"
       - "src/**/Web/AuditEntryTable.razor.cs"
+      - "src/**/Web/AuditFilterForm.razor"
+      - "src/**/Web/AuditFilterForm.razor.cs"
+      - "src/**/Web/AuditFilterState.cs"
       - "test/**/Web/AuditPageTests.cs"
       - "test/**/Web/ProjectAuditPageTests.cs"
+      - "test/**/Web/AuditEntryTableTests.cs"
+      - "test/**/Web/AuditFilterStateTests.cs"
 
   - id: ReviewCenter-Web-RepositoriesPage
     title: Review of ReviewCenter RepositoriesPage unit implementation
@@ -1141,8 +1146,12 @@ reviews:
       - "docs/design/review-center/core/audit-service.md"
       - "docs/verification/review-center/core/audit-service.md"
       - "src/DemaConsulting.ReviewCenter.Core/AuditService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditFilter.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditActions.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IAuditStore.cs"
       - "test/**/Core/AuditServiceTests.cs"
+      - "test/**/Core/AuditFilterTests.cs"
+      - "test/**/Core/AuditActionsTests.cs"
 
   # ReviewCenter - Core repositories and file selection
   - id: ReviewCenter-Core-SelectionMatcher
@@ -1347,6 +1356,7 @@ reviews:
       - "src/**/Storage/AuditStore.cs"
       - "src/**/Storage/AuditAppender.cs"
       - "test/**/Storage/AuditStoreTests.cs"
+      - "test/**/Storage/AuditStoreFilterTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-DatabaseSetup

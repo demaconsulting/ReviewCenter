@@ -3,15 +3,16 @@
 #
 # The AuditPage unit holds the page that shows the whole audit trail to system administrators and verifies its hash
 # chain, and the page at /projects/{project}/audit that shows the audit trail of one project to whoever administers
-# that project. Both pages share the AuditEntryTable component, which renders the entries.
+# that project. Both pages share the AuditEntryTable component, which renders the entries, and the filter form that
+# narrows them.
 
 sections:
   - title: AuditPage Unit Requirements
     requirements:
       - id: ReviewCenter-AuditPage-Display
         title: >-
-          The AuditPage component shall show the whole audit trail newest first, 50 entries to a page, with the
-          sequence, time, actor, action, review, and detail of each, with links to the older and newer page, a
+          The AuditPage component shall show the whole audit trail newest first, 50 entries to a page by default, with
+          the sequence, time, actor, action, review, and detail of each, with links to the older and newer page, a
           message when the trail is empty, and all text rendered as plain text.
         justification: |
           System administrators review what happened in the system, and the text comes from users.
@@ -60,19 +61,70 @@ sections:
           - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
           - Routes_Render_AdminOpensAuditRoute_ShowsAuditPage
 
+      - id: ReviewCenter-AuditPage-Filter
+        title: >-
+          The AuditPage unit shall show, on the whole audit trail and on the audit trail of a project, a form that
+          narrows the entries by actor text, action (any, a group, or one exact action from the list of the known
+          actions), review, a range of UTC days, and page size (25, 50 or 100), and on the whole audit trail also by
+          project, shall keep the choice in the address so that the filter form and a link to a view are the same, shall
+          fall back to no condition, or for the page size to 50, for every filter value of the address that cannot be
+          used instead of failing, shall ignore a range that ends before it starts and say so, shall cut a text to the
+          width of the field it is compared with, shall render every value as encoded text, shall show a link that
+          clears the filters while one is set, and shall say that no entry matches when a filter shows nothing.
+        justification: |
+          An auditor must find the entries of one person, one kind of action or one review without reading the trail
+          page by page, and must be able to send the link of that view to a colleague. The address is written by
+          anybody, so no value of it may break the page, reach the store in a form that is not valid, or become
+          markup.
+        tests:
+          - AuditPage_Render_Admin_ShowsFilterFormWithProjectSelector
+          - AuditPage_Render_QueryFilters_LimitTheEntriesAndFillTheForm
+          - AuditPage_Render_ProjectQuery_ShowsOnlyThatProjectsEntries
+          - AuditPage_Render_FilterMatchesNothing_ShowsNoMatchStateAndClearLink
+          - AuditPage_Render_HostileQueryValues_AreHandledAndEncoded
+          - AuditPage_Render_HugeActorText_IsCutAndPageRenders
+          - AuditPage_Render_FromAfterTo_ShowsMessageAndIgnoresTheDates
+          - ProjectAuditPage_Render_QueryFilters_LimitTheProjectsEntries
+          - ProjectAuditPage_Render_NoMatchAndHostileValues_AreSafe
+          - ProjectAuditPage_Render_FilterAndScoping_NeverShowsOtherProjectsOrGlobalEntries
+          - AuditFilterState_FromQuery_NoValues_IsTheDefaultState
+          - AuditFilterState_FromQuery_GoodValues_AreReadAndWrittenBack
+          - AuditFilterState_ToFilter_ProjectPageProject_WinsOverTheQueryProject
+          - AuditFilterState_FromQuery_BadValues_FallBackToDefaults
+          - AuditFilterState_FromQuery_HugeTexts_AreBoundedAndTheFilterIsValid
+          - AuditFilterState_FromQuery_ReversedDatesAndSize_DropDatesAndSizeIsNotNarrowing
+
+      - id: ReviewCenter-AuditPage-Paging
+        title: >-
+          The AuditPage unit shall page the entries with links to the older and the newer page that carry the filter
+          and the page size, so that paging stays inside the filtered entries, shall write the values of the filter
+          into those links as escaped query values, and shall tell a filter that matches nothing from a trail that
+          is empty.
+        justification: |
+          A link that lost the filter would drop the reader out of the view that was chosen, and a value that is not
+          escaped could add parameters or markup to the link.
+        tests:
+          - AuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
+          - ProjectAuditPage_Render_FilterWithManyMatches_LinksCarryTheFilter
+          - AuditEntryTable_Render_WithFilter_LinksCarryTheFilter
+          - AuditEntryTable_Render_EmptyPage_TellsNoMatchFromNothingRecorded
+          - AuditFilterState_ToQuery_TextWithSpecialCharacters_IsEscaped
+
       - id: ReviewCenter-AuditPage-ProjectView
         title: >-
-          The AuditPage unit shall provide the page /projects/{project}/audit, which shows whoever administers the
-          project (a system administrator or a project admin of it) the audit trail of that project only, newest
-          first, 50 entries to a page, with links to the older and newer page and a message when nothing was recorded,
-          using the same table as the whole audit trail, and shall show the not-found message and no entries to a
-          plain member, a user who is no member, and for a missing project, and, when the right is lost while the page
-          is open, drop the entries.
+          The AuditPage unit shall provide the page /projects/{project}/audit, which shows whoever may read the audit
+          trail of the project (a system administrator or a project admin of it, and an Auditor of it once that role
+          can be given, all through the audit-read access of the project) the audit trail of that project only,
+          newest first, with the filter and the paging of the whole audit trail, links to the older and newer page
+          and a message when nothing was recorded, using the same table as the whole audit trail, and shall show the
+          not-found message and no entries to a plain member, a user who is no member, and for a missing project,
+          and, when the right is lost while the page is open, drop the entries.
         justification: |
           Project admins are accountable for who joined their project and what was done in it, so they need the trail
           of their project, but the whole trail names every user and action of the installation and stays for system
           administrators. The right is checked on every load, because an open page keeps its state after a membership
-          is revoked or a user is demoted.
+          is revoked or a user is demoted. The page asks the audit-read access instead of the administration right, so
+          that a read-only auditor can be given the page without being given anything else.
         tests:
           - ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents
           - ProjectAuditPage_Render_SystemAdmin_ShowsTheProjectsEvents

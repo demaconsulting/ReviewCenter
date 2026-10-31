@@ -51,10 +51,27 @@ public partial class AuditEntryTable : ComponentBase
     public string BasePath { get; set; } = string.Empty;
 
     /// <summary>
-    ///     Gets or sets the sentence shown when the page has no entries.
+    ///     Gets or sets the sentence shown when the page has no entries and no filter is set.
     /// </summary>
     [Parameter]
     public string EmptyText { get; set; } = "Nothing has been recorded yet.";
+
+    /// <summary>
+    ///     Gets or sets the filter the page was read with, or <c>null</c> for none; the paging buttons carry it, and
+    ///     an empty page of a narrowing filter says that nothing matches instead of that nothing was recorded.
+    /// </summary>
+    [Parameter]
+    public AuditFilterState? Filter { get; set; }
+
+    /// <summary>
+    ///     Gets the filter that stands for "none", so the buttons need no null checks.
+    /// </summary>
+    private static AuditFilterState EmptyFilter { get; } = AuditFilterState.FromQuery(null, null, null, null, null, null, null);
+
+    /// <summary>
+    ///     Gets the sentence shown for a page without entries.
+    /// </summary>
+    private string NoEntriesText => Filter is { Narrows: true } ? "No entry matches the filters." : EmptyText;
 
     /// <summary>
     ///     Formats the time of an entry in UTC.
@@ -152,13 +169,15 @@ public partial class AuditEntryTable : ComponentBase
     private static partial Regex LongHexRegex();
 
     /// <summary>
-    ///     Builds the address of another page of the trail.
+    ///     Builds the address of another page of the trail, carrying the filter.
     /// </summary>
     /// <param name="key">The query key: <c>before</c> or <c>after</c>.</param>
     /// <param name="sequence">The sequence to carry; <c>null</c> gives the first page.</param>
     /// <returns>The address, relative to the site root.</returns>
     private string PageLink(string key, long? sequence)
     {
-        return sequence is { } value ? $"{BasePath}?{key}={value.ToString(CultureInfo.InvariantCulture)}" : BasePath;
+        var state = Filter ?? EmptyFilter;
+        var query = key == "after" ? state.ToQuery(after: sequence) : state.ToQuery(before: sequence);
+        return BasePath + query;
     }
 }

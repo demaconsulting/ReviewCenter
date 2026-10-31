@@ -170,7 +170,12 @@ The last project administrator rule, including two removals made at the same tim
 membership and its audit entry by `UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether` and
 `UserStore_AddToProjectAsync_Failure_StoresNothing`, all defined in `ProjectMembersStoreTests.cs`. The listing of the
 audit trail for one project only is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`
-in the same file. The time of the newest audit entry of each review of a project (the last activity) is tested by
+in the same file. The filter of the listing (each field, the literal matching of `%`, `_`, and `\`, the day range, the
+stored form of the time, the paging with a filter, and the speed on a larger trail) is tested in `AuditStoreFilterTests.cs`
+(see `AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive` and
+`AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable`), and the indexes of the audit table by
+`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`. The time of the newest audit entry of each review of a
+project (the last activity) is tested by
 `AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject`, defined in `AuditStoreTests.cs`.
 
 **External identity**: An account of an identity provider is found only by the exact pair of issuer and subject, and a

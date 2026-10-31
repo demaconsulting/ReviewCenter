@@ -1,0 +1,68 @@
+@* AuditFilterForm: the filter bar of the audit pages (part of the AuditPage unit).
+
+   A plain form with a GET method, so every filtered view has an address of its own and the Older / Newer links can
+   carry it. The fields are an actor text, an action (any, a whole group such as every review action, or one exact
+   action; the choices come from AuditActions), a review id, a from and a to date (UTC days), and the page size
+   (25, 50 or 100); the whole-trail page also gets a project selector. "Clear filters" is a link to the bare page.
+   Every value is rendered by the Razor encoder, and none is trusted: the state was already cleaned by
+   AuditFilterState. Every key value carries a stable kebab-case data-testid. *@
+<form class="filter-bar" method="get" action="@BasePath" data-testid="audit-filter-form">
+    @if (Projects is not null)
+    {
+        <label>Project
+            <select name="project" data-testid="audit-filter-project">
+                <option value="" selected="@(State.ProjectId is null)">All projects</option>
+                @foreach (var project in Projects)
+                {
+                    <option value="@project.Id" selected="@(State.ProjectId == project.Id)">@project.Name</option>
+                }
+            </select>
+        </label>
+    }
+    <label>Actor
+        <input type="search" name="actor" value="@State.Actor" maxlength="@AuditText.MaxActorNameLength"
+               placeholder="Name contains" data-testid="audit-filter-actor" />
+    </label>
+    <label>Action
+        <select name="action" data-testid="audit-filter-action">
+            <option value="" selected="@(State.Action.Length == 0)">Any action</option>
+            @foreach (var prefix in AuditActions.Prefixes)
+            {
+                <optgroup label="@prefix.TrimEnd('.')">
+                    <option value="@prefix" selected="@(State.Action == prefix)">All @prefix.TrimEnd('.') actions</option>
+                    @foreach (var action in AuditActions.InGroup(prefix))
+                    {
+                        <option value="@action" selected="@(State.Action == action)">@action</option>
+                    }
+                </optgroup>
+            }
+        </select>
+    </label>
+    <label>Review
+        <input type="search" name="review" value="@State.Review" maxlength="@ReviewLimits.MaxReviewIdLength"
+               placeholder="Review id" data-testid="audit-filter-review" />
+    </label>
+    <label>From
+        <input type="date" name="from" value="@AuditFilterState.FormatDate(State.From)" data-testid="audit-filter-from" />
+    </label>
+    <label>To
+        <input type="date" name="to" value="@AuditFilterState.FormatDate(State.To)" data-testid="audit-filter-to" />
+    </label>
+    <label>Per page
+        <select name="size" data-testid="audit-filter-size">
+            @foreach (var size in AuditService.PageSizes)
+            {
+                <option value="@size" selected="@(State.PageSize == size)">@size</option>
+            }
+        </select>
+    </label>
+    <button type="submit" class="outline small" data-testid="audit-filter-apply">Apply</button>
+    @if (State.IsFiltered)
+    {
+        <a class="action outline small" href="@BasePath" data-testid="audit-filter-clear">Clear filters</a>
+    }
+</form>
+@if (State.Message is not null)
+{
+    <p class="notice" role="status" data-testid="audit-filter-message">@State.Message</p>
+}

@@ -11,7 +11,10 @@ Concurrency is verified by starting many appends at once, from one store and fro
 `UserStore`, and `AuditStore` share the appender), and checking that the stored sequence has no gap and the chain
 verifies. Failure injection uses a database trigger that aborts the audit insert, and a draft function that throws,
 and then checks that the change was rolled back and that the gate was released (a later call does not block). The
-absence of an update or delete operation is checked on the public surface by reflection.
+absence of an update or delete operation is checked on the public surface by reflection. The filter, the date range, and
+the stored form of the time are verified in `AuditStoreFilterTests.cs` against the same kind of database, with the
+entries written directly through the appender with chosen times and actors, and the indexes in
+`StorageSubsystemTests.cs`.
 
 #### Test Environment
 
@@ -28,6 +31,13 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - Concurrent appends, also from different stores, produce one linear chain without gap or fork.
 - A second entry with an existing sequence is refused by the database key.
 - The newest-first listing honors the review filter and both cursors; the batch read is ascending and bounded.
+- Each field of the filter selects the matching entries alone and together; the actor text is case-insensitive and
+  matches `%`, `_`, and `\` literally; an action prefix matches literally; the day range includes the first instant of
+  the From day and the last instant of the To day and excludes the instant before and the next day; the filtered
+  pages follow the cursors over the matches only; a filter with a project never returns an entry without one; and a
+  filtered page of a trail of 3,000 entries is read within a loose time bound.
+- The time of an entry is stored as fixed-width UTC text, whatever offset it was written with, and the chain still
+  verifies; a database created now has the four indexes of the table.
 - The listing for a project returns only that project's entries, none of another project or without a project, and the
   chain over all entries still verifies.
 - The last activity of a project is the time of the newest entry of each of its reviews, without entries that have no
@@ -84,6 +94,40 @@ and without the review filter and with both cursors; the result is newest first.
 of project two, and without a project are appended; the listing for project one returns its two entries newest
 first, project two returns its one, a project without entries returns none, and the chain over all four entries
 verifies. This scenario is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`.
+
+**AuditStore_ListAsync_EachField_SelectsMatchingEntries**: Entries that differ in project, review, actor, action, and
+time are listed with one field of the filter at a time; only the matching entries are returned, newest first. This
+scenario is tested by `AuditStore_ListAsync_EachField_SelectsMatchingEntries`, and with several fields set at once by
+`AuditStore_ListAsync_CombinedFields_AllMustMatch`.
+
+**AuditStore_ListAsync_ProjectFilter_NeverReturnsGlobalEntries**: Entries without a project are never returned for a
+filter with a project. This scenario is tested by `AuditStore_ListAsync_ProjectFilter_NeverReturnsGlobalEntries`.
+
+**AuditStore_ListAsync_ActorText_MatchesLiterallyAndIgnoresCase**: Actor names with `%`, `_`, and `\` are searched for
+with those characters; they match literally and not as wildcards, and letters match without regard to case. This
+scenario is tested by `AuditStore_ListAsync_ActorText_MatchesLiterallyAndIgnoresCase`, and the group of actions by
+`AuditStore_ListAsync_ActionPrefix_MatchesLiterally`.
+
+**AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive**: Entries just before the first instant of a day, at it, at
+the last instant of the day, and at the first instant of the next day (some written with an offset) are listed for
+that day; the two inside are returned. This scenario is tested by
+`AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive`.
+
+**AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable**: Entries written with and without an offset are
+stored as fixed-width UTC text, read back as the same instants, and the chain verifies. This scenario is tested by
+`AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable`.
+
+**AuditStore_ListAsync_FilterWithCursors_PagesThroughMatchesOnly**: A filtered listing is paged older and newer; only
+the matching entries are visited, each once. This scenario is tested by
+`AuditStore_ListAsync_FilterWithCursors_PagesThroughMatchesOnly`.
+
+**AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded**: A trail of 3,000 entries is filtered by project,
+actor, action, and dates; each page is no larger than requested and the read takes well under the loose bound. This
+scenario is tested by `AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded`.
+
+**StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes**: A database that is created now has the indexes on project and
+sequence, actor and sequence, action and sequence, and project, review, and sequence. This scenario is tested by
+`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`.
 
 **AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject**: Entries of two reviews of project one, one entry of
 the project without a review, and one entry of another project are appended. The last activity of project one names the
