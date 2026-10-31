@@ -225,8 +225,8 @@ sections:
           come before the probe because the probe is what creates the new key. The escape hatch lets an operator who
           has accepted the loss start once; secrets that are only partly unreadable do not stop the rest of the server
           from working, so they are reported loudly instead of refused. A database that cannot be read (a lock, a
-          damaged file) leaves it unknown whether secrets exist, and the escape hatch only accepts the loss of
-          secrets that are known to exist, so an empty ring is refused until the database can be read.
+          table that cannot be read) leaves it unknown whether secrets exist, and the escape hatch only accepts the
+          loss of secrets that are known to exist, so an empty ring is refused until the database can be read.
         tests:
           - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
           - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning

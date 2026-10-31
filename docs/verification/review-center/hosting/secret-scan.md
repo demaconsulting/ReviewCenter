@@ -21,6 +21,8 @@ N/A - standard test environment. The tests run on every platform.
 - With the ring of another installation, every secret is unreadable and the ids of the repositories and users are
   reported, ascending; with a mix of secrets only the foreign ones are unreadable.
 - A key folder with no key file counts every secret as unreadable and no key file is created.
+- A key folder whose only key file is malformed also counts every secret as unreadable, creates no key file, and leaves
+  the malformed file as it was.
 - Key files are counted by their content: plaintext (`<masterKey`) and in total.
 - A database that does not exist is not created and holds no secrets; a database without the tables, or with the
   tables and no rows, holds no secrets and is no error.
@@ -44,6 +46,11 @@ scanned; only the second is unreadable. This scenario is tested by the test of t
 **SecretScan_ScanAsync_EmptyRingWithSecrets_CountsThemUnreadableAndCreatesNoKey**: The database is scanned with the
 protectors of an installation whose ring was never used; the ring is empty, every secret is unreadable, and no key file
 exists afterwards (the scan did not ask the ring). This scenario is tested by the test of the same name.
+
+**SecretScan_ScanAsync_MalformedKeyFileOnly_CountsSecretsUnreadableAndCreatesNoKey**: The database is scanned with the
+protectors of an installation whose key folder holds one file `key-*.xml` that is not a key; the file counts in the
+total, every secret is unreadable, no other key file exists afterwards, and the malformed file is unchanged. This
+scenario is tested by the test of the same name.
 
 **SecretScan_ScanAsync_PlaintextKeyFile_IsCountedAndMissingDatabaseIsNotCreated**: A folder with one plain and one
 encrypted key file is described as two files of which one is plain, and a database file that does not exist is not

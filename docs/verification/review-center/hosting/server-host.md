@@ -254,16 +254,19 @@ cases). The build fails with the message "Key ring '...' is empty but the databa
 `DataProtection:AllowNewKeyRing` true; the build succeeds and a warning that names the setting and the number of
 secrets is logged. This scenario is tested by `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`.
 
-**ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey**: The database file is
-replaced by a file that is not a database, so the scan fails with a `SqliteException` on every platform, and the key
-folder has no key (a theory without and with `DataProtection:AllowNewKeyRing`). The build fails with the message "Key
+**ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey**: A database file is
+created that opens and holds a table (so the schema is not created again) but whose `Repositories` view reads a table
+that does not exist, so the start-up database preparation succeeds and the scan fails with a `SqliteException` on every
+platform, and the key folder has no key (a theory without and with `DataProtection:AllowNewKeyRing`). The build fails
+with the message "Key
 ring '...' is empty and the database (Database:ConnectionString) could not be read to check whether it holds protected
 secrets, so no key was created", which holds neither the location of the database nor the text of the exception and has
 no inner exception, and no key file exists afterwards. This scenario is tested by
 `ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey`.
 
 **ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning**: A server is started once, so that
-the ring has a key, and the database file is then replaced by a file that is not a database. The second build succeeds
+the ring has a key, and the database file is then replaced by one that opens but whose `Repositories` view reads a
+table that does not exist. The second build succeeds
 with the same single key and logs a warning that the database could not be read. This scenario is tested by
 `ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning`.
 

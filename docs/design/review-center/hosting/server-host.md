@@ -237,7 +237,9 @@ before the probe round trip because the round trip creates a key when there is n
   which case a warning with the count is logged and the start goes on. With keys in the ring but some secrets that cannot
   be decrypted, an error is logged with the counts per kind, the ids of the repositories and users, and the remedy
   (enter the repository tokens again; an administrator resets the two-factor secret), and the start goes on. When the
-  scan cannot complete because the database cannot be read (a `SqliteException`, for example a lock or a damaged file)
+  scan cannot complete because the database cannot be read (a `SqliteException` after the database was prepared, for
+  example a lock or a table that cannot be read; a file that is not a database fails earlier, in `InitializeDatabase`, with
+  "Failed to prepare the database", which creates no key either)
   and the folder holds no key file, an `InvalidOperationException` "Key ring '{folder}' is empty and the database
   (Database:ConnectionString) could not be read to check whether it holds protected secrets, so no key was created. Fix
   the access to the database and start again; run 'reviewcenter --validate --check-config' for the details." is thrown,

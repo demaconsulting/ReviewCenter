@@ -140,6 +140,33 @@ public class SecretScanTests
     }
 
     /// <summary>
+    ///     Test that a ring whose only key file is malformed counts the secrets as unreadable without asking the ring,
+    ///     which would create a replacement key, and leaves the malformed file as it is.
+    /// </summary>
+    [Fact]
+    public async Task SecretScan_ScanAsync_MalformedKeyFileOnly_CountsSecretsUnreadableAndCreatesNoKey()
+    {
+        // Arrange: a database with secrets, and a ring whose only key file is not a key
+        using var install = new Install();
+        install.AddToken(1, TokenText);
+        install.AddTotp(2);
+        using var damaged = new Install();
+        Directory.CreateDirectory(damaged.KeysFolder);
+        var malformed = Path.Combine(damaged.KeysFolder, "key-00000000-0000-0000-0000-000000000009.xml");
+        await File.WriteAllTextAsync(malformed, "this is not a key", TestContext.Current.CancellationToken);
+
+        // Act
+        var result = await SecretScan.ScanAsync(
+            damaged.KeysFolder, install.Database, damaged.Credentials, damaged.TotpSecrets, TestContext.Current.CancellationToken);
+
+        // Assert: everything unreadable, and neither a new key file nor a change of the malformed one
+        Assert.Equal(1, result.KeyFiles);
+        Assert.Equal(2, result.UnreadableSecrets);
+        Assert.Equal([malformed], damaged.KeyFiles());
+        Assert.Equal("this is not a key", await File.ReadAllTextAsync(malformed, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that key files are counted as plaintext or encrypted by their content, and that a database that does
     ///     not exist holds no secret and is not created.
     /// </summary>

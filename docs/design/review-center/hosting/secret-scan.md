@@ -46,8 +46,9 @@ a missing table or column means no secrets of that kind, and a missing file mean
 database; (4) decrypt each value with the protector of its kind and drop the plaintext at once; a value that raises a
 `DomainRuleException`, `CryptographicException`, or `FormatException` is counted as unreadable and its row id is kept.
 
-When the folder holds no key file, step 4 does not ask the protectors: Data Protection would create the first key
-for the question, so every secret is counted as unreadable instead. A caller that must not create keys under any
+When the folder holds no usable key (no key file, or only files that are neither a plain nor an encrypted key, such as a
+malformed or unreadable file), step 4 does not ask the protectors: Data Protection would create a replacement key for
+the question, so every secret is counted as unreadable instead. A caller that must not create keys under any
 circumstance (the self-validation) also switches automatic key generation off for its services.
 
 **FormatIds**: Formats the ids of unreadable rows for a message: the first ten, followed by "and N more" when there

@@ -80,10 +80,10 @@ internal sealed record SecretScanResult(
 ///     production protectors, discards the plaintext on the spot, and counts the ones that fail. It is strictly
 ///     read-only. The database is opened read-only, so a missing file is never created and a missing database, table
 ///     or row simply means no secrets. Nothing is ever protected, so no key is created; and because decrypting
-///     against a ring without any key file would make Data Protection create the first key, an empty ring is not
-///     asked at all and every secret is counted as unreadable. The caller that must not create keys under any
-///     circumstance (the self-validation) additionally switches automatic key generation off. The class is stateless
-///     and thread-safe.
+///     against a ring without any usable key file (none, or only malformed or unreadable ones) would make Data
+///     Protection create a key, such a ring is not asked at all and every secret is counted as unreadable. The
+///     caller that must not create keys under any circumstance (the self-validation) additionally switches
+///     automatic key generation off. The class is stateless and thread-safe.
 /// </remarks>
 internal static class SecretScan
 {
@@ -138,8 +138,11 @@ internal static class SecretScan
         ArgumentNullException.ThrowIfNull(credentials);
         ArgumentNullException.ThrowIfNull(totpSecrets);
 
-        var (keyFiles, plaintext, _) = KeyRingProtection.InspectKeyFiles(keysFolder);
-        var ringIsEmpty = keyFiles == 0;
+        var (keyFiles, plaintext, encrypted) = KeyRingProtection.InspectKeyFiles(keysFolder);
+
+        // A file that is neither a plaintext nor an encrypted key (malformed, unreadable) is no key: with only such
+        // files Data Protection would create a replacement key when asked, so the ring is not asked then either
+        var ringHasNoKey = plaintext + encrypted == 0;
 
         // The rows are read first, then decrypted: the database is not held open while the ring is asked
         var repositories = new List<(int Id, string Text)>();
@@ -161,7 +164,7 @@ internal static class SecretScan
         foreach (var (id, text) in repositories)
         {
             // Without a key file the ring cannot hold what protected the value, and asking would create a key
-            if (ringIsEmpty || !CanUnprotect(() => _ = credentials.Unprotect(text)))
+            if (ringHasNoKey || !CanUnprotect(() => _ = credentials.Unprotect(text)))
             {
                 unreadableRepositories.Add(id);
             }
@@ -170,7 +173,7 @@ internal static class SecretScan
         var unreadableTotps = new List<int>();
         foreach (var (id, text) in totps)
         {
-            if (ringIsEmpty || !CanUnprotect(() => Array.Clear(totpSecrets.Unprotect(id, text))))
+            if (ringHasNoKey || !CanUnprotect(() => Array.Clear(totpSecrets.Unprotect(id, text))))
             {
                 unreadableTotps.Add(id);
             }
