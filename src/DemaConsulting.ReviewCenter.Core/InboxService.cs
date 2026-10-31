@@ -152,6 +152,20 @@ public sealed class InboxService
     }
 
     /// <summary>
+    ///     Finds the highest comment identity of a review among the comments posted at or before a moment, which is
+    ///     what the user has seen of a review that was read from that moment on.
+    /// </summary>
+    /// <param name="threads">The threads of the review with their comments. Must not be null.</param>
+    /// <param name="notAfter">The moment the reading started; comments posted later are not counted.</param>
+    /// <returns>The highest comment identity, or zero when there is no such comment.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="threads"/> is null.</exception>
+    public static int MaxCommentId(IEnumerable<ReviewThread> threads, DateTimeOffset notAfter)
+    {
+        ArgumentNullException.ThrowIfNull(threads);
+        return InboxRules.MaxCommentId(threads, notAfter);
+    }
+
+    /// <summary>
     ///     Builds the inbox of a user.
     /// </summary>
     /// <param name="actor">The signed-in user; <c>null</c> and users without access give the empty inbox.</param>
@@ -328,7 +342,7 @@ public sealed class InboxService
         foreach (var (projectId, reviewId) in view.Items.Select(item => (item.ProjectId, item.ReviewId)).Distinct())
         {
             var threads = await _reviews.ListThreadsAsync(projectId, reviewId, cancellationToken);
-            marks.Add(new InboxSeenMark(projectId, reviewId, InboxRules.MaxCommentId(threads)));
+            marks.Add(new InboxSeenMark(projectId, reviewId, InboxRules.MaxCommentId(threads, now)));
         }
 
         await _inbox.MarkSeenManyAsync(user.Id, marks, now, cancellationToken);
@@ -399,7 +413,8 @@ public sealed class InboxService
                 if (unsigned.Count > 0)
                 {
                     var chip = unsigned.Contains(SlotSignatureState.NotSigned) ? NotSignedChip : SignAgainChip;
-                    items.Add(Row(InboxSection.ToSign, chip, review.State is null));
+                    var unread = await IsToSignUnreadAsync(review, lastSeenCommentId, lastSeenAt, cancellationToken);
+                    items.Add(Row(InboxSection.ToSign, chip, unread));
                 }
             }
 
@@ -431,6 +446,45 @@ public sealed class InboxService
         {
             await AddUpdatesAsync(items, review, Row, new ApprovalFacts(approved, digest, signatures, lastSeenAt), cancellationToken);
         }
+    }
+
+    /// <summary>
+    ///     Decides whether a To sign row is new to the user: the user never saw the review, or something that bears
+    ///     on the signature happened after the user last saw it.
+    /// </summary>
+    /// <param name="review">What is known of the review.</param>
+    /// <param name="lastSeenCommentId">The highest comment identity the user has seen; zero when none.</param>
+    /// <param name="lastSeenAt">The time the user last saw the review; the minimum value when never.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when there is no read state, or when someone else signed, answered a check, commented,
+    /// or reopened the review after the user last saw it.</returns>
+    private async Task<bool> IsToSignUnreadAsync(
+        ReviewContext review,
+        int lastSeenCommentId,
+        DateTimeOffset lastSeenAt,
+        CancellationToken cancellationToken)
+    {
+        if (review.State is null)
+        {
+            return true;
+        }
+
+        var (record, _, signatures) = review.Snapshot;
+        var username = review.User.Username;
+        if (signatures.Any(signature => signature.UserId != review.User.Id && signature.SignedAt > lastSeenAt)
+            || record.Answers.Any(answer => !InboxRules.SameUser(answer.AnsweredByUsername, username) && answer.AnsweredAt > lastSeenAt)
+            || InboxRules.CountUnread(record.Threads, username, lastSeenCommentId) > 0)
+        {
+            return true;
+        }
+
+        if (record.Reopens == 0)
+        {
+            return false;
+        }
+
+        var reopens = await _reviews.ListReopensAsync(review.Candidate.ProjectId, review.Candidate.ReviewId, cancellationToken);
+        return reopens.Any(reopen => !InboxRules.SameUser(reopen.ReopenedBy, username) && reopen.ReopenedAt > lastSeenAt);
     }
 
     /// <summary>

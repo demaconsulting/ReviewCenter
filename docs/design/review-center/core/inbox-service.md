@@ -54,7 +54,9 @@ are assigned in posting order and never reused, so one integer per review tells 
   The due date is shown on the action rows, as overdue when it is past and the review is not approved.
 - *Unread*: a row is unread when the user has no read-state row, or the reason is newer than the row: a comment of
   someone else with a higher identity than `LastSeenCommentId`, a signature or a reopening after `LastSeenAt`, or a
-  Fail answered by someone else after `LastSeenAt`.
+  Fail answered by someone else after `LastSeenAt`. A To sign row follows the same rule, so it is unread when
+  someone else signed or answered a check after `LastSeenAt`, wrote a comment newer than `LastSeenCommentId`, or
+  reopened the review after `LastSeenAt`; the missing row is not the only reason.
 
 **CountAsync**: The `ActionCount` of the inbox, for the home page. It never raises for an unknown actor.
 
@@ -69,12 +71,14 @@ user for the review, zero when there is no row or the user is not a known user. 
 **MarkAllReadAsync**: Marks every review of the inbox as seen.
 
 - *Postconditions*: The clock is read before the inbox is loaded, so a change that happens while the inbox is built stays
-  new. One `MarkSeenManyAsync` call stores the highest comment identity of each review and the time. Returns the number
-  of reviews marked.
+  new. One `MarkSeenManyAsync` call stores the highest comment identity of each review, counting only the comments
+  written at or before that time, and the time, so a comment posted while the inbox is built is not stored as seen.
+  Returns the number of reviews marked.
 
 **IsUnread**, **CountUnread**, **MaxCommentId**: Public static helpers, forwarded to `InboxRules`, that the review page
 uses to mark comments. A comment is unread when its author is someone else (compared without regard to case) and its
-identity is higher than the baseline; the user's own comments are never unread.
+identity is higher than the baseline; the user's own comments are never unread. `MaxCommentId` has a second form with
+a cutoff time that ignores the comments created after the cutoff; it is the watermark to store with that time.
 
 #### Error Handling
 

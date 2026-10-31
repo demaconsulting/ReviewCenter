@@ -676,6 +676,90 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that "Mark all as read" does not mark a comment as seen that was posted after the moment it started.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread()
+    {
+        // Arrange: ann is a reviewer and started a thread at the start; eve replies a minute later, which is after
+        // the moment at which the service that marks everything as read starts (the clock of that service is 30
+        // seconds after the start of the world)
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        var thread = await world.StartThreadAsync("r1", "ann");
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        var late = await world.ReplyAsync("r1", thread.Id, "eve");
+        var marking = new InboxService(
+            world.InboxStore,
+            world.Store,
+            world.Access,
+            world.UserStore,
+            new MovableTimeProvider(InboxTestWorld.Start.AddSeconds(30)));
+
+        // Act
+        var marked = await marking.MarkAllReadAsync(InboxTestWorld.ActorOf("ann"), Ct);
+        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.RepliesWaiting));
+
+        // Assert: the state stops before the late comment, so the row is still unread
+        Assert.Equal(1, marked);
+        var state = Assert.Single(world.InboxStore.States);
+        Assert.Equal(thread.Comments[0].Id, state.LastSeenCommentId);
+        Assert.True(late.Id > state.LastSeenCommentId);
+        Assert.True(row.IsUnread);
+    }
+
+    /// <summary>
+    ///     Test that a To sign row of a user who has seen the review turns unread again when someone else signs it.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread()
+    {
+        // Arrange: ann and bob are reviewers of a finished review; ann has seen it
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        var bobSlot = await world.AddSlotAsync("r1", "bob");
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
+        var seen = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: bob signs
+        await world.SignAsync("r1", bobSlot.Id, "bob");
+        var after = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+
+        // Assert: the row was read before and is new now
+        Assert.False(seen.IsUnread);
+        Assert.True(after.IsUnread);
+    }
+
+    /// <summary>
+    ///     Test that a To sign row of a user who has seen the review turns unread again when someone else comments.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread()
+    {
+        // Arrange: ann is a reviewer and has seen the review
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
+        var seen = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: bob starts a thread
+        await world.StartThreadAsync("r1", "bob");
+        var after = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+
+        // Assert
+        Assert.False(seen.IsUnread);
+        Assert.True(after.IsUnread);
+    }
+
+    /// <summary>
     ///     Test that the count is the number of distinct reviews that need action, not the number of rows and
     ///     not the information rows.
     /// </summary>

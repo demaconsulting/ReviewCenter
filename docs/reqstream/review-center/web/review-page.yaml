@@ -657,12 +657,14 @@ sections:
       - id: ReviewCenter-ReviewPage-MarkSeen
         title: >-
           The ReviewPage unit shall read what the user has seen before it shows the review, store the newest comment
-          and the time after the page was shown in the live session, store it again when the page is changed to
-          another review, and store nothing for a user who may not see the review.
+          written up to the time the loading began, with that time, after the page was shown in the live session, store
+          it again when the page is changed to another review, and store nothing for a user who may not see the review.
         justification: |
           The badges must show the state of the previous visit, so it is read first, and only a rendered page counts as
-          seen. A user without access must leave no trace.
+          seen. A comment posted while the page loads was not shown and must stay new. A user without access must
+          leave no trace.
         tests:
           - ReviewPage_Render_AfterLiveRender_UpsertsLastSeen_AndSecondVisitShowsNoDots
+          - ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen
           - ReviewPage_Render_ParameterChangeToOtherReview_ReloadsBaselineAndMarksSeen
           - ReviewPage_Render_NoViewAccess_WritesNoState

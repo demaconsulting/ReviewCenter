@@ -292,7 +292,8 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 - The count on the home page is the number of distinct reviews in the first three groups, so a review in two groups
   counts once. Updates are never counted.
 - A comment is unread when it is by someone else and newer than the last comment you saw in that review. Your own
-  comments are never unread, whatever the case of your user name.
+  comments are never unread, whatever the case of your user name. A review to sign is marked New again when someone
+  else signs it, answers a check, writes a comment, or reopens it after you last saw it.
 - The read state is one row for each user and review, in the table `ReviewUserStates`, with the last time and the
   highest comment seen. It only moves forward, it is removed with its review or user, and it is neither audited nor
   part of the record digest.

@@ -111,6 +111,23 @@ internal static class InboxRules
     }
 
     /// <summary>
+    ///     Finds the highest identity among the comments that were posted at or before a moment, so that a comment
+    ///     posted after the moment is never counted as seen.
+    /// </summary>
+    /// <param name="threads">The threads with their comments.</param>
+    /// <param name="notAfter">The moment the user's view was started; later comments are ignored.</param>
+    /// <returns>The highest identity, or zero when there is no such comment.</returns>
+    public static int MaxCommentId(IEnumerable<ReviewThread> threads, DateTimeOffset notAfter)
+    {
+        return threads
+            .SelectMany(thread => thread.Comments)
+            .Where(comment => comment.Created <= notAfter)
+            .Select(comment => comment.Id)
+            .DefaultIfEmpty(0)
+            .Max();
+    }
+
+    /// <summary>
     ///     Finds the open threads in which the latest comment is by someone else and that the user took part in
     ///     or whose review the user authored.
     /// </summary>

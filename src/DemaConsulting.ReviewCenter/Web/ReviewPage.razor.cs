@@ -1160,7 +1160,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
             var viewer = await AuthenticationState.GetActorOrNullAsync();
             if (viewer is not null)
             {
-                await Inbox.MarkSeenAsync(viewer, ProjectId, ReviewId, InboxService.MaxCommentId(Threads), _seenAt);
+                await Inbox.MarkSeenAsync(viewer, ProjectId, ReviewId, InboxService.MaxCommentId(Threads, _seenAt), _seenAt);
             }
         }
 

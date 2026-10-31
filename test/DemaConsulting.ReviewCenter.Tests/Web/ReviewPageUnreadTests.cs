@@ -20,6 +20,7 @@
 
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Web;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
@@ -85,6 +86,36 @@ public class ReviewPageUnreadTests : InboxWebTestBase
         Assert.Empty(second.FindAll("[data-testid='review-unread-summary']"));
         Assert.Empty(second.FindAll($"[data-testid='index-unread-{thread.Id}']"));
         Assert.Empty(second.FindAll($"[data-testid='thread-unread-{thread.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that a comment that is posted after the page started to load is not stored as seen.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen()
+    {
+        // Arrange: bob and eve wrote before the page loads; a later comment of eve (a minute after the clock of the
+        // page, as if it was posted while the page loaded) is in the thread the page reads
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        var thread = await StartAndAnswerThreadAsync("r1", "bob", "eve");
+        var before = InboxService.MaxCommentId(await Threads.ListAsync(ProjectId, "r1", Ct));
+        var later = TestServices.Threads(Store, new FixedTimeProvider(Time.GetUtcNow().AddMinutes(1)));
+        var late = await later.ReplyAsync(ProjectId, "r1", thread.Id, ActorOf("eve"), "Too late", Ct);
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var first = RenderReview("r1");
+        await first.WaitForAssertionAsync(() => Assert.Single(InboxStore.States));
+        var second = RenderReview("r1");
+
+        // Assert: the state stops before the late comment, so the next visit still marks it as new
+        var state = Assert.Single(InboxStore.States);
+        Assert.Equal(before, state.LastSeenCommentId);
+        Assert.True(late.Id > state.LastSeenCommentId);
+        Assert.Equal(
+            "New 1 comment by someone else is new since your last visit.",
+            second.Find("[data-testid='review-unread-summary']").TextContent);
     }
 
     /// <summary>

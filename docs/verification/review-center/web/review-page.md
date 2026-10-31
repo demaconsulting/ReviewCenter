@@ -829,6 +829,10 @@ tested by `ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers` in `
 stored with the highest comment; a second visit shows no marker. This scenario is tested by
 `ReviewPage_Render_AfterLiveRender_UpsertsLastSeen_AndSecondVisitShowsNoDots`.
 
+**ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen**: A comment written after the time the page
+began loading is not part of the stored watermark, so it is still new at the next visit. This scenario is tested by
+`ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen`.
+
 **ReviewPage_Render_OwnComments_ShowNoDot**: The comments of the viewer are never marked as new. This scenario is tested
 by `ReviewPage_Render_OwnComments_ShowNoDot`.
 

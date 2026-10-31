@@ -143,6 +143,27 @@ public class InboxRulesTests
     }
 
     /// <summary>
+    ///     Test that the highest comment identity before a moment ignores the comments that are newer than it.
+    /// </summary>
+    [Fact]
+    public void InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments()
+    {
+        // Arrange: comment 4 was posted at the moment, comment 9 a second later
+        var moment = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero);
+        var threads = new[]
+        {
+            Thread(1, ReviewThreadState.Open, Comment(1, "ann", moment.AddMinutes(-1)), Comment(4, "bob", moment)),
+            Thread(2, ReviewThreadState.Open, Comment(9, "bob", moment.AddSeconds(1)))
+        };
+
+        // Act, Assert
+        Assert.Equal(4, InboxRules.MaxCommentId(threads, moment));
+        Assert.Equal(9, InboxRules.MaxCommentId(threads, moment.AddSeconds(1)));
+        Assert.Equal(0, InboxRules.MaxCommentId(threads, moment.AddDays(-1)));
+        Assert.Equal(0, InboxRules.MaxCommentId([], moment));
+    }
+
+    /// <summary>
     ///     Test which threads wait for the user: open ones with the latest comment by someone else in which the user
     ///     wrote or that belong to a review the user authored.
     /// </summary>
@@ -232,10 +253,18 @@ public class InboxRulesTests
     /// </summary>
     /// <param name="id">The identity.</param>
     /// <param name="username">The user name of the author.</param>
+    /// <param name="created">The moment the comment was posted, or <c>null</c> for the default.</param>
     /// <returns>The comment.</returns>
-    private static ReviewComment Comment(int id, string username)
+    private static ReviewComment Comment(int id, string username, DateTimeOffset? created = null)
     {
-        return new ReviewComment { Id = id, Author = username, AuthorUsername = username, Text = "Text" };
+        return new ReviewComment
+        {
+            Id = id,
+            Author = username,
+            AuthorUsername = username,
+            Text = "Text",
+            Created = created ?? default
+        };
     }
 
     /// <summary>

@@ -457,7 +457,8 @@ mark-seen flag. A user who may not see the project gets a baseline of zero and n
 
 **OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection and, when the mark-seen
 flag is set, clears it and calls
-`InboxService.MarkSeenAsync` with the highest comment identity of the loaded threads and the time seen. The flag is
+`InboxService.MarkSeenAsync` with the highest comment identity of the loaded threads written at or before the time
+seen, so a comment posted after the load began stays new. The flag is
 checked only here and not while the page is rendered first on the server, so only a review that was shown on a live
 connection counts as
 seen. The service checks the access again, so a user who may not view the review leaves no row behind. A change of the

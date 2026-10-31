@@ -129,6 +129,14 @@ the user name. This scenario is tested by `InboxService_GetInboxAsync_OwnComment
 and the row of the inbox follows. This scenario is tested by
 `InboxService_GetInboxAsync_CommentsAfterLastSeen_AreUnread`.
 
+**InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread**: A review to sign that the user has seen is
+unread again when another reviewer signs it after the last seen time. This scenario is tested by
+`InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread`.
+
+**InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread**: A review to sign that the user has seen is
+unread again when someone else writes a comment after the last seen one. This scenario is tested by
+`InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread`.
+
 **InboxService_CountAsync_EqualsDistinctActionReviews**: The count is the number of distinct reviews that need action,
 not the number of rows and not the information rows. This scenario is tested by
 `InboxService_CountAsync_EqualsDistinctActionReviews`.
@@ -144,6 +152,10 @@ later time, and stores nothing for a user who may not see the review. This scena
 **InboxService_MarkAllReadAsync_UpsertsEveryListedReview**: Marking everything as read stores a state for every listed
 review, including the ones that were never opened, with the highest comment; a new comment is unread again. This
 scenario is tested by `InboxService_MarkAllReadAsync_UpsertsEveryListedReview`.
+
+**InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread**: A comment written after the time the marking began is
+not stored as seen, so the review stays unread. This scenario is tested by
+`InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread`.
 
 **InboxService_NullArguments_Throw**: Null arguments are refused where a value is required. This scenario is tested by
 `InboxService_NullArguments_Throw`.
@@ -164,6 +176,9 @@ than the last seen one. This scenario is tested by `InboxRules_IsUnread_OtherAnd
 **InboxRules_CountUnreadAndMaxCommentId_AllThreads_AreCounted**: The unread count and the highest comment look at the
 comments of all threads, and no comment gives zero. This scenario is tested by
 `InboxRules_CountUnreadAndMaxCommentId_AllThreads_AreCounted`.
+
+**InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments**: With a cutoff time, the highest comment ignores the comments
+created after it. This scenario is tested by `InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments`.
 
 **InboxRules_WaitingThreads_OpenLatestByOther_AreWaiting**: The threads that wait for the user are the open ones with
 the latest comment by someone else in which the user wrote or that belong to a review the user authored. This scenario
