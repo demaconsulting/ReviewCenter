@@ -504,6 +504,38 @@ public sealed class FileKeyProviderTests
     }
 
     /// <summary>
+    ///     Test that a PFX file whose key bag sits in a password-encrypted safe is protected: the bag that is read after
+    ///     the safe is decrypted is not taken for a plain key, so there is no warning and no refusal.
+    /// </summary>
+    [Fact]
+    public void FileKeyProvider_GetSigningKey_PfxWithKeyBagInEncryptedSafe_IsTreatedAsProtected()
+    {
+        // Arrange: a PFX whose certificate and plain key bag are in one encrypted safe
+        using var folder = new TemporaryDirectory();
+        using var issued = Issue();
+        var localKeyId = new Pkcs9LocalKeyId(issued.Signer.GetCertHash());
+        var contents = new Pkcs12SafeContents();
+        contents.AddCertificate(issued.Signer).Attributes.Add(localKeyId);
+        contents.AddKeyUnencrypted(issued.Key).Attributes.Add(localKeyId);
+        var builder = new Pkcs12Builder();
+        builder.AddSafeContentsEncrypted(
+            contents, Password, new PbeParameters(PbeEncryptionAlgorithm.Aes256Cbc, HashAlgorithmName.SHA256, 2048));
+        builder.SealWithMac(Password, HashAlgorithmName.SHA256, 2048);
+        var path = folder.GetFilePath("signing.pfx");
+        File.WriteAllBytes(path, builder.Encode());
+        RestrictToOwner(path);
+        using var provider = Create(new AttestationOptions { CertificatePath = path, CertificatePassword = Password }, requireEncryptedKeys: true);
+
+        // Act: load it with encryption required
+        var key = provider.GetSigningKey();
+        var status = provider.Describe();
+
+        // Assert: it loads, and there is no warning about an unprotected key
+        Assert.Equal(issued.Signer.Thumbprint, key.Info.Thumbprint, ignoreCase: true);
+        Assert.DoesNotContain(status.Warnings, w => w.Contains("not protected by a password", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that a message about a separate key file calls it the private key file, not the certificate file.
     /// </summary>
     [Fact]

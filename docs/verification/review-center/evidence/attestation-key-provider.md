@@ -338,6 +338,11 @@ key loads with the unprotected warning, and the same file is refused with `Requi
 tested by
 `FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected`.
 
+**FileKeyProvider_GetSigningKey_PfxWithKeyBagInEncryptedSafe_IsTreatedAsProtected**: A PFX whose key bag is in a
+password-encrypted safe. The bag that is read after the safe is decrypted is not taken for a plain key: the key loads
+with no unprotected warning, also with `RequireEncryptedKeys`. This scenario is tested by
+`FileKeyProvider_GetSigningKey_PfxWithKeyBagInEncryptedSafe_IsTreatedAsProtected`.
+
 **FileKeyProvider_GetSigningKey_UnprotectedKeyWithRequireEncryptedKeys_IsRefused**: The same file with
 `RequireEncryptedKeys`. An exception names `DataProtection:RequireEncryptedKeys`. This scenario is tested by
 `FileKeyProvider_GetSigningKey_UnprotectedKeyWithRequireEncryptedKeys_IsRefused`.

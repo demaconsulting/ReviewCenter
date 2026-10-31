@@ -260,8 +260,9 @@ internal sealed class FileKeyProvider(
     /// <param name="content">The bytes of the file, which loaded successfully.</param>
     /// <param name="password">The password that opened the file, or <c>null</c> when none is set.</param>
     /// <returns>
-    ///     <c>true</c> only when a password is set and the file holds an encrypted (shrouded) private key and no
-    ///     plain one; a password that the file does not use protects nothing.
+    ///     <c>true</c> only when a password is set and the file holds a private key that is encrypted (a shrouded key
+    ///     bag, or a key bag in an encrypted safe) and no key in an unencrypted safe; a password that the file does not
+    ///     use protects nothing.
     /// </returns>
     private static bool IsPkcs12KeyProtected(byte[] content, string? password)
     {
@@ -272,30 +273,34 @@ internal sealed class FileKeyProvider(
 
         try
         {
-            var shrouded = false;
+            var protectedKey = false;
             foreach (var safe in Pkcs12Info.Decode(content, out _).AuthenticatedSafe)
             {
+                // A key bag read from an encrypted safe was decrypted by the call below; it is a protected key
+                var encryptedSafe = safe.ConfidentialityMode != Pkcs12ConfidentialityMode.None;
                 if (safe.ConfidentialityMode == Pkcs12ConfidentialityMode.Password)
                 {
                     safe.Decrypt(password);
                 }
-                else if (safe.ConfidentialityMode != Pkcs12ConfidentialityMode.None)
+                else if (encryptedSafe)
                 {
-                    return false;
+                    // Encrypted to a certificate: its content cannot be inspected without that key, and it is not plain
+                    protectedKey = true;
+                    continue;
                 }
 
                 foreach (var bag in safe.GetBags())
                 {
-                    if (bag is Pkcs12KeyBag)
+                    if (bag is Pkcs12KeyBag && !encryptedSafe)
                     {
                         return false;
                     }
 
-                    shrouded |= bag is Pkcs12ShroudedKeyBag;
+                    protectedKey |= bag is Pkcs12ShroudedKeyBag || (bag is Pkcs12KeyBag && encryptedSafe);
                 }
             }
 
-            return shrouded;
+            return protectedKey;
         }
         catch (Exception ex) when (ex is CryptographicException or System.Formats.Asn1.AsnContentException
                                        or InvalidOperationException)

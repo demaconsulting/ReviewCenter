@@ -77,6 +77,7 @@ sections:
           - FileKeyProvider_GetSigningKey_PasswordSettingsConflictOrFileMissing_AreRefusedWithTheirMessages
           - FileKeyProvider_GetSigningKey_UnprotectedPfx_LoadsWithWarning
           - FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected
+          - FileKeyProvider_GetSigningKey_PfxWithKeyBagInEncryptedSafe_IsTreatedAsProtected
           - FileKeyProvider_GetSigningKey_UnprotectedKeyWithRequireEncryptedKeys_IsRefused
 
       - id: ReviewCenter-AttestationKeyProvider-FilePermissions
