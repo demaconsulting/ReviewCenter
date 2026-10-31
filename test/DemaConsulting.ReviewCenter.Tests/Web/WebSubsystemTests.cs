@@ -157,21 +157,51 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that, through the real pipeline, the author of a review sees the notice and disabled answer controls
+    ///     on the checklist page, while another user sees neither.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers()
+    {
+        // Arrange: start the real pipeline and create a review that Ann authored
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var annBrowser = await TestBrowser.SignedInAsync(app, "ann");
+        using var bobBrowser = await TestBrowser.SignedInAsync(app, "bob");
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        var route = $"/projects/{project.Id}/reviews/rev-1/checklist";
+
+        // Act: request the checklist page as the author and as another user
+        var asAuthor = await ParseAsync(annBrowser.Client, route);
+        var asOther = await ParseAsync(bobBrowser.Client, route);
+
+        // Assert: the author gets the notice and disabled controls; the other user gets neither
+        Assert.NotNull(asAuthor.QuerySelector("[data-testid='author-answer-blocked']"));
+        Assert.True(asAuthor.QuerySelector("[data-testid='check-pass-req-01']")?.HasAttribute("disabled"));
+        Assert.Null(asOther.QuerySelector("[data-testid='author-answer-blocked']"));
+        Assert.False(asOther.QuerySelector("[data-testid='check-pass-req-01']")?.HasAttribute("disabled"));
+    }
+
+    /// <summary>
     ///     Test that checks answered through the domain service are presented by the checklist page and the
     ///     review page through the real pipeline, and are still there when the pages are requested again.
     /// </summary>
     [Fact]
     public async Task WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload()
     {
-        // Arrange: start the real pipeline, create a review and answer two of its checks
+        // Arrange: start the real pipeline, create a review (by Bob, because its author may not answer it) and answer two checks
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        using var bobBrowser = await TestBrowser.SignedInAsync(app, "bob");
         var client = browser.Client;
         var project = await app.Services.GetRequiredService<ProjectService>()
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Bob, TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         await checklists.SetAnswerAsync(
             project.Id, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
@@ -233,6 +263,10 @@ public partial class WebSubsystemTests
             TestActors.Ann, project.Id, "rev-1", ann.Id, null, TestContext.Current.CancellationToken);
         var route = $"/projects/{project.Id}/reviews/rev-1";
 
+        // Ann is the only reviewer and reopens the review below; the rule that would refuse that is off here
+        await app.Services.GetRequiredService<ProjectService>().SetReviewRuleAsync(
+            TestActors.Ann, project.Id, ReviewRule.NonReopenerSigning, true, false, TestContext.Current.CancellationToken);
+
         // Act, Assert: before signing, the page offers the sign form and the review is In review
         var before = await ParseAsync(client, route);
         Assert.Equal("In review", before.QuerySelector("[data-testid='review-approval']")?.TextContent);
@@ -276,6 +310,7 @@ public partial class WebSubsystemTests
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var admin = await TestBrowser.SignedInAsync(app, "ann");
         using var member = await TestBrowser.SignedInAsync(app, "cyd", UserRole.Reviewer);
+        using var bobBrowser = await TestBrowser.SignedInAsync(app, "bob");
         var users = app.Services.GetRequiredService<UserService>();
         var ann = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!;
         var cyd = (await users.GetAsync("cyd", TestContext.Current.CancellationToken))!;
@@ -284,7 +319,7 @@ public partial class WebSubsystemTests
         await store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
         await store.AddMembershipAsync(cyd.Id, project.Id, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Bob, TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {

@@ -35,13 +35,15 @@ repository; `RevisionValidator`, the check that a revision name cannot be taken 
 review of a project, for the project overview and the API list;
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner; and
 `InboxService`, the inbox of a user (the reviews that wait for the user, in four groups, which also serves as the list
-of notifications) and the read state that marks what is new. The
+of notifications) and the read state that marks what is new;
+`UserImpactService`, the offboarding impact of a user
+(the reviewer slots that still wait for the user and the projects the user alone administers). The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `Actor`, the access types `ProjectMembership`, `ProjectRole`, and
 `ProjectMember`, the signing types `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `ReviewRecord`, `ReviewApproval`,
-`ReviewLock`, and `ReviewReopen`, the audit types `AuditEntry`, `AuditDraft`,
+`ReviewLock`, `ReviewReopen`, and `ReopenRules`, the audit types `AuditEntry`, `AuditDraft`,
 and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
 `ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `RepositorySource` (the
@@ -52,7 +54,8 @@ revisions and selection a creation request names, before they are resolved), `Ch
 types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the second factor types
 (`UserTotp`, `TotpRecoveryCode`, `TotpSettings`, `TotpEnrollment`, `TotpStatus`, `TotpSignInOutcome`,
 `TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the inbox types (`InboxSection`, `InboxItem`, `InboxView`,
-`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the text and line
+`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the offboarding types (`UserImpact`, `UserOpenWork`,
+`SoleAdminProject`, and `UserReviewSlot`), the text and line
 definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
@@ -130,10 +133,12 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   admin or system administrator reopens it with a reason (`ReopenReviewAsync`; never with an API token), which keeps the
   earlier signatures as history and requires fresh ones. A project admin switches the project rule "require independent
   reviewers" (`ProjectService.SetRequireIndependentReviewersAsync`; on by default): the user who created a review can then
-  neither be chosen as a reviewer of it nor sign it. The same administrators can switch two further stored rules
-  (`ProjectService.SetReviewRuleAsync`; on by default): the review author may not answer the checklist of the review,
-  and the person who reopened a review may not sign it again. These two are stored and audited only; no service applies
-  them yet. A review has an optional due date, a UTC calendar day
+  neither be chosen as a reviewer of it nor sign it. The same administrators can switch two further rules
+  (`ProjectService.SetReviewRuleAsync`; on by default, also for projects that existed before they were enforced): the
+  review author may not answer the checklist of the review (`ChecklistService`, refused with `AuthorCannotAnswer`), and
+  the person who reopened a review may not sign it again (`SigningService`, refused with `ReopenerCannotSign`). While
+  the second rule is on, `ReopenReviewAsync` also refuses a reopening that would leave a slot with nobody who may sign
+  it (`ReopenWouldStrandSlot`, decided by the pure `ReopenRules`). A review has an optional due date, a UTC calendar day
   (`DateOnly`): it can be given when the review is created (`CreateDraftAsync`, `CreateFromRepositoryAsync`, and the
   planner) and is changed or cleared by `SetDueDateAsync` (a project admin, a system administrator, or the user who
   created the review; never with an API token; refused with `ReviewLocked` when the review is approved; audited as
@@ -267,6 +272,17 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   empty inbox without an error.
 - *Constraints*: Read state is stored in one row per user and review, never moves back, is not audited, and is not part
   of the record digest. There is no notification record: the inbox is computed from the review data.
+
+**UserImpactService**: The offboarding impact of a user. It is consumed by the Users page and the Members card in later
+slices; no page uses it yet.
+
+- *Type*: In-process .NET class.
+- *Role*: Provider.
+- *Contract*: Give, for a user, the reviewer slots of unlocked reviews that still wait for the user (as primary or
+  alternate, not signed or out of date) and the projects in which the user is the only enabled project administrator. A
+  system administrator may ask about every user and sees every project; a project administrator sees only the
+  projects the asker administers; every other actor is refused as not allowed and an unknown user is not found.
+- *Constraints*: Reads only; nothing is stored or audited. The signature rule is the one of the inbox.
 
 **IInboxStore**: The store interface the subsystem requires for the read state and for finding the reviews of a user.
 
@@ -453,6 +469,9 @@ message and keep the entered values, and there is a single, easily tested path f
 | `ReviewNotLocked` | A reopen is requested for a review that is not approved |
 | `ReopenReasonInvalid` | The reason for a reopen is empty after trimming or longer than 250 characters |
 | `ReviewerNotIndependent` | Independent reviewers are required and the review author would be, or signs as, one |
+| `AuthorCannotAnswer` | The author answers a check or changes a section while the project does not allow it |
+| `ReopenerCannotSign` | The person who reopened the review signs it while the project does not allow it |
+| `ReopenWouldStrandSlot` | A reopening would leave a slot with nobody who may sign it, while the rule is on |
 | `RepositoryNameInvalid` | The name is not 1 to 40 of letters, digits, `.`, `_`, `-`, starting with a letter or digit |
 | `RepositoryLocationInvalid` | Location is empty, too long, or not an `https`, local `http`, or `file` URL or path |
 | `RepositoryCredentialInvalid` | Invalid credential, non-`https` location, or token contained in name/user/location |
@@ -502,8 +521,11 @@ system administrator with a reason, stored as a `ReviewReopen`. The number of re
 it is above zero, so legacy digests do not change and the format version is not bumped, and after a reopen every earlier
 signature is kept as history but is out of date. The project rule `RequireIndependentReviewers` (on by default) keeps the
 user who created the review (for an API-token review, the token's owner) out of its slots and away from its signature;
-the authors of git commits are not matched. The due date of a review is not part of the record digest, so setting or
-clearing it never makes a signature out of date.
+the authors of git commits are not matched. The rules `RequireNonAuthorChecklistAnswers` and
+`RequireNonReopenerSigning` (also on by default, for every project) work the same way: `ChecklistService` refuses the
+author's answers, `SigningService` refuses the signature of a person who reopened the review, and the pure
+`ReopenRules.StrandedSlots` tells `ReopenReviewAsync` which slots would be left without a free person. The due date of
+a review is not part of the record digest, so setting or clearing it never makes a signature out of date.
 
 The audit trail is the third kind of record: an append-only, hash-chained list of everything that happens, kept in the
 same database. A change of data and its audit entry are stored in the same transaction by the store, so the services

@@ -634,6 +634,20 @@ sections:
         tests:
           - ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates
 
+      - id: ReviewCenter-ReviewPage-ReopenerBlocked
+        title: >-
+          The ReviewPage unit shall show to a user who occupies a slot and reopened the review, while the project does
+          not let that person sign again, a notice that another reviewer must sign, instead of the sign form, shall
+          show the sign form to every other occupant and to the reopener when the rule is switched off, and shall show
+          the message of the rule in the reopen error when a reopening is refused because a slot would have nobody who
+          may sign it.
+        justification: |
+          A user who cannot sign must see why, and an administrator who is refused a reopening must learn what to do.
+          The rules are enforced by the signing service, which refuses a stale page that still sends the request.
+        tests:
+          - ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm
+          - ReviewPage_Reopen_WouldStrandSlot_ShowsMessageAndReopensNothing
+
       - id: ReviewCenter-ReviewPage-DueDate
         title: >-
           The ReviewPage unit shall show the due date of a review in its header, stated as a calendar day in UTC, or

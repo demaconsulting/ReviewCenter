@@ -176,6 +176,32 @@ public class AuditorRoleTests
     }
 
     /// <summary>
+    ///     Test that adding a user who already is a member as an auditor reports the duplicate membership, even when
+    ///     the user holds open review work, and that a removed member who still holds a slot is refused on return.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_AddMemberAsync_Auditor_ExistingMemberReportsDuplicate_RemovedMemberWithSlotIsRefused()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = new Actor("root", "root");
+        await world.Signing.AddSlotAsync(root, world.Own, "rev-1", world.Ids["usr"], null, cancellationToken);
+
+        // Act
+        var duplicate = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Projects.AddMemberAsync(root, world.Own, "usr", ProjectRole.Auditor, cancellationToken));
+        await world.Projects.RemoveMemberAsync(root, world.Own, "usr", cancellationToken);
+        var returning = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Projects.AddMemberAsync(root, world.Own, "usr", ProjectRole.Auditor, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.MembershipExists, duplicate.Rule);
+        Assert.Equal(DomainRule.MemberHasOpenReviewWork, returning.Rule);
+        Assert.Contains("'rev-1' (First)", returning.Message);
+    }
+
+    /// <summary>
     ///     Test that an auditor is not offered as a reviewer, cannot be put in a slot as primary or alternate, and
     ///     cannot be moved into one by an update.
     /// </summary>

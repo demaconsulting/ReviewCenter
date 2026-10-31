@@ -338,6 +338,12 @@
                                     </ul>
                                 </div>
                             }
+                            else if (ReopenerBlocked)
+                            {
+                                <p class="notice" role="status" data-testid="reopener-cannot-sign-@slotId">
+                                    You reopened this review; another reviewer must sign.
+                                </p>
+                            }
                             else if (CurrentIsExternal && !ConfirmedSlots.Contains(slotId))
                             {
                                 <form method="post" action="/auth/oidc/reauth" data-testid="sign-reauth-form-@slotId">

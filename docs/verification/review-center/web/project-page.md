@@ -532,8 +532,9 @@ switches `author-checklist-switch` and `reopener-signing-switch` are not rendere
 
 **ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule**: A project admin opens the project page; both further
 switches are turned on. `author-checklist-switch` is turned off and `independent-reviewers-save` is pressed; the status
-names the author rule and says "stored; not applied yet", the project stores the new value for that rule only, and one
-audit entry `project.review-rule-changed` with the detail `RequireNonAuthorChecklistAnswers on->off` exists. The
+names the author rule and says "Authors cannot answer the checklist: now off.", the project stores the new value for
+that rule only, and one audit entry `project.review-rule-changed` with the detail
+`RequireNonAuthorChecklistAnswers on->off` exists. The
 `reopener-signing-switch` and the independence switch are then turned off together and saved; both are stored, one audit
 entry exists for each (`project.review-rule-changed` and `project.independent-reviewers-changed`), and the status names
 both. This scenario is tested by `ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule`.
@@ -544,9 +545,11 @@ error `review-rules-error` shows the message of the stale change, the switch sho
 switch is unchanged, and nothing more is audited. This scenario is tested by
 `ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads`.
 
-**ProjectPage_ReviewRules_NewSwitches_SayNotAppliedYet**: The markers `author-checklist-pending` and
-`reopener-signing-pending` next to the two further switches contain "Not applied yet", and the independence switch has no
-such marker. This scenario is tested by `ProjectPage_ReviewRules_NewSwitches_SayNotAppliedYet`.
+**ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement**: The hints next to the two further switches say that the
+rule applies to every project and, for the author rule, that this includes projects created before it was enforced; the
+reopener hint says that a reopen is refused when nobody may sign. There is no "Not applied yet" text and there are no
+pending markers anywhere on the page. This scenario is tested by
+`ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement`.
 
 **Evidence settings** are verified in `EvidenceSettingsPageTests.cs`, with the real `EvidenceSettingsService` and the
 real access rules behind the page.

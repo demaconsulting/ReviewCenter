@@ -44,6 +44,10 @@ N/A - standard test environment.
   that an administrator can reopen the review, and the Pass, Fail, and N/A buttons, the justification and reason boxes,
   the save buttons, and the applicability switches are disabled and marked `data-locked="true"`, while the sections
   can still be opened and read; a review that is not approved shows no notice and enabled controls.
+- While the project does not let authors answer the checklist, the author of the review sees the notice
+  `author-answer-blocked` and the same controls disabled (without `data-locked`), no other member sees the notice, the
+  notice is not shown when the rule is off, an approved review shows only the lock notice, and a page that was loaded
+  before the rule was switched on shows the refusal of the rule when the author clicks, and stores nothing.
 
 **ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection**: The page is rendered for a new review; the
 status line, the overall progress, all 14 sections with their progress, and exactly one open section are shown, and
@@ -132,6 +136,20 @@ slot holds a current signature; the notice `checklist-locked` is shown, the chec
 save buttons, and the applicability switches are disabled and marked `data-locked="true"`, and a section can still be
 opened. The same page for a review that is not approved shows no notice and no disabled control. This scenario is
 tested by `ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls`.
+
+**ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls**: The page is rendered for the author of the
+review while the rule is on: the notice `author-answer-blocked` is shown and the check buttons, boxes, and switches are
+disabled. Another member sees no notice and enabled controls, and with the rule switched off the author sees none. This
+scenario is tested by `ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls`.
+
+**ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice**: The author of an approved review sees
+`checklist-locked` and not `author-answer-blocked`. This scenario is tested by
+`ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice`.
+
+**ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing**: The page is loaded while the rule is
+off, the rule is switched on, and the author clicks Pass; the error line of the check contains "Authors cannot answer
+the checklist" and nothing is stored. This scenario is tested by
+`ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing`.
 
 **ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate**: A review is
 fully answered, has two slots, and only the first is signed. A check is changed to Fail with a justification; the page

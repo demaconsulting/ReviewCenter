@@ -59,7 +59,9 @@ public sealed record NewMemberAccount(ProjectMember Member, string TemporaryPass
 ///     the injected stores are; the last project administrator is protected by the store, atomically.
 ///     A project also carries the "require independent reviewers" rule (on by default), which a project administrator
 ///     switches with <see cref="SetRequireIndependentReviewersAsync"/>; <see cref="SigningService"/> applies it. Two
-///     further rules are stored only (not applied yet); <see cref="SetReviewRuleAsync"/> switches any of the three.
+///     further rules (the author does not answer the checklist, the reopener does not sign again) are applied by
+///     <see cref="ChecklistService"/> and <see cref="SigningService"/>; <see cref="SetReviewRuleAsync"/> switches any
+///     of the three.
 /// </remarks>
 public sealed class ProjectService
 {
@@ -370,8 +372,10 @@ public sealed class ProjectService
                 throw new DomainRuleException(DomainRule.UserNotFound, CannotAddMessage);
             }
 
-            if (role == ProjectRole.Auditor)
+            if (role == ProjectRole.Auditor
+                && await _store.GetMembershipAsync(user.Id, projectId, cancellationToken) is null)
             {
+                // An existing member is left to the store, which reports the duplicate (MembershipExists)
                 await EnsureNoOpenReviewWorkAsync(projectId, user, cancellationToken);
             }
 
@@ -649,9 +653,8 @@ public sealed class ProjectService
     ///     <see cref="ReviewRule.IndependentReviewers"/> rule records <see cref="IndependentReviewersChangedAction"/>
     ///     with the text <c>RequireIndependentReviewers on-&gt;off</c>; the other rules record
     ///     <see cref="ReviewRuleChangedAction"/> with the property name in the same form, for example
-    ///     <c>RequireNonReopenerSigning on-&gt;off</c>. Only <see cref="ReviewRule.IndependentReviewers"/> is applied
-    ///     today (when a reviewer is chosen and when a review is signed; existing signatures stay valid); the
-    ///     other rules are stored only.
+    ///     <c>RequireNonReopenerSigning on-&gt;off</c>. The rules are applied when they are checked (a reviewer is
+    ///     chosen, a review is signed or reopened, a checklist answer is given); existing signatures stay valid.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="rule"/> is not defined.</exception>
     /// <exception cref="DomainRuleException">
@@ -742,9 +745,9 @@ public sealed class ProjectService
     /// <returns>A task that completes when the user holds no open review work.</returns>
     /// <remarks>
     ///     Open work is a reviewer slot (as primary or alternate reviewer) that has no signature of the current record,
-    ///     on a review that is not approved. The reviews are read as one consistent set of snapshots and judged with the
-    ///     same rules as the approval status (<see cref="ReviewLock.IsApproved"/>, the record digest), so what is
-    ///     refused here is exactly what the inbox calls a review to sign. The check and the role change are two steps,
+    ///     on a review that is not approved. It is found by the one shared definition of the offboarding impact query
+    ///     (<see cref="UserImpactService"/>), so what is refused here is exactly what the inbox calls a review to
+    ///     sign and what the impact panel lists. The check and the role change are two steps,
     ///     not one transaction: a slot that is given to the user between them is not caught, which leaves an auditor in
     ///     a slot; such an auditor cannot sign (<see cref="SigningService"/> refuses it) and the slot shows as waiting
     ///     until a member changes it.
@@ -754,34 +757,15 @@ public sealed class ProjectService
     /// </exception>
     private async Task EnsureNoOpenReviewWorkAsync(int projectId, User user, CancellationToken cancellationToken)
     {
-        var reviews = await _store.ListReviewsAsync(projectId, cancellationToken);
-        if (reviews.Count == 0)
-        {
-            return;
-        }
-
-        var snapshots = await _store.ListSnapshotsAsync(
-            projectId,
-            reviews.Select(review => review.Id).ToList(),
+        var work = await UserImpactService.FindOpenWorkAsync(
+            _store,
+            user.Id,
+            new HashSet<int> { projectId },
             cancellationToken);
-        var open = new List<string>();
-        foreach (var review in reviews.OrderBy(review => review.Id, StringComparer.Ordinal))
-        {
-            if (!snapshots.TryGetValue(review.Id, out var snapshot)
-                || ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
-            {
-                continue;
-            }
-
-            var digest = RecordDigest.Compute(snapshot.Record);
-            if (snapshot.Slots.Any(
-                    slot => InboxRules.IsAssigned(slot, user.Id)
-                            && InboxRules.SlotState(slot, snapshot.Signatures, digest) != SlotSignatureState.Signed))
-            {
-                open.Add($"'{review.Id}' ({review.Title})");
-            }
-        }
-
+        var open = work
+            .Select(item => $"'{item.ReviewId}' ({item.Title})")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         if (open.Count > 0)
         {
             const int listed = 5;

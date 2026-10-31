@@ -235,6 +235,19 @@ sections:
         tests:
           - ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409
 
+      - id: ReviewCenter-ApiEndpoints-RuleConflict
+        title: >-
+          The ApiEndpoints unit shall answer a request that a service refuses because of a review rule of the project
+          (an author answering the checklist of their own review, the person who reopened a review signing it
+          again, or a
+          reopening that would leave a slot without a person who may sign it) with status 409 and a problem document
+          that carries the message of the rule.
+        justification: |
+          These refusals are conflicts with the state of the project and not mistakes in the request, and the message
+          tells the script what to do instead, so that it can tell them from a request that is wrong.
+        tests:
+          - ApiProblems_StatusOf_ReviewRuleRefusals_Is409
+
       - id: ReviewCenter-ApiEndpoints-OpenRoutes
         title: >-
           The ApiEndpoints unit shall put exactly two routes, the evidence index and the attestation PDF, behind a

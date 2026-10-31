@@ -209,6 +209,7 @@ review identifier, an existing membership, the removal or demotion of the last p
 review work (`MemberHasOpenReviewWork`), a disabled repository,
 a change that the approval lock refuses (`ReviewLocked`), a reopen of a review that is not locked (`ReviewNotLocked`),
 a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`),
+a change that a project review rule refuses (`AuthorCannotAnswer`, `ReopenerCannotSign`, `ReopenWouldStrandSlot`),
 and a changed record to 409; too many attempts to 429; an unavailable git to 503, a git access failure
 to
 502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, and a token action of a user who
@@ -236,6 +237,11 @@ not affected by the lock; a reopened review simply reads as not approved.
 that raise it, so the 409 mapping is defense in depth and the problem body is still the message of the rule. When an
 endpoint that changes the record is added, the contract is that its problem document carries the affected slots as an
 `affectedSlots` list (slot number and signer name) and that the request can acknowledge them; that is not built yet.
+
+**Review rules and the API**: the three rules of the project that refuse a change by the author or the reopener
+(`AuthorCannotAnswer`, `ReopenerCannotSign`, `ReopenWouldStrandSlot`) are conflicts with the state of the project and
+map to 409 with the message of the rule as the detail. No endpoint raises them today (the API cannot answer a check,
+sign, or reopen), so the mapping is defense in depth, like the one of `ReviewLocked`.
 
 #### Error Handling
 

@@ -673,7 +673,7 @@ public partial class ProjectPage : ComponentBase
     }
 
     /// <summary>
-    ///     Saves the review rules (independent reviewers, and the two stored-only rules).
+    ///     Saves the review rules (independent reviewers, authors answering the checklist, and reopening administrators signing).
     /// </summary>
     /// <returns>A task that completes when the rules are stored or the problem is shown.</returns>
     /// <remarks>
@@ -747,8 +747,8 @@ public partial class ProjectPage : ComponentBase
                 ? "Independent reviewers are now required."
                 : "Independent reviewers are no longer required.",
             ReviewRule.NonAuthorChecklistAnswers =>
-                $"Authors cannot answer the checklist: now {state} (stored; not applied yet).",
-            _ => $"The person who reopened a review cannot sign it again: now {state} (stored; not applied yet).",
+                $"Authors cannot answer the checklist: now {state}.",
+            _ => $"The person who reopened a review cannot sign it again: now {state}.",
         };
     }
 

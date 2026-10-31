@@ -151,6 +151,10 @@ N/A - standard test environment.
 - While the project requires independent reviewers, the author of the review is not offered as primary or alternate
   reviewer, and the author sees the hint that a different member has to review and sign; with the rule off the author is
   offered and no hint is shown.
+- While the project does not let the person who reopened a review sign it again, a reviewer who reopened the review sees
+  a notice instead of the sign form of the slot, other reviewers and a project that switched the rule off are not
+  affected, and a reopening that Core refuses because a slot would have nobody who may sign shows the message in
+  `reopen-error` and changes nothing.
 - A signer who has a second factor sees a code field (that asks for a one-time code) next to the password field, and a
   signer who has none sees no such field; the password and a fresh code sign and both fields are empty afterwards; a
   missing, wrong, recovery, or already used code shows the one message that names the password and the code, signs
@@ -587,6 +591,17 @@ primary and alternate lists of the add form, the other members are, and the hint
 created this review, so a different project member has to review and sign it.") is shown. For another member the
 hint is not shown, and with the rule switched off the author is offered again. This scenario is tested by
 `ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates`.
+
+**ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm**: A slot of two reviewers is signed and the review
+is reopened by the alternate. While the rule is on, the reopener sees `reopener-cannot-sign-{id}` and no sign form for
+the slot, and the other reviewer of the slot sees the sign form and no notice; with the rule switched off the reopener
+sees the sign form. This scenario is tested by
+`ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm`.
+
+**ReviewPage_Reopen_WouldStrandSlot_ShowsMessageAndReopensNothing**: An administrator who is the only reviewer of a
+signed slot reopens the review while the rule is on; `reopen-error` shows "Slot 1 would have no one who may sign...",
+the review is still approved, and no reopen is stored. This scenario is tested by
+`ReviewPage_Reopen_WouldStrandSlot_ShowsMessageAndReopensNothing`.
 
 **ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge**: A review without slots is rendered; the
 Reviewers card, its empty message, and the add form are shown, and the badge reads "In review". This scenario is

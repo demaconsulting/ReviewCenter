@@ -112,6 +112,7 @@ sections:
           - ProjectService_SetMemberRoleAsync_NoOpenWork_AllowsAuditor
           - ProjectService_SetMemberRoleAsync_LastProjectAdminToAuditor_IsRefused
           - ProjectService_AddMemberAsync_Auditor_IsAllowedForANewMember
+          - ProjectService_AddMemberAsync_Auditor_ExistingMemberReportsDuplicate_RemovedMemberWithSlotIsRefused
           - ProjectService_MemberManagement_Auditor_IsRefused
 
       - id: ReviewCenter-ProjectService-MemberLookup

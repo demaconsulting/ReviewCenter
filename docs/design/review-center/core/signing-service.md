@@ -12,8 +12,10 @@ is the one place where these rules live, so every caller (the pages, a later API
 enforces the integrity of an approved review: an approved review is locked, only an administrator can reopen it, and
 (by default) the author of a review cannot review it. It is also
 the home of the supporting types of signing: `SlotRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewRecord`,
-`ReviewApproval`, `SlotStatus`, `SlotMember`, `SlotSignatureState`, `ReviewLock`, and `ReviewReopen`, together with
-the signing rules of `DomainRule`. `ReviewLock`, `ReviewReopen`, and `SignatureImpact` live in the files of this unit;
+`ReviewApproval`, `SlotStatus`, `SlotMember`, `SlotSignatureState`, `ReviewLock`, `ReviewReopen`, and `ReopenRules`,
+together with
+the signing rules of `DomainRule`. `ReviewLock`, `ReviewReopen`, `ReopenRules`, and `SignatureImpact` live in the files
+of this unit;
 they are not units of their own. The service is a singleton, as `UserService` is.
 
 #### Data Model
@@ -135,6 +137,25 @@ setting was off cannot be signed by the author once it is on. The rule is not re
 is chosen and when a review is signed, and existing signatures stay valid. Limitation: the authors of the git commits of
 the reviewed files are not known to Review Center and are not matched; only the user who created the review in the tool
 is.
+
+**Reopener rule**: when the project's `RequireNonReopenerSigning` setting is on (the default, also for projects that
+existed before the rule was enforced; see `ProjectService`), a person who reopened the review, now or earlier, cannot
+sign it again (`ReopenerCannotSign`: "You reopened this review, so you cannot sign it again. Another reviewer must sign
+it, ..."). `SignWithCredentialsAsync` checks it before the record check and before the password is asked for, like the
+independence rule, so a refused call costs nothing and no attempt is counted. A review that was never reopened needs no
+further read. Whoever reopened is matched by user name, ignoring case, in the reopen history.
+
+**Stranded slots**: the reopener rule alone would let an administrator make a review impossible to approve, because a
+reopen needs an approved review, so every slot has a signature and none of them can be changed afterwards. While the
+rule is on, `ReopenReviewAsync` therefore refuses a reopen with `ReopenWouldStrandSlot` when a slot would have nobody
+who may sign: "Slot 1 would have no one who may sign; ask another administrator or switch the rule off." The blocked
+people are the administrator who reopens and the earlier reopening administrators; the pure helper
+`ReopenRules.StrandedSlots` finds
+the slots whose primary is blocked and whose alternate is missing or blocked, numbered as the review page shows them,
+and `ReopenRules.StrandedMessage` words the refusal. Every slot counts, not only the ones that were signed by the
+administrator. The check runs after the review is known to be locked and before anything is stored, so a refusal
+records nothing and the review stays approved. Out of scope: an occupant that is disabled or no longer a member is not
+considered, and the inbox can still list the review under "To sign" for a blocked reopener who shares a slot.
 
 **Rules for slots**:
 
@@ -312,7 +333,8 @@ not found.
 - *Algorithm*: under the gate, the checks above (`ActorNotAllowed`, `ProjectNotFound`, `ReopenReasonInvalid`), then
   `ReviewNotFound` or `ReviewNotLocked` from one `GetSnapshotAsync` read, then `IReviewStore.ReopenReviewAsync` with a
   `ReviewReopen` (previous digest, the actor's user name and display name, `TimeProvider` time) and the audit draft
-  `review.reopened`.
+  `review.reopened`. When the project does not let a reopener sign again, the stranded-slot check (see "Stranded slots")
+  runs after the snapshot read and before the store call (`ReopenWouldStrandSlot`).
 - *Postconditions*: Nothing is stored when a rule fails. After success the record's reopen count is one higher, so the
   digest differs, the review is "In review", and the earlier signatures are out of date.
 
@@ -381,7 +403,8 @@ never contain a password or a hash. An infrastructure failure of the store passe
 - **TotpService** — tells whether the signer has a second factor and checks the code (optional, injected; without it a
   signer who needs a code cannot sign).
 - **RecordDigest** — calculates the digest of the record.
-- **ReviewLock**, **ReviewReopen**, and **SignatureImpact** — the helpers and the history record of this unit (see above).
+- **ReviewLock**, **ReviewReopen**, **ReopenRules**, and **SignatureImpact** — the helpers and the history record of
+  this unit (see above).
 - **ThreadService** — `NextStep` words the next step when signing is blocked.
 - **ChecklistState** — decides which sections apply and what the answers are.
 - **.NET runtime library** — `TimeProvider` for the signing time and `SemaphoreSlim` for the serialization.

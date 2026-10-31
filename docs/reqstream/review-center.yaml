@@ -368,24 +368,30 @@ sections:
         title: >-
           The tool shall keep, for each project, a switch for each of two further review rules, one for authors
           answering the checklist of their own review and one for the person who reopened a review signing it again,
-          each on for a new project, shall let only an administrator of the project or a system administrator change
-          them, never through an access token, shall record each change in the audit trail, and shall only store
-          them, because it does not apply them yet.
+          each on for a new project and for every project that existed before the rules were enforced, shall let only
+          an administrator of the project or a system administrator change them, never through an access token, shall
+          record each change in the audit trail, and shall enforce each rule that is on: the author of a review cannot
+          answer its checklist, and the person who reopened a review cannot sign it again, nor reopen it in a way that
+          leaves a slot without a person who may sign.
         tags: [system]
         justification: |
-          A project must be able to say beforehand which review rules it wants, and the choice must be in the history
-          so that it can be shown who relaxed a rule and when. The switches are stored first, so that every project
-          has a recorded value on the day the rules are applied; until then the tool says on the page that they are
-          not applied, so nobody takes a stored switch for a protection that does not exist yet. The system tests
-          verify the audited, administrator-only change and the page; the storage across a restart is verified by the
-          tests of the child requirements.
+          A project must be able to say which review rules it wants, and the choice must be in the history so that it
+          can be shown who relaxed a rule and when. The rules are on by default for every project, also the ones
+          that were created before they were enforced, so that no project is left without the protection by
+          accident; a project that has to let one person do everything switches the rules off with a record. The
+          system tests verify the audited, administrator-only change and the page; the storage across a restart and
+          the enforcement are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-ReviewRuleSwitches
+          - ReviewCenter-Core-ReviewRules
           - ReviewCenter-Storage-ReviewRuleSwitches
           - ReviewCenter-Web-ReviewRuleSwitches
+          - ReviewCenter-Web-ReviewRuleNotices
         tests:
           - CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale
+          - CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff
           - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
+          - WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers
 
       - id: ReviewCenter-System-SignatureReauthentication
         title: >-
@@ -780,16 +786,18 @@ sections:
           The tool shall let a system administrator list the users and create a user, make a user a system
           administrator or an ordinary user, enable and disable a user, and set a password, let every user change
           the own password, require a password of 12 to 128 characters, lock a user out for 5 minutes after 5
-          failed sign-ins in a row, never disable or demote the last enabled system administrator, and keep the
-          users, with only a hash of the password, in the database across restarts.
+          failed sign-ins in a row, never disable or demote the last enabled system administrator, tell an
+          administrator which open review work and which projects depend on a user, and keep the users, with only
+          a hash of the password, in the database across restarts.
         tags: [system]
         justification: |
           Users are the accountable parties of a review. A password policy and a lockout make guessing hard (21
           CFR Part 11 section 11.300(d), safeguards against unauthorized use), the rule for the last system
-          administrator keeps the system manageable, and a password hash means a copy of the database does not
-          reveal the passwords.
+          administrator keeps the system manageable, the impact of a user shows what an offboarding leaves
+          behind, and a password hash means a copy of the database does not reveal the passwords.
         children:
           - ReviewCenter-Core-Users
+          - ReviewCenter-Core-UserImpact
           - ReviewCenter-Storage-Users
           - ReviewCenter-Web-SignIn
         tests:

@@ -596,9 +596,10 @@ public sealed class SigningService
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> (an API token, a disabled account or a user who does
     ///     not administer the project), <see cref="DomainRule.ProjectNotFound"/>,
-    ///     <see cref="DomainRule.ReopenReasonInvalid"/>, <see cref="DomainRule.ReviewNotFound"/> or
-    ///     <see cref="DomainRule.ReviewNotLocked"/> (the review is not approved) when a rule is violated; nothing is
-    ///     stored then.
+    ///     <see cref="DomainRule.ReopenReasonInvalid"/>, <see cref="DomainRule.ReviewNotFound"/>,
+    ///     <see cref="DomainRule.ReviewNotLocked"/> (the review is not approved) or
+    ///     <see cref="DomainRule.ReopenWouldStrandSlot"/> (the project does not let a reopener sign again, and a slot
+    ///     would have nobody left who may sign) when a rule is violated; nothing is stored then.
     /// </exception>
     public async Task ReopenReviewAsync(
         Actor actor,
@@ -635,6 +636,10 @@ public sealed class SigningService
                     DomainRule.ReviewNotLocked,
                     "The review is not locked, so there is nothing to reopen.");
             }
+
+            // A reopen blocks the person reopening (and anyone who reopened before) from signing again when the project
+            // says so, so it must not leave a slot in which nobody may sign: the review would never be approved again
+            await EnsureNoStrandedSlotAsync(snapshot, user, projectId, reviewId, cancellationToken);
 
             var previousDigest = RecordDigest.Compute(snapshot.Record);
             await _store.ReopenReviewAsync(
@@ -694,7 +699,8 @@ public sealed class SigningService
     ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then. Also thrown with
     ///     <see cref="DomainRule.ReviewLocked"/> when the review is already approved and with
     ///     <see cref="DomainRule.ReviewerNotIndependent"/> when the signer created the review and the project
-    ///     requires independent reviewers.
+    ///     requires independent reviewers, and with <see cref="DomainRule.ReopenerCannotSign"/> when the signer
+    ///     reopened the review and the project does not let a reopener sign it again.
     /// </exception>
     public Task<ReviewSignature> SignAsync(
         Actor actor,
@@ -744,7 +750,8 @@ public sealed class SigningService
     ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then. Also thrown with
     ///     <see cref="DomainRule.ReviewLocked"/> when the review is already approved and with
     ///     <see cref="DomainRule.ReviewerNotIndependent"/> when the signer created the review and the project
-    ///     requires independent reviewers.
+    ///     requires independent reviewers, and with <see cref="DomainRule.ReopenerCannotSign"/> when the signer
+    ///     reopened the review and the project does not let a reopener sign it again.
     /// </exception>
     public async Task<ReviewSignature> SignWithCredentialsAsync(
         Actor actor,
@@ -771,6 +778,11 @@ public sealed class SigningService
             // checked here, not only when the slot is filled, so a slot assigned before the rule was switched on
             // is covered too, and it is refused before the password is asked for
             await EnsureIndependentAsync(projectId, reviewId, user, cancellationToken);
+
+            // Whoever reopened the review may not sign it again when the project says so; refused before the
+            // password is asked for, like the independence rule
+            await EnsureNotReopenerAsync(record, projectId, reviewId, user, cancellationToken);
+
             // The record must be the one the signer saw, and must be signable; both are refused before the
             // password is asked for
             var digest = await EnsureSignableAsync(
@@ -1298,6 +1310,91 @@ public sealed class SigningService
                 DomainRule.ReviewerNotIndependent,
                 "You created this review, so you cannot be a reviewer of it. A different project member must " +
                 "review and sign it, or a project administrator can switch off 'Require independent reviewers'.");
+        }
+    }
+
+    /// <summary>
+    ///     Checks that a signer did not reopen the review while the project does not let a reopener sign it again.
+    /// </summary>
+    /// <param name="record">The record of the review; a never reopened review needs no further read.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="user">The signer's account.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the signer is allowed.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReopenerCannotSign"/> when the signer reopened the review (once or
+    ///     earlier) and the project does not let a reopener sign it again.
+    /// </exception>
+    private async Task EnsureNotReopenerAsync(
+        ReviewRecord record,
+        int projectId,
+        string reviewId,
+        User user,
+        CancellationToken cancellationToken)
+    {
+        if (record.Reopens == 0
+            || await _store.GetProjectAsync(projectId, cancellationToken) is not { RequireNonReopenerSigning: true })
+        {
+            return;
+        }
+
+        var reopens = await _store.ListReopensAsync(projectId, reviewId, cancellationToken);
+        if (reopens.Any(reopen => InboxRules.SameUser(reopen.ReopenedBy, user.Username)))
+        {
+            throw new DomainRuleException(
+                DomainRule.ReopenerCannotSign,
+                "You reopened this review, so you cannot sign it again. Another reviewer must sign it, or a project " +
+                "administrator can switch off 'The person who reopened a review cannot sign it again'.");
+        }
+    }
+
+    /// <summary>
+    ///     Checks that a reopen would not leave a slot in which nobody may sign again.
+    /// </summary>
+    /// <param name="snapshot">The snapshot of the approved review that is reopened.</param>
+    /// <param name="user">The administrator who reopens.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the reopen is allowed.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReopenWouldStrandSlot"/> when the project does not let a reopener sign
+    ///     again and a slot has only blocked people (the administrator and earlier reopening administrators) in it.
+    /// </exception>
+    /// <remarks>
+    ///     The people are matched by user name (the history keeps names, the slots keep identities). Occupants that
+    ///     are disabled or no longer project members are not considered.
+    /// </remarks>
+    private async Task EnsureNoStrandedSlotAsync(
+        ReviewSnapshot snapshot,
+        User user,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken)
+    {
+        if (await _store.GetProjectAsync(projectId, cancellationToken) is not { RequireNonReopenerSigning: true })
+        {
+            return;
+        }
+
+        var blockedNames = new HashSet<string>([user.Username], StringComparer.OrdinalIgnoreCase);
+        if (snapshot.Record.Reopens > 0)
+        {
+            foreach (var reopen in await _store.ListReopensAsync(projectId, reviewId, cancellationToken))
+            {
+                blockedNames.Add(reopen.ReopenedBy);
+            }
+        }
+
+        var blockedIds = (await _users.ListAsync(cancellationToken))
+            .Where(u => blockedNames.Contains(u.Username))
+            .Select(u => u.Id)
+            .ToHashSet();
+        var stranded = ReopenRules.StrandedSlots(snapshot.Slots, blockedIds);
+        if (stranded.Count > 0)
+        {
+            throw new DomainRuleException(DomainRule.ReopenWouldStrandSlot, ReopenRules.StrandedMessage(stranded));
         }
     }
 

@@ -1079,9 +1079,11 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/SlotRole.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewLock.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReopenRules.cs"
       - "src/DemaConsulting.ReviewCenter.Core/SignatureImpact.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewReopen.cs"
       - "test/**/Core/SigningServiceTests.cs"
+      - "test/**/Core/ReopenRulesTests.cs"
       - "test/**/Core/SigningServiceExternalTests.cs"
       - "test/**/Core/SigningServiceTotpTests.cs"
       - "test/**/Core/CountingUserStore.cs"
@@ -1305,6 +1307,22 @@ reviews:
       - "test/**/Core/InboxTestWorld.cs"
       - "test/**/Core/FakeInboxStore.cs"
 
+  - id: ReviewCenter-Core-UserImpactService
+    title: Review of ReviewCenter UserImpactService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/user-impact-service.yaml"
+      - "docs/design/review-center/core/user-impact-service.md"
+      - "docs/verification/review-center/core/user-impact-service.md"
+      - "docs/sysml2/model/review-center/core/user-impact-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/UserImpactService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/UserImpact.cs"
+      - "test/**/Core/UserImpactServiceTests.cs"
+
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
     title: Review of ReviewCenter Storage subsystem architecture and interfaces
@@ -1348,6 +1366,7 @@ reviews:
       - "test/**/Storage/ReviewStoreSigningTests.cs"
       - "test/**/Storage/ReviewStoreSnapshotBatchTests.cs"
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
+      - "test/**/Storage/ReviewStoreUserImpactTests.cs"
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectChecklistStoreTests.cs"
       - "test/**/Storage/ReviewDueDateStoreTests.cs"

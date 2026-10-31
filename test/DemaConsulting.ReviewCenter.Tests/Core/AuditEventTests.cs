@@ -250,11 +250,11 @@ public class AuditEventTests
         var sectionId = DefaultChecklist.Current.Sections[1].Id;
         const string Justification = "Confidential reason hunter2";
 
-        // Act
-        await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", firstItem, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+        // Act: Ann created the review and may not answer it, so Bob answers (the rule is not under test here)
+        await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", firstItem, ChecklistOutcome.Pass, null, TestActors.Bob, TestContext.Current.CancellationToken);
         await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", firstItem, ChecklistOutcome.Fail, Justification, TestActors.Bob, TestContext.Current.CancellationToken);
-        await fixture.Checklists.SetSectionApplicabilityAsync(fixture.ProjectId, "rev-1", sectionId, false, "Not relevant", TestActors.Ann, TestContext.Current.CancellationToken);
-        await fixture.Checklists.SetSectionApplicabilityAsync(fixture.ProjectId, "rev-1", sectionId, true, null, TestActors.Ann, TestContext.Current.CancellationToken);
+        await fixture.Checklists.SetSectionApplicabilityAsync(fixture.ProjectId, "rev-1", sectionId, false, "Not relevant", TestActors.Bob, TestContext.Current.CancellationToken);
+        await fixture.Checklists.SetSectionApplicabilityAsync(fixture.ProjectId, "rev-1", sectionId, true, null, TestActors.Bob, TestContext.Current.CancellationToken);
 
         // Assert
         var drafts = fixture.Reviews.Audits.Skip(2).ToList();
@@ -277,9 +277,11 @@ public class AuditEventTests
         // Arrange
         var fixture = await CreateAsync();
         var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Ann created the review and may not answer it, so Bob answers
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
         {
-            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
         }
 
         // A slot that is added and removed again first, so the slot under test has the identity 2 but is slot 1 on the page
@@ -547,11 +549,11 @@ public class AuditEventTests
     [Fact]
     public async Task SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword()
     {
-        // Arrange: a review that may be signed, and four wrong passwords already given
+        // Arrange: a review that may be signed (Bob answers, because Ann created it), and four wrong passwords already given
         var fixture = await CreateAsync();
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
         {
-            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Bob, TestContext.Current.CancellationToken);
         }
 
         var slot = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], null, TestContext.Current.CancellationToken);

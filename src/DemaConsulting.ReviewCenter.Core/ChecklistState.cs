@@ -68,6 +68,16 @@ public sealed class ChecklistState
     public ChecklistDefinition Definition { get; }
 
     /// <summary>
+    ///     Gets a value indicating whether the viewer created the review and the project does not let the author answer
+    ///     the checklist, so the answers and the applicability of sections are read-only for the viewer.
+    /// </summary>
+    /// <remarks>
+    ///     It is <c>false</c> unless <see cref="ChecklistService.GetAsync"/> was given the viewer; it tells the page what
+    ///     to show, the service refuses the change either way.
+    /// </remarks>
+    public bool AuthorBlocked { get; init; }
+
+    /// <summary>
     ///     Gets the progress over all sections that apply.
     /// </summary>
     public ChecklistProgress Overall

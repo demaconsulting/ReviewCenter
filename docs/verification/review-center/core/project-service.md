@@ -221,6 +221,12 @@ made an `Auditor`, as for any other role that is no administrator. This scenario
 **ProjectService_AddMemberAsync_Auditor_IsAllowedForANewMember**: A new member can be added as `Auditor`, because a new
 member holds no slot. This scenario is tested by `ProjectService_AddMemberAsync_Auditor_IsAllowedForANewMember`.
 
+**ProjectService_AddMemberAsync_Auditor_ExistingMemberReportsDuplicate_RemovedMemberWithSlotIsRefused**: Adding a user
+who already is a member as `Auditor` reports `MembershipExists` (the open-work scan is skipped for a member, so the
+store reports the duplicate), and a removed member who still holds an open slot is refused with
+`MemberHasOpenReviewWork` when added again as `Auditor`. This scenario is tested by
+`ProjectService_AddMemberAsync_Auditor_ExistingMemberReportsDuplicate_RemovedMemberWithSlotIsRefused`.
+
 **ProjectService_MemberManagement_Auditor_IsRefused**: An `Auditor` who tries to add, change, remove, or list members is
 refused with `ActorNotAllowed`. This scenario is tested by `ProjectService_MemberManagement_Auditor_IsRefused`.
 

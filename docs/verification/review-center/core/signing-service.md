@@ -86,6 +86,13 @@ N/A - standard test environment.
   primary or alternate reviewer when a slot is added or changed and is refused when signing, also in a slot that was
   filled before the rule was switched on, with `ReviewerNotIndependent` and before the password is asked for; with the
   rule off the author may be assigned and may sign.
+- While the project does not let the person who reopened a review sign it again (the default, also for projects that
+  existed before the rule was enforced), a reopener, now or earlier, is refused when signing with `ReopenerCannotSign`
+  before the password is asked for, and signs again with the rule off. A reopen that would leave a slot with nobody who
+  may sign it (every slot counts, the people blocked are the administrator and the earlier reopening administrators, a
+  slot with an
+  unblocked alternate is not stranded) is refused with `ReopenWouldStrandSlot` and records nothing, and is accepted
+  with the rule off. The helper `ReopenRules` decides this from values only.
 - The candidates for a slot are the enabled members of the project.
 - The status of a slot says for the primary and the alternate reviewer whether the user is still a member of the
   project, and a removed user stays assigned to the slot.
@@ -312,6 +319,42 @@ the author is accepted as the primary reviewer of a slot. This scenario is teste
 the requirement is off, and the requirement is then switched on. The author signing the ready review, with the right
 password, is refused with `ReviewerNotIndependent` and nothing is signed. This scenario is tested by
 `SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent`.
+
+**SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword**: An approved review, in a slot
+with a primary and an alternate, is reopened by the primary. The primary then tries six wrong passwords; each refusal is
+`ReopenerCannotSign`, not `ReauthenticationFailed`, no `signature.reauth-failed` entry is written (so the account is not
+counted towards a lockout), and the alternate then signs with the right password and the review is approved. This
+scenario is tested by `SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword`.
+
+**SigningService_SignAsync_EarlierReopener_StaysBlocked**: A review is reopened by one reviewer, signed again by the
+alternate, and reopened by another administrator; the first reopener is still refused with `ReopenerCannotSign`. This
+scenario is tested by `SigningService_SignAsync_EarlierReopener_StaysBlocked`.
+
+**SigningService_SignAsync_ReopenerWhileRuleIsOff_Signs**: With the rule switched off, the reopener signs the reopened
+review. This scenario is tested by `SigningService_SignAsync_ReopenerWhileRuleIsOff_Signs`.
+
+**SigningService_ReopenReviewAsync_WouldStrandSlot_ThrowsAndRecordsNothing**: Two slots, each with one person, are
+signed; the person of the first slot, who is an administrator, reopens. The reopen is refused with
+`ReopenWouldStrandSlot` and the message that names slot 1 only, no reopen and no audit entry are stored, and the review
+stays approved. This scenario is tested by
+`SigningService_ReopenReviewAsync_WouldStrandSlot_ThrowsAndRecordsNothing`.
+
+**SigningService_ReopenReviewAsync_EarlierReopenerCounts_ThrowsForTheLastFreePerson**: A slot holds a primary and an
+alternate; the primary reopens and the alternate signs again. A reopen by the alternate is then refused, because the
+earlier reopener stays blocked, while a reopen by an administrator who holds no slot is accepted. This scenario is
+tested by `SigningService_ReopenReviewAsync_EarlierReopenerCounts_ThrowsForTheLastFreePerson`.
+
+**SigningService_ReopenReviewAsync_WouldStrandSlotWhileRuleIsOff_Reopens**: With the rule switched off the same reopen
+is accepted. This scenario is tested by `SigningService_ReopenReviewAsync_WouldStrandSlotWhileRuleIsOff_Reopens`.
+
+**ReopenRules**: The unit tests of the pure helper show that a slot is stranded only when its primary is blocked and it
+has no alternate or a blocked one, that slots are numbered by identity whatever the order of the list, that no blocked
+user strands nothing, that a null argument is refused, and that the message names one slot or several slots and refuses
+an empty or null list. These scenarios are tested by
+`ReopenRules_StrandedSlots_PrimaryAndAlternate_StrandsOnlyWhenNobodyIsFree`,
+`ReopenRules_StrandedSlots_UnorderedSlotsAndNoBlockedUsers_NumbersByIdentity`,
+`ReopenRules_StrandedSlots_NullArguments_Throw`, `ReopenRules_StrandedMessage_OneOrMoreSlots_NamesThem`, and
+`ReopenRules_StrandedMessage_NullOrEmpty_Throws`.
 
 **SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences**: A review has one Fail answer, the other
 checks unanswered, and one open thread; an approved review is arranged too. The structured counts of the status

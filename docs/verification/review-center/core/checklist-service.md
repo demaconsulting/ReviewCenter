@@ -37,6 +37,11 @@ N/A - standard test environment.
   section are found.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
+- While the project does not let authors answer the checklist (the default, also for projects that existed before the
+  rule was enforced), the author of the review is refused when answering a check or changing a section with
+  `AuthorCannotAnswer`, also on an approved review (the rule is reported before the lock), and nothing is stored;
+  another member is not affected, threads are not affected, the author may answer once the rule is off, and
+  `GetAsync` reports `AuthorBlocked` for the author only while the rule is on.
 - A change that would make a current signature out of date is refused with `SignaturesWouldBecomeOutOfDate` naming
   each affected slot number and signer, unless the slot is acknowledged, and nothing is stored; a review without a
   current signature, a save that leaves the record as it is, and a locked review (`ReviewLocked` first) behave as
@@ -158,6 +163,23 @@ on a signed review; it is refused until the slots are acknowledged, and then it 
 **ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact**: On an approved review the refusal is
 `ReviewLocked`, not the signature impact. This scenario is tested by
 `ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact`.
+
+**ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing**: The author of the review
+answers a check and changes a section while the rule is on (the default); each is refused with `AuthorCannotAnswer`
+and nothing is stored, while another member answers. This scenario is tested by
+`ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing`.
+
+**ChecklistService_Answer_AuthorWhileRuleIsOff_Stores**: With the rule switched off the author's answer is stored. This
+scenario is tested by `ChecklistService_Answer_AuthorWhileRuleIsOff_Stores`.
+
+**ChecklistService_Answer_AuthorOfApprovedReview_ReportsAuthorRuleBeforeLock**: The author answers on an approved
+review; the refusal is `AuthorCannotAnswer`, not `ReviewLocked`. This scenario is tested by
+`ChecklistService_Answer_AuthorOfApprovedReview_ReportsAuthorRuleBeforeLock`.
+
+**ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn**: `GetAsync` with the user name of
+the author reports `AuthorBlocked` while the rule is on, and does not for another user, without a user name, or when
+the rule is off. This scenario is tested by
+`ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn`.
 
 **ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource**: The exception copies the list of
 affected slots it is given, so a later change to the caller's list does not change it, and an exception without slots

@@ -212,6 +212,19 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
+    ///     Switches one of the default-on review rules off for a project, as the default actor, for a test that is
+    ///     about something else than the rule.
+    /// </summary>
+    public static Task SetReviewRuleOffAsync(
+        this ProjectService service,
+        int projectId,
+        ReviewRule rule,
+        CancellationToken cancellationToken = default)
+    {
+        return service.SetReviewRuleAsync(DefaultActor, projectId, rule, true, false, cancellationToken);
+    }
+
+    /// <summary>
     ///     Builds the evidence index as the default actor.
     /// </summary>
     public static Task<IReadOnlyList<EvidenceIndexEntry>> BuildAsync(

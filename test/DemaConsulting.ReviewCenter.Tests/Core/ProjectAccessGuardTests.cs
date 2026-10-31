@@ -396,6 +396,10 @@ public class ProjectAccessGuardTests
         await world.Store.AddMembershipAsync(padm.Id, world.Own, ProjectRole.ProjectAdmin, cancellationToken);
         var item = DefaultChecklist.Current.Sections[0].Items[0].Id;
 
+        // The test is about who may work, not about the author rule: root created the review and answers it below
+        await world.Projects.SetReviewRuleAsync(
+            new Actor("root", "root"), world.Own, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken);
+
         // Act, Assert
         foreach (var actor in new[] { new Actor("padm", "padm"), new Actor("root", "root") })
         {

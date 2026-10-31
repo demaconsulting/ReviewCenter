@@ -207,11 +207,11 @@ public class CoreSubsystemTests
         // only answers are those the re-authentication scenario needs to get as far as the password
         Assert.Equal(rule, exception.Rule);
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
-        Assert.Equal(rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate ? 2 : 1, (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
+        Assert.Equal(rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign ? 2 : 1, (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
         Assert.Single(store.Reviews);
         Assert.Empty(store.Threads);
         var overall = (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall;
-        Assert.Equal(rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate ? overall.Total : 0, overall.Answered);
+        Assert.Equal(rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign or DomainRule.ReopenWouldStrandSlot ? overall.Total : 0, overall.Answered);
     }
 
     /// <summary>
@@ -568,7 +568,9 @@ public class CoreSubsystemTests
         DomainRule.ReviewNotLocked,
         DomainRule.ReopenReasonInvalid,
         DomainRule.ReviewerNotIndependent,
-        DomainRule.SignaturesWouldBecomeOutOfDate
+        DomainRule.SignaturesWouldBecomeOutOfDate,
+        DomainRule.ReopenerCannotSign,
+        DomainRule.ReopenWouldStrandSlot
     ];
 
     /// <summary>
@@ -658,6 +660,22 @@ public class CoreSubsystemTests
                     "Found a problem.",
                     actor,
                     cancellationToken);
+                return;
+            case DomainRule.ReopenWouldStrandSlot:
+                // The only slot belongs to root alone, who signs it and then reopens the review
+                await AnswerAllAndSignAsync(signing, checklists, actor, projectId, slot.Id, cancellationToken);
+                await signing.ReopenReviewAsync(actor, projectId, "rev-1", "Found a problem.", cancellationToken);
+                return;
+            case DomainRule.ReopenerCannotSign:
+                // Another user is the alternate, so that root may reopen; root then tries to sign again
+                var spare = await users.CreateAsync("spare", "Spare", UserRole.Reviewer, ValidPassword, cancellationToken);
+                await store.AddMembershipAsync(spare.Id, projectId, cancellationToken);
+                await signing.RemoveSlotAsync(actor, projectId, "rev-1", slot.Id, cancellationToken);
+                var shared = await signing.AddSlotAsync(actor, projectId, "rev-1", root.Id, spare.Id, cancellationToken);
+                await AnswerAllAndSignAsync(signing, checklists, actor, projectId, shared.Id, cancellationToken);
+                await signing.ReopenReviewAsync(actor, projectId, "rev-1", "Found a problem.", cancellationToken);
+                digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+                await signing.SignAsync(actor, projectId, "rev-1", shared.Id, digest, ValidPassword, cancellationToken);
                 return;
             case DomainRule.ReviewLocked:
                 // Answer every check, sign, and then try to change the approved review
@@ -771,6 +789,8 @@ public class CoreSubsystemTests
                 projectId, "rev-1", "NOPE-01", ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken),
             DomainRule.ChecklistJustificationInvalid => checklists.SetAnswerAsync(
                 projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, " ", TestActors.Ann, cancellationToken),
+            DomainRule.AuthorCannotAnswer => checklists.SetAnswerAsync(
+                projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Author, cancellationToken),
             DomainRule.UserNameInvalid => users.CreateAsync("a b", "New", UserRole.Reviewer, ValidPassword, cancellationToken),
             DomainRule.UserNameTaken => users.CreateAsync("ROOT", "New", UserRole.Reviewer, ValidPassword, cancellationToken),
             DomainRule.DisplayNameInvalid => users.CreateAsync("new.user", " ", UserRole.Reviewer, ValidPassword, cancellationToken),
@@ -1442,6 +1462,55 @@ public class CoreSubsystemTests
         Assert.Equal("RequireNonAuthorChecklistAnswers on->off", audits[0].Detail);
         Assert.Equal("RequireNonReopenerSigning on->off", audits[1].Detail);
         Assert.All(audits, a => Assert.Equal("root", a.ActorUsername));
+    }
+
+    /// <summary>
+    ///     Test that the two default-on rules are enforced through the services under the real access rules and
+    ///     can be switched off: the author cannot answer, a reopen that leaves a slot without a person who may sign is
+    ///     refused, and with the rules off both go through.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff()
+    {
+        // Arrange: ann created rev-1; dan is a project administrator and the only reviewer of the slot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var pid = realm.ProjectId;
+        var dan = await realm.Users.CreateAsync("dan", "Dan", false, ValidPassword, Actor.CommandLine, cancellationToken);
+        await realm.Store.AddMembershipAsync(dan.Id, pid, ProjectRole.ProjectAdmin, cancellationToken);
+        var danActor = new Actor("dan", "Dan");
+        var firstItem = DefaultChecklist.Current.Sections[0].Items[0].Id;
+
+        // Act: the author answers while the rule is on, then an administrator switches the rule off
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Checklists.SetAnswerAsync(
+            pid, "rev-1", firstItem, ChecklistOutcome.Pass, null, realm.Ann, cancellationToken));
+        await realm.Projects.SetReviewRuleAsync(realm.Root, pid, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken);
+        await realm.Checklists.SetAnswerAsync(pid, "rev-1", firstItem, ChecklistOutcome.Pass, null, realm.Ann, cancellationToken);
+
+        // Assert: refused first, stored once the rule is off
+        Assert.Equal(DomainRule.AuthorCannotAnswer, refused.Rule);
+        Assert.Equal("Ann", (await realm.Checklists.GetAsync(pid, "rev-1", cancellationToken))!.AnswerFor(firstItem)!.AnsweredBy);
+
+        // Act: bob answers every check, dan signs the only slot, and dan reopens while the rule is on
+        await AnswerAllAsync(realm, cancellationToken);
+        var slot = await realm.Signing.AddSlotAsync(realm.Root, pid, "rev-1", dan.Id, null, cancellationToken);
+        await realm.Signing.SignAsync(
+            danActor, pid, "rev-1", slot.Id, (await ApprovalOfAsync(realm, cancellationToken)).Digest, ValidPassword, cancellationToken);
+        var stranded = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.ReopenReviewAsync(
+            danActor, pid, "rev-1", "Found a problem.", cancellationToken));
+
+        // Assert: refused, and the review is still approved
+        Assert.Equal(DomainRule.ReopenWouldStrandSlot, stranded.Rule);
+        Assert.True((await ApprovalOfAsync(realm, cancellationToken)).IsApproved);
+
+        // Act: the rule is switched off, dan reopens and signs again
+        await realm.Projects.SetReviewRuleAsync(realm.Root, pid, ReviewRule.NonReopenerSigning, true, false, cancellationToken);
+        await realm.Signing.ReopenReviewAsync(danActor, pid, "rev-1", "Found a problem.", cancellationToken);
+        await realm.Signing.SignAsync(
+            danActor, pid, "rev-1", slot.Id, (await ApprovalOfAsync(realm, cancellationToken)).Digest, ValidPassword, cancellationToken);
+
+        // Assert: approved again
+        Assert.True((await ApprovalOfAsync(realm, cancellationToken)).IsApproved);
     }
 
     /// <summary>

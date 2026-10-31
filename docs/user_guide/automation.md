@@ -226,14 +226,18 @@ follows none).
   read is also **400**); a project, review, or repository that does
   not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
   repository, an attestation of a review that is not complete, or a change that is refused because the review is
-  approved and locked (or a reopen of a review that is not locked) **409** (a request without a token, possible on the
+  approved and locked (or a reopen of a review that is not locked, or a change that a project review rule refuses)
+  **409** (a request without a token, possible on the
   anonymous attestation route, gets **404** instead); and a git repository that is not reachable
   **502**, **503**, or **504**.
 - A **locked review** stays readable. `GET` of the review shows `approved: true`, and its attestation PDF and the
   evidence index keep working; the wire format has not changed. The API has no route that changes a thread, a checklist
   answer, or a reviewer slot, so a token does not meet the lock today. If a refusal because of the lock is reported, it
   is a **409** problem document whose detail is "This review is approved and locked. A project administrator must reopen
-  it before it can change.". There is no reopen route in the API.
+  it before it can change.". There is no reopen route in the API. The same holds for the review rules of the project
+  (authors cannot answer the checklist, the person who reopened cannot sign again): the API has no route that answers a
+  check, signs, or reopens, so a refusal for one of them would also be a **409** problem document, and the rules are on
+  by default for ALL existing projects.
 - Any other address under `/api` is answered with a JSON **404**, with or without a token, for every standard HTTP
   method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`).
 - The server behind a reverse proxy needs the setting described in Secure Cookie Behind a Reverse Proxy (in the

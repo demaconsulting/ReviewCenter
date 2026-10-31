@@ -31,6 +31,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     never free text.
 ///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is approved (see
 ///     <see cref="ReviewLock"/>).
+///     When the project requires it (on by default, also for projects that existed before the rule was enforced), the
+///     person who created the review cannot answer its checks or set the applicability of its sections: the change is
+///     refused with <see cref="DomainRule.AuthorCannotAnswer"/>. Comment threads are not part of that rule.
 ///     A change that would make a current signature out of date is refused with
 ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> unless the caller acknowledges the affected slots.
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
@@ -76,11 +79,16 @@ public sealed class ChecklistService
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="viewerUsername">
+    ///     The user name of the person who looks at the checklist, or <c>null</c> (the default) when there is none;
+    ///     it decides <see cref="ChecklistState.AuthorBlocked"/>.
+    /// </param>
     /// <returns>The state, or <c>null</c> when the review does not exist or has no checklist.</returns>
     public async Task<ChecklistState?> GetAsync(
         int projectId,
         string reviewId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? viewerUsername = null)
     {
         var checklist = await _store.GetChecklistAsync(projectId, reviewId, cancellationToken);
         if (checklist is null)
@@ -90,7 +98,14 @@ public sealed class ChecklistService
 
         var sections = await _store.ListChecklistSectionStatesAsync(projectId, reviewId, cancellationToken);
         var answers = await _store.ListChecklistAnswersAsync(projectId, reviewId, cancellationToken);
-        return new ChecklistState(checklist.Parse(), sections, answers);
+
+        // Only a viewer is asked about; the project and review are read for them alone
+        var authorBlocked = viewerUsername is not null
+                            && IsAuthorBlocked(
+                                await _store.GetProjectAsync(projectId, cancellationToken),
+                                await _store.GetReviewAsync(projectId, reviewId, cancellationToken),
+                                viewerUsername);
+        return new ChecklistState(checklist.Parse(), sections, answers) { AuthorBlocked = authorBlocked };
     }
 
     /// <summary>
@@ -115,6 +130,8 @@ public sealed class ChecklistService
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.AuthorCannotAnswer"/> when the actor created the review and the project does not let
+    ///     the author answer, and
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
     ///     nothing is stored then.
     /// </exception>
@@ -130,6 +147,7 @@ public sealed class ChecklistService
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
+        await RequireNotAuthorAsync(projectId, reviewId, actor, cancellationToken);
         var definition = await GetDefinitionAsync(projectId, reviewId, cancellationToken);
         if (!definition.Sections.Any(section => section.Id == sectionId))
         {
@@ -206,6 +224,8 @@ public sealed class ChecklistService
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="outcome"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.AuthorCannotAnswer"/> when the actor created the review and the project does not let
+    ///     the author answer, and
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
     ///     nothing is stored then.
     /// </exception>
@@ -221,6 +241,7 @@ public sealed class ChecklistService
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
+        await RequireNotAuthorAsync(projectId, reviewId, actor, cancellationToken);
         if (!Enum.IsDefined(outcome))
         {
             throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "The outcome is not a known value.");
@@ -277,6 +298,61 @@ public sealed class ChecklistService
                 projectId,
                 reviewId),
             cancellationToken);
+    }
+
+    /// <summary>
+    ///     Tells whether a user created the review while the project does not let the author answer its checklist.
+    /// </summary>
+    /// <param name="project">The project, or <c>null</c> when it does not exist (nothing is then enforced).</param>
+    /// <param name="review">The review, or <c>null</c> when it does not exist (nothing is then enforced).</param>
+    /// <param name="username">The user name to test, or <c>null</c> for nobody.</param>
+    /// <returns>
+    ///     <c>true</c> when the project requires that the author does not answer and the review was created by the
+    ///     user, compared without regard to case. A review without a recorded author (for example one created from
+    ///     the command line) never matches.
+    /// </returns>
+    /// <remarks>
+    ///     The author is the Review Center user who created the review (for a review created with an API token, the
+    ///     owner of the token). The authors of git commits are not known to Review Center and are not matched.
+    /// </remarks>
+    internal static bool IsAuthorBlocked(Project? project, Review? review, string? username)
+    {
+        return project is { RequireNonAuthorChecklistAnswers: true }
+               && !string.IsNullOrEmpty(username)
+               && !string.IsNullOrEmpty(review?.CreatedBy)
+               && string.Equals(review.CreatedBy, username, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Refuses the change when the actor created the review and the project does not let the author answer.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="actor">The signed-in user who changes the checklist.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the actor is allowed.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.AuthorCannotAnswer"/> when the actor is blocked.</exception>
+    private async Task RequireNotAuthorAsync(
+        int projectId,
+        string reviewId,
+        Actor actor,
+        CancellationToken cancellationToken)
+    {
+        var project = await _store.GetProjectAsync(projectId, cancellationToken);
+        if (project is not { RequireNonAuthorChecklistAnswers: true })
+        {
+            return;
+        }
+
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        if (IsAuthorBlocked(project, review, actor.Username))
+        {
+            throw new DomainRuleException(
+                DomainRule.AuthorCannotAnswer,
+                "You created this review, so you cannot answer its checklist in this project. Another project member " +
+                "must answer it, or a project administrator can switch off 'Authors cannot answer the checklist of " +
+                "their own review'.");
+        }
     }
 
     /// <summary>

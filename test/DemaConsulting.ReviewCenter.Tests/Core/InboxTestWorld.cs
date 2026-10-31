@@ -51,7 +51,7 @@ internal sealed class InboxTestWorld
     private InboxTestWorld()
     {
         Store = new FakeReviewStore();
-        UserStore = new FakeUserStore();
+        UserStore = new FakeUserStore(Store);
         Clock = new MovableTimeProvider(Start);
         Users = new UserService(UserStore, new FakePasswordHasher(), Clock);
         Access = new ProjectAccess(UserStore, Store);

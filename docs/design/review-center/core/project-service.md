@@ -22,7 +22,8 @@ reviewer slots and cannot sign it (see the `SigningService` unit, which enforces
 created the review in the tool; the authors of git commits are not matched. Two further review rules are stored with
 the project and are on by default: `RequireNonAuthorChecklistAnswers` (`bool`): whether the author of a review may not
 answer the checklist of that review, and `RequireNonReopenerSigning` (`bool`): whether the person who reopened a
-review may not sign it again. They are stored and audited only; no unit applies them yet.
+review may not sign it again. Both are enforced (`ChecklistService` and `SigningService`; see those units) and, as
+the stored columns default to on, they apply to every project, also one that existed before they were enforced.
 
 **ReviewRule**: an enumeration of the rules of a project that an administrator can switch: `IndependentReviewers`,
 `NonAuthorChecklistAnswers`, and `NonReopenerSigning`.
@@ -157,17 +158,17 @@ account can never be a system administrator and cannot exist without the members
   detail (`user 'name', role Auditor`).
 
 **Open review work** (private `EnsureNoOpenReviewWorkAsync`, used by `SetMemberRoleAsync` when the new role is
-`Auditor` and by `AddMemberAsync` for symmetry): an auditor cannot be named in a slot or sign, so a member who still owes
-a signature must not become one. The check reads the reviews of the project and their snapshots (`ListReviewsAsync` and
-`ListSnapshotsAsync`) and, for each review that is not approved (`ReviewLock.IsApproved`), looks for a slot whose
-primary or alternate is the member (`InboxRules.IsAssigned`) and that is not signed and current. If one exists the
+`Auditor` and by `AddMemberAsync` for a user who is not a member yet, since a removed member keeps the slots; an
+existing member is left to the store, which reports `MembershipExists`): an auditor cannot be named in a slot or sign,
+so a user who still owes a signature must not become one. The check calls the one shared definition of open work
+(`UserImpactService.FindOpenWorkAsync`, the same read as the offboarding impact query: `ListSlotsOfUserAsync` and
+`ListSnapshotsAsync` limited to this project, `ReviewLock.IsApproved`, `InboxRules.SlotState`), so a slot whose review
+is not approved and that is not signed and current is open work. If one exists the
 call is refused with `MemberHasOpenReviewWork`, whose message lists up to five reviews as `'id' (title)`, and nothing is
-changed. To resolve it, a member who can work in the project reassigns or removes the slot, or the member signs. A
-new member holds
-no slot, so adding as an auditor never refuses. The check is a service-level read made before the store change and not
+changed. To resolve it, a member who can work in the project reassigns or removes the slot, or the member signs. The
+check is a service-level read made before the store change and not
 in the same transaction as the role change; a slot assigned in the gap between the two is not caught, and the auditor
 then simply cannot sign it (`SigningService` refuses), so the review shows that slot as waiting until it is reassigned.
-The impact query of the offboarding work (`UserImpactService`) is expected to replace or share this read.
 
 **SetRequireIndependentReviewersAsync**: Switches the "require independent reviewers" rule of a project.
 
@@ -205,8 +206,9 @@ The impact query of the offboarding work (`UserImpactService`) is expected to re
 
 The audit detail is the property name followed by `on->off` or `off->on`.
 
-The two rules `NonAuthorChecklistAnswers` and `NonReopenerSigning` are stored, audited, and shown only: the checklist
-and signing services do not read them yet.
+The two rules `NonAuthorChecklistAnswers` and `NonReopenerSigning` are read by `ChecklistService` (author answers) and
+`SigningService` (reopener signing and the stranded-slot check) at the time of each change; the service only stores,
+audits, and shows them. A rule that is switched off is not retroactive for what happened while it was on.
 
 **Audit**: `CreateAsync` builds the audit draft `project.created` (detail `project 'Name'`) from the stored project, so
 it can name the identity the database assigned, and passes it to the store, which saves it in the same transaction. A

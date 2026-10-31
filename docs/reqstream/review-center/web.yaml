@@ -307,16 +307,33 @@ sections:
         title: >-
           The Web subsystem shall let an administrator of the project or a system administrator switch the two
           further review rules (authors answering the checklist of their own review, and the person who reopened a
-          review signing it again) on the project page, shall say next to them that they are stored but not applied
-          yet, and shall not show them to any other user.
+          review signing it again) on the project page, shall say next to them that the rules are on by default and
+          apply to every project of the tool, also the projects that existed before, and shall not show them to any
+          other user.
         justification: |
-          The rules are stored before they are applied, so a page that offered a switch without saying so would
-          promise a protection that does not exist yet. Only the people who administer the project may change a rule
-          that protects its reviews.
+          The rules are enforced for every project from the day they are enforced, so a page that offered a switch
+          without saying so would hide that an existing project is affected too. Only the people who administer the
+          project may change a rule that protects its reviews.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches
         tests:
           - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
+
+      - id: ReviewCenter-Web-ReviewRuleNotices
+        title: >-
+          The Web subsystem shall tell the author of a review on the checklist page, while the project does not let
+          authors answer the checklist, that another member has to answer it, with the answer controls disabled, shall
+          tell the person who reopened a review on the review page, while the project does not let that person sign
+          again, that another reviewer must sign, instead of the sign form, and shall show the user the message of the
+          rule when a reopening is refused because a slot would have nobody who may sign it.
+        justification: |
+          The services enforce the rules, but the pages are where people meet them. A user must not be left with
+          controls that fail for no visible reason, and must be told what to do instead.
+        children:
+          - ReviewCenter-ChecklistPage-AuthorBlocked
+          - ReviewCenter-ReviewPage-ReopenerBlocked
+        tests:
+          - WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers
 
       - id: ReviewCenter-Web-SignIn
         title: >-

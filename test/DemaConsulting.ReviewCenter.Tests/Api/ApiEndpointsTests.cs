@@ -98,6 +98,30 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that the refusals of the author and reopener rules, and of a reopen that would leave a slot without a
+    ///     person who may sign, are conflicts (409) whose problem answer carries the rule's message.
+    /// </summary>
+    /// <param name="rule">The rule that failed.</param>
+    [Theory]
+    [InlineData(DomainRule.AuthorCannotAnswer)]
+    [InlineData(DomainRule.ReopenerCannotSign)]
+    [InlineData(DomainRule.ReopenWouldStrandSlot)]
+    public void ApiProblems_StatusOf_ReviewRuleRefusals_Is409(DomainRule rule)
+    {
+        // Arrange: the refusal of a service
+        var exception = new DomainRuleException(rule, "The project rule does not allow this.");
+
+        // Act
+        var status = ApiProblems.StatusOf(rule);
+        var problem = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult>(ApiProblems.ToResult(exception));
+
+        // Assert: 409 with the message as the detail
+        Assert.Equal(409, status);
+        Assert.Equal(409, problem.StatusCode);
+        Assert.Equal("The project rule does not allow this.", problem.ProblemDetails.Detail);
+    }
+
+    /// <summary>
     ///     Test that a change that would make a signature out of date without being acknowledged is a conflict (409)
     ///     whose problem answer carries the message that names the slots.
     /// </summary>

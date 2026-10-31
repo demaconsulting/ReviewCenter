@@ -692,6 +692,29 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that the author of a review may still start a thread, reply and resolve it while the author rule is
+    ///     on: the rule is about the checklist only.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected()
+    {
+        // Arrange: a review created by the user "author" and the rule on (the default)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+
+        // Act: the author starts a thread, replies to it and resolves it
+        var thread = await service.StartThreadAsync(
+            projectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Author, "Question", cancellationToken);
+        await service.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Author, "Answer", cancellationToken);
+        await service.ResolveAsync(projectId, "rev-1", thread.Id, TestActors.Author, cancellationToken);
+
+        // Assert: the thread is stored, resolved, with both comments
+        var stored = Assert.Single(store.Threads);
+        Assert.Equal(ReviewThreadState.Resolved, stored.State);
+        Assert.Equal(2, stored.Comments.Count);
+    }
+
+    /// <summary>
     ///     Test that a blank or too long text is refused and the longest allowed one is accepted.
     /// </summary>
     [Fact]

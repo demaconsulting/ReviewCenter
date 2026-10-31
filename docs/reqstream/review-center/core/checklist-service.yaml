@@ -181,6 +181,26 @@ sections:
         tests:
           - ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked
 
+      - id: ReviewCenter-ChecklistService-AuthorRule
+        title: >-
+          The ChecklistService class shall refuse to answer a check and to change the applicability of a section when
+          the project requires that authors do not answer the checklist and the actor is the author of the review
+          (compared by user name, ignoring case), with the AuthorCannotAnswer rule, after the access check and before
+          the lock check and before anything is stored, shall let any other actor and any author of a project that
+          switched the rule off pass, shall tell a page through the ChecklistState whether the viewer is blocked, and
+          shall leave comment threads unaffected.
+        justification: |
+          A person who wrote the content must not be the one who answers whether the content meets the checks, or the
+          checklist is no independent look. The service enforces the rule itself, whatever the page or the API checked,
+          and reports it before the lock so that the reason that counts is named. The rule is on by default and applies
+          to every project, also those created before it was enforced; an administrator can switch it off per project.
+        tests:
+          - ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing
+          - ChecklistService_Answer_AuthorWhileRuleIsOff_Stores
+          - ChecklistService_Answer_AuthorOfApprovedReview_ReportsAuthorRuleBeforeLock
+          - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
+          - ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected
+
       - id: ReviewCenter-ChecklistService-SignatureImpact
         title: >-
           The ChecklistService class shall refuse to answer a check and to change the applicability of a section when

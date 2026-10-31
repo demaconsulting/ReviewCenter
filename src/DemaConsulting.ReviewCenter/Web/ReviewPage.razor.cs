@@ -439,6 +439,25 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private bool RequireIndependent { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the project does not let the person who reopened a review sign it
+    ///     again.
+    /// </summary>
+    private bool RequireNonReopener { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user reopened this review while the project does not let a
+    ///     reopener sign it again, so the user is told so instead of being offered the signing form.
+    /// </summary>
+    /// <remarks>
+    ///     This is a per-viewer fact, so it is not one of the blockers of the approval, which are the same for everyone.
+    /// </remarks>
+    private bool ReopenerBlocked =>
+        RequireNonReopener
+        && CurrentUsername.Length > 0
+        && Approval?.Reopens is { } reopens
+        && reopens.Any(reopen => string.Equals(reopen.ReopenedBy, CurrentUsername, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     ///     Gets or sets a value indicating whether the signed-in user may reopen a locked review (a project or system
     ///     administrator).
     /// </summary>
@@ -721,6 +740,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
         ProjectName = project?.Name;
         RequireIndependent = project?.RequireIndependentReviewers == true;
+        RequireNonReopener = project?.RequireNonReopenerSigning == true;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         DueDateInput = Review?.DueDate is { } due ? FormatDueDate(due) : string.Empty;
         FollowUps = Review is null
@@ -835,6 +855,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         Candidates = [];
         ClearNewThreadForm();
         RequireIndependent = false;
+        RequireNonReopener = false;
         CanReopen = false;
         ReadOnly = false;
         ReopenReason = string.Empty;

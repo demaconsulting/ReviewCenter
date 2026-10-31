@@ -287,7 +287,25 @@ public enum DomainRule
     ///     The change would make one or more current signatures out of date and the person making it did not
     ///     acknowledge them; <see cref="DomainRuleException.AffectedSlots"/> lists the signatures not acknowledged.
     /// </summary>
-    SignaturesWouldBecomeOutOfDate
+    SignaturesWouldBecomeOutOfDate,
+
+    /// <summary>
+    ///     The user created the review and the project does not allow the author of a review to answer its checklist,
+    ///     so the user can not change the checklist answers or section applicability of it.
+    /// </summary>
+    AuthorCannotAnswer,
+
+    /// <summary>
+    ///     The user reopened the review and the project does not allow the person who reopened a review to sign it
+    ///     again, so the user can not sign it.
+    /// </summary>
+    ReopenerCannotSign,
+
+    /// <summary>
+    ///     The reopen would leave a reviewer slot in which nobody may sign again (the primary and the alternate, if
+    ///     any, are the person reopening or people who reopened it before), so the review could never be approved again.
+    /// </summary>
+    ReopenWouldStrandSlot
 }
 
 /// <summary>
