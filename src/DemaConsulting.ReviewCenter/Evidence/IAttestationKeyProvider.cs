@@ -27,7 +27,18 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// <param name="IsAvailable">Whether a key was found and satisfies the trust policy.</param>
 /// <param name="Info">The public description of the key, or <c>null</c> when it is not available.</param>
 /// <param name="Problem">The reason the key is not available, or <c>null</c> when it is.</param>
-internal sealed record AttestationKeyStatus(string Provider, bool IsAvailable, AttestationKeyInfo? Info, string? Problem);
+/// <remarks>
+///     <see cref="Warnings"/> lists what an operator should know about a key that is available and works: the
+///     certificate is about to expire or has expired, the key file is readable by other users, the key is not
+///     encrypted. It is empty for a key that is not available and for a key without anything to say.
+/// </remarks>
+internal sealed record AttestationKeyStatus(string Provider, bool IsAvailable, AttestationKeyInfo? Info, string? Problem)
+{
+    /// <summary>
+    ///     Gets the warnings about the key; empty when there are none.
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}
 
 /// <summary>
 ///     Supplies the key that signs attestations; the only thing the signer, the service and the page know about

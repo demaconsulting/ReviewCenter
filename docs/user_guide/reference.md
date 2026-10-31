@@ -206,10 +206,15 @@ decrypted (the message gives the counts and the repository and user ids), when t
 the database holds secrets, when the ring is not encrypted and `DataProtection:RequireEncryptedKeys` is true, when
 the newest key cannot be decrypted, and when the protected attestation key file
 `attestation-selfsigned.pfx.protected` cannot be decrypted with the key ring (restore the ring that protected it, or
-delete the file to create a new key at the next start). With `Attestation:RequireTrustedKey` set to true and no key
-yet, the check passes with `will be created on first start`, but the server then refuses to start, because the new
-self-signed key is not trusted; use the `CertificateStore` provider for a trusted key. It never prints a key, a secret,
-a password, or a path other than the key folder: a problem with the attestation key names only the file or the setting.
+delete the file to create a new key at the next start). With the `File` provider (or `CertificateStore`), the clause
+describes the certificate, followed by `; warning:` and the text of each warning (the certificate ends within
+`Attestation:ExpiryWarningDays` or has ended, a key without a password, a file that others can read), and the check
+**fails** when the certificate path, the file, or the password is missing, the password is wrong, or the key is
+refused by `Attestation:RequireTrustedKey` or `DataProtection:RequireEncryptedKeys`. With
+`Attestation:RequireTrustedKey` set to true and no key yet, the check passes with `will be created on first start`, but
+the server then refuses to start, because the new self-signed key is not trusted; use the `CertificateStore` or `File`
+provider for a trusted key. It never prints a key, a secret, a password, or a path other than the key folder: a problem
+with the attestation key names only the file name or the setting.
 It is **skipped** when no database is configured or the database file does not exist yet, and when the database
 holds no secret and the key folder does not exist yet. See Back Up and Restore in the Deployment chapter.
 

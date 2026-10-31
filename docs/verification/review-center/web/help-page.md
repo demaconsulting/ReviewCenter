@@ -26,7 +26,8 @@ N/A - standard test environment.
 - No page of the help contains a link that begins with `#`.
 - The not-found page shows its message and a link to `/help`.
 - The Signed attestation topic describes the download, what the signature proves and does not prove, the self-signed
-  key, the certificate store settings, and `Attestation:RequireTrustedKey` (refusal to start for a self-signed key or a
+  key, the certificate store and File provider settings, the expiry warning (`Attestation:ExpiryWarningDays`), and
+  `Attestation:RequireTrustedKey` (refusal to start for a self-signed key or a
   certificate without a signing key usage, and the review page reason for a certificate that stops being valid while
   the server runs).
 - The API tokens topic describes how to create a token on the account page, that the value is shown once, the expiry
@@ -72,10 +73,12 @@ not a topic; the message is shown and the index link points to `/help`. This sce
 **HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey**: The Signed attestation page is rendered; the
 heading is "Signed attestation", and the text names the button "Download attestation (PDF)", says that the signature
 does not prove who the reviewers are, shows the label "SELF-SIGNED KEY - NOT AN ORGANIZATION KEY", and names the
-settings `Attestation:Provider` and `Attestation:RequireTrustedKey`. It says that `RequireTrustedKey` makes the server
+settings `Attestation:Provider`, `Attestation:CertificatePath` and `Attestation:ExpiryWarningDays`, and
+`Attestation:RequireTrustedKey`. It says that `RequireTrustedKey` makes the server
 refuse to start for a self-signed key or a certificate without a signing key usage, that a certificate that stops being
 valid while the server runs is reported on the review page instead of the button, and that the note of a self-signed
-certificate from the store says that the administrator supplied it. It also says that the signature certifies the
+certificate that the administrator supplied says that the administrator supplied it. It also says that the signature
+certifies the
 document with no changes allowed, that a certificate for code signing only is used, not refused for that reason, with
 a note in the PDF and a start-up warning, and that the server does not check the certificate chain or revocation. This
 scenario is tested by `HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`.

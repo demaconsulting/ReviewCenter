@@ -509,8 +509,163 @@ public partial class ValidationChecksTests
         var exception = await Assert.ThrowsAsync<ValidationFailedException>(
             () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
 
-        // Assert: the setting and the value are named
+        // Assert: the setting and the value are named, with all three providers
         Assert.Contains("Attestation:Provider 'Pfx' is not supported", exception.Message);
+        Assert.Contains("Use SelfSigned, CertificateStore or File.", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check describes the attestation key of the File provider by subject, thumbprint and
+    ///     validity, warns that the certificate ends soon, names no folder and never the password, and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword()
+    {
+        // Arrange: a protected PFX that ends in 30 days, with its password in the environment form of the setting
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(certificates, "attest", KeysInstall.Password);
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("Attestation__Provider", "File"),
+            new("Attestation__CertificatePath", pfx),
+            new("Attestation__CertificatePassword", KeysInstall.Password));
+        var before = install.Snapshot();
+
+        // Act
+        var detail = await ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the public description, the expiry warning, no folder, no password, and nothing was changed
+        Assert.Contains("attestation key File: subject 'CN=attest'", detail);
+        Assert.Contains(", thumbprint ", detail);
+        Assert.Contains("warning: The signing certificate ", detail);
+        Assert.Contains(" expires on ", detail);
+        Assert.DoesNotContain(certificates.DirectoryPath, detail);
+        Assert.DoesNotContain(KeysInstall.Password, detail);
+        Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check fails when the PFX file of the File provider needs a password that is not set,
+    ///     naming the file and the two settings but not the folder.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderWithoutPassword_FailsNamingTheFileAndSettings()
+    {
+        // Arrange: a protected PFX and no password setting
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(certificates, "attest", KeysInstall.Password);
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("Attestation__Provider", "File"),
+            new("Attestation__CertificatePath", pfx));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the file name and both settings, not the folder
+        Assert.Contains("The certificate file 'attest.pfx' needs a password.", exception.Message);
+        Assert.Contains("Attestation:CertificatePassword or Attestation:CertificatePasswordFile", exception.Message);
+        Assert.DoesNotContain(certificates.DirectoryPath, exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails when the certificate file of the File provider does not exist, naming the
+    ///     file without its folder.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderMissingFile_FailsNamingTheFileWithoutFolder()
+    {
+        // Arrange: a path to a file that does not exist
+        using var certificates = new TemporaryDirectory();
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var missingFile = install.Configure(
+            new("Attestation__Provider", "File"),
+            new("Attestation__CertificatePath", certificates.GetFilePath("gone.pfx")));
+
+        // Act
+        var fileException = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the file name, not the folder
+        Assert.Contains("Attestation:CertificatePath 'gone.pfx' could not be loaded: the file does not exist.", fileException.Message);
+        Assert.DoesNotContain(certificates.DirectoryPath, fileException.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for the File provider with no certificate path, naming the setting.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderWithoutPath_FailsNamingTheSetting()
+    {
+        // Arrange: the File provider and no path
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(new KeyValuePair<string, string?>("Attestation__Provider", "File"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the setting is named
+        Assert.Contains("Attestation:CertificatePath is not set; it is required for the File provider.", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for the File provider with a wrong password, without the password and
+    ///     without the folder.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderWrongPassword_FailsWithoutPasswordOrFolder()
+    {
+        // Arrange: a protected PFX and another password
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(certificates, "attest", KeysInstall.Password);
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("Attestation__Provider", "File"),
+            new("Attestation__CertificatePath", pfx),
+            new("Attestation__CertificatePassword", "some-other-password"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: wrong password, and neither password nor folder in the message
+        Assert.Contains("wrong password", exception.Message);
+        Assert.DoesNotContain("some-other-password", exception.Message);
+        Assert.DoesNotContain(KeysInstall.Password, exception.Message);
+        Assert.DoesNotContain(certificates.DirectoryPath, exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails when a trusted key is required and the certificate of the File provider is
+    ///     self-signed, as for every provider.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderUntrustedKeyWithRequireTrustedKey_Fails()
+    {
+        // Arrange: a self-signed PFX and the policy on
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(certificates, "attest", KeysInstall.Password);
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("Attestation__Provider", "File"),
+            new("Attestation__CertificatePath", pfx),
+            new("Attestation__CertificatePassword", KeysInstall.Password),
+            new("Attestation__RequireTrustedKey", "true"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the policy is named
+        Assert.Contains("Attestation:RequireTrustedKey", exception.Message);
     }
 
     /// <summary>

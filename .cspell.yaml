@@ -148,6 +148,7 @@ words:
   - certificatestore
   - certlm
   - certmgr
+  - topk
   - Oids
   - Acro
   - Annot

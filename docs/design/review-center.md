@@ -387,7 +387,8 @@ that the review
 is approved, builds the document description from the record, has `AttestationRenderer` lay it out (with
 `PdfDocumentWriter` as the PDF writer), has `AttestationSigner` add a detached CMS signature that covers the document
 with the key from `AttestationKeyProvider`, and records the generation in the audit trail. The key is a self-signed key
-of the server by default, or a certificate of a certificate store whose private key is never exported. The signature
+of the server by default, a certificate of a certificate store whose private key is never exported, or a certificate
+file. The signature
 proves that the document is unchanged and was produced by the holder of the key; it does not prove who the reviewers
 are (the sign-offs of the record do that) and carries no trusted time. Nothing is stored: the document is made when it
 is asked for. `ServerHost` wires it and checks the key at the start, and `ReviewPage` offers the download.
@@ -474,7 +475,8 @@ binds to which review is followed and which rows were carried (and is unchanged 
 follow-up). The form for a new review offers the choice of the earlier review with a preview of what is carried, and the
 checklist and review pages mark what was carried and from which review. An Approved review
 can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
-(a self-signed key by default, or a certificate from a certificate store), proves that the document is unchanged and
+(a self-signed key by default, a certificate from a certificate store, or a certificate file), proves that the
+document is unchanged and
 comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
 identified by the signatures in the record, and there is no time stamp authority in this version).
 
@@ -702,17 +704,22 @@ is running.
 - *Type*: File system or certificate store, selected by configuration.
 - *Role*: Consumer (the server reads the key and signs with it).
 - *Contract*: Selected by the `Attestation` configuration section (`Attestation:Provider`, with the environment
-  variable `Attestation__Provider`: `SelfSigned`, the default, or `CertificateStore` with
+  variable `Attestation__Provider`: `SelfSigned`, the default, `CertificateStore` with
   `Attestation:CertificateThumbprint`,
-  `Attestation:StoreLocation`, and `Attestation:StoreName`; `Attestation:RequireTrustedKey` and
+  `Attestation:StoreLocation`, and `Attestation:StoreName`, or `File` with `Attestation:CertificatePath`,
+  `Attestation:PrivateKeyPath`, `Attestation:CertificatePassword` (a secret) or `Attestation:CertificatePasswordFile`;
+  `Attestation:ExpiryWarningDays`, `Attestation:RequireTrustedKey` and
   `Attestation:SelfSignedFolder`). The default self-signed key is created on first use in an `attestation-selfsigned`
   folder inside the key ring folder. The private key of a certificate is never exported: the signature is made through
-  the store, smart card, or hardware module.
+  the store, smart card, or hardware module, or with a key that was loaded into memory from the file.
 - *Constraints*: The key must be usable at the start, or `serve` does not start. The self-signed key is for development
   and test; its file (`attestation-selfsigned.pfx.protected`) is protected with the Data Protection key ring of the
-  server, so it must be backed up and restored with the key ring, and its loss changes the signing key.
+  server, so it must be backed up and restored with the key ring, and its loss changes the signing key. The File
+  provider needs its certificate file and its password source to be backed up by the operator, and refuses a key
+  without a password when `DataProtection:RequireEncryptedKeys` is set.
   `Attestation:RequireTrustedKey` only refuses a self-signed key and a certificate that
-  is not suited to document signing or not valid; it does not validate a chain or check revocation. The Azure Key Vault
+  is not suited to document signing or not valid; it does not validate a chain or check revocation. The server warns
+  when the certificate ends within `Attestation:ExpiryWarningDays`. The Azure Key Vault
   provider and an RFC 3161 time stamp authority are planned and not implemented.
 
 **Standard Output**: Normal program output written to `Console.Out`.

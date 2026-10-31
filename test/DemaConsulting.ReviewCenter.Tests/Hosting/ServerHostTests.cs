@@ -1359,6 +1359,70 @@ public class ServerHostKeyRingTests
     }
 
     /// <summary>
+    ///     Test that the File attestation provider loads a protected PFX at start, logs the warning that the
+    ///     certificate ends soon, and never logs the password.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry()
+    {
+        // Arrange: a protected PFX that ends in 30 days
+        using var folder = new TemporaryDirectory();
+        var attestation = KeyRingTestCertificates.WritePfx(folder, "attest", Password);
+        var logs = new CapturingLoggerProvider();
+
+        // Act: build the application with the File provider
+        await using var app = Create(
+            Settings(
+                folder,
+                ("Attestation:Provider", "File"),
+                ("Attestation:CertificatePath", attestation),
+                ("Attestation:CertificatePassword", Password)),
+            logs);
+        var status = app.Services.GetRequiredService<IAttestationKeyProvider>().Describe();
+
+        // Assert: the key is available, the expiry warning is logged and shown, and the password is not logged
+        Assert.True(status.IsAvailable);
+        Assert.Equal("File", status.Provider);
+        Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Warning
+            && entry.Message.Contains(" expires on ", StringComparison.Ordinal));
+        Assert.Contains(status.Warnings, warning => warning.Contains(" expires on ", StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains(Password, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that an attestation key file without a password is refused when the settings of the key ring require
+    ///     encrypted keys, and that the same file is only a warning without the requirement.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys()
+    {
+        // Arrange: a ring protected with a certificate, and an attestation PFX without a password
+        using var folder = new TemporaryDirectory();
+        var ring = KeyRingTestCertificates.WritePfx(folder, "ring", Password);
+        var attestation = KeyRingTestCertificates.WritePfx(folder, "attest", null);
+        var logs = new CapturingLoggerProvider();
+        (string, string?)[] common =
+        [
+            ("DataProtection:CertificatePath", ring),
+            ("DataProtection:CertificatePassword", Password),
+            ("DataProtection:Protection", "Auto"),
+            ("Attestation:Provider", "File"),
+            ("Attestation:CertificatePath", attestation)
+        ];
+
+        // Act: with the requirement, and without it
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(
+            Settings(folder, [.. common, ("DataProtection:RequireEncryptedKeys", "true")]), logs));
+        await using var app = Create(Settings(folder, common), logs);
+
+        // Assert: refused naming the settings in the first case; started with a warning in the second
+        Assert.Contains("DataProtection:RequireEncryptedKeys", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("is not protected by a password", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Warning
+            && entry.Message.Contains("is not protected by a password", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that settings that cannot work stop the start with an error that names the setting at fault.
     /// </summary>
     /// <param name="key">The setting to change.</param>

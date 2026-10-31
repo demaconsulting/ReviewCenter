@@ -119,7 +119,9 @@ response.
   The `Attestation` settings are bound, with an empty `SelfSignedFolder` becoming an `attestation-selfsigned` folder
   inside the folder from `ResolveKeysPath`, the key provider is registered through
   `AttestationKeyProviderFactory.Create` (with the `IDataProtectionProvider` of the container, which protects the
-  self-signed key file, and `allowCreate` set to `true`; the provider is created on first use, which is the start-up
+  self-signed key file, `allowCreate` set to `true`, and `requireEncryptedKeys` set to the value of
+  `DataProtection:RequireEncryptedKeys`, so that the File provider refuses a key without a password; the provider is
+  created on first use, which is the start-up
   validation of `serve`, so `UserCommand` and `AuditCommand` never create the key), and `AttestationRenderer`,
   `AttestationSigner`, and `AttestationService` are
   registered as singletons (the first two as the interfaces `IAttestationRenderer` and `IAttestationSigner`;
@@ -263,9 +265,11 @@ before the probe round trip because the round trip creates a key when there is n
 - *Returns*: `void`.
 - *Postconditions*: The signing key can be obtained and meets the `RequireTrustedKey` rule; otherwise the application is
   disposed and an `InvalidOperationException` "The attestation signing key is not usable: {reason}" is thrown, whose
-  reason names the `Attestation` setting at fault, or, for a protected self-signed key file that the key ring cannot
+  reason names the `Attestation` setting or the file at fault (for the File provider: the missing path, file or
+  password, the wrong password, a key without a password under `DataProtection:RequireEncryptedKeys`), or, for a
+  protected self-signed key file that the key ring cannot
   decrypt, the file and the remedy (restore the ring or delete the file). With the default self-signed provider the
-  protected key file is created here on the first start.
+  protected key file is created here on the first start. An expiry warning of the key is logged here as well.
 - *Notes*: The server never deletes or replaces a signing key, so `DataProtection:AllowNewKeyRing` does not help here: it
   only accepts the loss of stored secrets (`GuardLostRing`). A start with a lost ring and a surviving protected key
   file therefore fails here, with or without that setting. In the edge case of an empty ring, no database secrets,

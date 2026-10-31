@@ -1511,6 +1511,7 @@ reviews:
       - "src/**/Evidence/AttestationKeyProviderBase.cs"
       - "src/**/Evidence/SelfSignedKeyProvider.cs"
       - "src/**/Evidence/CertificateStoreKeyProvider.cs"
+      - "src/**/Evidence/FileKeyProvider.cs"
       - "src/**/Evidence/AttestationKeyPolicy.cs"
       - "src/**/Evidence/IAttestationKeyProvider.cs"
       - "src/**/Evidence/AttestationSigningKey.cs"
@@ -1520,6 +1521,7 @@ reviews:
       - "test/**/Evidence/AttestationKeyPolicyTests.cs"
       - "test/**/Evidence/SelfSignedKeyProviderTests.cs"
       - "test/**/Evidence/CertificateStoreKeyProviderTests.cs"
+      - "test/**/Evidence/FileKeyProviderTests.cs"
 
   - id: ReviewCenter-Evidence-AttestationService
     title: Review of ReviewCenter AttestationService unit implementation

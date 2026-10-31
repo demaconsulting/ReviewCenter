@@ -242,15 +242,18 @@ sections:
         title: >-
           The ServerHost class shall register the attestation key provider chosen by the Attestation settings, the
           renderer, the signer, and the attestation service once for the whole process, keep the self-signed key in
-          Attestation:SelfSignedFolder or, by default, in a folder beside the Data Protection keys, and map the
-          download of the attestation of a review.
+          Attestation:SelfSignedFolder or, by default, in a folder beside the Data Protection keys, hand the File
+          provider the setting DataProtection:RequireEncryptedKeys so that it refuses a key without a password, and
+          map the download of the attestation of a review.
         justification: |
           The composition root is the one place that connects the Evidence subsystem to the audit trail, the signing
           service, and the settings. The default folder keeps the self-signed key with the other keys so that it
-          persists across restarts.
+          persists across restarts, and one setting decides for every key of the server whether it must be encrypted.
         tests:
           - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
           - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
+          - ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry
+          - ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys
 
       - id: ReviewCenter-ServerHost-AttestationKeyProtection
         title: >-

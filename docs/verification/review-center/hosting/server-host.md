@@ -319,6 +319,17 @@ unchanged (the server never deletes or replaces a signing key). This scenario is
 folder; the key file is created there and the provider reports an available key. This scenario is tested by
 `ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere`.
 
+**ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry**: The File provider is chosen with a
+protected PFX that ends in 30 days and its password. The application is created, the status of the key is available and
+names the File provider, a warning that the certificate expires is logged and shown in the status, and the password is
+not in any log entry. This scenario is tested by `ServerHost_CreateApplication_FileAttestationKey_StartsAndWarnsAboutExpiry`.
+
+**ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys**: The key ring is
+protected by a certificate and the attestation key is a PFX without a password. With `DataProtection:RequireEncryptedKeys`
+the start fails, naming that setting and saying that the key is not protected by a password. Without it, the server
+starts and logs the warning. This scenario is tested by
+`ServerHost_CreateApplication_UnprotectedFileAttestationKey_RefusedOnlyWithRequireEncryptedKeys`.
+
 **ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError**: The provider setting names a provider that
 does not exist; an `InvalidOperationException` "The attestation signing key is not usable" that names
 `Attestation:Provider` is thrown. This scenario is tested by

@@ -340,7 +340,7 @@ internal static class ServerHost
         services.AddSingleton<IReviewSetParser, ReviewMarkConfigParser>();
         services.AddSingleton<ReviewPlanner>();
 
-        // The attestation: the signing key (SelfSigned by default, or a certificate from a store), the PDF
+        // The attestation: the signing key (SelfSigned by default, or a certificate from a store or a file), the PDF
         // renderer and signer, and the service that ties them to the review. The self-signed key is kept in a
         // subfolder of the Data Protection keys folder, which is known to be writable and private to the server
         services.AddOptions<AttestationOptions>()
@@ -360,7 +360,8 @@ internal static class ServerHost
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILoggerFactory>(),
             provider.GetRequiredService<IDataProtectionProvider>(),
-            allowCreate: true));
+            allowCreate: true,
+            requireEncryptedKeys: provider.GetRequiredService<IOptions<KeyRingSettings>>().Value.RequireEncryptedKeys));
         services.AddSingleton<IAttestationRenderer, AttestationRenderer>();
         services.AddSingleton<IAttestationSigner, AttestationSigner>();
         services.AddSingleton<AttestationService>();

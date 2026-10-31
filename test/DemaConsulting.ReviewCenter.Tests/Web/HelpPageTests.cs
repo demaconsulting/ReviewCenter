@@ -128,6 +128,8 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("stops being valid while the server is running", text, StringComparison.Ordinal);
         Assert.Contains("self-signed certificate supplied by the administrator", text, StringComparison.Ordinal);
         Assert.Contains("Attestation:Provider", text, StringComparison.Ordinal);
+        Assert.Contains("Attestation:CertificatePath", text, StringComparison.Ordinal);
+        Assert.Contains("Attestation:ExpiryWarningDays", text, StringComparison.Ordinal);
         Assert.Contains("no changes allowed", text, StringComparison.Ordinal);
         Assert.Contains("code signing only is used, not refused for that reason", text, StringComparison.Ordinal);
         Assert.Contains("does not check the certificate chain or revocation", text, StringComparison.Ordinal);

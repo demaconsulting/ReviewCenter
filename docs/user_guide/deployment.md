@@ -149,6 +149,10 @@ that is not part of the release archive. The defaults are:
 | `DataProtection:RequireEncryptedKeys`     | false                          | Key Ring Protection (Administration)    |
 | `DataProtection:AllowNewKeyRing`          | false                          | Back Up and Restore (Deployment)        |
 | `Attestation:*`                           | a self-signed key              | The Signing Key (Reviewing)             |
+| `Attestation:CertificatePath`             | empty (File provider only)     | The Signing Key (Reviewing)             |
+| `Attestation:PrivateKeyPath`              | empty (key in the certificate) | The Signing Key (Reviewing)             |
+| `Attestation:CertificatePasswordFile`     | empty (use the setting)        | The Signing Key (Reviewing)             |
+| `Attestation:ExpiryWarningDays`           | 30 (0 for no warning)          | The Signing Key (Reviewing)             |
 | `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
 | `Git:TimeoutSeconds`                      | 120 seconds (1 to 3600)        | Repositories and Credentials            |
 
@@ -404,7 +408,13 @@ deployment itself, both **read-only**:
   still in the folder, and it **fails** when the protected key file cannot be decrypted with the key ring. It creates no
   key, folder, or file, and prints no key, secret, password, or path other than the key folder. With
   `Attestation:RequireTrustedKey` set to true and no key yet, the check still passes with `will be created on first
-  start`, but the server then refuses to start because a new self-signed key is not trusted.
+  start`, but the server then refuses to start because a new self-signed key is not trusted. With
+  `Attestation:Provider` set to `File` (or `CertificateStore`), it describes the certificate (subject, thumbprint,
+  validity) and adds `warning:` and the expiry warning when the certificate ends within
+  `Attestation:ExpiryWarningDays` or has ended, and any other warning of the provider (a key without a password, a file
+  that others can read). It **fails** when the path, the file or the password is missing, the password is wrong, or
+  `RequireTrustedKey` or `DataProtection:RequireEncryptedKeys` refuses the key. It names a file by its name only and
+  never prints the password or the folder.
 
 With a database and a key ring in place, the run ends with `Passed: 11` and exit code 0, and the last two lines read like
 `ReviewCenter_ConfiguredDatabase - Passed (...): provider Sqlite; opened read-only; schema matches (18 tables, 148
@@ -437,7 +447,12 @@ Four things belong together, and a backup that misses one of them is not a backu
    (`attestation-selfsigned`; the key file in it is encrypted with this ring, so it is useless without the ring). If you
    moved the attestation key with `Attestation:SelfSignedFolder`, back that folder up
    too. If the signing key is in the certificate store of the machine (`Attestation:Provider` set to `CertificateStore`),
-   back up that certificate and its private key by the means of your organization.
+   back up that certificate and its private key by the means of your organization. If the signing key is a file
+   (`Attestation:Provider` set to `File`), back up the certificate file, the key file (`Attestation:PrivateKeyPath`), and
+   **its password source** (the password file, or the secret that sets `Attestation__CertificatePassword`) apart from
+   each other, as for the certificate of the key ring. The key ring does not protect these files, and a restore that
+   misses them stops the start with the messages of Troubleshooting. After a certificate was replaced, keep the public
+   part of the retired certificate with the backups (see The Signing Key in the Reviewing chapter).
 3. **The secret that protects the key ring**, which is not in the folder: for DPAPI, the Windows account (and the machine,
    or only the machine with `DpapiScope` `LocalMachine`) that wrote the keys; for a certificate, the certificate file
    (`DataProtection:CertificatePath`, and any `PreviousCertificatePaths`) **and its password** (or the password file).
@@ -589,8 +604,12 @@ because no release has been published yet.
   for each address on anonymous evidence downloads (see Password Rules and Lockout in the Users and Sign-in chapter,
   and Anonymous Access in the Administration chapter).
 - Replace the default self-signed attestation key. The server logs a warning at every start that the self-signed key
-  is for development and test only. Use `Attestation:Provider` `CertificateStore` with a certificate of your
-  organization, and consider `Attestation:RequireTrustedKey` (see The Signing Key in the Reviewing chapter).
+  is for development and test only. Use `Attestation:Provider` `CertificateStore`, or `File` where there is no
+  certificate store, with a certificate of your
+  organization, and consider `Attestation:RequireTrustedKey` (see The Signing Key in the Reviewing chapter). For
+  `File`, protect the key with a password from `Attestation:CertificatePasswordFile`, let only the account of the server
+  read the certificate, key, and password files (mode 600; the server warns otherwise), do not put the password into
+  `appsettings.json`, and keep `Attestation:ExpiryWarningDays` above 0 so that the end of the certificate is noticed.
 - Prefer an account at your identity provider where one exists (see Sign In with an OpenID Connect Provider in the
   Users and Sign-in chapter), and turn anonymous evidence access on only for projects that need it.
 - The server checks its settings when it starts, and refuses to start when an enabled setting is invalid, when the
@@ -666,8 +685,33 @@ the project produced on purpose with a wrong setting, and what to do:
 - A warning in the log or in the `ReviewCenter_ConfiguredKeys` line that the file `attestation-selfsigned.pfx` of an
   earlier version is ignored: the server no longer reads that plaintext file and has created a protected key. Delete
   the old file.
-- `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned or
-  CertificateStore.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
+- `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned,
+  CertificateStore or File.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
+- `The attestation signing key is not usable: Attestation:CertificatePath is not set; it is required for the File
+  provider.`: set `Attestation:CertificatePath`, or choose another provider.
+- `... Attestation:CertificatePath '<file>' could not be loaded: the file does not exist.` (or `Attestation:PrivateKeyPath
+  '<file>' ...`): correct the path, and let the account of the server read the file.
+- `... The certificate file '<file>' needs a password. Set Attestation:CertificatePassword or
+  Attestation:CertificatePasswordFile.`: the PFX, or the encrypted PEM key, is protected and no password is set. Set one
+  of the two settings.
+- `... The certificate file '<file>' could not be opened with the password that is set: wrong password, or not a
+  certificate with a private key.`: check the password (the message never holds it) and that the file holds a
+  certificate with its private key.
+- `... Attestation:CertificatePassword and Attestation:CertificatePasswordFile are both set; set only one of them.` and
+  `... refers to the file '<file>', which does not exist.`: set only one of the two password settings, and name an
+  existing password file.
+- `... The private key in '<file>' is not protected by a password, and DataProtection:RequireEncryptedKeys is set.`:
+  protect the key with a password, or turn `DataProtection:RequireEncryptedKeys` off if the key ring is the only thing
+  that you want to require.
+- `... The private key in '<file>' is in the legacy encrypted PEM format (Proc-Type: 4,ENCRYPTED), which is not
+  supported. Convert it to PKCS #8 ...`: convert the key, for example with `openssl pkcs8 -topk8 -in old.key -out
+  new.key`, and use the new file.
+- A warning at start that the certificate **expires on** or **expired on** a date: replace the certificate (see The
+  Signing Key in the Reviewing chapter), or change `Attestation:ExpiryWarningDays`. With
+  `Attestation:RequireTrustedKey`, an expired certificate stops the start.
+- A warning that a file with the private key (the certificate file, or the key file when a PEM certificate has a
+  separate one) or the password file **can be accessed by other users** (Linux and macOS):
+  restrict it, for example with `chmod 600`, and let only the account of the server own it.
 
 Other things to check:
 
