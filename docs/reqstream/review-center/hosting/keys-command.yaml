@@ -1,0 +1,66 @@
+---
+# Software Unit Requirements for the KeysCommand Class
+#
+# The KeysCommand class runs the keys reprotect verb: it rolls a new Data Protection key and re-protects every stored
+# repository token and second-factor secret with it, so that old key material and an old certificate can be retired.
+# It is the only verb that writes the key ring and these stored secret columns.
+
+sections:
+  - title: KeysCommand Unit Requirements
+    requirements:
+      - id: ReviewCenter-KeysCommand-Reprotect
+        title: >-
+          The KeysCommand class shall create a new Data Protection key with the configured protection of the key
+          files and protect every repository token and every second-factor secret again with the newest key, in one
+          transaction per table, so that every secret stays readable, so that no stored payload references an older
+          key afterwards, and so that a second run is possible and gives another new key; a key folder that does not
+          exist is created with the owner-only access that the server gives it, before the key is written; a failure
+          after the new key
+          was created (a locked database, a full disk, a changed row) is reported with exit code 1, the new key, the
+          tables that were completed, the table that is unchanged, and that the command can be run again, and without
+          a secret.
+        justification: |
+          Re-protecting is what makes an old key file, and the certificate that protected it, retirable: nothing
+          that is stored needs them any more. A new key that is not the one in use, or a secret that is lost on the
+          way, would make the rotation worse than none, and an operator must be able to repeat the command, which
+          they only do when the message says that a key exists and that the run can be repeated.
+        tests:
+          - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
+          - KeysCommand_Run_NewKey_IsTheOnlyOneReferencedAndOldKeyIsReported
+          - KeysCommand_Run_SecondRun_IsIdempotentAndGivesAnotherKey
+          - KeysCommand_Run_SecondTableFails_ReportsNewKeyAndCompletedTable
+          - KeysCommand_Run_NoSecrets_SucceedsWithZeroCounts
+          - KeysCommand_Run_MissingKeyFolder_IsCreatedWithOwnerOnlyAccess
+          - KeysCommand_ReadKeyId_Payload_GivesKeyIdOrNull
+
+      - id: ReviewCenter-KeysCommand-RefusesUnreadable
+        title: >-
+          The KeysCommand class shall run the secret scan first and refuse with exit code 1, a sanitized message and
+          no change at all (no key, no stored value) when a protected secret cannot be read, when the key ring has no
+          usable key although secrets are stored, when the key ring settings cannot be used, or when the database
+          does not exist, and shall reject a null context.
+        justification: |
+          Re-protecting what cannot be read would not rescue it, and a command that created a key in an empty or
+          foreign ring would hide the loss that the scan finds. Whoever runs the command must be able to rely on a
+          refusal having changed nothing.
+        tests:
+          - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
+          - KeysCommand_Run_EmptyRingWithSecrets_RefusesAndCreatesNoKey
+          - KeysCommand_Run_KeyRingSettingsProblem_RefusesAndCreatesNoKey
+          - KeysCommand_Run_MissingDatabase_RefusesAndCreatesNothing
+          - KeysCommand_Run_NullContext_ThrowsArgumentNullException
+
+      - id: ReviewCenter-KeysCommand-Report
+        title: >-
+          The KeysCommand class shall report the new key id, the number of re-protected repository tokens and
+          second-factor secrets, the keys that a stored payload still references and the keys of the ring that
+          nothing references, as GUIDs read from the payload headers, and the next steps for the operator, and shall
+          never print or log a secret value.
+        justification: |
+          The operator deletes old key files and drops the old certificate only when nothing references them, so the
+          report has to say exactly that. The output is kept in terminals and job logs, so it must not hold what the
+          key ring protects.
+        tests:
+          - KeysCommand_Run_NewKey_IsTheOnlyOneReferencedAndOldKeyIsReported
+          - KeysCommand_Run_Report_HoldsNoSecretValue
+          - KeysCommand_ReadKeyId_Payload_GivesKeyIdOrNull

@@ -903,6 +903,28 @@ sections:
           - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
           - ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey
 
+      - id: ReviewCenter-System-KeyRotation
+        title: >-
+          The tool shall let an operator rotate the Data Protection key with the keys reprotect verb, run with the
+          server stopped: it first scans the stored secrets and refuses, without changing anything and with exit code
+          1, when a secret cannot be read or the ring cannot be scanned, and otherwise creates a new key with the
+          configured protection, protects every stored repository token and second-factor secret again with it, and
+          reports the counts, the keys that stored secrets still reference and what the operator can retire, without
+          printing a secret.
+        tags: [system, security]
+        justification: |
+          An old key file, and the certificate that protected it, stays a risk until nothing stored depends on it.
+          Without a way to move the stored secrets to a new key, a changed protection mode or a replaced certificate
+          could never be completed, and a ring that was plaintext before could never be retired. The command is the
+          one place that writes keys and secrets, so it must be sure first that it loses nothing.
+        children:
+          - ReviewCenter-Cli-KeysReprotect
+          - ReviewCenter-Program-KeysReprotect
+          - ReviewCenter-Hosting-KeysReprotect
+        tests:
+          - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
+          - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
+
       # ----------------------------------------------------------------------------------------------
       # Automation: pipelines and tests
       # ----------------------------------------------------------------------------------------------

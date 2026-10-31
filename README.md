@@ -51,6 +51,7 @@ a project checklist, and sign the review with their credentials. Every action is
 - 🤖 **Puppet UI Automation** - Lets AI agents drive and screenshot the UI
 - 📦 **Self-Contained Executable** - Single Windows and Linux executable, no runtime
 - 🗄️ **SQLite Storage** - Everything in one auto-created database file
+- 🔄 **Key Rotation** - `reviewcenter keys reprotect` moves stored secrets to a new Data Protection key
 - 🧪 **Self-Validation** - Built-in tests with TRX and JUnit output
 
 ## Installation

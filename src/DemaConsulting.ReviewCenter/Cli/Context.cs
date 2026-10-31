@@ -102,6 +102,11 @@ internal sealed class Context : IDisposable
     public bool AuditVerify { get; private init; }
 
     /// <summary>
+    ///     Gets a value indicating whether the <c>keys reprotect</c> verb was specified.
+    /// </summary>
+    public bool KeysReprotect { get; private init; }
+
+    /// <summary>
     ///     Gets the user name given with <c>--username</c>; set whenever <see cref="UserAdd"/> is <c>true</c>.
     /// </summary>
     public string? Username { get; private init; }
@@ -168,6 +173,7 @@ internal sealed class Context : IDisposable
             Urls = parser.Urls ?? DefaultUrls,
             UserAdd = parser.UserAdd,
             AuditVerify = parser.AuditVerify,
+            KeysReprotect = parser.KeysReprotect,
             Username = parser.Username,
             DisplayName = parser.DisplayName,
             SystemAdmin = parser.SystemAdmin
@@ -267,6 +273,11 @@ internal sealed class Context : IDisposable
         ///     Gets a value indicating whether the <c>audit verify</c> verb was specified.
         /// </summary>
         public bool AuditVerify { get; private set; }
+
+        /// <summary>
+        ///     Gets a value indicating whether the <c>keys reprotect</c> verb was specified.
+        /// </summary>
+        public bool KeysReprotect { get; private set; }
 
         /// <summary>
         ///     Gets the value of <c>--username</c>, or <c>null</c> when the option was not given.
@@ -404,6 +415,16 @@ internal sealed class Context : IDisposable
                     }
 
                     AuditVerify = true;
+                    return index + 1;
+
+                case "keys":
+                    // 'reprotect' is the only action; it must follow directly
+                    if (index >= args.Length || args[index] != "reprotect")
+                    {
+                        throw new ArgumentException("keys requires the reprotect action", nameof(args));
+                    }
+
+                    KeysReprotect = true;
                     return index + 1;
 
                 case "--username":

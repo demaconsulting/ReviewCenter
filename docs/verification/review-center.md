@@ -512,6 +512,13 @@ Verify button of the audit page reports the first broken entry of a tampered cha
 `AuditPage_Verify_TamperedChain_ShowsFirstBadEntry`. No test starts the tool as a process with the `audit verify`
 verb; the dispatch of `Program` to the command is verified by inspection and by the tests of the command.
 
+**Key rotation**: The `keys reprotect` verb is verified by the unit tests of `KeysCommand` over a real database and a
+real key folder: every stored repository token and second-factor secret is still readable by freshly started production
+services afterwards, which is tested by `KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards`, and an
+unreadable secret makes the command refuse with exit code 1 and no change at all, which is tested by
+`KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing`. No test starts the tool as a process with the verb; the
+dispatch of `Program` to the command is verified by inspection and by the tests of the command.
+
 **Registered git repositories**: A private https repository and a local repository are registered through the
 repository service over a real database. The stored token text differs from the token, the access data holds the
 token, and the real git source resolves a branch and reads a changed file. This scenario is tested by

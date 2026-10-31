@@ -703,12 +703,14 @@ when the newest key (or every key) cannot be decrypted, it refuses to start and 
 and `DataProtection:PreviousCertificatePaths`. It also refuses to start when the folder holds key files but no key can
 be read from them (damaged or unsupported files), names `DataProtection:KeysPath`, and changes nothing: restore the key
 folder, or remove the damaged files only if you accept that what they protected is lost. A key that was written before
-encryption was set stays in plain text
-until Data Protection replaces it (every 90 days); with `RequireEncryptedKeys` such a ring is refused.
+encryption was set stays in plain text until you run `reviewcenter keys reprotect`, which makes a new, encrypted key,
+and you delete the old key file (see Rotate the Key Ring Protection in the Deployment chapter); with
+`RequireEncryptedKeys` such a ring is refused.
 
 **Replacing the certificate.** Set the new certificate in `DataProtection:CertificatePath` and list the old one in
 `DataProtection:PreviousCertificatePaths`. The older keys stay encrypted with the old certificate, so keep it listed for
-as long as they are in the ring (there is no command yet that encrypts them again). An old certificate is opened with
+as long as they are in the ring. To retire them, run `reviewcenter keys reprotect` with the server stopped and delete
+the old key files afterwards (the Deployment chapter has the whole procedure). An old certificate is opened with
 the password of the current certificate, or without a password, so give both certificates the same password.
 
 **Recipe: a certificate with OpenSSL** (Linux and macOS; the project did not run these commands):
@@ -746,8 +748,8 @@ Environment=DataProtection__RequireEncryptedKeys=true
 
 A setting for `DataProtection` is read from the host configuration (`appsettings.json`, environment variables, and the
 command line) once, when the services are registered. The commands `user add` and `audit
-verify` register the same services and the same protection but do not use the key ring, so the server is the only
-command that checks it.
+verify` register the same services and the same protection but do not use the key ring, so only the server (at start),
+`--check-config`, and `keys reprotect` check it.
 
 ### How Repositories Are Read
 

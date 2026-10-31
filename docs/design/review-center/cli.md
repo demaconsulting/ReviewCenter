@@ -19,15 +19,17 @@ flags and write output. The `Cli` subsystem contains one unit: `Context`.
   present. Returns a fully initialized `Context`. Accepts `--result` as a legacy alias for
   `--results`, the `serve` verb, `--urls <url>`, which sets the listen URL for `serve`
   (default `http://localhost:5000`), the `user add` verb with `--username <name>`, `--display-name <name>`, and the
-  switch `--system-admin`, and the `audit verify` verb.
+  switch `--system-admin`, the `audit verify` verb, and the `keys reprotect` verb.
 - *Constraints*: Throws `ArgumentException` for unknown or malformed arguments, including
   `--urls` without a value, `--urls` with a value that is not an absolute http or https URL,
   `--urls` without the `serve` verb, a user option without `user add`, `user add` without a user name and a display
-  name, and `audit` without the `verify` action; throws `InvalidOperationException` when the log file
+  name, `audit` without the `verify` action, and `keys` without the `reprotect` action; throws
+  `InvalidOperationException` when the log file
   cannot be opened.
 
 **Context.Serve**, **Context.Urls**, **Context.UserAdd**, **Context.Username**, **Context.DisplayName**,
-**Context.SystemAdmin**, and **Context.AuditVerify**: Read-only properties describing the serve, user, and audit requests.
+**Context.SystemAdmin**, **Context.AuditVerify**, and **Context.KeysReprotect**: Read-only properties describing the
+serve, user, audit, and keys requests.
 
 - *Type*: In-process .NET properties.
 - *Role*: Provider.
@@ -35,7 +37,7 @@ flags and write output. The `Cli` subsystem contains one unit: `Context`.
   with `--urls`, or the default when none was supplied. `UserAdd` is true when `user add` was supplied, and then
   `Username` and `DisplayName` hold the values supplied and `SystemAdmin` is true only when `--system-admin` was
   supplied (an ordinary user by default).
-  `AuditVerify` is true when `audit verify` was supplied.
+  `AuditVerify` is true when `audit verify` was supplied. `KeysReprotect` is true when `keys reprotect` was supplied.
 - *Constraints*: Read-only; consumed by `Program` and by the `Hosting` subsystem.
 
 **Context.WriteLine**: Writes a message to stdout and to the log file.
@@ -81,7 +83,8 @@ The subsystem has no dependencies on other tool subsystems; it uses .NET BCL typ
 `Hosting` subsystem depends on it in the other
 direction: `ServerHost` reads the listen URL and the silent option from `Context`, and reports
 a failure to start through `Context.WriteError`; `UserCommand` reads the user options and reports through the same
-methods; `AuditCommand` reports the result of the verification the same way, so that a broken chain gives exit code 1.
+methods; `AuditCommand` reports the result of the verification the same way, so that a broken chain gives exit code 1;
+`KeysCommand` reports its result and its refusals the same way.
 
 Error handling flows from `Context.Create` to `Program.Main`: argument parsing errors propagate
 as `ArgumentException`; log-file errors propagate as `InvalidOperationException`. Both are

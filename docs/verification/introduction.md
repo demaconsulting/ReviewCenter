@@ -29,6 +29,7 @@ This document covers the verification design for the following software items:
     - **SecretScan** — read-only count of the key files and of the protected secrets that the key ring can still decrypt
     - **UserCommand** — the `user add` verb
     - **AuditCommand** — the `audit verify` verb
+    - **KeysCommand** — the `keys reprotect` verb
   - **Identity** subsystem
     - **PasswordHasher** — password hashing and verification
     - **SignIn** — cookie sign-in, authorization, and the signed-in actor

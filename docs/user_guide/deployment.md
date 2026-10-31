@@ -120,7 +120,8 @@ The server reads its settings from these sources; a later source wins:
    set, and that an `appsettings.Staging.json` was read when `ASPNETCORE_ENVIRONMENT` was `Staging`.
 3. Environment variables. A setting `Section:Key` is the variable `Section__Key` (two underscores).
 
-There is no command-line option for a setting other than `--urls`. The verbs `user add` and `audit verify`, and the
+There is no command-line option for a setting other than `--urls`. The verbs `user add`, `audit verify`, and
+`keys reprotect`, and the
 option `--check-config`, read the same sources, so set the same environment for them as for `serve`.
 
 Edit `appsettings.json` only for values that stay the same for the installation; a new release replaces that file.
@@ -552,6 +553,51 @@ The checks of steps 3 and 4 show that the database can be read and that the keys
 show that the attestation key is the one that signed earlier PDFs; compare the certificate of a new and an old
 attestation PDF if you must be sure.
 
+## Rotate the Key Ring Protection
+
+Use this procedure when the protection of the key ring changes: you switch `DataProtection:Protection` (for example
+from `PermissionsOnly` to `Certificate`), you replace the certificate, or you want a new key. Stored tokens and
+second-factor secrets are protected by a key of the ring, so a key file that was written under the old protection stays
+in the ring, and an old certificate stays needed, until the `keys reprotect` verb has protected every secret with a new
+key and the old key files are deleted.
+
+1. **Back up first** (see Back Up and Restore): the database, the key ring folder, and the certificate with its
+   password. The procedure deletes files at the end; keep the backup until the new state is backed up too.
+2. **Change the settings.** For a new certificate, set `DataProtection:CertificatePath` (and the password setting) to
+   the new certificate and list the old one in `DataProtection:PreviousCertificatePaths`, so that the old key files can
+   still be read. To protect a ring that was **plaintext before** (written with `PermissionsOnly`, or before encryption
+   was set), set `DataProtection:Protection` to `Certificate` (or `Dpapi` on Windows) and the certificate settings.
+   Optionally set `DataProtection:RequireEncryptedKeys` to `true`; the verb in step 4 does not refuse for the plaintext
+   keys that it is about to retire, but the server does.
+3. **Stop the server.**
+4. **Run `reviewcenter keys reprotect`** with the same environment as the service. It refuses without any change when a
+   secret cannot be read (see Rotating the Data Protection Key in the Command-Line Reference chapter); fix that first.
+   On success it creates a key that is protected with the new settings and protects every secret with it, and it lists
+   the keys of the ring that nothing references any more.
+5. **Verify** with `reviewcenter --validate --check-config`: `ReviewCenter_ConfiguredKeys` must pass with
+   `unreadable 0`. It also shows how many key files are not encrypted; after step 6 there must be none, if the new
+   protection encrypts.
+6. **Delete the old key files.** In the key ring folder, delete the files `key-<id>.xml` of the keys that the verb
+   listed as not referenced (a plaintext ring: every key file except the new one). Keep a copy with the backup of
+   step 1. Then run the check of step 5 again: `key files 1 (0 not encrypted)` shows that no plaintext key is left.
+   Once no older key file is left, the old certificate is no longer needed: remove it from
+   `DataProtection:PreviousCertificatePaths` and dispose of it. Do not delete a key file that is not listed: a secret
+   or a session may still need it.
+7. **Start the server** and back up the new state (key ring folder and the certificate), apart from each other.
+
+What users notice: sign-in cookies are protected by the key ring too, so a cookie that an older key protected stops
+working when its key file is deleted, and users sign in again once. The key ring rolls to a new key about every
+90 days by itself; that does not change the stored secrets, only this verb does.
+
+If the verb stops with an error after it created the new key, the message says so, names the table that was being
+changed (it is unchanged) and the tables that were completed; stop the server (a running server can keep the database
+locked) and run the verb again, a second run is fine. The self-signed attestation key file
+`attestation-selfsigned.pfx.protected` is protected by
+the ring too, and this verb does not change it: it stays readable only while the key that protected it stays in the
+ring. If you delete that key file, delete the attestation file too (the check of step 5 reports that it cannot be
+decrypted); the server then creates a new self-signed key at the next start, and PDFs signed earlier stay verifiable. A
+key of the `File` or `CertificateStore` provider does not depend on the ring.
+
 ## Upgrade
 
 **This release has no database migrations.** The server creates the tables when the database file is new, and it does
@@ -651,9 +697,10 @@ the project produced on purpose with a wrong setting, and what to do:
 - `The key ring is not encrypted at rest and DataProtection:RequireEncryptedKeys is true.`: set
   `DataProtection:CertificatePath` (or, on Windows, leave `Protection` at `Auto`), or turn `RequireEncryptedKeys` off.
 - `The key ring '<folder>' holds key files that are not encrypted (...) and DataProtection:RequireEncryptedKeys is
-  true.`: the ring was made before encryption was set, and a key stays plain until Data Protection replaces it
-  (every 90 days). Move the plain key files away only if you accept that what they protected (the stored tokens and
-  second-factor secrets) is lost.
+  true.`: the ring was made before encryption was set, and a key stays plain until you replace it. Set the encrypting
+  protection, stop the server, run `reviewcenter keys reprotect`, and delete the plain key files (see Rotate the Key
+  Ring Protection above); `reviewcenter keys reprotect` does not refuse because of these files. Moving the plain key files
+  away without that loses what they protected (the stored tokens and second-factor secrets).
 - `The key ring '<folder>' holds N key(s), but the newest key cannot be decrypted: ...`: the ring was made with another
   certificate, or with none, or by DPAPI for another account or machine. Set the right certificate in
   `DataProtection:CertificatePath`, or list the old certificate in `DataProtection:PreviousCertificatePaths`. The

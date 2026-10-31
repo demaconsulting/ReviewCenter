@@ -113,3 +113,10 @@ the verb is rejected, each with an `ArgumentException`. This scenario is tested 
 text printed by `Program.Run` names `audit verify`, which is tested by `Program_Run_Help_DocumentsAuditVerify`. No
 subsystem test runs the dispatch of `Program` to the command; that part is verified by the tests of
 `AuditCommand` in the `Hosting` subsystem and by inspection.
+
+**Keys reprotect verb**: The unit tests verify the flow of the `keys reprotect` verb. `Context.Create` with the
+arguments `keys reprotect` sets `KeysReprotect`, which is tested by
+`Context_Create_KeysReprotectVerb_SetsKeysReprotect`,
+and the help text printed by `Program.Run` names `keys reprotect`, which is tested by
+`Program_Run_Help_DocumentsKeysReprotect`. No subsystem test runs the dispatch of `Program` to the command; that part is
+verified by the tests of `KeysCommand` in the `Hosting` subsystem and by inspection.

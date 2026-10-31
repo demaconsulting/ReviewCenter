@@ -105,6 +105,12 @@ a tampered entry gives the first bad entry and exit code 1, which is tested by
 `AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne`. The registration of the audit services in
 `ServerHost.AddServices` is exercised by the sign-in audit tests, not by a separate hosting test.
 
+**Keys reprotect verb**: The `KeysCommand` unit tests run the verb over a real database and a real key folder. After a
+run every secret is still readable and a new key is the only one that stored payloads reference, which is tested by
+`KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards` and
+`KeysCommand_Run_NewKey_IsTheOnlyOneReferencedAndOldKeyIsReported`; a secret that cannot be read makes the command
+refuse with exit code 1 and no change, which is tested by `KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing`.
+
 **OpenID Connect settings**: Starting the real pipeline with sign-in with a provider enabled and an invalid setting
 throws an `InvalidOperationException` that names the setting and does not contain the client secret, which is tested
 by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`. With the provider off, or on with

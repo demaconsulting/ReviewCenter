@@ -14,11 +14,12 @@ by the `Web` subsystem, the registration and mapping of the JSON API of the `Api
 the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
 start, run, and stop lifecycle of that application and
-the translation of start-up failures into ordinary error reports. The `user add` and `audit verify` verbs reuse the same
-registration of the database and the services to work without starting a server. The subsystem contains five
+the translation of start-up failures into ordinary error reports. The `user add`, `audit verify`, and `keys reprotect`
+verbs reuse the same
+registration of the database and the services to work without starting a server. The subsystem contains six
 units: `ServerHost`, together with its small options type `ServerHostOptions`, which is
-documented with `ServerHost` as a supporting type, `KeyRingProtection`, `SecretScan`, `UserCommand`, and
-`AuditCommand`.
+documented with `ServerHost` as a supporting type, `KeyRingProtection`, `SecretScan`, `UserCommand`,
+`AuditCommand`, and `KeysCommand`.
 
 ### Interfaces
 
@@ -76,6 +77,19 @@ documented with `ServerHost` as a supporting type, `KeyRingProtection`, `SecretS
   file that does not exist, or the failure to read the database, through `Context.WriteError` (exit code 1).
 - *Constraints*: The caller is `Program`. It never changes the trail and never creates a database, so running it
   against a wrong location only reports that the file does not exist.
+
+**KeysCommand.Run**: Rotates the Data Protection key and protects the stored secrets again.
+
+- *Type*: In-process .NET static method.
+- *Role*: Provider.
+- *Contract*: Takes the parsed `Context`, runs the secret scan, and refuses with exit code 1 and without any change when
+  a protected secret cannot be read, when the key ring cannot be used, or when the database file does not exist.
+  Otherwise it creates a new Data Protection key with the configured protection, protects every repository token and
+  second-factor secret again with it (one transaction per table), and reports the new key id, the counts, the keys
+  that are still referenced or no longer referenced, and the next steps (exit code 0).
+- *Constraints*: The caller is `Program`. It is the only verb that writes the key ring and the stored repository token
+  and second-factor secret columns, and the server must be
+  stopped while it runs. It never prints a secret.
 
 **Health endpoint**: The `/health` route of the running server.
 
@@ -217,7 +231,7 @@ singletons in the same way, together with the `Git` and `DataProtection` setting
 review-set parser interface) and `ReviewPlanner` are registered as singletons too. The
 services hold no per-user state, and every
 database operation opens its own short-lived context from the factory. The registration is the public method
-`AddServices`, so that `UserCommand` and `AuditCommand` build exactly the same services.
+`AddServices`, so that `UserCommand`, `AuditCommand`, and `KeysCommand` build exactly the same services as the server.
 
 The attestation of the `Evidence` subsystem is registered in the same place: the `Attestation` settings, the key
 provider that the factory chooses from them, the renderer, the signer, and `AttestationService`, all singletons. The

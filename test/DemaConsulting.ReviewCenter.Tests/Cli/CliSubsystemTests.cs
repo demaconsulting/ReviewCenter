@@ -537,6 +537,66 @@ public class CliSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the keys reprotect verb is parsed and is off when not given.
+    /// </summary>
+    [Fact]
+    public void Context_Create_KeysReprotectVerb_SetsKeysReprotect()
+    {
+        // Act: parse the verb and a context without it
+        using var context = Context.Create(["keys", "reprotect"]);
+        using var other = Context.Create([]);
+
+        // Assert
+        Assert.True(context.KeysReprotect);
+        Assert.False(other.KeysReprotect);
+        Assert.False(context.AuditVerify);
+        Assert.Equal(0, context.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that incorrect use of the keys verb is rejected with a message.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("keys")]
+    [InlineData("keys rotate")]
+    public void Context_Create_KeysMisuse_ThrowsArgumentException(string arguments)
+    {
+        // Act: parse the arguments
+        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+
+        // Assert: refused with a message that names the missing action
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("reprotect", argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the help text documents the keys reprotect verb.
+    /// </summary>
+    [Fact]
+    public void Program_Run_Help_DocumentsKeysReprotect()
+    {
+        // Arrange: capture console output
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+
+            // Act
+            using var help = Context.Create(["--help"]);
+            Program.Run(help);
+
+            // Assert
+            Assert.Contains("keys reprotect", outWriter.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>
     ///     Test that the help text documents the audit verify verb.
     /// </summary>
     [Fact]

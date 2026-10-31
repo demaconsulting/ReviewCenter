@@ -703,15 +703,7 @@ internal static class ServerHost
         var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(KeyRingProtection).FullName!);
         try
         {
-            Directory.CreateDirectory(folder);
-            if (!OperatingSystem.IsWindows())
-            {
-                // The keys decrypt the stored tokens: only the server account may read them
-                File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            }
-
-            // On Windows without encryption (PermissionsOnly) the access rules of the folder are the protection
-            KeyRingProtection.RestrictKeyFolder(plan, folder);
+            KeyRingProtection.PrepareKeyFolder(plan, folder);
 
             var probe = Path.Combine(folder, $".probe-{Guid.NewGuid():N}.tmp");
             File.WriteAllText(probe, "probe");

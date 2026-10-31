@@ -85,3 +85,16 @@ sections:
           - Program_Run_Help_DocumentsAuditVerify
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
+
+      - id: ReviewCenter-Program-KeysReprotect
+        title: >-
+          The Program class shall list the keys reprotect verb in the help text, and shall run the key rotation, with
+          exit code 0 on success and 1 for a refusal or a failure, when the verb is provided.
+        justification: |
+          Program is the single dispatcher for every action of the tool, and operators discover the verb from the
+          help text. The dispatch itself is verified through the KeysCommand unit tests, which run the command
+          directly.
+        tests:
+          - Program_Run_Help_DocumentsKeysReprotect
+          - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
+          - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing

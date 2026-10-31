@@ -42,6 +42,8 @@ supplied via `--depth`.
 
 **AuditVerify**: `bool` — `true` when the `audit verify` verb was present in the argument list.
 
+**KeysReprotect**: `bool` — `true` when the `keys reprotect` verb was present in the argument list.
+
 **Username**: `string?` — The user name supplied via `--username`; set whenever `UserAdd` is `true`.
 
 **DisplayName**: `string?` — The display name supplied via `--display-name`; set whenever `UserAdd` is `true`.
@@ -64,7 +66,8 @@ Delegates to the private `ArgumentParser` helper to parse flags, then opens the 
 calling `OpenLogFile` if `--log` was present. The parser treats `serve` as a verb that sets
 `Serve`, and `--urls` as an option whose value must parse as an absolute http or https URL.
 It treats `user` as a verb that must be followed by the action `add`, which sets `UserAdd`, and `audit` as a verb that
-must be followed by the action `verify`, which sets `AuditVerify`; `--username` and
+must be followed by the action `verify`, which sets `AuditVerify`, and `keys` as a verb that must be followed by the
+action `reprotect`, which sets `KeysReprotect`; `--username` and
 `--display-name` take a text value and `--system-admin` is a switch without a value.
 After all arguments are consumed, the parser rejects a `--urls` value given without `serve`, rejects the user options
 given without `user add`, and rejects `user add` without both `--username` and `--display-name`.
@@ -106,7 +109,8 @@ the action is missing or is not `add` ("user requires the add action"), for `--u
 value is missing, when a user option is supplied without `user add`
 ("--username, --display-name and --system-admin require the user add verb"), and when `user add` lacks a name
 ("user add requires --username and --display-name"). For `audit` it throws `ArgumentException` when the action is
-missing or is not `verify` ("audit requires the verify action"). It throws
+missing or is not `verify` ("audit requires the verify action"). For `keys` it throws `ArgumentException` when the
+action is missing or is not `reprotect` ("keys requires the reprotect action"). It throws
 `InvalidOperationException` ("Failed to open log file '{path}': {detail}") when the `--log`
 file cannot be opened. Both exceptions propagate to `Program.Main`.
 
@@ -127,3 +131,4 @@ available.
   start.
 - **UserCommand** — reads `Username`, `DisplayName`, and `SystemAdmin`, and calls `WriteLine` and `WriteError`.
 - **AuditCommand** — calls `WriteLine` for an intact chain and `WriteError` for a broken chain or a read failure.
+- **KeysCommand** — calls `WriteLine` for the report and `WriteError` for a refusal or a failure.

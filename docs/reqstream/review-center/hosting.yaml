@@ -144,6 +144,23 @@ sections:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
 
+      - id: ReviewCenter-Hosting-KeysReprotect
+        title: >-
+          The Hosting subsystem shall rotate the Data Protection key when the keys reprotect verb is run, in the
+          same configuration environment as the server: refuse with exit code 1 and without any change when the
+          stored secrets cannot all be read, and otherwise create a new key, protect every stored repository token and
+          second-factor secret again with it, and report the counts and the keys that are still referenced.
+        justification: |
+          Old key material can be retired only when nothing stored needs it, and the operator needs one safe command
+          to get there.
+        children:
+          - ReviewCenter-KeysCommand-Reprotect
+          - ReviewCenter-KeysCommand-RefusesUnreadable
+          - ReviewCenter-KeysCommand-Report
+        tests:
+          - KeysCommand_Run_SecretsOfTheRing_AreStillReadableAfterwards
+          - KeysCommand_Run_UnreadableSecret_RefusesAndChangesNothing
+
       - id: ReviewCenter-Hosting-RepositoryServices
         title: >-
           The Hosting subsystem shall make the repository registry, the credential protector, and the git content

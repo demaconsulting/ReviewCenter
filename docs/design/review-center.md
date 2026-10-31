@@ -30,6 +30,7 @@ flowchart TD
         SecretScan
         UserCommand
         AuditCommand
+        KeysCommand
     end
     subgraph Identity
         PasswordHasher
@@ -119,6 +120,7 @@ flowchart TD
     Program --> ServerHost
     Program --> UserCommand
     Program --> AuditCommand
+    Program --> KeysCommand
     Validation --> ValidationChecks
     ValidationChecks --> TemporaryDirectory
     ValidationChecks --> ServerHost
@@ -176,6 +178,11 @@ flowchart TD
     AuditCommand --> ServerHost
     AuditCommand --> DatabaseSetup
     AuditCommand --> AuditService
+    KeysCommand --> Context
+    KeysCommand --> ServerHost
+    KeysCommand --> KeyRingProtection
+    KeysCommand --> SecretScan
+    KeysCommand --> DatabaseSetup
     SignIn --> UserService
     SignIn --> SignInThrottle
     SignIn --> AuditService
@@ -325,7 +332,8 @@ flowchart TD
 `Program` is the entry point. It creates a `Context` from the `Cli` subsystem, dispatches to
 `Validation` when `--validate` is passed, dispatches to `ServerHost` from the `Hosting`
 subsystem when the `serve` verb is passed, dispatches to `UserCommand` when the `user add` verb is passed, dispatches
-to `AuditCommand` when the `audit verify` verb is passed, and
+to `AuditCommand` when the `audit verify` verb is passed, dispatches to `KeysCommand` when the `keys reprotect` verb is
+passed, and
 returns the exit code from `Context`.
 `Validation` lists and runs the `ValidationChecks`, which call the production services (git, the review workflow,
 the fingerprint, the audit chain, the attestation signer and the web host through `ServerHost`) over temporary
@@ -336,7 +344,10 @@ the silent option from `Context`, configures structured logging, registers the s
 maps the `/health` endpoint, maps the user interface defined by the `Web` subsystem, and connects the pages to the
 database. `UserCommand` creates a user from the command line with the same configuration and registration, which is
 how the first system administrator is created. `AuditCommand` verifies the hash chain of the audit trail with the same
-configuration and registration and reports the result as the exit code. `KeyRingProtection` decides how the key ring of
+configuration and registration and reports the result as the exit code. `KeysCommand` rotates the Data Protection key
+and protects every stored secret again with it, after `SecretScan` has shown that every secret can be read; it is the
+only verb that writes the key ring and the stored repository token and second-factor secret columns.
+`KeyRingProtection` decides how the key ring of
 the Data Protection system is protected at rest (Windows DPAPI, a certificate, or the permissions of its folder),
 applies it for `ServerHost`, and refuses a ring that the certificate does not open; the root of trust of the stored
 tokens is therefore the key ring and its certificate or account, not the database. `SecretScan` reads the database and
@@ -554,7 +565,8 @@ retention, or archiving of the trail.
 - *Type*: CLI.
 - *Role*: Consumer (the host environment invokes the system with command-line arguments).
 - *Contract*: Accepts the `serve` verb, the `user add` verb with the options `--username <name>`,
-  `--display-name <name>`, and the switch `--system-admin`, the `audit verify` verb, and the arguments `-v`/`--version`,
+  `--display-name <name>`, and the switch `--system-admin`, the `audit verify` verb, the `keys reprotect` verb, and the
+  arguments `-v`/`--version`,
   `-?`/`-h`/`--help`,
   `--silent`, `--validate`, `--results <file>`, `--result <file>` (legacy alias for
   `--results`), `--depth <n>`, `--log <file>`, and `--urls <url>`. Returns exit code 0 for
@@ -570,7 +582,11 @@ retention, or archiving of the trail.
   `Audit chain BROKEN at entry N` on standard error and exits with 1 when it is not; an unreadable database is also
   reported with exit code 1, and so is a database file that does not exist at the configured location (the command
   never creates a database). It does not
-  show the head hash, so the head hash must be taken from the audit page. `user add` never takes the
+  show the head hash, so the head hash must be taken from the audit page. `keys` must be followed by `reprotect`.
+  `keys reprotect` is run with the server stopped; it refuses with exit code 1 and without any change when a protected
+  secret cannot be read, and otherwise creates a new Data Protection key, protects every stored repository token and
+  second-factor secret again with it, prints the counts, the keys that are still referenced and the next steps, and
+  exits with 0. `user add` never takes the
   password from the command line: it is read from the environment variable `REVIEWCENTER_PASSWORD`, otherwise from the
   first line of standard input when that is redirected, otherwise from a masked prompt that asks twice. When `serve`
   is used, the process runs until it is stopped (Ctrl+C or a

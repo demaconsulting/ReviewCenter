@@ -16,6 +16,7 @@ The following command-line options are supported:
 | `--display-name <text>`               | Display name for `user add`                                  |
 | `--system-admin`                      | Make the user of `user add` a system administrator           |
 | `audit verify`                        | Verify the hash chain of the audit trail (exit code 0 or 1)  |
+| `keys reprotect`                      | Roll a new Data Protection key and protect the secrets again |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
@@ -217,6 +218,42 @@ provider for a trusted key. It never prints a key, a secret, a password, or a pa
 with the attestation key names only the file name or the setting.
 It is **skipped** when no database is configured or the database file does not exist yet, and when the database
 holds no secret and the key folder does not exist yet. See Back Up and Restore in the Deployment chapter.
+
+## Rotating the Data Protection Key
+
+The `keys reprotect` verb moves every stored secret to a new Data Protection key, so that old key files and an old
+certificate can be retired:
+
+```bash
+reviewcenter keys reprotect
+```
+
+It reads the same configuration as the server (`appsettings.json` and the environment variables), so run it with the
+same environment, and **stop the server first**, and run only one copy of the command at a time: it is not safe to
+run concurrently with itself or with the server. A running server may change a secret while the command works, and the
+command then stops with an error for the table that it could not complete. It is the only verb that writes to the key
+ring, and the only one that changes these stored secrets (other verbs, such as `user add`, write other data of the
+database). It takes no option of its own; `--silent` and `--log <file>`
+work as for the other verbs.
+
+The command works in this order:
+
+1. It first reads every stored repository token and second-factor secret with the key ring, as `--check-config` does. It
+   **refuses**, with exit code 1, a message without any secret, and **no change at all** (no new key, no changed value),
+   when a secret cannot be decrypted, when the key folder is empty but the database holds secrets, when the key ring
+   settings are invalid, or when the database file does not exist. Re-protecting would not rescue what cannot be read;
+   restore the right key folder first, and run `reviewcenter --validate --check-config` until it passes.
+2. It creates a new key, protected the way the settings say (DPAPI, the certificate in
+   `DataProtection:CertificatePath`, or the permissions of the folder), so switch the protection or the certificate
+   **before** the command (see Rotate the Key Ring Protection in the Deployment chapter).
+3. It protects every repository token and second-factor secret again with the newest key, in one transaction for each
+   table: a table is either completely changed or not at all.
+4. It prints the new key id, the number of tokens and secrets, the keys that stored secrets still reference (none after
+   a successful run), the older keys of the ring that nothing references any more, how many key files are not encrypted,
+   and what to do next. Keys are shown by their ids (GUIDs); a secret is never printed or logged.
+
+A second run is fine: it creates another key and protects the secrets with it. The exit code is 0 after a successful
+rotation and 1 after a refusal or a failure.
 
 ## Silent Mode
 
