@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Storage;
 using Microsoft.AspNetCore.DataProtection;
@@ -27,6 +28,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -44,12 +46,16 @@ namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
 ///     many are not encrypted) and the number of protected secrets (and how many cannot be read). It fails for
 ///     secrets that cannot be read, for a key ring that does not meet <c>DataProtection:RequireEncryptedKeys</c>,
 ///     for an empty ring next to a database with secrets, and for a ring whose newest key cannot be decrypted.
+///     It also describes the attestation signing key (provider, subject, thumbprint and validity), through a provider
+///     that may not create anything: a self-signed key that does not exist yet is reported as created at the first
+///     start, a key file of an earlier version (not encrypted, ignored by the server) is reported as a warning, and a
+///     protected key file that cannot be decrypted with the ring fails the check.
 ///     It never creates a key, a folder or a file: automatic key generation of Data Protection is switched off for
 ///     the services of the check, and the folder of the ring is only read when it exists. It never prints a key, a
 ///     secret, a password or any path other than the key folder; certificate settings that cannot be used are
 ///     reported by the setting name only. With no database (not configured, or the file does not exist yet) it is
-///     skipped, as it is when the key folder does not exist yet and there is nothing it could protect. The class is
-///     stateless and thread-safe.
+///     skipped, as it is when the key folder does not exist yet and there is nothing it could protect; the
+///     attestation key is then not described either. The class is stateless and thread-safe.
 /// </remarks>
 internal static class ConfiguredKeysCheck
 {
@@ -140,7 +146,7 @@ internal static class ConfiguredKeysCheck
                     "created at the first start.");
             }
 
-            return Evaluate(plan, folder, scan);
+            return Evaluate(plan, folder, scan) + "; " + DescribeAttestationKey(provider);
         }
         catch (InvalidOperationException ex)
         {
@@ -152,6 +158,75 @@ internal static class ConfiguredKeysCheck
         {
             // The SQLite message names the problem, not the path or the connection string
             throw new ValidationFailedException($"The configured database could not be read: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    ///     Describes the attestation signing key without creating it.
+    /// </summary>
+    /// <param name="services">The services of the check.</param>
+    /// <returns>
+    ///     The subject, thumbprint and validity of the key; a note that the self-signed key is created at the first
+    ///     start; and a note about a key file of an earlier version. Never a key, a password or a path.
+    /// </returns>
+    /// <exception cref="ValidationFailedException">
+    ///     Thrown when the provider is not supported, the key cannot be decrypted or loaded, or the trust policy refuses it.
+    /// </exception>
+    private static string DescribeAttestationKey(IServiceProvider services)
+    {
+        var options = services.GetRequiredService<AttestationOptions>();
+        var time = services.GetRequiredService<TimeProvider>();
+        try
+        {
+            // Inspect only: the provider may not create the key, its folder or a replacement
+            var keys = AttestationKeyProviderFactory.Create(
+                options,
+                time,
+                services.GetRequiredService<ILoggerFactory>(),
+                services.GetRequiredService<IDataProtectionProvider>(),
+                allowCreate: false);
+            using var owner = keys as IDisposable;
+            var selfSigned = keys.Name == AttestationOptions.SelfSignedProvider;
+
+            // A key file of an earlier version is ignored by the server, and it holds a key that is not encrypted
+            var note = selfSigned && !string.IsNullOrWhiteSpace(options.SelfSignedFolder)
+                       && File.Exists(Path.Combine(options.SelfSignedFolder, SelfSignedKeyProvider.LegacyFileName))
+                ? $"; warning: the file {SelfSignedKeyProvider.LegacyFileName} of an earlier version, an attestation key " +
+                  "that is not encrypted, exists in the attestation key folder and is ignored; delete it"
+                : string.Empty;
+            try
+            {
+                var info = keys.GetSigningKey().Info;
+                var expired = string.Empty;
+                if (time.GetUtcNow() > info.NotAfter)
+                {
+                    expired = selfSigned ? " (expired; a new key is created at the first start)" : " (expired)";
+                }
+
+                return $"attestation key {info.Provider}: subject '{info.Subject}', thumbprint {info.Thumbprint}, " +
+                       $"valid {info.NotBefore:u} to {info.NotAfter:u}{expired}{note}";
+            }
+            catch (AttestationKeyException ex) when (ex.WillBeCreated)
+            {
+                return $"attestation key {keys.Name}: will be created on first start{note}";
+            }
+            catch (AttestationKeyException ex) when (ex.IsUnreadable)
+            {
+                throw new ValidationFailedException(
+                    $"The protected attestation key file {SelfSignedKeyProvider.FileName} cannot be decrypted with the " +
+                    "key ring. Restore the key ring that protected it, or delete the file to create a new key at the " +
+                    "next start (attestation PDFs signed earlier stay valid)." + note);
+            }
+        }
+        catch (AttestationKeyException ex)
+        {
+            throw new ValidationFailedException(
+                $"The attestation signing key is not usable: {ex.MessageWithoutPath ?? ex.Message}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
+        {
+            throw new ValidationFailedException(
+                "The attestation signing key could not be read because of an unexpected error; start the server and see its log.");
         }
     }
 

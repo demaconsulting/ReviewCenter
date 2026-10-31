@@ -709,8 +709,9 @@ is running.
   folder inside the key ring folder. The private key of a certificate is never exported: the signature is made through
   the store, smart card, or hardware module.
 - *Constraints*: The key must be usable at the start, or `serve` does not start. The self-signed key is for development
-  and test; its file has no password and must be protected by file permissions and backed up with the key ring, and its
-  loss changes the signing key. `Attestation:RequireTrustedKey` only refuses a self-signed key and a certificate that
+  and test; its file (`attestation-selfsigned.pfx.protected`) is protected with the Data Protection key ring of the
+  server, so it must be backed up and restored with the key ring, and its loss changes the signing key.
+  `Attestation:RequireTrustedKey` only refuses a self-signed key and a certificate that
   is not suited to document signing or not valid; it does not validate a chain or check revocation. The Azure Key Vault
   provider and an RFC 3161 time stamp authority are planned and not implemented.
 

@@ -77,6 +77,9 @@ folder (see below). The folder holds these items:
 | Self-signed attestation key      | `keys/attestation-selfsigned` folder     | `Attestation:SelfSignedFolder` |
 | Git mirrors                      | `git-cache` folder beside the database   | `Git:CachePath`                |
 
+The self-signed attestation key is the file `attestation-selfsigned.pfx.protected` in its folder. It is encrypted with
+the Data Protection key ring, so it can only be read with the key ring that is in the `keys` folder.
+
 The default `ReviewCenter` folder is `%LOCALAPPDATA%\ReviewCenter` on Windows and `~/.local/share/ReviewCenter` on
 Linux. When the account has no such folder (for example a Linux service account without a home folder), the data goes
 to `data` beside the executable. **For a service, set `Database:ConnectionString` to an explicit file, so that the
@@ -87,8 +90,8 @@ On a Windows machine the following was observed with a new database, a running s
 
 - While the server runs, the data folder holds the database file (named `rc.db` in the test through
   `Database:ConnectionString`), its `-wal` and `-shm` files, the `keys` folder with one `key-<guid>.xml` file, and
-  `keys\attestation-selfsigned\attestation-selfsigned.pfx`. The server log shows that it switches the database to the
-  write-ahead log mode.
+  `keys\attestation-selfsigned\attestation-selfsigned.pfx.protected`. The server log shows that it switches the
+  database to the write-ahead log mode.
 - After a graceful stop (Ctrl+C on Windows; SIGTERM from systemd is also a stop request of ASP.NET Core, but the
   project did not run that) the `-wal` and `-shm` files are gone and the database file is complete. After a crash or
   a killed process they stay, and the next start reads them. **Never delete the `-wal` file of a database that was
@@ -395,13 +398,19 @@ deployment itself, both **read-only**:
   version expects.
 - `ReviewCenter_ConfiguredKeys` reads the configured key ring and tries to decrypt every stored repository token and
   second-factor secret with it. It reports the protection in force, the number of key files (and how many are not
-  encrypted), the number of protected secrets, and how many of them cannot be decrypted. It creates no key, folder, or
-  file, and prints no key, secret, password, or path other than the key folder.
+  encrypted), the number of protected secrets, and how many of them cannot be decrypted. It also reports the
+  attestation key: the provider, subject, thumbprint, and validity of the key, or `will be created on first start` when
+  the key does not exist yet, with a warning when a plaintext `attestation-selfsigned.pfx` of an earlier version is
+  still in the folder, and it **fails** when the protected key file cannot be decrypted with the key ring. It creates no
+  key, folder, or file, and prints no key, secret, password, or path other than the key folder. With
+  `Attestation:RequireTrustedKey` set to true and no key yet, the check still passes with `will be created on first
+  start`, but the server then refuses to start because a new self-signed key is not trusted.
 
 With a database and a key ring in place, the run ends with `Passed: 11` and exit code 0, and the last two lines read like
 `ReviewCenter_ConfiguredDatabase - Passed (...): provider Sqlite; opened read-only; schema matches (18 tables, 148
 columns)` and `ReviewCenter_ConfiguredKeys - Passed (...): protection Dpapi; key files 1 (0 not encrypted); protected
-secrets 3 (repository tokens 2, second-factor secrets 1); unreadable 0`; the numbers are those of the installation and,
+secrets 3 (repository tokens 2, second-factor secrets 1); unreadable 0; attestation key SelfSigned: subject 'CN=...',
+thumbprint ..., valid ... to ...`; the numbers are those of the installation and,
 for the schema, grow when a release adds tables or columns. The first of the two lines was observed on a Windows
 machine of the project; the second shows the form of the report. A non-zero exit code means that a
 check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter). The key check
@@ -425,7 +434,8 @@ Four things belong together, and a backup that misses one of them is not a backu
 1. **The database** (`reviewcenter.db`), with its `-wal` and `-shm` files when they exist.
 2. **The key ring folder** (`keys`, or `DataProtection:KeysPath`). It holds the keys that encrypt the stored repository
    tokens and the second-factor secrets of the database, and, by default, the self-signed attestation key
-   (`attestation-selfsigned`). If you moved the attestation key with `Attestation:SelfSignedFolder`, back that folder up
+   (`attestation-selfsigned`; the key file in it is encrypted with this ring, so it is useless without the ring). If you
+   moved the attestation key with `Attestation:SelfSignedFolder`, back that folder up
    too. If the signing key is in the certificate store of the machine (`Attestation:Provider` set to `CertificateStore`),
    back up that certificate and its private key by the means of your organization.
 3. **The secret that protects the key ring**, which is not in the folder: for DPAPI, the Windows account (and the machine,
@@ -447,8 +457,9 @@ To take a backup:
    is elsewhere), to the backup location. Keep the certificate and its password as described above.
 3. Start the server again.
 
-The keys and the pfx file are not encrypted at rest unless the key ring is protected (see Key Ring Protection in the
-Administration chapter; the pfx file of the attestation key has no password). Protect the backup like the live data,
+The keys and the attestation key file are not encrypted at rest unless the key ring is protected (see Key Ring
+Protection in the Administration chapter). The attestation key file is encrypted with the key ring, so its protection is
+the protection of the ring. Protect the backup like the live data,
 and let only the service account and the backup operator read the files.
 
 **A key ring that Windows DPAPI protects cannot be restored on another machine or under another account.** DPAPI
@@ -473,7 +484,9 @@ What happens when the keys are missing at the restore:
   `DataProtection:AllowNewKeyRing` to `true` for **one start** (for example `DataProtection__AllowNewKeyRing=true` in
   the environment of that start, and remove it afterwards). The server then starts, creates a new key ring, and logs a
   warning with the number of secrets that became unreadable. A fresh installation (no secrets) is not affected and
-  needs no setting.
+  needs no setting. `DataProtection:AllowNewKeyRing` accepts only the loss of stored secrets: a protected attestation
+  key file that the new ring cannot decrypt still stops the start with an error that names the file, because the
+  server never deletes or replaces a signing key (delete the file yourself, or restore the ring).
 - **A database that cannot be read, next to an empty key folder, is refused too.** When the server cannot read the
   database to check whether it holds protected secrets (for example it is locked or a table cannot be read) and the
   key folder holds no key file, it does not start and creates no key, because it cannot tell a lost key ring from a new
@@ -488,9 +501,13 @@ What happens when the keys are missing at the restore:
   tokens and second-factor secrets and their repository and user ids. Enter the repository tokens again, and have an
   administrator reset the two-factor secret of each user listed; or restore the right key folder. Run
   `reviewcenter --validate --check-config` to see the same counts without starting the server.
-- The attestation key is affected only with the default `SelfSigned` provider: when its pfx file is missing (it is in the
-  key folder by default), the server generates a new key, so the signatures of new attestation PDFs come from a new key,
-  and a verifier that trusts the old key does not trust them. A key of the `CertificateStore` provider is not in the data
+- The attestation key is affected only with the default `SelfSigned` provider. Its file
+  `attestation-selfsigned.pfx.protected` is encrypted with the key ring, so it is readable only together with the ring
+  that wrote it: restoring it with the right key ring keeps the key. When the file is missing (it is in the key folder
+  by default), the server generates a new key, so the signatures of new attestation PDFs come from a new key,
+  and a verifier that trusts the old key does not trust them. When the file is there but the key ring is another, the
+  server does not start (see Troubleshooting); delete the file to accept a new key. A key of the `CertificateStore`
+  provider is not in the data
   folder; it stays in the certificate store, and the server does not generate one (a missing certificate stops the start
   with a message).
 - A ring protected by a certificate that is missing or wrong is not replaced: the server refuses to start with a message
@@ -554,9 +571,11 @@ because no release has been published yet.
 - Let the proxy accept only your host names, redirect HTTP to HTTPS, and add HSTS where you need it; the server does
   none of these (see Host Filtering, HTTPS Redirection, and HSTS).
 - Run the server under an account of its own that can write only to the data folder, and let only that account read the
-  database, the `keys` folder, and the attestation pfx file. On Windows the key ring is encrypted with DPAPI by
+  database, the `keys` folder, and the attestation key file. On Windows the key ring is encrypted with DPAPI by
   default; on Linux and macOS it is not encrypted unless you set `DataProtection:CertificatePath` (the server warns at
-  every start), and the attestation pfx file is never encrypted. Without encryption the server restricts the `keys`
+  every start). The attestation key file `attestation-selfsigned.pfx.protected` is encrypted with the key ring, so it
+  is only as protected as the ring: with an unencrypted ring, whoever can read the keys folder can also decrypt it.
+  Without encryption the server restricts the `keys`
   folder and the key files to its own account (also the files that it creates when the ring rolls; on Windows,
   `PermissionsOnly` sets an owner-only access rule on the folder).
 - Set `DataProtection:RequireEncryptedKeys` to true where the key ring must be encrypted: the server then refuses to
@@ -630,13 +649,23 @@ the project produced on purpose with a wrong setting, and what to do:
   this database, or set DataProtection:AllowNewKeyRing=true for one start to accept that they become unreadable.`: the
   database was restored (or the key folder was lost) without its key ring. Restore the key folder that belongs to the
   database. Only if you accept that the stored repository tokens and second-factor secrets are lost, start once with
-  `DataProtection:AllowNewKeyRing` set to `true` (see Back Up and Restore).
+  `DataProtection:AllowNewKeyRing` set to `true` (see Back Up and Restore). That setting does not cover the protected
+  attestation key file: when it exists and the new ring cannot decrypt it, the start still stops with the next message.
 - `Key ring '<folder>' is empty and the database (Database:ConnectionString) could not be read to check whether it
   holds protected secrets, so no key was created. Fix the access to the database and start again; run 'reviewcenter
   --validate --check-config' for the details.`: the key folder has no key file and the server could not read the
   database (it is locked or a table cannot be read), so it cannot tell whether a key ring was lost. Fix the access to
   the database (a lock is usually gone after a moment) and start again; `DataProtection:AllowNewKeyRing` does not
   bypass this.
+- `The attestation signing key is not usable: The protected self-signed attestation key file '<path>' could not be
+  decrypted or read. It can only be read with the Data Protection key ring that protected it. Restore that key ring, or
+  delete the file to create a new key.`: the file `attestation-selfsigned.pfx.protected` was written by another key ring
+  than the one in use (the key folder was lost, replaced, or restored from another time). Restore the key folder that
+  belongs to the file; only if you accept that the signing key changes, delete that file, and the next start creates a
+  new key.
+- A warning in the log or in the `ReviewCenter_ConfiguredKeys` line that the file `attestation-selfsigned.pfx` of an
+  earlier version is ignored: the server no longer reads that plaintext file and has created a protected key. Delete
+  the old file.
 - `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned or
   CertificateStore.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
 

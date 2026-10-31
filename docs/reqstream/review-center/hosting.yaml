@@ -262,6 +262,7 @@ sections:
           key is kept and backed up with the other keys.
         children:
           - ReviewCenter-ServerHost-AttestationServices
+          - ReviewCenter-ServerHost-AttestationKeyProtection
         tests:
           - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
           - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere

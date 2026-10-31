@@ -12,11 +12,13 @@ sections:
       - id: ReviewCenter-AttestationKeyProvider-Selection
         title: >-
           The AttestationKeyProvider unit shall choose the SelfSigned provider when no provider or SelfSigned is
-          configured and the CertificateStore provider when CertificateStore is configured, and shall refuse any other
-          value with an error that names the Attestation:Provider setting.
+          configured and the CertificateStore provider when CertificateStore is configured, hand the SelfSigned provider
+          the Data Protection provider that protects its key, and refuse any other value with an error that names the
+          Attestation:Provider setting.
         justification: |
           Which key signs the attestation is the most important choice of an operator. A misspelled value must stop the
-          server with a clear message and never silently fall back to a different kind of key.
+          server with a clear message and never silently fall back to a different kind of key. The key at rest is
+          protected by the key ring of the server, so the factory must pass that ring on.
         tests:
           - AttestationKeyProviderFactory_Create_BlankOrSelfSigned_SelectsSelfSignedProvider
           - AttestationKeyProviderFactory_Create_CertificateStore_SelectsCertificateStoreProvider
@@ -25,8 +27,9 @@ sections:
       - id: ReviewCenter-AttestationKeyProvider-SelfSigned
         title: >-
           The SelfSignedKeyProvider class shall create an RSA key with a self-signed certificate of a limited validity
-          period in a file in the configured folder when none exists, reload and use the same key afterwards, return
-          the same key on every call, and let concurrent first uses end with one key for everyone.
+          period in the file attestation-selfsigned.pfx.protected in the configured folder when none exists, reload
+          and use the same key afterwards, return the same key on every call, and let concurrent first uses end with
+          one key for everyone.
         justification: |
           A new installation must produce an attestation without any configuration, so the server makes a key of its
           own. The key must persist, because attestations signed with different keys after every restart could not be
@@ -37,6 +40,43 @@ sections:
           - SelfSignedKeyProvider_GetSigningKey_ExistingFile_ReloadsTheSameKeyAndSigns
           - SelfSignedKeyProvider_GetSigningKey_RepeatedCalls_ReturnTheSameKey
           - SelfSignedKeyProvider_GetSigningKey_ConcurrentFirstUse_CreatesOneKeyForEveryone
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedProtected
+        title: >-
+          The SelfSignedKeyProvider class shall store the key only as bytes that the Data Protection key ring has
+          protected, so that the file is not a readable PFX and reloads with the same ring after a restart; shall
+          ignore a plaintext file of an earlier version with a warning that tells the operator to delete it, and
+          create a new key; shall report a file that the ring cannot decrypt as an error that names the file and tells
+          the operator to restore the ring or delete the file; shall archive an expired key as a retired file and
+          create a new key with a warning; and shall put no key, password or ciphertext into a message.
+        justification: |
+          A key file that anyone who can read the folder can use would let that person sign attestations. Tying the
+          file to the key ring protects it at rest, and the ring is already part of every backup and restore. An old
+          unprotected file is never trusted or migrated, so a leaked file cannot become the key again. An expired key
+          would make the attestation fail, and the old PDFs stay valid because they carry their own certificate.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_FirstUse_FileIsNotAReadablePfx
+          - SelfSignedKeyProvider_GetSigningKey_RestartWithPersistedRing_ReloadsTheSameKey
+          - SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt
+          - SelfSignedKeyProvider_GetSigningKey_LegacyPlaintextFile_IsIgnoredWithWarning
+          - SelfSignedKeyProvider_GetSigningKey_ExpiredKey_IsArchivedAndRegeneratedWithWarning
+          - SelfSignedKeyProvider_GetSigningKey_AnyScenario_NoSecretOrCiphertextInMessages
+
+      - id: ReviewCenter-AttestationKeyProvider-NoCreate
+        title: >-
+          The AttestationKeyProvider unit shall, when it is told not to create a key, describe an existing key
+          without changing any file, when no key exists report that a key will be created on first start without
+          creating the folder or a file, and when a regular file stands where the folder should be report an error
+          that names Attestation:SelfSignedFolder instead.
+        justification: |
+          A configuration check must be safe to run on a production installation. A check that created the key as a
+          side effect would hide the very state the operator wants to see and would write with the wrong account. A
+          check that reports a key that will be created where the start would fail would be wrong.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing
+          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndFolderIsAFile_ThrowsNamingTheSetting
+          - SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing
+          - AttestationKeyProviderFactory_Create_CreationNotAllowed_ProviderCreatesNothing
 
       - id: ReviewCenter-AttestationKeyProvider-SelfSignedWarning
         title: >-
@@ -51,13 +91,20 @@ sections:
       - id: ReviewCenter-AttestationKeyProvider-SelfSignedErrors
         title: >-
           The SelfSignedKeyProvider class shall report a folder that is not set, a folder that is a file, and a key
-          file that cannot be read as an attestation key error that names the setting or the file.
+          file that cannot be read as an attestation key error that names the setting or the file, shall offer a
+          message without any folder path for a report that prints none, and shall report a cryptographic failure
+          while a key is created as a failure to create the key and not as a file that cannot be decrypted.
         justification: |
-          An operator can correct a problem only when the message names the setting or the file that has it.
+          An operator can correct a problem only when the message names the setting or the file that has it. The
+          configuration check is archived, so it must not print a folder path, and an error while a key is created
+          must not send the operator to delete a key file that is fine.
         tests:
           - SelfSignedKeyProvider_GetSigningKey_FolderNotSet_ThrowsNamingTheSetting
           - SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting
           - SelfSignedKeyProvider_GetSigningKey_CorruptFile_ThrowsNamingTheFile
+          - SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt
+          - SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder
+          - SelfSignedKeyProvider_GetSigningKey_ProtectFails_IsNotReportedAsUnreadable
 
       - id: ReviewCenter-AttestationKeyProvider-CertificateStore
         title: >-

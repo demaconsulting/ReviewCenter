@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
 
 namespace DemaConsulting.ReviewCenter.Evidence;
@@ -33,19 +34,31 @@ internal static class AttestationKeyProviderFactory
     /// <param name="options">The attestation settings.</param>
     /// <param name="time">The clock.</param>
     /// <param name="logs">The logger factory.</param>
+    /// <param name="dataProtection">The Data Protection provider that protects a self-signed key at rest.</param>
+    /// <param name="allowCreate">
+    ///     Whether a provider may create the key (and its folder). <c>false</c> is the inspect-only mode of the
+    ///     configuration check: a key that does not exist yet is reported, never written.
+    /// </param>
     /// <returns>The provider. It is disposable (it owns the key) and the caller keeps it for the life of the application.</returns>
     /// <exception cref="AttestationKeyException">Thrown when the provider is not supported.</exception>
-    public static IAttestationKeyProvider Create(AttestationOptions options, TimeProvider time, ILoggerFactory logs)
+    public static IAttestationKeyProvider Create(
+        AttestationOptions options,
+        TimeProvider time,
+        ILoggerFactory logs,
+        IDataProtectionProvider dataProtection,
+        bool allowCreate)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(logs);
+        ArgumentNullException.ThrowIfNull(dataProtection);
 
         // A blank setting means the default
         var name = string.IsNullOrWhiteSpace(options.Provider) ? AttestationOptions.SelfSignedProvider : options.Provider.Trim();
         if (string.Equals(name, AttestationOptions.SelfSignedProvider, StringComparison.OrdinalIgnoreCase))
         {
-            return new SelfSignedKeyProvider(options, time, logs.CreateLogger<SelfSignedKeyProvider>());
+            return new SelfSignedKeyProvider(
+                options, time, logs.CreateLogger<SelfSignedKeyProvider>(), dataProtection, allowCreate);
         }
 
         if (string.Equals(name, AttestationOptions.CertificateStoreProvider, StringComparison.OrdinalIgnoreCase))

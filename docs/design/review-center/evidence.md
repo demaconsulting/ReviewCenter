@@ -124,9 +124,10 @@ The signer works only with a document that has the layout of its own writer.
 configuration. It creates an RSA key and a self-signed certificate on first use, in a file in a folder beside the Data
 Protection keys (`attestation-selfsigned` under the folder of `DataProtection:KeysPath`, or
 `Attestation:SelfSignedFolder`),
-and loads the same file afterwards, so that the key persists across restarts. The file is a PFX without a password,
-so anyone who can read the folder can use the key; it is only as safe as the folder, which is restricted to its owner
-on systems that support it, and it is **for development and test only**. The key says so in its certificate subject, in
+and loads the same file afterwards, so that the key persists across restarts. The file
+(`attestation-selfsigned.pfx.protected`) holds the PFX protected by the Data Protection key ring of the server, so a
+copy of the file is useless without the ring, and the file is restricted to its owner on systems that support it. The
+key is **for development and test only**. The key says so in its certificate subject, in
 the log, in the user interface, in the document, and in the Help. A PDF reader reports the signer of a self-signed
 document as not trusted, which is correct. The **certificate store provider** uses the certificate with a configured
 thumbprint from a certificate store of the server account. It never exports the key: it keeps the handle of the private

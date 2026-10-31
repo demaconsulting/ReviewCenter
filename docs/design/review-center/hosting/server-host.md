@@ -118,7 +118,10 @@ response.
   `ReviewMarkConfigParser` is registered as the Core interface `IReviewSetParser`, and `ReviewPlanner` as a singleton.
   The `Attestation` settings are bound, with an empty `SelfSignedFolder` becoming an `attestation-selfsigned` folder
   inside the folder from `ResolveKeysPath`, the key provider is registered through
-  `AttestationKeyProviderFactory.Create`, and `AttestationRenderer`, `AttestationSigner`, and `AttestationService` are
+  `AttestationKeyProviderFactory.Create` (with the `IDataProtectionProvider` of the container, which protects the
+  self-signed key file, and `allowCreate` set to `true`; the provider is created on first use, which is the start-up
+  validation of `serve`, so `UserCommand` and `AuditCommand` never create the key), and `AttestationRenderer`,
+  `AttestationSigner`, and `AttestationService` are
   registered as singletons (the first two as the interfaces `IAttestationRenderer` and `IAttestationSigner`;
   `AttestationService` as the concrete class).
 
@@ -246,7 +249,9 @@ before the probe round trip because the round trip creates a key when there is n
   whatever `DataProtection:AllowNewKeyRing` says: that setting accepts the loss of secrets that are known to exist, and
   here it is not known. With keys in the ring the same failure is logged as a warning and the start goes on, as the
   start-up that opens the database reports the problem.
-- *Notes*: A database with no secrets (a fresh installation) never triggers the guard. The message holds the folder
+- *Notes*: A database with no secrets (a fresh installation) never triggers the guard. `DataProtection:AllowNewKeyRing`
+  covers only the stored secrets: it does not affect the protected attestation key file (see `ValidateAttestation`).
+  The message holds the folder
   and a count only (the unreadable-database message holds the folder and the setting name only, no exception text, no
   connection string, and no database location), never a secret value, ciphertext, or key. It runs for the `serve`
   verb only, because it is part of
@@ -258,8 +263,16 @@ before the probe round trip because the round trip creates a key when there is n
 - *Returns*: `void`.
 - *Postconditions*: The signing key can be obtained and meets the `RequireTrustedKey` rule; otherwise the application is
   disposed and an `InvalidOperationException` "The attestation signing key is not usable: {reason}" is thrown, whose
-  reason names the `Attestation` setting at fault. With the default self-signed provider the key file is created here on
-  the first start.
+  reason names the `Attestation` setting at fault, or, for a protected self-signed key file that the key ring cannot
+  decrypt, the file and the remedy (restore the ring or delete the file). With the default self-signed provider the
+  protected key file is created here on the first start.
+- *Notes*: The server never deletes or replaces a signing key, so `DataProtection:AllowNewKeyRing` does not help here: it
+  only accepts the loss of stored secrets (`GuardLostRing`). A start with a lost ring and a surviving protected key
+  file therefore fails here, with or without that setting. In the edge case of an empty ring, no database secrets,
+  and a surviving protected attestation file, the lost-ring probe (`ValidateDataProtection`) has already created a new
+  Data Protection key before this check refuses; the attestation file is left untouched, and the operator deletes it
+  (the next start then creates a new signing key) or restores the ring that protected it. `GuardLostRing` does not
+  look at the attestation file.
 
 Runs after `ValidateDataProtection` in `CreateApplication`, so it applies to the `serve` verb only. It does not sign a
 test value, so a smart card is not asked for its PIN at the start. The consequence of failing fast is that a server
