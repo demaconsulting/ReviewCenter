@@ -318,6 +318,7 @@ sections:
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Core-BallotConsolidation
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent

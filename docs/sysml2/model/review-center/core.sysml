@@ -32,5 +32,6 @@ package ReviewCenter {
         part personalAccessTokenService : PersonalAccessTokenService;
         part inboxService : InboxService;
         part userImpactService : UserImpactService;
+        part ballotConsolidation : BallotConsolidation;
     }
 }

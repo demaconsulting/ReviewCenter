@@ -17,7 +17,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the twenty-two units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the twenty-three units.
 
 ### Test Environment
 
@@ -322,3 +322,10 @@ administrator, and the scope by actor. This is tested by
 `UserImpactService_GetImpactAsync_PrimaryAndAlternateSlots_AreOpenWork`,
 `UserImpactService_GetImpactAsync_OnlyEnabledProjectAdministrator_IsSoleAdmin`, and
 `UserImpactService_GetImpactAsync_ProjectAdministrator_SeesOnlyOwnProjects`.
+
+**Ballot consolidation**: The unit tests of `BallotConsolidation` verify the subsystem requirement for the agreed
+standing of the ballots of a review. The agreement of the submitted ballots on a check, the dispute, the pending check,
+the sections that apply or not, the outcome derived from them, and the test of a complete ballot are tested over
+in-memory ballots, for example by `BallotConsolidation_Consolidate_SubmittedEqual_Agreed`,
+`BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts`, and
+`BallotConsolidation_Consolidate_AgreedFail_Rejected`.

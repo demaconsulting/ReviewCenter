@@ -11,7 +11,7 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains twenty-three units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains twenty-four units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
@@ -37,7 +37,8 @@ review of a project, for the project overview and the API list;
 `InboxService`, the inbox of a user (the reviews that wait for the user, in four groups, which also serves as the list
 of notifications) and the read state that marks what is new;
 `UserImpactService`, the offboarding impact of a user
-(the reviewer slots that still wait for the user and the projects the user alone administers). The
+(the reviewer slots that still wait for the user and the projects the user alone administers); and
+`BallotConsolidation`, the agreed standing of the submitted ballots of a review and the outcome it leads to. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
@@ -283,6 +284,16 @@ by the Members card in a later slice.
   system administrator may ask about every user and sees every project; a project administrator sees only the
   projects the asker administers; every other actor is refused as not allowed and an unknown user is not found.
 - *Constraints*: Reads only; nothing is stored or audited. The signature rule is the one of the inbox.
+
+**BallotConsolidation**: The agreed standing of the ballots of a review. It is consumed by the ballot rules and the
+review pages in a later slice.
+
+- *Type*: In-process .NET static class.
+- *Role*: Provider.
+- *Contract*: Give, for a checklist and the ballots of a review, the agreed, disputed, or pending standing of every check
+  and section, the outcome that the standing leads to, and whether one ballot answers every check it requires. Only
+  submitted ballots count, and only the outcome of a check is compared.
+- *Constraints*: Pure: nothing is read, stored, or audited, and the result does not depend on the order of the ballots.
 
 **IInboxStore**: The store interface the subsystem requires for the read state and for finding the reviews of a user.
 
