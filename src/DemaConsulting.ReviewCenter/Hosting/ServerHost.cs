@@ -192,6 +192,7 @@ internal static class ServerHost
 
         // The signed PDF attestation of a completed review
         app.MapAttestation();
+        app.MapAuditExport();
 
         // The JSON API under /api (personal access tokens only) and its OpenAPI document; mapped before the UI so
         // an unknown /api address is answered by the API's own JSON 404

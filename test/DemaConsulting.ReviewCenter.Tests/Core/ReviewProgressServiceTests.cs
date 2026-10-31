@@ -794,6 +794,23 @@ public partial class ReviewProgressServiceTests
         }
 
         /// <inheritdoc />
+        public Task<IReadOnlyList<AuditEntry>> ReadMatchingAsync(
+            AuditFilter filter,
+            long afterSequence,
+            long upToSequence,
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            return inner.ReadMatchingAsync(filter, afterSequence, upToSequence, count, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<long> LatestSequenceAsync(CancellationToken cancellationToken = default)
+        {
+            return inner.LatestSequenceAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
         public Task<IReadOnlyDictionary<string, DateTimeOffset>> LastActivityAsync(
             int projectId,
             CancellationToken cancellationToken = default)

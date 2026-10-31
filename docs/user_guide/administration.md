@@ -423,6 +423,42 @@ page, and the **Older** and **Newer** buttons keep the filter and the page size.
 entries, whatever the address says. A filter value of the address that is not usable (a date that is not `yyyy-MM-dd`, an
 unknown action, another page size) is ignored. When nothing matches, the page says "No entry matches the filters."
 
+### Exporting the Audit Trail
+
+Both audit pages show **Export CSV** and **Export JSON** links under the filter form. The export contains
+**everything that matches the current filter**, not only the page that is shown, in the order of the chain (oldest
+entry first); the page size and the position of the page do not matter. It is a download of a file, for example
+`audit-project-3-20250101T120000Z-chain-intact.csv`.
+
+- **Who may export**: the audit page of a project can export the entries of that project for everyone who may open the
+  page (project administrators and system administrators today). Someone who may see the project but not read its
+  audit trail is refused with 403, and someone who cannot see the project gets 404. The export of the whole trail
+  (`/audit/export`) is for system administrators only; everyone else is refused with 403, and a request without a
+  session is sent to the sign-in page.
+- **Formats**: CSV (the default; UTF-8 with a byte order mark, comma separated, quoted as in RFC 4180, lines end with
+  CR LF) with the columns `sequence,timestampUtc,actor,action,project,review,detail,previousHash,hash`, and JSON (an
+  object with `export`, `chain`, and `entries`). Times are ISO 8601 in UTC.
+- **CSV and spreadsheets**: so that a spreadsheet does not run an entry as a formula, a text cell (actor, action,
+  review, and detail) that starts with `=`, `+`, `-`, `@`, a tab, or a carriage return gets a leading `'` in the CSV.
+  The JSON export is not changed.
+- **Chain status**: before the first row is sent the whole chain is verified once. The result is in the response
+  headers `X-ReviewCenter-Audit-Chain` (`intact` or `broken`) and, for a broken chain,
+  `X-ReviewCenter-Audit-Chain-Broken-At` (the sequence of the first broken entry), in the file name, and, in the JSON,
+  in `chain`. A broken chain is still exported so that it can be examined. The chain is global, so the status of the
+  export of one project tells only whether the whole chain is sound and where it first breaks, never how many entries
+  other projects have. The status can therefore be `broken` for an export whose rows all come before the first broken
+  entry. Every export verifies the whole chain, so an export of a long trail takes time proportional to the length of
+  the chain, even when the filter matches only a few entries.
+- **A view of a verified chain**: a filtered export is a view of the chain, not a chain of its own. Each row keeps its
+  `previousHash` and `hash`, so a script can recompute the hash of a row and check that it follows from the fields
+  and the previous hash. To check the whole chain, use `reviewcenter audit verify` (see
+  [Verify from the Command Line](#verify-from-the-command-line)).
+- **Snapshot**: the export covers the entries up to the newest one when it started; entries that are added while the
+  file is streamed are not in it.
+- **The export is audited**: after the file has been sent an `audit.exported` entry records who exported, the format,
+  the filter, and the number of rows (marked incomplete when the download was cancelled or failed). It belongs to the
+  project of the export, or to no project for the whole trail, and it is not part of the file itself.
+
 ### The Chain
 
 Each entry stores the SHA-256 hash of the entry before it and its own hash, which is calculated from the previous hash
@@ -475,6 +511,7 @@ head hash is a manual step, and it is most useful after important events such as
 | TOTP      | `auth.totp-recovery-used`, `auth.totp-recovery-regenerated`, `auth.totp-failed`      |
 | Users     | `account.oidc-created` (an account was created at the first sign-in at a provider)   |
 | Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
+| Auditing  | `audit.exported` (the audit trail was exported; format, filter, and number of rows)  |
 | Signing   | `signature.reauth-failed` (a wrong password, or a missing confirmation at a provider)|
 | Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
 | Project   | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
@@ -510,7 +547,7 @@ head hash is a manual step, and it is most useful after important events such as
 - Comments, justifications, and the reason for marking a checklist section not applicable are recorded only as a short
   digest, never as text. The reason for reopening a review is the exception: it is recorded as text (at most 250
   characters, so that it fits the entry), together with the digest of the record that was reopened.
-- There is no export and no retention or archiving of the trail, and no external anchoring.
+- There is no retention or archiving of the trail (the export is a copy to keep elsewhere), and no external anchoring.
 - The audit trail is a new table. A development database created before it existed must be recreated (see the next
   section). The same applies to a database created before the filter of the audit pages, which stores the time of an
   entry in another form and has fewer indexes.

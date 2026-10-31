@@ -826,6 +826,46 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that the export link of the audit page, after the trail was filtered, hands out the filtered trail as
+    ///     a CSV download that states the chain is intact, using the session of the browser.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_AuditTrail_Export_ReportsChainStatus()
+    {
+        // Arrange: the scenario has signed in as the user puppet and created a review; filter by the action
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await browser.GotoAsync("/audit?action=review.created", "audit-page");
+        var linkShown = await browser.ExistsAsync("audit-export-csv");
+        var href = await browser.EvalAsync("document.querySelector('[data-testid=\"audit-export-csv\"]').getAttribute('href')");
+
+        // Act: fetch the link from the page, so that the cookies of the session are used
+        await browser.EvalAsync(
+            "(() => { window.exportResult = null; fetch('" + href + "').then(async r => { const t = await r.text(); " +
+            "window.exportResult = r.status + '|' + r.headers.get('X-ReviewCenter-Audit-Chain') + '|' + " +
+            "r.headers.get('Content-Type') + '|' + r.headers.get('Content-Disposition') + '|' + " +
+            "t.split('\\r\\n').filter(l => l.length > 0).length + '|' + t.includes('review.created'); })" +
+            ".catch(e => { window.exportResult = 'error ' + e; }); return 'started'; })()");
+        await browser.WaitUntilAsync(
+            async () => await browser.EvalAsync("window.exportResult !== null") == "true",
+            "the export to be fetched");
+        var result = (await browser.EvalAsync("window.exportResult")).Split('|');
+
+        // Assert: a CSV with the chain status in the header, holding the filtered action only
+        Assert.True(linkShown, "The audit page must offer the CSV export.");
+        Assert.Contains("format=csv", href, StringComparison.Ordinal);
+        Assert.Contains("action=review.created", href, StringComparison.Ordinal);
+        Assert.Equal("200", result[0]);
+        Assert.Equal("intact", result[1]);
+        Assert.StartsWith("text/csv", result[2], StringComparison.Ordinal);
+        Assert.Contains("attachment", result[3], StringComparison.Ordinal);
+        Assert.Contains("chain-intact.csv", result[3], StringComparison.Ordinal);
+        Assert.True(int.Parse(result[4], System.Globalization.CultureInfo.InvariantCulture) >= 2, "The header and the created review must be in the file.");
+        Assert.Equal("true", result[5]);
+    }
+
+    /// <summary>
     ///     Test that a follow-up review, created through the form from an earlier review that has a failed check, an
     ///     open thread and sections that do not apply, carries the Pass and N/A answers, the sections and the open
     ///     thread with visible marks, shows the earlier Fail for a new decision, can be signed once that is decided and

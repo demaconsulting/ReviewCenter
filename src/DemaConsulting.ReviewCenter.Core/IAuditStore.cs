@@ -75,6 +75,37 @@ public interface IAuditStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Reads the entries that match a filter in sequence order, up to a fixed position, for an export; never loads
+    ///     the whole trail at once.
+    /// </summary>
+    /// <param name="filter">
+    ///     What to look for, already validated by <see cref="AuditService"/>; the same scoping rules as
+    ///     <see cref="ListAsync"/> apply. Must not be null.
+    /// </param>
+    /// <param name="afterSequence">Only entries with a higher sequence than this; 0 starts at the beginning.</param>
+    /// <param name="upToSequence">Only entries with a sequence at or below this, the snapshot limit of the export.</param>
+    /// <param name="count">The largest number of entries to return.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     At most <paramref name="count"/> matching entries, oldest first; empty when no matching entry is left in
+    ///     the range. The sequence of the last entry is the position to pass as <paramref name="afterSequence"/> for
+    ///     the next batch (keyset paging, so a batch costs the same at the start and at the end of the trail).
+    /// </returns>
+    Task<IReadOnlyList<AuditEntry>> ReadMatchingAsync(
+        AuditFilter filter,
+        long afterSequence,
+        long upToSequence,
+        int count,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Gets the sequence of the newest entry of the whole trail.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The highest sequence; 0 when the trail is empty.</returns>
+    Task<long> LatestSequenceAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Finds when each review of a project last had an entry in the trail, for the progress overview.
     /// </summary>
     /// <param name="projectId">The project identity.</param>

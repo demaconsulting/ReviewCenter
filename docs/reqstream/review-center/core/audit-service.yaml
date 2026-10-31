@@ -2,7 +2,8 @@
 # Software Unit Requirements for the AuditService Class
 #
 # The AuditService class records the events that change no data on a best-effort basis, reads the audit trail one
-# page at a time, and verifies the hash chain by streaming. It also defines the store contract.
+# page at a time, verifies the hash chain by streaming, and streams an export of the filtered trail. The
+# AuditExportWriter class writes the export as CSV or JSON. The AuditService also defines the store contract.
 
 sections:
   - title: AuditService Unit Requirements
@@ -129,3 +130,92 @@ sections:
           - AuditService_VerifyAsync_UntouchedTrail_IsIntactAndReadInBatches
           - AuditService_VerifyAsync_EmptyTrail_IsIntact
           - AuditService_VerifyAsync_TamperedEntryInLaterBatch_ReportsItsSequence
+
+      - id: ReviewCenter-AuditService-Export
+        title: >-
+          The AuditService class shall prepare and stream an export of the audit trail that honors the filter of the
+          listing, writes every matching entry once, in ascending sequence order, in keyset batches of 500 that are
+          never held together in memory, up to the newest sequence that existed when the export was prepared (so
+          that entries appended meanwhile, including its own audit entry, are not part of it), for a project only
+          the entries of that project, never an entry without a project, and shall stop at once when cancelled.
+        justification: |
+          An auditor or a regulator needs a copy of the trail that can be kept and checked elsewhere (21 CFR Part 11
+          section 11.10(b) and (e)). The trail only grows and may be large, so the export streams it in bounded
+          batches, and the fixed upper bound gives one consistent view while the chain keeps growing.
+        tests:
+          - AuditExport_ExportAsync_Filter_WritesMatchingEntriesAscending
+          - AuditExport_ExportAsync_Scope_ProjectNeverHoldsGlobalRows
+          - AuditExport_ExportAsync_EntriesAppendedAfterPrepare_AreNotIncluded
+          - AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500
+          - AuditExport_ExportAsync_ExactlyWholeBatches_EndsAfterAnEmptyRead
+          - AuditExport_ExportAsync_EmptyTrail_IsValidAndAudited
+          - AuditExport_PrepareExportAsync_InvalidFilter_ThrowsDomainRule
+          - AuditExport_NullArguments_Throw
+          - AuditFilter_Describe_SetParts_AreListedInOrder
+
+      - id: ReviewCenter-AuditService-ExportChainStatus
+        title: >-
+          The AuditService class shall verify the whole chain once while preparing an export, after it has captured
+          the newest sequence and before the first byte is written, so that the status of the chain (intact, or
+          broken with the first broken sequence) is known to the caller in advance and covers every exported entry,
+          shall export a broken chain too and say so, and shall reveal, for a project export, neither the number
+          nor the head hash of the whole chain nor anything of the entries of other projects.
+        justification: |
+          An export of a tampered trail must say so, in a place the reader sees before reading the data, but the chain
+          is global, so a project export may name only whether the whole chain is sound and where it first breaks.
+        tests:
+          - AuditExport_PrepareExportAsync_IntactChain_ReportsIntact
+          - AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence
+          - AuditExport_ExportAsync_ProjectExport_RevealsNoCountsOfOtherProjects
+          - AuditExport_FileNameAndContentType_FollowScopeFormatAndStatus
+
+      - id: ReviewCenter-AuditService-ExportAudited
+        title: >-
+          The AuditService class shall, after the export has ended and so outside its snapshot, record the export as
+          an audit entry of the action audit.exported for the exporting user, scoped to the project of the filter or
+          without a project, whose detail names the format, the number of entries written, whether the export was
+          complete or incomplete (cancelled or failed), and a bounded human-readable summary of the filter, and shall
+          record it also when the export is cancelled or fails, without letting a failure of that entry hide the
+          outcome of the export.
+        justification: |
+          A copy of the whole trail is itself an event that an auditor must be able to find (21 CFR Part 11 section
+          11.10(e)). A cancelled download still handed out data, so it is recorded, marked incomplete.
+        tests:
+          - AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream
+          - AuditExport_ExportAsync_GlobalScope_RecordsEntryWithoutProject
+          - AuditExport_ExportAsync_CancelledMidStream_RecordsIncompleteEntry
+          - AuditExport_ExportAsync_TargetFails_RecordsIncompleteEntryAndRethrows
+          - AuditExport_ExportAsync_AuditAppendFails_ReportsErrorAndStillCompletes
+          - AuditExport_ExportedAction_IsInTheActionCatalog
+          - AuditExport_ExportAsync_MaximalFilter_DetailFitsAndKeepsCountAndDates
+
+      - id: ReviewCenter-AuditService-ExportFormat
+        title: >-
+          The AuditExportWriter class shall write an export as CSV, in UTF-8 with a byte order mark, with the columns
+          sequence, timestampUtc, actor, action, project, review, detail, previousHash, and hash, CRLF line ends, the
+          quoting of RFC 4180 for a comma, a quote, and a line break, and ISO 8601 UTC timestamps, or as JSON, as one
+          streamed object with the export (time and filter), the chain status, and the entries, escaped by a JSON
+          writer, in both cases a valid document when nothing matches, and shall, in CSV, prefix with an apostrophe any
+          text cell (actor, action, review, detail) that starts with =, +, -, @, a tab, or a carriage return, and
+          alter no hash, sequence, or timestamp.
+        justification: |
+          The file is opened in spreadsheets, where a cell that starts with a formula character is executed, and the
+          text of the trail comes from users. Neutralizing only the text cells keeps the hashes usable for the
+          re-check of the chain, and the JSON form is not interpreted by a spreadsheet.
+        tests:
+          - AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf
+          - AuditExportWriter_Csv_Row_HasColumnsInOrderAndUtcTimestamp
+          - AuditExportWriter_Quote_SpecialCharacters_QuotedPerRfc4180
+          - AuditExportWriter_Csv_DetailWithCommaQuoteAndNewline_IsOneQuotedCell
+          - AuditExportWriter_Neutralize_LeadingFormulaCharacter_IsPrefixed
+          - AuditExportWriter_Csv_TextCells_AreNeutralizedAndGeneratedCellsAreNot
+          - AuditExportWriter_Csv_Unicode_IsWrittenAsUtf8
+          - AuditExportWriter_Csv_NoEntries_IsHeaderOnly
+          - AuditExportWriter_Csv_NoProject_LeavesProjectCellEmpty
+          - AuditExportWriter_Json_Envelope_HasExportChainAndEntries
+          - AuditExportWriter_Json_HostileText_IsEscapedAndRoundTrips
+          - AuditExportWriter_Json_NoEntries_IsValidDocument
+          - AuditExportWriter_Json_BrokenChain_NamesFirstBrokenSequenceAndNoCounts
+          - AuditExportWriter_FlushToAsync_EmptiesTheBufferEachTime
+          - AuditExportWriter_NullArguments_Throw
+          - AuditExportWriter_Dispose_ReleasesBuffersAndIsRepeatable

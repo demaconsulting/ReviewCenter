@@ -55,4 +55,17 @@ public partial class AuditFilterForm : ComponentBase
     /// </summary>
     [Parameter]
     public IReadOnlyList<Project>? Projects { get; set; }
+
+    /// <summary>
+    ///     Gets the address of an export of the current filter.
+    /// </summary>
+    /// <param name="format">The format, <c>csv</c> or <c>json</c>.</param>
+    /// <returns>
+    ///     The export address under <see cref="BasePath"/>, with the filter values but without the page size or
+    ///     position; the project is carried only when the form offers a project selector.
+    /// </returns>
+    private string ExportHref(string format)
+    {
+        return BasePath + "/export" + State.ToExportQuery(format, Projects is not null);
+    }
 }

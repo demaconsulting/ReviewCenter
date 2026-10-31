@@ -51,8 +51,68 @@ N/A - standard test environment (a temporary database and key folder are created
 - The evidence index and the attestation PDF are the only two routes that serve a request without a token, when the
   project allows it, and the only two that are limited per address; the endpoint grouping, the policies, and the limit
   are verified by `AnonymousEvidenceAccessTests.cs` (see the `ApiTokenAuthentication` unit).
+- The audit export routes (`AuditExportEndpoints.cs`, verified by `AuditExportEndpointsTests.cs`, which start the real
+  application and sign in through the sign-in form to get a cookie) serve a project admin or a system administrator
+  the CSV (default) or JSON export with the headers `Content-Type`, `Content-Disposition` (scope, time, chain status),
+  `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and `X-ReviewCenter-Audit-Chain`
+  (and `X-ReviewCenter-Audit-Chain-Broken-At` for a broken chain, produced by editing a row in the database); honor the
+  filter of the query and ignore `size`, `before`, `after`, and, on the project route, `project`; answer a plain member
+  with 403 and a user who is no member, or a missing project, with 404; redirect a request without a session to the
+  sign-in page; refuse the whole trail to everybody but a system administrator with 403; answer an unknown format with
+  400 only to a user who is allowed; survive hostile query values; record one `audit.exported` entry per served export;
+  and are absent from the OpenAPI document.
 
 #### Test Scenarios
+
+**AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders**: A project admin requests the export of the
+project. The answer is 200 `text/csv; charset=utf-8` with the headers of the table in the design, the chain `intact`,
+a file name with the project and `chain-intact.csv`, and a body that starts with the byte order mark and the header
+row and holds the entries of the project and none of another project or without a project. This scenario is tested by
+`AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders`.
+
+**AuditExportEndpoints_SystemAdmin_ExportsAnyProjectAndTheWholeTrail**: A system administrator exports a project and
+the whole trail. This scenario is tested by `AuditExportEndpoints_SystemAdmin_ExportsAnyProjectAndTheWholeTrail`.
+
+**AuditExportEndpoints_JsonFormat_ServesEnvelopeWithChainStatus**: With `format=json` the answer is
+`application/json` with the envelope and the chain status. This scenario is tested by
+`AuditExportEndpoints_JsonFormat_ServesEnvelopeWithChainStatus`.
+
+**AuditExportEndpoints_QueryFilter_IsHonoredAndTheExportIsAudited**: Filter values of the query narrow the export, and
+each served export adds an `audit.exported` entry for the user. This scenario is tested by
+`AuditExportEndpoints_QueryFilter_IsHonoredAndTheExportIsAudited`; the `project` value is tested by
+`AuditExportEndpoints_ProjectRoute_IgnoresProjectInQuery` (project route) and
+`AuditExportEndpoints_GlobalExport_ProjectInQuery_LimitsAndScopesTheAuditEntry` (whole-trail route).
+
+**AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404**: A plain member gets 403, a user who is no member
+404, and a missing project 404, with no chain header and no entry in the body. This scenario is tested by
+`AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404`.
+
+**AuditExportEndpoints_SignedOut_RedirectsToLogin**: A request without a session to either route is answered with a
+redirect to the sign-in page. This scenario is tested by `AuditExportEndpoints_SignedOut_RedirectsToLogin`.
+
+**AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403**: A project admin, a member and an outsider get 403 from
+the whole-trail route. This scenario is tested by `AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403`.
+
+**AuditExportEndpoints_HostileQueryValues_AreSafe**: Hostile text values match nothing and are answered 200 with a
+header-only file, and unusable dates, sizes, positions and project values are dropped. This scenario is tested by
+`AuditExportEndpoints_HostileQueryValues_AreSafe`; the unknown format by
+`AuditExportEndpoints_UnknownFormat_Answers400ToAllowedUsersOnly`.
+
+**AuditExportEndpoints_TamperedChain_ReportsBrokenInHeadersAndFileName**: A row is edited in the database; the export is
+still served with `X-ReviewCenter-Audit-Chain: broken`, the first broken sequence in
+`X-ReviewCenter-Audit-Chain-Broken-At`, and `chain-broken` in the file name. This scenario is tested by
+`AuditExportEndpoints_TamperedChain_ReportsBrokenInHeadersAndFileName`.
+
+**AuditExportEndpoints_Routes_AreNotInTheApiDocument**: The OpenAPI document does not mention the export routes. This
+scenario is tested by `AuditExportEndpoints_Routes_AreNotInTheApiDocument`.
+
+**AuditExportEndpoints_StreamAsync_ClientAbortedDuringWrite_EndsQuietlyAndAuditsIncomplete**: The handler runs on a
+default HTTP context whose body stream cancels `RequestAborted` and then fails the first write with an `IOException`,
+as a closed connection does. The call returns without an exception and the trail ends with an `audit.exported` entry
+marked incomplete. This scenario is tested by
+`AuditExportEndpoints_StreamAsync_ClientAbortedDuringWrite_EndsQuietlyAndAuditsIncomplete`; the same failure without an
+abort is not swallowed, and the export is still audited as incomplete, tested by
+`AuditExportEndpoints_StreamAsync_WriteFailsWithoutAbort_IsNotSwallowed`.
 
 **ApiEndpoints_ListProjects_Token_ReturnsProjects**: Two projects are listed with the token of a system
 administrator. The answer is 200 `application/json` with a list whose items have camel-case names, the identity,

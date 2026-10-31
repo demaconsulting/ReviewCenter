@@ -552,7 +552,9 @@ public class AuditStoreTests
         var names = storeMethods.Concat(interfaceMethods).Distinct().ToList();
 
         // Assert
-        Assert.Equal(["AppendAsync", "LastActivityAsync", "ListAsync", "ReadAfterAsync"], names.Order());
+        Assert.Equal(
+            ["AppendAsync", "LastActivityAsync", "LatestSequenceAsync", "ListAsync", "ReadAfterAsync", "ReadMatchingAsync"],
+            names.Order());
         Assert.DoesNotContain(names, name => forbidden.Any(word => name.StartsWith(word, StringComparison.Ordinal)));
     }
 

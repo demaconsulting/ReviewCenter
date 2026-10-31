@@ -373,6 +373,13 @@ shows the Clear link. The address with the actor `puppet` and the group `auth.` 
 and an actor nobody has shows the no-match state without a row. The Clear link returns to the whole trail. This
 scenario is tested by `ReviewCenter_AuditTrail_FiltersByActionAndActor`.
 
+**ReviewCenter_AuditTrail_Export_ReportsChainStatus**: This scenario verifies the export of the system requirement for
+the audit trail. The user `puppet` has signed in and created a review, and the audit page is filtered by the action
+`review.created`. The CSV export link of the page carries `format=csv` and the action. Fetched from the page, so that
+the cookies of the session are used, it answers 200 with the type `text/csv`, an attachment file name that ends in
+`chain-intact.csv`, the header `X-ReviewCenter-Audit-Chain` with the value `intact`, and a body that holds the header
+row and the entry of the created review. This scenario is tested by `ReviewCenter_AuditTrail_Export_ReportsChainStatus`.
+
 **ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne**: Three users are created
 with the `user add` verb on a temporary database, and `audit verify` reports an intact chain with exit code 0. One audit
 entry is then edited directly in the SQLite file, and `audit verify` reports that the chain is broken at that entry with

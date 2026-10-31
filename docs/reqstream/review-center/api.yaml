@@ -186,6 +186,23 @@ sections:
           - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
           - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
 
+      - id: ReviewCenter-Api-AuditExport
+        title: >-
+          The Api subsystem shall let a signed-in user who may read the audit trail (a project admin or a system
+          administrator for a project, a system administrator for the whole trail) download the trail that matches
+          a filter as CSV or JSON from a cookie-authenticated route, with the state of the chain in the response
+          headers, refuse everybody else as the audit pages do and a request without a session, and keep these
+          routes out of the token API and its OpenAPI document.
+        justification: |
+          An auditor needs a copy of the trail that can be kept and checked elsewhere, and the export of a trail that
+          names every user and action must be limited like the page that shows it.
+        children:
+          - ReviewCenter-ApiEndpoints-AuditExport
+        tests:
+          - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+          - AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404
+          - AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403
+
       - id: ReviewCenter-Api-AnonymousEvidence
         title: >-
           The Api subsystem shall let a project open its evidence index and its attestation PDFs to a client without

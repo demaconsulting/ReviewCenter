@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
+
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
@@ -112,6 +114,63 @@ public sealed record AuditFilter(
         Require(From is null || To is null || From <= To, "The 'from' date is after the 'to' date.");
 
         return this with { ReviewId = reviewId, ActorText = actorText, Action = action, ActionPrefix = actionPrefix };
+    }
+
+    /// <summary>
+    ///     Describes the filter in one short, human-readable line, for the audit entry of an export.
+    /// </summary>
+    /// <returns>
+    ///     The set parts separated by commas (for example <c>from 2026-01-01, project 5, actor contains "bob"</c>), or
+    ///     <c>no filter</c> when nothing is set. The parts are ordered from the short and most telling to the long
+    ///     free text: the date range, the project, the review, the actor id, the action and the action group, and the
+    ///     actor text last. Every text is at most as long as the stored field it is matched with, but the whole line
+    ///     can still be longer than a stored audit detail; a cut by the store then removes only the end of the
+    ///     actor text or the actions, never the date range, the project or the review.
+    /// </returns>
+    public string Describe()
+    {
+        var parts = new List<string>();
+        if (From is { } from)
+        {
+            parts.Add($"from {from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
+        }
+
+        if (To is { } to)
+        {
+            parts.Add($"to {to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
+        }
+
+        if (ProjectId is { } project)
+        {
+            parts.Add($"project {project.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (ReviewId is { } review)
+        {
+            parts.Add($"review \"{review}\"");
+        }
+
+        if (ActorUserId is { } actorUserId)
+        {
+            parts.Add($"actor id {actorUserId.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (Action is { } action)
+        {
+            parts.Add($"action \"{action}\"");
+        }
+
+        if (ActionPrefix is { } prefix)
+        {
+            parts.Add($"action group \"{prefix}\"");
+        }
+
+        if (ActorText is { } actorText)
+        {
+            parts.Add($"actor contains \"{actorText}\"");
+        }
+
+        return parts.Count == 0 ? "no filter" : string.Join(", ", parts);
     }
 
     /// <summary>

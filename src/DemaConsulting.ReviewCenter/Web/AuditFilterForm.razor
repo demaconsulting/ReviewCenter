@@ -5,7 +5,9 @@
    action; the choices come from AuditActions), a review id, a from and a to date (UTC days), and the page size
    (25, 50 or 100); the whole-trail page also gets a project selector. "Clear filters" is a link to the bare page.
    Every value is rendered by the Razor encoder, and none is trusted: the state was already cleaned by
-   AuditFilterState. Every key value carries a stable kebab-case data-testid. *@
+   AuditFilterState. Below the form, two links export everything that matches the filter (not only the shown page) as
+   CSV or JSON from BasePath + "/export", carrying the current filter values but never the page size or position.
+   Every key value carries a stable kebab-case data-testid. *@
 <form class="filter-bar" method="get" action="@BasePath" data-testid="audit-filter-form">
     @if (Projects is not null)
     {
@@ -66,3 +68,12 @@
 {
     <p class="notice" role="status" data-testid="audit-filter-message">@State.Message</p>
 }
+<p class="export-bar" data-testid="audit-export">
+    Export:
+    <a class="action outline small" href="@ExportHref("csv")" download data-testid="audit-export-csv">CSV</a>
+    <a class="action outline small" href="@ExportHref("json")" download data-testid="audit-export-json">JSON</a>
+    <span class="muted" data-testid="audit-export-note">
+        The export covers every entry that matches the filter, not only the page shown, and states whether the
+        audit chain is intact.
+    </span>
+</p>
