@@ -7,7 +7,8 @@
 `KeysCommand` is the `keys reprotect` verb. Its single responsibility is to move every stored secret to a new Data
 Protection key, so that an operator who has changed the protection of the key ring (a plaintext ring that is to be
 protected, a new certificate) can retire the old key files and the old certificate. It is the only verb that writes to
-the key ring and the database. It must be run with the server stopped.
+the key ring and to the stored repository token and second-factor secret columns of the database (other verbs, such as
+`user add`, write other data). It must be run with the server stopped.
 
 #### Data Model
 
@@ -47,7 +48,10 @@ not create a key as a side effect of a refusal. The sequence is:
    do not refuse, because retiring them is what this command is for), then `SecretScan.ScanAsync` decrypts every
    secret with the production protectors. When any secret cannot be read, or the ring has no usable key, the command
    refuses: re-protecting cannot rescue what is unreadable.
-3. **New key.** `IKeyManager.CreateNewKey` creates a key that is active now. The key manager applies the protection
+3. **New key.** The folder of the key ring first gets the access that the server gives it at start-up
+   (`KeyRingProtection.PrepareKeyFolder`: the folder is created when it does not exist, owner-only mode on Linux and
+   macOS, owner-only access rules on Windows with `PermissionsOnly`), because creating a key creates a missing
+   folder. `IKeyManager.CreateNewKey` then creates a key that is active now. The key manager applies the protection
    that the configuration chose (DPAPI, a certificate, or the permissions of the folder), so the new key file is
    protected as configured.
 4. **Services again.** A Data Protection key ring that was read before the new key existed is refreshed in the

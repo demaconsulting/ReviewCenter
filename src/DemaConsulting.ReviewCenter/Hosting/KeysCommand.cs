@@ -39,7 +39,8 @@ namespace DemaConsulting.ReviewCenter.Hosting;
 /// <remarks>
 ///     The command builds its configuration and services the same way the server does (the same
 ///     <c>appsettings.json</c> and environment variables, the same registration), so it reads the same key ring and
-///     the same database; the server must be stopped while it runs. It is the only verb that writes. It first runs the
+///     the same database; the server must be stopped while it runs. It is the only verb that writes the key ring and these
+///     stored secret columns. It first runs the
 ///     <see cref="SecretScan"/> and refuses, with a clear message and without any change, when a protected secret
 ///     cannot be read or the ring or the database cannot be scanned: re-protecting would then lose what is readable
 ///     now only by chance of the ring. Otherwise it creates a new key (<see cref="IKeyManager.CreateNewKey"/>, which
@@ -240,7 +241,9 @@ internal static class KeysCommand
             return;
         }
 
-        // Step 2: the new key, protected as the configuration says
+        // Step 2: the new key, protected as the configuration says; the folder gets the access that the server gives
+        // it first, because creating the key creates a missing folder
+        KeyRingProtection.PrepareKeyFolder(plan, folder);
         var options = services.GetRequiredService<IOptions<KeyManagementOptions>>().Value;
         var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
         var newKey = keyManager.CreateNewKey(now, now + options.NewKeyLifetime);

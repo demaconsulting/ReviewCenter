@@ -75,6 +75,11 @@ ciphertext either (see the scenario above). This scenario is tested by `KeysComm
 **KeysCommand_Run_NoSecrets_SucceedsWithZeroCounts**: A database without secrets succeeds and reports zero counts.
 This scenario is tested by `KeysCommand_Run_NoSecrets_SucceedsWithZeroCounts`.
 
+**KeysCommand_Run_MissingKeyFolder_IsCreatedWithOwnerOnlyAccess**: The key folder does not exist. The command
+succeeds, the folder holds one key file, and the folder has the owner-only access that the server sets at start-up:
+mode 700 on Linux and macOS, access rules without inheritance on Windows. This scenario is tested by
+`KeysCommand_Run_MissingKeyFolder_IsCreatedWithOwnerOnlyAccess`.
+
 **KeysCommand_Run_MissingDatabase_RefusesAndCreatesNothing**: The database file does not exist; the command refuses
 with exit code 1 and creates neither the database nor a key. This scenario is tested by
 `KeysCommand_Run_MissingDatabase_RefusesAndCreatesNothing`.

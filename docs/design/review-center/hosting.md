@@ -87,7 +87,8 @@ documented with `ServerHost` as a supporting type, `KeyRingProtection`, `SecretS
   Otherwise it creates a new Data Protection key with the configured protection, protects every repository token and
   second-factor secret again with it (one transaction per table), and reports the new key id, the counts, the keys
   that are still referenced or no longer referenced, and the next steps (exit code 0).
-- *Constraints*: The caller is `Program`. It is the only verb that writes keys and secrets, and the server must be
+- *Constraints*: The caller is `Program`. It is the only verb that writes the key ring and the stored repository token
+  and second-factor secret columns, and the server must be
   stopped while it runs. It never prints a secret.
 
 **Health endpoint**: The `/health` route of the running server.

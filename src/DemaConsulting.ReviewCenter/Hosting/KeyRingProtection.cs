@@ -670,6 +670,33 @@ internal static class KeyRingProtection
     }
 
     /// <summary>
+    ///     Creates the folder of the key ring when it does not exist and sets the access to it that the server sets at
+    ///     start-up: on Linux and macOS only the account of the server, on Windows without encryption
+    ///     (<see cref="KeyRingProtectionMode.PermissionsOnly"/>) the owner-only access rules of
+    ///     <see cref="RestrictKeyFolder(KeyRingPlan, string)"/>.
+    /// </summary>
+    /// <param name="plan">The plan. Must not be null.</param>
+    /// <param name="folder">The folder of the key ring. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    /// <exception cref="IOException">Thrown when the folder cannot be created or its mode set.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when the account has no right to do so.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the access rules cannot be set.</exception>
+    internal static void PrepareKeyFolder(KeyRingPlan plan, string folder)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(folder);
+        Directory.CreateDirectory(folder);
+        if (!OperatingSystem.IsWindows())
+        {
+            // The keys decrypt the stored tokens: only the server account may read them
+            File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        // On Windows without encryption (PermissionsOnly) the access rules of the folder are the protection
+        RestrictKeyFolder(plan, folder);
+    }
+
+    /// <summary>
     ///     Replaces the access rules of a folder by full control for the current account and the system, without
     ///     inheritance from the parent and inherited by what is created in the folder.
     /// </summary>

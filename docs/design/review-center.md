@@ -341,7 +341,8 @@ database. `UserCommand` creates a user from the command line with the same confi
 how the first system administrator is created. `AuditCommand` verifies the hash chain of the audit trail with the same
 configuration and registration and reports the result as the exit code. `KeysCommand` rotates the Data Protection key
 and protects every stored secret again with it, after `SecretScan` has shown that every secret can be read; it is the
-only verb that writes keys and secrets. `KeyRingProtection` decides how the key ring of
+only verb that writes the key ring and the stored repository token and second-factor secret columns.
+`KeyRingProtection` decides how the key ring of
 the Data Protection system is protected at rest (Windows DPAPI, a certificate, or the permissions of its folder),
 applies it for `ServerHost`, and refuses a ring that the certificate does not open; the root of trust of the stored
 tokens is therefore the key ring and its certificate or account, not the database. `SecretScan` reads the database and

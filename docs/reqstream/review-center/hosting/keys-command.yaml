@@ -3,7 +3,7 @@
 #
 # The KeysCommand class runs the keys reprotect verb: it rolls a new Data Protection key and re-protects every stored
 # repository token and second-factor secret with it, so that old key material and an old certificate can be retired.
-# It is the only verb that writes.
+# It is the only verb that writes the key ring and these stored secret columns.
 
 sections:
   - title: KeysCommand Unit Requirements
@@ -13,7 +13,9 @@ sections:
           The KeysCommand class shall create a new Data Protection key with the configured protection of the key
           files and protect every repository token and every second-factor secret again with the newest key, in one
           transaction per table, so that every secret stays readable, so that no stored payload references an older
-          key afterwards, and so that a second run is possible and gives another new key; a failure after the new key
+          key afterwards, and so that a second run is possible and gives another new key; a key folder that does not
+          exist is created with the owner-only access that the server gives it, before the key is written; a failure
+          after the new key
           was created (a locked database, a full disk, a changed row) is reported with exit code 1, the new key, the
           tables that were completed, the table that is unchanged, and that the command can be run again, and without
           a secret.
@@ -28,6 +30,7 @@ sections:
           - KeysCommand_Run_SecondRun_IsIdempotentAndGivesAnotherKey
           - KeysCommand_Run_SecondTableFails_ReportsNewKeyAndCompletedTable
           - KeysCommand_Run_NoSecrets_SucceedsWithZeroCounts
+          - KeysCommand_Run_MissingKeyFolder_IsCreatedWithOwnerOnlyAccess
           - KeysCommand_ReadKeyId_Payload_GivesKeyIdOrNull
 
       - id: ReviewCenter-KeysCommand-RefusesUnreadable

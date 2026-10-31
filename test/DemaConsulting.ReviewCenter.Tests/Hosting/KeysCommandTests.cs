@@ -233,6 +233,39 @@ public class KeysCommandTests
     }
 
     /// <summary>
+    ///     Test that a key folder that does not exist is created with the owner-only access that the server gives it,
+    ///     before the new key is written: owner-only mode on Linux and macOS, owner-only rules without inheritance on
+    ///     Windows.
+    /// </summary>
+    [Fact]
+    public void KeysCommand_Run_MissingKeyFolder_IsCreatedWithOwnerOnlyAccess()
+    {
+        // Arrange: an installation without secrets whose key folder does not exist
+        using var install = new Install();
+        if (Directory.Exists(install.KeysFolder))
+        {
+            Directory.Delete(install.KeysFolder, recursive: true);
+        }
+
+        // Act
+        var (exitCode, _) = Reprotect(install.Folder);
+
+        // Assert: the command succeeded, the folder exists with one key file, and only its owner can use the folder
+        Assert.Equal(0, exitCode);
+        Assert.Single(Directory.GetFiles(install.KeysFolder, "key-*.xml"));
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.True(new DirectoryInfo(install.KeysFolder).GetAccessControl().AreAccessRulesProtected);
+        }
+        else
+        {
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                File.GetUnixFileMode(install.KeysFolder));
+        }
+    }
+
+    /// <summary>
     ///     Test that a database file that does not exist is refused and nothing is created.
     /// </summary>
     [Fact]
