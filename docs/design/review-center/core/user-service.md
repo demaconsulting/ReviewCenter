@@ -47,7 +47,8 @@ password alone is not enough). **PasswordCheckPurpose** (internal enumeration): 
 **Must change password**: `MustChangePassword` is set on an account that a project administrator created
 (`ProjectService.CreateMemberAccountAsync`) with a generated temporary password, and on an account whose password a
 system administrator sets for somebody else (`SetPasswordAsync`), and is cleared when the user changes the
-own password. While it is set the user can sign in but is confined to the password change (see _SignIn_,
+own password or an administrator sets the own password (`SetPasswordAsync` writes `!ownPassword`, so setting the own
+password also ends a pending change). While it is set the user can sign in but is confined to the password change (see _SignIn_,
 _ProjectAccess_, _PersonalAccessTokenService_, and _SigningService_ for what each refuses); the rules owned by this unit
 are the re-authentication refusal and the password change described below.
 

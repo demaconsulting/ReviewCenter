@@ -237,6 +237,7 @@ sections:
           - UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporaryExceptOwn
           - UserService_SetPasswordAsync_OtherUserOrOwn_OnlyOtherForcesAChange
           - UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange
+          - UserService_SetPasswordAsync_OwnRow_ClearsAPendingChange
           - UserService_SetPasswordAsync_ApiTokenActorOrExternalUser_ForcesAChangeOrIsRefused
 
       - id: ReviewCenter-UserService-LastSignIn

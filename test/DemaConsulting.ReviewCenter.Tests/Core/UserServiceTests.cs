@@ -706,6 +706,27 @@ public class UserServiceTests
     }
 
     /// <summary>
+    ///     Test that an administrator who sets their own password ends a pending forced change.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetPasswordAsync_OwnRow_ClearsAPendingChange()
+    {
+        // Arrange: an administrator whose password was set by the command line, so a change is pending
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+        await service.SetPasswordAsync("root", "temporary password", Actor.CommandLine, cancellationToken);
+        var pending = (await store.GetByUsernameAsync("root", cancellationToken))!.MustChangePassword;
+
+        // Act: the administrator sets their own password
+        await service.SetPasswordAsync("root", "own chosen password", new Actor("root", "Root"), cancellationToken);
+
+        // Assert
+        Assert.True(pending);
+        Assert.False((await store.GetByUsernameAsync("root", cancellationToken))!.MustChangePassword);
+    }
+
+    /// <summary>
     ///     Test that an API-token actor with the name of the user is not "the own row", and that an external user
     ///     cannot get a password.
     /// </summary>

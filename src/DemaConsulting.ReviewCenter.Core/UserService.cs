@@ -905,13 +905,11 @@ public sealed class UserService
             user.LockoutUntil = null;
 
             // A password somebody else chose is known to that person: the user must replace it before anything else.
-            // An administrator who sets the own password chose it, so that does not force a change
+            // An administrator who sets the own password chose it, so that does not force a change and ends a
+            // pending one
             var ownPassword = !actor.ViaApiToken
                               && string.Equals(actor.Username, user.Username, StringComparison.OrdinalIgnoreCase);
-            if (!ownPassword)
-            {
-                user.MustChangePassword = true;
-            }
+            user.MustChangePassword = !ownPassword;
 
             await _store.UpdateAsync(
                 user,

@@ -244,7 +244,9 @@ in `MustChangePasswordTests.cs`.
 **UserService admin password scenarios**: These tests are defined in `UserServiceTests.cs`. A password set by another
 actor sets the flag, and a later change of the own password clears it, which is tested by
 `UserService_SetPasswordAsync_OtherUserOrOwn_OnlyOtherForcesAChange`. An administrator who sets the own password gets no
-forced change, which is tested by `UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange`. An actor that acts through
+forced change, which is tested by `UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange`, and a change that was
+pending is ended by it, which is tested by `UserService_SetPasswordAsync_OwnRow_ClearsAPendingChange`. An actor that
+acts through
 an API token with the name of the user is not the own row, and an external account is refused with `PasswordInvalid`
 and stays without a password, which is tested by
 `UserService_SetPasswordAsync_ApiTokenActorOrExternalUser_ForcesAChangeOrIsRefused`.
