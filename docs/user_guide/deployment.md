@@ -544,6 +544,12 @@ the project produced on purpose with a wrong setting, and what to do:
   certificate, or with none, or by DPAPI for another account or machine. Set the right certificate in
   `DataProtection:CertificatePath`, or list the old certificate in `DataProtection:PreviousCertificatePaths`. The
   server stopped before it created a new key; a new key would have made the stored tokens unreadable.
+- `The key ring '<folder>' (DataProtection:KeysPath) holds key files that could not be read: they are malformed or not
+  supported. Nothing was changed. ...`: the folder holds `key-*.xml` files, but no key can be read from them (a
+  damaged or truncated file, or a file from another product or version). The server stopped before it created a new
+  key, which would have made the stored tokens unreadable. Restore the key folder that belongs to this database (for
+  example from a backup). Only if you accept that the stored tokens and second-factor secrets are lost, remove the
+  damaged key files from the folder to start a new ring.
 - `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned or
   CertificateStore.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
 

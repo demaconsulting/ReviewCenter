@@ -123,15 +123,19 @@ sections:
         title: >-
           The KeyRingProtection class shall refuse to start, with a message that names DataProtection:CertificatePath
           and DataProtection:PreviousCertificatePaths, when the ring already holds key files and the newest key, or
-          every key, cannot be decrypted, and shall not create a new key in that case.
+          every key, cannot be decrypted, or when the folder holds key files from which no key can be read (malformed
+          or not supported), and shall not create a new key in that case.
         justification: |
           Data Protection answers a key that it cannot read by silently creating a new one, after which every stored
           token and secret is unreadable. Starting with the wrong certificate, or with none after a certificate was
           used, must therefore stop before any key is created, and an old key that cannot be read must be reported.
+          Data Protection also skips a key file that it cannot deserialize, so a folder with key files and no readable
+          key is not a new ring and is refused as well.
         tests:
           - KeyRingProtection_CheckRing_WrongCertificate_RefusesWithoutCreatingASecondKey
           - KeyRingProtection_CheckRing_EncryptedRingWithoutCertificate_Refuses
           - KeyRingProtection_CheckRing_EmptyRing_Passes
+          - KeyRingProtection_CheckRing_KeyFilesButNoReadableKey_RefusesWithoutChangingTheFolder
           - KeyRingProtection_CheckRing_OlderKeyUnreadable_LogsErrorAndPasses
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
 

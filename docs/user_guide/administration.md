@@ -646,7 +646,10 @@ be restored on another machine.
 **The server never replaces a ring that it cannot read.** Data Protection answers a key that it cannot decrypt by
 creating a new key, which would make the stored tokens unreadable. At start the server therefore checks the ring first:
 when the newest key (or every key) cannot be decrypted, it refuses to start and names `DataProtection:CertificatePath`
-and `DataProtection:PreviousCertificatePaths`. A key that was written before encryption was set stays in plain text
+and `DataProtection:PreviousCertificatePaths`. It also refuses to start when the folder holds key files but no key can
+be read from them (damaged or unsupported files), names `DataProtection:KeysPath`, and changes nothing: restore the key
+folder, or remove the damaged files only if you accept that what they protected is lost. A key that was written before
+encryption was set stays in plain text
 until Data Protection replaces it (every 90 days); with `RequireEncryptedKeys` such a ring is refused.
 
 **Replacing the certificate.** Set the new certificate in `DataProtection:CertificatePath` and list the old one in

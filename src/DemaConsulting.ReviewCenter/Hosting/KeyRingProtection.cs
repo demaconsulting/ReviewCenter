@@ -471,16 +471,19 @@ internal static class KeyRingProtection
     /// <param name="logger">The logger for the finding about older keys. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when the ring holds keys and the newest key (or every key) cannot be decrypted, or when
-    ///     <c>DataProtection:RequireEncryptedKeys</c> is set and a key file of the ring is not encrypted.
+    ///     Thrown when the ring holds keys and the newest key (or every key) cannot be decrypted, when the folder
+    ///     holds key files but no key can be read from them, or when <c>DataProtection:RequireEncryptedKeys</c> is set
+    ///     and a key file of the ring is not encrypted.
     /// </exception>
     /// <remarks>
     ///     The check reads the keys with <see cref="IKeyManager.GetAllKeys"/>, which creates nothing, and touches the
     ///     descriptor of each: a key that cannot be decrypted (wrong or missing certificate, a ring that DPAPI
     ///     protected for another account or machine) fails there. Data Protection itself would log a warning and
     ///     create a second key in the same folder, and every stored token and second-factor secret would be lost
-    ///     without any error. This must run before the probe that protects a value, because that creates a key. An
-    ///     empty ring is fine: it is new. When only keys older than the newest cannot be decrypted, the server can
+    ///     without any error. This must run before the probe that protects a value, because that creates a key. A
+    ///     ring without keys is fine only when the folder holds no <c>key-*.xml</c> files (or does not exist): it is
+    ///     new. Data Protection skips a key file that it cannot read, so no keys with key files present is refused as
+    ///     well, and so is a key file that is not XML at all. The message never contains the content of a file. When only keys older than the newest cannot be decrypted, the server can
     ///     work, and the finding is logged as an error.
     /// </remarks>
     internal static void CheckRing(KeyRingPlan plan, IKeyManager keys, string folder, ILogger logger)
@@ -503,10 +506,26 @@ internal static class KeyRingProtection
             }
         }
 
-        // Reading the keys is read-only; an empty ring is a new one, which is fine
-        var all = keys.GetAllKeys();
+        // Reading the keys is read-only. No keys is a new ring only when the folder holds no key files: Data
+        // Protection skips a key file that it cannot deserialize (and fails on one that is not even XML), and
+        // creating a key then would replace the ring
+        IReadOnlyCollection<IKey> all;
+        try
+        {
+            all = keys.GetAllKeys();
+        }
+        catch (XmlException ex)
+        {
+            throw UnreadableKeyFiles(folder, ex);
+        }
+
         if (all.Count == 0)
         {
+            if (HasKeyFiles(folder))
+            {
+                throw UnreadableKeyFiles(folder, null);
+            }
+
             return;
         }
 
@@ -755,6 +774,29 @@ internal static class KeyRingProtection
         found.Sort(StringComparer.Ordinal);
         return found;
     }
+
+    /// <summary>
+    ///     Makes the refusal for a folder with key files from which no key can be read.
+    /// </summary>
+    /// <param name="folder">The folder of the key ring.</param>
+    /// <param name="inner">The exception of the read, or <c>null</c>; its message is not copied, as it may quote a file.</param>
+    /// <returns>The exception to throw.</returns>
+    private static InvalidOperationException UnreadableKeyFiles(string folder, Exception? inner) =>
+        new(
+            $"The key ring '{folder}' (DataProtection:KeysPath) holds key files that could not be read: they are " +
+            "malformed or not supported. Nothing was changed. Starting would silently create a new key and make " +
+            "every stored token and second-factor secret unreadable. Restore the key folder that belongs to this " +
+            "database, or remove the damaged key files on purpose to start a new ring (what they protected " +
+            "becomes unreadable).",
+            inner);
+
+    /// <summary>
+    ///     Tells whether the folder holds at least one key file.
+    /// </summary>
+    /// <param name="folder">The folder of the key ring.</param>
+    /// <returns><c>true</c> when a key file exists; <c>false</c> when there is none or the folder does not exist.</returns>
+    private static bool HasKeyFiles(string folder) =>
+        Directory.Exists(folder) && Directory.EnumerateFiles(folder, KeyFilePattern).Any();
 
     /// <summary>
     ///     Tells whether the descriptor of a key can be read, which needs the key to be decrypted.

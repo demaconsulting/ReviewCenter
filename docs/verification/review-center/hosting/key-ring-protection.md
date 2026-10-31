@@ -33,7 +33,8 @@ proves the decision (restrict on Unix, do nothing on Windows) without touching t
 - A ring protected by a certificate holds an encrypted secret and no plain key, is read again after a restart, and is
   read with a previous certificate after the certificate was replaced.
 - The guard refuses a ring that the certificate cannot open, without creating a second key, refuses an encrypted ring
-  with no certificate, passes an empty ring, and reports an older unreadable key as an error without stopping.
+  with no certificate, passes an empty ring (no keys and no key files), refuses key files from which no key can be read,
+  and reports an older unreadable key as an error without stopping.
 - `RequireEncryptedKeys` refuses `PermissionsOnly` and a plain key file.
 - On Linux and macOS the key files are restricted to the owner, also when Data Protection stores a new key file while
   the server runs. The warning of `PermissionsOnly` is logged.
@@ -108,6 +109,14 @@ certificates, and the number of key files is counted before and after; a folder 
 well, and the keys of the older-key scenario get explicit creation dates so that the newest key does not depend on the
 clock. These scenarios are tested by the tests of the
 same names.
+
+**KeyRingProtection_CheckRing_KeyFilesButNoReadableKey_RefusesWithoutChangingTheFolder**: A temporary key folder holds
+one `key-*.xml` file that Data Protection cannot turn into a key: once with content that is not XML (the read of the
+folder throws an `XmlException`) and once with XML that is not a key (Data Protection skips it and returns no keys). In
+both cases the guard refuses with an `InvalidOperationException` that names `DataProtection:KeysPath` and says that the
+key files could not be read, without the content of the file; no key file is created and the damaged file keeps its
+content. The scenario runs on every platform and is tested by the test of the same name, as a theory with both
+contents.
 
 **KeyRingProtection_LogProtection_EachMode_LogsTheProtectionInForce**: Each mode logs its protection; the permissions
 mode logs a warning. This scenario is tested by the test of the same name.

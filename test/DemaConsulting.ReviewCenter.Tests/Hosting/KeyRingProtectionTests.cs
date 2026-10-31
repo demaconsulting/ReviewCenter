@@ -825,6 +825,39 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that a folder with key files from which Data Protection reads no key is refused and left untouched:
+    ///     it skips such a file, and the probe would then create a new key and replace the ring.
+    /// </summary>
+    /// <param name="content">The content of the key file.</param>
+    [Theory]
+    [InlineData("this is not xml <<<")]
+    [InlineData("<key id=\"not-a-guid\"><unsupported /></key>")]
+    public void KeyRingProtection_CheckRing_KeyFilesButNoReadableKey_RefusesWithoutChangingTheFolder(string content)
+    {
+        // Arrange: a key file that holds no key that can be read
+        using var folder = new TemporaryDirectory();
+        var keys = folder.GetFilePath("keys");
+        Directory.CreateDirectory(keys);
+        var damaged = Path.Combine(keys, "key-00000000-0000-0000-0000-000000000002.xml");
+        File.WriteAllText(damaged, content);
+        using var ring = new Ring(keys, new KeyRingSettings { Protection = "PermissionsOnly" }, UnixPlatform);
+
+        // Act
+        var exception = Assert.Throws<InvalidOperationException>(() => KeyRingProtection.CheckRing(
+            ring.Plan,
+            ring.Keys,
+            keys,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance));
+
+        // Assert: the message names the setting, no content is printed, no key was created, the file is untouched
+        Assert.Contains("DataProtection:KeysPath", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("could not be read", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(content, exception.Message, StringComparison.Ordinal);
+        Assert.Equal([damaged], KeyFiles(keys));
+        Assert.Equal(content, File.ReadAllText(damaged));
+    }
+
+    /// <summary>
     ///     Test that a key file with an unencrypted key is refused when encryption is required, and found otherwise.
     /// </summary>
     [Fact]

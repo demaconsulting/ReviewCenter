@@ -76,7 +76,12 @@ mode.
   has keys, the newest key can be decrypted and at least one key can be decrypted (read through `GetAllKeys` and
   the descriptor of each key, which only reads). Otherwise an `InvalidOperationException` names
   `DataProtection:CertificatePath` and `DataProtection:PreviousCertificatePaths`. An older key that cannot be read
-  is logged as an error and does not stop the start, because the newer keys still protect new data.
+  is logged as an error and does not stop the start, because the newer keys still protect new data. A ring with no keys
+  passes only when the folder holds no `key-*.xml` file (a folder that does not exist is an empty ring). When the
+  folder holds key files but `GetAllKeys` returns no key (Data Protection skips a file that it cannot deserialize,
+  and the read throws an `XmlException` for a file that is not XML), an `InvalidOperationException` names
+  `DataProtection:KeysPath`, says that the key files could not be read, and points to restoring the ring or removing
+  the damaged files on purpose. Nothing is changed, and no file content is in the message.
 - *Notes*: Data Protection answers a key that it cannot decrypt by creating a new one, after which every stored secret
   is unreadable. That was found when the unit was designed, and it is why this check must run before the probe round
   trip of `ServerHost`, which creates a key.
