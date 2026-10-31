@@ -2,7 +2,9 @@
 
 #### Verification Approach
 
-`AuditService` is verified with unit tests defined in `AuditServiceTests.cs`. The tests use the in-memory fake store
+`AuditService` is verified with unit tests defined in `AuditServiceTests.cs`, and its export with `AuditExportTests.cs`
+(the service) and `AuditExportWriterTests.cs` (the pure CSV and JSON writer, no HTTP and no store). The tests use the
+in-memory fake store
 (`FakeAuditStore`), which implements the same contract as the real store and can be made to fail the next append, to
 count reads and the largest batch, and to alter a stored entry, so that failure handling, paging, and batched
 verification are checked without a database. The
@@ -35,6 +37,19 @@ N/A - standard test environment.
   set of action codes that the product sources record, so a new action that is not added to the list fails a test.
 - Verification of an untouched trail is intact and reads in batches; an empty trail is intact; a tampered entry in a
   later batch is reported with its sequence.
+- The export writes the entries that match the filter once, in ascending sequence order, in batches of 500 (a trail of
+  more than 1,200 entries is read in three batches), up to the sequence that was newest when it was prepared (an entry
+  appended before the first batch, or while streaming, is not in it); a project export holds no entry without a
+  project; an empty trail gives a valid document; an invalid filter is refused before anything is read.
+- The status of the chain is known after preparing and before writing: intact for an untouched trail, and broken with
+  the first broken sequence for a tampered one, which is still exported; a project export reveals no count or head
+  hash and nothing of other projects.
+- Every export, also a cancelled one and one whose target fails, records one `audit.exported` entry after the stream,
+  for the exporting user, with the project of the filter or none, the format, the number of rows written, complete or
+  incomplete, and the filter summary; a failing append is reported to the hook and does not fail the export.
+- The CSV has the byte order mark, the nine columns, CRLF, RFC 4180 quoting, UTC timestamps, and, for the text cells
+  only, the apostrophe before a leading `=`, `+`, `-`, `@`, tab or carriage return, so hashes stay unchanged; the JSON
+  document has the export, chain, and entries objects, escapes hostile text, and is valid when empty.
 - The coalescing record stores the first event of a key in a minute and does not store the repeats; the first event of
   the next minute is stored with the count of the repeats; different keys do not share a minute; a full key table does
   not store new keys until a minute has passed, and writes one `audit.events-suppressed` entry and one error report per
@@ -176,3 +191,72 @@ was read in more than one batch. This scenario is tested by
 **AuditService_VerifyAsync_TamperedEntryInLaterBatch_ReportsItsSequence**: An entry in the second batch is altered; the
 result is broken at that entry. This scenario is tested by
 `AuditService_VerifyAsync_TamperedEntryInLaterBatch_ReportsItsSequence`.
+
+**AuditExport_ExportAsync_Filter_WritesMatchingEntriesAscending**: A trail of ten entries over three projects is
+exported with a project filter; the CSV holds that project's entries in ascending order. This scenario is tested by
+`AuditExport_ExportAsync_Filter_WritesMatchingEntriesAscending`; the scope by
+`AuditExport_ExportAsync_Scope_ProjectNeverHoldsGlobalRows`, which also shows that an export without a project holds
+every entry including the audit entry of the first export; the empty trail by
+`AuditExport_ExportAsync_EmptyTrail_IsValidAndAudited`; the summary of the filter by
+`AuditFilter_Describe_SetParts_AreListedInOrder`; and the refusals by
+`AuditExport_PrepareExportAsync_InvalidFilter_ThrowsDomainRule` and `AuditExport_NullArguments_Throw`.
+
+**AuditExport_ExportAsync_EntriesAppendedAfterPrepare_AreNotIncluded**: An entry is appended after the export was
+prepared and another while the first batch is read (through the hook of the fake store); neither is in the output.
+This scenario is tested by `AuditExport_ExportAsync_EntriesAppendedAfterPrepare_AreNotIncluded`.
+
+**AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500**: 1,201 entries are exported with three reads, none
+larger than 500, and 1,000 entries end after an empty read. This scenario is tested by
+`AuditExport_ExportAsync_MoreThanOneBatch_ReadsInBatchesOf500` and
+`AuditExport_ExportAsync_ExactlyWholeBatches_EndsAfterAnEmptyRead`.
+
+**AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence**: A stored entry is altered; the
+prepared export is broken at its sequence, an untouched trail is intact, the file name says so, and a project export
+carries no count of the other projects. This scenario is tested by
+`AuditExport_PrepareExportAsync_TamperedChain_ReportsBrokenAtFirstBadSequence`,
+`AuditExport_PrepareExportAsync_IntactChain_ReportsIntact`,
+`AuditExport_ExportAsync_ProjectExport_RevealsNoCountsOfOtherProjects`, and
+`AuditExport_FileNameAndContentType_FollowScopeFormatAndStatus`.
+
+**AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream**: After a project export the trail ends with an
+`audit.exported` entry of the exporting user, scoped to the project, naming the format, the row count, `complete`, and
+the filter; a global export records one without a project. This scenario is tested by
+`AuditExport_ExportAsync_ProjectScope_RecordsAuditEntryAfterStream`,
+`AuditExport_ExportAsync_GlobalScope_RecordsEntryWithoutProject`, and
+`AuditExport_ExportedAction_IsInTheActionCatalog`. A filter with every text at its maximum length gives a detail that
+the store has to cut, so the order of the summary keeps the dates and drops the end of the actor text; this is tested
+by `AuditExport_ExportAsync_MaximalFilter_DetailFitsAndKeepsCountAndDates`, which asserts that the stored detail is
+within 500 characters and still starts with the format, the row count, the state, and the date range.
+
+**AuditExport_ExportAsync_CancelledMidStream_RecordsIncompleteEntry**: The token is cancelled while the second batch
+is read; the export throws, and the entry says `500 rows, incomplete`. A failing target is recorded the same way and
+rethrown, and a failing append is reported to the hook. This scenario is tested by
+`AuditExport_ExportAsync_CancelledMidStream_RecordsIncompleteEntry`,
+`AuditExport_ExportAsync_TargetFails_RecordsIncompleteEntryAndRethrows`, and
+`AuditExport_ExportAsync_AuditAppendFails_ReportsErrorAndStillCompletes`.
+
+**AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf**: The CSV starts with the byte order mark and the header
+row, and every line ends with CR LF. This scenario is tested by
+`AuditExportWriter_Csv_StartsWithBomAndHeader_AndUsesCrlf`, `AuditExportWriter_Csv_Row_HasColumnsInOrderAndUtcTimestamp`,
+`AuditExportWriter_Csv_NoEntries_IsHeaderOnly`, `AuditExportWriter_Csv_NoProject_LeavesProjectCellEmpty`, and
+`AuditExportWriter_Csv_Unicode_IsWrittenAsUtf8`.
+
+**AuditExportWriter_Quote_SpecialCharacters_QuotedPerRfc4180**: A comma, a quote, a carriage return and a line feed make
+a quoted cell with doubled quotes, and plain text stays unquoted. This scenario is tested by
+`AuditExportWriter_Quote_SpecialCharacters_QuotedPerRfc4180` and
+`AuditExportWriter_Csv_DetailWithCommaQuoteAndNewline_IsOneQuotedCell`.
+
+**AuditExportWriter_Neutralize_LeadingFormulaCharacter_IsPrefixed**: Cells that start with `=cmd|' /C calc'!A0`, `+1`,
+`-2`, `@SUM`, a tab or a carriage return get an apostrophe; benign text is untouched; the hashes, the sequence and the
+timestamp of a row are not changed. This scenario is tested by
+`AuditExportWriter_Neutralize_LeadingFormulaCharacter_IsPrefixed` and
+`AuditExportWriter_Csv_TextCells_AreNeutralizedAndGeneratedCellsAreNot`.
+
+**AuditExportWriter_Json_Envelope_HasExportChainAndEntries**: The JSON document has `export` (with only the set
+filter conditions), `chain`, and `entries`; hostile text is escaped and round-trips; an empty result and a broken chain
+(first broken sequence, no count, no head hash) are valid documents; the buffer is emptied by every flush; null
+arguments are refused. This scenario is tested by `AuditExportWriter_Json_Envelope_HasExportChainAndEntries`,
+`AuditExportWriter_Json_HostileText_IsEscapedAndRoundTrips`, `AuditExportWriter_Json_NoEntries_IsValidDocument`,
+`AuditExportWriter_Json_BrokenChain_NamesFirstBrokenSequenceAndNoCounts`,
+`AuditExportWriter_FlushToAsync_EmptiesTheBufferEachTime`, `AuditExportWriter_NullArguments_Throw`, and
+`AuditExportWriter_Dispose_ReleasesBuffersAndIsRepeatable` (the writer can be disposed twice and refuses writes after).

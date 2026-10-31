@@ -3,7 +3,8 @@
 #### Verification Approach
 
 `AuditPage` and `ProjectAuditPage` are verified with component tests defined in `AuditPageTests.cs`,
-`ProjectAuditPageTests.cs`, and `AuditEntryTableTests.cs`, and the cleaning of the address in `AuditFilterStateTests.cs`
+`ProjectAuditPageTests.cs`, `AuditEntryTableTests.cs`, and `AuditExportLinksTests.cs` (the export links), and the
+cleaning of the address in `AuditFilterStateTests.cs`
 (plain unit tests), which use the bUnit test context to render
 the real components over a real `AuditService` with the in-memory fake audit store (`FakeAuditStore`, which can also
 alter a stored entry to break the chain) and a real `UserService` with an in-memory fake user store; the tests of the
@@ -52,8 +53,25 @@ N/A - standard test environment.
   project or an entry without a project, whatever the address says.
 - Hostile values in the address (markup, huge texts, negative or unknown sizes, bad dates, unknown actions, reversed
   dates) never raise and are shown, if at all, as encoded text.
+- Both pages show a CSV and a JSON export link and the note; the links go to `/audit/export` or
+  `/projects/{id}/audit/export`, carry the filter values that are set and the project of the whole-trail page as
+  escaped query values, never carry the page size or the paging positions, and a hostile value is encoded so that it can
+  neither add a parameter nor leave the attribute.
 
 #### Test Scenarios
+
+**AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues**: The whole-trail page is rendered with a filter, a page
+size, and a position; the CSV and JSON links point to `/audit/export` with the filter values and the project but no
+size, `before` or `after`. This scenario is tested by `AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues`
+and, for the query itself, `AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues`.
+
+**AuditExportLinks_ProjectPage_PointToTheProjectExportWithTheFilter**: The project page links to the export of its
+project with the filter, and bare links carry only the format. This scenario is tested by
+`AuditExportLinks_ProjectPage_PointToTheProjectExportWithTheFilter` and `AuditExportLinks_NoFilter_AreBareExportLinks`.
+
+**AuditExportLinks_HostileValues_AreEncoded**: A value with a quote, markup, and `&format=json` is escaped in the link
+and cannot add a parameter or break out of the attribute. This scenario is tested by
+`AuditExportLinks_HostileValues_AreEncoded`.
 
 **AuditPage_Render_Admin_ShowsEntriesNewestFirst**: A system administrator opens the page; the entries are listed newest
 first with their columns. This scenario is tested by `AuditPage_Render_Admin_ShowsEntriesNewestFirst`.

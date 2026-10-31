@@ -65,6 +65,20 @@ sections:
           - AuditStore_Verification_EditedRow_ReportsThatSequence
           - AuditStore_Verification_DeletedRow_ReportsThatSequence
 
+      - id: ReviewCenter-AuditStore-ReadMatching
+        title: >-
+          The AuditStore unit shall read, for an export, the entries that match a filter in ascending sequence order
+          in bounded keyset batches after a given sequence and up to a given sequence, with the conditions of the
+          listing (so that a project filter never returns an entry without a project), and shall return the newest
+          sequence of the trail, or zero for an empty trail.
+        justification: |
+          An export must stream a trail of any size in constant memory and give a consistent view while entries are
+          appended, which an upper bound on the sequence and a cursor on the primary key do, using the same filter as
+          the page so that the export contains what the page shows.
+        tests:
+          - AuditStore_LatestSequenceAsync_EmptyThenFilled_ReturnsHighestSequence
+          - AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches
+
       - id: ReviewCenter-AuditStore-Filter
         title: >-
           The AuditStore unit shall narrow the listing by the identity of the actor, by a case-insensitive text in the

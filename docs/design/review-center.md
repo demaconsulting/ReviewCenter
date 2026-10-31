@@ -544,8 +544,8 @@ coalescing table (500 keys) is full of live keys, events of new keys are not rec
 name of an unknown user is recorded, cleaned and cut to 50 characters, but the address of the client is not recorded
 in the trail (only the web server log has it); a wrong current password on the account page appears as
 `auth.sign-in-failed`, and an attempt there on a locked account is not recorded; recording of
-sign-in, sign-out, failed sign-in, and lockout is best effort and a failure is only logged; and there is no export,
-retention, or archiving of the trail.
+sign-in, sign-out, failed sign-in, and lockout is best effort and a failure is only logged; and there is no
+retention or archiving of the trail (an export is available, see the AuditService unit).
 
 ## External Interfaces
 

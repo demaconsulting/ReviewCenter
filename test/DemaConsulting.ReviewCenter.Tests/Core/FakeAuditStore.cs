@@ -55,9 +55,53 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
     private int _largestReadCount;
 
     /// <summary>
+    ///     The number of filtered batches requested for an export.
+    /// </summary>
+    private int _matchingReads;
+
+    /// <summary>
+    ///     The largest batch size any export read asked for.
+    /// </summary>
+    private int _largestMatchingCount;
+
+    /// <summary>
     ///     Gets or sets the exception thrown by the next append, or <c>null</c> for none; it is cleared when thrown.
     /// </summary>
     public Exception? FailNextAppend { get; set; }
+
+    /// <summary>
+    ///     Gets or sets what runs after each export batch was read, with the number of the batch (1 for the first);
+    ///     <c>null</c> for nothing. It runs outside the lock, so it may append entries or cancel an operation.
+    /// </summary>
+    public Action<int>? AfterMatchingRead { get; set; }
+
+    /// <summary>
+    ///     Gets the number of filtered batches requested for an export.
+    /// </summary>
+    public int MatchingReads
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _matchingReads;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Gets the largest batch size any export read asked for.
+    /// </summary>
+    public int LargestMatchingCount
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _largestMatchingCount;
+            }
+        }
+    }
 
     /// <summary>
     ///     Gets a snapshot of the stored entries in sequence order.
@@ -187,6 +231,41 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
                 .Take(count)
                 .ToList();
             return Task.FromResult(result);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<AuditEntry>> ReadMatchingAsync(
+        AuditFilter filter,
+        long afterSequence,
+        long upToSequence,
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        int call;
+        IReadOnlyList<AuditEntry> result;
+        lock (_lock)
+        {
+            call = ++_matchingReads;
+            _largestMatchingCount = Math.Max(_largestMatchingCount, count);
+            result = _entries
+                .Where(e => e.Sequence > afterSequence && e.Sequence <= upToSequence && Matches(e, filter))
+                .OrderBy(e => e.Sequence)
+                .Take(count)
+                .ToList();
+        }
+
+        // The hook runs outside the lock so that it may append entries (the trail keeps growing during an export)
+        AfterMatchingRead?.Invoke(call);
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc />
+    public Task<long> LatestSequenceAsync(CancellationToken cancellationToken = default)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult(_entries.Count == 0 ? 0L : _entries[^1].Sequence);
         }
     }
 

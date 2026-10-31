@@ -11,7 +11,7 @@ shape of a request.
 
 #### Data Model
 
-The unit is three files. `ApiEndpoints` is a static class with the extension method `MapApi` and the handlers of the
+The unit is four files. `ApiEndpoints` is a static class with the extension method `MapApi` and the handlers of the
 routes. `ApiModels` holds the types of the requests and answers, all immutable records: `ProjectDto`,
 `ReviewSummaryDto`, `ReviewDetailDto` (with `SlotDto` and `ReviewCountsDto`), `CreateReviewRequest` (with
 `UploadFileDto` and `RepositorySourceDto`), `CreatedReviewDto` (with `SkippedFileDto`), and `ProjectChecklistDto` (with
@@ -152,6 +152,58 @@ the server; the scheme follows the forwarded protocol when the forwarded headers
 pass the `Host` header on. Every answer of the handler, including the 404 of an unknown project, has
 `Cache-Control: no-store`. An empty list is a normal answer.
 
+**MapAuditExport** (`AuditExportEndpoints.cs`): Maps the two routes of the audit export on the application. They are
+*not* part of `MapApi`: they are for a signed-in person, they need the session cookie, not a token, and they are not in
+the OpenAPI document (which describes the token API only; a test checks that the routes are absent). Both require
+authorization with the default (cookie) scheme, so a request without a session is redirected to the sign-in page, like
+the attestation route of the web. Neither collides with the pages `/audit` and `/projects/{id}/audit`, because the
+path has one more segment (`/export`).
+
+- `GET /projects/{projectId:int}/audit/export`: whoever passes `RequireAuditAsync` of the project; reads `actor`,
+  `action`, `review`, `from`, and `to`.
+- `GET /audit/export`: system administrators; reads the same and `project`.
+
+The project number of the project route always wins: a `project` value in its query is ignored. The filter values are
+read with `AuditFilterState.FromQuery`, the parser of the pages, so an unusable value (a bad date, an unknown action, a
+huge text) falls back exactly as it does on the page and never fails; `size`, `before`, and `after` are not read. The
+query value `format` is `csv` (the default, also when it is empty) or `json`, without regard to case; any other value is
+a 400 problem.
+
+*Access answers*, decided before anything is read or written and before the format is checked:
+
+- No session: 302 to `/login` (cookie scheme).
+- A project that does not exist, or one the user may not see: 404 with an empty body (the page for a missing address
+  is shown).
+- A project the user may see but not read the audit trail of (a plain member): 403 problem.
+- A project admin or a system administrator on a project: 200.
+- The whole trail, not a system administrator (also a project admin): 403 problem.
+- The whole trail, a system administrator: 200.
+- An unknown `format`, after the access check: 400 problem.
+
+The project export mirrors the project page (a user who may not even see the project cannot tell it from a missing
+one), and the whole-trail export answers 403 where the page shows an access denied message, because an export is a
+request for data and not a page: the user is signed in, so a refusal is the honest answer.
+
+*Streaming*: the handler calls `AuditService.PrepareExportAsync` first (the snapshot and the single verification of the
+chain), then writes the response headers, then calls `ExportAsync` with the response body and `RequestAborted`, so the
+body is streamed in batches and an aborted download stops the read. An `OperationCanceledException` or an
+`IOException` (a write to a closed connection) is swallowed when `RequestAborted` is set, after the service has
+recorded the incomplete export; the same exceptions without an abort propagate. A cancellation during the
+verification of `PrepareExportAsync` also ends the request quietly and records nothing, because no data was sent. The
+response headers are:
+
+- `Content-Type`: `text/csv; charset=utf-8` or `application/json`.
+- `Content-Disposition`: `attachment; filename="audit-<scope>-<yyyyMMddTHHmmssZ>-chain-<status>.<ext>"`, where the
+  scope is `project-N` or `all` and the status is `intact` or `broken`.
+- `Cache-Control`: `no-store`; `X-Content-Type-Options`: `nosniff`.
+- `X-ReviewCenter-Audit-Chain`: `intact` or `broken`.
+- `X-ReviewCenter-Audit-Chain-Broken-At`: the first broken sequence, only when the chain is broken.
+
+The status of the chain is in the headers (and in the file name) because the body is streamed; the headers are sent
+before the first byte, and the chain was verified once for it. The chain is global, so the headers of a project export
+say only whether the whole chain is sound and where it first breaks, never a count. The export is recorded in the audit
+trail by the service (`audit.exported`, for the user, scoped to the project of the filter).
+
 **ApiProblems.StatusOf**: Maps a rule to a status: the not-found rules (including a missing token) to 404; a duplicate
 review identifier, an existing membership, the removal or demotion of the last project admin, a disabled repository,
 a change that the approval lock refuses (`ReviewLocked`), a reopen of a review that is not locked (`ReviewNotLocked`),
@@ -192,6 +244,8 @@ without credentials, for a project that does not allow it, gets the same generic
   **ProjectChecklistService**, **ReviewProgressService** — Core; the work.
 - **AttestationService**, **AttestationEndpoint** — Evidence; the attestation and the shared mapping of its result.
 - **EvidenceIndexService** — Evidence; the entries of the evidence index.
+- **AuditService**, **IProjectAccess**, **AuditFilterState** — the export routes: the export, the access answers, and
+  the parsing of the filter.
 - **ApiTokenAuthentication**, **AnonymousRateLimit** — the policies of the groups and the limiter of anonymous callers.
 - **Actor**, **DomainRuleException**, **DomainRule** — Core.
 

@@ -31,7 +31,7 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     The store only appends and reads: it has no method that updates or deletes an entry. A standalone
 ///     append takes the shared <see cref="AuditAppender"/> gate and a write transaction, like every change that
 ///     carries an audit entry, so the chain stays linear. Reads are untracked and never take the gate, and the
-///     verification read returns one ordered batch at a time so the whole trail is never in memory.
+///     verification and export reads return one ordered batch at a time so the whole trail is never in memory.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
 /// <param name="appender">The appender that owns the gate and builds the chain.</param>
@@ -180,6 +180,32 @@ internal sealed class AuditStore(IDbContextFactory<ReviewCenterDbContext> factor
             .OrderBy(a => a.Sequence)
             .Take(count)
             .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<AuditEntry>> ReadMatchingAsync(
+        AuditFilter filter,
+        long afterSequence,
+        long upToSequence,
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Keyset batch in chain order: the position is the sequence, so no offset is ever skipped over
+        return await Filter(context.AuditEntries.AsNoTracking(), filter)
+            .Where(a => a.Sequence > afterSequence && a.Sequence <= upToSequence)
+            .OrderBy(a => a.Sequence)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<long> LatestSequenceAsync(CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.AuditEntries.AsNoTracking().MaxAsync(a => (long?)a.Sequence, cancellationToken) ?? 0;
     }
 
     /// <inheritdoc />

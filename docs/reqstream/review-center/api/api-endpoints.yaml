@@ -277,3 +277,41 @@ sections:
           - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
           - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
           - ApiDocument_Get_MatchesCommittedSnapshot
+
+      - id: ReviewCenter-ApiEndpoints-AuditExport
+        title: >-
+          The ApiEndpoints unit shall serve, in the file AuditExportEndpoints.cs, the cookie-authenticated routes
+          GET /projects/{project}/audit/export and GET /audit/export, which stream the audit trail that matches the
+          filter of the query (actor, action, review, from, and to, and on the whole trail also project, all read like
+          the audit pages so that an unusable value falls back and never fails) as CSV or, with format=json, as JSON,
+          never accepting a request without a signed-in session (it is redirected to the sign-in page), answering for
+          a project the 404 of a project that the user may not see and the 403 problem for a user who may see it but
+          not read its audit trail (the audit-read access of the project), answering the whole trail to system
+          administrators only with 403 for everybody else, answering an unknown format with 400 after the access
+          check, and sending the status of the chain before the body in the headers X-ReviewCenter-Audit-Chain
+          (intact or broken) and, when broken, X-ReviewCenter-Audit-Chain-Broken-At with the first broken sequence,
+          together with the attachment file name audit-<project-N|all>-<yyyyMMddTHHmmssZ>-chain-<status>.<ext>, the
+          content type, Cache-Control no-store, and X-Content-Type-Options nosniff, and shall not be part of the
+          OpenAPI document.
+        justification: |
+          The export is for people with a signed-in session (a token cannot read the audit trail), so it uses the
+          same access rules as the audit pages, answered like the other cookie routes. The status of the chain is in
+          the headers because the body is streamed, so a script or a browser knows it before the first byte. A
+          project that a user may not see must not be told apart from one that does not exist, and a trail that
+          names every user is for system administrators.
+        tests:
+          - AuditExportEndpoints_ProjectExport_ProjectAdmin_ServesCsvWithHeaders
+          - AuditExportEndpoints_SystemAdmin_ExportsAnyProjectAndTheWholeTrail
+          - AuditExportEndpoints_JsonFormat_ServesEnvelopeWithChainStatus
+          - AuditExportEndpoints_QueryFilter_IsHonoredAndTheExportIsAudited
+          - AuditExportEndpoints_ProjectRoute_IgnoresProjectInQuery
+          - AuditExportEndpoints_GlobalExport_ProjectInQuery_LimitsAndScopesTheAuditEntry
+          - AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404
+          - AuditExportEndpoints_SignedOut_RedirectsToLogin
+          - AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403
+          - AuditExportEndpoints_HostileQueryValues_AreSafe
+          - AuditExportEndpoints_UnknownFormat_Answers400ToAllowedUsersOnly
+          - AuditExportEndpoints_TamperedChain_ReportsBrokenInHeadersAndFileName
+          - AuditExportEndpoints_Routes_AreNotInTheApiDocument
+          - AuditExportEndpoints_StreamAsync_ClientAbortedDuringWrite_EndsQuietlyAndAuditsIncomplete
+          - AuditExportEndpoints_StreamAsync_WriteFailsWithoutAbort_IsNotSwallowed

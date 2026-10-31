@@ -14,7 +14,7 @@ and then checks that the change was rolled back and that the gate was released (
 absence of an update or delete operation is checked on the public surface by reflection. The filter, the date range, and
 the stored form of the time are verified in `AuditStoreFilterTests.cs` against the same kind of database, with the
 entries written directly through the appender with chosen times and actors, and the indexes in
-`StorageSubsystemTests.cs`.
+`StorageSubsystemTests.cs`. The two reads of the export are verified in `AuditStoreExportTests.cs`.
 
 #### Test Environment
 
@@ -43,7 +43,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - The last activity of a project is the time of the newest entry of each of its reviews, without entries that have no
   review or belong to another project, and does not change the chain.
 - An edited or a deleted row is found by verification, at its sequence.
-- The store offers no update or delete operation.
+- The store offers no update or delete operation beyond the reads listed in the public surface test.
+- The newest sequence is 0 for an empty trail and the highest sequence otherwise; the matching read honors the filter,
+  returns ascending keyset batches after a sequence and up to a snapshot sequence, never returns an entry above the
+  snapshot, and never returns an entry without a project for a project filter.
 
 #### Test Scenarios
 
@@ -147,3 +150,10 @@ verification reports the missing sequence. This scenario is tested by
 
 **AuditStore_PublicSurface_OffersNoUpdateOrDelete**: The public methods of the store and the interface are inspected;
 none updates or deletes an entry. This scenario is tested by `AuditStore_PublicSurface_OffersNoUpdateOrDelete`.
+
+**AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches**: A trail with entries of two projects and
+without a project is read with a project filter in batches of two, passing the last sequence each time and a snapshot
+sequence below the newest; the batches are ascending, bounded, hold only the project, and stop at the snapshot. The
+newest sequence of an empty trail is 0 and of a filled trail the highest sequence. This scenario is tested by
+`AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches` and
+`AuditStore_LatestSequenceAsync_EmptyThenFilled_ReturnsHighestSequence`.

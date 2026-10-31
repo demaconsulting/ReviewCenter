@@ -41,6 +41,7 @@ public static class AuditActions
         "account.oidc-created",
         "attestation.generated",
         "audit.events-suppressed",
+        "audit.exported",
         "auth.locked-out",
         "auth.oidc-sign-in",
         "auth.oidc-sign-in-failed",

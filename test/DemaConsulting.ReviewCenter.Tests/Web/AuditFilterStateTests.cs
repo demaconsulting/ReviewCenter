@@ -168,4 +168,27 @@ public class AuditFilterStateTests
         // Assert
         Assert.Equal("?actor=a%26b%3Dc%20%3Ci%3E%25&review=x%20y&before=5", query);
     }
+
+    /// <summary>
+    ///     Test that the export query carries the format and the entry-limiting values, escaped, and never the page
+    ///     size or a paging position; the project only when asked for.
+    /// </summary>
+    [Fact]
+    public void AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues()
+    {
+        // Arrange
+        var state = AuditFilterState.FromQuery("a&b <i>", "review.", "R 1", "2026-01-02", "2026-03-04", "100", "7");
+
+        // Act
+        var global = state.ToExportQuery("json", includeProject: true);
+        var project = state.ToExportQuery("csv", includeProject: false);
+        var bare = AuditFilterState.FromQuery(null, null, null, null, null, "25", null).ToExportQuery("csv", includeProject: true);
+
+        // Assert
+        Assert.Equal("?format=json&project=7&actor=a%26b%20%3Ci%3E&action=review.&review=R%201&from=2026-01-02&to=2026-03-04", global);
+        Assert.Equal("?format=csv&actor=a%26b%20%3Ci%3E&action=review.&review=R%201&from=2026-01-02&to=2026-03-04", project);
+        Assert.Equal("?format=csv", bare);
+        Assert.DoesNotContain("size", global, StringComparison.Ordinal);
+        Assert.DoesNotContain("before", global, StringComparison.Ordinal);
+    }
 }

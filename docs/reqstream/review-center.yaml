@@ -507,7 +507,7 @@ sections:
           of entries (and on the page the head hash) and a broken chain with the first broken entry, returning exit
           code 0 for an intact chain and 1 for a broken chain or an unreadable database, and shall show a system
           administrator the audit trail on the audit page, which a system administrator can narrow by project, actor,
-          action, review and date range.
+          action, review and date range, and export as CSV or JSON together with the verified state of the chain.
         tags: [system]
         justification: |
           Verification is how tampering is found, and an audit trail that nobody can read or check does not protect
@@ -516,9 +516,11 @@ sections:
           and when for the reviews they may see, while the whole trail names every user and action and so is
           limited to system administrators (21 CFR Part 11 section 11.10(e), audit trail available for review and
           copying by the agency). The system tests verify the chain from the audit page and by the verb on a
-          database that was edited behind the server, and the filter form of the audit page by the action and the
-          actor; the history of one review that every participant may see, the
-          paging of 50, the refusal of the whole trail to anybody but a system administrator, and the exit code
+          database that was edited behind the server, the filter form of the audit page by the action and the
+          actor, and the export link of the audit page, which hands out the filtered trail as a CSV file that says
+          the chain is intact; the history of one review that every participant may see, the
+          paging of 50, the refusal of the whole trail to anybody but a system administrator, the formats and the
+          access rules of the export, and the exit code
           for an unreadable database are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Program-AuditVerify
@@ -526,10 +528,12 @@ sections:
           - ReviewCenter-Hosting-AuditVerify
           - ReviewCenter-Web-AuditPage
           - ReviewCenter-Web-AuditHistory
+          - ReviewCenter-Api-AuditExport
         tests:
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
           - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
           - ReviewCenter_AuditTrail_FiltersByActionAndActor
+          - ReviewCenter_AuditTrail_Export_ReportsChainStatus
 
       - id: ReviewCenter-System-Attestation
         title: >-

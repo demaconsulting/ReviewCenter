@@ -94,7 +94,9 @@ and per row `audit-row`, `audit-sequence`, `audit-time`, `audit-actor`, `audit-a
 from `AuditEntryTable`, so both pages have them). `AuditFilterForm` has `audit-filter-form`, `audit-filter-actor`,
 `audit-filter-action`, `audit-filter-review`, `audit-filter-from`, `audit-filter-to`, `audit-filter-size`,
 `audit-filter-apply`, `audit-filter-clear` (only while a value differs from the default), `audit-filter-message`, and,
-on the whole-trail page only, `audit-filter-project`. `ProjectAuditPage` has `project-audit-page` (root),
+on the whole-trail page only, `audit-filter-project`. The form also shows the export bar `audit-export` with the links
+`audit-export-csv` and `audit-export-json` and the note `audit-export-note` (see *Export links* below).
+`ProjectAuditPage` has `project-audit-page` (root),
 `breadcrumb-projects-link`, `breadcrumb-project-link`, `project-audit-loading`, and `project-not-found`.
 
 #### Key Methods
@@ -142,6 +144,17 @@ full value as its `title`, and `ShortHash` of it as the content; text parts are 
 The concatenated text of the parts is the original detail.
 
 **OnAfterRender** (both pages): Marks the page interactive after the first render on a live connection.
+
+**Export links** (`AuditFilterForm`, `AuditFilterState.ToExportQuery`): Under the filter form, on both pages and for
+whoever sees the page, the form shows a CSV link and a JSON link (`download` anchors) and a note that the export covers
+every entry that matches the filter, not only the page shown, and states whether the audit chain is intact. The link
+goes to `{BasePath}/export` (`/audit/export` or `/projects/{id}/audit/export`) with the query
+`?format=csv|json` followed by the filter values that are set (`actor`, `action`, `review`, `from`, `to`, and on the
+whole-trail page `project`), each written with `Uri.EscapeDataString`, from the *cleaned* state of the page. The
+paging values (`before`, `after`) and the page size are never carried, because the export returns everything that
+matches. The links are plain anchors to a cookie-authenticated route (see `ApiEndpoints`), so the browser sends the
+session cookie and the server decides the access again; the page shows no chain-status chip, because the export
+itself reports the status.
 
 #### Error Handling
 

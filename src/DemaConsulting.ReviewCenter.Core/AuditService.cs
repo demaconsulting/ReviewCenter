@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
+
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
@@ -45,7 +47,8 @@ public sealed record AuditEntryPage(IReadOnlyList<AuditEntry> Entries, bool HasO
 /// <remarks>
 ///     Changes of data are audited by the store in the same transaction as the change (see
 ///     <see cref="IReviewStore"/>); this service records the events that change no data and offers the
-///     read and verification side. <see cref="TryRecordAsync"/> never throws for a storage failure, so a
+///     read and verification side, and the streaming export of the entries that match a filter
+///     (<see cref="PrepareExportAsync"/> and <see cref="ExportAsync"/>). <see cref="TryRecordAsync"/> never throws for a storage failure, so a
 ///     problem with the trail cannot lock a person out; the failure is reported through the error hook given
 ///     at construction. <see cref="TryRecordCoalescedAsync"/> bounds how many rows a repeating event (one that
 ///     anybody can trigger as often as they like) can add: the first event of a key in a one-minute window is
@@ -74,6 +77,16 @@ public sealed class AuditService
     ///     The number of entries read from the store at once while verifying.
     /// </summary>
     private const int VerifyBatchSize = 500;
+
+    /// <summary>
+    ///     The number of entries read from the store at once while exporting.
+    /// </summary>
+    public const int ExportBatchSize = 500;
+
+    /// <summary>
+    ///     The action of the entry that records an export of the audit trail.
+    /// </summary>
+    public const string ExportedAction = "audit.exported";
 
     /// <summary>
     ///     The most keys <see cref="TryRecordCoalescedAsync"/> tracks at once; also the most rows per window.
@@ -382,5 +395,114 @@ public sealed class AuditService
         }
 
         return verifier.Result;
+    }
+
+    /// <summary>
+    ///     Prepares an export: validates the filter, fixes the snapshot and verifies the chain, so the chain status
+    ///     is known before the first byte of the export is written.
+    /// </summary>
+    /// <param name="filter">
+    ///     What to export; validated here. With a project set the export holds only entries of that project; the
+    ///     caller must have checked the right to export first. Must not be null.
+    /// </param>
+    /// <param name="format">The file format.</param>
+    /// <param name="actor">The exporting user, the actor of the audit entry the export leaves. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The prepared export.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="filter"/> or <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.AuditFilterInvalid"/> when the filter is not valid.
+    /// </exception>
+    /// <remarks>
+    ///     The newest sequence is read before the verification starts, so every entry the export can include is
+    ///     covered by the verified chain; entries appended afterwards are not part of the snapshot. The whole chain
+    ///     is verified once (see <see cref="VerifyAsync"/>), whatever the filter: a filtered export is a view of a
+    ///     verified chain, and the result says only whether the chain is intact and where it first broke. A broken
+    ///     chain does not stop the export; the evidence is exactly what an auditor needs, with the status said first.
+    /// </remarks>
+    public async Task<AuditExport> PrepareExportAsync(
+        AuditFilter filter,
+        AuditExportFormat format,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(actor);
+        var valid = filter.Validated();
+        var snapshot = await _store.LatestSequenceAsync(cancellationToken);
+        var chain = await VerifyAsync(cancellationToken);
+        return new AuditExport(format, valid, actor, chain, snapshot, _timeProvider.GetUtcNow());
+    }
+
+    /// <summary>
+    ///     Streams a prepared export to the target and then records that it happened.
+    /// </summary>
+    /// <param name="export">The export from <see cref="PrepareExportAsync"/>. Must not be null.</param>
+    /// <param name="target">The stream to write the file to. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the streaming; the audit entry is still recorded.</param>
+    /// <returns>The number of entries written.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    /// <exception cref="OperationCanceledException">
+    ///     Thrown when <paramref name="cancellationToken"/> is cancelled before the end; the export is then audited as
+    ///     incomplete.
+    /// </exception>
+    /// <remarks>
+    ///     The entries are read in ascending sequence (the order of the chain) in keyset batches of
+    ///     <see cref="ExportBatchSize"/>, up to the snapshot sequence of the export, and each batch is written and
+    ///     passed on before the next is read, so memory use does not depend on the size of the trail and the
+    ///     trail may keep growing meanwhile. After the stream ended (or failed, or was cancelled) an
+    ///     <see cref="ExportedAction"/> entry is appended with a token that is never cancelled, so an export
+    ///     leaves a trace even when the download was aborted; its detail starts with the format, the number of rows
+    ///     and whether the export is complete, then names the filter. The entry belongs to the project of the
+    ///     filter, or to no project for an export of the whole trail. Because it is appended after the stream it is
+    ///     not inside the snapshot of its own export. A failure to store the entry is reported to the error hook
+    ///     and does not replace the outcome of the export.
+    /// </remarks>
+    public async Task<long> ExportAsync(AuditExport export, Stream target, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(export);
+        ArgumentNullException.ThrowIfNull(target);
+        long rows = 0;
+        var complete = false;
+        try
+        {
+            using var writer = new AuditExportWriter(export);
+            writer.WriteStart();
+            await writer.FlushToAsync(target, cancellationToken);
+
+            var last = 0L;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var batch = await _store.ReadMatchingAsync(
+                    export.Filter, last, export.SnapshotSequence, ExportBatchSize, cancellationToken);
+                if (batch.Count == 0)
+                {
+                    break;
+                }
+
+                writer.WriteEntries(batch);
+                await writer.FlushToAsync(target, cancellationToken);
+                rows += batch.Count;
+                last = batch[^1].Sequence;
+                if (batch.Count < ExportBatchSize)
+                {
+                    break;
+                }
+            }
+
+            writer.WriteEnd();
+            await writer.FlushToAsync(target, cancellationToken);
+            complete = true;
+            return rows;
+        }
+        finally
+        {
+            var state = complete ? "complete" : "incomplete (cancelled or failed)";
+            var detail = $"{export.Format.ToString().ToLowerInvariant()} export, {rows.ToString(CultureInfo.InvariantCulture)} rows, {state}; {export.Filter.Describe()}";
+            await TryRecordAsync(
+                AuditDraft.By(export.Actor, ExportedAction, detail, export.Filter.ProjectId),
+                CancellationToken.None);
+        }
     }
 }

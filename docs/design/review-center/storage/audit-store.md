@@ -98,6 +98,16 @@ be deleted and created again, like for every change of the schema (there are no 
 **AuditStore.ReadAfterAsync**: Reads entries in ascending order after a sequence, at most a given number, so that
 verification can stream the trail in batches.
 
+**AuditStore.ReadMatchingAsync**: The read of the export: entries that match an `AuditFilter`, in ascending sequence
+order, with `Sequence > afterSequence` and `Sequence <= upToSequence`, at most a given number (a keyset batch; the caller
+passes the last sequence it received). It applies exactly the conditions of `ListAsync` (the same private filter
+function), so the export holds what the page shows and a project filter never returns an entry without a project. The
+upper bound is the snapshot of the export: entries appended later are never read. The read is untracked, takes no
+gate, and uses the indexes of the filter ending in `Sequence`.
+
+**AuditStore.LatestSequenceAsync**: Returns the highest sequence of the trail, or 0 for an empty trail (the maximum of
+the primary key). The export reads it to fix its snapshot before it verifies the chain.
+
 **AuditStore.LastActivityAsync**: Returns, for one project and with one grouped query, the time of the newest entry of
 each review of that project, by review identifier. The newest entry of a review is the one with the highest sequence
 (the existing index on project, review, and sequence serves the grouping), and the time is read from those entries, so

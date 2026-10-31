@@ -8,7 +8,8 @@
 are to record the events that change no data (sign-in, sign-out, failed sign-in, attempts on a locked account, refusals
 by the sign-in throttle, failed re-authentication, lockout) on a best-effort basis, with a coalescing variant for events
 that a caller can repeat without limit,
-to read the trail one page at a time, and to verify the hash chain by streaming. It also defines the store contract
+to read the trail one page at a time, to verify the hash chain by streaming, and to stream an export of the filtered
+trail as CSV or JSON (see *Export* below, with `AuditExportWriter`). It also defines the store contract
 `IAuditStore` and the page type `AuditEntryPage`. The events that belong to a change of data are *not* recorded by this
 service: they are recorded by the store in the same transaction as the change (see *Atomicity* below and the
 `AuditStore` unit).
@@ -59,6 +60,9 @@ none is given) so tests can move time.
 
 **OverflowAction**: `string` (constant) — `audit.events-suppressed`; the action of the entry that tells events of new
 keys were suppressed because the table was full.
+
+**ExportBatchSize**: `int` (constant) — 500; the number of entries `ExportAsync` reads, writes and flushes at a time.
+**ExportedAction**: `string` (constant) — `audit.exported`; the action of the entry that records an export.
 
 **AuditEntryPage**: the entries of one page, newest first, `HasOlder` and `HasNewer` (whether more entries lie beyond
 either end), and the cursors `OlderBefore` (the sequence of the last entry of the page) and `NewerAfter` (the sequence of
@@ -244,6 +248,81 @@ a test that scans the product sources for the action codes passed to an audit dr
   bounded by the batch, and the time grows linearly with the number of entries. Entries appended while the
   verification runs are tolerated: it ends when a batch comes back empty.
 
+**PrepareExportAsync**: Starts an export and decides the status of the chain before any byte is written.
+
+- *Parameters*: an `AuditFilter`, an `AuditExportFormat` (`Csv` or `Json`), the exporting `Actor`, and a cancellation
+  token.
+- *Returns*: an `AuditExport`: the format, the validated filter, the actor, the `AuditVerificationResult` of the chain,
+  the snapshot sequence, the generation time, and the derived content type, file extension, and file name
+  (`audit-<project-N|all>-<yyyyMMddTHHmmssZ>-chain-<intact|broken>.<ext>`).
+- *Postconditions*: The filter is validated first (`AuditFilterInvalid` for an invalid one). The newest sequence of the
+  trail is read **first** (`IAuditStore.LatestSequenceAsync`, 0 for an empty trail) and the whole chain is verified
+  **once** afterwards with `VerifyAsync`, so every entry that the export can contain lies inside the part of the chain
+  that was verified. The caller therefore knows the status (intact, or broken with the first broken sequence) before it
+  writes the first byte, and can put it in response headers. A broken chain is *exported*, with its status.
+- *Status and rows*: the verification covers the whole chain, including entries appended after the snapshot, so the
+  status can be `broken` with a first broken sequence above every exported row; this is conservative by intent.
+- *Cancellation*: a cancellation during the verification ends the call before any byte is written and leaves no audit
+  entry, because no data left the system.
+
+**ExportAsync**: Streams the export to a stream and audits it.
+
+- *Parameters*: the `AuditExport` from `PrepareExportAsync`, the target `Stream`, and a cancellation token.
+- *Returns*: the number of entries written.
+- *Postconditions*: The writer writes the start of the document and flushes it, then entries are read with
+  `IAuditStore.ReadMatchingAsync(filter, afterSequence, snapshotSequence, 500)` in ascending sequence order, written,
+  and flushed batch by batch (a keyset cursor on the sequence), until a batch is short or empty. No more than one batch
+  is in memory, whatever the size of the trail. Entries appended during or after the export, among them its own audit
+  entry, have a higher sequence than the snapshot and are not part of it. Cancellation is checked before every batch.
+  The end of the document is written last. The row count counts only entries that were flushed to the target.
+- *Audit*: In a `finally` block, after the stream has ended (and so outside the snapshot), the export records one
+  `audit.exported` entry through `TryRecordAsync` with `CancellationToken.None`, so that a cancelled or failed export is
+  recorded too and a failure to store the entry never hides the outcome (it goes to the error hook). The actor is the
+  exporting user; the project is the project of the filter, or none for an export of the whole trail. The detail reads
+  `<csv|json> export, <N> rows, <complete|incomplete (cancelled or failed)>; <filter summary>`; the filter summary
+  comes from `AuditFilter.Describe()` (for example `from 2026-01-01, project 3, action group "review.", actor
+  contains "ann"`, or `no filter`). The store cuts a detail at 500 characters, and a filter with every text at its
+  maximum length is longer than that, so the order is chosen to lose only the least important end: the format, the
+  count and the state come first, then the date range, the project, the review and the actions, and the actor text
+  (up to 200 characters) last.
+- *Errors*: an exception of the target or a cancellation is rethrown after the entry was recorded.
+
+**Export semantics**: The rules of the export are these.
+
+- *Filter*: the listing filter, all conditions together. The cursors and the page size are not used: the export
+  returns everything that matches.
+- *Order*: ascending sequence, which is the order of the chain.
+- *Snapshot*: entries up to the newest sequence at the start; later entries are left out.
+- *Scope*: a project filter never returns an entry without a project, so a project export holds no global row.
+- *Chain status*: `intact`, or `broken` with the first broken sequence; verified once, before the first byte.
+- *What the status says*: the chain is **global**, so a project export says only whether the whole chain is sound and
+  where it first breaks; it never carries a count, a head hash, or anything of the entries of other projects.
+- *A filtered export* is a *view* of a verified chain: every row keeps its `previousHash` and `hash`, so `audit verify`
+  (the existing verb) on the database, or a script that recomputes the hashes, can check it again.
+
+**AuditExportWriter**: the pure writer of the two formats (no HTTP, no store). It writes into a small buffer that the
+service empties into the target after every batch (`FlushToAsync`).
+
+- *CSV*: UTF-8 with a byte order mark; the header row
+  `sequence,timestampUtc,actor,action,project,review,detail,previousHash,hash`, then one row per entry; CRLF line ends;
+  RFC 4180 quoting (a cell with a comma, a quote, CR or LF is quoted and quotes are doubled); an empty result is the
+  header row only.
+- *JSON*: UTF-8 without a byte order mark, written with `Utf8JsonWriter`, one streamed object
+  `{ "export": { "generatedUtc", "filter": {...} }, "chain": { "status", "firstBrokenSequence"? },
+  "entries": [ ... ] }`, the entries with the same nine names as the CSV columns (`project` and `review` are `null`
+  when absent); the `filter` object lists only the conditions that are set; an empty result is a valid document with
+  an empty `entries` array.
+- *Timestamps*: ISO 8601 `O` form in UTC in both formats.
+- *Lifetime*: the writer owns a buffer and, for JSON, a `Utf8JsonWriter` with pooled memory, so it is `IDisposable`;
+  `ExportAsync` creates one writer per export and disposes it when the export ends, however it ends.
+
+**CSV injection rule**: a spreadsheet runs a cell that starts with a formula character. In CSV every *text* cell
+(`actor`, `action`, `review`, `detail`) whose first character is `=`, `+`, `-`, `@`, a tab, or a carriage return is
+prefixed with an apostrophe (`'`) before the quoting. The generated cells (`sequence`, `timestampUtc`, `project`,
+`previousHash`, `hash`) are never changed, so a hash can always be compared. The prefix means that a text that
+legitimately starts with one of these characters is shown with the apostrophe in the CSV; the JSON form is not changed,
+because a spreadsheet does not interpret it, and is the form to use when the exact text matters.
+
 #### Error Handling
 
 `RecordAsync` lets store failures propagate. `TryRecordAsync` swallows everything except cancellation, as described above;
@@ -264,7 +343,12 @@ sign-in event can be missing from the trail when the write fails. Null arguments
   user with a second factor is recorded as `auth.totp-failed`. A wrong password typed on the signing
   dialog is recorded as `signature.reauth-failed`.
 - The address of the client is not in the trail (see above).
-- The trail has no export and no retention or archiving function in this slice.
+- The trail has no retention or archiving function in this slice; the export is a copy to keep elsewhere, and the
+  trail still only grows.
+- Risk: every export verifies the whole chain before the first byte (see `PrepareExportAsync`), and no result is
+  cached or shared between exports, so an export of a long trail takes time proportional to the length of the chain,
+  also when the filter matches only a few entries, and several exports at once repeat that work. This is accepted for
+  this slice; caching a recent result or serializing the verifications would be the next step if it becomes a problem.
 - The chain is tamper-*evident*, not tamper-*proof*; see *What The Chain Proves And What It Does Not* in `AuditChain`.
   Removal of the newest entries, or a complete rewrite by someone with write access to the database, is not detected
   unless the head hash was recorded elsewhere, and this slice does not record it anywhere.
@@ -287,6 +371,7 @@ sign-in event can be missing from the trail when the write fails. Null arguments
   audit-read access); the audit page also verifies the chain.
 - **ProjectService** — records failed member adds through `TryRecordAsync` (when an `AuditService` was supplied).
 - **AuditCommand** (Hosting) — verifies the chain for the `audit verify` verb.
+- **AuditExportEndpoints** (Api) — prepare and stream an export for the two export routes.
 - **Services that change data** (`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`,
   `SigningService`, `UserService`) — do not call this service for their changes; they pass drafts to their stores
   (the member add that fails is the one event `ProjectService` records through this service).

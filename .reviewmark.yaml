@@ -766,6 +766,7 @@ reviews:
       - "test/**/Web/ProjectAuditPageTests.cs"
       - "test/**/Web/AuditEntryTableTests.cs"
       - "test/**/Web/AuditFilterStateTests.cs"
+      - "test/**/Web/AuditExportLinksTests.cs"
 
   - id: ReviewCenter-Web-RepositoriesPage
     title: Review of ReviewCenter RepositoriesPage unit implementation
@@ -1151,10 +1152,14 @@ reviews:
       - "docs/verification/review-center/core/audit-service.md"
       - "src/DemaConsulting.ReviewCenter.Core/AuditService.cs"
       - "src/DemaConsulting.ReviewCenter.Core/AuditFilter.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditExport.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditExportWriter.cs"
       - "src/DemaConsulting.ReviewCenter.Core/AuditActions.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IAuditStore.cs"
       - "test/**/Core/AuditServiceTests.cs"
       - "test/**/Core/AuditFilterTests.cs"
+      - "test/**/Core/AuditExportTests.cs"
+      - "test/**/Core/AuditExportWriterTests.cs"
       - "test/**/Core/AuditActionsTests.cs"
 
   # ReviewCenter - Core repositories and file selection
@@ -1361,6 +1366,7 @@ reviews:
       - "src/**/Storage/AuditAppender.cs"
       - "test/**/Storage/AuditStoreTests.cs"
       - "test/**/Storage/AuditStoreFilterTests.cs"
+      - "test/**/Storage/AuditStoreExportTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-DatabaseSetup
@@ -1711,8 +1717,10 @@ reviews:
       - "src/**/Api/ApiEndpoints.cs"
       - "src/**/Api/ApiModels.cs"
       - "src/**/Api/ApiProblems.cs"
+      - "src/**/Api/AuditExportEndpoints.cs"
       - "test/**/Api/ApiEndpointsTests.cs"
       - "test/**/Api/ApiProjectAccessTests.cs"
+      - "test/**/Api/AuditExportEndpointsTests.cs"
 
   - id: ReviewCenter-Api-ApiDocument
     title: Review of ReviewCenter ApiDocument unit implementation

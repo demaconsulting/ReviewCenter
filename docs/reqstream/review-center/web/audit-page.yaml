@@ -110,6 +110,25 @@ sections:
           - AuditEntryTable_Render_EmptyPage_TellsNoMatchFromNothingRecorded
           - AuditFilterState_ToQuery_TextWithSpecialCharacters_IsEscaped
 
+      - id: ReviewCenter-AuditPage-Export
+        title: >-
+          The AuditPage unit shall show, on the whole audit trail and on the audit trail of a project, to whoever sees
+          the page, a CSV and a JSON export link (data-testid audit-export-csv and audit-export-json) that go to the
+          export of the same scope (/audit/export or /projects/{project}/audit/export) and carry the current filter
+          (and on the whole audit trail the project) as escaped query values, never the page size or the paging
+          cursors, and a note that the export covers everything that matches the filter, not only the page shown, and
+          states whether the chain is intact.
+        justification: |
+          An auditor who has narrowed the trail to a view wants a copy of exactly that view, and a link that carried
+          the paging cursors would export one page only. Values written by anybody must not add parameters or markup
+          to the link.
+        tests:
+          - AuditExportLinks_GlobalPage_CarryTheFilterWithoutPagingValues
+          - AuditExportLinks_ProjectPage_PointToTheProjectExportWithTheFilter
+          - AuditExportLinks_NoFilter_AreBareExportLinks
+          - AuditExportLinks_HostileValues_AreEncoded
+          - AuditFilterState_ToExportQuery_FilterValues_CarriedWithoutPagingValues
+
       - id: ReviewCenter-AuditPage-ProjectView
         title: >-
           The AuditPage unit shall provide the page /projects/{project}/audit, which shows whoever may read the audit

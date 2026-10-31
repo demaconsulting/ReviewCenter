@@ -216,6 +216,31 @@ public sealed class AuditFilterState
     }
 
     /// <summary>
+    ///     Writes the filter into the query string of an export link: the format and the entry-limiting values.
+    /// </summary>
+    /// <param name="format">The export format, <c>csv</c> or <c>json</c>.</param>
+    /// <param name="includeProject">
+    ///     <c>true</c> to carry the project (the whole-trail page); a project page's export is already limited to
+    ///     its own project by the address.
+    /// </param>
+    /// <returns>
+    ///     <c>?format=</c> and the format, followed by the <c>name=value</c> pairs of the values that are set. The page
+    ///     size and the paging positions are never carried: an export covers everything that matches the filter.
+    /// </returns>
+    public string ToExportQuery(string format, bool includeProject)
+    {
+        var parts = new List<string>();
+        Add(parts, "format", format);
+        Add(parts, "project", includeProject ? ProjectId?.ToString(CultureInfo.InvariantCulture) : null);
+        Add(parts, "actor", Actor);
+        Add(parts, "action", Action);
+        Add(parts, "review", Review);
+        Add(parts, "from", From is null ? null : FormatDate(From));
+        Add(parts, "to", To is null ? null : FormatDate(To));
+        return "?" + string.Join('&', parts);
+    }
+
+    /// <summary>
     ///     Adds one <c>name=value</c> pair when the value is not empty.
     /// </summary>
     /// <param name="parts">The pairs so far.</param>
