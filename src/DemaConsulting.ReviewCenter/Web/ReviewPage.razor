@@ -511,7 +511,7 @@
                         <div class="reply">
                             <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
                                       aria-label="Reply to thread @threadId" placeholder="Reply"
-                                      data-testid="reply-text-@threadId" data-locked="@LockedMarker" value="@ReplyTexts.GetValueOrDefault(threadId)"
+                                      data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
                                       data-ctrl-enter-submits="reply-button-@threadId"
                                       @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
                             @if (ReplyErrors.TryGetValue(threadId, out var replyError))
@@ -519,7 +519,6 @@
                                 <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
                             }
                             <button type="button" class="secondary" data-testid="reply-button-@threadId"
-                                    data-locked="@LockedMarker"
                                     aria-label="Post reply to thread @threadId"
                                     @onclick="() => ReplyAsync(threadId)">Reply</button>
                             <span class="muted hint" data-testid="reply-submit-hint-@threadId">Ctrl+Enter to submit</span>
@@ -561,7 +560,7 @@
                 <div class="field">
                     <label for="thread-text">Comment</label>
                     <textarea id="thread-text" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
-                              data-locked="@LockedMarker" data-ctrl-enter-submits="start-thread-button"
+                              data-ctrl-enter-submits="start-thread-button"
                               data-testid="thread-text-input" @bind="NewText" @bind:event="oninput"></textarea>
                 </div>
                 @if (NewThreadError is not null)
@@ -569,7 +568,7 @@
                     <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
                 }
                 <div class="form-actions">
-                    <button type="submit" data-locked="@LockedMarker" data-testid="start-thread-button">Start thread</button>
+                    <button type="submit" data-testid="start-thread-button">Start thread</button>
                     <span class="muted hint" data-testid="thread-submit-hint">Ctrl+Enter to submit</span>
                     @if (inlineComposer)
                     {
