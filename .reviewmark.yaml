@@ -1030,6 +1030,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistOutcome.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistProgress.cs"
       - "test/**/Core/ChecklistServiceTests.cs"
+      - "test/**/Core/ChecklistServiceReviewConclusionTextTests.cs"
       - "test/**/Core/ChecklistValidatorTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -1399,6 +1400,7 @@ reviews:
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectChecklistStoreTests.cs"
       - "test/**/Storage/ReviewDueDateStoreTests.cs"
+      - "test/**/Storage/ReviewStoreReviewConclusionTextTests.cs"
       - "test/**/Storage/ReviewFollowUpStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 

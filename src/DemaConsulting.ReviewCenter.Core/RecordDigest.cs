@@ -52,6 +52,10 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               the same value again as the same person does not invalidate a signature;</item>
 ///         <item>the sections that do not apply, sorted by section id: id and reason (not who marked the section or
 ///               when, which unlike an answer is not a statement the record makes);</item>
+///         <item>only when the review has a review conclusion text (see <see cref="ReviewRecord.ReviewConclusionText"/>), a
+///               <c>conclusion-text</c> line with the text, so a signature binds to the words the reviewers wrote as the
+///               conclusion of the record. The line is absent when there is no text, so the digest of a review without
+///               one is unchanged. It is unrelated to the review conclusion (approved or rejected) of the ballot;</item>
 ///         <item>the report: a <c>report</c> marker line, then one block for every thread that has at least one comment
 ///               included in the report (see <see cref="ReviewComment.IncludeInReport"/>). A block is a
 ///               <c>thread file</c> line (the anchor: path, side, first and last line, so the anchor slot can later
@@ -137,6 +141,13 @@ public static class RecordDigest
         foreach (var section in record.SectionStates.Where(s => !s.Applicable).OrderBy(s => s.SectionId, StringComparer.Ordinal))
         {
             lines.Add($"not-applicable {Text(section.SectionId)} {Text(section.Reason)}{Carried(section.CarriedFromReviewId)}");
+        }
+
+        // The review conclusion text is part of what the reviewers sign; the line is absent when there is none, which
+        // keeps the digest of every review without one as it was. It comes before the report, which ends the text
+        if (record.ReviewConclusionText is not null)
+        {
+            lines.Add("conclusion-text " + Text(record.ReviewConclusionText));
         }
 
         // The report holds only the threads with an included comment; each becomes one block, and sorting the blocks

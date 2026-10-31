@@ -337,6 +337,11 @@ promote a thread. This scenario is tested by `ThreadService_PromoteAsync_Starter
 **ThreadService_PromoteAsync_AlsoIncludesExistingResolutionComments**: Promoting a resolved thread includes its
 Resolution comments. This scenario is tested by `ThreadService_PromoteAsync_AlsoIncludesExistingResolutionComments`.
 
+**ThreadService_PromoteAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired**: Promoting a Question that was
+resolved without a note is refused with `ResolutionNoteRequired` and changes nothing; after the thread is reopened the
+promotion works. This scenario is tested by
+`ThreadService_PromoteAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired`.
+
 **ThreadService_PromoteAsync_AlreadyFinding_IsNoOp**: Promoting a Finding stores nothing and records no entry. This
 scenario is tested by `ThreadService_PromoteAsync_AlreadyFinding_IsNoOp`.
 

@@ -49,6 +49,12 @@ N/A - standard test environment.
 - Answers and not-applicable sections that a follow-up review carried count like the others (a review whose checks are
   all carried is complete); answering a carried check again, or setting a carried section again, stores a row without
   the carried mark and with the new person.
+- The review conclusion text (the free text, not the approved or rejected conclusion) can be written by the reviewer
+  of any slot and the lead only, never by an auditor, an API token, another member or a person outside the project; it
+  is normalized (LF, trimmed, blank means none) and limited to 4000 characters without control characters; a concluded
+  review refuses it with `ReviewLocked`; a change while a signature is current needs the acknowledgement; the same text
+  again changes nothing; a change by someone else in between is refused with `RecordChanged`; and every change is
+  audited as `review.conclusion-changed` with the two lengths and never the text.
 
 #### Test Scenarios
 
@@ -306,3 +312,71 @@ carried answer that was not touched keeps its mark. This scenario is tested by
 **ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered**: A review whose checks are all carried has a
 complete checklist with no unanswered check. This scenario is tested by
 `ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered`.
+
+**Review conclusion text** is verified in `ChecklistServiceReviewConclusionTextTests.cs`. The tests of who may write
+use the real `ProjectAccess` and `FakeUserStore` with the users root (the lead and creator), alt (the reviewer of a
+slot), usr and mem (plain members), out (not a member) and aud (an auditor). The tests of the lock and of the signature
+impact use the signed-review world, in which everybody is a lead. The text under test is the free text, never the
+approved or rejected conclusion of a ballot.
+
+**ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores**: A theory over the reviewer of a slot and the
+lead; each stores a text, the review reads back with it, and exactly one `review.conclusion-changed` entry names the
+writer. This scenario is tested by `ChecklistService_SetReviewConclusionTextAsync_SlotOwnerOrLead_Stores`.
+
+**ChecklistService_SetReviewConclusionTextAsync_OtherMember_ThrowsActorNotAllowed**: A plain member who holds no slot
+and did not create the review is refused with `ActorNotAllowed`; nothing is stored or audited. This scenario is tested
+by `ChecklistService_SetReviewConclusionTextAsync_OtherMember_ThrowsActorNotAllowed`.
+
+**ChecklistService_SetReviewConclusionTextAsync_NonMember_ThrowsProjectNotFound**: A person outside the project is
+refused with `ProjectNotFound`, like a project that does not exist. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_NonMember_ThrowsProjectNotFound`.
+
+**ChecklistService_SetReviewConclusionTextAsync_Auditor_Refused**: An auditor is refused with `ActorNotAllowed`; nothing
+is stored. This scenario is tested by `ChecklistService_SetReviewConclusionTextAsync_Auditor_Refused`.
+
+**ChecklistService_SetReviewConclusionTextAsync_ApiToken_Refused**: The lead acting through an API token is refused with
+`ActorNotAllowed`; nothing is stored. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_ApiToken_Refused`.
+
+**ChecklistService_SetReviewConclusionTextAsync_Concluded_ThrowsReviewLocked**: On a review whose slots are all signed
+with no open thread, the change is refused with `ReviewLocked`; the text and the audit trail are unchanged. This
+scenario is tested by `ChecklistService_SetReviewConclusionTextAsync_Concluded_ThrowsReviewLocked`.
+
+**ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows**: A text with CRLF and
+surrounding white space is stored with LF and trimmed; a text of exactly 4000 characters is stored; 4001 characters, a
+control character and a lone carriage return are each refused with `ConclusionTextInvalid` and leave the text as it was;
+a blank text clears it. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows`.
+
+**ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing**: A carriage return alone,
+at the start, at the end, or among white space, or before a CRLF, is refused with `ConclusionTextInvalid`, because the
+control character check runs before the trim; the text and the audit trail are unchanged. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing`.
+
+**ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement**: With slot 1 signed, a change
+without acknowledgement is refused with `SignaturesWouldBecomeOutOfDate` naming slot 1 and nothing is stored; with the
+acknowledgement the text is stored and the signature is out of date. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement`.
+
+**ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit**: Saving the text a review already has, written
+as a browser sends it, returns `false`, needs no acknowledgement, records no entry and keeps the signature. This
+scenario is tested by `ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit`.
+
+**ChecklistService_SetReviewConclusionTextAsync_Audit_RecordsLengthsOnly**: Setting, replacing and clearing the text
+record entries with the details `length 0 -> 15`, `length 15 -> 5` and `length 5 -> 0`, the action
+`review.conclusion-changed`, the project and the review, and no entry contains the text. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_Audit_RecordsLengthsOnly`.
+
+**ChecklistService_SetReviewConclusionTextAsync_ConcurrentChange_ThrowsRecordChanged**: Another writer stores a text
+after the service read the review and before it stores; the service throws `RecordChanged`, the first writer's text
+and its single audit entry remain. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_ConcurrentChange_ThrowsRecordChanged`.
+
+**ChecklistService_CanSetReviewConclusionTextAsync_Roles**: The lead and the reviewer of a slot may write the text; a
+plain member, an auditor, a person outside the project, no actor, an API token and a missing review give `false`. This
+scenario is tested by `ChecklistService_CanSetReviewConclusionTextAsync_Roles`.
+
+**ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing**: The classification test in
+`ProjectAccessGuardTests.cs` lists `SetReviewConclusionTextAsync` among the changes an auditor is refused and
+`CanSetReviewConclusionTextAsync` among the reads. This scenario is tested by
+`ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing`.

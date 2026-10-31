@@ -258,6 +258,8 @@ sections:
           - ReviewCenter-ChecklistService-Answer
           - ReviewCenter-ChecklistService-AnsweredBy
           - ReviewCenter-ChecklistService-Progress
+          - ReviewCenter-ChecklistService-ReviewConclusionText
+          - ReviewCenter-ChecklistService-ReviewConclusionTextAudit
         tests:
           - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
 

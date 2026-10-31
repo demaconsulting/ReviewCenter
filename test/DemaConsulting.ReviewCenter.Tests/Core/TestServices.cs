@@ -79,10 +79,11 @@ internal static class TestServices
     /// </summary>
     /// <param name="store">The review store.</param>
     /// <param name="clock">The clock.</param>
+    /// <param name="users">The user store the review conclusion text rules look reviewers up in; defaults to a fake.</param>
     /// <returns>The service.</returns>
-    public static ChecklistService Checklists(IReviewStore store, TimeProvider clock)
+    public static ChecklistService Checklists(IReviewStore store, TimeProvider clock, IUserStore? users = null)
     {
-        return new ChecklistService(store, new AllowAllProjectAccess(store), clock);
+        return new ChecklistService(store, new AllowAllProjectAccess(store), users ?? new FakeUserStore(), clock);
     }
 
     /// <summary>

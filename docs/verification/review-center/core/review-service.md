@@ -444,6 +444,10 @@ tested by `ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId`.
 carries nothing, and its audit detail has no follow-up text. This scenario is tested by
 `ReviewService_CreateDraftAsync_NoFollowUp_HasNoCarriedData`.
 
+**ReviewService_CreateFollowUpAsync_ReviewConclusionText_NotCarried**: An earlier review that has a review conclusion
+text yields a follow-up whose record has none. This scenario is tested by
+`ReviewService_CreateFollowUpAsync_ReviewConclusionText_NotCarried`.
+
 **ReviewService_CreateDraftAsync_UnknownOrForeignSource_IsRefusedWithoutRevealing**: A review that does not exist, and a
 review of another project, are refused with `FollowUpInvalid` and the same message, which does not name the other
 project, and nothing is stored. This scenario is tested by

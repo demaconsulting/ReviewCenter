@@ -499,4 +499,71 @@ public class RecordDigestReportTests
         Assert.NotEqual(RecordDigest.Compute(single), RecordDigest.Compute(split));
         Assert.NotEqual(RecordDigest.Canonicalize(single), RecordDigest.Canonicalize(split));
     }
+
+    /// <summary>
+    ///     Builds an upload record without threads that carries a review conclusion text.
+    /// </summary>
+    /// <param name="conclusionText">The review conclusion text, or <c>null</c> for none.</param>
+    /// <returns>The record.</returns>
+    private static ReviewRecord RecordWithConclusionText(string? conclusionText)
+    {
+        return new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload, 0, ReviewConclusionText: conclusionText);
+    }
+
+    /// <summary>
+    ///     Test that a review conclusion text is written as the line <c>conclusion-text</c> between the sections and
+    ///     the report block, with the documented text and known digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue()
+    {
+        // Arrange
+        var record = RecordWithConclusionText("Looks good.");
+
+        // Act
+        var text = RecordDigest.Canonicalize(record);
+
+        // Assert
+        var expected = string.Join('\n', [.. _prefix, "conclusion-text 11:Looks good.", "report"]);
+        Assert.Equal(expected, text);
+        Assert.Equal("73c5cebeca22e655eb130335b39f7836598a6adda65354c1b75f4b740e755bd7", RecordDigest.Compute(record));
+    }
+
+    /// <summary>
+    ///     Test that a multi-line review conclusion text is length-prefixed, so its newline cannot imitate a line, with
+    ///     the known digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue()
+    {
+        // Arrange
+        var record = RecordWithConclusionText("Line one\nLine two");
+
+        // Act
+        var text = RecordDigest.Canonicalize(record);
+
+        // Assert
+        var expected = string.Join('\n', [.. _prefix, "conclusion-text 17:Line one\nLine two", "report"]);
+        Assert.Equal(expected, text);
+        Assert.Equal("51c218722cbdc88a5dfa6ec6643957e09e6225574448ae23623ef812457a63b3", RecordDigest.Compute(record));
+    }
+
+    /// <summary>
+    ///     Test that a missing review conclusion text writes no line, so records without one keep their digest, and
+    ///     that every change of the text changes the digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest()
+    {
+        // Arrange
+        var none = RecordWithConclusionText(null);
+        var first = RecordWithConclusionText("Looks good.");
+        var second = RecordWithConclusionText("Looks good!");
+
+        // Act, Assert: no text equals the plain record; each text differs from the others
+        Assert.Equal(RecordDigest.Compute(Record()), RecordDigest.Compute(none));
+        Assert.DoesNotContain("conclusion-text", RecordDigest.Canonicalize(none), StringComparison.Ordinal);
+        Assert.NotEqual(RecordDigest.Compute(none), RecordDigest.Compute(first));
+        Assert.NotEqual(RecordDigest.Compute(first), RecordDigest.Compute(second));
+    }
 }

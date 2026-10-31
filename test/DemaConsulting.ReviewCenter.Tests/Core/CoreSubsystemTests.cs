@@ -825,6 +825,12 @@ public class CoreSubsystemTests
                 projectId, "rev-1", "NOPE-01", ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken),
             DomainRule.ChecklistJustificationInvalid => checklists.SetAnswerAsync(
                 projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, " ", TestActors.Ann, cancellationToken),
+            DomainRule.ConclusionTextInvalid => checklists.SetReviewConclusionTextAsync(
+                projectId,
+                "rev-1",
+                new string('x', ReviewLimits.MaxConclusionTextLength + 1),
+                new Actor("root", "Root"),
+                cancellationToken),
             DomainRule.AuthorCannotAnswer => checklists.SetAnswerAsync(
                 projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Author, cancellationToken),
             DomainRule.UserNameInvalid => users.CreateAsync("a b", "New", UserRole.Reviewer, ValidPassword, cancellationToken),

@@ -87,6 +87,12 @@ public sealed record ReviewSource(
 ///     The identifier of the review this one follows up, or <c>null</c> when it is not a follow-up. It is part of the
 ///     digest only when it is set (see <see cref="RecordDigest"/>), so the digest of every other review is unchanged.
 /// </param>
+/// <param name="ReviewConclusionText">
+///     The free-text conclusion the reviewers wrote for the record (see <see cref="Review.ReviewConclusionText"/>), or
+///     <c>null</c> when there is none. It is part of the digest only when it is set (the <c>conclusion-text</c> line),
+///     so the digest of every review without one is unchanged. It is not the review conclusion (approved or rejected)
+///     of the ballot.
+/// </param>
 public sealed record ReviewRecord(
     string ContentFingerprint,
     ReviewChecklist? Checklist,
@@ -95,7 +101,8 @@ public sealed record ReviewRecord(
     IReadOnlyList<ReviewThread> Threads,
     ReviewSource Source,
     int Reopens = 0,
-    string? FollowsReviewId = null);
+    string? FollowsReviewId = null,
+    string? ReviewConclusionText = null);
 
 /// <summary>
 ///     One consistent read of a review for the approval status: the record a signature covers, together with the

@@ -419,6 +419,25 @@ a project checklist that is replaced afterwards, does not change reviews that al
 answers are not linked to comment threads. The checklist
 page is made for narrow screens too.
 
+### Review Conclusion Text
+
+A review record can also hold a **review conclusion text**: a short plain-text summary of what the review found
+(up to 4000 characters, line breaks allowed, no formatting). It is written by a primary or alternate reviewer of any
+slot or by the lead of the review (the creator, a project administrator, or a system administrator), and only while
+the review is not concluded; a concluded review is locked and refuses the change (see
+[Locked Reviews and Reopening](#locked-reviews-and-reopening)). An auditor, a member who is not a reviewer of the
+review, and a personal access token cannot write it. Leaving the text blank clears it.
+
+The text is part of the record that signatures approve, so a change of it makes the signatures given so far out of
+date, and the change first needs the same confirmation as a changed checklist answer, which names every affected slot
+and signer. If someone else changed the text while you worked on it, your change is refused ("record changed") and
+nothing is overwritten. The audit trail records `review.conclusion-changed` with the old and new length of the text,
+never the text itself. A follow-up review starts without a conclusion text; it is not carried over.
+
+This text is not the approved or rejected conclusion of a ballot. In this release there is no page, API call, or
+attestation field for it yet; they follow in a later change, which also plans a rule that a rejected review needs a
+conclusion text before it can be signed.
+
 ## Follow-up Reviews
 
 When a check failed, the files of the review cannot change, so the fix is reviewed in a new review. A **follow-up

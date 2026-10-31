@@ -122,9 +122,11 @@ sections:
         children:
           - ReviewCenter-ReviewStore-Slots
           - ReviewCenter-ReviewStore-Record
+          - ReviewCenter-ReviewStore-ReviewConclusionText
           - ReviewCenter-ReviewStore-Signatures
           - ReviewCenter-ReviewStore-SnapshotBatch
           - ReviewCenter-DbContext-Signatures
+          - ReviewCenter-DbContext-ReviewConclusionText
         tests:
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
 

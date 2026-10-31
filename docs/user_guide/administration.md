@@ -655,6 +655,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Project   | `project.review-rule-changed` (a further review rule was switched)                   |
 | Reopening | `review.reopened` (an administrator reopened an approved review)                     |
 | Due date  | `review.due-date-changed` (the due date of a review was set, changed, or cleared)    |
+| Record    | `review.conclusion-changed` (conclusion text changed; lengths only, never the text)  |
 | Tokens    | `token.created`, `token.revoked`                                                     |
 | Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
 

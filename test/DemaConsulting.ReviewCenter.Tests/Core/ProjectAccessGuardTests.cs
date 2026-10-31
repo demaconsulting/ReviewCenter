@@ -210,6 +210,7 @@ public class ProjectAccessGuardTests
     private static readonly string[] _refusedForAuditor =
     [
         "ChecklistService.SetAnswerAsync",
+        "ChecklistService.SetReviewConclusionTextAsync",
         "ChecklistService.SetSectionApplicabilityAsync",
         "RepositoryService.ListEnabledAsync",
         "ReviewPlanner.CreateAsync",
@@ -239,6 +240,7 @@ public class ProjectAccessGuardTests
     /// </summary>
     private static readonly string[] _reads =
     [
+        "ChecklistService.CanSetReviewConclusionTextAsync",
         "ProjectChecklistService.GetAsync",
         "ProjectService.GetAsync",
         "ProjectService.ListAsync",
@@ -314,6 +316,8 @@ public class ProjectAccessGuardTests
                 project, "rev-1", item, ChecklistOutcome.Pass, null, actor, cancellationToken),
             ["ChecklistService.SetSectionApplicabilityAsync"] = () => world.Checklists.SetSectionApplicabilityAsync(
                 project, "rev-1", section, false, "not needed", actor, cancellationToken),
+            ["ChecklistService.SetReviewConclusionTextAsync"] = () => world.Checklists.SetReviewConclusionTextAsync(
+                project, "rev-1", "A conclusion.", actor, cancellationToken),
             ["SigningService.AddSlotAsync"] = () => world.Signing.AddSlotAsync(
                 actor, project, "rev-1", world.Ids["usr"], null, cancellationToken),
             ["SigningService.UpdateSlotAsync"] = () => world.Signing.UpdateSlotAsync(
@@ -500,7 +504,7 @@ public class ProjectAccessGuardTests
         var git = new FakeGitRepositoryProvider();
         var reviews = new ReviewService(store, access, clock, repositories, git);
         var threads = new ThreadService(store, access, userStore, clock);
-        var checklists = new ChecklistService(store, access, clock);
+        var checklists = new ChecklistService(store, access, userStore, clock);
         var signing = new SigningService(store, users, access, clock);
         var planner = new ReviewPlanner(store, reviews, repositories, git, signing, new FakeReviewSetParser(), access);
 

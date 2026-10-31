@@ -199,6 +199,8 @@ its files, the new review's files and checklist, and the creation time, and retu
 - Reviewer slots, signatures, the reopenings, and the person who created the follow-up are never part of the carry:
   the carried answers keep the original answerer, so the creator does not become the answerer of anything, and the
   independence rule still looks at `Review.CreatedBy` only.
+- The review conclusion text of the earlier review (the free text of the record) is never carried: a follow-up starts
+  without one, because the conclusion belongs to the review it was written for.
 
 A carried answer counts as an answer (the progress of the checklist and `SigningService.Assess` need no change), and a
 carried thread is an open thread, so it blocks signing and the conclusion until it is resolved. Answering a carried

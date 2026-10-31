@@ -10,7 +10,9 @@ memberships), `ReviewStoreUserImpactTests.cs` (the slots of a user and the proje
 the same time), `EvidenceSettingsStoreTests.cs` (the evidence settings of a project and their compare-and-set
 change), and `ProjectChecklistStoreTests.cs` (the checklist definition of a project, its compare-and-set change by the
 hash of the stored text, and the race of two writers), `ReviewDueDateStoreTests.cs` (the due date of a review and
-its compare-and-set change), and `ReviewStoreRecordContentTests.cs` (the included comments, the resolution notes, the
+its compare-and-set change), `ReviewStoreReviewConclusionTextTests.cs` (the review conclusion text of a review, its
+compare-and-set change, and the approval lock), and `ReviewStoreRecordContentTests.cs` (the included comments, the
+resolution notes, the
 kind of a thread, the report flag of a comment, and the open-thread rule of the signature). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
@@ -347,6 +349,11 @@ starting comment and of the Resolution comments, demoting clears them, replies k
 stored with its entry. This scenario is tested by
 `ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments`.
 
+**ReviewStore_SetThreadKindAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired**: Promoting a resolved
+Question that has no Resolution comment is refused inside the transaction with `ResolutionNoteRequired`, with nothing
+stored and no entry; a resolved Question with a note can be promoted. This scenario is tested by
+`ReviewStore_SetThreadKindAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired`.
+
 **ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused**: The flag of a reply is changed with
 an entry, and the starting comment and a Resolution comment are refused. This scenario is tested by
 `ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused`.
@@ -578,6 +585,25 @@ was and no entry is written. This scenario is tested by `ReviewStore_UpdateDueDa
 **ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins**: Two writers that start from the same stored date
 with different new dates are released together; exactly one wins, the stored date is the winner's, one entry exists,
 and the chain verifies. This scenario is tested by `ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`.
+
+**The review conclusion text** is verified in `ReviewStoreReviewConclusionTextTests.cs`.
+
+**ReviewStore_UpdateReviewConclusionTextAsync_StoresTextAndAuditAndRecord**: A text is set with a matching
+expectation; the call reports `true`, writes one `review.conclusion-changed` entry, the text reads back in the review
+and in the record that `GetRecordAsync` returns, and the digest changes. This scenario is tested by
+`ReviewStore_UpdateReviewConclusionTextAsync_StoresTextAndAuditAndRecord`.
+
+**ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation**: A change that expects another
+text than the stored one reports `false`; the stored text is as it was and no entry is written. This scenario is
+tested by `ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation`.
+
+**ReviewStore_UpdateReviewConclusionTextAsync_MissingReview_ReturnsFalse**: A change for a review that does not exist
+reports `false` and writes no entry. This scenario is tested by
+`ReviewStore_UpdateReviewConclusionTextAsync_MissingReview_ReturnsFalse`.
+
+**ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked**: A change of a review that is
+concluded at that moment is refused with `ReviewLocked`; nothing is stored and no entry is written. This scenario is
+tested by `ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

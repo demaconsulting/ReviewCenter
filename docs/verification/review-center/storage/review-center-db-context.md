@@ -46,6 +46,7 @@ be loadable on the test platform.
   back with none, and a definition of the full size limit is stored and read back unchanged.
 - The `DueDate` column of a review is created as nullable text holding the calendar day: a review without a date reads
   back with none and a date reads back as the same day.
+- The `ReviewConclusionText` column of a review is created as optional text limited to 4000 characters.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
@@ -209,6 +210,10 @@ tested by `ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroug
 **Due date column**: A review added with a due date reads it back as the same calendar day, and one added without reads
 back with none, which is tested by `ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`, defined in
 `ReviewDueDateStoreTests.cs` and described with the `ReviewStore` unit.
+
+**Review conclusion text column**: The model has the `ReviewConclusionText` column of a review as optional with a
+maximum length of 4000, which is tested by `ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional`,
+defined in `ReviewStoreReviewConclusionTextTests.cs` and described with the `ReviewStore` unit.
 
 **Second factor tables**: The `UserTotps` and `TotpRecoveryCodes` tables are exercised by the tests of `TotpStore` in
 `TotpStoreTests.cs` over a real database file. The unique index on the user and the recovery code hash refuses a

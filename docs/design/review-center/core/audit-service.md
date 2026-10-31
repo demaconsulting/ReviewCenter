@@ -95,6 +95,7 @@ administrator is not throttled but is a trusted actor).
 | `project.checklist-changed` | `version V, N sections, M items, sha256 {8 hex}, previous version P` (or reset) |
 | `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)`, plus follow-up and due date text (see below) |
 | `review.due-date-changed` | `none -> 2030-01-31` (old and new due date, `none` for no date; review in its own field) |
+| `review.conclusion-changed` | `length 0 -> 42` (old and new length of the review conclusion text, never the text) |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {number}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {number}, role {Primary or Alternate}, record digest <64 hex>` |
 | `thread.started` | `thread {id} on {path} {anchor}; comment {cid}, text sha256 {8 hex}` (`; in report` if included) |

@@ -368,7 +368,8 @@ sections:
           included in the report, that gives the
           original anchor. Resolved threads, reviewer slots, signatures and reopenings are not carried, the person who
           creates the follow-up does not become the answerer of anything, and everything that is carried is marked with
-          the review it came from.
+          the review it came from, and shall not carry the review conclusion text (the free text, not the approved or
+          rejected conclusion).
         justification: |
           What a person has already answered and not failed is still true of unchanged wording, and answering it again
           wastes time and invites mistakes. A Fail is the reason for the follow-up, so it must be answered again. A
@@ -376,6 +377,8 @@ sections:
           where it was. The original text and author of a comment are evidence, so they are copied unchanged. Slots and
           signatures belong to the record that was signed, and the person who creates the review must not look like
           the one who answered. A failed carry must not leave a half-built review, so all rows are stored together.
+          The review conclusion text is the free text the reviewers wrote about the earlier record, so it is not
+          carried either: the follow-up starts without one.
         tests:
           - FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer
           - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
@@ -393,6 +396,7 @@ sections:
           - ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried
           - ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors
           - ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor
+          - ReviewService_CreateFollowUpAsync_ReviewConclusionText_NotCarried
           - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
           - ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened
 

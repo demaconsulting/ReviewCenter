@@ -463,6 +463,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `ChecklistNotFound` | An answer or section decision is made for a review that does not exist or has no checklist |
 | `ChecklistItemNotFound` | The section or check is not in the review's frozen checklist |
 | `ChecklistJustificationInvalid` | A justification (Fail, N/A) or section reason is empty after trimming, or too long |
+| `ConclusionTextInvalid` | A review conclusion text is longer than 4000 characters or holds a control character |
 | `UserNameInvalid` | The user name is not 3 to 50 characters of `A-Z`, `a-z`, `0-9`, `.`, `_`, `-` |
 | `UserNameTaken` | A user with that name (without regard to case) exists |
 | `DisplayNameInvalid` | The display name is empty after trimming or is too long |

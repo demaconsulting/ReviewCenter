@@ -541,6 +541,34 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
+    ///     Test that a resolved Question without a resolution note cannot be promoted, because the result would be a
+    ///     resolved Finding without the note that its resolution needs; reopening the thread makes it possible.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_PromoteAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired()
+    {
+        // Arrange: a Question that was resolved without a note
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var id = await StartAsync(world);
+        await world.Threads.ResolveAsync(world.Project, ReviewId, id, Who("usr"), cancellationToken);
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Threads.PromoteAsync(world.Project, ReviewId, id, Who("usr"), cancellationToken));
+        var refused = await GetAsync(world, id);
+        await world.Threads.ReopenAsync(world.Project, ReviewId, id, Who("usr"), cancellationToken);
+        await world.Threads.PromoteAsync(world.Project, ReviewId, id, Who("usr"), cancellationToken);
+
+        // Assert: nothing changed by the refusal, and the reopened thread can be promoted
+        Assert.Equal(DomainRule.ResolutionNoteRequired, ex.Rule);
+        Assert.Equal(ThreadKind.Question, refused.Kind);
+        Assert.Equal(ReviewThreadState.Resolved, refused.State);
+        Assert.Equal(ThreadKind.Finding, (await GetAsync(world, id)).Kind);
+        Assert.Equal(1, AuditCount(world, "thread.kind-changed"));
+    }
+
+    /// <summary>
     ///     Test that promoting a Finding does nothing, not even an entry in the audit trail.
     /// </summary>
     [Fact]
@@ -1033,7 +1061,7 @@ public class ThreadServiceReportTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var world = await ResolvedChatThreadSignedAsync();
+        var world = await ResolvedChatThreadSignedAsync(withNote: true);
         var project = world.World.ProjectId;
 
         // Act
@@ -1192,7 +1220,7 @@ public class ThreadServiceReportTests
     {
         // Arrange: a resolved chat thread, then slot 1 signs
         var cancellationToken = TestContext.Current.CancellationToken;
-        var world = await ResolvedChatThreadSignedAsync();
+        var world = await ResolvedChatThreadSignedAsync(withNote: true);
         var project = world.World.ProjectId;
         var original = (await world.World.ApprovalAsync()).Digest;
 
@@ -1325,14 +1353,16 @@ public class ThreadServiceReportTests
     /// <summary>
     ///     Arranges the signed-review world with a chat thread that was started and resolved before slot 1 signed.
     /// </summary>
+    /// <param name="withNote">Whether the thread is resolved with a note, which a promotion to a Finding needs.</param>
     /// <returns>The world and the identity of the thread.</returns>
-    private static async Task<(SignedReviewWorld World, int ThreadId)> ResolvedChatThreadSignedAsync()
+    private static async Task<(SignedReviewWorld World, int ThreadId)> ResolvedChatThreadSignedAsync(bool withNote = false)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await SignedReviewWorld.CreateAsync();
         var thread = await world.Threads.StartThreadAsync(
             world.ProjectId, ReviewId, _anchor, TestActors.Ann, "Question", cancellationToken);
-        await world.Threads.ResolveAsync(world.ProjectId, ReviewId, thread.Id, TestActors.Ann, cancellationToken);
+        await world.Threads.ResolveAsync(
+            world.ProjectId, ReviewId, thread.Id, TestActors.Ann, cancellationToken, null, withNote ? "Answered" : null);
         await world.SignAsync(1);
         return (world, thread.Id);
     }

@@ -163,7 +163,7 @@ public partial class ReviewProgressServiceTests
             auditStore,
             reviews,
             signing,
-            new ChecklistService(store, access, clock),
+            new ChecklistService(store, access, userStore, clock),
             new ThreadService(store, access, userStore, clock),
             users,
             progress,

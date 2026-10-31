@@ -56,6 +56,10 @@ N/A - standard test environment.
   a `follows {id}` line after the source block and the suffix `carried {id}`, after a space, on a carried answer,
   not-applicable section, and included thread line, and any change of these marks changes the digest, while the number
   that a carried thread had in the earlier review does not.
+- The review conclusion text (the free text, not the approved or rejected conclusion) is written as one
+  length-prefixed `conclusion-text` line between `sections` and `report` only when there is a text, so a record
+  without one keeps its digest; the known digests of a one-line and a two-line text match, and setting, changing or
+  clearing the text changes the digest.
 - A null record is rejected with an `ArgumentNullException` by both methods.
 
 #### Test Scenarios
@@ -276,6 +280,19 @@ another digest. This scenario is tested by `RecordDigest_Compute_ReportCommentOr
 **RecordDigest_Compute_DelimitersInReportText_DoNotCollide**: Text in an included comment that holds the delimiters of
 the format cannot produce the digest of another record. This scenario is tested by
 `RecordDigest_Compute_DelimitersInReportText_DoNotCollide`.
+
+**RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue**: The upload record with the fingerprint `abc` and the
+review conclusion text `Looks good.` has the line `conclusion-text 11:Looks good.` between `sections` and `report`,
+and the known digest `73c5cebe...5bd7`. This scenario is tested by
+`RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue`.
+
+**RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue**: A text of two lines (17 characters, one line
+feed) is written length-prefixed with its line feed, and has the known digest `51c21872...63b3`. This scenario is
+tested by `RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue`.
+
+**RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest**: A record without a text has no `conclusion-text`
+line and the digest of the plain record; a text, and another text, each give a different digest. This scenario is
+tested by `RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest`.
 
 **RecordDigest_Compute_NullRecord_Throws**: A null record is rejected with an `ArgumentNullException` by both
 methods. This scenario is tested by `RecordDigest_Compute_NullRecord_Throws`.

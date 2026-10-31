@@ -36,7 +36,10 @@ text. Hashing is the only use of the text; it is never stored.
 4. Every stored checklist answer: the check id, the outcome (`Pass`, `Fail`, or `NotApplicable`), the justification,
    and who answered (the display name and the user name of the person).
 5. Every checklist section that is marked as not applicable: the section id and the reason.
-6. The report: every comment thread that has at least one comment **included in the report**
+6. The review conclusion text (`ReviewRecord.ReviewConclusionText`, the free-text conclusion of the review, never the
+   approved or rejected conclusion of a ballot), but only when there is one. A change of the text, or setting or clearing
+   it, changes the digest.
+7. The report: every comment thread that has at least one comment **included in the report**
    (`ReviewComment.IncludeInReport`) is a block of the digest. A block holds the anchor of the thread (the file path,
    the side `Head` or `Baseline`, and the start and end line, or none for a whole file) and, in posting order, only
    the included comments: the display name of the author, the user name of the author, the text, and the time, each
@@ -44,7 +47,7 @@ text. Hashing is the only use of the text; it is never stored.
    line of a thread means a line of the text of its side, so a head thread and a baseline thread on the same
    numbers are different discussions and give different digests. A thread that has no included comment is not in the
    digest at all.
-7. The number of times an administrator reopened the review, but only when it is above zero (see below). A reopen is
+8. The number of times an administrator reopened the review, but only when it is above zero (see below). A reopen is
    therefore part of what a signature approves: an earlier approval can never be current after a reopen.
 
 **What the digest does not cover**:
@@ -92,6 +95,7 @@ answers
 answer {S:itemId} {S:outcome} {S:justification} {S:answeredBy} {S:answeredByUsername}   sorted by item id
 sections
 not-applicable {S:sectionId} {S:reason}                    one line per section that does not apply, sorted by id
+conclusion-text {S:text}                                   only when the review has a review conclusion text
 report
 thread file {S:path} {S:side} {start} {end}                one block per thread with an included comment: this line,
 claim {S:author} {S:username} {S:text} {ticks}             the starting comment, if it is included,
@@ -103,6 +107,11 @@ reopens {count}                                            only when the review 
 The `report` line is always present; a review without an included comment has the line alone and no block, so there is
 no `report 0` line. The lines of a block are one per included comment in posting order, each with the label that fits
 the comment (`claim` for the starting comment, `resolution` for a resolution note, otherwise `comment`).
+
+The `conclusion-text` line is written only when the review has a review conclusion text, straight after the `sections`
+block and before `report`; with no text there is no such line, so every record without a text keeps the digest it had.
+The text is written length-prefixed, so a line break inside it cannot imitate a line of its own. It is the text as
+stored (normalized by `ChecklistService`: LF line breaks, trimmed), at most 4000 characters.
 
 A follow-up review (see `ReviewService`) adds text that is written only when it applies, like `reopens`: a line
 `follows {S:reviewId}` straight after the source block (after the change lines of a review from a repository, before
@@ -266,6 +275,14 @@ and the digest is `c8bb5168eb86e1540291fe341d89c94ca71c711e0031112226508caf33585
 `reopens 1` it is `1bd2f9a28c73eda31b0c1f71b1a3f07df4d09a1e1b5c2d58f3525070d170f4b8`. All answers were
 calculated independently of the implementation with a short script (SHA-256 of the canonical text as written
 above), not copied from the code under test.
+
+With a review conclusion text, the upload record with the fingerprint `abc` above (no checklist, no answers, no
+sections that do not apply, no report block) gets the line `conclusion-text 11:Looks good.` between `sections` and
+`report`, and the digest is `73c5cebeca22e655eb130335b39f7836598a6adda65354c1b75f4b740e755bd7`. With the text
+`Line one` and `Line two` on two lines (17 characters, one line feed) the line is `conclusion-text 17:Line one`
+followed by a line feed and `Line two`, and the digest is
+`51c218722cbdc88a5dfa6ec6643957e09e6225574448ae23623ef812457a63b3`. The tests pin both, and that a record without a
+text has no `conclusion-text` line and the digest of the first vector.
 
 The tests check the digests of the first two vectors, of the two review-set variants, of the checklist vector, of
 the two side vectors, and of the last vector (without and with a reopen), the exact canonical text of the second, the
