@@ -223,5 +223,36 @@ no entry is audited. This scenario is tested by
 is no longer the stored one is refused with `RecordChanged`, does not overwrite the newer value, and adds no audit
 entry. This scenario is tested by `ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged`.
 
+**ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn**: A project created through the service has all three rules
+on, in the returned project and in the stored one. This scenario is tested by
+`ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn`.
+
+**ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail**: For each of the two further rules,
+an
+administrator switches the rule off, repeats the same change (which returns `false` and records nothing), and switches it
+on again. Exactly two entries `project.review-rule-changed` are audited with the project and the details
+`<Property> on->off` and `<Property> off->on`, where the property is `RequireNonAuthorChecklistAnswers` or
+`RequireNonReopenerSigning`, and no other rule changes. This scenario is tested by
+`ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail`.
+
+**ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction**: Switching the independence rule
+with `SetReviewRuleAsync` and with `SetRequireIndependentReviewersAsync` records `project.independent-reviewers-changed`
+with the details `RequireIndependentReviewers on->off` and `RequireIndependentReviewers off->on`. This scenario is tested
+by `ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction`.
+
+**ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused**: For each of the three rules, a plain member and an
+administrator whose identity arrives through a token are refused with `ActorNotAllowed` and a stranger with
+`ProjectNotFound`; the value is unchanged and no entry is audited. This scenario is tested by
+`ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused`.
+
+**ProjectService_SetReviewRuleAsync_StaleExpected_ThrowsRecordChanged**: For each of the three rules, a change whose
+expected value is no longer the stored one is refused with `RecordChanged` and the message of
+`IndependentReviewersChangedByOthersMessage`, does not overwrite the newer value, and adds no audit entry. This scenario
+is tested by `ProjectService_SetReviewRuleAsync_StaleExpected_ThrowsRecordChanged`.
+
+**ProjectService_SetReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange**: A rule that is not a defined value is
+rejected with `ArgumentOutOfRangeException`. This scenario is tested by
+`ProjectService_SetReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange`.
+
 The tests of the membership operations, of the system administrator rule for creation, and of the hidden project are
 defined in `ProjectAccessTests.cs`, which arranges the users they need.

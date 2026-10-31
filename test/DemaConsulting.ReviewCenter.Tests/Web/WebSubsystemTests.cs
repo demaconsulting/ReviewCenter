@@ -363,6 +363,48 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that through the real pipeline an administrator sees the two stored-only review rule switches on, a
+    ///     plain member sees no rules card, and a change made through the service shows as off.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches()
+    {
+        // Arrange: the real pipeline with a project, an administrator and a plain member
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var admin = await TestBrowser.SignedInAsync(app, "ann");
+        using var member = await TestBrowser.SignedInAsync(app, "cyd", UserRole.Reviewer);
+        var users = app.Services.GetRequiredService<UserService>();
+        var ann = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!;
+        var cyd = (await users.GetAsync("cyd", TestContext.Current.CancellationToken))!;
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
+        await store.AddMembershipAsync(cyd.Id, project.Id, TestContext.Current.CancellationToken);
+        var route = $"/projects/{project.Id}";
+
+        // Act: read the page as the administrator and as the member
+        var before = await ParseAsync(admin.Client, route);
+        var asMember = await ParseAsync(member.Client, route);
+
+        // Assert: both switches are on for the administrator; the member sees no card and no switch
+        Assert.True(before.QuerySelector("[data-testid='author-checklist-switch']")?.HasAttribute("checked"));
+        Assert.True(before.QuerySelector("[data-testid='reopener-signing-switch']")?.HasAttribute("checked"));
+        Assert.Null(asMember.QuerySelector("[data-testid='review-rules-card']"));
+        Assert.Null(asMember.QuerySelector("[data-testid='author-checklist-switch']"));
+
+        // Act: the administrator switches the author rule off through the service (the page button does the same call)
+        var changed = await app.Services.GetRequiredService<ProjectService>().SetReviewRuleAsync(
+            TestActors.Ann, project.Id, ReviewRule.NonAuthorChecklistAnswers, true, false, TestContext.Current.CancellationToken);
+        var after = await ParseAsync(admin.Client, route);
+
+        // Assert: stored, shown as off, and the other switch is still on
+        Assert.True(changed);
+        Assert.False(after.QuerySelector("[data-testid='author-checklist-switch']")?.HasAttribute("checked"));
+        Assert.True(after.QuerySelector("[data-testid='reopener-signing-switch']")?.HasAttribute("checked"));
+    }
+
+    /// <summary>
     ///     Test that every interactive element (a, button, input, select, textarea) on every page has a stable
     ///     kebab-case <c>data-testid</c>, so UI tests never need to depend on text or layout.
     /// </summary>

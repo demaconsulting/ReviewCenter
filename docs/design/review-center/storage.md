@@ -59,7 +59,10 @@ application; the rest of the system sees only the Core store interfaces.
   otherwise changes nothing and stores no entry. The schema has no migration: a development database that was created
   before the settings existed is recreated. A review rule of the project, `RequireIndependentReviewers`, is stored in
   a boolean column of the project and changed in the same way (`UpdateRequireIndependentReviewersAsync`, audited as
-  `project.independent-reviewers-changed`). The checklist definition of a project is stored with the project in one
+  `project.independent-reviewers-changed`). Two further review rules, `RequireNonAuthorChecklistAnswers` and
+  `RequireNonReopenerSigning`, are stored in boolean columns of the project (on by default) and changed in the same way
+  through `UpdateReviewRuleAsync`, audited as `project.review-rule-changed`. The checklist definition of a project is
+  stored with the project in one
   nullable, unbounded text column (null stands for the built-in default) and changed by a compare-and-set on the hash of
   the stored text (`UpdateChecklistDefinitionAsync`, audited as `project.checklist-changed` in the same transaction, so
   the hash chain stays intact). An approved review is locked: the operations that change a thread, a
@@ -173,7 +176,8 @@ after those, the tables of reviewer slots and signatures after those, the audit 
 `PersonalAccessTokens` table with the creator columns of reviews after that, and the `ProjectMemberships` table with
 the project of a repository and the system administrator flag of a user after that, and the `MustChangePassword` column
 of a user after that, and the external identity columns of a user after that, and the `ReviewReopens` table with
-the `RequireIndependentReviewers` column of a project after that, so a database
+the `RequireIndependentReviewers` column of a project after that, and the `RequireNonAuthorChecklistAnswers` and
+`RequireNonReopenerSigning` columns of a project after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
@@ -182,7 +186,8 @@ databases created before the signature slice, before the audit trail, before the
 reviews from a repository, before the personal access tokens, before the project access control, before the
 project members management (the `MustChangePassword` column), before the sign-in with an identity provider (the
 external identity columns), and before the approval lock (the `ReviewReopens` table and the
-`RequireIndependentReviewers` column); there is no
+`RequireIndependentReviewers` column), and before the review rule switches (the `RequireNonAuthorChecklistAnswers` and
+`RequireNonReopenerSigning` columns); there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide

@@ -76,6 +76,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     Created = project.Created,
                     Evidence = project.Evidence,
                     RequireIndependentReviewers = project.RequireIndependentReviewers,
+                    RequireNonAuthorChecklistAnswers = project.RequireNonAuthorChecklistAnswers,
+                    RequireNonReopenerSigning = project.RequireNonReopenerSigning,
                     ChecklistDefinition = project.ChecklistDefinition
                 };
                 context.Projects.Add(entity);
@@ -145,23 +147,48 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
-    public async Task<bool> UpdateRequireIndependentReviewersAsync(
+    public Task<bool> UpdateRequireIndependentReviewersAsync(
         int projectId,
+        bool expected,
+        bool updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default) =>
+        UpdateReviewRuleAsync(projectId, ReviewRule.IndependentReviewers, expected, updated, audit, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateReviewRuleAsync(
+        int projectId,
+        ReviewRule rule,
         bool expected,
         bool updated,
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(audit);
+        if (!Enum.IsDefined(rule))
+        {
+            throw new ArgumentOutOfRangeException(nameof(rule), rule, "The rule is not a known value.");
+        }
 
         return await appender.ExecuteAsync<bool>(
             factory,
             async context =>
             {
-                // The comparison is part of the update statement, so it is atomic with the change
-                var rows = await context.Projects
-                    .Where(p => p.Id == projectId && p.RequireIndependentReviewers == expected)
-                    .ExecuteUpdateAsync(p => p.SetProperty(x => x.RequireIndependentReviewers, updated), cancellationToken);
+                // The comparison is part of the update statement, so it is atomic with the change; EF cannot
+                // parameterize the property, so each rule has its own statement
+                var rows = rule switch
+                {
+                    ReviewRule.IndependentReviewers => await context.Projects
+                        .Where(p => p.Id == projectId && p.RequireIndependentReviewers == expected)
+                        .ExecuteUpdateAsync(p => p.SetProperty(x => x.RequireIndependentReviewers, updated), cancellationToken),
+                    ReviewRule.NonAuthorChecklistAnswers => await context.Projects
+                        .Where(p => p.Id == projectId && p.RequireNonAuthorChecklistAnswers == expected)
+                        .ExecuteUpdateAsync(p => p.SetProperty(x => x.RequireNonAuthorChecklistAnswers, updated), cancellationToken),
+                    ReviewRule.NonReopenerSigning => await context.Projects
+                        .Where(p => p.Id == projectId && p.RequireNonReopenerSigning == expected)
+                        .ExecuteUpdateAsync(p => p.SetProperty(x => x.RequireNonReopenerSigning, updated), cancellationToken),
+                    _ => throw new System.Diagnostics.UnreachableException()
+                };
                 return rows > 0 ? (true, audit) : (false, null);
             },
             cancellationToken);

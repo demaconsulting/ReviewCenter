@@ -447,6 +447,60 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the two further review rules are on for a new project, that a change is stored with its audit
+    ///     entry, survives closing and opening the database, and that a stale change is refused.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet()
+    {
+        // Arrange: a new database file
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        int projectId;
+
+        // Act: create a project, switch the author rule off, close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var project = await first.Projects.CreateAsync("Apollo", null, cancellationToken);
+            projectId = project.Id;
+            Assert.True(project.RequireNonAuthorChecklistAnswers);
+            Assert.True(project.RequireNonReopenerSigning);
+            Assert.True(await first.Projects.SetReviewRuleAsync(
+                TestActors.Ann, projectId, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken));
+        }
+
+        // Act: open it again, try a stale change and switch the other rule off, close the database
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var stale = await Assert.ThrowsAsync<DomainRuleException>(() => second.Projects.SetReviewRuleAsync(
+                TestActors.Ann, projectId, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken));
+            Assert.Equal(DomainRule.RecordChanged, stale.Rule);
+            Assert.True(await second.Projects.SetReviewRuleAsync(
+                TestActors.Ann, projectId, ReviewRule.NonReopenerSigning, true, false, cancellationToken));
+        }
+
+        // Act: open it a third time and read everything back
+        var third = Open(options);
+        using (third.Provider)
+        {
+            var project = (await third.Store.GetProjectAsync(projectId, cancellationToken))!;
+            var audit = new AuditStore(
+                third.Provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+                new AuditAppender(TimeProvider.System));
+            var entries = await audit.ReadAfterAsync(0, 10_000, cancellationToken);
+
+            // Assert: both rules are off, independence is untouched, and each change is audited once
+            Assert.False(project.RequireNonAuthorChecklistAnswers);
+            Assert.False(project.RequireNonReopenerSigning);
+            Assert.True(project.RequireIndependentReviewers);
+            Assert.Equal(2, entries.Count(e => e.Action == ProjectService.ReviewRuleChangedAction));
+            Assert.True(AuditChain.Verify(entries).IsIntact);
+        }
+    }
+
+    /// <summary>
     ///     Builds a user service over the database of a provider.
     /// </summary>
     /// <param name="provider">The provider that owns the database factory.</param>

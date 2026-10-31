@@ -267,6 +267,24 @@ sections:
         tests:
           - StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction
 
+      - id: ReviewCenter-Storage-ReviewRuleSwitches
+        title: >-
+          The Storage subsystem shall keep the two further review rules of a project (authors answering the checklist
+          of their own review, and the person who reopened a review signing it again) in the database file, on for a
+          project that does not say otherwise, so that they are still there, unchanged, when the database is opened
+          again, and shall change each rule only when it still has the value the caller saw, together with its audit
+          entry in one transaction, without changing another rule. The schema is created without a migration, so a
+          development database that was created before the columns existed has to be recreated.
+        justification: |
+          A rule that is chosen for a project is evidence about how its reviews were run, so it must survive a
+          restart, must not be lost when the project is read or listed, and must not be overwritten by a caller that
+          saw an old value; the change and its audit entry are one step so that the history never misses a change.
+        children:
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches
+          - ReviewCenter-DbContext-ReviewRuleColumns
+        tests:
+          - StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet
+
       - id: ReviewCenter-Storage-RepositoryReviews
         title: >-
           The Storage subsystem shall keep the source of a review from a repository (including the review-set it was

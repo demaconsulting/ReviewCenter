@@ -43,7 +43,10 @@ members section holds only a "+ Add member" button, and the page never loads a l
 `ProjectPage` also shows a "Review rules" card above the members: the switch "Require independent reviewers" with a
 hint that the person who created a review cannot be one of its reviewers and cannot sign it, that the switch can be
 turned off for a project where one person has to do both, and that ReviewCenter only knows who created the review in
-this tool and does not match the authors of commits, and a "Save review rules" button. The card also holds one line,
+this tool and does not match the authors of commits, and a "Save review rules" button. Two more switches follow, "Authors
+cannot answer the checklist of their own review" and "The person who reopened a review cannot sign it again", both on
+by default; each shows the marker "Not applied yet." and a hint, because the rules are stored and audited but not applied
+yet. One "Save review rules" button saves all three. The card also holds one line,
 "Checklist: ...", that names the version label of the checklist new reviews start with, its number of sections and
 checks, and whether it is the built-in default or custom, with a link to the checklist template page; the line is read
 with `ProjectChecklistService.GetAsync` for an administrator only, and a stored definition that cannot be read shows a
@@ -134,7 +137,10 @@ system administrator or a project admin), from `IProjectAccess`. **Members** (`P
 from `ProjectService.ListMembersAsync`, loaded only when `CanAdminister`.
 **MemberError**, **MemberStatus**: the refusal (for example the last-project-admin message) or the outcome of the last
 membership change. **RequireIndependentChoice** (`ProjectPage`): the state of the switch as shown, which starts at the
-stored `Project.RequireIndependentReviewers`. **RulesError**, **RulesStatus**: the refusal or the outcome of the last
+stored `Project.RequireIndependentReviewers`. **RequireNonAuthorChoice**, **RequireNonReopenerChoice**
+(`ProjectPage`): the
+same for the two further switches, starting at `Project.RequireNonAuthorChecklistAnswers` and
+`Project.RequireNonReopenerSigning`. **RulesError**, **RulesStatus**: the refusal or the outcome of the last
 save of the review rules.
 
 The remaining state belongs to `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, `EvidenceSettingsPage`, and
@@ -195,7 +201,9 @@ review is one row
 of `reviews-list`: the identifier is the link, followed by the title, the state and approval badges, and the creation
 date. `evidence-settings-link` is the "Evidence settings" button, shown to whoever administers the project. The Review
 rules card of an administrator has `review-rules-card`, `review-rule-independent-reviewers` (the row),
-`independent-reviewers-switch` (the checkbox), `independent-reviewers-save`, `review-rules-status`, and
+`independent-reviewers-switch` (the checkbox), `author-checklist-switch` and `reopener-signing-switch` (the two stored-only
+rules, each with its row `review-rule-author-checklist` or `review-rule-reopener-signing` and its "Not applied yet." marker
+`author-checklist-pending` or `reopener-signing-pending`), `independent-reviewers-save`, `review-rules-status`, and
 `review-rules-error`. `checklist-link` is the "Checklist" button, shown to whoever administers the project; the
 Review rules card also has `review-rule-checklist` (the row), `project-checklist-summary` (the one line), and
 `review-rules-checklist-link`.
@@ -270,12 +278,20 @@ The page holds no membership rule; the refusal to remove or demote the last proj
 `ProjectService` and is shown as the error of the section.
 
 **SaveReviewRulesAsync** (`ProjectPage`): Clears the two messages, runs `GuardMembersAsync`, asks for the current user,
-and calls `ProjectService.SetRequireIndependentReviewersAsync` with the user, the project, the value the page loaded as
-the expected value, and the switch as the new value. Core refuses it unless the user administers the project and refuses
-an API token, performs the compare-and-set, and appends the audit entry `project.independent-reviewers-changed` in the
-same step. The page then reloads the project and shows "Independent reviewers are now required.", "Independent
-reviewers are no longer required.", or, when the stored value already was the chosen one, "The review rules were
-already set this way." A `DomainRuleException` (for example the refusal of a save over a change by someone else) is shown
+and calls `ProjectService.SetReviewRuleAsync` with the user, the project, the rule, the value the page loaded as
+the expected value, and the switch as the new value, for each of the three rules in turn (independent reviewers, authors
+cannot answer the checklist, the person who reopened cannot sign) but only for a rule whose switch differs from the
+loaded value. Core refuses it unless the user administers the project and refuses
+an API token, performs the compare-and-set, and appends the audit entry (`project.independent-reviewers-changed` for the
+independence rule and `project.review-rule-changed` for the two others) in the
+same step. The page then reloads the project and shows one sentence per changed rule, joined with a space:
+"Independent reviewers are now required." or "Independent
+reviewers are no longer required."; "Authors cannot answer the checklist: now on (stored; not applied yet)." or "now off";
+"The person who reopened a review cannot sign it again: now on (stored; not applied yet)." or "now off"; or, when no
+switch was changed, "The review rules were
+already set this way." Each rule is its own change, so when a later rule is refused the earlier ones were already
+saved; the page then loads the stored values again. A `DomainRuleException` (for example the refusal of a save over a
+change by someone else) is shown
 in `review-rules-error` only when the guard, asked again, still passes, and the page loads the stored value again and
 shows it in the switch.
 
@@ -439,8 +455,8 @@ the subsystem.
 - **SessionGate** (App) — wraps the whole content of each page, so the page is replaced by a "Session ended" message
   when the sign-in state of the open page ends.
 - **ProjectService** — reads the project for the actor, lists the members, adds a member by exact user name, creates a
-  member account with a temporary password, removes a member, changes a role, and changes the review rule
-  `RequireIndependentReviewers`.
+  member account with a temporary password, removes a member, changes a role, and changes the review rules
+  (`SetReviewRuleAsync`; `RequireIndependentReviewers` and the two stored-only rules).
 - **ReviewService** — lists reviews (`ProjectPage`) and creates them (`NewReviewPage`).
 - **RepositoryService** — lists the enabled repositories of the project (names only, never a location or token), for
   the plan link and for the drop-down.

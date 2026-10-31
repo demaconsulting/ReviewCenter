@@ -358,6 +358,22 @@ sections:
           - CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly
           - CoreSubsystem_ApiTokenReview_AuthorIsTokenUser
 
+      - id: ReviewCenter-Core-ReviewRuleSwitches
+        title: >-
+          The Core subsystem shall keep, for each project, a switch for each of two further review rules (authors
+          answering the checklist of their own review, and the person who reopened a review signing it again), on for
+          a new project, shall let only an administrator of the project or a system administrator change them, never
+          through an access token, and shall record each change in the audit trail; it only stores them and does not
+          apply them yet.
+        justification: |
+          The rules are stored before they are applied, so that every project has a recorded choice on the day they
+          take effect. The change rules are the ones of the independence rule, so that a project that has to relax a
+          rule does so in a way that is visible in the history.
+        children:
+          - ReviewCenter-ProjectService-ReviewRuleSwitches
+        tests:
+          - CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale
+
       - id: ReviewCenter-Core-AuditTrail
         title: >-
           The Core subsystem shall record every change of projects, reviews, threads, checklists, reviewer slots,

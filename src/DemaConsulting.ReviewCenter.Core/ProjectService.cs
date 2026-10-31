@@ -58,7 +58,8 @@ public sealed record NewMemberAccount(ProjectMember Member, string TemporaryPass
 ///     That throttle state is per process and lost on restart. The service is safe for concurrent use as long as
 ///     the injected stores are; the last project administrator is protected by the store, atomically.
 ///     A project also carries the "require independent reviewers" rule (on by default), which a project administrator
-///     switches with <see cref="SetRequireIndependentReviewersAsync"/>; <see cref="SigningService"/> applies it.
+///     switches with <see cref="SetRequireIndependentReviewersAsync"/>; <see cref="SigningService"/> applies it. Two
+///     further rules are stored only (not applied yet); <see cref="SetReviewRuleAsync"/> switches any of the three.
 /// </remarks>
 public sealed class ProjectService
 {
@@ -82,6 +83,12 @@ public sealed class ProjectService
     ///     The action recorded when the "require independent reviewers" rule of a project is switched.
     /// </summary>
     public const string IndependentReviewersChangedAction = "project.independent-reviewers-changed";
+
+    /// <summary>
+    ///     The action recorded when a further review rule of a project (not "require independent reviewers") is
+    ///     switched.
+    /// </summary>
+    public const string ReviewRuleChangedAction = "project.review-rule-changed";
 
     /// <summary>
     ///     The message for a setting that someone else changed while the caller was editing it.
@@ -598,9 +605,49 @@ public sealed class ProjectService
     ///     <see cref="DomainRule.RecordChanged"/> when the stored value is no longer <paramref name="expected"/>
     ///     (someone else changed it first); nothing is stored then.
     /// </exception>
-    public async Task<bool> SetRequireIndependentReviewersAsync(
+    public Task<bool> SetRequireIndependentReviewersAsync(
         Actor actor,
         int projectId,
+        bool expected,
+        bool value,
+        CancellationToken cancellationToken = default) =>
+        SetReviewRuleAsync(actor, projectId, ReviewRule.IndependentReviewers, expected, value, cancellationToken);
+
+    /// <summary>
+    ///     Switches one review rule of a project on or off.
+    /// </summary>
+    /// <param name="actor">
+    ///     The signed-in user; must administer the project (or be a system administrator). An API token is refused.
+    /// </param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="rule">The rule to switch.</param>
+    /// <param name="expected">The value the caller read and based its change on.</param>
+    /// <param name="value">The new value: <c>true</c> switches the rule on.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the value was changed; <c>false</c> when <paramref name="value"/> equals
+    ///     <paramref name="expected"/> and nothing was stored or recorded.
+    /// </returns>
+    /// <remarks>
+    ///     The change is a compare-and-set on the stored value, stored together with its audit entry. The
+    ///     <see cref="ReviewRule.IndependentReviewers"/> rule records <see cref="IndependentReviewersChangedAction"/>
+    ///     with the text <c>RequireIndependentReviewers on-&gt;off</c>; the other rules record
+    ///     <see cref="ReviewRuleChangedAction"/> with the property name in the same form, for example
+    ///     <c>RequireNonReopenerSigning on-&gt;off</c>. Only <see cref="ReviewRule.IndependentReviewers"/> is applied
+    ///     today (when a reviewer is chosen and when a review is signed; existing signatures stay valid); the
+    ///     other rules are stored only.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="rule"/> is not defined.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/> (see
+    ///     <see cref="IProjectAccess.RequireAdministerAsync"/>; also for an API token), and with
+    ///     <see cref="DomainRule.RecordChanged"/> when the stored value is no longer <paramref name="expected"/>
+    ///     (someone else changed it first); nothing is stored then.
+    /// </exception>
+    public async Task<bool> SetReviewRuleAsync(
+        Actor actor,
+        int projectId,
+        ReviewRule rule,
         bool expected,
         bool value,
         CancellationToken cancellationToken = default)
@@ -615,20 +662,18 @@ public sealed class ProjectService
 
         // The right is checked again on every call: a user demoted while a page was open must not get a change through
         await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
+        var (action, property) = Describe(rule);
         if (expected == value)
         {
             return false;
         }
 
-        var stored = await _store.UpdateRequireIndependentReviewersAsync(
+        var stored = await _store.UpdateReviewRuleAsync(
             projectId,
+            rule,
             expected,
             value,
-            AuditDraft.By(
-                actor,
-                IndependentReviewersChangedAction,
-                $"RequireIndependentReviewers {OnOff(expected)}->{OnOff(value)}",
-                projectId),
+            AuditDraft.By(actor, action, $"{property} {OnOff(expected)}->{OnOff(value)}", projectId),
             cancellationToken);
         if (!stored)
         {
@@ -644,6 +689,20 @@ public sealed class ProjectService
     /// <param name="value">The value.</param>
     /// <returns><c>on</c> or <c>off</c>.</returns>
     private static string OnOff(bool value) => value ? "on" : "off";
+
+    /// <summary>
+    ///     Names the audit action and the project property of a review rule.
+    /// </summary>
+    /// <param name="rule">The rule.</param>
+    /// <returns>The audit action and the property name written to the audit text.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the rule is not defined.</exception>
+    private static (string Action, string Property) Describe(ReviewRule rule) => rule switch
+    {
+        ReviewRule.IndependentReviewers => (IndependentReviewersChangedAction, nameof(Project.RequireIndependentReviewers)),
+        ReviewRule.NonAuthorChecklistAnswers => (ReviewRuleChangedAction, nameof(Project.RequireNonAuthorChecklistAnswers)),
+        ReviewRule.NonReopenerSigning => (ReviewRuleChangedAction, nameof(Project.RequireNonReopenerSigning)),
+        _ => throw new ArgumentOutOfRangeException(nameof(rule), rule, "The rule is not a known value."),
+    };
 
     /// <summary>
     ///     Rejects a role that is not a defined value, and the read-only <see cref="ProjectRole.Auditor"/> role

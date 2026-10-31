@@ -117,6 +117,14 @@ the administrator, the reason, and the previous digest, with the old signature (
 and the `review.reopened` entry in the audit trail, whose chain verifies. This scenario is tested by
 `StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction`.
 
+**StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet**: Over a new database, a project is created
+through `ProjectService` with the two further review rules (authors answering the checklist of their own review, and the
+person who reopened a review signing it again) on. The author rule is switched off and the database is closed and opened
+again; a repeated change from the old value is refused with `RecordChanged`, the other rule is switched off, and the
+database is closed and opened a third time. Both rules read back off, the independence rule is still on, the audit trail
+holds two `project.review-rule-changed` entries, and its chain verifies. This scenario is tested by
+`StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet`.
+
 **StorageSubsystem_Repositories_PersistAcrossReopen**: A system administrator is created over a new database, a
 project is created, and a private repository with a user name and a token is registered in it through
 `RepositoryService`, then disabled; the database is

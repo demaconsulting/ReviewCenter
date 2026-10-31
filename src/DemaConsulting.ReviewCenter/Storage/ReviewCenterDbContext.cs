@@ -36,7 +36,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     the repository source columns of reviews and review files, the personal access token table and the creator
 ///     columns of reviews). The same is true for the second factor tables (<c>UserTotps</c> and
 ///     <c>TotpRecoveryCodes</c>): a database from before them must be deleted and recreated. The same is true for
-///     the <c>ReviewReopens</c> table and the <c>RequireIndependentReviewers</c> column of projects. Instances are
+///     the <c>ReviewReopens</c> table and the <c>RequireIndependentReviewers</c>,
+///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -204,6 +205,10 @@ internal sealed class ReviewCenterDbContext : DbContext
             // The review rules: independent reviewers are required unless an administrator switches the rule off. No
             // database default is declared, so the value always comes from the entity (true unless set otherwise)
             project.Property(p => p.RequireIndependentReviewers);
+
+            // Two further review rules, stored for the enforcement that follows. Same reasoning: no database default
+            project.Property(p => p.RequireNonAuthorChecklistAnswers);
+            project.Property(p => p.RequireNonReopenerSigning);
 
             // The project's own checklist definition (JSON). NULL means the built-in default checklist. The text is
             // not length-limited by the column: ChecklistValidator bounds it (ReviewLimits.MaxChecklistBytes) before

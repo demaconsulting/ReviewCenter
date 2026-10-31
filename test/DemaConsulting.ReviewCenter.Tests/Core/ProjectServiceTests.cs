@@ -150,6 +150,191 @@ public class ProjectServiceTests
     }
 
     /// <summary>
+    ///     Reads the value of one review rule from a project.
+    /// </summary>
+    /// <param name="project">The project.</param>
+    /// <param name="rule">The rule.</param>
+    /// <returns>The stored value.</returns>
+    private static bool ReadRule(Project project, ReviewRule rule) => rule switch
+    {
+        ReviewRule.IndependentReviewers => project.RequireIndependentReviewers,
+        ReviewRule.NonAuthorChecklistAnswers => project.RequireNonAuthorChecklistAnswers,
+        _ => project.RequireNonReopenerSigning
+    };
+
+    /// <summary>
+    ///     Test that a new project has every review rule switched on.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn()
+    {
+        // Arrange: a service over an empty store
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+
+        // Act: create a project
+        var project = await service.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+
+        // Assert: the returned and the stored project have all three rules on
+        var stored = (await store.GetProjectAsync(project.Id, TestContext.Current.CancellationToken))!;
+        foreach (var rule in Enum.GetValues<ReviewRule>())
+        {
+            Assert.True(ReadRule(project, rule));
+            Assert.True(ReadRule(stored, rule));
+        }
+    }
+
+    /// <summary>
+    ///     Test that an administrator switches a further rule and that each change, and only a change, is audited
+    ///     with the fixed action and the property name.
+    /// </summary>
+    /// <param name="rule">The rule to switch.</param>
+    /// <param name="property">The property name expected in the audit detail.</param>
+    [Theory]
+    [InlineData(ReviewRule.NonAuthorChecklistAnswers, "RequireNonAuthorChecklistAnswers")]
+    [InlineData(ReviewRule.NonReopenerSigning, "RequireNonReopenerSigning")]
+    public async Task ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail(ReviewRule rule, string property)
+    {
+        // Arrange: a project with all rules on
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+        var project = await service.CreateAsync("Apollo", null, cancellationToken);
+        var auditBefore = store.Audits.Count;
+
+        // Act: switch off, switch off again without a change, switch on
+        var off = await service.SetReviewRuleAsync(TestActors.Ann, project.Id, rule, true, false, cancellationToken);
+        var stored = (await store.GetProjectAsync(project.Id, cancellationToken))!;
+        var unchanged = await service.SetReviewRuleAsync(TestActors.Ann, project.Id, rule, false, false, cancellationToken);
+        var on = await service.SetReviewRuleAsync(TestActors.Ann, project.Id, rule, false, true, cancellationToken);
+
+        // Assert: two changes and exactly two audit entries; the other rules were never touched
+        Assert.True(off);
+        Assert.False(ReadRule(stored, rule));
+        Assert.All(Enum.GetValues<ReviewRule>().Where(r => r != rule), other => Assert.True(ReadRule(stored, other)));
+        Assert.False(unchanged);
+        Assert.True(on);
+        var audits = store.Audits.Skip(auditBefore).ToList();
+        Assert.Equal(2, audits.Count);
+        Assert.All(audits, a => Assert.Equal(ProjectService.ReviewRuleChangedAction, a.Action));
+        Assert.Equal("project.review-rule-changed", audits[0].Action);
+        Assert.Equal($"{property} on->off", audits[0].Detail);
+        Assert.Equal($"{property} off->on", audits[1].Detail);
+        Assert.Equal(project.Id, audits[0].ProjectId);
+    }
+
+    /// <summary>
+    ///     Test that the independent reviewers rule keeps its original audit action and detail, whether it is
+    ///     switched with the general method or the original one.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction()
+    {
+        // Arrange: a project with all rules on
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+        var project = await service.CreateAsync("Apollo", null, cancellationToken);
+        var auditBefore = store.Audits.Count;
+
+        // Act: switch off with the general method, on with the original method
+        await service.SetReviewRuleAsync(TestActors.Ann, project.Id, ReviewRule.IndependentReviewers, true, false, cancellationToken);
+        await service.SetRequireIndependentReviewersAsync(TestActors.Ann, project.Id, false, true, cancellationToken);
+
+        // Assert: both audit entries use the original action and the original detail
+        var audits = store.Audits.Skip(auditBefore).ToList();
+        Assert.Equal(2, audits.Count);
+        Assert.All(audits, a => Assert.Equal(ProjectService.IndependentReviewersChangedAction, a.Action));
+        Assert.Equal("RequireIndependentReviewers on->off", audits[0].Detail);
+        Assert.Equal("RequireIndependentReviewers off->on", audits[1].Detail);
+    }
+
+    /// <summary>
+    ///     Test that somebody who does not administer the project, and an API token, cannot switch any rule.
+    /// </summary>
+    /// <param name="rule">The rule to try.</param>
+    [Theory]
+    [InlineData(ReviewRule.IndependentReviewers)]
+    [InlineData(ReviewRule.NonAuthorChecklistAnswers)]
+    [InlineData(ReviewRule.NonReopenerSigning)]
+    public async Task ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused(ReviewRule rule)
+    {
+        // Arrange: real access rules with an administrator and a plain member
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var store = new FakeReviewStore();
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        await users.CreateAsync("root", "Root", true, "correct horse battery", Actor.CommandLine, cancellationToken);
+        var member = await users.CreateAsync("mem", "Mem", false, "correct horse battery", Actor.CommandLine, cancellationToken);
+        var service = new ProjectService(store, userStore, new ProjectAccess(userStore, store), new FakePasswordHasher(), clock);
+        var root = new Actor("root", "Root");
+        var project = await service.CreateAsync("Apollo", null, root, cancellationToken);
+        await store.AddMembershipAsync(member.Id, project.Id, ProjectRole.User, cancellationToken);
+        var auditBefore = store.Audits.Count;
+
+        // Act: a member, an administrator's token and a stranger try
+        var plain = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetReviewRuleAsync(
+            new Actor("mem", "Mem"), project.Id, rule, true, false, cancellationToken));
+        var viaToken = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetReviewRuleAsync(
+            new Actor("root", "Root") { ApiTokenId = "K7M2QX9P" }, project.Id, rule, true, false, cancellationToken));
+        var stranger = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetReviewRuleAsync(
+            new Actor("nobody", "Nobody"), project.Id, rule, true, false, cancellationToken));
+
+        // Assert: refused each time, the value is unchanged and nothing was recorded
+        Assert.Equal(DomainRule.ActorNotAllowed, plain.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, viaToken.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, stranger.Rule);
+        Assert.True(ReadRule((await store.GetProjectAsync(project.Id, cancellationToken))!, rule));
+        Assert.Equal(auditBefore, store.Audits.Count);
+    }
+
+    /// <summary>
+    ///     Test that a change of any rule based on an outdated reading is refused with
+    ///     <see cref="DomainRule.RecordChanged"/> and does not overwrite the newer value.
+    /// </summary>
+    /// <param name="rule">The rule to try.</param>
+    [Theory]
+    [InlineData(ReviewRule.IndependentReviewers)]
+    [InlineData(ReviewRule.NonAuthorChecklistAnswers)]
+    [InlineData(ReviewRule.NonReopenerSigning)]
+    public async Task ProjectService_SetReviewRuleAsync_StaleExpected_ThrowsRecordChanged(ReviewRule rule)
+    {
+        // Arrange: a project whose rule somebody else switched off after the caller read "on"
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+        var project = await service.CreateAsync("Apollo", null, cancellationToken);
+        await service.SetReviewRuleAsync(TestActors.Bob, project.Id, rule, true, false, cancellationToken);
+        var auditBefore = store.Audits.Count;
+
+        // Act: the caller still believes it is on and wants to switch it off
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetReviewRuleAsync(
+            TestActors.Ann, project.Id, rule, true, false, cancellationToken));
+
+        // Assert: refused as changed by someone else, nothing more recorded
+        Assert.Equal(DomainRule.RecordChanged, ex.Rule);
+        Assert.Equal(ProjectService.IndependentReviewersChangedByOthersMessage, ex.Message);
+        Assert.Equal(auditBefore, store.Audits.Count);
+    }
+
+    /// <summary>
+    ///     Test that a rule that is not a defined value is rejected.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange()
+    {
+        // Arrange: a project and a value outside the enumeration
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var service = CreateService(new FakeReviewStore());
+        var project = await service.CreateAsync("Apollo", null, cancellationToken);
+
+        // Act and assert: the undefined rule is rejected
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.SetReviewRuleAsync(
+            TestActors.Ann, project.Id, (ReviewRule)99, true, false, cancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a valid project is stored with trimmed text and the clock's creation time.
     /// </summary>
     [Fact]

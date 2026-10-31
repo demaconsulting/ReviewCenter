@@ -870,6 +870,100 @@ public class ReviewStoreSigningTests
     }
 
     /// <summary>
+    ///     Reads the value of one review rule from a project.
+    /// </summary>
+    /// <param name="project">The project.</param>
+    /// <param name="rule">The rule.</param>
+    /// <returns>The stored value.</returns>
+    private static bool ReadRule(Project project, ReviewRule rule) => rule switch
+    {
+        ReviewRule.IndependentReviewers => project.RequireIndependentReviewers,
+        ReviewRule.NonAuthorChecklistAnswers => project.RequireNonAuthorChecklistAnswers,
+        _ => project.RequireNonReopenerSigning
+    };
+
+    /// <summary>
+    ///     Test that every review rule defaults to on for a new project and is changed only if it still holds the
+    ///     value the caller read, with the audit entry written in the same step.
+    /// </summary>
+    /// <param name="rule">The rule to change.</param>
+    [Theory]
+    [InlineData(ReviewRule.IndependentReviewers)]
+    [InlineData(ReviewRule.NonAuthorChecklistAnswers)]
+    [InlineData(ReviewRule.NonReopenerSigning)]
+    public async Task ReviewStore_UpdateReviewRuleAsync_CompareAndSet(ReviewRule rule)
+    {
+        // Arrange: a new project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var draft = AuditDraft.By(TestActors.Ann, "project.review-rule-changed", $"{rule} on->off", projectId);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+
+        // Act: read the default, switch it off based on "on", try the same again, and try an unknown project
+        var initial = ReadRule((await db.Store.GetProjectAsync(projectId, cancellationToken))!, rule);
+        var first = await db.Store.UpdateReviewRuleAsync(projectId, rule, true, false, draft, cancellationToken);
+        var stale = await db.Store.UpdateReviewRuleAsync(projectId, rule, true, false, draft, cancellationToken);
+        var unknown = await db.Store.UpdateReviewRuleAsync(999, rule, true, false, draft, cancellationToken);
+
+        // Assert: on by default, one change stored and audited once, the stale and unknown ones refused
+        Assert.True(initial);
+        Assert.True(first);
+        Assert.False(stale);
+        Assert.False(unknown);
+        Assert.False(ReadRule((await db.Store.GetProjectAsync(projectId, cancellationToken))!, rule));
+        var entries = await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken);
+        Assert.Equal(auditBefore + 1, entries.Count);
+        Assert.Equal(1, entries.Count(e => e.Action == "project.review-rule-changed"));
+        Assert.True(AuditChain.Verify(entries).IsIntact);
+    }
+
+    /// <summary>
+    ///     Test that changing one review rule never changes another.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule()
+    {
+        // Arrange: a new project with all rules on
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+
+        // Act: switch off one rule after the other
+        foreach (var rule in Enum.GetValues<ReviewRule>())
+        {
+            var draft = AuditDraft.By(TestActors.Ann, "project.review-rule-changed", $"{rule} on->off", projectId);
+            Assert.True(await db.Store.UpdateReviewRuleAsync(projectId, rule, true, false, draft, cancellationToken));
+
+            // Assert: exactly the rules switched so far are off
+            var project = (await db.Store.GetProjectAsync(projectId, cancellationToken))!;
+            foreach (var other in Enum.GetValues<ReviewRule>())
+            {
+                Assert.Equal(other > rule, ReadRule(project, other));
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Test that a rule that is not a defined value is rejected and nothing is recorded.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_UpdateReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange()
+    {
+        // Arrange: a new project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var draft = AuditDraft.By(TestActors.Ann, "project.review-rule-changed", "x", projectId);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+
+        // Act and assert: the undefined rule is rejected and the audit trail is unchanged
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => db.Store.UpdateReviewRuleAsync(projectId, (ReviewRule)99, true, false, draft, cancellationToken));
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+    }
+
+    /// <summary>
     ///     Test that the lock check does not refuse a write to a review that does not exist with
     ///     <see cref="DomainRule.ReviewLocked"/>: an unknown review is not locked, so each write ends the way it does
     ///     without any lock (not found, or refused by the relationships of the database), and stores nothing.

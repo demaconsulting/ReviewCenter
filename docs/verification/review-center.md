@@ -304,6 +304,16 @@ and cannot be a reviewer of it, and the review stays In review. The audit page l
 `project.independent-reviewers-changed` entries. This scenario is tested by
 `ReviewCenter_IndependentReviewers_AuthorIsNotOfferedAndAdministratorCanSwitchTheRuleOff`.
 
+**CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale** and
+**WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches**: These subsystem scenarios verify the system requirement of
+the two further review rule switches (authors answering the checklist of their own review, and the person who reopened
+a review signing it again). In the Core scenario a plain member and an administrator's token are refused, the
+administrator switches both rules off with one audit entry `project.review-rule-changed` each, and a stale change is
+refused. In the Web scenario the real pipeline shows both switches, on by default, only to the administrator, and shows
+a rule as off after it was changed. The rules are stored only, so no scenario here expects a refusal of a checklist
+answer or of a signature. These scenarios are tested by `CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale`
+and `WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches`.
+
 **ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne**: Three users are created
 with the `user add` verb on a temporary database, and `audit verify` reports an intact chain with exit code 0. One audit
 entry is then edited directly in the SQLite file, and `audit verify` reports that the chain is broken at that entry with

@@ -290,8 +290,9 @@ before you use it.
 ## Review Rules
 
 **Where you are.** The **Review rules** card on the project page (`/projects/{id}`), above the members. It is shown
-only to a project administrator of the project and to a system administrator; other members do not see it. It holds one
-rule today, the switch **Require independent reviewers**, saved with **Save review rules**.
+only to a project administrator of the project and to a system administrator; other members do not see it. It holds three
+switches, saved together with **Save review rules**: **Require independent reviewers**, which ReviewCenter applies, and
+two further switches that ReviewCenter only stores and records for now (see below).
 
 **Require independent reviewers.** The setting is **on by default**, for every project of a newly created database (a
 database made before this setting existed must be recreated, because the schema has no migrations). While it is on,
@@ -315,6 +316,19 @@ someone else. Reload the page and try again.", and the page shows the stored val
 the setting ("Project settings cannot be changed with an API token; sign in to the web pages."). Every change is recorded
 in the audit trail as `project.independent-reviewers-changed` with the project and the detail
 `RequireIndependentReviewers on->off` (or `off->on`).
+
+**Two further switches: not applied yet.** The card also holds **Authors cannot answer the checklist of their own
+review** and **The person who reopened a review cannot sign it again**. Both are **on by default** and are marked "Not
+applied yet." on the page: ReviewCenter stores each setting and records every change in the audit trail, but it does not
+apply either setting yet, so nothing is refused for these reasons today. A later version will apply them, and because
+they are on by default they will then affect every project that still has them on; if your team must not be affected,
+switch them off beforehand. Saving works as described above; the page says, for example, "Authors cannot answer the
+checklist: now off (stored; not applied yet)." or "The person who reopened a review cannot sign it again: now on
+(stored; not applied yet).", and each change is a separate change, so a refusal of a later switch does not undo an
+earlier one. Each change is recorded in the audit trail as `project.review-rule-changed` with the project and the detail
+`RequireNonAuthorChecklistAnswers on->off` or `RequireNonReopenerSigning on->off` (or `off->on`). The same rules apply
+as for the first switch: only a project administrator or a system administrator changes them, and a personal access
+token cannot.
 
 ## Reopening an Approved Review
 
@@ -427,6 +441,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Project   | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
 | Project   | `project.checklist-changed` (the checklist of a project was replaced or reset)       |
 | Project   | `project.independent-reviewers-changed` (the independence rule was switched)         |
+| Project   | `project.review-rule-changed` (a further review rule was switched)                   |
 | Reopening | `review.reopened` (an administrator reopened an approved review)                     |
 | Tokens    | `token.created`, `token.revoked`                                                     |
 | Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
@@ -510,7 +525,9 @@ recreate development databases created before them. The approval lock and the in
 `ReviewReopens` (the history of reopened reviews) and the column `Projects.RequireIndependentReviewers`, again with no
 migration: the server creates them only when the database is new, so a development database created before them must
 be deleted and created again, like the earlier ones. A new project, and a review that was never reopened, keep their
-record digests (the number of reopens is added to the digest only when it is more than zero).
+record digests (the number of reopens is added to the digest only when it is more than zero). The review rule switches
+add the columns `Projects.RequireNonAuthorChecklistAnswers` and `Projects.RequireNonReopenerSigning`, again with no
+migration: a development database created before them must be deleted and created again.
 
 ## Repositories and Credentials
 

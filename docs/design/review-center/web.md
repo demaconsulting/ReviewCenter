@@ -512,7 +512,10 @@ a locked review, because Core and the store refuse with `ReviewLocked` and the p
 author is not offered as a reviewer while the project requires independent reviewers, and the Reviewers card says why
 (Core refuses the author as a reviewer or signer in any case). The project page has the admin-only "Review rules" card
 that saves the `RequireIndependentReviewers` setting of the project through `ProjectService`, based on the value it
-loaded, so that a change by someone else is shown and never overwritten. Reading, the attestation download, and the
+loaded, so that a change by someone else is shown and never overwritten. The card has two more switches (authors cannot
+answer the checklist of their own review; the person who reopened a review cannot sign it again) that are stored and
+audited and are marked "Not applied yet." because no page or service enforces them. Reading, the attestation download,
+and the
 evidence index are unaffected by the lock.
 
 #### Signed attestation

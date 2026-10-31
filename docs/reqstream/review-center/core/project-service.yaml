@@ -208,3 +208,26 @@ sections:
           - ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits
           - ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused
           - ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged
+
+      - id: ReviewCenter-ProjectService-ReviewRuleSwitches
+        title: >-
+          The ProjectService class shall switch each review rule of a project with SetReviewRuleAsync, shall keep the
+          two further rules (authors answering the checklist of their own review, and the person who reopened a
+          review signing it again) on for a new project, shall let only an administrator of the project or a system
+          administrator change a rule, and never an actor that came through a personal access token, shall change a
+          rule only when the value that the caller saw is still the stored one and refuse with the RecordChanged rule
+          otherwise, shall change and record nothing when the new value equals the one the caller saw, shall record a
+          change of a further rule in the audit trail as project.review-rule-changed with the property name and the
+          old and the new value, shall keep recording a change of the independence rule as
+          project.independent-reviewers-changed, and shall keep SetRequireIndependentReviewersAsync working as before.
+        justification: |
+          One method with one set of guards for every rule keeps the rules of changing a switch identical, so that
+          adding a rule cannot weaken them. The independence rule keeps its audit action, so that the history of
+          existing projects stays readable by the same name.
+        tests:
+          - ProjectService_SetReviewRuleAsync_NewProject_AllRulesAreOn
+          - ProjectService_SetReviewRuleAsync_NewRules_AdminTogglesAndAuditsWithFixedDetail
+          - ProjectService_SetReviewRuleAsync_IndependentReviewers_KeepsTheOriginalAuditAction
+          - ProjectService_SetReviewRuleAsync_NotAdminOrApiToken_IsRefused
+          - ProjectService_SetReviewRuleAsync_StaleExpected_ThrowsRecordChanged
+          - ProjectService_SetReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange

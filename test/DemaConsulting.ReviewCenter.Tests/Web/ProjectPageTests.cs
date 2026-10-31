@@ -919,6 +919,102 @@ public class ProjectPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='review-rules-card']"));
         Assert.Empty(cut.FindAll("[data-testid='independent-reviewers-switch']"));
         Assert.Empty(cut.FindAll("[data-testid='independent-reviewers-save']"));
+        Assert.Empty(cut.FindAll("[data-testid='author-checklist-switch']"));
+        Assert.Empty(cut.FindAll("[data-testid='reopener-signing-switch']"));
+    }
+
+    /// <summary>
+    ///     Test that the two further review rule switches start on, that a changed switch is saved through the
+    ///     service with its own audit entry and a confirmation that says it is stored only, and that several changed
+    ///     switches are saved together.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule()
+    {
+        // Arrange: a project administrator with the page open
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+        Assert.True(cut.Find("[data-testid='author-checklist-switch']").HasAttribute("checked"));
+        Assert.True(cut.Find("[data-testid='reopener-signing-switch']").HasAttribute("checked"));
+        var auditBefore = Store.Audits.Count;
+
+        // Act: switch the author rule off and save
+        await cut.Find("[data-testid='author-checklist-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='independent-reviewers-save']").ClickAsync();
+
+        // Assert: stored alone, confirmed as stored only, and audited with the fixed action and detail
+        var status = cut.Find("[data-testid='review-rules-status']").TextContent;
+        Assert.Contains("Authors cannot answer the checklist", status, StringComparison.Ordinal);
+        Assert.Contains("stored; not applied yet", status, StringComparison.Ordinal);
+        var stored = (await Projects.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken))!;
+        Assert.False(stored.RequireNonAuthorChecklistAnswers);
+        Assert.True(stored.RequireNonReopenerSigning);
+        Assert.True(stored.RequireIndependentReviewers);
+        var first = Assert.Single(Store.Audits.Skip(auditBefore));
+        Assert.Equal(ProjectService.ReviewRuleChangedAction, first.Action);
+        Assert.Equal("RequireNonAuthorChecklistAnswers on->off", first.Detail);
+        Assert.Equal(projectId, first.ProjectId);
+
+        // Act: switch the reopener rule and the independence rule off together and save
+        await cut.Find("[data-testid='reopener-signing-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='independent-reviewers-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='independent-reviewers-save']").ClickAsync();
+
+        // Assert: both are stored with one audit entry each, and the confirmation names both
+        var both = cut.Find("[data-testid='review-rules-status']").TextContent;
+        Assert.Contains("Independent reviewers are no longer required.", both, StringComparison.Ordinal);
+        Assert.Contains("The person who reopened a review cannot sign it again", both, StringComparison.Ordinal);
+        var after = (await Projects.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken))!;
+        Assert.False(after.RequireNonReopenerSigning);
+        Assert.False(after.RequireIndependentReviewers);
+        var audits = Store.Audits.Skip(auditBefore + 1).ToList();
+        Assert.Equal(2, audits.Count);
+        Assert.Single(audits, a => a.Action == ProjectService.IndependentReviewersChangedAction);
+        Assert.Single(audits, a => a.Action == ProjectService.ReviewRuleChangedAction && a.Detail == "RequireNonReopenerSigning on->off");
+    }
+
+    /// <summary>
+    ///     Test that a further switch that somebody else changed after the page was loaded is refused with the
+    ///     message of the rule, the page shows the stored values again, and nothing more is audited.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads()
+    {
+        // Arrange: a project administrator with the page open, and another administrator who switches the rule off
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+        await Projects.SetReviewRuleAsync(
+            TestActors.Bob, projectId, ReviewRule.NonReopenerSigning, true, false, TestContext.Current.CancellationToken);
+        var auditBefore = Store.Audits.Count;
+
+        // Act: the page still shows "on"; switch it off and save
+        await cut.Find("[data-testid='reopener-signing-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='independent-reviewers-save']").ClickAsync();
+
+        // Assert: the stale message is shown, the switch shows the stored value, and nothing was audited
+        Assert.Equal(
+            ProjectService.IndependentReviewersChangedByOthersMessage,
+            cut.Find("[data-testid='review-rules-error']").TextContent);
+        Assert.False(cut.Find("[data-testid='reopener-signing-switch']").HasAttribute("checked"));
+        Assert.True(cut.Find("[data-testid='author-checklist-switch']").HasAttribute("checked"));
+        Assert.Equal(auditBefore, Store.Audits.Count);
+    }
+
+    /// <summary>
+    ///     Test that the two further switches say that they are stored but not applied yet. This test and the
+    ///     markers go away when the rules are applied.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ReviewRules_NewSwitches_SayNotAppliedYet()
+    {
+        // Arrange and act: a project administrator with the page open
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+
+        // Assert: both further switches carry the marker; the independence switch does not
+        Assert.Contains("Not applied yet", cut.Find("[data-testid='author-checklist-pending']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("Not applied yet", cut.Find("[data-testid='reopener-signing-pending']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("Not applied yet", cut.Find("[data-testid='review-rule-independent-reviewers']").TextContent, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -1309,6 +1309,48 @@ public class CoreSubsystemTests
     }
 
     /// <summary>
+    ///     Test that only an administrator (not a member, not a token) changes the two further review rules, that a
+    ///     stale expectation is refused, that every change is audited, and that independence is not touched.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale()
+    {
+        // Arrange: a project with the default settings (all on)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var realm = await CreateRealmAsync(cancellationToken);
+        var pid = realm.ProjectId;
+
+        // Act: a member and an administrator's token try, then the administrator switches both rules off, and a
+        // stale expectation tries again
+        var byMember = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Projects.SetReviewRuleAsync(
+            realm.Ann, pid, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken));
+        var byToken = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Projects.SetReviewRuleAsync(
+            new Actor("root", "Root") { ApiTokenId = "K7M2QX9P" }, pid, ReviewRule.NonReopenerSigning, true, false, cancellationToken));
+        var authorChanged = await realm.Projects.SetReviewRuleAsync(
+            realm.Root, pid, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken);
+        var reopenerChanged = await realm.Projects.SetReviewRuleAsync(
+            realm.Root, pid, ReviewRule.NonReopenerSigning, true, false, cancellationToken);
+        var stale = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Projects.SetReviewRuleAsync(
+            realm.Root, pid, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken));
+
+        // Assert: refused for the member and the token; both changes are stored and audited once each
+        Assert.Equal(DomainRule.ActorNotAllowed, byMember.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, byToken.Rule);
+        Assert.True(authorChanged);
+        Assert.True(reopenerChanged);
+        Assert.Equal(DomainRule.RecordChanged, stale.Rule);
+        var project = (await realm.Store.GetProjectAsync(pid, cancellationToken))!;
+        Assert.False(project.RequireNonAuthorChecklistAnswers);
+        Assert.False(project.RequireNonReopenerSigning);
+        Assert.True(project.RequireIndependentReviewers);
+        var audits = realm.Store.Audits.Where(a => a.Action == ProjectService.ReviewRuleChangedAction).ToList();
+        Assert.Equal(2, audits.Count);
+        Assert.Equal("RequireNonAuthorChecklistAnswers on->off", audits[0].Detail);
+        Assert.Equal("RequireNonReopenerSigning on->off", audits[1].Detail);
+        Assert.All(audits, a => Assert.Equal("root", a.ActorUsername));
+    }
+
+    /// <summary>
     ///     Test that the author of a review created through an API token is the user of the token, so that user
     ///     cannot be a reviewer of it while independence is required.
     /// </summary>

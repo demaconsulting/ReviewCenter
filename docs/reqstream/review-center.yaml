@@ -241,6 +241,29 @@ sections:
           - CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly
           - CoreSubsystem_ApiTokenReview_AuthorIsTokenUser
 
+      - id: ReviewCenter-System-ReviewRuleSwitches
+        title: >-
+          The tool shall keep, for each project, a switch for each of two further review rules, one for authors
+          answering the checklist of their own review and one for the person who reopened a review signing it again,
+          each on for a new project, shall let only an administrator of the project or a system administrator change
+          them, never through an access token, shall record each change in the audit trail, and shall only store
+          them, because it does not apply them yet.
+        tags: [system]
+        justification: |
+          A project must be able to say beforehand which review rules it wants, and the choice must be in the history
+          so that it can be shown who relaxed a rule and when. The switches are stored first, so that every project
+          has a recorded value on the day the rules are applied; until then the tool says on the page that they are
+          not applied, so nobody takes a stored switch for a protection that does not exist yet. The system tests
+          verify the audited, administrator-only change and the page; the storage across a restart is verified by the
+          tests of the child requirements.
+        children:
+          - ReviewCenter-Core-ReviewRuleSwitches
+          - ReviewCenter-Storage-ReviewRuleSwitches
+          - ReviewCenter-Web-ReviewRuleSwitches
+        tests:
+          - CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale
+          - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
+
       - id: ReviewCenter-System-SignatureReauthentication
         title: >-
           The tool shall make a signature only after the signer has proved who they are again for that signature,

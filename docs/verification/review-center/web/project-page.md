@@ -424,7 +424,26 @@ without a change says that the rules were already set this way. This scenario is
 `ProjectPage_ReviewRules_AdminSavesToggle`.
 
 **ProjectPage_ReviewRules_NonAdmin_HidesCard**: The project page of a plain member has no Review rules card, no
-switch, and no save button. This scenario is tested by `ProjectPage_ReviewRules_NonAdmin_HidesCard`.
+switch, and no save button. This scenario is tested by `ProjectPage_ReviewRules_NonAdmin_HidesCard`. The two further
+switches `author-checklist-switch` and `reopener-signing-switch` are not rendered for a plain member either.
+
+**ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule**: A project admin opens the project page; both further
+switches are turned on. `author-checklist-switch` is turned off and `independent-reviewers-save` is pressed; the status
+names the author rule and says "stored; not applied yet", the project stores the new value for that rule only, and one
+audit entry `project.review-rule-changed` with the detail `RequireNonAuthorChecklistAnswers on->off` exists. The
+`reopener-signing-switch` and the independence switch are then turned off together and saved; both are stored, one audit
+entry exists for each (`project.review-rule-changed` and `project.independent-reviewers-changed`), and the status names
+both. This scenario is tested by `ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule`.
+
+**ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads**: After the page was loaded, another
+administrator switches the reopener rule off. The page, which still shows the switch on, switches it off and saves; the
+error `review-rules-error` shows the message of the stale change, the switch shows the stored value (off), the other
+switch is unchanged, and nothing more is audited. This scenario is tested by
+`ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads`.
+
+**ProjectPage_ReviewRules_NewSwitches_SayNotAppliedYet**: The markers `author-checklist-pending` and
+`reopener-signing-pending` next to the two further switches contain "Not applied yet", and the independence switch has no
+such marker. This scenario is tested by `ProjectPage_ReviewRules_NewSwitches_SayNotAppliedYet`.
 
 **Evidence settings** are verified in `EvidenceSettingsPageTests.cs`, with the real `EvidenceSettingsService` and the
 real access rules behind the page.

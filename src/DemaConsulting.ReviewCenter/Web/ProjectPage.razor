@@ -8,8 +8,10 @@
    Whoever may administer the
    project also sees a Members section below the reviews: the members with a role button and a Remove button, and a
    "+ Add member" button that leads to its own page (members are rarely changed, so the form is not here and no list
-   of users is ever shown). Above the members an administrator also sees a "Review rules" card with the switch
-   "Require independent reviewers" (the author of a review cannot be its reviewer or sign it) and a one-line summary
+   of users is ever shown). Above the members an administrator also sees a "Review rules" card with three switches
+   ("Require independent reviewers", which keeps the author of a review from being its reviewer or signing it, and two
+   rules that are stored but not applied yet: authors answering the checklist of their own review, and the person who
+   reopened a review signing it again) and a one-line summary
    of the project's checklist (version label, size, built-in default or custom) that leads to the checklist page. A project the user may not see looks exactly like a project that does not exist.
 
    Presentation only; state lives in ProjectPage.razor.cs. Every interactive element and every key value carries a
@@ -131,6 +133,35 @@
                         The person who created a review cannot be one of its reviewers and cannot sign it. Switch
                         this off for a project where one person has to do both. ReviewCenter only knows who created
                         the review in this tool; it does not match the authors of commits.
+                    </p>
+                </div>
+                <div class="field setting" data-testid="review-rule-author-checklist">
+                    <label class="switch">
+                        <input type="checkbox" checked="@RequireNonAuthorChoice"
+                               @onchange="e => RequireNonAuthorChoice = (bool)(e.Value ?? false)"
+                               data-testid="author-checklist-switch" />
+                        Authors cannot answer the checklist of their own review
+                    </label>
+                    <p class="muted hint">
+                        <strong data-testid="author-checklist-pending">Not applied yet.</strong>
+                        Stored for this project; today any member who may work in the project can answer a review's
+                        checklist, whatever
+                        this switch says. A later version will use the setting to keep the person who created a review
+                        from answering its checks. Every change is recorded in the audit trail.
+                    </p>
+                </div>
+                <div class="field setting" data-testid="review-rule-reopener-signing">
+                    <label class="switch">
+                        <input type="checkbox" checked="@RequireNonReopenerChoice"
+                               @onchange="e => RequireNonReopenerChoice = (bool)(e.Value ?? false)"
+                               data-testid="reopener-signing-switch" />
+                        The person who reopened a review cannot sign it again
+                    </label>
+                    <p class="muted hint">
+                        <strong data-testid="reopener-signing-pending">Not applied yet.</strong>
+                        Stored for this project; today a reviewer who holds a slot can sign again after the review was
+                        reopened, whatever this switch says. A later version will use the setting to keep the person
+                        who reopened a review from signing it again. Every change is recorded in the audit trail.
                     </p>
                 </div>
                 <p>
