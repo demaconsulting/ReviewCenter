@@ -267,6 +267,7 @@ sections:
           - ChecklistService_SetReviewConclusionTextAsync_ApiToken_Refused
           - ChecklistService_SetReviewConclusionTextAsync_Concluded_ThrowsReviewLocked
           - ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows
+          - ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing
           - ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement
           - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
           - ChecklistService_SetReviewConclusionTextAsync_ConcurrentChange_ThrowsRecordChanged

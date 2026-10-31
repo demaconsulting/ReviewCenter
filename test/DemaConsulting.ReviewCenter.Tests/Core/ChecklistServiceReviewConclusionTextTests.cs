@@ -285,6 +285,34 @@ public class ChecklistServiceReviewConclusionTextTests
     }
 
     /// <summary>
+    ///     Test that a carriage return at the start or the end of the text, or alone, is refused: the control character
+    ///     check runs before the trim, so the trim cannot hide it.
+    /// </summary>
+    /// <param name="text">The text with the stray carriage return.</param>
+    [Theory]
+    [InlineData("\r")]
+    [InlineData("\ra")]
+    [InlineData("a\r")]
+    [InlineData("  \r  ")]
+    [InlineData("a\r\r\nb")]
+    public async Task ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing(string text)
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var audits = world.Store.Audits.Count;
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetReviewConclusionTextAsync(
+            world.Project, ReviewId, text, Who("root"), cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ConclusionTextInvalid, ex.Rule);
+        Assert.Null(await StoredTextAsync(world.Store, world.Project));
+        Assert.Equal(audits, world.Store.Audits.Count);
+    }
+
+    /// <summary>
     ///     Test that changing the text while a signature is current needs the acknowledgement that names the affected
     ///     reviewer, and that the acknowledged change makes that signature out of date.
     /// </summary>

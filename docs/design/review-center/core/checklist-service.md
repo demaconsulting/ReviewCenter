@@ -197,9 +197,10 @@ has no web page or API yet: it is written through the two methods below and show
   `SignatureImpact.RequireAcknowledged` on the record with the new text). Then the store applies the change as a
   compare-and-set on the text that was read; when someone changed it meanwhile the service throws `RecordChanged` and
   nothing is stored.
-- *Normalization*: `\r\n` becomes `\n`, leading and trailing white space is removed, and a blank text means no text.
-  After that the text has at most 4000 characters, and a control character other than a line feed or a tab (a lone
-  carriage return included) is refused with `ConclusionTextInvalid`. The stored text, its length and the digest are
+- *Normalization*: `\r\n` becomes `\n`. Then a control character other than a line feed or a tab (a lone carriage
+  return included) is refused with `ConclusionTextInvalid`; this check runs before the trim, so a carriage return at
+  the start or the end of the text cannot be trimmed away. Then leading and trailing white space is removed, a blank
+  text means no text, and the text has at most 4000 characters. The stored text, its length and the digest are
   therefore the same whatever the browser sent.
 - *Digest*: the text is part of the record digest (the line `conclusion-text`; see `RecordDigest`), so a change while a
   signature is current needs the acknowledgement, and a concluded review is locked against it. It is not carried over

@@ -512,6 +512,8 @@ reviews:
       - "src/**/Web/MainLayout.razor.cs"
       - "src/**/Web/SessionGate.razor"
       - "test/**/Web/AppTests.cs"
+      - "test/**/Web/InboxWebTestBase.cs"
+      - "test/**/Web/PageTestBase.cs"
 
   - id: ReviewCenter-Web-HomePage
     title: Review of ReviewCenter HomePage unit implementation
@@ -1207,6 +1209,23 @@ reviews:
       - "docs/sysml2/model/review-center/core/selection-matcher.sysml"
       - "src/DemaConsulting.ReviewCenter.Core/SelectionMatcher.cs"
       - "test/**/Core/SelectionMatcherTests.cs"
+
+  - id: ReviewCenter-Core-BallotConsolidation
+    title: Review of ReviewCenter BallotConsolidation unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/ballot-consolidation.yaml"
+      - "docs/design/review-center/core/ballot-consolidation.md"
+      - "docs/verification/review-center/core/ballot-consolidation.md"
+      - "docs/sysml2/model/review-center/core/ballot-consolidation.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/Ballot*.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewOutcome.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewConclusion.cs"
+      - "test/**/Core/BallotConsolidationTests.cs"
 
   - id: ReviewCenter-Core-ReviewPlanner
     title: Review of ReviewCenter ReviewPlanner unit implementation

@@ -291,6 +291,7 @@ sections:
           - ThreadService_PromoteAsync_StarterSlotOwnerAndLead_Allowed
           - ThreadService_PromoteAsync_OtherMember_ThrowsActorNotAllowed
           - ThreadService_PromoteAsync_AlsoIncludesExistingResolutionComments
+          - ThreadService_PromoteAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired
           - ThreadService_PromoteAsync_AlreadyFinding_IsNoOp
           - ThreadService_PromoteAsync_AlternateOfSlot_Allowed
           - ThreadService_ReportActions_LeadWhoIsNotStarterOrReviewer_Allowed

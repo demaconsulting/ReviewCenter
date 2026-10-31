@@ -65,18 +65,18 @@ an address that matches no page. Opening `/not-found` itself answers with status
 
 **MainLayout component**: The page frame, rendered as static server-side markup (it needs no live connection). It
 reads the authentication state of the request once, so it keeps showing the name that was current when the page was
-served until the next navigation or reload, even after the state of an open page has ended. It holds two values, set in
-`OnInitializedAsync`: **Actor**, the signed-in user or `null` when nobody is signed in, and **IsAdmin**, true when the
-user is a system administrator (has the role `SignIn.AdminRole`), and **MustChangePassword**, true when the user still
-has a temporary password (the claim `must_change_password`, read with `SignIn.IsPasswordChangeRequired`). A derived
-value, **ShortVersion**, is the version of
-the footer.
+served until the next navigation or reload, even after the state of an open page has ended. It holds these values, set
+in `OnInitializedAsync`: **Actor**, the signed-in user or `null` when nobody is signed in; **IsAdmin**, true when the
+user is a system administrator (has the role `SignIn.AdminRole`); **MustChangePassword**, true when the user still
+has a temporary password (the claim `must_change_password`, read with `SignIn.IsPasswordChangeRequired`); and
+**ActionCount**, the number of reviews that need the user's action (zero when unknown). Derived values are
+**ShortVersion**, the version of the footer, and the text and the accessible label of the inbox badge.
 
 The header is a menu bar that spans the full width of the window and has two groups, which wrap onto further lines on a
 narrow screen. The left group is the logo (an inline vector image that is hidden from assistive technology), the
 product name `ReviewCenter` as the one link to the home page, and the primary navigation. The primary navigation is,
-for a signed-in user, the tab Projects and, only for a system administrator, the tabs Audit and Users (there is no tab
-for repositories, which belong to the projects and are reached from the page of a project); it is
+for a signed-in user, the tabs Projects and Inbox and, only for a system administrator, the tabs Audit and Users (there
+is no tab for repositories, which belong to the projects and are reached from the page of a project); it is
 empty when nobody is signed in, and also empty for a user who still has a temporary password (such a user has no
 system administrator role in the session either). The right group starts with the tab Help, which everyone sees, and
 then, when nobody is
@@ -94,16 +94,46 @@ page, the help, and the About page. `OnInitializedAsync` therefore checks the fi
 `SignIn.AccountPath` with a full page load. The layout stays alive while a user navigates inside an interactive
 circuit, so for a flagged user it also subscribes to `NavigationManager.LocationChanged` and runs the same check on
 every later navigation (for example a click from Help to `/projects`); `Dispose` removes the handler (the standard
-dispose pattern; a user without the claim never subscribes). The claim is enough for this, so no service is called per
-navigation; the
+dispose pattern). The claim is enough for this, so no service is called per navigation; the
 data is refused by the `Core` access rules anyway, so the redirect is a convenience and not the protection.
+
+**Inbox tab and its count**: The tab Inbox links to `/inbox` and shows a small badge (the shared `badge` style with the
+modifier `unread`, `data-testid` `nav-inbox-count`) with the number of reviews that need the user's action, taken from
+`InboxService.CountAsync`, the same figure as the inbox card of the home page. The badge is shown only when the number
+is above zero, as the number up to 99 and as `99+` above it, and carries an accessible label with the exact number
+("1 review needs your action", "N reviews need your action"). Nothing is asked for when nobody is signed in or the
+password is temporary, and the tab is not shown to those users either.
+
+- *Cache*: Counting costs one snapshot for each review the user is involved in (see `InboxService`), and the layout
+  would otherwise add that to every render, so the number is kept per user (key: the user name in upper case) in the
+  `IMemoryCache` of the server for **30 seconds** (`MainLayout.CountLifetime`). The entry holds the number and the time
+  it became available (stamped after the read); the age is checked against the injected `TimeProvider`, not the clock
+  of the cache, so tests control it without waiting (the cache also drops the entry by its own clock after the same
+  time). The number can therefore be up
+  to 30 seconds behind: work the user has just done (a signature, a reply) shows in the badge after at most that
+  time, while the inbox page and the home card always read the current figures.
+- *Refresh*: The number is read when the layout starts and again on every `LocationChanged` for any signed-in user
+  (so the handler is subscribed for every signed-in user and removed by `Dispose`), through `InvokeAsync` and
+  `StateHasChanged`. There is no timer and no polling; with the cache that is normally one count per user in 30
+  seconds however often the user clicks (the read-through is not atomic, so tabs that read at the same moment may each
+  read once; that is accepted for a hint). A navigation that reaches a disposed layout does nothing, and a refresh that
+  was queued before the disposal checks again when it starts and reads nothing.
+- *Failure*: The badge is a hint. A failure of the count (any exception) leaves `ActionCount` at
+  zero, which hides the badge, and is logged as a warning with the user name and the exception (for the operator; the
+  page shows neither); it is not cached, so the next
+  navigation tries again, and the page is never broken by it.
+- *Where it lives*: The cache is in the layout code-behind and not in a new class or in `InboxService`, because the
+  `Core` project does not reference the caching package and keeps no state of its own, and a new class would be a new
+  software unit with its own requirements, design, verification, and review set for 20 lines of presentation logic.
+  `IMemoryCache` is registered by `AddMemoryCache` in `ServerHost` for the web server.
 
 The footer is on every page, and shows `ReviewCenter {version} · © DEMA Consulting · Web-based code review for regulated
 projects` and a link "About" to `/about`. **ShortVersion** is the informational version of the program (the same value
 the command line prints) up to the `+`, and, when a commit identifier follows the `+`, a `+` and the first seven
 characters of it; a version without a `+` is shown as it is.
 
-The header and footer elements have `data-testid` values: `home-link`, `projects-link`, `audit-link`, `users-link`,
+The header and footer elements have `data-testid` values: `home-link`, `projects-link`, `inbox-link`,
+`nav-inbox-count`, `audit-link`, `users-link`,
 `help-link`, `signin-link`, `current-user`, `account-link`, `logout-button`, `footer`,
 `version-text`, and `about-link`. The layout only shows links; the access rules are enforced by the pages and the
 authorization of the `Identity` subsystem, so a hidden link is a convenience and not a protection.
@@ -143,17 +173,31 @@ home page are open to everyone and do not use it.
 **OnInitializedAsync (MainLayout)**: Works out who is signed in.
 
 - *Parameters*: None (the user comes from the authentication state of the request).
-- *Returns*: A task that completes when `Actor`, `IsAdmin`, and `MustChangePassword` are set.
-- *Preconditions*: The authentication state provider is available by injection.
+- *Returns*: A task that completes when `Actor`, `IsAdmin`, `MustChangePassword`, and `ActionCount` are set.
+- *Preconditions*: The authentication state provider, the inbox service, the memory cache, the clock, and the logger
+  are available by injection.
 - *Postconditions*: `Actor` is the signed-in user, or `null` when nobody is; `IsAdmin` is true only for a signed-in user
   who is a system administrator without a temporary password; `MustChangePassword` is true for a signed-in user with
   the claim, and then the request has been redirected to the account page unless its path is open during the change;
-  for such a user the layout also watches `LocationChanged` until it is disposed.
+  `ActionCount` is the number of reviews that need action for a signed-in user without the claim (zero for anybody
+  else, and when it could not be read); for every signed-in user the layout also watches `LocationChanged` until it is
+  disposed.
 
 **Dispose (MainLayout)**: Removes the `LocationChanged` handler, if one was added.
 
 - *Parameters*: None (the standard `Dispose()` and `Dispose(bool)` pattern).
-- *Postconditions*: Later navigation is no longer checked by this layout instance; calling it twice is harmless.
+- *Postconditions*: Later navigation is neither checked nor counted by this layout instance; a count that finishes
+  late changes nothing; calling it twice is harmless.
+
+**RefreshActionCountAsync (MainLayout)**: Sets `ActionCount` through the cache.
+
+- *Parameters*: None.
+- *Returns*: A task that completes when the count is set; it never faults.
+- *Preconditions*: None; it does nothing when nobody is signed in or the password is temporary.
+- *Postconditions*: `ActionCount` is the cached number when an entry of the user is younger than 30 seconds by the
+  injected clock; otherwise it is read from `InboxService.CountAsync` and cached with the time the number became
+  available (after the read, so a slow read does not shorten the reuse); when the
+  read fails it is zero, nothing is cached, and a warning with the user name and the exception is logged.
 
 **ShortVersion (MainLayout)**: Shortens the version for the footer.
 
@@ -168,7 +212,8 @@ home page are open to everyone and do not use it.
 - *Parameters*: None.
 - *Returns*: The rendered header, the page, and the footer.
 - *Postconditions*: The header always has the home link and the help link. It has the sign-in link when nobody is
-  signed in; otherwise the projects link, the display name, the account link, and the logout form, with the
+  signed in; otherwise the projects link, the inbox link (with the badge only when `ActionCount` is above zero), the
+  display name, the account link, and the logout form, with the
   audit and users links for a system administrator only (a user with a temporary password gets the display name, the
   account link, and the logout form, and no tabs). The footer is always present.
 
@@ -181,7 +226,9 @@ home page are open to everyone and do not use it.
 
 #### Error Handling
 
-N/A - the unit contains no error-producing logic. An unmatched URL is not an error: `Routes` renders the not-found
+N/A - the unit contains no error-producing logic, with one exception that is handled: a failure to read the count of
+the Inbox tab hides the badge and is logged as a warning (see "Inbox tab and its count"), so the page is never broken by
+it. An unmatched URL is not an error: `Routes` renders the not-found
 message. A browser that blocks local storage makes the appearance script use `system`, and the script ignores any other
 stored value. Failures in a rendered page are handled by the framework and are outside this unit.
 
@@ -195,6 +242,9 @@ document ahead of the style sheet, and the Puppet acceptance walk exercises the 
 - **SignIn** — `MainLayout` uses `GetActorAsync` to read the signed-in user, the role name of a system administrator,
   and `IsPasswordChangeRequired` and `AccountPath` to confine a user with a temporary password.
 - **Program** — supplies the informational version that the footer shortens.
+- **InboxService** — `MainLayout` calls `CountAsync` for the badge of the Inbox tab.
+- **Microsoft.Extensions.Caching.Memory** — `IMemoryCache` keeps the count of each user for 30 seconds; `TimeProvider`
+  ages the entries and `ILogger` records a count that failed.
 - **ASP.NET Core Blazor components** — `Router`, `AuthorizeRouteView`, `AuthorizeView`, `NavLink`, `HeadOutlet`, the
   authentication state (made available to the router by `AddCascadingAuthenticationState` in `ServerHost`), the
   antiforgery token component, and the base component types.

@@ -501,7 +501,18 @@ public sealed class ChecklistService
     private static string? NormalizeConclusionText(string? text)
     {
         // Browsers send CRLF; one form keeps the stored text, its length and the digest independent of the sender
-        var normalized = (text ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
+        var unified = (text ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        // Plain text only: line breaks and tabs are fine, other control characters (a lone carriage return included)
+        // are not. This runs before the trim, which would otherwise drop a leading or trailing carriage return.
+        if (unified.Any(c => char.IsControl(c) && c != '\n' && c != '\t'))
+        {
+            throw new DomainRuleException(
+                DomainRule.ConclusionTextInvalid,
+                "The review conclusion text must be plain text without control characters.");
+        }
+
+        var normalized = unified.Trim();
         if (normalized.Length == 0)
         {
             return null;
@@ -512,14 +523,6 @@ public sealed class ChecklistService
             throw new DomainRuleException(
                 DomainRule.ConclusionTextInvalid,
                 $"The review conclusion text must not be longer than {ReviewLimits.MaxConclusionTextLength} characters.");
-        }
-
-        // Plain text only: line breaks and tabs are fine, other control characters (a lone carriage return included) are not
-        if (normalized.Any(c => char.IsControl(c) && c != '\n' && c != '\t'))
-        {
-            throw new DomainRuleException(
-                DomainRule.ConclusionTextInvalid,
-                "The review conclusion text must be plain text without control characters.");
         }
 
         return normalized;

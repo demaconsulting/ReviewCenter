@@ -76,6 +76,7 @@ flowchart TD
         SigningService
         InboxService
         UserImpactService
+        BallotConsolidation
         ReauthProofStore
         TotpService
         TotpChallengeStore
@@ -267,6 +268,7 @@ flowchart TD
     RepositoriesPage --> UserService
     InboxPage --> InboxService
     ReviewPage --> InboxService
+    App --> InboxService
     InboxService --> InboxStore
     InboxService --> ReviewStore
     InboxService --> UserStore

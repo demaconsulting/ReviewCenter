@@ -348,6 +348,11 @@ control character and a lone carriage return are each refused with `ConclusionTe
 a blank text clears it. This scenario is tested by
 `ChecklistService_SetReviewConclusionTextAsync_CrlfBlankLongControl_NormalizesOrThrows`.
 
+**ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing**: A carriage return alone,
+at the start, at the end, or among white space, or before a CRLF, is refused with `ConclusionTextInvalid`, because the
+control character check runs before the trim; the text and the audit trail are unchanged. This scenario is tested by
+`ChecklistService_SetReviewConclusionTextAsync_StrayCarriageReturn_ThrowsAndStoresNothing`.
+
 **ChecklistService_SetReviewConclusionTextAsync_AfterSignature_NeedsAcknowledgement**: With slot 1 signed, a change
 without acknowledgement is refused with `SignaturesWouldBecomeOutOfDate` naming slot 1 and nothing is stored; with the
 acknowledgement the text is stored and the signature is out of date. This scenario is tested by

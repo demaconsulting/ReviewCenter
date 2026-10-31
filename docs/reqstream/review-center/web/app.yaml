@@ -192,6 +192,32 @@ sections:
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
 
+      - id: ReviewCenter-App-InboxBadge
+        title: >-
+          The App unit shall, while a user who does not need to change a temporary password is signed in, show in the
+          header an Inbox tab with a badge of the number of reviews that need the user's action, shown only above zero
+          and as 99+ above ninety-nine, with that number in its accessible label; read the number when the layout
+          starts and on each navigation, normally once per user in 30 seconds (concurrent tabs may each read once),
+          and ask for no number when nobody is signed in or the password is temporary; and, when the number cannot
+          be read, hide the badge and still render the page.
+        justification: |
+          A reviewer should see from every page that something waits, without opening the inbox. Counting costs a
+          snapshot for each review the user is involved in, so the number is kept for 30 seconds per user and
+          refreshed on navigation instead of by a timer, which bounds the cost however often the user clicks; a hint
+          must never break the page, so a failure only hides it.
+        tests:
+          - MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount
+          - MainLayout_Render_NoActionItems_ShowsInboxTabWithoutBadge
+          - MainLayout_Render_ManyActionItems_CapsBadgeAt99Plus
+          - MainLayout_Render_NobodyOrTemporaryPassword_ShowsNoInboxTabAndReadsNoCount
+          - MainLayout_Render_WithinThirtySeconds_ReadsCountOnceThenAgainAfterwards
+          - MainLayout_Navigate_ChangedCount_RefreshesBadgeAndStopsAfterDispose
+          - MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead
+          - MainLayout_Navigate_DisposedLayout_DoesNothing
+          - MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose
+          - MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage
+          - MainLayout_Render_TwoUsers_KeepsTheirCountsApart
+
       - id: ReviewCenter-App-TemporaryPassword
         title: >-
           The App unit shall, while the signed-in session carries the must-change-password claim, show no navigation

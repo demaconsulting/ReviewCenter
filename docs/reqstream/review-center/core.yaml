@@ -5,8 +5,8 @@
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
-#   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, ProjectChecklistService, InboxService, and
-#   UserImpactService
+#   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, ProjectChecklistService, InboxService,
+#   UserImpactService, and BallotConsolidation
 #   units, with the
 #   domain types they share
 #   (project, evidence settings, review,
@@ -627,6 +627,29 @@ sections:
           - UserImpactService_GetImpactAsync_PrimaryAndAlternateSlots_AreOpenWork
           - UserImpactService_GetImpactAsync_OnlyEnabledProjectAdministrator_IsSoleAdmin
           - UserImpactService_GetImpactAsync_ProjectAdministrator_SeesOnlyOwnProjects
+
+      - id: ReviewCenter-Core-BallotConsolidation
+        title: >-
+          The Core subsystem shall consolidate the submitted ballots of a review into one agreed standing of every
+          check and section, with the outcome of approved or rejected only when all of them are agreed, and shall
+          tell whether a ballot answers every check it requires.
+        justification: |
+          A signature must attest what the reviewers have handed in and agree on. The standing of the checks is derived
+          only from the submitted ballots by one pure rule, so that every page and every signature sees the same
+          agreement, dispute, or pending check, and the outcome exists only when there is nothing left to settle.
+        children:
+          - ReviewCenter-BallotConsolidation-PerCheck
+          - ReviewCenter-BallotConsolidation-SubmittedOnly
+          - ReviewCenter-BallotConsolidation-Applicability
+          - ReviewCenter-BallotConsolidation-Outcome
+          - ReviewCenter-BallotConsolidation-Counts
+          - ReviewCenter-BallotConsolidation-Complete
+          - ReviewCenter-BallotConsolidation-BallotState
+          - ReviewCenter-BallotConsolidation-Arguments
+        tests:
+          - BallotConsolidation_Consolidate_SubmittedEqual_Agreed
+          - BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts
+          - BallotConsolidation_Consolidate_AgreedFail_Rejected
 
       - id: ReviewCenter-Core-FollowUp
         title: >-

@@ -176,8 +176,10 @@ kind. `ReopenAsync` calls the reopen-only method of the store, which cannot reso
 **PromoteAsync** and **DemoteAsync**: Turn a Question into a Finding, or a Finding into a Question, by setting the
 report flag of the starting comment and of the Resolution comments of the thread (the replies keep their own flag).
 Allowed roles are described under "Roles for the kind and the flag". A thread that already has the requested kind is
-a no-op that records nothing. Each change records `thread.kind-changed` and needs the acknowledgement when a
-signature is current.
+a no-op that records nothing. A resolved Question that has no Resolution comment cannot be promoted
+(`ResolutionNoteRequired`: reopen the thread and resolve it again with a note), because the result would be a
+resolved Finding without the note its resolution needs. Each change records `thread.kind-changed` and needs the
+acknowledgement when a signature is current.
 
 **SetCommentIncludedAsync**: Sets the report flag of one reply. The starting comment and the Resolution comments
 follow the thread and are refused with `CommentNotTogglable`; a comment that is not in the thread is

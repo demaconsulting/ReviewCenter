@@ -349,6 +349,11 @@ starting comment and of the Resolution comments, demoting clears them, replies k
 stored with its entry. This scenario is tested by
 `ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments`.
 
+**ReviewStore_SetThreadKindAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired**: Promoting a resolved
+Question that has no Resolution comment is refused inside the transaction with `ResolutionNoteRequired`, with nothing
+stored and no entry; a resolved Question with a note can be promoted. This scenario is tested by
+`ReviewStore_SetThreadKindAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired`.
+
 **ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused**: The flag of a reply is changed with
 an entry, and the starting comment and a Resolution comment are refused. This scenario is tested by
 `ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused`.

@@ -124,6 +124,7 @@ sections:
           - ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits
           - ReviewStore_ResolveThreadAsync_AlreadyResolved_ReturnsFalseAndAddsNothing
           - ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments
+          - ReviewStore_SetThreadKindAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired
           - ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused
           - ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked
 

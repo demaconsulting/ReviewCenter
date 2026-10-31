@@ -259,7 +259,8 @@ stores nothing, no comment and no audit entry.
 
 **SetThreadKindAsync**: Promotes or demotes a thread by setting the report flag of its starting comment and of its
 resolution comments (replies keep theirs) with `ExecuteUpdateAsync`, and returns `true` only when the thread had the
-other kind.
+other kind. Promoting a resolved thread that has no resolution comment is refused with `ResolutionNoteRequired` inside
+the transaction, so a resolved Finding always carries its note.
 
 **SetCommentReportAsync**: Sets the report flag of one reply, with a single update. The starting comment and the
 resolution comments are refused with `CommentNotTogglable`; a thread or comment that does not exist, or a flag that

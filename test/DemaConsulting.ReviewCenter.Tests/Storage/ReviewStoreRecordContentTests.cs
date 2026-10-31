@@ -484,6 +484,41 @@ public class ReviewStoreRecordContentTests
     }
 
     /// <summary>
+    ///     Test that the store refuses, inside the transaction, to promote a resolved Question that has no resolution
+    ///     note, and stores nothing and writes no audit entry; a resolved Question with a note can be promoted.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_SetThreadKindAsync_ResolvedQuestionWithoutNote_ThrowsResolutionNoteRequired()
+    {
+        // Arrange: one Question resolved without a note and one resolved with a note
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var bare = await AddThreadAsync(db, projectId, false);
+        var noted = await AddThreadAsync(db, projectId, false);
+        await db.Store.ResolveThreadAsync(
+            projectId, "REV-1", bare.Id, ThreadKind.Question, null, Draft(projectId, "thread.resolved"), cancellationToken);
+        await db.Store.ResolveThreadAsync(
+            projectId, "REV-1", noted.Id, ThreadKind.Question, Comment("Answered"), Draft(projectId, "thread.resolved"), cancellationToken);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.SetThreadKindAsync(
+            projectId, "REV-1", bare.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken));
+        var promoted = await db.Store.SetThreadKindAsync(
+            projectId, "REV-1", noted.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken);
+
+        // Assert
+        Assert.Equal(DomainRule.ResolutionNoteRequired, exception.Rule);
+        var unchanged = await ReadThreadAsync(db, projectId, bare.Id);
+        Assert.Equal(ThreadKind.Question, unchanged.Kind);
+        Assert.False(unchanged.Comments[0].IncludeInReport);
+        Assert.True(promoted);
+        Assert.Equal(ThreadKind.Finding, (await ReadThreadAsync(db, projectId, noted.Id)).Kind);
+        Assert.Equal(auditBefore + 1, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+    }
+
+    /// <summary>
     ///     Test that a reply can be toggled on its own, that the same value again and an unknown comment give
     ///     <c>false</c>, and that the starting comment and a resolution note are refused with
     ///     <see cref="DomainRule.CommentNotTogglable"/>.

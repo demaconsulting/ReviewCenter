@@ -820,6 +820,19 @@ public sealed class ThreadService
         }
 
         var include = promoting;
+
+        // A resolved thread becomes a Finding only when it already carries a resolution note: the note of a Finding is
+        // part of the report, and the store refuses the same transition inside its transaction
+        if (promoting
+            && thread.State == ReviewThreadState.Resolved
+            && !thread.Comments.Any(c => c.Kind == ReviewCommentKind.Resolution))
+        {
+            throw new DomainRuleException(
+                DomainRule.ResolutionNoteRequired,
+                "A resolved question without a resolution note cannot become a finding. " +
+                "Reopen the thread and resolve it again with a note.");
+        }
+
         SignatureImpact.RequireAcknowledged(
             snapshot,
             WithThread(snapshot.Record, CopyThread(thread, thread.State, WithKindFlags(thread, include))),
