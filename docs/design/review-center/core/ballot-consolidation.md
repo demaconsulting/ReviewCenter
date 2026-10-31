@@ -30,7 +30,7 @@ handed in and agree on, which is why only submitted ballots take part.
 - **Checks**: `IReadOnlyList<CheckConsolidation>` — one entry per check of every section that applies, in checklist
   order. Each holds the item and section identifiers, the **Consensus** (`CheckConsensus`: `Pending`, `Agreed`, or
   `Disputed`), the agreed **Outcome** (`ChecklistOutcome?`, set only when agreed), and the **Outcomes** that each
-  submitted ballot gave, by slot.
+  submitted ballot gave, by slot, enumerated in ascending slot order whatever the order of the ballots.
 - **Sections**: `IReadOnlyList<SectionConsolidation>` — one entry per section, in checklist order, with its
   **Consensus** (`SectionConsensus`: `Applicable`, `NotApplicable`, or `Disputed`).
 - **Outcome**: `ReviewOutcome?` — the derived outcome, or null when it cannot be decided.

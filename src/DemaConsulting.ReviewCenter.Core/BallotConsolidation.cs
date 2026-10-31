@@ -201,8 +201,9 @@ public static class BallotConsolidation
     /// <returns>The standing of the check, with the outcome of each ballot that answered it.</returns>
     private static CheckConsolidation ConsolidateCheck(string itemId, string sectionId, IReadOnlyList<IndexedBallot> submitted)
     {
-        // Collect what each submitted ballot answered; a missing answer makes the check pending
-        var outcomes = new Dictionary<int, ChecklistOutcome>();
+        // Collect what each submitted ballot answered, keyed in slot order so that the map never depends on the order
+        // of the ballots; a missing answer makes the check pending
+        var outcomes = new SortedDictionary<int, ChecklistOutcome>();
         var unanswered = submitted.Count == 0;
         foreach (var ballot in submitted)
         {

@@ -90,7 +90,8 @@ sections. This scenario is tested by `BallotConsolidation_Consolidate_Counts_Are
 **BallotConsolidation_Consolidate_BallotCounts**: The submitted and all ballots are counted. This scenario is tested by
 `BallotConsolidation_Consolidate_BallotCounts`.
 
-**BallotConsolidation_Consolidate_BallotOrder_DoesNotMatter**: The same ballots in another order give the same result.
+**BallotConsolidation_Consolidate_BallotOrder_DoesNotMatter**: The same ballots in another order give the same result,
+and the per-slot outcomes of a check enumerate in ascending slot order.
 This scenario is tested by `BallotConsolidation_Consolidate_BallotOrder_DoesNotMatter`.
 
 **BallotConsolidation_NullArguments_Throws**: Null arguments, a null ballot and two ballots of one slot are refused.

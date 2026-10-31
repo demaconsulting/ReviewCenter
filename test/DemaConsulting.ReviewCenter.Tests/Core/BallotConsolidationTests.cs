@@ -571,11 +571,15 @@ public class BallotConsolidationTests
         var forward = BallotConsolidation.Consolidate(_definition, ballots);
         var backward = BallotConsolidation.Consolidate(_definition, ballots.OrderByDescending(ballot => ballot.SlotId).ToArray());
 
-        // Assert: the same standing in the same checklist order, whatever the order of the ballots
+        // Assert: the same standing in the same checklist order, whatever the order of the ballots, and the per-slot
+        // outcomes enumerate in ascending slot order in both
         Assert.Multiple(
             () => Assert.Equal(new[] { "i1", "i2", "i3" }, forward.Checks.Select(check => check.ItemId)),
             () => Assert.Equal(Describe(forward), Describe(backward)),
-            () => Assert.Equal(forward.Outcome, backward.Outcome));
+            () => Assert.Equal(forward.Outcome, backward.Outcome),
+            () => Assert.All(
+                forward.Checks.Concat(backward.Checks),
+                check => Assert.Equal(check.Outcomes.Keys.OrderBy(slot => slot), check.Outcomes.Keys)));
     }
 
     /// <summary>

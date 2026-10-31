@@ -62,8 +62,9 @@ public enum SectionConsensus
 /// <param name="Consensus">The standing of the check.</param>
 /// <param name="Outcome">The agreed outcome; not <c>null</c> exactly when <paramref name="Consensus"/> is <see cref="CheckConsensus.Agreed"/>.</param>
 /// <param name="Outcomes">
-///     The outcome that each submitted ballot gave, by the identity of its slot, for showing differing answers side
-///     by side; a ballot that did not answer the check has no entry.
+///     The outcome that each submitted ballot gave, by the identity of its slot and enumerated in ascending slot
+///     order whatever the order of the ballots, for showing differing answers side by side; a ballot that did not
+///     answer the check has no entry.
 /// </param>
 public sealed record CheckConsolidation(
     string ItemId,
