@@ -125,6 +125,12 @@ Limits to know about:
 - There are no `fail` entries. A review with a failed answer cannot be completed, so it is simply missing.
 - A review made from the **changes since a baseline** holds only the changed files, so its fingerprint is not the one
   ReviewMark computes for the whole review-set, and ReviewMark reports it as stale.
+- **Line endings.** The fingerprint of a review from a repository is calculated from the exact bytes that are committed
+  in git, and ReviewMark calculates its fingerprint from the bytes of the files in your working folder. On Windows,
+  `core.autocrlf=true` turns the working files into CRLF, so the two fingerprints differ and ReviewMark reports the
+  review as stale. Check the repository out with LF line endings: set `core.autocrlf=false` and check out again, or
+  commit a `.gitattributes` file with `* text=auto eol=lf`. ReviewCenter does not normalize line endings, because
+  its fingerprint must equal the one of ReviewMark.
 - ReviewMark only prints the `file` address. Following it needs a token (it is an API address) unless the project allows
   anonymous attestation PDFs, and records an `attestation.generated` event in the audit trail.
 - The host of `file` is the `Host` of the request. Behind a reverse proxy, the proxy must keep the `Host` header,
@@ -156,6 +162,11 @@ default; see Review Rules in the Administration chapter), the owner of the token
 its reviewers and cannot sign it, just as if the owner had created it in the browser. A review that is approved is
 locked and cannot change until an administrator reopens it in the web pages (see Locked Reviews and Reopening in the
 Reviewing chapter).
+
+**`state` and `approved`.** The review data has both a `state` and an `approved` field. `state` is the stored
+life-cycle value, and in this release it is always `Draft`, even after the review is signed; it is kept so that clients
+that read it keep working. Use `approved` (`true` while every reviewer slot has signed the current record, and the
+review is locked) to find out whether a review is approved.
 
 ## Errors, Refusals, and the Throttle
 

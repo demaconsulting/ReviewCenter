@@ -13,7 +13,8 @@ a **System admin** badge for system administrators. A system administrator can:
 
 ![The Users page with one system administrator and two ordinary users.](images/users-list.png)
 
-1. Create a user: press **+ New user**, which opens the form at `/users/new`, enter a user name, display name, and
+1. Create a user: press **+ New user**, which opens the form at `/users/new`, enter a user name (3 to 50 letters,
+   digits, `.`, `_`, or `-`; unique regardless of letter case), display name, and
    password, tick **System administrator** if the user is to be one, and create the user. **Cancel** goes back to the
    list, and so does a successful creation. A new user is a member of no project until a project administrator or a
    system administrator adds the user to one (see [Access and Visibility](#access-and-visibility)).
@@ -108,7 +109,8 @@ has passed. System administrators are not limited, and the count is kept in memo
 Each attempt is counted when it starts, so many attempts made at the same time cannot get past the limit.
 
 **Create an account for someone new.** On the same page, **Create a new account** opens
-`/projects/{id}/members/account`. Enter a user name and a display name, choose whether the person is a project admin,
+`/projects/{id}/members/account`. Enter a user name (3 to 50 letters, digits, `.`, `_`, or `-`) and a display name,
+choose whether the person is a project admin,
 and press **Create account**. The account exists only together with its membership in this project (recorded as
 `project.account-created`). ReviewCenter generates a **temporary password** and shows it **once**, with a **Copy**
 button; nobody types or chooses it, and it is never written to the audit trail or a log. Give it to the person right
@@ -393,7 +395,8 @@ head hash is a manual step, and it is most useful after important events such as
   are tracked at once; while that table is full of keys from the last minute, an event for a new key is not recorded.
   The trail then shows one `audit.events-suppressed` entry per minute (and the server log one warning). The first
   entry only says that events were left out; each next one says how many were left out in the minute before it.
-- The trail does not hold the address of the client; only the log of the web server has it.
+- The trail holds no address of a client, with one exception: the entries `token.use-failed` and `token.use-throttled`
+  name the address from which a token was refused. Everything else about addresses is only in the log of the web server.
 - A wrong current password on the account page is recorded as `auth.sign-in-failed`, because it is checked in the same
   way as a sign-in and counts toward the same lockout; an attempt there on a locked account is not recorded. A wrong
   password at a signature is recorded as `signature.reauth-failed`. A wrong code at the second step of a sign-in is
