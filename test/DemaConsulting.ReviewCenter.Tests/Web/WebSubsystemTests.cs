@@ -405,6 +405,32 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the inbox route sends a visitor who is not signed in to the login page, which returns to the
+    ///     inbox, and shows nothing of the inbox.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_InboxPage_Unauthenticated_IsChallenged()
+    {
+        // Arrange: start the real pipeline in memory; nobody is signed in
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = new TestBrowser(app);
+
+        // Act: request the inbox
+        var response = await browser.Client.GetAsync("/inbox", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: a redirect to the login page that returns to the inbox, and no inbox in the body
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("/login?ReturnUrl=", response.Headers.Location?.OriginalString, StringComparison.Ordinal);
+        Assert.Contains(
+            Uri.EscapeDataString("/inbox"),
+            response.Headers.Location?.OriginalString,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("inbox-page", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that every interactive element (a, button, input, select, textarea) on every page has a stable
     ///     kebab-case <c>data-testid</c>, so UI tests never need to depend on text or layout.
     /// </summary>
@@ -428,8 +454,10 @@ public partial class WebSubsystemTests
             "/about",
             "/help",
             "/help/getting-started",
+            "/help/inbox",
             "/help/no-such-topic",
             "/account",
+            "/inbox",
             "/users",
             "/users/new",
             "/projects",

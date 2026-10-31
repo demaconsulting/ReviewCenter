@@ -511,7 +511,9 @@ reviews:
       - "docs/design/review-center/web/home-page.md"
       - "docs/verification/review-center/web/home-page.md"
       - "src/**/Web/HomePage.razor"
+      - "src/**/Web/HomePage.razor.cs"
       - "test/**/Web/HomePageTests.cs"
+      - "test/**/Web/InboxWebTestBase.cs"
       - "test/**/Web/PageTestBase.cs"
       - "test/**/Web/SignedInUserAccess.cs"
 
@@ -633,6 +635,8 @@ reviews:
       - "test/**/Web/ReviewPageRepositoryTests.cs"
       - "test/**/Web/ReviewPageFollowUpTests.cs"
       - "test/**/Web/ReviewPageDiffTests.cs"
+      - "test/**/Web/ReviewPageUnreadTests.cs"
+      - "test/**/Web/InboxWebTestBase.cs"
       - "test/**/Web/ReviewLinksTests.cs"
       - "test/**/Identity/OidcReauthTests.cs"
       - "test/**/Web/ReviewDeepLinkTests.cs"
@@ -773,6 +777,23 @@ reviews:
       - "src/**/Web/NewRepositoryPage.razor.cs"
       - "test/**/Web/RepositoriesPageTests.cs"
 
+  - id: ReviewCenter-Web-InboxPage
+    title: Review of ReviewCenter InboxPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/inbox-page.yaml"
+      - "docs/design/review-center/web/inbox-page.md"
+      - "docs/verification/review-center/web/inbox-page.md"
+      - "docs/sysml2/model/review-center/web/inbox-page.sysml"
+      - "src/**/Web/InboxPage.razor"
+      - "src/**/Web/InboxPage.razor.cs"
+      - "test/**/Web/InboxPageTests.cs"
+      - "test/**/Web/InboxWebTestBase.cs"
+      - "test/**/Web/PageTestBase.cs"
   # ReviewCenter - Core
   - id: ReviewCenter-Core
     title: Review of ReviewCenter Core subsystem architecture and interfaces
@@ -788,6 +809,7 @@ reviews:
       - "test/**/Core/FakeUserStore.cs"
       - "test/**/Core/FakeAuditStore.cs"
       - "test/**/Core/FakeRepositoryStore.cs"
+      - "test/**/Core/FakeInboxStore.cs"
       - "test/**/Core/AuditTestExtensions.cs"
       - "test/**/Core/AllowAllProjectAccess.cs"
       - "test/**/Core/TestServices.cs"
@@ -1208,6 +1230,28 @@ reviews:
       - "test/**/Core/MustChangePasswordTests.cs"
       - "test/**/Core/FakePersonalAccessTokenStore.cs"
 
+  - id: ReviewCenter-Core-InboxService
+    title: Review of ReviewCenter InboxService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/inbox-service.yaml"
+      - "docs/design/review-center/core/inbox-service.md"
+      - "docs/verification/review-center/core/inbox-service.md"
+      - "docs/sysml2/model/review-center/core/inbox-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/InboxService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/InboxRules.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/InboxItem.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IInboxStore.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewUserState.cs"
+      - "test/**/Core/InboxServiceTests.cs"
+      - "test/**/Core/InboxRulesTests.cs"
+      - "test/**/Core/InboxTestWorld.cs"
+      - "test/**/Core/FakeInboxStore.cs"
+
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
     title: Review of ReviewCenter Storage subsystem architecture and interfaces
@@ -1347,6 +1391,21 @@ reviews:
       - "docs/sysml2/model/review-center/storage/totp-store.sysml"
       - "src/**/Storage/TotpStore.cs"
       - "test/**/Storage/TotpStoreTests.cs"
+
+  - id: ReviewCenter-Storage-InboxStore
+    title: Review of ReviewCenter InboxStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/inbox-store.yaml"
+      - "docs/design/review-center/storage/inbox-store.md"
+      - "docs/verification/review-center/storage/inbox-store.md"
+      - "docs/sysml2/model/review-center/storage/inbox-store.sysml"
+      - "src/**/Storage/InboxStore.cs"
+      - "test/**/Storage/InboxStoreTests.cs"
 
   # ReviewCenter - ContentSources
   - id: ReviewCenter-ContentSources

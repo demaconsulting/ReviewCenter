@@ -94,14 +94,14 @@ response.
 - *Preconditions*: Neither argument is null.
 - *Postconditions*: The `Database` options, a `ReviewCenterDbContext` factory configured by
   `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`,
-  `PersonalAccessTokenStore`, `TotpStore`, and `AuditStore` as
+  `PersonalAccessTokenStore`, `TotpStore`, `InboxStore`, and `AuditStore` as
   the Core store interfaces, `PasswordHasher` as the Core hasher interface, `TotpAlgorithm` and `TotpSecretProtector`
   as the Core second factor interfaces, `ProjectAccess` as the Core interface
   `IProjectAccess` (one singleton that every service and the API share, registered before the services that take it),
   and `ProjectService`, `ReviewService`,
   `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, `ReauthProofStore`
   (the single-use proofs of users of an identity provider, shared by the sign-in and the signing service),
-  `TotpChallengeStore` and `TotpService` (the second factor), and
+  `TotpChallengeStore` and `TotpService` (the second factor), `InboxService` (the inbox and the read state), and
   `AuditService`
   as singletons are registered. `TotpSignIn.AddTotpSignIn` binds the `Identity:Totp` settings.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
@@ -321,11 +321,11 @@ always disposed.
 - **Context** — supplies `Urls` and `Silent`, and receives start-up error reports.
 - **App** — the root component mapped as the user interface.
 - **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **PersonalAccessTokenStore**,
-  **TotpStore**,
+  **TotpStore**, **InboxStore**,
   **AuditStore**, **AuditAppender**,
   **RepositoryStore** — the database configuration, context, and stores registered for the pages.
 - **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**,
-  **PersonalAccessTokenService**, **SigningService**, **TotpService**, **TotpChallengeStore**,
+  **PersonalAccessTokenService**, **SigningService**, **TotpService**, **TotpChallengeStore**, **InboxService**,
   **AuditService**, **RepositoryService** — the Core services registered for the pages and the API.
 - **ProjectAccess**, **IProjectAccess** — Core; the one place that decides which project a user may see, registered as a
   singleton for the services, the pages, and the API.

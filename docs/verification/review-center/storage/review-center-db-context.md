@@ -56,6 +56,10 @@ be loadable on the test platform.
   `RequireIndependentReviewers` column set (a column of the `Projects` table without a database default, whose value
   comes from the entity). The `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns of the project
   table are created the same way and read back with the project.
+- The table for the read state of the inbox is created, and so are the indexes of the slot reviewers and of the review
+  creator that the inbox query uses (`DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`); the
+  rows of the read state are removed together with their review or user, and the real store is verified in the tests of
+  the `InboxStore` unit.
 
 #### Test Scenarios
 
@@ -212,3 +216,8 @@ followed review of a review, and the carried rows that a review holds only while
 scenario is tested by `ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview`. The columns themselves are
 verified by `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`, which is described with the `ReviewStore`
 unit.
+
+**DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes**: Creating the database makes the table of the
+read state of the inbox and the indexes of the slot reviewers and of the review creator, and the table is empty. This
+scenario is tested by `DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`, which is defined in
+`DatabaseSetupTests.cs`.

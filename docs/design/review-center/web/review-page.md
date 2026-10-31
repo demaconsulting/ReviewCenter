@@ -143,6 +143,14 @@ has acted since so that a failure report is no longer shown. The settings of the
 
 **InteractiveMarker**: as for the other pages.
 
+**Unread markers**: **UnreadBaselineCommentId** is the highest comment identity the user had seen before this visit,
+read by `InboxService.GetReviewUnreadAsync` when the review is loaded (zero for a first visit). A comment of somebody
+else with a higher identity is new for the whole life of the page, so the markers stay while the reader works. The page
+shows `index-unread-{id}` (a "New" badge on a row of the thread index, the suffix is the thread identity),
+`thread-unread-{id}` (a "New" badge on a thread with a new comment), and `review-unread-summary` (the
+sentence with the number of new comments), and shows none of them for the user's own comments or when nothing is new.
+**SeenAt** is the time read before the review was loaded, and **MarkSeenPending** says that the state still has to be
+stored.
 **IndexFilter**: the state the thread index shows (`Open` by default, `Resolved`, or `null` for all).
 **ExpandedThreads**: the identities of the resolved threads the reader has expanded; an open thread is always shown
 expanded. **FocusedThreadId**: the thread chosen in the index, whose lines and card are highlighted. The page also
@@ -443,8 +451,20 @@ is unavailable:" with the reason of the provider instead of the link. A review t
 page never signs: the download is a plain authenticated `GET` handled by `AttestationEndpoint`, and the page only
 decides whether to offer it.
 
-**OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, and, when a
-replacement address is pending, calls the browser function `reviewCenter.replaceUrl` (defined in `App`) with it. Then,
+**OnParametersSetAsync** (unread state): The time is read before anything is loaded and kept as the time seen. After the
+review is loaded for a signed-in user, `InboxService.GetReviewUnreadAsync` gives the baseline and the page sets the
+mark-seen flag. A user who may not see the project gets a baseline of zero and nothing is stored.
+
+**OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection and, when the mark-seen
+flag is set, clears it and calls
+`InboxService.MarkSeenAsync` with the highest comment identity of the loaded threads written at or before the time
+seen, so a comment posted after the load began stays new. The flag is
+checked only here and not while the page is rendered first on the server, so only a review that was shown on a live
+connection counts as
+seen. The service checks the access again, so a user who may not view the review leaves no row behind. A change of the
+route to another review clears the baseline and the flag and reads them again. Then, when a
+replacement address is pending, the method calls the browser function `reviewCenter.replaceUrl` (defined in `App`)
+with it. Then,
 when a scroll
 target is set, it calls the browser function `reviewCenter.scrollToTestId` (defined in `App`) once with the test id and
 where it should land (`start` or `center`) and clears the target. Highlighting is done by the page itself (a
@@ -526,6 +546,8 @@ page.
 - **ThreadService** — starts (on the Head or the Baseline side), answers, resolves, reopens, and lists threads, and
   shapes them for the index.
 - **ChecklistService** — reads the checklist progress for the summary.
+- **InboxService** — reads what the user has seen of the review before the visit, stores what the user has seen after
+  the review was shown, and decides which comments are new (`CountUnread`, `MaxCommentId`).
 - **SigningService** — computes the approval status (blockers, record digest, next step, lock, reopen history), lists
   the users that can fill a slot, adds, changes, and removes slots, signs, and reopens a locked review; it holds every
   signing, lock, and reopen rule. It also tells

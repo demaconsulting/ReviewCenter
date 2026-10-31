@@ -1377,4 +1377,48 @@ public class CoreSubsystemTests
         Assert.True(review.CreatedViaApi);
         Assert.Equal(DomainRule.ReviewerNotIndependent, ex.Rule);
     }
+
+    /// <summary>
+    ///     Test the inbox workflow end to end over the real services: what waits for the reviewers and the author
+    ///     appears as thread, signature and approval happen, and the action count follows the distinct reviews.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts()
+    {
+        // Arrange: a review by the author with reviewers ann and bob; ann asks a question and bob answers
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        var annSlot = await world.AddSlotAsync("r1", "ann");
+        var bobSlot = await world.AddSlotAsync("r1", "bob");
+        var thread = await world.StartThreadAsync("r1", "ann", "Why?");
+        await world.ReplyAsync("r1", thread.Id, "bob", "Because");
+
+        // Act and Assert: ann has the review twice (to sign and a reply waiting) but counts it once
+        var ann = await world.InboxOfAsync("ann");
+        Assert.Equal([InboxSection.ToSign, InboxSection.RepliesWaiting], ann.Items.Select(item => item.Section));
+        Assert.Equal(1, ann.ActionCount);
+        Assert.Equal(1, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("ann"), cancellationToken));
+
+        // Assert: bob only has to sign, the author waits for the replies
+        Assert.Equal([InboxSection.ToSign], (await world.InboxOfAsync("bob")).Items.Select(item => item.Section));
+        Assert.Equal([InboxSection.RepliesWaiting], (await world.InboxOfAsync("author")).Items.Select(item => item.Section));
+
+        // Act: resolve the thread, answer every check, and let both reviewers sign
+        await world.Threads.ResolveAsync(world.ProjectId, "r1", thread.Id, cancellationToken);
+        await world.AnswerAllAsync("r1");
+        await world.SignAsync("r1", annSlot.Id, "ann");
+        Assert.Equal(0, (await world.InboxOfAsync("ann")).ActionCount);
+        await world.SignAsync("r1", bobSlot.Id, "bob");
+
+        // Assert: nothing is left to do; ann and the author are told about the approval, bob signed last himself
+        Assert.Equal(0, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("ann"), cancellationToken));
+        var annItem = Assert.Single((await world.InboxOfAsync("ann")).Items);
+        Assert.Equal(InboxSection.Updates, annItem.Section);
+        Assert.Equal(InboxService.ApprovedChip, annItem.Chip);
+        Assert.Equal(
+            [InboxSection.Updates], (await world.InboxOfAsync("author")).Items.Select(item => item.Section));
+        Assert.Empty((await world.InboxOfAsync("bob")).Items);
+    }
 }
+

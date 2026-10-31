@@ -5,11 +5,12 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains sixteen units: `App`, the HTML shell with the stored-theme
+shows and how it responds to user actions. It contains seventeen units: `App`, the HTML shell with the stored-theme
 script, the URL router, the page frame (the menu bar with the product name, the primary navigation, the Help link
 and the sign-in controls, and the footer with the version and the link to the About page), and the `SessionGate`
 that replaces an open page when its user is no longer signed in; `HomePage`, the landing page served at the root URL,
-with a Get started section for signed-in users; `AboutPage` and `HelpPage`, the pages that describe the product and
+with a Get started section for signed-in users that starts with the inbox and its count; `AboutPage` and `HelpPage`,
+the pages that describe the product and
 explain how to use it (`HelpPage` includes the index, a page for each topic, and the topic list `HelpTopics`);
 `ProjectsPage`,
 `ProjectPage`, `PlanPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, the planning of reviews from
@@ -26,9 +27,10 @@ appearance and managing one's personal access tokens, and managing users and who
 `HistoryPage` and `AuditPage`, the pages that
 show the history of a review and let a system administrator
 verify the audit trail (`AuditPage` includes `ProjectAuditPage`, the audit view of one project for its administrators,
-and `AuditEntryTable`, the table both audit pages share); and `RepositoriesPage`, the page where whoever manages a
+and `AuditEntryTable`, the table both audit pages share); `RepositoriesPage`, the page where whoever manages a
 project registers the git
-repositories of that project that its reviews can be created from (it includes `NewRepositoryPage`). Which projects
+repositories of that project that its reviews can be created from (it includes `NewRepositoryPage`); and `InboxPage`,
+the page that lists the reviews that wait for the signed-in user, which is also the list of notifications. Which projects
 a user sees is decided by project membership: a system administrator sees every project and any other user the
 projects of which the user is a member, and the pages ask the `Core` access service instead of deciding for
 themselves. The subsystem
@@ -44,8 +46,9 @@ all domain behavior and never access the database.
 - *Type*: HTTP `GET`; there is no live connection, because the page is plain server-rendered markup.
 - *Role*: Provider.
 - *Contract*: Returns an HTML document titled "ReviewCenter" containing the home page: the product name and the
-  tagline, and for a signed-in user a Get started section with a link card to the projects page and, for a
-  system administrator, to the audit and users pages (three cards in all).
+  tagline, and for a signed-in user a Get started section with a link card to the inbox page, with the number of reviews
+  that need action, and to the projects page and, for a
+  system administrator, to the audit and users pages (four cards in all).
 - *Constraints*: The page is open to anonymous visitors, who see only the tagline.
 
 **About and Help routes** (`GET /about`, `GET /help`, `GET /help/{topic}`): The pages that describe the product.
@@ -80,6 +83,16 @@ all domain behavior and never access the database.
   `error` is present, a message about too many attempts when it is `throttled`, and a link back to the sign-in page.
   Without a live challenge it redirects to `/login?error=totp-expired`.
 - *Constraints*: Open to anonymous visitors, but useful only with the challenge cookie of a right password.
+
+**Inbox route** (`GET /inbox`): The inbox of the signed-in user.
+
+- *Type*: HTTP `GET` with an interactive server session (the "Mark all as read" button needs the live connection).
+- *Role*: Provider.
+- *Contract*: Shows the reviews that wait for the user in the groups To sign, Replies waiting, Failed checks, and
+  Updates, each row with a link to the review, a chip, a New badge when it is unread, and the due date, and a summary
+  line with the number of reviews that need action. The button marks every listed review as seen.
+- *Constraints*: Needs a signed-in user; a request without a sign-in is challenged. Only reviews of projects the user
+  can see are listed.
 
 **Project routes** (`GET /projects`, `GET /projects/new`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
 `GET /projects/{id}/reviews/new`, `GET /projects/{id}/reviews/{reviewId}`,
@@ -260,12 +273,13 @@ address), and on the ASP.NET Core Blazor components framework.
 #### Pages and domain access
 
 `ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
-`AuditPage`, and `RepositoriesPage`, and the pages they include (`NewProjectPage`, `NewReviewPage`, `NewMemberPage`,
+`AuditPage`, `RepositoriesPage`, and `InboxPage`, and the pages they include (`NewProjectPage`, `NewReviewPage`, `NewMemberPage`,
 `NewMemberAccountPage`, `ProjectAuditPage`, `NewRepositoryPage`, and `NewUserPage`), follow the pattern of
 the interactive pages: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
-`ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`, `RepositoryService`,
+`ThreadService`, `ChecklistService`, `SigningService`, and `InboxService` (for the unread markers); `InboxPage` and
+`HomePage`: `InboxService`; `ProjectPage`: also `SigningService`, `RepositoryService`,
 and `IProjectAccess`; `NewMemberPage` and `NewMemberAccountPage`: `ProjectService` and `IProjectAccess`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
@@ -633,6 +647,17 @@ fields are password inputs, the values are cleared right after every attempt, an
 "no token". Because a stored token cannot be read back, editing offers three explicit choices (keep, replace, or
 clear), and the default is to keep. Repositories can be disabled but not deleted. The pages show breadcrumb links to
 the projects page and to the project.
+
+#### Inbox
+
+`InboxPage` shows the reviews that wait for the signed-in user and contains no rules: which reviews are listed, why,
+and what is new are decided by `InboxService` in `Core`. The inbox is also the list of notifications; there is no
+notification record, because every row is computed from the review data when the page opens, and the only state is one
+row per user and review that says what the user has already seen. `ReviewPage` reads that row before it shows a review
+and marks the comments of other people that are newer than it with a New badge, and stores the new state after the
+review was shown on a live connection. `HomePage` shows the number of reviews that need action. The state is a personal
+convenience: it is not audited and not part of the signed record. The page has no tab in the frame; it is reached from
+the Get started section of the home page.
 
 #### Test identifiers
 

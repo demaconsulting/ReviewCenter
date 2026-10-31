@@ -5,13 +5,19 @@
 #### Purpose
 
 `HomePage` is the landing page served at the root URL. Its responsibilities are to show the product name and
-tagline and, for a signed-in user, to offer a short "Get started" list of links to the pages the user can use. It is
-rendered on the server as plain markup and uses no live connection. It is a Razor component with presentation only
-(`HomePage.razor`, no code-behind), and it is open to anonymous visitors, who see only the name and the tagline.
+tagline and, for a signed-in user, to offer a short "Get started" list of links to the pages the user can use, the
+inbox first with the number of reviews that need the user's action. It is
+rendered on the server as plain markup and uses no live connection. It is a Razor component split into presentation
+(`HomePage.razor`) and a small code-behind (`HomePage.razor.cs`) that reads the count, and it is open to anonymous
+visitors, who see only the name and the tagline.
 
 #### Data Model
 
-The page holds no state. It is built from two nested authorize views of the Blazor authorization components. The outer
+The page holds one value, **ActionCount**, the number of reviews that need the user's action, read once in
+`OnInitializedAsync` with `InboxService.CountAsync` for the signed-in actor (zero for an anonymous visitor and for a
+user without access, without an error). Nothing is written. The sentence of the inbox card is "Nothing needs your
+action." for zero, "1 needs your action." for one, and "N need your action." otherwise. The markup is built from two
+nested authorize views of the Blazor authorization components. The outer
 one shows the "Get started" section to any signed-in user; the inner one, restricted to the system administrator role
 named by `SignIn.AdminRole`, adds the links that only a system administrator can use. The section is a `card` and its
 entries are
@@ -20,31 +26,35 @@ an `item-list`, each entry being a link followed by a one-line description in th
 
 The entries are:
 
+- **Inbox**: for every signed-in user; links to `/inbox`, with the sentence of the count as its description.
 - **Projects**: for every signed-in user; links to `/projects`.
 - **Audit**: for a system administrator; links to `/audit`.
 - **Users**: for a system administrator; links to `/users`.
 
 There is no entry for repositories: they belong to the projects and are reached from the page of a project. A system
-administrator sees three entries and any other user one.
+administrator sees four entries and any other user two.
 
 The markup gives each element a stable `data-testid` so that tests and tooling can find it: `home-page` (root
-element), `home-get-started` (the section), and `home-card-projects`, `home-card-audit`,
+element), `home-get-started` (the section), `home-card-inbox`, `home-inbox-count` (the sentence of the inbox card),
+`home-card-projects`, `home-card-audit`,
 and `home-card-users` (the links). There is no `data-interactive` marker, because the page has no live connection. The
 page has no link to the home page itself; the brand link in the header of every page (see `App`) serves that purpose.
 
 #### Key Methods
 
-N/A - the unit has no handlers; the links are followed by the browser.
+**OnInitializedAsync**: Reads the number of reviews that need action for the signed-in actor. The links are followed by
+the browser.
 
 #### Error Handling
 
-N/A - the unit contains no error-producing logic. The system administrator links are a convenience that mirrors the
+The unit contains no error-producing logic of its own. The system administrator links are a convenience that mirrors the
 header; the
 access rules are enforced by the target pages and the authorization of the `Identity` subsystem, so a hidden link is
-not a protection.
+not a protection. A user without access gets the count zero from the service.
 
 #### Dependencies
 
+- **InboxService** — counts the reviews that need action.
 - **SignIn** — `SignIn.AdminRole` names the role that sees the system administration links.
 - **ASP.NET Core Blazor components** — page routing, page title support, and the authorize view that reads the
   authentication state.

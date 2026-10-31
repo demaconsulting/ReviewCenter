@@ -346,6 +346,19 @@ Open the review; in the locked notice, enter a **Reason for reopening** (require
 - Reopen only when the approval must really be undone: it makes every signature of the review worthless for the
   current record, and nothing takes the reopen back.
 
+## Inbox and Read State
+
+Every user has an inbox of the reviews that wait for them (see Your Inbox in the Reviewing chapter). It is built from
+the reviews in which the user is named in a slot or is the author, and from what is stored about what the user has
+seen. Nothing needs to be set up, and no setting turns it off.
+
+- The read state (when a user last saw a review, and the highest comment seen) is stored for each user and review. It
+  is not an entry of the audit trail and it is not part of the record that a signature binds to, so reading a review
+  never makes a signature out of date and never adds an audit entry.
+- Administrators cannot read the inbox of another user, and a system administrator who is no member of a project sees
+  in the inbox only the reviews in which that person is named as a reviewer or the author.
+- Deleting a user or a review deletes the read state that belongs to it.
+
 ## Audit Trail
 
 ReviewCenter records every change that the application makes to projects, reviews, comments, checklists, reviewer

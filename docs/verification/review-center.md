@@ -433,6 +433,12 @@ with the same code give exactly one success, which is tested by
 rules, the store, the settings, and the pages are verified in the `Identity`, `Core`, `Storage`, `Hosting`, and `Web`
 subsystems.
 
+**Inbox**: A reviewer who is named in a slot finds the review in the inbox as a signature to give; the home page counts
+it, the item is gone once the reviewer has signed, and reading and signing leave no inbox or read-state event in the
+audit trail. This scenario is tested by the system test
+`ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned`. The service, the store, the route, and the
+pages are verified in the `Core`, `Storage`, `Hosting`, and `Web` subsystems.
+
 **Review checklist**: Two checks of a new review are answered through the domain service over the real pipeline, one
 Pass and one Fail with a justification; the checklist page, requested twice, shows the progress, the pressed Pass
 button, and the justification, and the review page shows the progress summary, the link to the checklist page, and

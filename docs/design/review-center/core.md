@@ -11,7 +11,7 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains twenty-two units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains twenty-three units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
@@ -31,7 +31,9 @@ created from, with their credentials; `SelectionMatcher`, the file pattern langu
 repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression;
 `LineDiff`, the comparison of the lines of two versions of a file and its division into shown and collapsed regions;
 `ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository; and
-`PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner. The
+`PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner; and
+`InboxService`, the inbox of a user (the reviews that wait for the user, in four groups, which also serves as the list
+of notifications) and the read state that marks what is new. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
@@ -47,13 +49,15 @@ revisions and selection a creation request names, before they are resolved), `Ch
 `PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the personal access token
 types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the second factor types
 (`UserTotp`, `TotpRecoveryCode`, `TotpSettings`, `TotpEnrollment`, `TotpStatus`, `TotpSignInOutcome`,
-`TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the text and line
+`TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the inbox types (`InboxSection`, `InboxItem`, `InboxView`,
+`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the text and line
 definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IProjectAccess`, `IReviewStore`,
 `IUserStore`,
-`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ITotpStore`, `ITotpAlgorithm`, `ITotpSecretProtector`,
+`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ITotpStore`, `IInboxStore`, `ITotpAlgorithm`,
+`ITotpSecretProtector`,
 `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
 `IReviewSetParser`, and `IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
@@ -236,6 +240,25 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   change whose result says whether this caller made it, so two requests can never both succeed. A change that is
   audited is stored in the same transaction as its entry. Every read returns a new object.
 
+**InboxService**: The operations the `Web` subsystem uses for the inbox and for the unread markers.
+
+- *Type*: In-process .NET class.
+- *Role*: Provider.
+- *Contract*: Build the inbox of an actor (the groups to sign, replies waiting, failed checks, and updates, with a
+  count of the reviews that need action), count the reviews that need action, read what the actor has seen of a
+  review, store it, and mark every review of the inbox as seen. Only reviews of projects the actor can see are
+  considered, and an anonymous actor, an unknown user, a disabled user, and a user with a temporary password get an
+  empty inbox without an error.
+- *Constraints*: Read state is stored in one row per user and review, never moves back, is not audited, and is not part
+  of the record digest. There is no notification record: the inbox is computed from the review data.
+
+**IInboxStore**: The store interface the subsystem requires for the read state and for finding the reviews of a user.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `InboxStore` in the `Storage` subsystem).
+- *Contract*: List the reviews in which a user is a reviewer or the creator without loading their files, list and read
+  the read-state rows of a user, and mark one or several reviews as seen.
+- *Constraints*: Marking is a monotonic upsert that is safe for parallel calls. Every read returns a new object.
 **ITotpAlgorithm and ITotpSecretProtector**: The ports the subsystem requires for the one-time password algorithm
 (secrets, Base32 text, the `otpauth://` address, codes, and verification) and for the encryption of the secret.
 

@@ -27,7 +27,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <summary>
 ///     Unit tests for the <see cref="HomePage"/> component, rendered in memory with bUnit.
 /// </summary>
-public class HomePageTests : PageTestBase
+public class HomePageTests : InboxWebTestBase
 {
     /// <summary>
     ///     Test that the page shows the product title heading and sets the document title.
@@ -63,10 +63,10 @@ public class HomePageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a signed-in reviewer sees the Get started section with only the Projects link.
+    ///     Test that a signed-in reviewer sees the Get started section with the Inbox and Projects links only.
     /// </summary>
     [Fact]
-    public void HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly()
+    public void HomePage_Render_Reviewer_ShowsInboxAndProjectsCards()
     {
         // Arrange: a reviewer is signed in
         SignInAs("bea", "Bea", UserRole.Reviewer);
@@ -74,9 +74,34 @@ public class HomePageTests : PageTestBase
         // Act: render the page
         var cut = Render<HomePage>();
 
-        // Assert: one link, to the projects page
+        // Assert: two links, to the inbox and to the projects page
+        Assert.Equal("/inbox", cut.Find("[data-testid='home-card-inbox']").GetAttribute("href"));
         Assert.Equal("/projects", cut.Find("[data-testid='home-card-projects']").GetAttribute("href"));
-        Assert.Single(cut.FindAll("a"));
+        Assert.Equal(2, cut.FindAll("a").Count);
+        Assert.Equal("Nothing needs your action.", cut.Find("[data-testid='home-inbox-count']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the inbox card says how many reviews need the signed-in user's action.
+    /// </summary>
+    [Fact]
+    public async Task HomePage_Render_Reviewer_InboxCardShowsActionCount()
+    {
+        // Arrange: ann must sign one review
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        SignInAs("ann", "Ann", false);
+
+        // Act: render the page
+        var first = Render<HomePage>();
+
+        // Assert: the singular sentence; with a second review the plural one
+        Assert.Equal("1 needs your action.", first.Find("[data-testid='home-inbox-count']").TextContent);
+        await CreateInboxReviewAsync("r2");
+        await AddSlotAsync("r2", "ann");
+        var second = Render<HomePage>();
+        Assert.Equal("2 need your action.", second.Find("[data-testid='home-inbox-count']").TextContent);
     }
 
     /// <summary>
@@ -91,9 +116,10 @@ public class HomePageTests : PageTestBase
         // Act: render the page
         var cut = Render<HomePage>();
 
-        // Assert: the three links, each to its page; repositories belong to projects and have no card
-        Assert.Equal(3, cut.FindAll("a").Count);
+        // Assert: the four links, each to its page; repositories belong to projects and have no card
+        Assert.Equal(4, cut.FindAll("a").Count);
         Assert.Empty(cut.FindAll("[data-testid='home-card-repositories']"));
+        Assert.Equal("/inbox", cut.Find("[data-testid='home-card-inbox']").GetAttribute("href"));
         Assert.Equal("/audit", cut.Find("[data-testid='home-card-audit']").GetAttribute("href"));
         Assert.Equal("/users", cut.Find("[data-testid='home-card-users']").GetAttribute("href"));
     }

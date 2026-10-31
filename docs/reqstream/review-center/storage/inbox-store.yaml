@@ -1,0 +1,46 @@
+---
+# Software Unit Requirements for the InboxStore Class
+#
+# The InboxStore class keeps what each user has seen of each review in the database and finds the reviews in which a
+# user is a reviewer or the creator. It holds no rule of the inbox; the rules are in the InboxService class.
+
+sections:
+  - title: InboxStore Unit Requirements
+    requirements:
+      - id: ReviewCenter-InboxStore-Candidates
+        title: >-
+          The InboxStore class shall find the reviews in which a user is the primary or the alternate reviewer of a
+          slot or is the creator, matching the creator by user name without regard to case, shall give for each only
+          the project, the identifier, the title, the creator, and the due date without loading any file, and shall
+          not find a review in which the user has no part.
+        justification: |
+          The inbox must not read every review of every project. Finding only the reviews that concern the user, and
+          only the fields the list needs, keeps the cost of the page small however many reviews exist.
+        tests:
+          - InboxStore_ListInvolvedReviewsAsync_PrimaryAlternateAndCreator_AreFound
+          - InboxStore_ListInvolvedReviewsAsync_DoesNotLoadFiles_ReturnsLightRecords
+
+      - id: ReviewCenter-InboxStore-UserState
+        title: >-
+          The InboxStore class shall store for a user and a review the newest comment and the time that the user has
+          seen, insert the row on the first visit and update it later, never move either value back, also when many
+          visits arrive at the same moment, without any of them failing and with the highest value left, and shall
+          return only the rows of the user asked for.
+        justification: |
+          Two tabs or a double click must not lose a newer value or end in an error, and one user must never read
+          the state of another.
+        tests:
+          - InboxStore_MarkSeenAsync_InsertsThenUpdatesAndNeverMovesBackwards
+          - InboxStore_MarkSeenAsync_ParallelCalls_NoExceptionAndHighestWins
+          - InboxStore_ListStatesAsync_ReturnsOnlyTheUsersRows
+          - InboxStore_NullArguments_Throw
+
+      - id: ReviewCenter-InboxStore-Cascade
+        title: >-
+          The InboxStore class shall leave no state behind for a review that is deleted or a user that is deleted.
+        justification: |
+          A state row without its review or user is a record about nothing, and a deleted user's data should not
+          outlive the user.
+        tests:
+          - InboxStore_DeletingTheReview_DeletesTheStates
+          - InboxStore_DeletingTheUser_DeletesTheStates

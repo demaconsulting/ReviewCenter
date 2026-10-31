@@ -252,6 +252,33 @@ The page never shows text printed by git, the location of the repository, or a c
   page that needs a role from an
   already open page is checked against the role you had when the page was opened.
 
+## Your Inbox
+
+The **Inbox** (`/inbox`, linked from the home page) lists the reviews that wait for you, so you do not have to open
+every project to find them. Each row shows the project, the review, a short chip, and a link that opens the review.
+A review appears in the inbox only when you are named in it: as the primary or alternate reviewer of a slot, or as the
+author of the review. Someone who only wrote a comment in another person's review is not shown it.
+
+| Group | What it lists | Chip |
+| ----- | ------------- | ---- |
+| To sign | A slot of yours that is unsigned or out of date | "Not signed", "Out of date, sign again" |
+| Replies waiting | An open thread whose latest comment is by someone else | "N waiting" |
+| Failed checks | Checks of your own review that someone answered Fail | "N failed" |
+| Updates | A review that someone else approved or reopened since you last looked | "Approved" or "Reopened" |
+
+Only the first three groups need your action. They also show the due date of the review, marked "Overdue" when it is
+past, and the home page card and the summary line at the top of the inbox count the distinct reviews
+in them. The Updates group is for information: it is not counted, and a row goes away once you open the review.
+An approved review needs no one's action any more, so it appears only as an update for the others. Auditors, who may
+only read, are shown no signature to give and no reply waiting. An empty inbox says that nothing needs your action.
+
+A row you have not looked at yet carries a **New** marker. Opening the review marks it seen. **Mark all as read**
+(shown when the inbox has rows) marks every listed review as seen at once, also the ones you never opened; it changes
+nothing in a review.
+
+The read state is kept for each user and review, so it is yours alone. It is not part of the signed record of a review
+and not an entry of the audit trail, so looking at a review never changes whether a signature is current.
+
 ## Review Comments
 
 Select a file on the review page to read it as numbered lines and to discuss it in comment threads. The line at the
@@ -291,6 +318,11 @@ disabled, and no thread can be started, answered, resolved, or reopened (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)). Comments posted by other people appear when you reload
 the page or take an action on it. Comment text is
 always shown as plain text; any markup in it is displayed as typed.
+
+Comments of other people that you have not seen yet carry a **New** marker in the summary line, in the thread index,
+and in the thread. Your own comments are never marked. The page remembers what you have seen when it is open, so the
+markers are gone the next time you open the review; see [Your Inbox](#your-inbox) for the list of what is new
+across all reviews.
 
 ### Sharing links
 

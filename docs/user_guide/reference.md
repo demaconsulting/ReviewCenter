@@ -286,6 +286,31 @@ same holds for a database created before the follow-up review existed: it lacks 
 `Reviews.CarriedAnswerCount`, `Reviews.CarriedThreadCount`, and the carried-from columns of the answers, the section
 states, and the threads.
 
+## Inbox Reference
+
+This section lists the rules of the inbox (see Your Inbox in the Reviewing chapter) in one place.
+
+| Group | A review is listed when | Needs action |
+| ----- | ----------------------- | ------------ |
+| To sign | You are primary or alternate of a slot that is not signed or out of date; not approved | Yes |
+| Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
+| Failed checks | You authored the review, it is not approved, and an applicable check is answered Fail | Yes |
+| Updates | Someone else completed the approval, or reopened the review, after you last saw it | No |
+
+- Only members who may contribute are given To sign and Replies waiting; an auditor gets neither. A user who is
+  disabled, has a temporary password, or is not a known user gets an empty inbox.
+- The count on the home page is the number of distinct reviews in the first three groups, so a review in two groups
+  counts once. Updates are never counted.
+- A comment is unread when it is by someone else and newer than the last comment you saw in that review. Your own
+  comments are never unread, whatever the case of your user name. A review to sign is marked New again when someone
+  else signs it, answers a check, writes a comment, or reopens it after you last saw it.
+- The read state is one row for each user and review, in the table `ReviewUserStates`, with the last time and the
+  highest comment seen. It only moves forward, it is removed with its review or user, and it is neither audited nor
+  part of the record digest.
+- A development database created before the inbox existed lacks the table `ReviewUserStates` and the indexes on the
+  reviewer slots and the creator of a review. ReviewCenter has no migrations, so delete such a database and let the
+  server create it again (see Database in the Administration chapter).
+
 ## Puppet Development Tool
 
 Puppet is a small developer helper for AI agents, not part of the distributed ReviewCenter executables. It keeps one

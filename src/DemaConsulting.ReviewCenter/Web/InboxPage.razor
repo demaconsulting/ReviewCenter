@@ -1,0 +1,82 @@
+@* InboxPage: the work waiting for the signed-in user, at "/inbox". The inbox is also the notification list: every row
+   is computed from the review data when the page opens, so there is nothing to clear except the "New" markers.
+
+   Four groups, in this order: "To sign" (a reviewer slot of the user without a current signature), "Replies waiting"
+   (someone answered in a thread of the user, or on the user's own review), "Failed checks" (the user's own review has
+   checks answered Fail) and "Updates" (a review of the user was approved or reopened by someone else since the user
+   last looked; for information only and not counted as work). A review can appear in several groups. Each row links
+   to the review, shows why it is listed as a chip, a "New" marker when the reason happened after the user last saw
+   the review, and the due date (marked when overdue) for the groups that need action. "Mark all as read" marks
+   every listed review as seen.
+
+   Presentation only; state lives in InboxPage.razor.cs. Every interactive element and every key value carries a
+   stable kebab-case data-testid (row-level ids carry the 1-based position of the row), and the data-interactive
+   marker on the root flips to "true" once the live circuit is connected.
+
+   Human factors: (a) the summary line says in one sentence how much needs action; (b) the empty state tells the user
+   plainly that nothing is waiting instead of showing a blank page; (c) the reason is a short chip, never color
+   alone; (d) the whole row is one link to the review.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/inbox"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>Inbox - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page" data-testid="inbox-page" data-interactive="@InteractiveMarker">
+    <div class="page-heading">
+        <h1>Inbox</h1>
+        @if (Items.Count > 0)
+        {
+            <button type="button" data-testid="inbox-mark-read" @onclick="MarkAllReadAsync">Mark all as read</button>
+        }
+    </div>
+    <p class="page-lead" data-testid="inbox-summary">@Summary</p>
+
+    @if (ActionCount == 0)
+    {
+        <p class="muted" data-testid="inbox-empty">Nothing needs your action.</p>
+    }
+
+    @foreach (var section in Sections)
+    {
+        var rows = Items.Where(item => item.Section == section).ToList();
+        if (rows.Count == 0)
+        {
+            continue;
+        }
+
+        <h2 class="section-title" data-testid="inbox-section-@SectionKey(section)">@SectionTitle(section)</h2>
+        <ul class="row-list" data-testid="inbox-list-@SectionKey(section)">
+            @foreach (var item in rows)
+            {
+                var n = Items.IndexOf(item) + 1;
+                <li class="row-card" data-testid="inbox-row-@n">
+                    <div class="row-main">
+                        <a class="row-title" href="/projects/@item.ProjectId/reviews/@item.ReviewId" data-testid="inbox-link-@n">@item.Title</a>
+                        <p class="muted" data-testid="inbox-review-@n">@item.ProjectName / @item.ReviewId</p>
+                        @if (item.Detail is { } detail)
+                        {
+                            <p class="muted" data-testid="inbox-detail-@n">@detail</p>
+                        }
+                    </div>
+                    <div class="row-meta">
+                        @if (item.IsUnread)
+                        {
+                            <span class="badge unread" data-testid="inbox-unread-@n">New</span>
+                        }
+                        <span class="badge @ChipClass(item)" data-testid="inbox-chip-@n">@item.Chip</span>
+                        @if (item.DueDate is { } due)
+                        {
+                            <span class="badge @(item.IsOverdue ? "failed" : null)" data-testid="inbox-due-@n">@(item.IsOverdue ? "Overdue" : "Due") @due.ToString("yyyy-MM-dd")</span>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</main>
+</SessionGate>

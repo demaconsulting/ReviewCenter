@@ -232,6 +232,43 @@ public class DatabaseSetupTests
     }
 
     /// <summary>
+    ///     Test that creating the database makes the read state table of the inbox and the indexes the inbox
+    ///     candidate query uses.
+    /// </summary>
+    [Fact]
+    public void DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        using var provider = new ServiceCollection()
+            .AddDbContextFactory<ReviewCenterDbContext>(builder => DatabaseSetup.Configure(builder, options))
+            .BuildServiceProvider();
+        var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+
+        // Act: create the database and read its schema
+        DatabaseSetup.EnsureCreated(factory, options);
+        using var context = factory.CreateDbContext();
+        context.Database.OpenConnection();
+        using var command = context.Database.GetDbConnection().CreateCommand();
+        command.CommandText = "SELECT type || ':' || name FROM sqlite_master";
+        var names = new List<string>();
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                names.Add(reader.GetString(0));
+            }
+        }
+
+        // Assert: the table, and one index for each column the candidate query filters on
+        Assert.Contains("table:ReviewUserStates", names);
+        Assert.Contains("index:IX_ReviewerSlots_PrimaryUserId", names);
+        Assert.Contains("index:IX_ReviewerSlots_AlternateUserId", names);
+        Assert.Contains("index:IX_Reviews_CreatedBy", names);
+        Assert.Empty(context.ReviewUserStates);
+    }
+
+    /// <summary>
     ///     Test that the missing-file check reports the full path of a database file that does not exist, nothing
     ///     for an existing file or a <c>file:</c> URI, rejects an unsupported provider, and never creates anything.
     /// </summary>

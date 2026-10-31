@@ -612,4 +612,72 @@ public class StorageSubsystemTests
         Assert.Equal("Original", review.Title);
         Assert.Equal(TestContent.FingerprintA, review.ContentFingerprint);
     }
+
+    /// <summary>
+    ///     Test that the inbox over a real database lists what waits for a reviewer, and that the read state written
+    ///     by one opening of the database is still there, and still honored, after it is closed and opened again.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var bob = new Actor("bob", "Bob");
+        int projectId;
+
+        // Act: ann authors a review and assigns bob as reviewer; bob's inbox lists it as new; he marks it seen
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var users = NewUserService(first.Provider);
+            var annUser = await users.CreateAsync("ann", "Ann", false, "correct horse battery", cancellationToken);
+            var bobUser = await users.CreateAsync("bob", "Bob", false, "correct horse battery", cancellationToken);
+            var project = await first.Projects.CreateAsync("Apollo", null, cancellationToken);
+            projectId = project.Id;
+            await first.Store.AddMembershipAsync(annUser.Id, projectId, cancellationToken);
+            await first.Store.AddMembershipAsync(bobUser.Id, projectId, cancellationToken);
+            await first.Reviews.CreateDraftAsync(
+                projectId, "rev-1", "First", [new("a.txt", TestContent.A)], new Actor("ann", "Ann"), cancellationToken);
+            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
+            await signing.AddSlotAsync(new Actor("ann", "Ann"), projectId, "rev-1", bobUser.Id, null, cancellationToken);
+            var inbox = NewInboxService(first.Provider, first.Store);
+            var view = await inbox.GetInboxAsync(bob, cancellationToken);
+            var item = Assert.Single(view.Items);
+            Assert.Equal((InboxSection.ToSign, "rev-1", true), (item.Section, item.ReviewId, item.IsUnread));
+            Assert.True(await inbox.MarkSeenAsync(bob, projectId, "rev-1", 0, null, cancellationToken));
+        }
+
+        // Act: open the same database again and ask for the inbox
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var inbox = NewInboxService(second.Provider, second.Store);
+            var view = await inbox.GetInboxAsync(bob, cancellationToken);
+
+            // Assert: the review is still listed, now as seen, and still needs the signature
+            var item = Assert.Single(view.Items);
+            Assert.Equal((InboxSection.ToSign, "rev-1", false), (item.Section, item.ReviewId, item.IsUnread));
+            Assert.Equal(1, view.ActionCount);
+            Assert.Equal(1, await inbox.CountAsync(bob, cancellationToken));
+        }
+    }
+
+    /// <summary>
+    ///     Builds the inbox service over the real stores of an opened database.
+    /// </summary>
+    /// <param name="provider">The provider that owns the database factory.</param>
+    /// <param name="store">The review store.</param>
+    /// <returns>The service.</returns>
+    private static InboxService NewInboxService(ServiceProvider provider, ReviewStore store)
+    {
+        var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+        var userStore = new UserStore(factory, new AuditAppender(TimeProvider.System));
+        return new InboxService(
+            new InboxStore(factory),
+            store,
+            new ProjectAccess(userStore, store),
+            userStore,
+            new FixedTimeProvider(_now));
+    }
 }
