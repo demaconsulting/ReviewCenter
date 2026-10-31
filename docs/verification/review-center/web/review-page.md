@@ -714,6 +714,18 @@ file names, file content, comment, reviewer name or checklist progress is in the
 `readonly-notice`, the comments and the status, and none of the slot, sign, comment, reply, and resolve controls and no
 reopen form. This scenario is tested by `ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls`.
 
+**ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked**: An Auditor opens a file of an open review; the diff
+hint says that the access is read-only and does not say that the review is locked. This scenario is tested by
+`ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked`.
+
+**ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection**: An Auditor's page holds a stale
+new-comment line selection; the page still renders no `new-thread-form`. This scenario is tested by
+`ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection`.
+
+**ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft**: A member has a comment draft open, the
+role changes to Auditor, and the page reloads; the composer and the draft are gone. This scenario is tested by
+`ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft`.
+
 **ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the review open, and the membership is
 removed in the store; choosing a file shows the not-found message, and nothing that the page had loaded (names, file
 content, comments, reviewer name, checklist progress) remains in the markup. This scenario is tested by

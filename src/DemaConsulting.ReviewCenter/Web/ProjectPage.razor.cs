@@ -639,7 +639,30 @@ public partial class ProjectPage : ComponentBase
             return false;
         }
 
-        return await Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowMembersLost);
+        if (await Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowMembersLost))
+        {
+            return true;
+        }
+
+        // Only the administer right is gone (for example the actor just changed their own role): the other rights may
+        // have changed with it, so they are asked again instead of being kept or dropped by assumption
+        await RefreshRightsAsync();
+        return false;
+    }
+
+    /// <summary>
+    ///     Asks again which rights the signed-in user holds in the project, after the membership changed under the page.
+    /// </summary>
+    /// <returns>A task that completes when the rights are updated.</returns>
+    private async Task RefreshRightsAsync()
+    {
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        CanContribute = actor is not null && await Access.CanContributeAsync(actor, ProjectId);
+        CanAudit = actor is not null && await Access.CanAuditAsync(actor, ProjectId);
+        if (!CanContribute)
+        {
+            Repositories = [];
+        }
     }
 
     /// <summary>
@@ -653,6 +676,7 @@ public partial class ProjectPage : ComponentBase
         PageRows = [];
         Repositories = [];
         CanContribute = false;
+        CanAudit = false;
         ShowMembersLost();
         Loaded = true;
     }
@@ -663,7 +687,6 @@ public partial class ProjectPage : ComponentBase
     private void ShowMembersLost()
     {
         CanAdminister = false;
-        CanAudit = false;
         ChecklistSummary = null;
         Members = [];
         MemberError = null;

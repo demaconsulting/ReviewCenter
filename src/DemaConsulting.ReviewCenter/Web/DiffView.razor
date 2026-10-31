@@ -19,7 +19,7 @@
     <p class="diff-summary" data-testid="diff-summary">@SummaryText()</p>
     @if (Result.Lines.Count > 0)
     {
-        <p class="muted hint" data-testid="diff-hint">@(CommentsDisabled ? "This review is locked; comments are read-only." : "Click + to comment on a line.")</p>
+        <p class="muted hint" data-testid="diff-hint">@HintText()</p>
     }
     <div class="diff-code" data-testid="diff-content">
         @{
@@ -67,6 +67,18 @@
 </div>
 
 @code {
+    // The hint above the diff: why the comment controls are disabled (locked review or read-only access), or how to comment.
+    private string HintText()
+    {
+        if (!CommentsDisabled)
+        {
+            return "Click + to comment on a line.";
+        }
+
+        return ReadOnlyAccess
+            ? "You have read-only access; comments are disabled."
+            : "This review is locked; comments are read-only.";
+    }
     // One cell of a row: the left cell shows the baseline version of a line, the right cell the head version.
     // "anchor" is the row index that names an empty placeholder.
     private RenderFragment Cell(int? index, bool isLeft, int anchor) =>
@@ -90,7 +102,7 @@
              data-testid="diff-row-@key" data-kind="@KindClass(line)">
             <span class="gutter">
                 <button type="button" class="line-comment" data-testid="diff-comment-@key"
-                        disabled="@CommentsDisabled" data-locked="@(CommentsDisabled ? "true" : "false")"
+                        disabled="@CommentsDisabled" data-locked="@(CommentsDisabled && !ReadOnlyAccess ? "true" : "false")"
                         aria-label="@CommentLabel(line, side)" title="@CommentLabel(line, side)"
                         @onclick="e => CommentAsync(row, side, e)">+</button>
                 @if (isLeft)

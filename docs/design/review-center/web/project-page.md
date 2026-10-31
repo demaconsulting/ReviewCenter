@@ -353,7 +353,10 @@ when not, `ShowNoAccess` drops the project, the progress, the repositories, and 
 the page shows the not-found message. Then it asks `ProjectViewGuard.GuardAdministerAsync` whether the user still
 administers the project; when not, `ShowMembersLost` clears `CanAdminister`, the members, and the member messages (and
 with them the Members section and the administration buttons), and the reviews stay, because the user may still be a
-member. The action is then not run. The members are data only an administrator may read, so an error shown above them
+member. Because the demotion may have changed the other rights too (an administrator who made themselves an Auditor
+no longer contributes), `RefreshRightsAsync` recomputes `CanContribute` and `CanAudit` from `ProjectAccess` (and
+clears the repositories without the contribute right), while a plain-member demotion keeps contribution. The action
+is then not run. The members are data only an administrator may read, so an error shown above them
 would not be enough.
 
 **OnParametersSetAsync** (`NewMemberPage`, `NewMemberAccountPage`): Reset the form values and messages (the router

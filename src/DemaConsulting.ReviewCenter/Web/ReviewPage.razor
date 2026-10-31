@@ -534,7 +534,7 @@
             // In the diff the threads are drawn under their lines; only whole-file threads are listed below it
             var hasLineDiff = HasLineDiff;
             var listedThreads = hasLineDiff ? fileThreads.Where(t => t.StartLine is null).ToList() : fileThreads;
-            var composerRange = hasLineDiff && !IsLocked ? ComposerRange() : null;
+            var composerRange = hasLineDiff && !IsLocked && !ReadOnly ? ComposerRange() : null;
             var inlineComposer = composerRange is not null;
             ThreadSide? composerSide = inlineComposer ? NewSide : null;
 
@@ -753,6 +753,7 @@
                                   Composer="newThreadForm"
                                   OnComment="request => GuardedAsync(() => CommentOnDiffLine(request))"
                                   CommentsDisabled="IsLocked || ReadOnly"
+                                  ReadOnlyAccess="ReadOnly && !IsLocked"
                                   CanReveal="GuardChildAsync" />
                     }
                 }

@@ -1075,6 +1075,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
             CanReopen = actor is not null && await Access.CanAdministerAsync(actor, ProjectId);
             ReadOnly = actor is not null && !await Access.CanContributeAsync(actor, ProjectId);
+            if (ReadOnly)
+            {
+                // A reader who lost the right to comment (a role change under the open page) keeps no half-made comment
+                ClearNewThreadForm();
+            }
             CanSetDueDate = await ReviewService.CanSetDueDateAsync(actor, Review);
             try
             {

@@ -237,6 +237,7 @@ sections:
           - ProjectPage_Render_EmptyProject_InvitesOnlyContributors
           - ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories
           - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+          - ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed
 
       - id: ReviewCenter-ProjectPage-MemberRoles
         title: >-

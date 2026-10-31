@@ -265,6 +265,37 @@ public class AuditorPagesTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a project admin who makes themselves an auditor (the member list can no longer be read) keeps no
+    ///     right to work, keeps the audit trail, and that one who makes themselves a plain member keeps working.
+    /// </summary>
+    /// <param name="role">The role the admin gives themselves.</param>
+    /// <param name="canWork">Whether the admin may still create reviews afterwards.</param>
+    [Theory]
+    [InlineData("auditor", false)]
+    [InlineData("user", true)]
+    public async Task ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed(string role, bool canWork)
+    {
+        // Arrange: a second project admin exists, so the last-admin rule allows the change
+        var projectId = await ArrangeAsync();
+        SignInAs("pam", "Pam", false);
+        var cut = Render<ProjectPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
+        await cut.Find("[data-testid='member-toggle-role-bob']").ClickAsync();
+
+        // Act
+        var selector = role == "user" ? "member-toggle-role-pam" : $"member-set-role-pam-{role}";
+        await cut.Find($"[data-testid='{selector}']").ClickAsync();
+
+        // Assert: the administration is gone for both; the other rights follow the new role
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.Equal(canWork, cut.FindAll("[data-testid='new-review-button']").Count > 0);
+        Assert.Equal(!canWork, cut.FindAll("[data-testid='readonly-notice']").Count > 0);
+        if (!canWork)
+        {
+            Assert.NotEmpty(cut.FindAll("[data-testid='project-audit-link']"));
+        }
+    }
+
+    /// <summary>
     ///     Test that a member who still has an unsigned slot on a review that is not approved is refused the auditor
     ///     role with the reason on the page, that the role stays, and that the last project administrator is refused
     ///     with the usual explanation.

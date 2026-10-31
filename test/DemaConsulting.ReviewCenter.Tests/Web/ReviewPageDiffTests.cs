@@ -1041,4 +1041,97 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='diff-content']"));
         Assert.Empty(cut.FindAll("[data-testid='diff-text-0']"));
     }
+
+    /// <summary>
+    ///     Test that a diff whose comments are disabled for a reader who may only read says so, and does not say that
+    ///     the review is locked; a locked review keeps its own words.
+    /// </summary>
+    [Fact]
+    public void ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked()
+    {
+        // Arrange
+        var result = LineDiff.Compute(["a"], ["a", "b"]);
+
+        // Act
+        var cut = Render<DiffView>(parameters => parameters
+            .Add(view => view.Result, result)
+            .Add(view => view.CommentsDisabled, true)
+            .Add(view => view.ReadOnlyAccess, true));
+
+        // Assert
+        Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
+        Assert.All(cut.FindAll("[data-testid^='diff-comment-']"), button => Assert.True(button.HasAttribute("disabled")));
+        Assert.All(cut.FindAll("[data-testid^='diff-comment-']"), button => Assert.Equal("false", button.GetAttribute("data-locked")));
+    }
+
+    /// <summary>
+    ///     Test that the review page shows an auditor a diff with the read-only hint, offers no comment form even when
+    ///     a line selection is left in the page state, and that the page drops such a selection on a reload.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection()
+    {
+        // Arrange: an auditor opens the modified file
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        var auditor = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(auditor.Id, projectId, ProjectRole.Auditor, cancellationToken);
+        SignInAs("aud", "Aud", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+
+        // Act: a line selection is left in the state (as a restored selection would), then the page renders
+        var start = typeof(ReviewPage).GetProperty("NewStartLine", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        await cut.InvokeAsync(() =>
+        {
+            start.SetValue(cut.Instance, "10");
+            typeof(Microsoft.AspNetCore.Components.ComponentBase)
+                .GetMethod("StateHasChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(cut.Instance, null);
+        });
+
+        // Assert
+        Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
+        Assert.All(cut.FindAll("[data-testid^='diff-comment-']"), button => Assert.True(button.HasAttribute("disabled")));
+    }
+
+    /// <summary>
+    ///     Test that a member whose role changes to auditor under the open page loses the comment form and the
+    ///     half-made comment as soon as the page reloads its state.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft()
+    {
+        // Arrange: a member has the composer open on a line with a typed text
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, cancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+        await cut.Find("[data-testid='diff-comment-9']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Half made");
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-composer']"));
+        await ChangeMemberRoleAsync(projectId, "mem", ProjectRole.Auditor);
+
+        // Act: a reload of the page state (the refresh that follows every successful change)
+        var refresh = typeof(ReviewPage).GetMethod("RefreshAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        await cut.InvokeAsync(async () =>
+        {
+            await (Task)refresh.Invoke(cut.Instance, null)!;
+            typeof(Microsoft.AspNetCore.Components.ComponentBase)
+                .GetMethod("StateHasChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(cut.Instance, null);
+        });
+
+        // Assert: no form, no draft, and the hint is the read-only one
+        Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
+        Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
+        var text = typeof(ReviewPage).GetProperty("NewText", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        Assert.Equal(string.Empty, text.GetValue(cut.Instance));
+    }
 }

@@ -176,6 +176,14 @@ public partial class DiffView : ComponentBase
     public bool CommentsDisabled { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the comment controls are disabled because the reader may only read
+    ///     the project, and the review is not locked. It only changes the words of the hint, so that a read-only
+    ///     reader is not told the review is locked.
+    /// </summary>
+    [Parameter]
+    public bool ReadOnlyAccess { get; set; }
+
+    /// <summary>
     ///     Gets or sets the check that runs before a collapsed run is expanded; supplied by the page so that lines of
     ///     the loaded diff are not revealed once the reader may no longer see the project. When it returns
     ///     <c>false</c> nothing is expanded. When it is <c>null</c> the run is expanded without a check.

@@ -45,12 +45,18 @@ sections:
         title: >-
           The ReviewPage unit shall show a member whose role is auditor the whole review with a read-only notice and
           without any control that changes it, that is the reopening and due date forms, the slot forms and the signing
-          form, the new comment form, the reply box, the resolve toggle, and the line comment controls.
+          form, the new comment form, the reply box, the resolve toggle, and the line comment controls, and the diff
+          shall say that the access is read-only instead of saying that the review is locked, and shall offer no
+          comment composer even for a stale line selection or after the role changed under an open page.
         justification: |
           An auditor reads everything and changes nothing, so the page must not offer what the rules would refuse, and
-          the notice says why the controls are missing.
+          the notice says why the controls are missing. A read-only reader of an open review must not be told the
+          review is locked.
         tests:
           - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
+          - ReviewPage_DiffView_ReadOnlyAccess_HintSaysReadOnlyNotLocked
+          - ReviewPage_DiffView_Auditor_HasReadOnlyHintAndNoComposerEvenWithAStaleSelection
+          - ReviewPage_DiffView_MemberBecomesAuditor_ReloadDropsTheComposerAndTheDraft
 
       - id: ReviewCenter-ReviewPage-Layout
         title: >-

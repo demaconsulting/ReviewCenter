@@ -437,6 +437,11 @@ message and no table. This scenario is tested by `ProjectPage_Render_AuditorAndS
 repositories are not read (a counting store decorator proves it). This scenario is tested by
 `ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories`.
 
+**ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed**: An administrator changes their own role to
+Auditor or to member; the administration is lost, and the page recomputes all rights, so the Auditor keeps the audit
+link and loses the New review control, while the plain member keeps contributing. This scenario is tested by
+`ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed`.
+
 **ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly**: A project administrator sees the labels Member,
 Auditor, and Project admin; an Auditor row offers only the explicit User and Project administrator buttons, other rows
 keep the toggle and offer Auditor; each button sets exactly that role. This scenario is tested by
