@@ -596,6 +596,7 @@ reviews:
       - "test/**/Web/NewMemberPageTests.cs"
       - "test/**/Web/NewMemberAccountPageTests.cs"
       - "test/**/Web/NewReviewPageRepositoryTests.cs"
+      - "test/**/Web/NewReviewPageFollowUpTests.cs"
 
   - id: ReviewCenter-Web-PlanPage
     title: Review of ReviewCenter PlanPage unit implementation
@@ -630,6 +631,7 @@ reviews:
       - "src/**/Web/ReviewLinks.cs"
       - "test/**/Web/ReviewPageTests.cs"
       - "test/**/Web/ReviewPageRepositoryTests.cs"
+      - "test/**/Web/ReviewPageFollowUpTests.cs"
       - "test/**/Web/ReviewPageDiffTests.cs"
       - "test/**/Web/ReviewLinksTests.cs"
       - "test/**/Identity/OidcReauthTests.cs"
@@ -649,6 +651,7 @@ reviews:
       - "src/**/Web/ChecklistPage.razor"
       - "src/**/Web/ChecklistPage.razor.cs"
       - "test/**/Web/ChecklistPageTests.cs"
+      - "test/**/Web/ChecklistPageFollowUpTests.cs"
 
   - id: ReviewCenter-Web-LoginPage
     title: Review of ReviewCenter LoginPage unit implementation
@@ -897,6 +900,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
       - "src/DemaConsulting.ReviewCenter.Core/RepositoryReviewResult.cs"
       - "src/DemaConsulting.ReviewCenter.Core/FollowUpCarry.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/FollowUpPreview.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewCarryOver.cs"
       - "test/**/Core/ReviewServiceTests.cs"
       - "test/**/Core/ReviewServiceRepositoryTests.cs"

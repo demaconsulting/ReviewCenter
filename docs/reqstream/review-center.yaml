@@ -149,7 +149,9 @@ sections:
           - ReviewCenter-Storage-FollowUp
           - ReviewCenter-Api-FollowUp
           - ReviewCenter-Evidence-FollowUp
+          - ReviewCenter-Web-FollowUp
         tests:
+          - ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn
           - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
           - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
           - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid

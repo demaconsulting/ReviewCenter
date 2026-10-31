@@ -665,6 +665,26 @@ sections:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
 
+      - id: ReviewCenter-Web-FollowUp
+        title: >-
+          The Web subsystem shall let a user create a review as a follow-up of an earlier review of the project from
+          the page for a new review, with a preview of what is carried over and a confirmation before open threads are
+          dropped, show on the checklist of a follow-up which answers and section states were carried and from which
+          review, show the earlier Fail of a check that is open again, and show on the review page what a review
+          follows, what follows it and which threads were carried.
+        justification: |
+          Carrying work over only helps when the people see what was carried, from where, and what they still have to
+          decide. The behavior needs a live connection, so it is verified by the component tests of the units, and the
+          whole journey by a system test.
+        children:
+          - ReviewCenter-ProjectPage-FollowUp
+          - ReviewCenter-ChecklistPage-CarriedMarks
+          - ReviewCenter-ReviewPage-FollowUp
+        tests:
+          - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+          - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+          - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
+
       - id: ReviewCenter-Web-OidcSignIn
         title: >-
           The Web subsystem shall offer the sign-in with an OpenID Connect provider as a button beside the form for a

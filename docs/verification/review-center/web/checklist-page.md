@@ -2,7 +2,8 @@
 
 #### Verification Approach
 
-`ChecklistPage` is verified with component tests defined in `ChecklistPageTests.cs`, which use the bUnit test context
+`ChecklistPage` is verified with component tests defined in `ChecklistPageTests.cs` and `ChecklistPageFollowUpTests.cs`
+(the marks of a follow-up review), which use the bUnit test context
 to render the real component over real Core services and an in-memory fake store holding a review with the default
 checklist. The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display
 name "Ann") unless a test signs in as someone else. Tests locate elements by their `data-testid` attributes (the page
@@ -142,3 +143,17 @@ stored. This scenario is tested by `ChecklistPage_Choose_MembershipRevoked_Shows
 **ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData**: The same arrangement, and a section is opened,
 an action that reads no service; the access check still runs and the result is the not-found page without data. This
 scenario is tested by `ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData`.
+
+**ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail**: The checklist of a follow-up is rendered; a carried
+Pass and a carried not-applicable section carry a "Carried from" mark with a link to the earlier review, and a check
+that failed in the earlier review shows the earlier Fail with its justification and a link, and no carried mark. This
+scenario is tested by `ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail`.
+
+**ChecklistPage_Render_FollowUp_DecidedAgainOrEarlierReview_ShowsNoEarlierFail**: Once the failed check is answered
+again the earlier Fail is gone, and the checklist of the earlier review itself shows no carried mark and no earlier
+Fail. This scenario is tested by `ChecklistPage_Render_FollowUp_DecidedAgainOrEarlierReview_ShowsNoEarlierFail`.
+
+**ChecklistPage_Render_FollowUp_ReworkedCheckThatFailed_ShowsNoEarlierFail**: Two checks failed in the earlier review
+and the project then reworded one of them before the follow-up was created. The follow-up shows no earlier Fail for the
+reworded check, because the earlier justification belongs to other wording, and still shows it for the unchanged check.
+This scenario is tested by `ChecklistPage_Render_FollowUp_ReworkedCheckThatFailed_ShowsNoEarlierFail`.

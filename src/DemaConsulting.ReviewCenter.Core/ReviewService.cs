@@ -629,6 +629,72 @@ public sealed class ReviewService
     }
 
     /// <summary>
+    ///     Shows what a follow-up review of uploaded files would take over from an earlier review, without creating
+    ///     anything.
+    /// </summary>
+    /// <remarks>
+    ///     A read-only companion of <see cref="CreateDraftAsync"/> for the form of a new review: it applies the same rules
+    ///     (<see cref="FollowUpCarry.CheckFit"/> and <see cref="FollowUpCarry.Compute"/>, with the checklist the new review
+    ///     would be frozen with), so the counts shown are the counts that creation stores. Nothing is stored and nothing is
+    ///     audited. Reading needs only the right to view the project, like the other reads of a review; creating still
+    ///     needs the right to contribute. Open threads on files that are not among <paramref name="files"/> are listed in
+    ///     <see cref="FollowUpPreview.DroppedThreadFiles"/>; creation asks the creator to acknowledge them.
+    /// </remarks>
+    /// <param name="projectId">The project of the earlier and of the new review.</param>
+    /// <param name="followsReviewId">The identifier of the earlier review.</param>
+    /// <param name="files">The files of the new review; only their paths and content hashes are used.</param>
+    /// <param name="actor">The signed-in user. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>What would be carried.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="files"/> or <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and with
+    ///     <see cref="DomainRule.FollowUpInvalid"/> when no review is named, the review does not exist in the project or
+    ///     does not fit the new files, and with the file rules of <see cref="CreateDraftAsync"/> (for example
+    ///     <see cref="DomainRule.DuplicatePath"/>) when the files would be refused at creation.
+    /// </exception>
+    public async Task<FollowUpPreview> PreviewFollowUpAsync(
+        int projectId,
+        string? followsReviewId,
+        IReadOnlyList<UploadedFile> files,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(actor);
+
+        // Whoever may not see the project learns nothing about it, and nothing about its reviews
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+
+        // The files obey the rules of creation (count, paths, sizes, unique paths): the carry-over compares paths, so
+        // a set that creation would refuse is refused with the same message here
+        ValidateFiles(files);
+        var follow = NormalizeFollows(followsReviewId)
+                     ?? throw new DomainRuleException(DomainRule.FollowUpInvalid, "Choose the review to follow up.");
+
+        // The same preparation as creation, but only the paths and hashes are needed and nothing is kept
+        var newFiles = files
+            .Select(file => new ReviewFile
+            {
+                ProjectId = projectId,
+                ReviewId = string.Empty,
+                Path = file.Path,
+                Size = file.Content.Length,
+                Sha256 = Fingerprint.ComputeFileHash(file.Content)
+            })
+            .ToList();
+        var definition = await ResolveChecklistDefinitionAsync(projectId, cancellationToken);
+        var carry = await PrepareFollowUpAsync(
+            projectId, string.Empty, follow, acknowledge: true, null, null, newFiles, definition, _timeProvider.GetUtcNow(), cancellationToken);
+        return new FollowUpPreview(
+            carry!.Answers.Count,
+            carry.SectionStates.Count,
+            carry.Threads.Count,
+            carry.ResolvedThreadsNotCarried,
+            carry.DroppedThreadFiles);
+    }
+
+    /// <summary>
     ///     Tells whether an actor may change the due date of a review.
     /// </summary>
     /// <remarks>

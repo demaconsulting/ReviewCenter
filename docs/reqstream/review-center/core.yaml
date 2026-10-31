@@ -547,6 +547,7 @@ sections:
         children:
           - ReviewCenter-ReviewService-FollowUp
           - ReviewCenter-ReviewService-FollowUpCarry
+          - ReviewCenter-ReviewService-FollowUpPreview
           - ReviewCenter-ChecklistService-CarriedMarking
           - ReviewCenter-SigningService-CarriedRecord
           - ReviewCenter-RecordDigest-FollowUp

@@ -114,3 +114,19 @@ sections:
           stale page still sends it.
         tests:
           - ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls
+
+      - id: ReviewCenter-ChecklistPage-CarriedMarks
+        title: >-
+          The ChecklistPage unit shall mark on the checklist of a follow-up review every answer and every section
+          state that was carried from another review with a Carried from badge that links to that review, and shall
+          show, for a check that is not answered and failed in the followed review with the same wording, the earlier
+          Fail and its justification, read-only, with a link to that review, until the check is answered again, and
+          shall show neither on a review that follows nothing.
+        justification: |
+          A carried answer was given by someone else about an earlier state of the content, so the reviewer must see
+          that it was carried and from where. The earlier Fail is the reason for the follow-up; showing it makes the
+          reviewer decide the check again on purpose instead of overlooking it.
+        tests:
+          - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+          - ChecklistPage_Render_FollowUp_DecidedAgainOrEarlierReview_ShowsNoEarlierFail
+          - ChecklistPage_Render_FollowUp_ReworkedCheckThatFailed_ShowsNoEarlierFail

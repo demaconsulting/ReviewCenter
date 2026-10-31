@@ -627,3 +627,17 @@ sections:
         tests:
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
           - ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited
+
+      - id: ReviewCenter-ReviewPage-FollowUp
+        title: >-
+          The ReviewPage unit shall show on a review that follows another a link to the followed review with the
+          number of answers and of threads that were carried, shall show on the review that is followed a list of
+          the reviews that follow it, each with a link, shall mark each carried thread with a link to the review it
+          came from, and shall show none of this on a review that neither follows nor is followed.
+        justification: |
+          A reader of a follow-up must see where its answers and threads came from, and a reader of the earlier review
+          must find the review that took over. The marks are the same facts as in the record, so nothing carried can
+          be mistaken for something that was said in this review.
+        tests:
+          - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
+          - ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine

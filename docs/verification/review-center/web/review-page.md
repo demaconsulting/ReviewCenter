@@ -3,7 +3,8 @@
 #### Verification Approach
 
 `ReviewPage` is verified with component tests defined in `ReviewPageTests.cs` and
-`ReviewPageRepositoryTests.cs` and `ReviewPageDiffTests.cs`, which use the bUnit test context to
+`ReviewPageRepositoryTests.cs` and `ReviewPageDiffTests.cs` and `ReviewPageFollowUpTests.cs` (the marks of a follow-up
+review), which use the bUnit test context to
 render the real component over real Core services and an in-memory fake store holding a review of known files.
 The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display name "Ann")
 unless a test signs in as someone else. The signing tests also create real users (with a password) through
@@ -807,3 +808,11 @@ shows "The password or the code is incorrect.", stores no signature, and leaves 
 enrolled is refused, and after the clock moves on the code of the next step signs; this is tested by
 `ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode`. A recovery code typed in place of the code is
 refused and nothing is signed, which is tested by `ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused`.
+
+**ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark**: A review that follows another shows a link to
+it and "0 answers and 1 thread carried"; the carried thread is marked with a link to the earlier review and a thread of
+the review's own is not. This scenario is tested by `ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark`.
+
+**ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine**: The followed review lists its follow-ups with
+links and shows no follows line, and a follow-up that nothing follows shows no list. This scenario is tested by
+`ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine`.

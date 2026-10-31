@@ -362,6 +362,11 @@ public class ReviewServiceFollowUpTests
         Assert.Equal("rev-1", (await w.Reviews.GetAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!.FollowsReviewId);
         Assert.Equal(before, RecordDigest.Compute(await RecordAsync(w, "rev-1")));
         Assert.Null((await RecordAsync(w, "rev-1")).FollowsReviewId);
+
+        // Assert: the checklist state names the review a section was carried from, and nothing for the others
+        var checklist = (await w.Checklists.GetAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!;
+        Assert.Equal("rev-1", checklist.CarriedFromFor("b"));
+        Assert.Null(checklist.CarriedFromFor("a"));
     }
 
     /// <summary>
@@ -870,5 +875,129 @@ public class ReviewServiceFollowUpTests
         Assert.Single(w.Store.Reviews);
         Assert.Single((await RecordAsync(w, "rev-1")).Answers);
         Assert.Single((await RecordAsync(w, "rev-1")).Threads);
+    }
+
+    /// <summary>
+    ///     Test that the preview counts exactly what the creation then carries: the Pass and not-applicable answers, the
+    ///     not-applicable section, the open threads, the resolved threads that are left out, and the files whose open
+    ///     threads would be dropped; and that the Fail answer is not counted.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_PreviewFollowUpAsync_CountsWhatCreationCarries()
+    {
+        // Arrange: Pass, Fail and N/A answers, a section that does not apply, an open thread on a.txt, a resolved one on
+        // a.txt and an open one on b.txt, which the new files do not have
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1", ["a.txt", "b.txt"]);
+        await AnswerAsync(w, "rev-1", "a-01");
+        await AnswerAsync(w, "rev-1", "a-02", ChecklistOutcome.Fail);
+        await w.Checklists.SetSectionApplicabilityAsync(w.ProjectId, "rev-1", "b", false, "Not relevant", TestActors.Bob, TestContext.Current.CancellationToken);
+        await ThreadAsync(w, "rev-1", "a.txt");
+        var resolved = await ThreadAsync(w, "rev-1", "a.txt", null);
+        await w.Threads.ResolveAsync(w.ProjectId, "rev-1", resolved.Id, TestActors.Bob, TestContext.Current.CancellationToken);
+        await ThreadAsync(w, "rev-1", "b.txt");
+
+        // Act: preview, then create with the acknowledgement
+        var preview = await w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId, " rev-1 ", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        var review = await UploadAsync(w, "rev-2", ["a.txt"], follows: "rev-1", acknowledge: true);
+
+        // Assert: the preview is the creation
+        Assert.Equal(1, preview.CarriedAnswers);
+        Assert.Equal(1, preview.CarriedSections);
+        Assert.Equal(1, preview.CarriedThreads);
+        Assert.Equal(1, preview.ResolvedThreadsNotCarried);
+        Assert.Equal(["b.txt"], preview.DroppedThreadFiles);
+        Assert.Equal(preview.CarriedAnswers, review.CarriedAnswerCount);
+        Assert.Equal(preview.CarriedThreads, review.CarriedThreadCount);
+        Assert.Equal(preview.CarriedSections, (await RecordAsync(w, "rev-2")).SectionStates.Count);
+    }
+
+    /// <summary>
+    ///     Test that the preview writes nothing and audits nothing: no review, no record row and no audit entry is added,
+    ///     and the earlier review keeps its digest.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_PreviewFollowUpAsync_ChangesNothing()
+    {
+        // Arrange
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1");
+        await AnswerAsync(w, "rev-1", "a-01");
+        await ThreadAsync(w, "rev-1");
+        var reviews = w.Store.Reviews.Count;
+        var audits = w.Store.Audits.Count;
+        var threads = w.Store.Threads.Count;
+        var digest = RecordDigest.Compute(await RecordAsync(w, "rev-1"));
+
+        // Act
+        await w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId, "rev-1", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(reviews, w.Store.Reviews.Count);
+        Assert.Equal(audits, w.Store.Audits.Count);
+        Assert.Equal(threads, w.Store.Threads.Count);
+        Assert.Equal(digest, RecordDigest.Compute(await RecordAsync(w, "rev-1")));
+    }
+
+    /// <summary>
+    ///     Test that the preview refuses what creation refuses, with the same rule: nothing named, a review that does not
+    ///     exist or belongs to another project, and a review that shares no file with the new ones.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid()
+    {
+        // Arrange: a review in the other project, and one here with a file of its own
+        var w = await CreateAsync();
+        await UploadAsync(w, "foreign", projectId: w.OtherProjectId);
+        await UploadAsync(w, "rev-1");
+        var files = new[] { new UploadedFile("a.txt", TestContent.A) };
+
+        // Act, Assert
+        foreach (var follows in new[] { null, " ", "missing", "foreign" })
+        {
+            await RefusedAsync(() => w.Reviews.PreviewFollowUpAsync(
+                w.ProjectId, follows, files, TestActors.Ann, TestContext.Current.CancellationToken));
+        }
+
+        var noCommonFile = await RefusedAsync(() => w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId, "rev-1", [new UploadedFile("z.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken));
+        Assert.Contains("no file in common", noCommonFile.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the preview applies the file rules of creation before it compares paths: a set with a duplicate
+    ///     path, a path that is too long and no file at all are refused with the rule of creation, and the message of
+    ///     the duplicate names the path.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation()
+    {
+        // Arrange
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1");
+
+        // Act
+        var duplicate = await Assert.ThrowsAsync<DomainRuleException>(() => w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId,
+            "rev-1",
+            [new UploadedFile("a.txt", TestContent.A), new UploadedFile("a.txt", TestContent.A)],
+            TestActors.Ann,
+            TestContext.Current.CancellationToken));
+        var tooLong = await Assert.ThrowsAsync<DomainRuleException>(() => w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId,
+            "rev-1",
+            [new UploadedFile(new string('x', ReviewLimits.MaxPathLength + 1), TestContent.A)],
+            TestActors.Ann,
+            TestContext.Current.CancellationToken));
+        var none = await Assert.ThrowsAsync<DomainRuleException>(() => w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId, "rev-1", [], TestActors.Ann, TestContext.Current.CancellationToken));
+
+        // Assert: the rules and the message are those of creation
+        Assert.Equal(DomainRule.DuplicatePath, duplicate.Rule);
+        Assert.Contains("'a.txt' appears more than once", duplicate.Message, StringComparison.Ordinal);
+        Assert.Equal(DomainRule.PathInvalid, tooLong.Rule);
+        Assert.Equal(DomainRule.NoFiles, none.Rule);
     }
 }

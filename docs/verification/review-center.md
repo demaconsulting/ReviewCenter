@@ -94,6 +94,11 @@ loopback TCP ports.
   is created or planned and may be changed or cleared by an administrator or the creator, each change audited; the page
   shows an Overdue badge once the date has passed unless the review is approved, and an approved review keeps its date
   without a badge and without an edit form (`ReviewCenter-System-DueDate`).
+- A review can be created in the browser or through the API as a follow-up of an earlier review of the project: the form
+  previews what is carried over, the checklist marks every carried answer and shows the earlier Fail of an open check,
+  the review page names the followed review and marks carried threads, the follow-up is approved on its own while the
+  earlier review stays as it was, and the attestation of the follow-up names the earlier review
+  (`ReviewCenter-System-FollowUpReview`; the system test `ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn`).
 - A signature needs the password of the signer again for that signature; a wrong password is refused, signs nothing,
   and is audited without the password (`ReviewCenter-System-SignatureReauthentication`). The lockout count, the second
   factor, and the provider proof are verified at the level of the child requirements.
@@ -327,6 +332,16 @@ the signature of `second`; it keeps its date as history, shows no Overdue badge,
 page lists the `review.due-date-changed` entries. This scenario is tested by
 `ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited`.
 
+**ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn**: In a browser, one user fails a check of a review,
+passes the rest of its section, marks the other sections as not applicable and starts a thread. A second review is
+created through the form of a new review from the same repository, with the first review chosen in the follow-up
+choice and the suggested title kept. The new review names the first one with the carried counts and marks the carried
+thread; its checklist marks the carried Pass and section and shows the earlier Fail with its justification for the check
+that is open again. The check is decided again and the carried thread is resolved, a second user signs, and the review is
+Approved while the first review is still In review and lists the follow-up. The attestation PDF of the follow-up contains
+"Follows review" and the identifier of the first review. This scenario is tested by
+`ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn`.
+
 **ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne**: Three users are created
 with the `user add` verb on a temporary database, and `audit verify` reports an intact chain with exit code 0. One audit
 entry is then edited directly in the SQLite file, and `audit verify` reports that the chain is broken at that entry with
@@ -348,7 +363,8 @@ transaction of the review; and the attestation names the followed review. These 
 `ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid`,
 `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`, and
 `AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers`. The page for choosing the
-earlier review and the carried badges belong to a later change.
+earlier review and the carried badges are verified by the component tests of the Web units and by the system test
+`ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn`.
 
 **Review creation and display**: A project and a review are created through the domain services over a real
 database, and the review and project pages are requested over HTTP; the pages show the fingerprint, the files,

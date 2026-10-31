@@ -133,6 +133,77 @@
                         </ul>
                     }
                 }
+                @if (Candidates.Count > 0)
+                {
+                    var eligible = EligibleCandidates();
+                    <div class="field" data-testid="follow-up">
+                        <label for="follow-source">Follow up on an earlier review (optional)</label>
+                        <select id="follow-source" data-testid="follow-source-select" value="@FollowSourceId"
+                                @onchange="OnFollowSourceChangedAsync">
+                            <option value="">No, this is a new review</option>
+                            @foreach (var candidate in eligible)
+                            {
+                                <option value="@candidate.Id">@candidate.Id - @candidate.Title</option>
+                            }
+                        </select>
+                        <span class="muted">
+                            A follow-up takes over the Pass and N/A answers, the N/A sections and the open threads of the
+                            earlier review; Fail answers, resolved threads, reviewer slots and signatures are never carried.
+                        </span>
+                        @if (eligible.Count == 0)
+                        {
+                            <p class="muted" data-testid="follow-source-none">
+                                @(FromRepository && RepositoryIdText.Length == 0
+                                    ? "Choose a repository to see the earlier reviews that can be followed up."
+                                    : "No earlier review of this project can be followed up with these files.")
+                            </p>
+                        }
+                        @if (FollowSourceId.Length > 0)
+                        {
+                            @if (FollowRefusal is not null)
+                            {
+                                <p class="error" role="alert" data-testid="follow-preview-error">@FollowRefusal</p>
+                            }
+                            else if (FollowPreview is not null)
+                            {
+                                <p data-testid="follow-preview">
+                                    Carried over from <strong>@FollowSourceId</strong>:
+                                    @FollowPreview.CarriedAnswers Pass or N/A @(FollowPreview.CarriedAnswers == 1 ? "answer" : "answers"),
+                                    @FollowPreview.CarriedSections N/A @(FollowPreview.CarriedSections == 1 ? "section" : "sections")
+                                    and @FollowPreview.CarriedThreads open @(FollowPreview.CarriedThreads == 1 ? "thread" : "threads").
+                                    @FollowPreview.ResolvedThreadsNotCarried resolved
+                                    @(FollowPreview.ResolvedThreadsNotCarried == 1 ? "thread is" : "threads are") not carried.
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="muted" data-testid="follow-preview-hint">
+                                    @(FromRepository
+                                        ? "What is carried over is counted when the review is created and shown on its page."
+                                        : "Choose the files to see what is carried over.")
+                                </p>
+                            }
+
+                            @if (FollowPreview is { DroppedThreadFiles.Count: > 0 })
+                            {
+                                <p class="notice" data-testid="follow-dropped-files">
+                                    Open threads on these files are not carried, because the files are not in the new review:
+                                    @string.Join(", ", FollowPreview.DroppedThreadFiles)
+                                </p>
+                            }
+
+                            @if (FromRepository || FollowPreview is { DroppedThreadFiles.Count: > 0 })
+                            {
+                                <label class="switch" for="follow-acknowledge">
+                                    <input id="follow-acknowledge" type="checkbox" checked="@AcknowledgeDropped"
+                                           data-testid="follow-acknowledge-checkbox"
+                                           @onchange="e => AcknowledgeDropped = (bool)(e.Value ?? false)" />
+                                    I have checked the open threads of the earlier review whose files are not in this one
+                                </label>
+                            }
+                        }
+                    </div>
+                }
                 @if (ErrorMessage is not null)
                 {
                     <p class="error" role="alert" data-testid="review-error">@ErrorMessage</p>

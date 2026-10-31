@@ -37,7 +37,8 @@ project is not visible to the user), and
 the name of the owning project shown in the breadcrumb.
 
 **State**: the `ChecklistState` of the review (`null` when the review has no checklist); it is read again after each
-change.
+change. **FollowedState**: for a follow-up review, the `ChecklistState` of the review it follows (read with
+`ChecklistService.GetAsync`, once when the page loads), so a check that failed there can be shown; `null` otherwise.
 
 **OpenSectionId**: the section whose checks are shown; at most one.
 
@@ -53,7 +54,11 @@ Test identifiers: `checklist-page` (root), `breadcrumb-projects-link`, `project-
 `section-{id}-save`, `section-{id}-error`, `section-{id}-unsaved-hint` (shown while the switch is off and the reason is
 not saved), `section-{id}-next`, and `section-{id}-back`, and, per check, `check-{item}`,
 `check-pass-{item}`, `check-fail-{item}`, `check-na-{item}`, `check-justification-{item}`, `check-save-{item}`,
-`check-error-{item}`, and `check-answered-by-{item}`. Section and check identifiers are written in lower case (`section-req-toggle`,
+`check-error-{item}`, and `check-answered-by-{item}`; for a follow-up review also `section-{id}-carried` and
+`section-{id}-carried-link` (a not-applicable section carried over), `check-carried-{item}` and
+`check-carried-link-{item}` (an answer carried over), and `check-earlier-fail-{item}` and
+`check-earlier-fail-link-{item}` (a check that failed in the followed review and is not answered here). Section and
+check identifiers are written in lower case (`section-req-toggle`,
 `check-pass-req-01`). The justification box, its Save button, the reason box and its Save button exist only while
 they are needed.
 
@@ -85,6 +90,14 @@ the section is still stored as applying, so its progress label reads "Reason nee
 badge has the `pending` style (`SectionBadgeClass`), and a hint "Not saved until you press Save reason." is shown
 (`section-{id}-unsaved-hint`). A
 section that does not apply shows its reason and no checks.
+
+**Carried marks**: In a follow-up review (`Review.FollowsReviewId` is set) an answer that was carried over shows the
+badge "Carried from" followed by a link to the review X (`check-carried-{item}`), and a section that was carried over as
+not applicable shows "Not applicable, carried from review X" with a link to X (`section-{id}-carried`)
+(`ChecklistState.CarriedFromFor`). A check that is not answered here and that failed in the followed review, with the
+same wording, shows the earlier Fail and its justification as read-only text, "Failed in review X: justification"
+(`EarlierFailFor`), so the reviewer has to decide it again. Nothing is stored for these marks, the earlier answer is
+not copied, and carrying never makes the creator the answerer: "Answered by" still names the one who answered.
 
 A violated rule is shown in an alert next to the check (`check-error-{item}`) or the section
 (`section-{id}-error`) and everything typed stays. An answered check

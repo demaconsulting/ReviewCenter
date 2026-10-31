@@ -1143,4 +1143,32 @@ public class ProjectPageTests : PageTestBase
         // Assert: the root element reports interactivity
         Assert.Equal("true", cut.Find("[data-testid='project-page']").GetAttribute("data-interactive"));
     }
+
+    /// <summary>
+    ///     Test that the review list of the project tags a follow-up with a link to the review it follows.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_FollowUpReview_ShowsFollowTag()
+    {
+        // Arrange: REV-2 and REV-3 follow REV-1
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
+        await Reviews.CreateDraftAsync(
+            project.Id, "REV-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
+        foreach (var id in new[] { "REV-2", "REV-3" })
+        {
+            await Reviews.CreateDraftAsync(
+                project.Id, id, "Follow-up " + id, [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken, null, "REV-1");
+        }
+
+        // Act
+        var cut = RenderProjectPage(project.Id);
+
+        // Assert: the follow-ups are tagged, the earlier review is not
+        var link = cut.Find("[data-testid='review-follows-link-REV-2']");
+        Assert.Equal("REV-1", link.TextContent);
+        Assert.Equal($"/projects/{project.Id}/reviews/REV-1", link.GetAttribute("href"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-follows-REV-3']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-follows-REV-1']"));
+    }
 }

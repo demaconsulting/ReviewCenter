@@ -179,6 +179,12 @@ form (`yyyy-MM-dd`, empty for none), a calendar day in UTC that the form states 
 
 **SelectedFiles**: the files read from the file input, as `UploadedFile` values held in memory.
 
+**Candidates**, **FollowSourceId**, **FollowPreview**, **FollowRefusal**, **AcknowledgeDropped** (`NewReviewPage`): the
+reviews of the project that can be offered as the earlier review (read with `ReviewService.ListAsync` when the project
+loads), the identifier of the chosen earlier review (empty for none), what the follow-up would carry (a
+`FollowUpPreview`, only for uploaded files), the message of a refused preview, and whether the creator has ticked that
+the dropped open threads were checked. The acknowledgement is cleared whenever the choice, the files or the source change.
+
 **ErrorMessage**: the message of the last rejected selection or submission.
 
 **FromRepository**: whether the form creates the review from a repository. **RepositoryIdText**, **HeadRevision**,
@@ -251,7 +257,10 @@ Test identifiers of `NewReviewPage`: `new-review-page` (root), `breadcrumb-proje
 `baseline-revision-input`, `selection-input`, `review-files-input`, `selected-files-list`, `selected-file-{index}`,
 `selected-file-path-{index}`, `selected-file-size-{index}`, `review-error`, `create-review-button`,
 `cancel-new-review-link` (an outline link back to the project), `review-created`, `skipped-entries-list`,
-`skipped-entry-{index}`, and `open-created-review-link`.
+`skipped-entry-{index}`, and `open-created-review-link`. The follow-up part of the form has `follow-up` (the field),
+`follow-source-select`, `follow-source-none` (the empty state), `follow-preview`, `follow-preview-hint` (for a
+repository source), `follow-preview-error`, `follow-dropped-files`, and `follow-acknowledge-checkbox`. A review row of
+the project list of a follow-up has `review-follows-{id}` and `review-follows-link-{id}`.
 
 The form offers one choice as two selectable option cards, "Upload files" (the default) or "From a repository", and
 shows only the fields of the chosen source, so the page stays short. The repository choice is disabled, with a hint,
@@ -431,8 +440,24 @@ files matching the selection changed between X and Y", a repository disabled in 
 the page does not navigate at once: it shows `review-created` with the list of skipped entries and a link to open the
 review, because these entries are not stored with the review and this is the only time to tell the creator.
 
+**OnFollowSourceChangedAsync** (`NewReviewPage`): Handles the choice of the earlier review. It repeats the access check
+of the page, suggests the title "Follow-up to {id}" as long as the creator has not typed another title, and then
+refreshes the preview. The preview is asked from `ReviewService.PreviewFollowUpAsync` only for uploaded files that have
+been selected; the same refresh runs when the files change. A refusal of the service (`FollowUpInvalid`) is shown in
+`follow-preview-error`, and the service stays the authority for what fits: the selector only leaves out the reviews that
+cannot fit by kind (for uploaded files the uploaded reviews, for a repository the reviews of the same repository), and
+the files and the sets are judged by the service. For a repository source the files are known only after the git read,
+so the form shows a hint instead of counts. When the preview names open threads on files the new review does not have,
+the form lists the files and shows the checkbox `follow-acknowledge-checkbox`; the creation passes it as
+`acknowledgeDroppedThreads`, and without it the service refuses the creation with its own message, shown in
+`review-error`. The whole follow-up field is left out when the project has no review at all; when reviews exist but
+none suits the chosen source, the field shows the message `follow-source-none`.
+
+For both sources `CreateReviewAsync` passes the chosen identifier as `followsReviewId` and the acknowledgement to
+`CreateDraftAsync` or `CreateFromRepositoryAsync`.
+
 **ChooseSource** (`NewReviewPage`): Switches between the two sources and clears the message; the repository source
-cannot be chosen when no repository is enabled.
+cannot be chosen when no repository is enabled. A chosen earlier review that does not suit the new source is dropped.
 
 **OnAfterRender** (all pages): Marks the page interactive after the first render on a live connection.
 
@@ -463,7 +488,8 @@ the subsystem.
 - **ProjectService** — reads the project for the actor, lists the members, adds a member by exact user name, creates a
   member account with a temporary password, removes a member, changes a role, and changes the review rules
   (`SetReviewRuleAsync`; `RequireIndependentReviewers` and the two stored-only rules).
-- **ReviewService** — lists reviews (`ProjectPage`) and creates them (`NewReviewPage`).
+- **ReviewService** — lists reviews (`ProjectPage`, and `NewReviewPage` for the earlier reviews that can be followed),
+  previews a follow-up, and creates reviews (`NewReviewPage`).
 - **RepositoryService** — lists the enabled repositories of the project (names only, never a location or token), for
   the plan link and for the drop-down.
 - **IProjectAccess** (Core) — tells whether the user administers the project (`ProjectPage`, the two member pages, and

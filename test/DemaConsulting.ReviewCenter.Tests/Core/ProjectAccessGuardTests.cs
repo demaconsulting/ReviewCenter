@@ -79,7 +79,9 @@ public class ProjectAccessGuardTests
             ["remove slot"] = () => world.Signing.RemoveSlotAsync(actor, project, "rev-1", world.SlotId, cancellationToken),
             ["sign"] = () => world.Signing.SignAsync(
                 actor, project, "rev-1", world.SlotId, "digest", Password, cancellationToken),
-            ["candidates"] = () => world.Signing.ListCandidatesAsync(actor, project, cancellationToken)
+            ["candidates"] = () => world.Signing.ListCandidatesAsync(actor, project, cancellationToken),
+            ["preview follow-up"] = () => world.Reviews.PreviewFollowUpAsync(
+                project, "rev-1", [new UploadedFile("a.txt", [1])], actor, cancellationToken)
         };
 
         // Act
@@ -234,6 +236,7 @@ public class ProjectAccessGuardTests
         "ProjectService.GetAsync",
         "ProjectService.ListAsync",
         "ReviewService.CanSetDueDateAsync",
+        "ReviewService.PreviewFollowUpAsync",
         "SigningService.HasReauthProofAsync"
     ];
 
@@ -359,6 +362,8 @@ public class ProjectAccessGuardTests
         var threads = await world.Threads.ListAsync(world.Own, "rev-1", cancellationToken);
         var checklist = await world.Checklists.GetAsync(world.Own, "rev-1", cancellationToken);
         var approval = await world.Signing.GetApprovalAsync(world.Own, "rev-1", cancellationToken);
+        var preview = await world.Reviews.PreviewFollowUpAsync(
+            world.Own, "rev-1", [new UploadedFile("a.txt", [1])], actor, cancellationToken);
 
         // Assert
         Assert.True(canView);
@@ -369,6 +374,7 @@ public class ProjectAccessGuardTests
         Assert.Single(threads);
         Assert.NotNull(checklist);
         Assert.NotNull(approval);
+        Assert.Equal(1, preview.CarriedThreads);
     }
 
     /// <summary>

@@ -99,6 +99,10 @@
                         <div class="row-main">
                             <a class="row-title" href="/projects/@ProjectId/reviews/@review.Id" data-testid="review-link-@review.Id">@review.Id</a>
                             <p class="muted" data-testid="review-title-@review.Id">@review.Title</p>
+                            @if (review.FollowsReviewId is { } follows)
+                            {
+                                <p class="muted" data-testid="review-follows-@review.Id">Follow-up to <a href="/projects/@ProjectId/reviews/@follows" data-testid="review-follows-link-@review.Id">@follows</a></p>
+                            }
                         </div>
                         <div class="row-meta">
                             <span class="badge @(IsApproved(review.Id) ? "approved" : null)" data-testid="review-approval-@review.Id">@(IsApproved(review.Id) ? "Approved" : "In review")</span>

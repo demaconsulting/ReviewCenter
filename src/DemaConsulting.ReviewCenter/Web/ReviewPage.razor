@@ -113,6 +113,28 @@
             }
         </section>
 
+        @* A follow-up says which review it follows and how much it took over; a review that was followed up lists its
+           follow-ups. Both are plain links: what was carried is marked on the checklist and on the threads themselves *@
+        @if (Review.FollowsReviewId is { } follows)
+        {
+            <p class="status" data-testid="review-follows">
+                Follows <a href="@ReviewLinks.ForReview(ProjectId, follows)" data-testid="review-follows-link">@follows</a>:
+                <span data-testid="review-carried-counts">@Review.CarriedAnswerCount @(Review.CarriedAnswerCount == 1 ? "answer" : "answers") and @Review.CarriedThreadCount @(Review.CarriedThreadCount == 1 ? "thread" : "threads") carried</span>
+            </p>
+        }
+        @if (FollowUps.Count > 0)
+        {
+            <p class="status" data-testid="review-followed-by">
+                Followed by
+                @for (var index = 0; index < FollowUps.Count; index++)
+                {
+                    var followUp = FollowUps[index];
+                    @(index > 0 ? ", " : null)
+                    <a href="@ReviewLinks.ForReview(ProjectId, followUp)" data-testid="review-followed-by-link-@followUp">@followUp</a>
+                }
+            </p>
+        }
+
         @if (IsLocked)
         {
             <section class="card" data-testid="review-locked-banner">
@@ -512,6 +534,10 @@
                 <div class="thread-head">
                     <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(item)</span>
                     <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@item.State</span>
+                    @if (item.CarriedFromReviewId is { } carriedFrom)
+                    {
+                        <span class="muted" data-testid="thread-carried-@threadId">carried from <a href="@ReviewLinks.ForReview(ProjectId, carriedFrom)" data-testid="thread-carried-link-@threadId">@carriedFrom</a></span>
+                    }
                     <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(item)</span>
                     <a class="thread-link action outline small" href="@ReviewLinks.ForThread(ProjectId, ReviewId, threadId)"
                        aria-label="Link to thread @threadId" data-testid="thread-link-@threadId">Link</a>

@@ -366,6 +366,47 @@ a project checklist that is replaced afterwards, does not change reviews that al
 answers are not linked to comment threads. The checklist
 page is made for narrow screens too.
 
+## Follow-up Reviews
+
+When a check failed, the files of the review cannot change, so the fix is reviewed in a new review. A **follow-up
+review** is a new review that names the earlier one and takes over what still holds, so the reviewers do not repeat
+their work.
+
+1. On the project page, open the form for a new review and choose the files (an upload, or a repository with head
+   revision and selection).
+2. Under **Follow up on an earlier review**, choose the earlier review. The list offers the earlier reviews of the
+   project that can fit the chosen source: for uploaded files the uploaded reviews, for a repository the reviews of
+   the same repository. The title is suggested as "Follow-up to {review id}"; you can change it.
+3. For uploaded files, the form shows what would be carried over before you create the review: the answers, the
+   sections, the open threads, the resolved threads that are not carried, and the open threads whose file is not in the
+   new review. For a repository the files are known only when the review is created, so the form shows no counts.
+4. If open threads would be dropped, because their file is not among the new files, tick **I have checked the open
+   threads of the earlier review whose files are not in this one**.
+   Without it the review is refused with an explanation.
+5. Create the review. A refusal, for example when the earlier review does not match the new files, is shown with its
+   reason and nothing is created.
+
+**What is carried over.** The Pass and N/A answers of checks whose wording is unchanged, the sections that do not
+apply (with the same title), and the open threads on files that are in the new review. On the checklist an answer shows
+the badge "Carried from" with a link to the earlier review, and a section shows "Not applicable, carried from review X"
+with a link. On the review page a carried thread shows "carried from" with a link. The
+review page also says "Follows X" with the number of answers and threads carried, and the earlier review lists the
+reviews that follow it.
+
+**What is not carried over.** Fail answers, resolved threads, reviewer slots, signatures, and reopenings. A check that
+failed shows "Failed in review X" with the earlier justification, read-only, until it is answered again here. A carried
+open thread blocks approval until it is resolved, like any other open thread.
+
+**Signing is unchanged.** The follow-up is signed like any review: every check answered, no Fail, no open thread, and
+the independence rules apply. Carrying an answer does not make you the answerer of it: the answer still names the
+person who gave it in the earlier review, so the person who creates the follow-up gets no credit for it and no
+exemption from the rules. The earlier review is not changed and stays In review; its attestation is not affected. The
+attestation of the follow-up names the review it follows.
+
+**A carried Pass is only as good as the unchanged content.** A Pass is carried when the wording of the check is
+unchanged, not after anyone checked the new files again. Reviewers should still read the follow-up with the changes in
+mind, and answer again a check that the fix may affect, because the changes of the fix can make an earlier Pass wrong.
+
 ## Review Signatures
 
 A review is approved when its reviewers have signed it. The review page shows an **Approved** or **In review** badge

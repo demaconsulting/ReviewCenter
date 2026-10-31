@@ -525,6 +525,16 @@ so (the page holds no date rule). A user who may change it (a project admin, a s
 the review) gets a small form that sets or clears it through `ReviewService.SetDueDateAsync`; the form is not offered
 while the review is locked, and any refusal (`ReviewLocked`, `RecordChanged`, `DueDateInvalid`) is shown as text.
 
+#### Follow-up reviews
+
+The form for a new review (`NewReviewPage`, part of the project page unit) offers "Follow up on an earlier review" with
+a preview of what would be carried, which it asks from `ReviewService.PreviewFollowUpAsync` (read-only, needs the right
+to view the project); creating still needs the right to contribute, and every fit rule stays in `ReviewService`, so a
+refusal is shown as the service words it. `ChecklistPage` marks carried answers and sections and shows an earlier Fail
+read-only, and `ReviewPage` shows the review that is followed, the counts carried, the threads carried and the
+follow-ups of the review. The pages hold no carry rule of their own. A choice of the follow-up in the review planner is
+not offered.
+
 #### Signed attestation
 
 An approved review offers the download of its signed PDF attestation. The page only decides whether to offer it: it asks

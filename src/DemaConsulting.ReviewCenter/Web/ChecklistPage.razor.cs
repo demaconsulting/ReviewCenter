@@ -131,6 +131,12 @@ public partial class ChecklistPage : ComponentBase
     private ChecklistState? State { get; set; }
 
     /// <summary>
+    ///     Gets the checklist state of the review this one follows up, or <c>null</c> when the review is no follow-up or
+    ///     the earlier checklist cannot be read. Only used to show, read-only, what failed earlier.
+    /// </summary>
+    private ChecklistState? FollowedState { get; set; }
+
+    /// <summary>
     ///     Gets a value indicating whether the review is approved and therefore locked: the checklist is read-only until
     ///     an administrator reopens the review.
     /// </summary>
@@ -203,6 +209,11 @@ public partial class ChecklistPage : ComponentBase
         ProjectName = project?.Name;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         State = project is null ? null : await ChecklistService.GetAsync(ProjectId, ReviewId);
+
+        // A follow-up shows what failed in the review it follows, so the reviewer decides that check again
+        FollowedState = Review?.FollowsReviewId is { } followed && State is not null
+            ? await ChecklistService.GetAsync(ProjectId, followed)
+            : null;
         IsLocked = project is not null && State is not null
             && (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsApproved == true;
         // Start where the work is: the first section with unanswered checks
@@ -251,6 +262,7 @@ public partial class ChecklistPage : ComponentBase
     {
         Review = null;
         State = null;
+        FollowedState = null;
         IsLocked = false;
         ProjectName = null;
         OpenSectionId = null;
@@ -532,6 +544,28 @@ public partial class ChecklistPage : ComponentBase
         return JustificationTexts.TryGetValue(itemId, out var typed)
             ? typed
             : State?.AnswerFor(itemId)?.Justification ?? string.Empty;
+    }
+
+    /// <summary>
+    ///     Gets the answer that failed a check in the review this one follows up, for a check that is not answered here.
+    /// </summary>
+    /// <param name="item">The check.</param>
+    /// <returns>
+    ///     The earlier Fail answer, shown read-only so the reviewer decides again; <c>null</c> when this is no follow-up,
+    ///     the check is answered here, the earlier answer was not a Fail, or the check was worded differently then.
+    /// </returns>
+    private ChecklistAnswer? EarlierFailFor(ChecklistItem item)
+    {
+        if (FollowedState is null || State?.AnswerFor(item.Id) is not null)
+        {
+            return null;
+        }
+
+        var earlier = FollowedState.AnswerFor(item.Id);
+        var sameWording = FollowedState.Definition.Sections
+            .SelectMany(section => section.Items)
+            .Any(other => other.Id == item.Id && string.Equals(other.Text, item.Text, StringComparison.Ordinal));
+        return earlier?.Outcome == ChecklistOutcome.Fail && sameWording ? earlier : null;
     }
 
     /// <summary>

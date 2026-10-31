@@ -57,7 +57,10 @@ N/A - standard test environment.
   review are carried, marked with the earlier review, and stored with it in one step; Fail answers, resolved threads,
   slots, signatures and reopenings are not; a line anchor is kept only for identical content; an unknown or foreign
   review, a review that does not fit, and dropped open threads without an acknowledgement are refused with
-  `FollowUpInvalid`; the audit entry names the carry; a review that follows nothing is unchanged.
+  `FollowUpInvalid`; the audit entry names the carry; a review that follows nothing is unchanged. The preview of a
+  follow-up (`PreviewFollowUpAsync`) reports, for a set of files, what the creation would carry and drop, by the same
+  rule, writes and audits nothing, refuses an unfit review with `FollowUpInvalid`, and is refused as a missing project
+  for a user who may not see the project.
 
 #### Test Scenarios
 
@@ -495,3 +498,28 @@ can be reopened. This scenario is tested by `ReviewService_FollowUp_ApprovedIsLo
 **ReviewService_FollowUp_DuplicateId_IsRefusedAndNothingChanges**: A follow-up with an identifier that exists is refused
 with `ReviewIdDuplicate` and stores nothing. This scenario is tested by
 `ReviewService_FollowUp_DuplicateId_IsRefusedAndNothingChanges`.
+
+**ReviewService_PreviewFollowUpAsync_CountsWhatCreationCarries**: For an earlier review with a Pass, a Fail, a
+not-applicable section, an open and a resolved thread on a file the new review has, and an open thread on a file it
+lacks, the preview of the new files reports one carried answer, one carried section, one carried thread, one resolved
+thread that is not carried, and the file of the dropped thread, and the creation of the same follow-up carries exactly
+those numbers. This scenario is tested by `ReviewService_PreviewFollowUpAsync_CountsWhatCreationCarries`.
+
+**ReviewService_PreviewFollowUpAsync_ChangesNothing**: After a preview, the number of reviews, audit entries and threads
+is the same, and the earlier review keeps its digest. This scenario is tested by
+`ReviewService_PreviewFollowUpAsync_ChangesNothing`.
+
+**ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid**: A missing or blank review identifier, a
+review that does not exist, a review of another project and an earlier review without a file in common are each refused
+with `FollowUpInvalid`; the last message says that there is no file in common. This scenario is tested by
+`ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid`.
+
+**ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation**: A set of files with a duplicate path, a path
+that is too long, or no file at all is refused with the rule of the creation (`DuplicatePath`, `PathInvalid`,
+`NoFiles`) before any path is compared, and the message of the duplicate names the path. This scenario is tested by
+`ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation`.
+
+**The access to the preview** is verified with the other operations that take an actor, in
+`ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing` (a user who is no member gets the not-found
+refusal of a project that does not exist), `ReviewReads_Auditor_AreAllowed` (an auditor may preview), and
+`AccessCoverage_PublicActorMethods_AreAllClassified` (the new method is classified as a read).

@@ -324,6 +324,17 @@ offered only to an administrator or the creator and never for an approved review
 `ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc`, and
 `ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot`.
 
+**Follow-up review**: The unit tests of `ProjectPage` (the form for a new review), `ChecklistPage`, and `ReviewPage`
+verify the subsystem requirement for the follow-up review: the choice of an earlier review with the preview of what is
+carried and the confirmation before open threads are dropped, passed on for both sources, the refusal of the service
+shown as it is, the carried badges and the earlier Fail on the checklist, and the link, the counts, the list of
+follow-ups and the carried-thread mark on the review page. They are tested by
+`NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp`,
+`NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement`,
+`NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement`,
+`ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail`, and
+`ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark`.
+
 **Temporary password**: A user who signed in with a temporary password is confined to the account page. The layout
 shows no navigation tabs and sends the browser to `/account` from every page except the account, help, and about pages,
 which is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`; the account page shows a banner and
