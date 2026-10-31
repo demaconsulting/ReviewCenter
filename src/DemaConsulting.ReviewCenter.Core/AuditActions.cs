@@ -80,6 +80,8 @@ public static class AuditActions
         "slot.added",
         "slot.removed",
         "slot.updated",
+        "thread.comment-report-changed",
+        "thread.kind-changed",
         "thread.reopened",
         "thread.replied",
         "thread.resolved",

@@ -571,9 +571,9 @@ public sealed class ReviewPlanner
     ///     Finds the most recently signed review of a review-set.
     /// </summary>
     /// <remarks>
-    ///     "Signed" is the signing service's approval: at least one reviewer slot and every slot signed with the
-    ///     current record digest. "Most recent" is the latest signature time; reviews created at the same time
-    ///     fall back to the creation time.
+    ///     "Signed" is the signing service's approval: at least one reviewer slot, every slot signed with the
+    ///     current record digest and no thread open. "Most recent" is the latest signature time; reviews created at
+    ///     the same time fall back to the creation time.
     /// </remarks>
     /// <param name="projectId">The project identity.</param>
     /// <param name="existing">The reviews of the project made from this repository.</param>

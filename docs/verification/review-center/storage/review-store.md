@@ -9,8 +9,9 @@ memberships), `ReviewStoreUserImpactTests.cs` (the slots of a user and the proje
 `ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
 the same time), `EvidenceSettingsStoreTests.cs` (the evidence settings of a project and their compare-and-set
 change), and `ProjectChecklistStoreTests.cs` (the checklist definition of a project, its compare-and-set change by the
-hash of the stored text, and the race of two writers), and `ReviewDueDateStoreTests.cs` (the due date of a review and
-its compare-and-set change). The tests use the real
+hash of the stored text, and the race of two writers), `ReviewDueDateStoreTests.cs` (the due date of a review and
+its compare-and-set change), and `ReviewStoreRecordContentTests.cs` (the included comments, the resolution notes, the
+kind of a thread, the report flag of a comment, and the open-thread rule of the signature). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
 Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
@@ -32,8 +33,17 @@ be loadable on the test platform.
 - A duplicate review key is reported as a duplicate review identifier.
 - A thread is stored with its anchor (whole file or line range), first comment, and state, and identities are
   assigned by the database; comments are appended and read in posting order; each comment keeps the display name and
-  the user name of its author; the state can be changed back and
-  forth; and an unknown thread, or a thread of another review, is reported as not found.
+  the user name of its author, its kind (a comment or a resolution), and whether it is included in the report; the
+  state can be changed back and forth; and an unknown thread, or a thread of another review, is reported as not found.
+  A comment written without a kind or a flag is a comment that is not included, and the kind of a thread follows from
+  its starting comment (a Finding when it is included, otherwise a Question).
+- A Finding is resolved in one transaction together with a Resolution comment that carries the note, and without a note
+  the store refuses with `ResolutionNoteRequired` and stores nothing; the kind is read again inside the transaction;
+  resolving a resolved thread stores nothing; promoting and demoting set the flag of the starting comment and of the
+  Resolution comments together; the flag of a reply can be changed, while the starting comment and a Resolution comment
+  are refused; each change is stored with its audit entry.
+- A signature is refused inside its transaction with `SigningNotAllowed` while any thread of the review is open, after
+  the comparison of the digest, and nothing is stored.
 - Threads are listed only for their own review, in creation order, and the database refuses a thread for a file
   that is not in the review.
 - A checklist snapshot is stored with its review and read back with its version; a review without one, and an
@@ -73,8 +83,10 @@ be loadable on the test platform.
 - A new project has the default evidence settings; a change of the settings is stored for its own project only, is read
   back with the project, and is stored with one audit entry of the project whose chain verifies; a change that names
   settings which are no longer stored, and a change of an unknown project, change nothing and write no entry.
-- A change of reviewed content (a thread, a comment, the state of a thread, a checklist answer, the applicability of a
-  section) and a change of the reviewer slots (add, update, remove) on an approved review is refused inside the write
+- A change of reviewed content (a thread, a comment, the state of a thread, a resolution, the kind of a thread, the
+  report flag of a comment, a checklist answer, the applicability of a
+  section) and a change of the reviewer slots (add, update, remove) on a concluded review (every slot signed for the
+  current record and no thread open) is refused inside the write
   transaction with `ReviewLocked`, whatever the caller did before, and stores no row and no audit entry; the same
   change on a review that is not approved is stored; a change of a review that does not exist is not refused as
   locked; and when a change races with the final signature of a review, exactly one of them takes effect (the change
@@ -292,6 +304,64 @@ stored and read back with the side they were given. This scenario is tested by
 **ReviewStore_AddThreadAsync_Side_IsStoredAsText**: A thread on the baseline side is stored, and a raw query of the
 `Side` column of the `Threads` table returns the text "Baseline". This scenario is tested by
 `ReviewStore_AddThreadAsync_Side_IsStoredAsText`.
+
+**ReviewStore_AddThreadAsync_IncludedComment_PersistsFlagAndKind**: A thread whose starting comment is included is
+stored; read back, the comment has its flag and the kind Comment, and the thread is a Finding. This scenario is tested
+by `ReviewStore_AddThreadAsync_IncludedComment_PersistsFlagAndKind`.
+
+**ReviewStore_AddCommentAsync_IncludedReply_PersistsFlag**: A reply that is included is stored with its flag, and the
+thread stays a Question. This scenario is tested by `ReviewStore_AddCommentAsync_IncludedReply_PersistsFlag`.
+
+**ReviewStore_GetRecordAsync_ThreadKind_DerivedFromStartingComment**: The record of a review carries the thread with
+its comments, their kinds, and their flags, and the kind of the thread is derived from its starting comment. This
+scenario is tested by `ReviewStore_GetRecordAsync_ThreadKind_DerivedFromStartingComment`.
+
+**ReviewStore_ResolveThreadAsync_FindingWithoutResolution_ThrowsResolutionNoteRequired**: Resolving a Finding without
+a Resolution comment is refused with `ResolutionNoteRequired`, the thread stays open, and no entry is stored. This
+scenario is tested by `ReviewStore_ResolveThreadAsync_FindingWithoutResolution_ThrowsResolutionNoteRequired`.
+
+**ReviewStore_ResolveThreadAsync_ConcurrentDemote_RechecksFlagInTransaction**: A thread is demoted after the service
+looked at it and before the store resolves it; the store reads the kind again and resolves the Question without
+needing the note. This scenario is tested by
+`ReviewStore_ResolveThreadAsync_ConcurrentDemote_RechecksFlagInTransaction`.
+
+**ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits**: Resolving a Finding with a note
+stores the state, an included Resolution comment, and the entry `thread.resolved` in one transaction. This scenario is
+tested by `ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits`.
+
+**ReviewStore_ResolveThreadAsync_AlreadyResolved_ReturnsFalseAndAddsNothing**: Resolving a resolved thread reports
+nothing done, adds no comment, and stores no entry. This scenario is tested by
+`ReviewStore_ResolveThreadAsync_AlreadyResolved_ReturnsFalseAndAddsNothing`.
+
+**ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments**: Promoting sets the flag of the
+starting comment and of the Resolution comments, demoting clears them, replies keep their flags, and each change is
+stored with its entry. This scenario is tested by
+`ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments`.
+
+**ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused**: The flag of a reply is changed with
+an entry, and the starting comment and a Resolution comment are refused. This scenario is tested by
+`ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused`.
+
+**ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked**: A theory over every thread write (start, reply, state,
+resolve, promote, demote, and toggle) on a concluded review; each is refused with `ReviewLocked` and stores nothing.
+This scenario is tested by `ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked`.
+
+**ReviewStore_AddSignatureAsync_OpenThread_ThrowsSigningNotAllowedAndStoresNothing**: A signature with the current
+digest on a review with an open thread is refused with `SigningNotAllowed` and no signature is stored. This scenario is
+tested by `ReviewStore_AddSignatureAsync_OpenThread_ThrowsSigningNotAllowedAndStoresNothing`.
+
+**ReviewStore_AddSignatureAsync_ThreadOpenedBeforeFinalSignature_IsRefused**: A thread is opened after the service
+looked at the review and before the final signature is stored; the store refuses the signature in the transaction.
+This scenario is tested by `ReviewStore_AddSignatureAsync_ThreadOpenedBeforeFinalSignature_IsRefused`.
+
+**ReviewStore_IsConcluded_Records_FollowReviewLock**: For records of every combination of signatures and threads, the
+store decides whether a review is concluded as `ReviewLock` does. This scenario is tested by
+`ReviewStore_IsConcluded_Records_FollowReviewLock`.
+
+**ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment**: A comment inserted without the new columns
+reads back as chat with the kind Comment, the columns hold the kind as text and the flag as a boolean, and the
+`Threads` table has no column for the kind. This scenario is tested by
+`ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment`.
 
 **ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed**: Memberships are added for two users in two
 projects, one as project administrator and the others with the default role; each is read back by user and project,
@@ -522,3 +592,8 @@ followed review is unchanged. This scenario is tested by `ReviewStore_AddReviewA
 that were carried are set again by another person; the stored rows are the new ones, have no marker, and there is still
 one row each, while the carried thread keeps its marker. This scenario is tested by
 `ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`.
+
+**ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind**: A carried Finding with its included starting
+comment and its included Resolution comment is stored with the follow-up; read back, the comments keep their kinds and
+flags, the thread is a Finding, and carried chat stays chat. This scenario is tested by
+`ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind`.

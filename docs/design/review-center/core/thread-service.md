@@ -5,10 +5,22 @@
 #### Purpose
 
 `ThreadService` owns the rules for review comments: it starts a thread on a file of a review, appends replies,
-resolves and reopens threads, and reads the threads of a review back, and it shapes them for display (last activity,
-an index by state, and a next-step sentence). It is also the home of the comment types
-`ReviewThread`, `ReviewComment`, and `ReviewThreadState`, and of `FileText`, which defines what a text file and a
-line are.
+resolves and reopens threads, decides which comments are part of the signed report (promoting and demoting a thread
+and including or excluding a reply), and reads the threads of a review back, and it shapes them for display (last
+activity, an index by state, and a next-step sentence). It is also the home of the comment types
+`ReviewThread`, `ReviewComment`, `ReviewCommentKind`, `ThreadKind`, and `ReviewThreadState`, and of `FileText`, which
+defines what a text file and a line are.
+
+#### Chat and report
+
+A comment is either chat or part of the report. **Chat** is the default: it is a conversation among the reviewers, it
+is not covered by the record digest, so it never makes a signature out of date and never needs an acknowledgement. A
+comment that is **included in the report** (`IncludeInReport`, default false) is part of the record that the
+signatures cover, so it is in the digest. An open thread of either kind blocks signing and the conclusion of the
+review, by a rule that is separate from the digest (see the `SigningService` unit). A thread whose starting comment is
+included is a **Finding**, and every other thread is a **Question** (a `ThreadKind` that is derived, never stored): a
+Question can still hold included replies, which are part of the record. The state of a thread (open or resolved) is not
+part of the record.
 
 #### Data Model
 
@@ -16,19 +28,28 @@ line are.
 `FilePath` (the path of one file of the review), `Side` (which version of the file the lines belong to, default
 `Head`), `StartLine` and `EndLine` (both null for a thread on the whole
 file, otherwise an inclusive 1-based range), `State`, `Created`, `Comments` (a list of `ReviewComment`), and the
-derived, not stored, `LastActivity`. A thread that was carried over into a follow-up review also has
+derived, not stored, `LastActivity` and `Kind` (`ThreadKind.Finding` when the starting comment is included in the
+report, otherwise `ThreadKind.Question`). A thread that was carried over into a follow-up review also has
 `CarriedFromReviewId` (the earlier review it was carried from) and `CarriedFromThreadId` (its number there); both are
-null for every other thread. The carried comments are copies with their original author, user name, text and time.
+null for every other thread. The carried comments are copies with their original author, user name, text, time, kind,
+and report flag, so a carried Finding stays a Finding and carried chat stays chat.
 When the anchor of a carried thread could not be kept, its last comment is a note by the author `ReviewCenter` (user
-name `(system)`) that names the old anchor (see `ReviewService`).
+name `(system)`) that names the old anchor and is not included in the report (see `ReviewService`).
 
 **ThreadSide**: a closed enumeration with the values `Head` (the version under review) and `Baseline` (the version
 before the change, only for a review from a repository that has a baseline commit). A thread on the whole file is
 always `Head`.
 
 **ReviewComment**: a data class (init-only properties) of `Id` (assigned by the store), `ThreadId`, `Author` (the
-display name of the person at the time of writing), `AuthorUsername` (the user name of the person), `Text`, and
-`Created` (UTC).
+display name of the person at the time of writing), `AuthorUsername` (the user name of the person), `Text`, `Created`
+(UTC), `IncludeInReport` (default false), and `Kind`.
+
+**ReviewCommentKind**: a closed enumeration with the values `Comment` (the default, an ordinary comment) and
+`Resolution` (the note that comes with the resolving of a thread). A Resolution comment follows the thread: it is
+included in the report exactly when the thread is a Finding when it is stored, and promoting or demoting the thread
+sets it again. It cannot be toggled on its own.
+
+**ThreadKind**: a closed enumeration with the values `Question` and `Finding`.
 
 **ReviewThreadState**: a closed enumeration with the values `Open` and `Resolved`.
 
@@ -57,7 +78,8 @@ is checked or read.
 
 **Immutability**: posted comments are never changed or removed. The service and the store interface offer no way to
 edit or delete a comment or a thread. The only change to an existing thread is its state, which is not attributed
-to anyone or timestamped yet.
+to anyone or timestamped yet, and the report flag of a comment, which only the promote, demote, and include operations
+change (each audited).
 
 **Author**: the author of a comment is the signed-in user, passed as an `Actor` by the page, never typed text. The
 comment stores the display name of the user at that time (`Author`) and the user name (`AuthorUsername`), so a later
@@ -65,32 +87,43 @@ change of the display name does not rewrite the record, and the author can still
 same display name. A null actor is a programming error and raises `ArgumentNullException`; there is no rule about the
 author, because the display name of a user was validated when the user was created.
 
-**Access**: every change (`StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, `ReopenAsync`) first requires that the
+**Access**: every change (`StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, `ReopenAsync`, `PromoteAsync`,
+`DemoteAsync`, `SetCommentIncludedAsync`) first requires that the
 actor may work in the project (`IProjectAccess.RequireContributeAsync`), so a user outside the project, like an
 anonymous or disabled one, gets `ProjectNotFound`, identical to a project that does not exist, and a read-only member
-(an auditor) gets `ActorNotAllowed`, before the review or the input is looked at. Every member who may work in the
+(an auditor) gets `ActorNotAllowed`, before the review or the input is looked at; an auditor can therefore neither
+promote nor demote. Every member who may work in the
 project can take part in the discussion; the unsigned-slot and membership rules of signing do not
 apply to comments. Reads (`ListAsync`) take no actor; the boundary guards them (every page and API handler first
 reads the project as the actor).
 
-**Approval lock**: while the review is approved it is locked (see the `SigningService` unit), so every change of a
-thread is refused with `ReviewLocked` ("This review is approved and locked. A project administrator must reopen it
-before it can change."): `StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, and `ReopenAsync` each call
-`ReviewLock.EnsureUnlockedAsync` after the access check and the checks of the input, and before the store write, so a
-thread (and a reply, a resolve, a reopen of a thread) cannot change what the signatures cover. The store repeats the
-check inside its write transaction. `ListAsync` is not affected. After an administrator reopens the review, threads can
-change again.
+**Roles for the kind and the flag**: promoting a Question to a Finding is allowed for the member who started the
+thread, the owner of a reviewer slot of the review (primary or alternate), and a lead (the creator of the review, who
+can still work in the project, or an administrator of the project); demoting is allowed for the starter and a lead;
+setting the flag of a reply is allowed for the
+author of that reply and a lead. Anybody else gets `ActorNotAllowed`. The roles are read by `ReviewActorRoles` and
+decided by the internal `ThreadKindRules`.
 
-**Signature impact**: a new comment or a change of state after somebody has signed makes that signature out of date
-(see "Signature impact" in the `SigningService` unit). `StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, and
-`ReopenAsync` therefore take an optional last argument `IReadOnlyCollection<int>? acknowledgedSlotIds`, after the
-cancellation token, and call `SignatureImpact.RequireAcknowledged` with the snapshot that
-`ReviewLock.EnsureUnlockedAsync` returned. A new thread always counts as a change. A reply counts when the thread
-exists (a thread that does not exist is still `ThreadNotFound`). A resolve or reopen counts only when the thread is in
-the other state, so repeating a request needs no acknowledgement. The check comes after all validation, including
-the anchor of a new thread, so a request that is not valid is reported as that error, and before the store write, so
-nothing is stored when it fails. Because an open thread blocks signing, a resolve in practice meets no current
-signature, so the new thread, the reply, and the reopen are the cases that are met.
+**Approval lock and conclusion**: while the review is concluded it is locked (see the `SigningService` unit), so every
+change of a thread is refused with `ReviewLocked` ("This review is concluded and locked. A project administrator must
+reopen it before it can change."): `StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, `ReopenAsync`, `PromoteAsync`,
+`DemoteAsync`, and `SetCommentIncludedAsync` each call
+`ReviewLock.EnsureUnlockedAsync` after the access check and the checks of the input, and before the store write, so
+nothing can change what the signatures cover. The store repeats the
+check inside its write transaction. `ListAsync` is not affected. After an administrator reopens the review, threads can
+change again. A review is concluded when every slot (at least one) is signed for the current record and no thread is
+open; a signed review with an open thread is therefore not locked, and its threads can still be resolved.
+
+**Signature impact**: only a change of the digest makes a current signature out of date (see "Signature impact" in
+the `SigningService` unit). The methods that can change the digest take an optional argument
+`IReadOnlyCollection<int>? acknowledgedSlotIds`, after the cancellation token, and call
+`SignatureImpact.RequireAcknowledged` with the snapshot that `ReviewLock.EnsureUnlockedAsync` returned. These need the
+acknowledgement when a signature is current: starting a thread or replying with `includeInReport`, setting the flag of
+a reply, promoting and demoting, and resolving a Finding (its resolution note is included). These never need it:
+starting a thread or replying as chat, resolving or reopening a Question, and reopening a Finding, because the state of
+a thread is not in the digest. A resolve or reopen that finds the thread already in the requested state is a no-op.
+The check comes after all validation, including the anchor of a new thread, so a request that is not valid is
+reported as that error, and before the store write, so nothing is stored when it fails.
 
 #### Key Methods
 
@@ -98,7 +131,7 @@ signature, so the new thread, the reply, and the reopen are the cases that are m
 
 - *Parameters*: `int projectId`, `string reviewId`, a `ThreadAnchor anchor` (the file path, the optional start and end
   lines, and the `ThreadSide`, which is `Head` unless named), `Actor actor`, `string? text`, a cancellation token, and
-  the optional `acknowledgedSlotIds`.
+  the optional `acknowledgedSlotIds`, and `includeInReport` (default false, so the starting comment is chat).
   The anchor groups the four values that always travel together (the review page collects them from one selection and
   `ReviewThread` stores them side by side). A null anchor is a programming error and raises `ArgumentNullException`,
   and an undefined side raises `ArgumentOutOfRangeException` for the `anchor` parameter.
@@ -109,9 +142,10 @@ signature, so the new thread, the reply, and the reopen are the cases that are m
 The rules are checked in this order, and the first violation is reported: the text (`CommentTextInvalid`); the shape
 of the anchor, that is both lines or neither, start at least 1, and end not
 before start (`ThreadAnchorInvalid`); that a whole-file anchor does not name the `Baseline` side
-(`ThreadAnchorInvalid`); that the review and the file exist (`ThreadAnchorInvalid`); that the review is not locked
-(`ReviewLocked`); that the side may carry lines
-for this file (`ThreadAnchorInvalid`: a `Head` range on a deleted file, "A deleted file has no head lines; comment on
+(`ThreadAnchorInvalid`); that the review is not locked (`ReviewLocked`, so a concluded review reports the lock even
+for a file that is not in it); that the review and the file exist (`ThreadAnchorInvalid`); that the side may carry
+lines for this file (`ThreadAnchorInvalid`: a `Head` range on a deleted file, "A deleted file has no head lines;
+comment on
 its baseline lines or on the whole file instead."; a `Baseline` range on a review without a baseline commit or on an
 added file, "This file has no baseline lines to comment on."); and, only when a range is given, that the content of
 the chosen side is text and the end line is within its line count (`ThreadAnchorInvalid`); and, last, that no current
@@ -121,17 +155,31 @@ need no I/O come first so that a bad request fails cheaply, and file content is 
 **ReplyAsync**: Appends a comment to an existing thread of the review.
 
 - *Parameters*: `int projectId`, `string reviewId`, `int threadId`, `Actor actor`, `string? text`, a
-  cancellation token, and the optional `acknowledgedSlotIds`.
+  cancellation token, the optional `acknowledgedSlotIds`, and `includeInReport` (default false).
 - *Returns*: `Task<ReviewComment>` — the stored comment.
 - *Postconditions*: Earlier comments are unchanged and the state of the thread does not change, so a resolved thread
   still accepts replies. A thread that does not exist in the review is reported as `ThreadNotFound`. A locked review
   refuses the reply with `ReviewLocked`.
 
 **ResolveAsync** and **ReopenAsync**: Set the state of a thread to `Resolved` or `Open`. Repeating a request leaves
-the state as requested. A thread that does not exist in the review is reported as `ThreadNotFound`. A locked review
-refuses both with `ReviewLocked`. Both take the optional `acknowledgedSlotIds` after the cancellation token, and a
-request that changes the state of a thread with a current signature is refused with `SignaturesWouldBecomeOutOfDate`
-unless acknowledged.
+the state as requested and records nothing. A thread that does not exist in the review is reported as
+`ThreadNotFound`. A locked review refuses both with `ReviewLocked`. Both take the optional `acknowledgedSlotIds`
+after the cancellation token; see "Signature impact" above for when it is needed. `ResolveAsync` also takes an
+optional `resolutionNote`. The note is trimmed and a blank note counts as none; it has the same length limit as a
+comment (`CommentTextInvalid`). Resolving a Finding without a note is refused with `ResolutionNoteRequired`; a
+Question needs none. A note is stored in the same transaction as a comment of the kind `Resolution`, which is included
+in the report when the thread is a Finding.
+
+**PromoteAsync** and **DemoteAsync**: Turn a Question into a Finding, or a Finding into a Question, by setting the
+report flag of the starting comment and of the Resolution comments of the thread (the replies keep their own flag).
+Allowed roles are described under "Roles for the kind and the flag". A thread that already has the requested kind is
+a no-op that records nothing. Each change records `thread.kind-changed` and needs the acknowledgement when a
+signature is current.
+
+**SetCommentIncludedAsync**: Sets the report flag of one reply. The starting comment and the Resolution comments
+follow the thread and are refused with `CommentNotTogglable`; a comment that is not in the thread is
+`ThreadNotFound`. A flag that already has the requested value is a no-op. Each change records
+`thread.comment-report-changed` and needs the acknowledgement when a signature is current.
 
 **ListAsync**: Lists all threads of a review, for every file, in creation order, each with its comments in posting
 order; the list is empty when there are none or the review does not exist.
@@ -162,12 +210,15 @@ default of 0 the wording is the same as before signing existed.
 **ReviewThread.LastActivity**: A read-only value derived from the comments, the time of the latest comment (the
 thread's `Created` when it has none). It is not stored, so the database is unchanged.
 
-**Audit**: Starting a thread, replying, resolving, and reopening take the `Actor` and record `thread.started`,
-`thread.replied`, `thread.resolved`, and `thread.reopened`. The draft is saved by the store in the same transaction as
-the change, and only when the change took effect (a thread that does not exist records nothing). The text of a comment
+**Audit**: Starting a thread, replying, resolving, reopening, promoting, demoting, and setting the flag of a reply take
+the `Actor` and record `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`,
+`thread.kind-changed`, and `thread.comment-report-changed`. The draft is saved by the store in the same transaction as
+the change, and only when the change took effect (a thread that does not exist, and a request that changes nothing,
+record nothing). The text of a comment or note
 is never written to the trail: the detail holds the identifiers, the anchor (a line anchor on the `Baseline` side
 carries the suffix `(baseline)`; a head anchor is worded as before), and the first 8 hex characters of the SHA-256 of the
-text, so that a later edit of the text would be noticed without copying the text into a second place. See the
+text, so that a later edit of the text would be noticed without copying the text into a second place. A comment that is
+included in the report says `in report`. See the
 `AuditService` unit for the detail formats.
 
 #### Error Handling
@@ -178,12 +229,14 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 #### Dependencies
 
 - **IReviewStore** — checks the review, reads file content, and stores and reads threads (injected).
-- **IProjectAccess** — requires that the actor may work in the project (injected).
+- **IProjectAccess** — requires that the actor may work in the project (injected), and decides the lead role.
+- **IUserStore** — resolves the actor to a user to find out whether the actor owns a reviewer slot (injected).
 - **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
-  approved, and refuse one that would make a current signature out of date without acknowledgement.
+  concluded, and refuse one that would change the digest under a current signature without acknowledgement.
+- **ThreadKindRules** and **ReviewActorRoles** — the internal rules for the roles and for the toggling of a comment.
 - **TimeProvider** — supplies the creation times (injected).
 
 #### Callers
 
-- **ReviewPage** — starts, answers, resolves, reopens, and lists threads, and uses `FileText` to show lines.
+- **ReviewPage** — starts (as chat), answers, resolves, reopens, and lists threads, and uses `FileText` to show lines.
 - **ServerHost** — registers the service for the pages.

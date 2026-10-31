@@ -376,13 +376,13 @@ public sealed class InboxService
     {
         var (record, slots, signatures) = review.Snapshot;
         var digest = RecordDigest.Compute(record);
-        var approved = ReviewLock.IsApproved(record, slots, signatures);
+        var concluded = ReviewLock.IsConcluded(record, slots, signatures);
         var lastSeenCommentId = review.State?.LastSeenCommentId ?? 0;
         var lastSeenAt = review.State?.LastSeenAt ?? DateTimeOffset.MinValue;
         var username = review.User.Username;
         var isAuthor = InboxRules.SameUser(review.Candidate.CreatedBy, username);
         var mine = slots.Where(slot => InboxRules.IsAssigned(slot, review.User.Id)).ToList();
-        var overdue = !approved && review.Candidate.DueDate is { } due && due < review.Today;
+        var overdue = !concluded && review.Candidate.DueDate is { } due && due < review.Today;
 
         InboxItem Row(InboxSection section, string chip, bool unread, string? detail = null)
         {
@@ -401,7 +401,7 @@ public sealed class InboxService
                 detail);
         }
 
-        if (!approved)
+        if (!concluded)
         {
             // To sign: one of my slots has no current signature
             if (review.Contribute && review.Member)
@@ -444,7 +444,7 @@ public sealed class InboxService
 
         if (mine.Count > 0 || isAuthor)
         {
-            await AddUpdatesAsync(items, review, Row, new ApprovalFacts(approved, digest, signatures, lastSeenAt), cancellationToken);
+            await AddUpdatesAsync(items, review, Row, new ApprovalFacts(concluded, digest, signatures, lastSeenAt), cancellationToken);
         }
     }
 

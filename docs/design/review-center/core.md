@@ -114,7 +114,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   thread on a file or a line range of the head or, for a file with a baseline, of the baseline (a file deleted at
   the head takes whole-file comments and baseline line comments only), read the line differences between the
   baseline and the head of one file from the frozen contents (within fixed bounds on the size of the comparison),
-  reply to it, resolve and reopen it, and list the threads of a review with their comments; read the frozen
+  reply to it, resolve and reopen it (a Finding is resolved with a note), promote a Question to a Finding or demote it,
+  include a reply in the report or take it out, and list the threads of a review with their comments; read the frozen
   checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
   user name and password, list and read users, enable and disable a user, make a user a system administrator or take
   the right away, and change a
@@ -128,7 +129,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   entered again, or, for a user of an identity provider, with a single-use proof of a fresh confirmation at the
   provider (members only), tell whether such a proof exists without spending it, read the
   approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
-  project, who can be chosen for a slot. An approved review is locked: every change of its threads, checklist answers,
+  project, who can be chosen for a slot. A concluded review (every slot signed for the current record and no thread
+  open) is locked: every change of its threads, checklist answers,
   section applicability, or reviewer slots, and any further signature, is refused with `ReviewLocked`, until a project
   admin or system administrator reopens it with a reason (`ReopenReviewAsync`; never with an API token), which keeps the
   earlier signatures as history and requires fresh ones. A project admin switches the project rule "require independent
@@ -172,12 +174,14 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 - *Type*: In-process .NET interface.
 - *Role*: Consumer (implemented by `ReviewStore` in the `Storage` subsystem).
 - *Contract*: Add and read projects; check, add, read, and list reviews; read one file's content; add a thread with
-  its first comment; add a comment to a thread of a review; set the state of a thread; list the threads of a review
+  its first comment; add a comment to a thread of a review; set the state of a thread, storing an optional
+  resolution comment in the same operation; set the report flag of the comments of a thread (promotion and demotion)
+  or of one reply; list the threads of a review
   with their comments; read the checklist snapshot, the section states, and the answers of a review; set the
   state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
-  update, and remove reviewer slots; add and list signatures; reopen an approved review and list its reopens (the store
-  re-checks that the review is approved inside the transaction); and add, read, list (of a project, and of a user), change
-  the role of, and remove the memberships of users in projects (removing or demoting can require that another project
+  update, and remove reviewer slots; add and list signatures; reopen a concluded review and list its reopens (the store
+  re-checks that the review is concluded inside the transaction); and add, read, list (of a project, and of a user),
+  change the role of, and remove the memberships of users in projects (removing or demoting can require that another project
   admin remains, checked inside the transaction); and change the evidence settings of a project by compare-and-set
   (`UpdateEvidenceSettingsAsync`: the new settings are stored only if the stored ones still equal the expected ones,
   and the project and its settings are read with every project), and change the "require independent reviewers" setting
@@ -197,8 +201,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   added with its first comment in one operation. Setting a section state or an answer replaces the earlier one.
   There is no operation to change or delete a signature. A signature is added only if the digest of the record is
   still the digest it carries, checked inside one transaction, and fails with a `DomainRuleException` for
-  `RecordChanged` otherwise. The operations that change a thread, a comment, a checklist section or answer, or a
-  reviewer slot refuse with a `DomainRuleException` for `ReviewLocked` when the review is approved, checked inside the
+  `RecordChanged` otherwise, and, after the digest check, with `SigningNotAllowed` when a thread is open. The
+  operations that change a thread, a comment, a checklist section or answer, or a
+  reviewer slot refuse with a `DomainRuleException` for `ReviewLocked` when the review is concluded, checked inside the
   same transaction as the change; nothing is stored then. `UpdateDueDateAsync` does the same, and its audit entry
   `review.due-date-changed` is appended in the same transaction. A user is a member of a project at most once: adding a
   second membership fails with a
@@ -411,7 +416,10 @@ binds to what the reviewer was shown.
 Draft is the only review state at present. The state is a closed enumeration and is stored as text so that
 states can be added without renumbering. A comment thread is `Open` or `Resolved`, stored the same way. Comments
 are immutable by design: a posted comment can neither be edited nor deleted, so a discussion stays a reliable
-record. The only change to an existing thread is its state. A thread has a side: `Head` for the version under review,
+record. The only changes to an existing thread are its state and the report flag of its comments (promoting or
+demoting a thread, including a reply). A comment is chat unless it is included in the report (`IncludeInReport`); a
+thread whose starting comment is included is a Finding, any other a Question (derived, never stored). A thread has a
+side: `Head` for the version under review,
 or `Baseline` for the version before the change, so that a reviewer can comment on a removed line; the line numbers of
 a thread belong to its side, and a whole-file thread is always `Head`. The author of a comment is the signed-in user:
 the web
@@ -438,7 +446,9 @@ message and keep the entered values, and there is a single, easily tested path f
 | `TotalSizeExceeded` | The files together are larger than the total limit |
 | `CommentTextInvalid` | The comment text is empty after trimming or is too long |
 | `ThreadAnchorInvalid` | The file is not in the review, or the line range does not fit the file (see ThreadService) |
-| `ThreadNotFound` | A reply, resolve, or reopen names a thread that does not exist in the review |
+| `ThreadNotFound` | A reply, resolve, reopen, promotion, or report change names a thread or comment that is not there |
+| `ResolutionNoteRequired` | A Finding (a thread whose starting comment is in the report) is resolved without a note |
+| `CommentNotTogglable` | The report flag of a starting comment or of a resolution note is set on its own |
 | `ChecklistNotFound` | An answer or section decision is made for a review that does not exist or has no checklist |
 | `ChecklistItemNotFound` | The section or check is not in the review's frozen checklist |
 | `ChecklistJustificationInvalid` | A justification (Fail, N/A) or section reason is empty after trimming, or too long |
@@ -463,10 +473,10 @@ message and keep the entered values, and there is a single, easily tested path f
 | `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
 | `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
 | `RecordChanged` | The record changed after the signer saw it (digest differs), or a setting was changed first |
-| `ReviewLocked` | The review is approved (locked) and content, a reviewer slot, a due date, or a signature changes |
+| `ReviewLocked` | The review is concluded (locked) and a content, thread, slot, due date, or signature changes |
 | `DueDateInvalid` | A due date for a new review is before today (UTC) or more than 2 years ahead, or is not a date |
 | `FollowUpInvalid` | A follow-up names a review that is not in the project, does not fit it, or drops threads |
-| `ReviewNotLocked` | A reopen is requested for a review that is not approved |
+| `ReviewNotLocked` | A reopen is requested for a review that is not concluded |
 | `ReopenReasonInvalid` | The reason for a reopen is empty after trimming or longer than 250 characters |
 | `ReviewerNotIndependent` | Independent reviewers are required and the review author would be, or signs as, one |
 | `AuthorCannotAnswer` | The author answers a check or changes a section while the project does not allow it |
@@ -508,18 +518,22 @@ together with the threads (see `RecordDigest`).
 Signing is a second kind of record beside the discussion. A review has reviewer slots, each with a primary and an
 optional alternate reviewer, and a slot is signed by one of the two after the password is entered again. A signature is
 bound to the digest of the record (the fingerprint, the source of the files with every change, the answers, the sections
-that do not apply, and the threads with their comments) and is current only while that digest is unchanged. Slots
+that do not apply, and the comments that are included in the report) and is current only while that digest is
+unchanged. Chat is not in the digest. Slots
 and signatures are never edited into a
 different meaning: a signed slot cannot be changed or removed, a signature is never changed or deleted, and the
 status of a review (Approved or In review) is computed from the record and the signatures each time and never stored.
 
-An approved review is also locked, and that too is computed, not stored: `ReviewLock.IsApproved` is the one definition
-(at least one slot, and every slot holds a signature of the current digest), used by the approval status, by the
+An approved review is also locked, and that too is computed, not stored: `ReviewLock.IsConcluded` is the one definition
+(at least one slot, every slot holds a signature of the current digest, and no thread is open), used by the approval
+status, by the
 `ReviewLocked` check that `ThreadService`, `ChecklistService`, and `SigningService` make before every change, and by the
 `Storage` subsystem inside its write transactions. Reopening is the only way out: an audited action of a project or
 system administrator with a reason, stored as a `ReviewReopen`. The number of reopens enters the record digest only when
-it is above zero, so legacy digests do not change and the format version is not bumped, and after a reopen every earlier
-signature is kept as history but is out of date. The project rule `RequireIndependentReviewers` (on by default) keeps the
+it is above zero, and after a reopen every earlier
+signature is kept as history but is out of date. Open threads are a rule of their own: a thread, chat or included,
+that is open blocks signing and the conclusion, and its state is not part of the digest. The project rule
+`RequireIndependentReviewers` (on by default) keeps the
 user who created the review (for an API-token review, the token's owner) out of its slots and away from its signature;
 the authors of git commits are not matched. The rules `RequireNonAuthorChecklistAnswers` and
 `RequireNonReopenerSigning` (also on by default, for every project) work the same way: `ChecklistService` refuses the

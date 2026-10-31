@@ -26,6 +26,8 @@ words:
   - hanko
   - appsettings
   - outofdate
+  - togglable
+  - toggleable
   - offadm
   - dpapi
   - encryptor

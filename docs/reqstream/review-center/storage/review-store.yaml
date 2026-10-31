@@ -79,12 +79,14 @@ sections:
           a comment to a thread of a review, change the state of a thread, list the threads of one review with
           their comments in creation order while keeping the threads of different reviews apart, and report a
           thread that does not exist as nothing or false. Each comment keeps the user name and the display name of
-          its author, and each thread keeps the side (head or baseline) it was anchored to.
+          its author, the kind (a comment or a resolution) and whether it is included in the report, and each thread
+          keeps the side (head or baseline) it was anchored to.
         justification: |
           Pages show the threads of exactly one review in a stable order, and a thread must be saved together
           with its first comment or not at all. Identifiers belong to the database alone, and the user name
           keeps an author identifiable when the display name later changes. The side says which text the lines
-          of a thread belong to, and must come back as it was saved.
+          of a thread belong to, and must come back as it was saved. The flag decides what the signed record
+          covers, so it must come back exactly as it was saved, and the kind of a thread follows from it.
         tests:
           - ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments
           - ReviewStore_AddThreadAsync_Side_IsPersisted
@@ -93,6 +95,47 @@ sections:
           - ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull
           - ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse
           - ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder
+          - ReviewStore_AddThreadAsync_IncludedComment_PersistsFlagAndKind
+          - ReviewStore_AddCommentAsync_IncludedReply_PersistsFlag
+          - ReviewStore_GetRecordAsync_ThreadKind_DerivedFromStartingComment
+
+      - id: ReviewCenter-ReviewStore-ThreadReport
+        title: >-
+          The ReviewStore class shall resolve a thread in one transaction together with the Resolution comment that
+          carries the note, re-reading the kind of the thread inside that transaction and refusing a Finding without
+          a note with the ResolutionNoteRequired rule, shall treat resolving a thread that is already resolved as
+          nothing done, shall promote or demote a thread by setting the flag of its starting comment and of all its
+          Resolution comments in one transaction, shall change the flag of a reply and refuse the starting comment
+          and a Resolution comment, each change with its audit entry in the same transaction, and shall refuse
+          every one of these writes, and the change of the state of a thread, on a concluded review with the
+          ReviewLocked rule.
+        justification: |
+          The check of the service is made before the transaction, so another request can change the thread in
+          between. Deciding again inside the transaction keeps a resolution from being stored against a kind that no
+          longer holds, and writing the state, the note, and the audit entry together keeps them from disagreeing.
+        tests:
+          - ReviewStore_ResolveThreadAsync_FindingWithoutResolution_ThrowsResolutionNoteRequired
+          - ReviewStore_ResolveThreadAsync_ConcurrentDemote_RechecksFlagInTransaction
+          - ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits
+          - ReviewStore_ResolveThreadAsync_AlreadyResolved_ReturnsFalseAndAddsNothing
+          - ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments
+          - ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused
+          - ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked
+
+      - id: ReviewCenter-ReviewStore-OpenThreadSigningRecheck
+        title: >-
+          The ReviewStore class shall refuse inside the transaction that saves a signature, after the comparison of
+          the digest, a signature while any thread of the review is not resolved, with the SigningNotAllowed rule and
+          without storing anything, and shall decide whether a review is concluded for the records it reads with the
+          same rule as the ReviewLock helper.
+        justification: |
+          The service checks the open threads before it saves the signature, but a thread can be started in between.
+          Checking again in the transaction closes that gap, so no review is signed with a thread that was opened
+          before the signature was saved.
+        tests:
+          - ReviewStore_AddSignatureAsync_OpenThread_ThrowsSigningNotAllowedAndStoresNothing
+          - ReviewStore_AddSignatureAsync_ThreadOpenedBeforeFinalSignature_IsRefused
+          - ReviewStore_IsConcluded_Records_FollowReviewLock
 
       - id: ReviewCenter-ReviewStore-Checklist
         title: >-
@@ -242,7 +285,8 @@ sections:
         title: >-
           The ReviewStore class shall store a follow-up review with the review that it follows, the numbers of
           answers and threads it took over, and the rows it carries (answers, not-applicable sections, and threads
-          with copies of their comments, each with the review it came from and, for a thread, its number there), all
+          with copies of their comments including the kind and the report flag of each, each with the review it came
+          from and, for a thread, its number there), all
           in the one transaction that stores the review and its audit entry, so that a carry that fails stores no
           review, no row, and no entry, shall give the threads new numbers of their own, shall load the follow-up
           and the carried marks into the record that a signature covers, and shall store an answer or a section that
@@ -256,23 +300,27 @@ sections:
           - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
           - ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing
           - ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker
+          - ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind
 
       - id: ReviewCenter-ReviewStore-ApprovalLockInTransaction
         title: >-
           The ReviewStore class shall refuse with the ReviewLocked rule, inside the same transaction that would store
-          the change, to store a thread, a comment, a thread state, a section state, a checklist answer, a due date,
-          or the addition, change, or removal of a reviewer slot, when the review is approved at that moment, using
-          the same definition of approved as the Core services, shall store nothing and no audit entry then, and
+          the change, to store a thread, a comment, a thread state, a resolution, a change of the kind of a thread, a
+          change of whether a comment is in the report, a section state, a checklist answer, a due date,
+          or the addition, change, or removal of a reviewer slot, when the review is concluded at that moment, using
+          the same definition of concluded as the Core services (every slot signed for the current record and no
+          thread open), shall store nothing and no audit entry then, and
           shall not refuse a change to a review that does not exist for this reason.
         justification: |
           The Core services check the lock before they write, but a final signature may be stored between that check
           and the change. Repeating the check in the transaction of the change closes that gap, so that no
-          interleaving of two requests can change an approved review.
+          interleaving of two requests can change a concluded review.
         tests:
           - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
           - ReviewStore_WriteMethods_UnknownReview_AreNotRefusedAsLocked
           - ReviewStore_AddSignatureAsync_RacingWithWrite_SignatureStartedFirst_EndsConsistent
           - ReviewStore_AddSignatureAsync_RacingWithWrite_WriteStartedFirst_EndsConsistent
+          - ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked
 
       - id: ReviewCenter-ReviewStore-ReopenHistory
         title: >-
@@ -349,7 +397,8 @@ sections:
         title: >-
           The ReviewStore class shall store every audited change (project, project membership, evidence settings,
           project checklist definition, setting that requires independent reviewers, review, thread, comment,
-          thread state, checklist answer and section state, slot, signature, and reopening) together with its audit
+          thread state, resolution, kind of a thread, report flag of a comment, checklist answer and section state,
+          slot, signature, and reopening) together with its audit
           entry in one transaction, through the
           process-wide audit gate, shall store neither when either fails, and shall store no entry for a change that
           has no effect.
@@ -362,6 +411,7 @@ sections:
           - ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing
           - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
           - ReviewStore_NoOpChanges_RecordNothing
+          - ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits
           - ReviewStore_Membership_Changes_AreAuditedWithTheProject
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
           - ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited

@@ -121,7 +121,8 @@ public class ReviewStoreSigningTests
     }
 
     /// <summary>
-    ///     Adds a thread with one comment to <c>REV-1</c>.
+    ///     Adds a thread with one comment to <c>REV-1</c>. The comment is included in the report, so the thread is a
+    ///     Finding that is part of the digest.
     /// </summary>
     /// <param name="db">The database.</param>
     /// <param name="projectId">The project identity.</param>
@@ -137,7 +138,17 @@ public class ReviewStoreSigningTests
                 FilePath = "a.txt",
                 State = ReviewThreadState.Open,
                 Created = _time,
-                Comments = [new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = text, Created = _time }]
+                Comments =
+                [
+                    new ReviewComment
+                    {
+                        Author = "Ann",
+                        AuthorUsername = "ann",
+                        Text = text,
+                        Created = _time,
+                        IncludeInReport = true
+                    }
+                ]
             },
             TestContext.Current.CancellationToken);
     }
@@ -272,7 +283,14 @@ public class ReviewStoreSigningTests
             projectId,
             "REV-1",
             thread.Id,
-            new ReviewComment { Author = "Bob", AuthorUsername = "bob", Text = "Second", Created = _time },
+            new ReviewComment
+            {
+                Author = "Bob",
+                AuthorUsername = "bob",
+                Text = "Second",
+                Created = _time,
+                IncludeInReport = true
+            },
             TestContext.Current.CancellationToken);
         var after = await DigestAsync(db, projectId);
 
@@ -305,10 +323,11 @@ public class ReviewStoreSigningTests
     [Fact]
     public async Task ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures()
     {
-        // Arrange: a review with a thread, a slot and a signature of the current digest
+        // Arrange: a review with a resolved thread, a slot and a signature of the current digest
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
-        await AddThreadAsync(db, projectId, "First");
+        var thread = await AddThreadAsync(db, projectId, "First");
+        await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
         var slot = await db.Store.AddSlotAsync(NewSlot(projectId), TestContext.Current.CancellationToken);
         var digest = await DigestAsync(db, projectId);
         await db.Store.AddSignatureAsync(NewSignature(projectId, slot.Id, digest), TestContext.Current.CancellationToken);
@@ -601,7 +620,7 @@ public class ReviewStoreSigningTests
         var snapshot = (await db.Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!;
         Assert.Single(snapshot.Signatures);
         Assert.Equal(slot.Id, snapshot.Signatures[0].SlotId);
-        Assert.False(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
+        Assert.False(ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures));
 
         // Assert: exactly one audit entry of the review was written, with the draft's content, and the chain verifies
         var entries = await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken);
@@ -803,7 +822,7 @@ public class ReviewStoreSigningTests
         Assert.Equal(0, (await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken))!.Reopens);
         Assert.Equal(digest, await DigestAsync(db, projectId));
         var snapshot = (await db.Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!;
-        Assert.True(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
+        Assert.True(ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures));
         Execute(db, "DROP TRIGGER refuse_audit");
         Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
 
@@ -1110,14 +1129,14 @@ public class ReviewStoreSigningTests
             Assert.Equal(DomainRule.ReviewLocked, writeResult!.Rule);
             Assert.Empty(threads);
             Assert.Equal(2, signatures.Count);
-            Assert.True(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
+            Assert.True(ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures));
         }
         else
         {
             Assert.Equal(DomainRule.RecordChanged, signResult.Rule);
             Assert.Single(threads);
             Assert.Single(signatures);
-            Assert.False(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
+            Assert.False(ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures));
         }
 
         // Assert: the audit chain is intact

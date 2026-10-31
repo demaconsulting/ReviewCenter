@@ -351,7 +351,11 @@ thread.
 collapses the thread. A thread that no longer exists is reported inside the thread.
 
 **Signature warning**: `StartThreadAsync`, `ReplyAsync`, and `ToggleThreadAsync` call the service without an
-acknowledgement. When it refuses with `SignaturesWouldBecomeOutOfDate`, the page keeps the request and shows the
+acknowledgement. The page posts chat only (the comment is not included in the report) and resolving or reopening a
+Question or reopening a Finding changes nothing the digest covers, so in this version the service does not refuse these
+calls and the banner stays hidden; the handling below is kept for the actions that later pages add (included comments,
+promote, demote, and resolving a Finding). When the service refuses with `SignaturesWouldBecomeOutOfDate`, the page
+keeps the request and shows the
 `SignatureWarning` component (`signature-warning`) where the action was taken: under the new-thread form, in the thread
 of the reply, or in the head of the toggled thread. The banner names every affected slot and its signer
 (`signature-warning-slots`, for example "Slot 1 (Ann)"). Nothing is stored and everything typed stays. **Confirm

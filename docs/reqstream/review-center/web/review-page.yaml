@@ -365,24 +365,20 @@ sections:
 
       - id: ReviewCenter-ReviewPage-SignatureWarning
         title: >-
-          The ReviewPage unit shall, when a new thread, a reply, or the resolving or reopening of a thread would make
-          a current signature out of date, store nothing and show a warning where the action was taken that names
-          every affected slot and its signer, repeat the action with those slots acknowledged only when the reader
-          confirms, show the warning again with every affected slot when another signature appeared meanwhile, and
-          leave the signatures and the record unchanged, and keep the typed text, when the reader cancels.
+          The ReviewPage unit shall post a new thread, a reply, and the resolving and reopening of a thread as chat
+          that is not included in the report, store each at once without a warning on a review with a current
+          signature and leave that signature current, resolve a thread without a resolution note, and show a refusal
+          for another reason, such as a review that was concluded meanwhile, as the normal error message and not as
+          a warning.
         justification: |
-          A comment after a signature silently voids the signature. The reader has to see whose signature is
-          affected and decide, so that nobody learns afterwards that a reviewer has to sign again. A signature that
-          appears while the warning is open must be shown before it is voided.
+          Chat is not part of what a signature covers, so it neither needs the confirmation of the reader nor voids
+          the signature. The page does not offer to include a comment in the report in this version, so it never meets
+          the warning for a thread action; a change of the checklist still warns, which the checklist page tests
+          cover.
         tests:
-          - ReviewPage_StartThread_SignedReview_ShowsWarningAndConfirmStoresTheThreadAndMarksTheSignatureOutOfDate
-          - ReviewPage_StartThread_SignedReview_CancelStoresNothingAndKeepsTheText
-          - ReviewPage_StartThread_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring
-          - ReviewPage_StartThread_ConfirmClickedTwice_StoresExactlyOneThread
+          - ReviewPage_PostChat_SignedReview_NeedsNoWarningAndKeepsSignature
+          - ReviewPage_ResolveThread_Question_PassesNullNoteAndResolves
           - ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning
-          - ReviewPage_Reply_SignedReview_ShowsWarningInTheThreadAndConfirmStoresTheReply
-          - ReviewPage_Reopen_SignedReview_ConfirmReopensTheThread
-          - ReviewPage_Render_SignatureWarningOpen_EveryInteractiveElementHasTestId
 
       - id: ReviewCenter-ReviewPage-Reviewers
         title: >-

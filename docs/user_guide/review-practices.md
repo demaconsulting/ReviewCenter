@@ -14,10 +14,11 @@ Know the hard rules first, because the practices build on them. A review can be 
 - no comment thread is open.
 
 Signing asks the signer to confirm their identity again (the password, or a fresh sign-in at the identity provider),
-and a signature covers the whole record as it was at that moment. While only some slots are signed, any change to the
-record, such as a new comment or a changed answer, makes the signatures given so far out of date; the page warns you
-and asks for a confirmation first (see *What Makes a Signature Out of Date*). When the last slot is
-signed, the review is Approved and **locked**: ReviewCenter then refuses every change of its threads, checklist, and
+and a signature covers the whole record as it was at that moment. While only some slots are signed, a change to the
+record, such as a changed answer, makes the signatures given so far out of date; the page warns you
+and asks for a confirmation first (see *What Makes a Signature Out of Date*). Chat does not: a comment that is not
+included in the report is never part of the record. When every slot is signed and no thread is open, the review is
+Approved and **locked**: ReviewCenter then refuses every change of its threads, checklist, and
 reviewers until a project administrator reopens it (see *Approved Reviews Are Locked* below).
 
 The product also constrains the reviewers: a slot holds only enabled members of the project, a person can be in only
@@ -46,10 +47,18 @@ project page; every change of the rule is audited.
 ## What Makes a Signature Out of Date
 
 A signature stays current only while the record is the one that was signed. These changes alter the record, so each one
-makes the current signatures out of date: a new comment thread, a reply, resolving or reopening a thread, a changed
-checklist answer (also the justification, or who gave the answer), and switching a checklist section to not applicable
-or back. A save that changes nothing, such as the same person saving the same answer again, does not. The due date of
-a review is planning information and is not part of the record, so changing it leaves the signatures current.
+makes the current signatures out of date: a changed checklist answer (also the justification, or who gave the answer),
+switching a checklist section to not applicable or back, and a change to the report, which is the set of comments that
+are included in it (an included comment, a reply that is included, including or removing a comment, promoting or
+demoting a thread, and resolving a Finding with its note). A save that changes nothing, such as the same person saving
+the same answer again, does not.
+
+Ordinary discussion does not alter the record. A comment is **chat** unless it is included in the report, and chat,
+replies to it, and the state of a thread (resolved or open) are not part of what a signature covers. This version of
+the pages posts chat only, so starting a thread, replying, resolving, and reopening never make a signature out of
+date. An open thread still blocks signing, and a review that has an open thread is not Approved even when every slot
+is signed. The due date of a review is planning information and is not part of the record, so changing it leaves the
+signatures current.
 
 ReviewCenter does not let such a change go through silently. When the change would make a current signature out of
 date, the page stores nothing and shows a warning where you worked. It names every affected slot and its signer, for
@@ -81,9 +90,10 @@ record that the signatures bind to.
 
 ## Sign Last
 
-Any change to the record, including a checklist answer of another reviewer (even an identical one), a new comment, or
-a resolved thread, makes the signatures given so far out of date. So agree who is still to answer or comment, let them
-finish, and only then sign; the signature of the last reviewer is the one that approves the review. If a late change
+Any change to the record, including a checklist answer of another reviewer (even an identical one) or a change to the
+report, makes the signatures given so far out of date. So agree who is still to answer, let them
+finish, close the open threads (an open thread blocks the signature), and only then sign; the signature of the last
+reviewer is the one that approves the review. If a late change
 is needed, the page warns you which signatures it voids; after you confirm, the reviewers who already signed sign the
 new record again.
 
@@ -120,10 +130,13 @@ record of the decision:
 - **Track it elsewhere.** Collect several minor findings in one ticket in your own tracker, reply "Tracked in PROJ-123",
   and resolve the threads. ReviewCenter has no link to a tracker, so the reference is plain text.
 
-Resolution has no text of its own: the **Resolve** button only changes the state of the thread. Write the reason as a
+Resolution has no text of its own in this version of the pages: the **Resolve** button only changes the state of the
+thread (a Finding, a thread that is included in the report, needs a resolution note, which the pages do not offer yet).
+Write the reason as a
 reply first, then resolve. A reply can also be added to a resolved thread (expand it first), and it does not reopen it.
-Remember that a reply or a resolve after some reviewers have signed makes their signatures out of date, and after the
-last signature the review is locked and refuses both, so close every thread before the first signature.
+Resolving or replying to a thread that is only chat does not make a signature out of date, but close every thread
+before the last signature anyway: an open thread blocks signing, and once the review is Approved and locked it refuses
+both.
 Say what was done and who decided, for example "Declined by the author after discussion with Alex: ...", because a
 resolved thread is shown collapsed, and the audit trail records who pressed the button but not why.
 
@@ -176,7 +189,8 @@ project's review rules setting.
 
 ## Approved Reviews Are Locked
 
-An Approved review is **Locked**: every slot has signed the current record, and the review page shows a Locked badge.
+An Approved review is **Locked**: every slot has signed the current record and no thread is open, and the review page
+shows a Locked badge.
 The lock is not a separate state; it lasts exactly while the review is Approved. A project administrator or a system
 administrator can **Reopen** it in the locked notice of the review page, with a reason of 1 to 250 characters. A reopen
 is audited (`review.reopened`, with the reason and the previous digest) and listed in the **Reopen history** of the
@@ -206,8 +220,8 @@ approved again.
 ## Signing Hygiene
 
 - **Sign only when the record you saw is final.** Before you sign, check that all threads and answers are as you
-  expect. While other slots are unsigned, anything that changes afterward makes your signature out of date; when you
-  are the last signer, the review locks and the record cannot change without an administrator's reopen.
+  expect. While other slots are unsigned, a change to the answers or the report afterward makes your signature out of
+  date; when you are the last signer, the review locks and the record cannot change without an administrator's reopen.
 - **A stale signature means review again.** When a slot says "Signature out of date", read what changed (the thread
   list and the **History** of the review show it) before you sign the new record. Do not sign only because the
   button is there.

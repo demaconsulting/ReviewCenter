@@ -9,7 +9,7 @@ records a signature after the signer has confirmed their identity (with the pass
 factor, a current code, or for a user of an external
 identity provider with a fresh sign-in at the provider), and computes the approval status of a review. It
 is the one place where these rules live, so every caller (the pages, a later API) gets the same answer. It also
-enforces the integrity of an approved review: an approved review is locked, only an administrator can reopen it, and
+enforces the integrity of a concluded review: a concluded review is locked, only an administrator can reopen it, and
 (by default) the author of a review cannot review it. It is also
 the home of the supporting types of signing: `SlotRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewRecord`,
 `ReviewApproval`, `SlotStatus`, `SlotMember`, `SlotSignatureState`, `ReviewLock`, `ReviewReopen`, and `ReopenRules`,
@@ -47,8 +47,9 @@ record that was reopened). A reopen is history: it is never changed or deleted.
 
 **ReviewApproval**: the computed status of a review: `IsApproved`, the current `Digest`, the `Slots` (one `SlotStatus`
 each), the `Blockers`, the `NextStep` sentence, and `Reopens`, the reopen history, oldest first (`null` or empty for
-a review that was never reopened; it is read only when the record's reopen count is above zero). `IsApproved` is
-also the lock: there is no separate stored or computed "locked" flag. A `SlotStatus` holds the slot identity, its
+a review that was never reopened; it is read only when the record's reopen count is above zero). `IsApproved` means
+that the review is concluded (see below) and is also the lock: there is no separate stored or computed "locked" flag.
+A `SlotStatus` holds the slot identity, its
 number, the primary and alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state,
 and, for a signed slot, the name
 of the signer and the signing time. `IsMember` is `false` when the user is no longer a member of the project (a slot
@@ -62,17 +63,22 @@ keeps the flag too.
 
 **Status is computed, never stored.** A slot is `Signed` when it has a signature whose digest equals the digest of the
 record now, `OutOfDate` when it has signatures but none of them is current, and `NotSigned` otherwise. A review is
-approved when it has at least one slot and every slot is `Signed`; a review without slots is "In review". A change to
-the record (a new comment, a changed answer, a changed state) therefore makes the approval go away by itself, and
-setting the record back restores it, because the signatures were never touched. The one definition of "approved" is
-`ReviewLock.IsApproved(record, slots, signatures)`: at least one slot, and every slot holds a signature whose digest
-equals the current digest. `GetApprovalAsync`, the lock checks of all Core services, and the lock checks inside the
-store transactions all call it, so they cannot disagree.
+concluded (and `IsApproved` is true) when it has at least one slot, every slot is `Signed`, **and no thread is open**; a
+review without slots is "In review". A change to the record (a new included comment, a changed answer) therefore makes
+the signatures go out of date by itself, and setting the record back restores them, because the signatures were never
+touched. Chat and the state of a thread are not in the digest, so they never change a signature; an open thread keeps
+the review from being concluded by a rule that is separate from the digest (the thread state is read from the record,
+not from the digest), so a fully signed review with an open thread is not concluded and not locked, and it is
+concluded when the thread is resolved. The one definition of "concluded" is
+`ReviewLock.IsConcluded(record, slots, signatures)`: at least one slot, no open thread, and every slot holds a
+signature whose digest equals the current digest. `GetApprovalAsync`, the lock checks of all Core services, and the lock
+checks inside the store transactions all call it, so they cannot disagree.
 
-**Approval lock**: an approved review is locked, so that what the signatures cover cannot change silently. While the
-review is approved, every change of reviewed content is refused with `ReviewLocked` ("This review is approved and
-locked. A project administrator must reopen it before it can change."): starting, replying to, resolving, and reopening
-a thread (`ThreadService`), a checklist answer and the applicability of a section (`ChecklistService`), and adding,
+**Approval lock**: a concluded review is locked, so that what the signatures cover cannot change silently. While the
+review is concluded, every change of reviewed content is refused with `ReviewLocked` ("This review is concluded and
+locked. A project administrator must reopen it before it can change."): starting, replying to, resolving, reopening,
+promoting, and demoting a thread and including a reply in the report or taking it out (`ThreadService`), a checklist
+answer and the applicability of a section (`ChecklistService`), and adding,
 changing, and removing a slot and signing (this service). Locked is computed from the same snapshot as the approval,
 never stored. The Core check is `ReviewLock.EnsureUnlockedAsync(store, projectId, reviewId)`; the store repeats the
 check inside its write transactions (see `ReviewStore`), which closes the gap between the check and a concurrent final
@@ -89,10 +95,11 @@ read and no trial write:
    and keeps, for each slot, its latest signature whose digest equals the digest of the record now. A slot without
    such a signature is not affected by anything.
 2. `RequireAcknowledged(snapshot, changed, acknowledged)` returns when the review does not exist, when no signature is
-   current, or when `changed` has the same `RecordDigest` as the current record. A new thread or comment passes
-   `changed = null`, which always counts as a change. A checklist change passes the record as it would be after the
-   change, so a save that changes nothing (the same person saving the same value again, or marking a section
-   applicable that has no row) is not a change. The answer time is not part of the digest; the person who answered is.
+   current, or when `changed` has the same `RecordDigest` as the current record. Every caller passes the record as it
+   would be after the change, so a change that leaves the digest alone is not a change: chat, the state of a thread,
+   a Question's resolution note, a save of the same answer by the same person, or marking a section applicable that
+   has no row. A change of an included comment, of the kind of a thread, or of the resolution note of a Finding is
+   one. The answer time is not part of the digest; the person who answered is.
 3. Otherwise every current signature whose slot identity is not in `acknowledged` is affected. When there is one,
    `DomainRuleException` is thrown with `SignaturesWouldBecomeOutOfDate`, the message "This change makes signatures
    out of date: slot 1 (Rita), slot 3 (Tess). Acknowledge them to continue.", and `AffectedSlots`, a copy of the list of
@@ -114,11 +121,12 @@ would need the store to repeat the check inside its transaction.
 acknowledgement. When `SignaturesWouldBecomeOutOfDate` is raised they show a warning that names the slots and signers
 of `AffectedSlots`, and only when the person confirms do they call the service again with those slot identities. A
 signature that appeared in the meantime is named in the next refusal, and the page asks again with the merged list.
-Cancelling stores nothing.
+Cancelling stores nothing. The review page in this version posts chat only, so it never meets the refusal for a
+thread.
 
 **Reopen**: `ReopenReviewAsync` is the only way out of the lock. It needs a project administrator or a system
 administrator (anyone else: `ActorNotAllowed`; an API token is always refused) and a reason of 1 to 250 characters after
-trimming (`ReopenReasonInvalid`). It works only on an approved review (`ReviewNotLocked`: "The review is not locked, so
+trimming (`ReopenReasonInvalid`). It works only on a concluded review (`ReviewNotLocked`: "The review is not locked, so
 there is nothing to reopen."). The reopen is stored as a `ReviewReopen` with the previous digest, and the number of reopens
 becomes part of the record digest (see `RecordDigest`). Consequently the earlier signatures are kept as history but are
 out of date and can never be current again, not even when the content is changed back; the review is "In review" and
@@ -181,7 +189,10 @@ plain sentences, in this order: "This review has no checklist.", "{n} checklist 
 check(s) is/are answered Fail", and "{n} thread(s) is/are open". The checklist of a review is fixed when it is created.
 Carried answers (see `ReviewService`) count as answered and carried open threads count as open threads, so the
 blockers need no extra rule: only a carried thread that is still open, never a carried Pass or N/A answer, blocks the
-signature of a follow-up. A carried answer is not a Fail, because Fail answers are never carried.
+signature of a follow-up. A carried answer is not a Fail, because Fail answers are never carried. The open-thread
+blocker is a rule of its own and does not depend on the digest: the store repeats it inside the transaction that stores
+a signature, after the digest check, and refuses with `SigningNotAllowed` when any thread, chat or included, is open.
+It covers a thread that was started or reopened after the signer loaded the page.
 
 **Next step**: "Approved. Every reviewer slot has a current signature." when the review is approved; otherwise, when
 there are blockers, the sentence of `ThreadService.NextStep` for the threads, the checklist progress, and the
@@ -416,7 +427,7 @@ never contain a password or a hash. An infrastructure failure of the store passe
   reopen to an administrator.
 - **ThreadService** and **ChecklistService** (`Core` subsystem) — call `ReviewLock.EnsureUnlockedAsync` before they
   change a thread or the checklist, and `SignatureImpact.RequireAcknowledged` with the snapshot it returns.
-- **ReviewStore** (`Storage` subsystem) — calls `ReviewLock.IsApproved` inside its write transactions.
+- **ReviewStore** (`Storage` subsystem) — calls `ReviewLock.IsConcluded` inside its write transactions.
 - **AttestationService** (`Evidence` subsystem) — reads the approval, including the reopen history.
 - **ReviewWorkflowCheck** (`SelfTest` subsystem) — signs, shows the lock, and reopens.
 - **OidcSignIn** (`Identity` subsystem) — asks `RequireConfirmableAsync` before it starts a confirmation at the provider.

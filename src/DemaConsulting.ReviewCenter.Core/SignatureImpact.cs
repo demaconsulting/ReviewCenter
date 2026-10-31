@@ -76,8 +76,9 @@ internal static class SignatureImpact
     /// </summary>
     /// <param name="snapshot">The review snapshot read before the change, or <c>null</c> when the review does not exist.</param>
     /// <param name="changed">
-    ///     The record as the change would leave it, or <c>null</c> when the change always alters the digest (a new
-    ///     thread or comment).
+    ///     The record as the change would leave it. The digest of it is compared with the digest of the current record;
+    ///     a <c>null</c> record (kept for a change that always alters the digest) no longer occurs for threads, because
+    ///     chat leaves the digest alone.
     /// </param>
     /// <param name="acknowledged">The slot identities the person has acknowledged, or <c>null</c> for none.</param>
     /// <exception cref="DomainRuleException">

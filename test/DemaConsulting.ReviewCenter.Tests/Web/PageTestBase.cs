@@ -91,7 +91,7 @@ public abstract class PageTestBase : BunitContext
         // not have to be a member of a project to prepare it.
         var allowAll = new AllowAllProjectAccess(store);
         Projects = new ProjectService(store, userStore, allowAll, new FakePasswordHasher(), clock, Audit);
-        Threads = new ThreadService(store, allowAll, clock);
+        Threads = new ThreadService(store, allowAll, userStore, clock);
         Checklists = new ChecklistService(store, allowAll, clock);
         Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), allowAll, clock);
         Reviews = new ReviewService(store, allowAll, clock, Repositories, Git);
@@ -107,7 +107,7 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Audit);
         Services.AddSingleton(pageProjects);
         Services.AddSingleton(pageReviews);
-        Services.AddSingleton(new ThreadService(store, Access, clock));
+        Services.AddSingleton(new ThreadService(store, Access, userStore, clock));
         Services.AddSingleton(new ChecklistService(store, Access, clock));
         Services.AddSingleton(Users);
         Services.AddSingleton(new UserImpactService(store, userStore, Access));

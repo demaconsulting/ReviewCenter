@@ -76,7 +76,9 @@ reopened), and one read of the last activity. A review
 that is removed between the first two reads is left out. The page that lists the reviews of a project used to ask for the
 approval of each review on its own; it now uses this one call.
 
-**Stage**: no slot gives `Setup`; otherwise an approved review gives `Approved` and every other `InReview`.
+**Stage**: no slot gives `Setup`; otherwise an approved review gives `Approved` and every other `InReview`. A review
+whose slots are all signed but that has an open thread is not approved, so it is `InReview` and its `OpenThreads`
+count blocks it until the thread is resolved.
 
 **WaitingOn**: for an unapproved review, the primary reviewer and, when it is another person, the alternate reviewer of
 every slot that is not signed or whose signature is out of date, each person once, in slot order. A person whose account

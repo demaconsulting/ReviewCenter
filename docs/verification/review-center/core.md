@@ -62,13 +62,15 @@ N/A - standard test environment.
 - A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
   signature makes the review approved, an administrator's reopen makes it out of date and not approved, and the
   slot can be signed again.
-- An approved review is locked: every change of its threads, checklist, and reviewer slots, and a further signature,
+- An approved review (every slot signed for the current record and no thread open) is locked: every change of its
+  threads, checklist, and reviewer slots, and a further signature,
   is refused with `ReviewLocked`, and its approval and digest stay as they were; only a project administrator reopens
   it, with a reason, which is audited with the previous digest, keeps the earlier signatures as out-of-date history,
   and needs fresh signatures; reopening a review that is not locked is refused with `ReviewNotLocked`.
-- A change of the checklist or of a thread that would make a current signature out of date is refused with
-  `SignaturesWouldBecomeOutOfDate`, naming the slot and its signer, and nothing is stored; with the slot acknowledged it
-  goes through and the signature is kept as out of date.
+- A change of the checklist or of a thread that would change the digest while a current signature exists is refused
+  with `SignaturesWouldBecomeOutOfDate`, naming the slot and its signer, and nothing is stored; with the slot
+  acknowledged it goes through and the signature is kept as out of date. Chat never needs the acknowledgement, and an
+  open thread, chat or included, blocks signing and conclusion.
 - While a project requires independent reviewers (the default), the author of a review is refused as reviewer of a slot
   and as signer, also for a slot that was filled earlier and for a review created through a token (its author is the
   owner of the token); only a project administrator switches the rule, and every switch is audited.
@@ -186,9 +188,11 @@ with the alternate as signer.
 This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.
 
 **CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement**: A review has two slots, every check is answered, and
-only the first slot is signed, so the review is not locked. Changing an answer and starting a thread without an
-acknowledgement are each refused with `SignaturesWouldBecomeOutOfDate`, naming slot 1 and its signer, nothing is stored,
-and the signature is still current. The same answer is then changed with slot 1 acknowledged; it is stored and the
+only the first slot is signed, so the review is not locked. Changing an answer and starting a thread that is included in
+the report, without an
+acknowledgement, are each refused with `SignaturesWouldBecomeOutOfDate`, naming slot 1 and its signer, nothing is
+stored, and the signature is still current. The same answer is then changed with slot 1 acknowledged; it is stored and
+the
 signature is out of date. This scenario is tested by `CoreSubsystem_Signatures_ChangeAfterSigning_NeedsAcknowledgement`.
 
 **CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner**: A user is created and a token is made through
