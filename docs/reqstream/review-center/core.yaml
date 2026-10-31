@@ -70,6 +70,8 @@ sections:
           - ReviewCenter-ProjectService-LastAdmin
           - ReviewCenter-ProjectService-CreateMemberAccount
           - ReviewCenter-ProjectService-MemberAudit
+          - ReviewCenter-ProjectService-AuditorRole
+          - ReviewCenter-SigningService-AuditorNotReviewer
           - ReviewCenter-RepositoryService-Ownership
           - ReviewCenter-ThreadService-Access
           - ReviewCenter-ChecklistService-Access

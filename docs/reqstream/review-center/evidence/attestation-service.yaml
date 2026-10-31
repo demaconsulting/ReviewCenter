@@ -66,7 +66,8 @@ sections:
 
       - id: ReviewCenter-AttestationService-Document
         title: >-
-          The AttestationService class shall return a signed PDF of the review, with its content, checklist, threads,
+          The AttestationService class shall return a signed PDF of the review, with its content, checklist (with who
+          answered and when), threads,
           sign-offs, audit head, and key, as far as the evidence settings of the project include them, and a file name
           that keeps only safe characters, and shall sign the document after the settings were applied so that the
           signature stays valid.
@@ -76,6 +77,7 @@ sections:
           signature covers the bytes that were released.
         tests:
           - AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview
+          - AttestationService_GenerateAsync_ReAnsweredLaterWithSameValue_ShowsAnswerTimeAndKeepsDigestAndApproval
           - AttestationService_FileNameFor_ReviewId_KeepsOnlySafeCharacters
           - AttestationService_GenerateAsync_DefaultSettings_IncludesEverything
           - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies

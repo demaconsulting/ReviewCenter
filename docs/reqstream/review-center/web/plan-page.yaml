@@ -41,6 +41,17 @@ sections:
           - PlanPage_Render_NonMember_LooksLikeAMissingProject
           - PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan
           - PlanPage_CreateReviews_MembershipRevoked_CreatesNothing
+
+      - id: ReviewCenter-PlanPage-ReadOnly
+        title: >-
+          The PlanPage unit shall show a member whose role is auditor a read-only notice instead of the plan form, and
+          shall not read the repositories of the project for that member.
+        justification: |
+          Planning creates reviews, which an auditor may not do, and the repositories are for those who manage the
+          project, so the page offers neither and says why.
+        tests:
+          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+
       - id: ReviewCenter-PlanPage-Summary
         title: >-
           The PlanPage unit shall show a plan as one plain summary sentence first, such as "3 sets need review, 1

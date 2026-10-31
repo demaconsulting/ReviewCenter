@@ -99,7 +99,8 @@ public sealed class ProjectAccess : IProjectAccess
     /// <inheritdoc />
     public async Task<bool> IsMemberAsync(int userId, int projectId, CancellationToken cancellationToken = default)
     {
-        return await _store.GetMembershipAsync(userId, projectId, cancellationToken) is not null;
+        return await _store.GetMembershipAsync(userId, projectId, cancellationToken) is { } membership
+            && Enum.IsDefined(membership.Role);
     }
 
     /// <inheritdoc />
@@ -120,7 +121,7 @@ public sealed class ProjectAccess : IProjectAccess
         }
 
         var memberships = await _store.ListMembershipsForUserAsync(user.Id, cancellationToken);
-        var visible = memberships.Select(m => m.ProjectId).ToHashSet();
+        var visible = memberships.Where(m => Enum.IsDefined(m.Role)).Select(m => m.ProjectId).ToHashSet();
         return projects.Where(p => visible.Contains(p.Id)).ToList();
     }
 
@@ -252,13 +253,13 @@ public sealed class ProjectAccess : IProjectAccess
             return null;
         }
 
-        // An undefined stored role fails closed: it may see the project but never work in it
+        // An undefined stored role fails closed: no access at all, the same as for a non-member
         return membership.Role switch
         {
             ProjectRole.ProjectAdmin => Level.Administer,
             ProjectRole.User => Level.Contribute,
             ProjectRole.Auditor => Level.Read,
-            _ => Level.Read
+            _ => null
         };
     }
 

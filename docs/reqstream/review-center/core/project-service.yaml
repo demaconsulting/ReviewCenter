@@ -89,10 +89,31 @@ sections:
           not exist, and to act on a project that does not exist, and shall change nothing in each case.
         justification: |
           A repeated or mistaken request must fail visibly and leave the access rights as they were, and a role
-          outside the defined roles, or the read-only role until it is offered, must never be stored.
+          outside the defined roles must never be stored.
         tests:
           - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
-          - ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered
+
+      - id: ReviewCenter-ProjectService-AuditorRole
+        title: >-
+          The ProjectService class shall let the same actors that manage the members assign the read-only Auditor
+          role when it adds a member, creates a member account, and changes the role of a member, shall record the
+          role name in the audit entry, shall refuse to change a member to Auditor with the member-has-open-review-work
+          rule that names the reviews while the member holds an unsigned or out-of-date slot, as primary or
+          alternate, on a review of the project that is not approved, and shall refuse every member management
+          operation by an Auditor.
+        justification: |
+          An oversight role is of no use if nobody can be given it, but a reviewer who is still named in a slot
+          would be unable to sign, and the review would wait for somebody who can no longer act. Telling the
+          administrator which reviews hold the member lets that be resolved first.
+        tests:
+          - ProjectService_Members_AuditorRole_IsAssignedAndAudited
+          - ProjectService_SetMemberRoleAsync_UnsignedSlot_RefusesAuditorAndNamesTheReview
+          - ProjectService_SetMemberRoleAsync_OutOfDateSlot_RefusesAuditor
+          - ProjectService_SetMemberRoleAsync_NoOpenWork_AllowsAuditor
+          - ProjectService_SetMemberRoleAsync_LastProjectAdminToAuditor_IsRefused
+          - ProjectService_AddMemberAsync_Auditor_IsAllowedForANewMember
+          - ProjectService_AddMemberAsync_Auditor_ExistingMemberReportsDuplicate_RemovedMemberWithSlotIsRefused
+          - ProjectService_MemberManagement_Auditor_IsRefused
 
       - id: ReviewCenter-ProjectService-MemberLookup
         title: >-

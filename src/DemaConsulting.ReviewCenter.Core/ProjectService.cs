@@ -341,7 +341,9 @@ public sealed class ProjectService
     ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/> (see
     ///     <see cref="IProjectAccess.RequireAdministerAsync"/>), <see cref="DomainRule.TooManyAttempts"/> when the
     ///     actor failed too often lately, <see cref="DomainRule.UserNotFound"/> (one message for a missing and a
-    ///     disabled user; the failure is counted and audited) or <see cref="DomainRule.MembershipExists"/>.
+    ///     disabled user; the failure is counted and audited), <see cref="DomainRule.MembershipExists"/> or
+    ///     <see cref="DomainRule.MemberHasOpenReviewWork"/> (the role is auditor and the user still has reviewer work
+    ///     to do in the project).
     /// </exception>
     public async Task<ProjectMember> AddMemberAsync(
         Actor actor,
@@ -368,6 +370,13 @@ public sealed class ProjectService
             {
                 await RegisterFailureAsync(actor, projectId, typed, cancellationToken);
                 throw new DomainRuleException(DomainRule.UserNotFound, CannotAddMessage);
+            }
+
+            if (role == ProjectRole.Auditor
+                && await _store.GetMembershipAsync(user.Id, projectId, cancellationToken) is null)
+            {
+                // An existing member is left to the store, which reports the duplicate (MembershipExists)
+                await EnsureNoOpenReviewWorkAsync(projectId, user, cancellationToken);
             }
 
             await _store.AddMembershipAsync(
@@ -540,12 +549,15 @@ public sealed class ProjectService
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The member as it is now.</returns>
     /// <remarks>
-    ///     The last-administrator rule of <see cref="RemoveMemberAsync"/> applies to a demotion too.
+    ///     The last-administrator rule of <see cref="RemoveMemberAsync"/> applies to a demotion too. Making a member an
+    ///     auditor is refused while the member holds an unsigned or out-of-date reviewer slot on a review that is not
+    ///     approved; changing an auditor back to a user or a project administrator is always allowed. The change is
+    ///     audited as <c>project.member-role-changed</c> with the role in the text.
     /// </remarks>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/>,
-    ///     <see cref="DomainRule.MembershipNotFound"/> (one message for an unknown name and a non-member) or
-    ///     <see cref="DomainRule.LastProjectAdmin"/>.
+    ///     <see cref="DomainRule.MembershipNotFound"/> (one message for an unknown name and a non-member),
+    ///     <see cref="DomainRule.LastProjectAdmin"/> or <see cref="DomainRule.MemberHasOpenReviewWork"/>.
     /// </exception>
     public async Task<ProjectMember> SetMemberRoleAsync(
         Actor actor,
@@ -559,6 +571,12 @@ public sealed class ProjectService
         await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
         var exempt = await _access.IsSystemAdminAsync(actor, cancellationToken);
         var user = await FindMemberCandidateAsync(username, cancellationToken);
+        if (role == ProjectRole.Auditor
+            && await _store.GetMembershipAsync(user.Id, projectId, cancellationToken) is not null)
+        {
+            await EnsureNoOpenReviewWorkAsync(projectId, user, cancellationToken);
+        }
+
         try
         {
             var changed = await _store.SetMembershipRoleAsync(
@@ -706,24 +724,57 @@ public sealed class ProjectService
     };
 
     /// <summary>
-    ///     Rejects a role that is not a defined value, and the read-only <see cref="ProjectRole.Auditor"/> role
-    ///     until it is offered.
+    ///     Rejects a role that is not a defined value.
     /// </summary>
     /// <param name="role">The role.</param>
-    /// <exception cref="ArgumentOutOfRangeException">
-    ///     Thrown when the role is not defined or is not offered yet.
-    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the role is not defined.</exception>
     private static void ValidateRole(ProjectRole role)
     {
         if (!Enum.IsDefined(role))
         {
             throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not a known value.");
         }
+    }
 
-        // Declared so access can be enforced, but nobody can be given it until the role is offered
-        if (role == ProjectRole.Auditor)
+    /// <summary>
+    ///     Refuses to make a user a read-only auditor while the user still has work to do in the project.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="user">The user who would become an auditor.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the user holds no open review work.</returns>
+    /// <remarks>
+    ///     Open work is a reviewer slot (as primary or alternate reviewer) that has no signature of the current record,
+    ///     on a review that is not approved. It is found by the one shared definition of the offboarding impact query
+    ///     (<see cref="UserImpactService"/>), so what is refused here is exactly what the inbox calls a review to
+    ///     sign and what the impact panel lists. The check and the role change are two steps,
+    ///     not one transaction: a slot that is given to the user between them is not caught, which leaves an auditor in
+    ///     a slot; such an auditor cannot sign (<see cref="SigningService"/> refuses it) and the slot shows as waiting
+    ///     until a member changes it.
+    /// </remarks>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.MemberHasOpenReviewWork"/>; the message lists the reviews.
+    /// </exception>
+    private async Task EnsureNoOpenReviewWorkAsync(int projectId, User user, CancellationToken cancellationToken)
+    {
+        var work = await UserImpactService.FindOpenWorkAsync(
+            _store,
+            user.Id,
+            new HashSet<int> { projectId },
+            cancellationToken);
+        var open = work
+            .Select(item => $"'{item.ReviewId}' ({item.Title})")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (open.Count > 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not offered yet.");
+            const int listed = 5;
+            var more = open.Count > listed ? $" and {open.Count - listed} more" : string.Empty;
+            var names = string.Join(", ", open.Take(listed)) + more;
+            throw new DomainRuleException(
+                DomainRule.MemberHasOpenReviewWork,
+                $"{user.DisplayName} still has reviewer work to do in {names}, so cannot become an auditor yet. " +
+                "Sign it, change the reviewer of the slot, or wait until the review is approved, then try again.");
         }
     }
 

@@ -291,6 +291,20 @@ sections:
           - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
           - ApiDocument_Get_MatchesCommittedSnapshot
 
+      - id: ReviewCenter-ApiEndpoints-ReadOnlyRole
+        title: >-
+          The ApiEndpoints unit shall let a token of a member whose role is Auditor read everything that the member may
+          see, shall refuse every change by that token with a 403 problem document and change nothing, shall answer a
+          token of a user who is no member of the project with 404 for reads and changes, and shall map the rule that
+          refuses a role change while the member holds open review work to 409.
+        justification: |
+          A script that acts for an auditor must be as read-only as the auditor, and a project that the token owner may
+          not see must read like a missing one.
+        tests:
+          - ApiAuditor_Reads_Token_ServeTheProject
+          - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
+          - ApiAuditor_MemberHasOpenReviewWork_Is409
+
       - id: ReviewCenter-ApiEndpoints-AuditExport
         title: >-
           The ApiEndpoints unit shall serve, in the file AuditExportEndpoints.cs, the cookie-authenticated routes
@@ -320,6 +334,7 @@ sections:
           - AuditExportEndpoints_ProjectRoute_IgnoresProjectInQuery
           - AuditExportEndpoints_GlobalExport_ProjectInQuery_LimitsAndScopesTheAuditEntry
           - AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404
+          - AuditExportEndpoints_ProjectExport_Auditor_ServesTheProjectTrailOnly
           - AuditExportEndpoints_SignedOut_RedirectsToLogin
           - AuditExportEndpoints_GlobalExport_NotSystemAdmin_Answers403
           - AuditExportEndpoints_HostileQueryValues_AreSafe

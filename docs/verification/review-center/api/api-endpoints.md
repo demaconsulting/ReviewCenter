@@ -62,7 +62,8 @@ N/A - standard test environment (a temporary database and key folder are created
   with 403 and a user who is no member, or a missing project, with 404; redirect a request without a session to the
   sign-in page; refuse the whole trail to everybody but a system administrator with 403; answer an unknown format with
   400 only to a user who is allowed; survive hostile query values; record one `audit.exported` entry per served export;
-  and are absent from the OpenAPI document.
+  and are absent from the OpenAPI document. An Auditor of the project is served the project export like a project
+  admin. `ApiAuditorTests.cs` verifies that the token of an Auditor reads and is refused writes with 403.
 
 #### Test Scenarios
 
@@ -88,6 +89,20 @@ each served export adds an `audit.exported` entry for the user. This scenario is
 **AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404**: A plain member gets 403, a user who is no member
 404, and a missing project 404, with no chain header and no entry in the body. This scenario is tested by
 `AuditExportEndpoints_ProjectExport_NotAllowed_Answers403Or404`.
+
+**AuditExportEndpoints_ProjectExport_Auditor_ServesTheProjectTrailOnly**: An Auditor of the project gets 200 for the
+project export, with entries of the project only. This scenario is tested by
+`AuditExportEndpoints_ProjectExport_Auditor_ServesTheProjectTrailOnly`.
+
+**ApiAuditor_Reads_Token_ServeTheProject**: The token of an Auditor reads the project, the review list, the progress
+overview, and the review. This scenario is tested by `ApiAuditor_Reads_Token_ServeTheProject`.
+
+**ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404**: The token of an Auditor is refused a write with 403 and
+the token of a non-member gets 404, and nothing is stored. This scenario is tested by
+`ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404`.
+
+**ApiAuditor_MemberHasOpenReviewWork_Is409**: The rule `MemberHasOpenReviewWork` is answered with a 409 problem. This
+scenario is tested by `ApiAuditor_MemberHasOpenReviewWork_Is409`.
 
 **AuditExportEndpoints_SignedOut_RedirectsToLogin**: A request without a session to either route is answered with a
 redirect to the sign-in page. This scenario is tested by `AuditExportEndpoints_SignedOut_RedirectsToLogin`.

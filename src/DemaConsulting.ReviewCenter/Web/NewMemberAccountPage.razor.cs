@@ -109,6 +109,11 @@ public partial class NewMemberAccountPage : ComponentBase
     private bool AsProjectAdmin { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the new member becomes a read-only auditor.
+    /// </summary>
+    private bool AsAuditor { get; set; }
+
+    /// <summary>
     ///     Gets the message of the last rejected submission, or <c>null</c> when there is none.
     /// </summary>
     private string? ErrorMessage { get; set; }
@@ -197,7 +202,17 @@ public partial class NewMemberAccountPage : ComponentBase
 
         try
         {
-            var role = AsProjectAdmin ? ProjectRole.ProjectAdmin : ProjectRole.User;
+            if (AsProjectAdmin && AsAuditor)
+            {
+                ErrorMessage = "Choose either project admin or auditor, not both.";
+                return;
+            }
+
+            var role = AsAuditor ? ProjectRole.Auditor : ProjectRole.User;
+            if (AsProjectAdmin)
+            {
+                role = ProjectRole.ProjectAdmin;
+            }
             Created = await ProjectService.CreateMemberAccountAsync(actor, ProjectId, Username, DisplayName, role);
             CopyStatus = null;
         }
@@ -274,6 +289,7 @@ public partial class NewMemberAccountPage : ComponentBase
         Username = string.Empty;
         DisplayName = string.Empty;
         AsProjectAdmin = false;
+        AsAuditor = false;
         ErrorMessage = null;
         Created = null;
         CopyStatus = null;

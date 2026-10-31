@@ -479,11 +479,11 @@ public class ProjectAccessTests
     }
 
     /// <summary>
-    ///     Test that a stored role that is not defined fails closed: the member sees the project but cannot work in
-    ///     it or administer it.
+    ///     Test that a stored role that is not defined fails closed: the member counts as a non-member, so the project
+    ///     is not visible and every rule behaves as for an unknown project.
     /// </summary>
     [Fact]
-    public async Task ProjectAccess_Matrix_UndefinedRole_FailsClosedAsReadOnly()
+    public async Task ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess()
     {
         // Arrange: a membership with a role value that no code defines
         var world = await WorldAsync();
@@ -493,41 +493,64 @@ public class ProjectAccessTests
 
         // Act
         var rights = await RightsAsync(world, actor, world.Own);
+        var required = new[]
+        {
+            await Assert.ThrowsAsync<DomainRuleException>(
+                () => world.Access.RequireViewAsync(actor, world.Own, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(
+                () => world.Access.RequireContributeAsync(actor, world.Own, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(
+                () => world.Access.RequireAuditAsync(actor, world.Own, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(
+                () => world.Access.RequireAdministerAsync(actor, world.Own, cancellationToken))
+        };
 
-        // Assert
-        Assert.Equal("view,audit", rights);
+        // Assert: no right, not a member, not listed, and every Require variant answers "not found"
+        Assert.Equal(string.Empty, rights);
+        Assert.False(await world.Access.IsMemberAsync(world.Ids["out"], world.Own, cancellationToken));
+        Assert.Empty(await world.Access.ListVisibleProjectsAsync(actor, cancellationToken));
+        Assert.All(required, e => Assert.Equal(DomainRule.ProjectNotFound, e.Rule));
     }
 
     /// <summary>
-    ///     Test that the read-only auditor role cannot be assigned yet by any of the three operations that store a
-    ///     role, and that a refused call changes and records nothing.
+    ///     Test that the read-only auditor role is assigned by all three operations that store a role, that each is
+    ///     audited with the role in the text, and that an auditor can be made a user or a project administrator again.
     /// </summary>
     [Fact]
-    public async Task ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered()
+    public async Task ProjectService_Members_AuditorRole_IsAssignedAndAudited()
     {
         // Arrange
         var world = await WorldAsync();
         var cancellationToken = TestContext.Current.CancellationToken;
         var root = new Actor("root", "Root");
-        var membersBefore = (await world.Store.ListMembershipsAsync(world.Own, cancellationToken)).Count;
-        var auditBefore = world.Store.Audits.Count;
 
         // Act
-        var add = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => world.Projects.AddMemberAsync(root, world.Own, "out", ProjectRole.Auditor, cancellationToken));
-        var create = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => world.Projects.CreateMemberAccountAsync(
-                root, world.Own, "fresh", "Fresh Auditor", ProjectRole.Auditor, cancellationToken));
-        var change = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => world.Projects.SetMemberRoleAsync(root, world.Own, "usr", ProjectRole.Auditor, cancellationToken));
+        await world.Projects.AddMemberAsync(root, world.Own, "out", ProjectRole.Auditor, cancellationToken);
+        await world.Projects.CreateMemberAccountAsync(
+            root, world.Own, "fresh", "Fresh Auditor", ProjectRole.Auditor, cancellationToken);
+        await world.Projects.SetMemberRoleAsync(root, world.Own, "usr", ProjectRole.Auditor, cancellationToken);
+
+        // Assert: all three are auditors and none of them can work in the project
+        foreach (var name in new[] { "out", "usr" })
+        {
+            Assert.Equal(
+                ProjectRole.Auditor,
+                (await world.Store.GetMembershipAsync(world.Ids[name], world.Own, cancellationToken))!.Role);
+        }
+
+        Assert.Equal("view,audit", await RightsAsync(world, new Actor("usr", "Usr"), world.Own));
+        Assert.Contains(world.Store.Audits, d => d.Action == "project.member-added" && d.Detail.Contains("role Auditor"));
+        Assert.Contains(
+            world.Store.Audits,
+            d => d.Action == "project.member-role-changed" && d.Detail.Contains("user 'usr', role Auditor"));
+
+        // Act: an auditor becomes a user or a project administrator again
+        await world.Projects.SetMemberRoleAsync(root, world.Own, "usr", ProjectRole.User, cancellationToken);
+        await world.Projects.SetMemberRoleAsync(root, world.Own, "out", ProjectRole.ProjectAdmin, cancellationToken);
 
         // Assert
-        Assert.All([add, create, change], e => Assert.Equal("role", e.ParamName));
-        Assert.Equal(membersBefore, (await world.Store.ListMembershipsAsync(world.Own, cancellationToken)).Count);
-        Assert.Equal(auditBefore, world.Store.Audits.Count);
-        Assert.Equal(
-            ProjectRole.User,
-            (await world.Store.GetMembershipAsync(world.Ids["usr"], world.Own, cancellationToken))!.Role);
+        Assert.Equal("view,contribute", await RightsAsync(world, new Actor("usr", "Usr"), world.Own));
+        Assert.Equal("view,contribute,administer,audit", await RightsAsync(world, new Actor("out", "Out"), world.Own));
     }
 
     /// <summary>

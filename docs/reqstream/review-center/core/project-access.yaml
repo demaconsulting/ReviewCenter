@@ -10,13 +10,16 @@ sections:
       - id: ReviewCenter-ProjectAccess-Visibility
         title: >-
           The ProjectAccess class shall let a user see only the projects the user is a member of, and administer
-          only the projects the user is a project administrator of, and shall let neither a non-member nor a
-          project the user does not belong to be seen or administered.
+          only the projects the user is a project administrator of, shall let neither a non-member nor a
+          project the user does not belong to be seen or administered, and shall treat a member whose stored role
+          is not defined as a non-member, so that such a member sees nothing.
         justification: |
           Reviews of one body of work must not be readable by people who have nothing to do with it. One rule in
-          one place keeps every page, route, and service in agreement about who may see what.
+          one place keeps every page, route, and service in agreement about who may see what. A role that no code
+          defines must never gain access, so the answer fails closed.
         tests:
           - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess
 
       - id: ReviewCenter-ProjectAccess-SystemAdmin
         title: >-
@@ -60,18 +63,18 @@ sections:
         title: >-
           The ProjectAccess class shall let a member whose role is User or ProjectAdmin and an enabled system
           administrator work in a project, shall let a member whose role is Auditor see the project but not work
-          in it, shall treat a stored role that is not defined as read-only, and shall refuse, when it is asked to
-          require the right to work, a project that is not visible with the project not found failure and a
-          member who may only read with the actor not allowed failure.
+          in it, shall treat a stored role that is not defined as no membership at all, and shall refuse, when it
+          is asked to require the right to work, a project that is not visible with the project not found failure
+          and a member who may only read with the actor not allowed failure.
         justification: |
           A read-only oversight role must be enforced in one place, or every service would have to remember it.
           The member already sees the project, so telling a read-only member that the action is not allowed
-          leaks nothing, and a role that no code defines must never gain more power than the least one.
+          leaks nothing, and a role that no code defines must never gain any power.
         tests:
           - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
           - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
           - ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFollowTheNextCall
-          - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsReadOnly
+          - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess
           - ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing
           - ReviewOperations_ProjectAdminAndSystemAdmin_AreAllowed
           - ReviewReads_Auditor_AreAllowed

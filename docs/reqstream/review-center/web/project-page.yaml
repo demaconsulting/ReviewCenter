@@ -235,6 +235,25 @@ sections:
         tests:
           - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
           - ProjectPage_Render_EmptyProject_InvitesOnlyContributors
+          - ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories
+          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+          - ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed
+
+      - id: ReviewCenter-ProjectPage-MemberRoles
+        title: >-
+          The ProjectPage unit shall name the role of every member on the members card as member, auditor, or project
+          admin, change the role only by a choice that names the new role, so that an auditor is never made a project
+          admin by a toggle, offer the auditor role on the pages that add a member and that create an account, refuse
+          to combine it with the project admin role, and show the reason when the role is refused, for example while the
+          member still holds an unsigned review slot, or when the member is the last project admin.
+        justification: |
+          A role that is changed by a toggle between two values would turn an auditor into an administrator by
+          accident. Naming the target of every change, and the reason of every refusal, lets the administrator do what
+          was meant and resolve what stands in the way.
+        tests:
+          - ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly
+          - ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage
+          - NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin
 
       - id: ReviewCenter-ProjectPage-Selection
         title: >-

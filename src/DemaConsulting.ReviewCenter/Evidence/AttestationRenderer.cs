@@ -284,7 +284,7 @@ internal sealed class AttestationRenderer : IAttestationRenderer
     }
 
     /// <summary>
-    ///     Writes one check with its outcome, the reviewer's comment and who answered it.
+    ///     Writes one check with its outcome, the reviewer's comment and who answered it and when.
     /// </summary>
     /// <param name="writer">The writer.</param>
     /// <param name="item">The check.</param>
@@ -306,15 +306,33 @@ internal sealed class AttestationRenderer : IAttestationRenderer
             writer.Paragraph($"Comment: {item.Comment}", PdfFont.HelveticaOblique, 9, 122, 1);
         }
 
-        if (item.AnsweredBy is not null)
+        var answered = AnsweredLine(item);
+        if (answered is not null)
         {
-            writer.Paragraph($"Answered by {item.AnsweredBy}", PdfFont.HelveticaOblique, 8, 122, 1);
+            writer.Paragraph(answered, PdfFont.HelveticaOblique, 8, 122, 1);
         }
 
         if (item.CarriedFrom is not null)
         {
             writer.Paragraph($"Carried from review {item.CarriedFrom}", PdfFont.HelveticaOblique, 8, 122, 1);
         }
+    }
+
+    /// <summary>
+    ///     Builds the line that says who answered a check and when.
+    /// </summary>
+    /// <param name="item">The check.</param>
+    /// <returns>The line, or <c>null</c> when the check has neither an answerer nor an answer time.</returns>
+    private static string? AnsweredLine(AttestationCheck item)
+    {
+        if (item.AnsweredBy is null)
+        {
+            return item.AnsweredAt is { } at ? $"Answered at {Time(at)}" : null;
+        }
+
+        return item.AnsweredAt is { } time
+            ? $"Answered by {item.AnsweredBy}, {Time(time)}"
+            : $"Answered by {item.AnsweredBy}";
     }
 
     /// <summary>

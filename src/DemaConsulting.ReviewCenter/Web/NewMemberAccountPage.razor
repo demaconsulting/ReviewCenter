@@ -98,6 +98,13 @@
                 </label>
                 <p class="muted hint">A project admin also manages the members and repositories of this project.</p>
             </div>
+            <div class="field">
+                <label>
+                    <input type="checkbox" data-testid="new-account-auditor-checkbox" @bind="AsAuditor" />
+                    Auditor (read-only)
+                </label>
+                <p class="muted hint">An auditor can read everything in this project and its audit trail, but cannot change anything or review.</p>
+            </div>
             <p class="muted hint">A temporary password is generated and shown once, after you create the account.</p>
             <div class="plan-actions">
                 <button type="submit" data-testid="new-account-submit">Create account</button>

@@ -53,7 +53,11 @@ number, the primary and alternate as `SlotMember` (identity, user name, display 
 and, for a signed slot, the name
 of the signer and the signing time. `IsMember` is `false` when the user is no longer a member of the project (a slot
 keeps its assignee after a removal, so the status says who can no longer sign; step 1 of signing refuses such a user);
-the candidates of `ListCandidatesAsync` are members by definition. A placeholder for an unknown user keeps the flag too.
+the candidates of `ListCandidatesAsync` are members by definition. A member whose role is `Auditor` is never a
+reviewer: `AddSlotAsync` and `UpdateSlotAsync` refuse such a user as primary or alternate with `SlotUserInvalid`, and
+signing refuses an Auditor who is still named in a slot with `ActorNotAllowed` (a role change to Auditor is refused
+while the member holds open work, so this only defends against a race or old data). A placeholder for an unknown user
+keeps the flag too.
 `SlotSignatureState` has the values `NotSigned`, `Signed`, and `OutOfDate`.
 
 **Status is computed, never stored.** A slot is `Signed` when it has a signature whose digest equals the digest of the
@@ -297,7 +301,8 @@ not found.
 - *Parameters*: the actor, the project identity, and a cancellation token.
 - *Preconditions*: The actor may work in the project (`ProjectNotFound` otherwise, `ActorNotAllowed` for a read-only
   member).
-- *Returns*: `Task<IReadOnlyList<SlotMember>>` — the enabled members of the project ordered by display name and then
+- *Returns*: `Task<IReadOnlyList<SlotMember>>` — the enabled members of the project, except members whose role is
+  `Auditor` (they cannot sign, so they are never offered), ordered by display name and then
   user name; nothing secret is included.
 
 **AddSlotAsync**: Adds a slot.

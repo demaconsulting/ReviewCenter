@@ -41,6 +41,18 @@ sections:
           - AttestationRenderer_Render_NoChecklist_SaysSo
           - AttestationRenderer_Render_Document_SummarizesThreads
 
+      - id: ReviewCenter-AttestationRenderer-AnswerTimes
+        title: >-
+          The AttestationRenderer class shall print with every checklist answer the time it was given, in UTC to the
+          second in the same format as the other times of the document, and print no time for an answer that has none.
+        justification: |
+          A burst of answers within a few seconds becomes visible to the reader of the PDF. The time is outside the
+          record digest, so showing it changes no signature; the PDF signature protects it like the rest of the
+          document.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments
+          - AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc
+
       - id: ReviewCenter-AttestationRenderer-ThreadLimit
         title: >-
           The AttestationRenderer class shall list at most 100 resolved threads, in the order of the document, and

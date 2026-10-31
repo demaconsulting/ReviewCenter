@@ -264,6 +264,12 @@ public partial class ProjectPage : ComponentBase
     private bool CanAdminister { get; set; }
 
     /// <summary>
+    ///     Gets a value indicating whether the user may read the audit trail of this project (an administrator or an
+    ///     auditor).
+    /// </summary>
+    private bool CanAudit { get; set; }
+
+    /// <summary>
     ///     Gets the members of the project; only loaded for someone who may administer the project.
     /// </summary>
     private IReadOnlyList<ProjectMember> Members { get; set; } = [];
@@ -360,6 +366,7 @@ public partial class ProjectPage : ComponentBase
         // A member who may only read (an auditor) cannot plan or create reviews, so the registry is not read for them
         Repositories = CanContribute ? await RepositoryService.ListEnabledAsync(actor, ProjectId) : [];
         CanAdminister = await Access.CanAdministerAsync(actor, ProjectId);
+        CanAudit = await Access.CanAuditAsync(actor, ProjectId);
         ChecklistSummary = CanAdminister ? await DescribeChecklistAsync(actor) : null;
         await LoadMembersAsync(actor);
 
@@ -632,7 +639,30 @@ public partial class ProjectPage : ComponentBase
             return false;
         }
 
-        return await Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowMembersLost);
+        if (await Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowMembersLost))
+        {
+            return true;
+        }
+
+        // Only the administer right is gone (for example the actor just changed their own role): the other rights may
+        // have changed with it, so they are asked again instead of being kept or dropped by assumption
+        await RefreshRightsAsync();
+        return false;
+    }
+
+    /// <summary>
+    ///     Asks again which rights the signed-in user holds in the project, after the membership changed under the page.
+    /// </summary>
+    /// <returns>A task that completes when the rights are updated.</returns>
+    private async Task RefreshRightsAsync()
+    {
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        CanContribute = actor is not null && await Access.CanContributeAsync(actor, ProjectId);
+        CanAudit = actor is not null && await Access.CanAuditAsync(actor, ProjectId);
+        if (!CanContribute)
+        {
+            Repositories = [];
+        }
     }
 
     /// <summary>
@@ -646,6 +676,7 @@ public partial class ProjectPage : ComponentBase
         PageRows = [];
         Repositories = [];
         CanContribute = false;
+        CanAudit = false;
         ShowMembersLost();
         Loaded = true;
     }
@@ -757,13 +788,33 @@ public partial class ProjectPage : ComponentBase
     }
 
     /// <summary>
-    ///     Switches a member between project admin and plain member.
+    ///     Switches a member between project admin and plain member; an auditor is never switched by this toggle.
     /// </summary>
     /// <param name="member">The member as shown.</param>
     /// <returns>A task that completes when the role is changed or the problem is shown.</returns>
     private Task<bool> ToggleRoleAsync(ProjectMember member)
     {
-        var role = member.Role == ProjectRole.ProjectAdmin ? ProjectRole.User : ProjectRole.ProjectAdmin;
+        // An auditor would otherwise be promoted by accident; the page offers explicit buttons for an auditor
+        if (member.Role == ProjectRole.Auditor)
+        {
+            return Task.FromResult(false);
+        }
+
+        return SetRoleAsync(member, member.Role == ProjectRole.ProjectAdmin ? ProjectRole.User : ProjectRole.ProjectAdmin);
+    }
+
+    /// <summary>
+    ///     Gives a member an explicit role.
+    /// </summary>
+    /// <param name="member">The member as shown.</param>
+    /// <param name="role">The new role.</param>
+    /// <returns>A task that completes when the role is changed or the problem is shown.</returns>
+    /// <remarks>
+    ///     A refusal, such as the last project admin or an auditor-to-be who still has reviews to sign, is shown as
+    ///     the error of the section.
+    /// </remarks>
+    private Task<bool> SetRoleAsync(ProjectMember member, ProjectRole role)
+    {
         return RunMemberChangeAsync(
             actor => ProjectService.SetMemberRoleAsync(actor, ProjectId, member.Username, role),
             $"'{member.Username}' is now {RoleText(role)}.");
@@ -776,7 +827,27 @@ public partial class ProjectPage : ComponentBase
     /// <returns>The text shown to the user.</returns>
     private static string RoleText(ProjectRole role)
     {
-        return role == ProjectRole.ProjectAdmin ? "project admin" : "member";
+        return role switch
+        {
+            ProjectRole.ProjectAdmin => "project admin",
+            ProjectRole.Auditor => "auditor",
+            _ => "member"
+        };
+    }
+
+    /// <summary>
+    ///     Gets the label of the role badge of a member.
+    /// </summary>
+    /// <param name="role">The role.</param>
+    /// <returns>The text shown to the user.</returns>
+    private static string RoleLabel(ProjectRole role)
+    {
+        return role switch
+        {
+            ProjectRole.ProjectAdmin => "Project admin",
+            ProjectRole.Auditor => "Auditor",
+            _ => "Member"
+        };
     }
 
     /// <summary>

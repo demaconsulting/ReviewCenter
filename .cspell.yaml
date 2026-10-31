@@ -32,6 +32,7 @@ words:
   - encryptors
   - decryptor
   - permissionsonly
+  - projectadmin
   - localmachine
   - newkey
   - keyout

@@ -31,8 +31,7 @@ namespace DemaConsulting.ReviewCenter.Web;
 /// </summary>
 /// <remarks>
 ///     An attribute on the page requires a signed-in user; the page shows the entries only to whoever holds the
-///     audit-read right of the project (a system administrator or a project admin of it today; an Auditor too once
-///     that role can be assigned) and shows the not-found state of a
+///     audit-read right of the project (a system administrator, a project admin of it, or an Auditor of it) and shows the not-found state of a
 ///     missing project to anybody else. The page changes nothing. It reads only the entries that carry the project
 ///     identity (see <see cref="AuditService.ListAsync"/>), never entries of other projects or global ones, with the
 ///     filter of the address (<see cref="AuditFilterState"/>, which never fails on a hand-edited address). The

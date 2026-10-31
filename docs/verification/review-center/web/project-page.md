@@ -432,6 +432,29 @@ element, and the markup appears only as encoded text. This scenario is tested by
 the same table as a member, without the New review and Plan controls; a user outside the project sees the not-found
 message and no table. This scenario is tested by `ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing`.
 
+**ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories**: An Auditor opens the page; it shows the
+`readonly-notice`, the table, and the audit trail link, no New review, Plan, or Checklist edit control, and the
+repositories are not read (a counting store decorator proves it). This scenario is tested by
+`ProjectPage_Render_Auditor_ShowsReadOnlyNoticeAndReadsNoRepositories`.
+
+**ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed**: An administrator changes their own role to
+Auditor or to member; the administration is lost, and the page recomputes all rights, so the Auditor keeps the audit
+link and loses the New review control, while the plain member keeps contributing. This scenario is tested by
+`ProjectPage_MemberRoles_AdminChangesOwnRole_RightsAreRecomputed`.
+
+**ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly**: A project administrator sees the labels Member,
+Auditor, and Project admin; an Auditor row offers only the explicit User and Project administrator buttons, other rows
+keep the toggle and offer Auditor; each button sets exactly that role. This scenario is tested by
+`ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly`.
+
+**ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage**: A member with an unsigned slot cannot be made
+an Auditor and the page shows the message that lists the review; the last project administrator cannot be made an
+Auditor. This scenario is tested by `ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage`.
+
+**NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin**: The add member and create account pages offer an
+auditor box; ticking it stores the Auditor role and ticking it together with the admin box shows an error and stores
+nothing. This scenario is tested by `NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin`.
+
 **ProjectPage_Render_EmptyProject_InvitesOnlyContributors**: A project without reviews is opened by a contributor and by
 a read-only member. The contributor sees the invitation to use New review; the read-only member sees "This project has
 no reviews yet." and no mention of New review. Both keep the `reviews-empty` element. This scenario is tested by

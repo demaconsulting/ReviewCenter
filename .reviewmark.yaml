@@ -608,6 +608,7 @@ reviews:
       - "src/**/Web/NewMemberAccountPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
       - "test/**/Web/ProjectPageOverviewTests.cs"
+      - "test/**/Web/AuditorPagesTests.cs"
       - "test/**/Web/ProjectAccessPageTests.cs"
       - "test/**/Web/EvidenceSettingsPageTests.cs"
       - "test/**/Web/ProjectChecklistPageTests.cs"
@@ -876,6 +877,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/DomainRuleException.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewLimits.cs"
       - "test/**/Core/ProjectServiceTests.cs"
+      - "test/**/Core/AuditorRoleTests.cs"
       - "test/**/Core/ProjectMemberServiceTests.cs"
       - "test/**/Core/GatedUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
@@ -1758,6 +1760,7 @@ reviews:
       - "test/**/Api/ApiEndpointsTests.cs"
       - "test/**/Api/ApiProjectAccessTests.cs"
       - "test/**/Api/AuditExportEndpointsTests.cs"
+      - "test/**/Api/ApiAuditorTests.cs"
 
   - id: ReviewCenter-Api-ApiDocument
     title: Review of ReviewCenter ApiDocument unit implementation

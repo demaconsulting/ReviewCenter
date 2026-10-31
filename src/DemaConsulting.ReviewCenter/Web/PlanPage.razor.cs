@@ -154,6 +154,12 @@ public partial class PlanPage : ComponentBase
     private bool Loaded { get; set; }
 
     /// <summary>
+    ///     Gets a value indicating whether the user may work in this project; a member who may only read (an auditor)
+    ///     sees a read-only notice instead of the planning form.
+    /// </summary>
+    private bool CanContribute { get; set; }
+
+    /// <summary>
     ///     Gets the project planned for, or <c>null</c> when it does not exist.
     /// </summary>
     private Project? Project { get; set; }
@@ -448,9 +454,10 @@ public partial class PlanPage : ComponentBase
 
         var actor = await AuthenticationState.GetActorOrNullAsync();
         var project = await ProjectService.GetAsync(actor, projectId);
-        var repositories = actor is not null && project is not null
-            ? await RepositoryService.ListEnabledAsync(actor, projectId)
-            : [];
+
+        // A member who may only read (an auditor) cannot plan, so the registry is not read for them
+        var contribute = actor is not null && project is not null && await Access.CanContributeAsync(actor, projectId);
+        var repositories = contribute ? await RepositoryService.ListEnabledAsync(actor!, projectId) : [];
         if (_loadedProjectId != projectId)
         {
             // The project changed again while loading; the newer call loads its own data
@@ -458,6 +465,7 @@ public partial class PlanPage : ComponentBase
         }
 
         Project = project;
+        CanContribute = contribute;
         Repositories = repositories;
 
         // With a single repository there is nothing to choose, so one step less for the user

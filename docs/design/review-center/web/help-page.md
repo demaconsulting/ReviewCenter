@@ -46,7 +46,8 @@ slug. The text is in cards (`card`), with figures for the screenshots. The scree
 what the picture shows and a caption.
 
 **Signed attestation topic** (`HelpAttestationPage`, slug `signed-attestation`): The topic after Reviewers and signing
-that explains the signed PDF of a complete review. It says when the download is offered and what the PDF lists; what the
+that explains the signed PDF of a complete review. It says when the download is offered and what the PDF lists
+(including who answered each check and when); what the
 signature proves (the content has not changed since the signing, and it was produced by the holder of the server key
 named in the document) and what it does not (who the reviewers are, which is shown by the sign-offs in the record, and a
 trusted signing time, because the time is the clock of the server and there is no time stamp authority); that the
@@ -106,12 +107,14 @@ them again, with the password (and the code of the second factor, when there is 
 identity provider.
 
 **Review integrity text**: Three topics explain the approval lock and the review rules, in static text. Reviewers and
-signing (`HelpSigningPage`) has two list items: an approved review is locked (nobody can add comments, change answers,
+signing (`HelpSigningPage`) has three list items: an approved review is locked (nobody can add comments, change answers,
 change the files, or change the reviewers), a project admin or a system administrator can reopen it with a reason, the
-reopen is recorded in the audit trail, the old signatures are kept as history, and the reviewers must sign again; and,
+reopen is recorded in the audit trail, the old signatures are kept as history, and the reviewers must sign again;
 when the project requires independent reviewers (the default), the person who created a review cannot be one of its
 reviewers and cannot sign it, where only the person who created the review in ReviewCenter is checked and the authors
-of the commits are not. Reading a review (`HelpReadingReviewPage`) says that on an approved review the + buttons and the
+of the commits are not; and, while the project rule is on (the default), the administrator who reopened a review cannot
+sign it again and a reopen that would leave a slot without anyone who may sign is refused. Reading a review
+(`HelpReadingReviewPage`) says that on an approved review the + buttons and the
 comment forms are disabled while every file and diff can still be read, and links to Reviewers and signing. Managing
 project members (`HelpMembersPage`) has a "Review rules" section that says the Review rules card of the project page is
 also only for a project admin or a system administrator, switches on or off whether the person who created a review may

@@ -10,8 +10,8 @@ of `Own`, a user in `Own`, a user outside every project, a disabled user in `Own
 administrator of `Own`. Rights are checked through the answers of the unit, and failures through the rule
 carried by the `DomainRuleException`. The tests that call the membership operations of `ProjectService` live in the
 same file and are described in the verification of that unit. The test double `AllowAllProjectAccess` is never used
-here. The rights for the read-only role are verified with the same world plus an auditor, because the `Auditor` role
-cannot be assigned through `ProjectService`; the tests store the membership directly in the fake store. The tests that
+here. The rights for the read-only role are verified with the same world plus an auditor; the tests store the
+membership directly in the fake store. The tests that
 prove the call sites (`ProjectAccessGuardTests.cs`) arrange a world with a user, a project administrator, a system
 administrator, and an auditor, call every operation of the review services as the auditor, and check that each
 mutating one is refused with `ActorNotAllowed` and changes nothing, while the reads stay allowed. The guards of the
@@ -33,14 +33,14 @@ N/A - standard test environment.
 - A hidden project and a missing project fail with the same rule and the same message; a member who is no project
   administrator, and an administrator who is no system administrator, fail with the actor rule.
 - A read-only member (an auditor) sees and audits the project but cannot contribute or administer; a plain member
-  contributes but cannot audit; a stored role that is not defined fails closed as read-only.
+  contributes but cannot audit; a stored role that is not defined fails closed as no membership at all.
 - A removed membership, a lowered project role, and a disabled account change the next answer.
 - An actor that came through a token has the access of its owner.
 - A user with a temporary password has no access to any project, even with a membership or the system administrator
   right, until the password is changed; the change restores the access.
 - Every public actor operation of the review services is classified (refused for an auditor, a read, or administer
   only), so a new operation without an access decision fails a test.
-- The `Auditor` role is refused by the membership operations of `ProjectService` until it is offered.
+- The `Auditor` role is assigned and audited by the membership operations of `ProjectService`.
 
 #### Test Scenarios
 
@@ -64,9 +64,10 @@ project, are no system administrator, and have an empty list of projects; even a
 administer a project that does not exist. This scenario is tested by
 `ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing`.
 
-**ProjectAccess_Matrix_UndefinedRole_FailsClosedAsReadOnly**: A membership whose stored role is not a defined value can
-view and audit the project but cannot contribute or administer. This scenario is tested by
-`ProjectAccess_Matrix_UndefinedRole_FailsClosedAsReadOnly`.
+**ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess**: A membership whose stored role is not a defined value
+gives no right at all (it is treated as no membership): the project cannot be viewed, contributed to, administered, or
+audited, every require operation fails with `ProjectNotFound`, the user is no member, and the project is not listed.
+This scenario is tested by `ProjectAccess_Matrix_UndefinedRole_FailsClosedAsNoAccess`.
 
 **ProjectAccess_ListVisibleProjectsAsync_EachKind_SeesOnlyItsProjects**: The system administrator lists both
 projects, the member lists only the own project, and a non-member and a disabled user list nothing. This scenario is
@@ -95,9 +96,9 @@ tested by `ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFo
 name that names a token views the project of the owner, does not view the other project, and does not administer.
 This scenario is tested by `ProjectAccess_TokenActor_HasTheMembershipsOfItsOwner`.
 
-**ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered**: Adding a member, creating a member account, and
-changing a member role with `Auditor` are refused with `ArgumentOutOfRangeException` and store nothing. This scenario
-is defined in `ProjectAccessTests.cs` and tested by `ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered`.
+**ProjectService_Members_AuditorRole_IsAssignedAndAudited**: Adding a member, creating a member account, and changing
+the role of a member with `Auditor` are accepted, store the role, and are audited with the role name in the detail. This
+scenario is defined in `ProjectAccessTests.cs` and tested by `ProjectService_Members_AuditorRole_IsAssignedAndAudited`.
 
 **ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing**: An auditor calls every mutating operation of the
 thread, checklist, review, planning, signing, and repository services; each is refused with `ActorNotAllowed` and

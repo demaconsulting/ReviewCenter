@@ -46,6 +46,16 @@ public class AttestationRendererTests
     private static readonly DateTimeOffset _generated = new(2025, 3, 4, 5, 6, 7, TimeSpan.Zero);
 
     /// <summary>
+    ///     Creates a time on the day of the sample document, a number of seconds after 05:01:00 UTC.
+    /// </summary>
+    /// <param name="seconds">The seconds after 05:01:00.</param>
+    /// <returns>The time.</returns>
+    private static DateTimeOffset Answered(int seconds)
+    {
+        return new DateTimeOffset(2025, 3, 4, 5, 1, seconds, TimeSpan.Zero);
+    }
+
+    /// <summary>
     ///     Describes a self-signed key.
     /// </summary>
     /// <param name="selfSigned">Whether the key is self-signed.</param>
@@ -104,9 +114,9 @@ public class AttestationRendererTests
                     true,
                     null,
                     [
-                        new AttestationCheck("C-1", "Does it compile?", "Pass", "Built on CI", "Ann"),
-                        new AttestationCheck("C-2", "Are errors handled?", "Fail", null, "Ann"),
-                        new AttestationCheck("C-3", "Is it thread safe?", "N/A", "Single threaded", "Bob")
+                        new AttestationCheck("C-1", "Does it compile?", "Pass", "Built on CI", "Ann", AnsweredAt: Answered(2)),
+                        new AttestationCheck("C-2", "Are errors handled?", "Fail", null, "Ann", AnsweredAt: Answered(3)),
+                        new AttestationCheck("C-3", "Is it thread safe?", "N/A", "Single threaded", "Bob", AnsweredAt: Answered(4))
                     ]),
                 new AttestationSection("security", "Security", false, "No external input", [])
             ],
@@ -220,6 +230,49 @@ public class AttestationRendererTests
         Assert.Contains("Comment: Built on CI", lines);
         Assert.Contains("Comment: Single threaded", lines);
         Assert.Contains("Not applicable: No external input", lines);
+        Assert.Contains("Answered by Ann, 2025-03-04 05:01:02 UTC", lines);
+        Assert.Contains("Answered by Bob, 2025-03-04 05:01:04 UTC", lines);
+    }
+
+    /// <summary>
+    ///     Test that the time of each answer is printed in UTC to the second, that answers a second apart stay
+    ///     distinct, that a carried answer keeps its original time, and that an answer without a time prints no time.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc()
+    {
+        // Arrange: an offset time, two answers a second apart, a carried answer and an answer without a time
+        var plain = Sample();
+        var document = plain with
+        {
+            Sections =
+            [
+                plain.Sections[0] with
+                {
+                    Items =
+                    [
+                        new AttestationCheck(
+                            "C-1", "One", "Pass", null, "Ann", AnsweredAt: new DateTimeOffset(2025, 3, 4, 7, 8, 9, TimeSpan.FromHours(2))),
+                        new AttestationCheck("C-2", "Two", "Pass", null, "Ann", AnsweredAt: Answered(10)),
+                        new AttestationCheck("C-3", "Three", "Pass", null, "Ann", AnsweredAt: Answered(11)),
+                        new AttestationCheck("C-4", "Four", "Pass", null, "Bob", "rev-0", Answered(12)),
+                        new AttestationCheck("C-5", "Five", "Pass", null, "Bob"),
+                        new AttestationCheck("C-6", "Six", "Pass", null, null, AnsweredAt: Answered(13))
+                    ]
+                }
+            ]
+        };
+
+        // Act: render
+        var lines = Render(document).TextLines;
+
+        // Assert: UTC to the second, the burst is visible, the carried answer shows time and origin, none without time
+        Assert.Contains("Answered at 2025-03-04 05:01:13 UTC", lines);
+        Assert.Contains("Answered by Ann, 2025-03-04 05:08:09 UTC", lines);
+        Assert.Contains("Answered by Ann, 2025-03-04 05:01:10 UTC", lines);
+        Assert.Contains("Answered by Ann, 2025-03-04 05:01:11 UTC", lines);
+        Assert.Contains("Answered by Bob, 2025-03-04 05:01:12 UTC", lines);
+        Assert.Contains("Carried from review rev-0", lines);
         Assert.Contains("Answered by Bob", lines);
     }
 

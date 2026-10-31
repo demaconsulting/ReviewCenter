@@ -636,8 +636,8 @@ shows what the trail says; it does not claim more. `AuditPage` and `ProjectAudit
 `AuditEntryTable` and the filter form `AuditFilterForm`, a GET form (actor, action, review, dates, page size, and on
 `AuditPage` the project) whose values `AuditFilterState` cleans: a value that cannot be used is dropped, never raised.
 `ProjectAuditPage` (`/projects/{id}/audit`, reached from the Audit trail button of the project
-page) shows the entries of one project only and is open to project administrators and system administrators (and to
-Auditors once that role can be given), through the audit-read access of `IProjectAccess`; it re-checks the access
+page) shows the entries of one project only and is open to project administrators, system administrators and Auditors
+(the audit-read access of `IProjectAccess`); it re-checks the access
 on load and before every paging step, and for anyone else it shows the not-found text of a project. It has no
 verification button: only `AuditPage` verifies the chain, and its result text says what
 was checked (the chain is intact, or the first entry that no longer fits) and shows the head hash so that an

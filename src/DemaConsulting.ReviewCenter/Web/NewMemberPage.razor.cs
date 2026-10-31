@@ -97,6 +97,11 @@ public partial class NewMemberPage : ComponentBase
     private bool AsProjectAdmin { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the member to add becomes a read-only auditor.
+    /// </summary>
+    private bool AsAuditor { get; set; }
+
+    /// <summary>
     ///     Gets the message of the last rejected submission, or <c>null</c> when there is none.
     /// </summary>
     private string? ErrorMessage { get; set; }
@@ -121,6 +126,7 @@ public partial class NewMemberPage : ComponentBase
         ErrorMessage = null;
         Username = string.Empty;
         AsProjectAdmin = false;
+        AsAuditor = false;
         var actor = await AuthenticationState.GetActorOrNullAsync();
         Project = actor is not null && await Access.CanAdministerAsync(actor, ProjectId)
             ? await ProjectService.GetAsync(actor, ProjectId)
@@ -175,7 +181,17 @@ public partial class NewMemberPage : ComponentBase
 
         try
         {
-            var role = AsProjectAdmin ? ProjectRole.ProjectAdmin : ProjectRole.User;
+            if (AsProjectAdmin && AsAuditor)
+            {
+                ErrorMessage = "Choose either project admin or auditor, not both.";
+                return;
+            }
+
+            var role = AsAuditor ? ProjectRole.Auditor : ProjectRole.User;
+            if (AsProjectAdmin)
+            {
+                role = ProjectRole.ProjectAdmin;
+            }
             await ProjectService.AddMemberAsync(actor, ProjectId, Username, role);
         }
         catch (DomainRuleException ex)
@@ -217,6 +233,7 @@ public partial class NewMemberPage : ComponentBase
         Project = null;
         Username = string.Empty;
         AsProjectAdmin = false;
+        AsAuditor = false;
         ErrorMessage = null;
         Loaded = true;
     }

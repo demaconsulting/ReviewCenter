@@ -417,6 +417,37 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that the attestation prints the time each answer was given, not the time of the signature or of the
+    ///     request, and that answering again with the same value later changes neither the record digest nor the
+    ///     approval: the time is outside the digest.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_ReAnsweredLaterWithSameValue_ShowsAnswerTimeAndKeepsDigestAndApproval()
+    {
+        // Arrange: a signed review answered at 05:06:07, then the same answers given again three hours later
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+        var before = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, AttestationFixture.ReviewId, cancellationToken))!.Digest;
+        fixture.Clock.Advance(TimeSpan.FromHours(3));
+        await fixture.AnswerAllAsync(ChecklistOutcome.Pass);
+        fixture.Clock.Advance(TimeSpan.FromHours(1));
+
+        // Act: the digest and the attestation, an hour after the second answers
+        var after = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, AttestationFixture.ReviewId, cancellationToken))!.Digest;
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
+
+        // Assert: same digest, still approved, and the answer time (08:06:07), neither signing nor generation time
+        Assert.Equal(before, after);
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        var lines = new PdfInspector(result.Content!).TextLines;
+        Assert.Contains("Answered by Ann, 2025-03-04 08:06:07 UTC", lines);
+        Assert.DoesNotContain("Answered by Ann, 2025-03-04 05:06:07 UTC", lines);
+        Assert.DoesNotContain("Answered by Ann, 2025-03-04 09:06:07 UTC", lines);
+    }
+
+    /// <summary>
     ///     Test that the attestation of an approved follow-up review names the review it follows with the counts of
     ///     what was carried, and marks the carried checklist answers, while the review that follows nothing has
     ///     neither the row nor the marks.

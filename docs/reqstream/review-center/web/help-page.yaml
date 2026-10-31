@@ -64,13 +64,25 @@ sections:
           to start for a self-signed key or a certificate without a signing key usage, and the review page shows why
           attestation is unavailable when a certificate stops being valid while the server runs), that the signature
           certifies the document with no changes allowed, and that a code-signing-only certificate is used with a
-          note and a start-up warning while the server does not check the chain or revocation, with a
+          note and a start-up warning while the server does not check the chain or revocation, that the PDF lists
+          who answered each check and when, with a
           screenshot of the download of an approved review.
         justification: |
           The attestation is easy to take for more than it is. The place the user is sent from the review page must
           say plainly what the document proves and how to make it carry weight.
         tests:
           - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+
+      - id: ReviewCenter-HelpPage-SigningTopic
+        title: >-
+          The HelpPage unit shall state in the Reviewers and signing topic that, while the project rule is on, the
+          person who reopened a review cannot sign it again, and that a reopen that would leave a slot without anyone
+          who may sign is refused.
+        justification: |
+          The rule and the refusal look like errors when met without explanation. The topic that explains signing
+          is the place a reviewer or an administrator looks first.
+        tests:
+          - HelpSigningPage_Render_ExplainsTheReopenerRule
 
       - id: ReviewCenter-HelpPage-ApiTokensTopic
         title: >-

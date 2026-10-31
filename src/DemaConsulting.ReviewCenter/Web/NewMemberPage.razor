@@ -66,6 +66,13 @@
                 </label>
                 <p class="muted hint">A project admin also manages the members and repositories of this project.</p>
             </div>
+            <div class="field">
+                <label>
+                    <input type="checkbox" data-testid="new-member-auditor-checkbox" @bind="AsAuditor" />
+                    Auditor (read-only)
+                </label>
+                <p class="muted hint">An auditor can read everything in this project and its audit trail, but cannot change anything or review.</p>
+            </div>
             <div class="plan-actions">
                 <button type="submit" data-testid="new-member-submit">Add member</button>
                 <a class="action outline" href="/projects/@ProjectId" data-testid="new-member-cancel">Cancel</a>

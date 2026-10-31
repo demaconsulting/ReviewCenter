@@ -175,7 +175,7 @@ a 400 problem.
 - A project that does not exist, or one the user may not see: 404 with an empty body (the page for a missing address
   is shown).
 - A project the user may see but not read the audit trail of (a plain member): 403 problem.
-- A project admin or a system administrator on a project: 200.
+- A project admin, a system administrator, or an Auditor on a project: 200.
 - The whole trail, not a system administrator (also a project admin): 403 problem.
 - The whole trail, a system administrator: 200.
 - An unknown `format`, after the access check: 400 problem.
@@ -205,7 +205,8 @@ say only whether the whole chain is sound and where it first breaks, never a cou
 trail by the service (`audit.exported`, for the user, scoped to the project of the filter).
 
 **ApiProblems.StatusOf**: Maps a rule to a status: the not-found rules (including a missing token) to 404; a duplicate
-review identifier, an existing membership, the removal or demotion of the last project admin, a disabled repository,
+review identifier, an existing membership, the removal or demotion of the last project admin, a member who holds open
+review work (`MemberHasOpenReviewWork`), a disabled repository,
 a change that the approval lock refuses (`ReviewLocked`), a reopen of a review that is not locked (`ReviewNotLocked`),
 a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`),
 a change that a project review rule refuses (`AuthorCannotAnswer`, `ReopenerCannotSign`, `ReopenWouldStrandSlot`),
@@ -218,6 +219,12 @@ detail;
 **NotFound** builds a 404; **ActorOf** builds the actor from a token principal (the user name, the display name, and the
 display id of the token, which is "unknown" when the claim is missing); **ActorOrAnonymous** returns that actor for an
 authenticated principal and `null` for a request without a token.
+
+**Read-only role and the API**: an API token acts as its user, so a token of an Auditor reads everything the user may
+read (projects, reviews, progress, checklist and thread counts, attestations, and the audit export of the project) and
+every write is refused in Core with `ActorNotAllowed`, which is a 403; a user who is not a member still gets 404. The
+API has no endpoint that assigns roles, so a role is only changed in the web pages (project administrators and system
+administrators). The progress overview and the review list stay on the view access, which an Auditor has.
 
 **Approval lock and the API**: The API has no endpoint that changes the content of an existing review, its threads, its
 checklist answers, or its reviewer slots, and none that signs or reopens a review (reviewers and signatures are made in

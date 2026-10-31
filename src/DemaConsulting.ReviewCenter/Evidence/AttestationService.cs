@@ -493,7 +493,8 @@ internal sealed class AttestationService
                         answer is null ? "Not answered" : OutcomeText(answer.Outcome),
                         answer?.Justification,
                         answer is null ? null : people.Name(answer.AnsweredBy, answer.AnsweredByUsername, false),
-                        answer?.CarriedFromReviewId);
+                        answer?.CarriedFromReviewId,
+                        answer?.AnsweredAt);
                 }).ToList(),
                 state.IsApplicable(section.Id)
                     ? null

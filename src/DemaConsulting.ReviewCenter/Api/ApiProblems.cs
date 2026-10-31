@@ -63,6 +63,7 @@ internal static class ApiProblems
             DomainRule.ReviewIdDuplicate
                 or DomainRule.MembershipExists
                 or DomainRule.LastProjectAdmin
+                or DomainRule.MemberHasOpenReviewWork
                 or DomainRule.RepositoryDisabled
                 or DomainRule.ReviewLocked
                 or DomainRule.ReviewNotLocked

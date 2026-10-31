@@ -133,6 +133,26 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("no changes allowed", text, StringComparison.Ordinal);
         Assert.Contains("code signing only is used, not refused for that reason", text, StringComparison.Ordinal);
         Assert.Contains("does not check the certificate chain or revocation", text, StringComparison.Ordinal);
+        Assert.Contains("who answered it and when", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the signing topic explains the rule that the person who reopened a review cannot sign it again
+    ///     and that a reopen that would leave a slot without a signer is refused.
+    /// </summary>
+    [Fact]
+    public void HelpSigningPage_Render_ExplainsTheReopenerRule()
+    {
+        // Act: render the topic page
+        var page = Render<HelpSigningPage>();
+
+        // Assert: the rule, who it concerns and the refusal
+        var text = page.Markup;
+        Assert.Contains("who reopened a review cannot sign it again", text, StringComparison.Ordinal);
+        Assert.Contains("is on", text, StringComparison.Ordinal);
+        Assert.Contains("without anyone who may sign", text, StringComparison.Ordinal);
+        Assert.Contains("is refused", text, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
     }
 
     /// <summary>

@@ -132,8 +132,8 @@ sections:
       - id: ReviewCenter-AuditPage-ProjectView
         title: >-
           The AuditPage unit shall provide the page /projects/{project}/audit, which shows whoever may read the audit
-          trail of the project (a system administrator or a project admin of it, and an Auditor of it once that role
-          can be given, all through the audit-read access of the project) the audit trail of that project only,
+          trail of the project (a system administrator or a project admin of it, and an Auditor of it, all through the
+          audit-read access of the project) the audit trail of that project only,
           newest first, with the filter and the paging of the whole audit trail, links to the older and newer page
           and a message when nothing was recorded, using the same table as the whole audit trail, and shall show the
           not-found message and no entries to a plain member, a user who is no member, and for a missing project,
@@ -147,6 +147,7 @@ sections:
         tests:
           - ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents
           - ProjectAuditPage_Render_SystemAdmin_ShowsTheProjectsEvents
+          - ProjectAuditPage_Render_Auditor_ShowsTheTrailOfOwnProjectOnly
           - ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries
           - ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst
           - ProjectAuditPage_Render_ProjectWithoutEvents_SaysNothingWasRecorded
