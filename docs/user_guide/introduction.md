@@ -8,8 +8,9 @@ verb. The current release lets you sign in, create projects and draft reviews ma
 content fingerprint of each review, lets you discuss the files in threaded comments, gives each review a
 checklist, and lets reviewers sign a review with their password (or by signing in again at an identity provider), with
 every action recorded under the signed-in
-user. A review is Approved when every reviewer has signed the current record; it is then locked, and a project
-administrator can reopen it. Every change is also recorded in a hash-chained audit trail that can be read and verified.
+user. A review is Approved when it has at least one reviewer slot and every slot is signed for the current record; it
+is then locked, and a project administrator can reopen it. Every change is also recorded in a hash-chained audit trail
+that can be read and verified.
 The web interface has a built-in Help with short
 guides to the main tasks. The command-line
 interface is documented in

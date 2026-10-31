@@ -35,7 +35,8 @@ it creates its repository and the server's clone cache in a temporary folder tha
 ## Acceptance Criteria
 
 - All tests pass with zero failures on all supported platforms.
-- `puppet start` while Puppet is already running fails with exit code 1; `puppet stop` removes the control file and a
+- `puppet start` while Puppet is already running (the same control file) fails with exit code 1; `puppet stop` removes
+  the control file and a
   second `puppet stop` exits with code 2.
 - A hover stays in effect for later commands: after `hover`, a separate `screenshot` and `eval` still see the
   element hovered, until `mouse-move` moves the mouse away.

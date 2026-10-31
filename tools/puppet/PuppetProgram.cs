@@ -253,6 +253,11 @@ internal static class PuppetProgram
     /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
     private static void ValidateOptions(Dictionary<string, string> options)
     {
+        if (options.TryGetValue("control-file", out var controlFile) && string.IsNullOrWhiteSpace(controlFile))
+        {
+            throw new PuppetException("--control-file must be a file path, not empty.");
+        }
+
         if (options.TryGetValue("timeout", out var timeout) && !(int.TryParse(timeout, out var ms) && ms > 0))
         {
             throw new PuppetException($"--timeout must be a positive number of milliseconds, not '{timeout}'.");

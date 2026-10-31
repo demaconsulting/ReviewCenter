@@ -24,3 +24,4 @@ sections:
               - ControlChannel_SendAsync_RoundTrip_DeliversRequestAndResponse
               - ControlChannel_IsAnsweringAsync_StaleControlFile_ReturnsFalse
               - ControlChannel_ResolveControlFile_VariableSetOrBlank_ChoosesPath
+              - ControlChannel_DefaultControlFile_EnvironmentVariable_IsHonored

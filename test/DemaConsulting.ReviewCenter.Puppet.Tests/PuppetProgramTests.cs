@@ -95,6 +95,12 @@ public class PuppetProgramTests
             Assert.Contains(message, error.ToString(), StringComparison.Ordinal);
         }
 
+        // Assert: a blank control file (which would otherwise resolve to the current folder) is a usage error too
+        using var blankError = new StringWriter();
+        using var blankOutput = new StringWriter();
+        Assert.Equal(2, await PuppetProgram.RunAsync(["start", "--control-file", " "], blankOutput, blankError, NoControlFile(), TestContext.Current.CancellationToken));
+        Assert.Contains("--control-file must be a file path", blankError.ToString(), StringComparison.Ordinal);
+
         // Assert: help prints the usage and succeeds
         using var output = new StringWriter();
         using var helpError = new StringWriter();
