@@ -186,7 +186,35 @@ that names `Attestation:SelfSignedFolder` and neither the attestation folder nor
 tested by the test of the same name.
 
 **ValidationChecks_ConfiguredKeys_UnsupportedAttestationProvider_FailsNamingTheSetting**: `Attestation:Provider` has a
-value that does not exist. The check fails and names the setting. This scenario is tested by the test of the same name.
+value that does not exist. The check fails and names the setting and lists SelfSigned, CertificateStore and File. This
+scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_FileProviderKey_DescribesKeyAndExpiryWarningWithoutFolderOrPassword**: The File provider
+is configured with a protected PFX that ends in about 30 days and its password in `Attestation__CertificatePassword`. The
+check passes and reports the subject and the thumbprint of the key and the expiry warning; the output holds neither the
+folder of the file nor the password, and the files of the installation are unchanged. This scenario is tested by the
+test of the same name.
+
+**ValidationChecks_ConfiguredKeys_FileProviderWithoutPassword_FailsNamingTheFileAndSettings**: The PFX is protected and
+no password is set. The check fails with "The certificate file 'attest.pfx' needs a password", naming
+`Attestation:CertificatePassword` and `Attestation:CertificatePasswordFile` and not the folder. This scenario is tested
+by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_FileProviderMissingFile_FailsNamingTheFileWithoutFolder**: The path names a file that
+does not exist. The check fails with the setting and the file name and not the folder. This scenario is tested by the
+test of the same name.
+
+**ValidationChecks_ConfiguredKeys_FileProviderWithoutPath_FailsNamingTheSetting**: The File provider is chosen and no
+path is set. The check fails with "Attestation:CertificatePath is not set; it is required for the File provider." This
+scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_FileProviderWrongPassword_FailsWithoutPasswordOrFolder**: Another password is set. The
+check fails with "wrong password", and the message holds neither password nor the folder. This scenario is tested by the
+test of the same name.
+
+**ValidationChecks_ConfiguredKeys_FileProviderUntrustedKeyWithRequireTrustedKey_Fails**: The PFX holds a self-signed
+certificate and `Attestation:RequireTrustedKey` is true. The check fails and names that setting. This scenario is tested
+by the test of the same name.
 
 The hermetic behavior of the default run is verified at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic`.

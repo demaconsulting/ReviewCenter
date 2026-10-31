@@ -191,6 +191,10 @@
                     <a class="action outline" href="@ReviewLinks.ForAttestation(ProjectId, ReviewId)" download="@DemaConsulting.ReviewCenter.Evidence.AttestationService.FileNameFor(ProjectId, ReviewId)" data-testid="attestation-download-button">Download attestation (PDF)</a>
                     <span class="muted" data-testid="attestation-note">@AttestationNote(attestationKey.Info!)</span>
                     <a class="action outline small" href="/help/signed-attestation" data-testid="attestation-help-link">About attestations</a>
+                    @foreach (var warning in attestationKey.Warnings)
+                    {
+                        <span class="notice warning" role="status" data-testid="attestation-key-warning">@warning</span>
+                    }
                 }
                 else
                 {

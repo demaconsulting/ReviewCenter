@@ -103,6 +103,12 @@ internal sealed class SelfSignedKeyProvider(
     /// <inheritdoc />
     public override string Name => AttestationOptions.SelfSignedProvider;
 
+    /// <summary>
+    ///     Gets a value indicating whether the provider warns about the expiry of the certificate: it does not, as it
+    ///     replaces an expired key itself and says so then, with a warning of its own.
+    /// </summary>
+    protected override bool WarnsAboutExpiry => false;
+
     /// <inheritdoc />
     protected override AttestationSigningKey Load()
     {

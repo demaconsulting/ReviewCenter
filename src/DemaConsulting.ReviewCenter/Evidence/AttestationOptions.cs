@@ -24,8 +24,10 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     The settings of the attestation signing key, bound from the <c>Attestation</c> configuration section.
 /// </summary>
 /// <remarks>
-///     The class is a plain settings holder that is only read after start-up. It never holds a secret: a key is
-///     found by a thumbprint or a folder, never by a password.
+///     The class is a plain settings holder that is only read after start-up. Most settings only say where a key is
+///     (a thumbprint, a folder, a file). <see cref="CertificatePassword"/> is the one secret: it is the password of
+///     the certificate file of the <c>File</c> provider, it is meant to come from an environment variable or from
+///     <see cref="CertificatePasswordFile"/>, and it is never logged, shown or put into a message.
 /// </remarks>
 internal sealed class AttestationOptions
 {
@@ -45,7 +47,18 @@ internal sealed class AttestationOptions
     public const string CertificateStoreProvider = "CertificateStore";
 
     /// <summary>
-    ///     Gets or sets the key provider: <c>SelfSigned</c> (the default) or <c>CertificateStore</c>, in any letter case.
+    ///     The name of the provider that uses a certificate and private key from a PKCS #12 or PEM file.
+    /// </summary>
+    public const string FileProvider = "File";
+
+    /// <summary>
+    ///     The default number of days before the end of the validity of the signing certificate from which a warning is shown.
+    /// </summary>
+    public const int DefaultExpiryWarningDays = 30;
+
+    /// <summary>
+    ///     Gets or sets the key provider: <c>SelfSigned</c> (the default), <c>CertificateStore</c> or <c>File</c>, in
+    ///     any letter case.
     /// </summary>
     public string Provider { get; set; } = SelfSignedProvider;
 
@@ -77,4 +90,39 @@ internal sealed class AttestationOptions
     ///     for the default folder beside the Data Protection keys.
     /// </summary>
     public string? SelfSignedFolder { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the path of the certificate file of the <c>File</c> provider: a PKCS #12 file (PFX or P12) with
+    ///     the certificate, its private key and optionally its intermediate certificates, or a PEM file with the
+    ///     certificate (and, when <see cref="PrivateKeyPath"/> is not set, the private key). A file with a PEM header
+    ///     is PEM, anything else is PKCS #12. Read by the <c>File</c> provider only.
+    /// </summary>
+    public string? CertificatePath { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the path of a separate PEM file with the private key of the <c>File</c> provider, or
+    ///     <c>null</c> or empty when the key is in <see cref="CertificatePath"/>. Read by the <c>File</c> provider only.
+    /// </summary>
+    public string? PrivateKeyPath { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the password of the PKCS #12 file or of the encrypted PEM key of the <c>File</c> provider;
+    ///     a secret, which is normally supplied with the environment variable <c>Attestation__CertificatePassword</c>.
+    ///     Not set together with <see cref="CertificatePasswordFile"/>.
+    /// </summary>
+    public string? CertificatePassword { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the path of a file that holds the password (see <see cref="CertificatePassword"/>), such as a
+    ///     systemd credential or a mounted secret. Not set together with <see cref="CertificatePassword"/>.
+    /// </summary>
+    public string? CertificatePasswordFile { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the number of days before the end of the validity of the signing certificate from which the
+    ///     server warns (and the page shows a warning); a certificate that has expired is warned about as well. The
+    ///     default is 30; 0 switches the warning off. It applies to every provider except <c>SelfSigned</c>, which
+    ///     replaces an expired key by itself.
+    /// </summary>
+    public int ExpiryWarningDays { get; set; } = DefaultExpiryWarningDays;
 }

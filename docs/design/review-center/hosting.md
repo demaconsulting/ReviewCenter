@@ -156,9 +156,10 @@ the `Evidence` design.
 
 - *Type*: Configuration (`appsettings.json` and environment variables).
 - *Role*: Consumer.
-- *Contract*: `Provider` (`SelfSigned` by default, or `CertificateStore`), `RequireTrustedKey`, `CertificateThumbprint`,
-  `StoreLocation`, `StoreName`, and `SelfSignedFolder` (empty for an `attestation-selfsigned` folder inside the key ring
-  folder).
+- *Contract*: `Provider` (`SelfSigned` by default, `CertificateStore` or `File`), `RequireTrustedKey`,
+  `CertificateThumbprint`, `StoreLocation`, `StoreName`, `CertificatePath`, `PrivateKeyPath`, `CertificatePassword`
+  (a secret), `CertificatePasswordFile`, `ExpiryWarningDays` (30 by default, 0 for no warning), and `SelfSignedFolder`
+  (empty for an `attestation-selfsigned` folder inside the key ring folder).
 - *Constraints*: The server refuses to start when the signing key cannot be used.
 
 **Data protection settings**: The `DataProtection` configuration section.

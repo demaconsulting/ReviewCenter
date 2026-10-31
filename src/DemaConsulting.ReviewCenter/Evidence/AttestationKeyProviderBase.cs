@@ -48,9 +48,26 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
     private AttestationSigningKey? _key;
 
     /// <summary>
+    ///     What the provider noted about the key while it loaded it (see <see cref="NoteWarning"/>); guarded by <see cref="_gate"/>.
+    /// </summary>
+    private readonly List<string> _loadWarnings = [];
+
+    /// <summary>
+    ///     The expiry warning that was last logged, so that the log shows it when it appears or changes and not on every call.
+    /// </summary>
+    private string? _loggedExpiryWarning;
+
+    /// <summary>
     ///     Gets the name of the provider.
     /// </summary>
     public abstract string Name { get; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the provider warns that the certificate is about to expire or has expired
+    ///     (<see cref="AttestationOptions.ExpiryWarningDays"/>). A provider that replaces an expired key itself says
+    ///     so when it does, and returns <c>false</c> so that the operator is not warned twice.
+    /// </summary>
+    protected virtual bool WarnsAboutExpiry => true;
 
     /// <summary>
     ///     Gets the attestation settings the provider was created with.
@@ -75,6 +92,7 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
             if (_key is null)
             {
                 // Find the key once; a failure leaves nothing behind, so the next call looks again
+                _loadWarnings.Clear();
                 var key = Load();
                 foreach (var warning in AttestationKeyPolicy.Warnings(key.Certificate))
                 {
@@ -99,7 +117,7 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
 #pragma warning disable CA1848 // Logged once when the key is found
                     Log.LogWarning(
                         "The attestation signing key is self-signed: for development and test only. "
-                        + "Set Attestation:Provider to CertificateStore to sign with an organization key.");
+                        + "Set Attestation:Provider to CertificateStore or File to sign with an organization key.");
 #pragma warning restore CA1848
                 }
 
@@ -107,7 +125,9 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
             }
 
             // The policy is checked on every call because validity changes with time
-            AttestationKeyPolicy.Enforce(_key.Info, Options.RequireTrustedKey, Time.GetUtcNow());
+            var now = Time.GetUtcNow();
+            AttestationKeyPolicy.Enforce(_key.Info, Options.RequireTrustedKey, now);
+            LogExpiryWarning(_key.Info, now);
             return _key;
         }
     }
@@ -117,7 +137,8 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
     {
         try
         {
-            return new AttestationKeyStatus(Name, true, GetSigningKey().Info, null);
+            var info = GetSigningKey().Info;
+            return new AttestationKeyStatus(Name, true, info, null) { Warnings = CollectWarnings(info) };
         }
         catch (AttestationKeyException ex)
         {
@@ -172,4 +193,63 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
     /// <returns>The signing key, created with <see cref="AttestationOptions.RequireTrustedKey"/>.</returns>
     /// <exception cref="AttestationKeyException">Thrown, with a message that names the setting to correct, when there is no key.</exception>
     protected abstract AttestationSigningKey Load();
+
+    /// <summary>
+    ///     Records and logs something an operator should know about the key that <see cref="Load"/> is finding, such
+    ///     as a key file that other users can read. The warning is part of <see cref="AttestationKeyStatus.Warnings"/>.
+    /// </summary>
+    /// <param name="warning">The warning; it must hold no secret.</param>
+    protected void NoteWarning(string warning)
+    {
+        _loadWarnings.Add(warning);
+#pragma warning disable CA1848 // Start-up diagnostics are logged once; delegates would add noise
+        Log.LogWarning("Attestation signing key of provider {Provider}: {Warning}", Name, warning);
+#pragma warning restore CA1848
+    }
+
+    /// <summary>
+    ///     Gets the expiry warning for a key.
+    /// </summary>
+    /// <param name="info">The description of the key.</param>
+    /// <param name="now">The current time.</param>
+    /// <returns>The warning, or <c>null</c> when there is none or the provider does not warn.</returns>
+    private string? ExpiryWarning(AttestationKeyInfo info, DateTimeOffset now) =>
+        WarnsAboutExpiry ? AttestationKeyPolicy.ExpiryWarning(info, now, Options.ExpiryWarningDays) : null;
+
+    /// <summary>
+    ///     Logs the expiry warning when it appears or changes.
+    /// </summary>
+    /// <param name="info">The description of the key.</param>
+    /// <param name="now">The current time.</param>
+    private void LogExpiryWarning(AttestationKeyInfo info, DateTimeOffset now)
+    {
+        var warning = ExpiryWarning(info, now);
+        if (warning is not null && warning != _loggedExpiryWarning)
+        {
+#pragma warning disable CA1848 // Logged only when the warning appears or changes
+            Log.LogWarning("Attestation signing key: {Warning}", warning);
+#pragma warning restore CA1848
+        }
+
+        _loggedExpiryWarning = warning;
+    }
+
+    /// <summary>
+    ///     Collects the warnings about the loaded key: what the provider noted, and the expiry warning.
+    /// </summary>
+    /// <param name="info">The description of the key.</param>
+    /// <returns>The warnings.</returns>
+    private List<string> CollectWarnings(AttestationKeyInfo info)
+    {
+        lock (_gate)
+        {
+            var warnings = new List<string>(_loadWarnings);
+            if (ExpiryWarning(info, Time.GetUtcNow()) is { } expiry)
+            {
+                warnings.Add(expiry);
+            }
+
+            return warnings;
+        }
+    }
 }

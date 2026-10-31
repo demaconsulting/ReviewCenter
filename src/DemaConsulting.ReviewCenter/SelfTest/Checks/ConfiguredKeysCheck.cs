@@ -49,11 +49,14 @@ namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
 ///     It also describes the attestation signing key (provider, subject, thumbprint and validity), through a provider
 ///     that may not create anything: a self-signed key that does not exist yet is reported as created at the first
 ///     start, a key file of an earlier version (not encrypted, ignored by the server) is reported as a warning, and a
-///     protected key file that cannot be decrypted with the ring fails the check.
+///     protected key file that cannot be decrypted with the ring fails the check. A certificate file of the
+///     <c>File</c> provider is described the same way, by its file name only: a missing file, a missing or wrong
+///     password, or a key that has expired under <c>Attestation:RequireTrustedKey</c> fails the check, and an
+///     expiry that is near or has passed, a key without a password and a file that other users can read are warnings.
 ///     It never creates a key, a folder or a file: automatic key generation of Data Protection is switched off for
 ///     the services of the check, and the folder of the ring is only read when it exists. It never prints a key, a
 ///     secret, a password or any path other than the key folder; certificate settings that cannot be used are
-///     reported by the setting name only. With no database (not configured, or the file does not exist yet) it is
+///     reported by the setting name or the file name only. With no database (not configured, or the file does not exist yet) it is
 ///     skipped, as it is when the key folder does not exist yet and there is nothing it could protect; the
 ///     attestation key is then not described either. The class is stateless and thread-safe.
 /// </remarks>
@@ -184,7 +187,8 @@ internal static class ConfiguredKeysCheck
                 time,
                 services.GetRequiredService<ILoggerFactory>(),
                 services.GetRequiredService<IDataProtectionProvider>(),
-                allowCreate: false);
+                allowCreate: false,
+                requireEncryptedKeys: services.GetRequiredService<IOptions<KeyRingSettings>>().Value.RequireEncryptedKeys);
             using var owner = keys as IDisposable;
             var selfSigned = keys.Name == AttestationOptions.SelfSignedProvider;
 
@@ -203,8 +207,11 @@ internal static class ConfiguredKeysCheck
                     expired = selfSigned ? " (expired; a new key is created at the first start)" : " (expired)";
                 }
 
+                // What the operator should know: the expiry, a key file that other users can read, a key without a
+                // password; each names the file without its folder
+                var warnings = string.Concat(keys.Describe().Warnings.Select(warning => $"; warning: {warning}"));
                 return $"attestation key {info.Provider}: subject '{info.Subject}', thumbprint {info.Thumbprint}, " +
-                       $"valid {info.NotBefore:u} to {info.NotAfter:u}{expired}{note}";
+                       $"valid {info.NotBefore:u} to {info.NotAfter:u}{expired}{warnings}{note}";
             }
             catch (AttestationKeyException ex) when (ex.WillBeCreated)
             {

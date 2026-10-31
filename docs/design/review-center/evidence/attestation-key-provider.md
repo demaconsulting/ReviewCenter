@@ -7,27 +7,40 @@
 The `AttestationKeyProvider` unit finds the key that signs the attestation. Its single responsibility is to turn the
 `Attestation` settings into a key that the signer can use and to refuse a key that the settings do not allow. It is a
 group of small types that belong together: the interface `IAttestationKeyProvider` with the status type
-`AttestationKeyStatus`, the base class `AttestationKeyProviderBase`, the providers `SelfSignedKeyProvider` and
-`CertificateStoreKeyProvider`, the `AttestationKeyProviderFactory`, the `AttestationKeyPolicy`, the types
+`AttestationKeyStatus`, the base class `AttestationKeyProviderBase`, the providers `SelfSignedKeyProvider`,
+`CertificateStoreKeyProvider` and `FileKeyProvider`, the `AttestationKeyProviderFactory`, the `AttestationKeyPolicy`,
+the types
 `AttestationSigningKey` and `AttestationKeyInfo`, the public `AttestationKeyException`, and the options type
 `AttestationOptions`.
 
 #### Data Model
 
-`AttestationOptions` is bound to the `Attestation` section: `Provider` (`SelfSigned` by default or `CertificateStore`),
-`RequireTrustedKey` (false by default), `CertificateThumbprint`, `StoreLocation` (`CurrentUser` by default or
-`LocalMachine`), `StoreName` (`My` by default), and `SelfSignedFolder` (set by `ServerHost` to a folder beside the Data
-Protection keys unless the operator sets it). An `AttestationSigningKey` holds the private key as an RSA or ECDSA object
+`AttestationOptions` is bound to the `Attestation` section: `Provider` (`SelfSigned` by default, `CertificateStore` or
+`File`), `RequireTrustedKey` (false by default), `CertificateThumbprint`, `StoreLocation` (`CurrentUser` by default or
+`LocalMachine`), `StoreName` (`My` by default), `SelfSignedFolder` (set by `ServerHost` to a folder beside the Data
+Protection keys unless the operator sets it), the settings of the File provider `CertificatePath`, `PrivateKeyPath`,
+`CertificatePassword` (the one secret setting) and `CertificatePasswordFile`, and `ExpiryWarningDays` (30 by default;
+0 turns the expiry warnings off). An `AttestationSigningKey` holds the private key as an RSA or ECDSA object
 (a handle, not key material), the signer certificate, the intermediate certificates, and an `AttestationKeyInfo` (provider,
 subject, issuer, thumbprint, serial number, algorithm, validity, whether the certificate is self-signed, whether its key
 usage allows signing, whether the certificate is for code signing only, and whether `RequireTrustedKey` is on).
 `AttestationKeyStatus` (provider, whether a key can be
-used, the `AttestationKeyInfo`, and the problem) is the answer for the review page.
+used, the `AttestationKeyInfo`, the problem, and the list of warnings) is the answer for the review page.
 
 `AttestationKeyProviderBase` loads the key once, on the first request, and keeps it; a failure is not kept, so the next
 call tries again. It logs the choice at information level and a warning for a self-signed key and for a certificate
 that is for code signing only. `AttestationKeyPolicy.Enforce` runs on every call, not only on the first, so a certificate
 that expires while the server runs stops the attestation and not the server.
+
+**Expiry warnings.** `AttestationKeyPolicy.ExpiryWarning(info, now, days)` returns `null` when `days` is 0 or the
+certificate ends later than `days` days from now, and otherwise a text that names the thumbprint and the date (UTC):
+"expires on" when the end is ahead and "expired on" when it has passed. The base class evaluates it on every use of the
+key, for the providers that do not replace their key (`WarnsAboutExpiry`; the self-signed provider does not, because it
+archives an expired key and creates a new one with its own warning), logs it at warning level once for each text, so the
+log is not filled by every signing, and puts it into the `Warnings` of the status. A certificate that has expired
+warns also when `RequireTrustedKey` is not set, where the server signs with it; with `RequireTrustedKey` the policy
+refuses the key as before. A warning that a provider notes while it loads the key (the `FileKeyProvider` notes some)
+is kept with the loaded key and is part of `Warnings` as well.
 
 The kinds of key, from the weakest to the strongest evidence: a **self-signed** key (the default, labeled in the
 attestation and logged), a **code-signing** certificate (used, with a note in the attestation and a warning in the log:
@@ -70,6 +83,41 @@ or in a hardware module. No test signature is made at start-up, so a card is not
 of the certificate with no revocation check and accepts an unknown root, and keeps the intermediate certificates only, so
 the signature carries what a reader needs to follow the chain, and the root is left to the reader to trust.
 
+The **file provider** reads a certificate with its private key from a file of the server, which an administrator
+deploys (for example from a secret store). `CertificatePath` is the file; the format is detected from the content: text
+that holds `-----BEGIN` is PEM, anything else is PKCS #12 (PFX). The password comes from `CertificatePassword` or from
+the contents of `CertificatePasswordFile`, trimmed of surrounding white space, resolved by the `SecretSource` unit, so
+setting both, or naming a password
+file that does not exist, is refused with the messages of that unit. A PFX is loaded with `X509CertificateLoader`
+as a collection with an ephemeral key set, so the key lives in memory only and is not written to the key store of the
+user (on macOS, where an ephemeral key set is not supported for a PFX, the default key set is used, as the key ring
+protection does). `PrivateKeyPath` is for PEM only: for a PFX it is ignored (not read, not checked, and not used for the
+permission check). Whether the key is protected is decided from the structure of the PKCS #12 file (`Pkcs12Info`: a
+password is set, the key is a shrouded key bag or sits in a password-encrypted safe, and no key sits in an unencrypted
+safe), not from whether a password is set: a password that the file does not use protects nothing, so such a file
+is treated as unprotected. The signer is the first certificate of the collection with a private key; the other
+certificates are
+the chain, without the signer itself and without a self-signed root, which the reader has to trust. A PEM
+certificate is loaded with `CreateFromPemFile`, or `CreateFromEncryptedPemFile` when the key is an
+`ENCRYPTED PRIVATE KEY`, with the key in the same file or in `PrivateKeyPath`; the other certificates of the PEM file
+are the chain. A legacy encrypted key (`Proc-Type: 4,ENCRYPTED`, as in `BEGIN RSA PRIVATE KEY`) is not supported by
+that loader: it is recognized by its header, before the load, and refused with a message that tells the operator to
+convert it to PKCS #8 (for example with `openssl pkcs8 -topk8`). The bytes that were read from the files, which can hold
+an unencrypted private key, are searched as bytes (no text copy of the key is made) and cleared with
+`CryptographicOperations.ZeroMemory` after the load. A key is *protected* when it needs a password (a PFX loaded with a
+password, an encrypted PEM key). A key
+that is not protected is a warning that names the file, and an error, naming `DataProtection:RequireEncryptedKeys`, when
+that setting is true (`ServerHost` and the configuration check pass the setting on through the factory). On Linux and
+macOS the provider warns, by file name, when the file that holds the private key or the password file can be accessed
+by the group or by others, and tells the operator to restrict the mode (for example `chmod 600`). The file that holds
+the key is the certificate file, except for a PEM certificate with a separate `PrivateKeyPath`, where it is the key
+file and the certificate file is not checked, because it holds no secret. The provider does not refuse for the mode,
+because a deployment can have a reason for a shared group. Every failure is an `AttestationKeyException` that names the
+setting or the file: the path is not set, the file does not exist, the key file does not exist, the file is neither
+PEM nor PFX, the file needs a password, the password is wrong or the file holds no private key. A password is never
+part of a message. Each such exception also carries `MessageWithoutPath`, with the file name instead of the full path,
+for the configuration check. The provider does not create or change any file, so `allowCreate` does not apply.
+
 #### Key Methods
 
 **GetSigningKey**: Returns the key, loading it on first use.
@@ -93,7 +141,8 @@ the signature carries what a reader needs to follow the chain, and the root is l
 
 - *Parameters*: None.
 - *Returns*: `AttestationKeyStatus` — the provider name, whether a key can be used, its description (subject,
-  thumbprint, and whether it is self-signed), and the problem.
+  thumbprint, and whether it is self-signed), the problem, and the warnings (the expiry warning and what the provider
+  noted while it loaded the key).
 - *Postconditions*: Never throws. An `AttestationKeyException` is returned as its message (which names what to correct).
   Any other non-fatal exception (for example an invalid folder name, or a store or chain error of the runtime) is logged
   at warning level and returned as the generic problem "The attestation signing key could not be loaded because of an
@@ -103,11 +152,14 @@ the signature carries what a reader needs to follow the chain, and the root is l
 **AttestationKeyProviderFactory.Create**: Chooses the provider.
 
 - *Parameters*: The options, the clock, the logger factory, the `IDataProtectionProvider` that protects the
-  self-signed key, and `allowCreate` (`false` to describe without creating anything).
-- *Returns*: The provider for `SelfSigned` (also for an empty value) or `CertificateStore`; the certificate store
-  provider ignores both new parameters.
+  self-signed key, `allowCreate` (`false` to describe without creating anything), and `requireEncryptedKeys` (the value
+  of `DataProtection:RequireEncryptedKeys`, which the File provider enforces for its key).
+- *Returns*: The provider for `SelfSigned` (also for an empty value), `CertificateStore` or `File` (the names are not
+  case sensitive); the certificate store provider ignores the last three parameters. A negative `ExpiryWarningDays` and
+  any other provider name are an `AttestationKeyException` that names the setting; the message for a provider name ends
+  with "Use SelfSigned, CertificateStore or File."
 
-**AttestationKeyPolicy.Enforce, HasSigningKeyUsage, IsCodeSigningOnly, Warnings**: The rules above.
+**AttestationKeyPolicy.Enforce, HasSigningKeyUsage, IsCodeSigningOnly, Warnings, ExpiryWarning**: The rules above.
 
 #### Error Handling
 
@@ -130,9 +182,12 @@ would plug in.
 #### Dependencies
 
 - **System.Security.Cryptography.X509Certificates** and the cryptography of the .NET runtime — the certificate, the
-  store, the key, and the chain. These belong to the runtime and are not OTS software items of their own.
+  store, the key, and the chain (and, for the File provider, the PEM and PKCS #12 loaders and the `Pkcs12Info` decoder
+  that tells a wrong password from a file that is no PFX). These belong to the runtime and are not OTS software items
+  of their own.
 - **Microsoft.Extensions.Options and Logging** — the options and the log of the application framework.
 - **Microsoft.AspNetCore.DataProtection** — the `IDataProtectionProvider` that protects the self-signed key.
+- **SecretSource** — resolves the password of the File provider from the setting or the password file.
 
 #### Callers
 

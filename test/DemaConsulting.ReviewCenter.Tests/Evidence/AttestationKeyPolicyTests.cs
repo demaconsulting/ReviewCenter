@@ -21,6 +21,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using DemaConsulting.ReviewCenter.Evidence;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -264,8 +265,10 @@ public class AttestationKeyPolicyTests
     /// <param name="key">The key to return.</param>
     /// <param name="options">The attestation settings.</param>
     /// <param name="log">The logger.</param>
-    private sealed class FixedKeyProvider(AttestationSigningKey key, AttestationOptions options, ILogger log)
-        : AttestationKeyProviderBase(options, TimeProvider.System, log)
+    /// <param name="time">The clock; the system clock when not given.</param>
+    private sealed class FixedKeyProvider(
+        AttestationSigningKey key, AttestationOptions options, ILogger log, TimeProvider? time = null)
+        : AttestationKeyProviderBase(options, time ?? TimeProvider.System, log)
     {
         /// <inheritdoc />
         public override string Name => "Fixed";
@@ -355,7 +358,179 @@ public class AttestationKeyPolicyTests
         // Assert: the message names the setting and the supported values
         Assert.Contains("Attestation:Provider", exception.Message, StringComparison.Ordinal);
         Assert.Contains("'Pfx'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("SelfSigned", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("CertificateStore", exception.Message, StringComparison.Ordinal);
+        Assert.EndsWith("Use SelfSigned, CertificateStore or File.", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the file provider is selected by name, whatever the case, and receives the encryption requirement.
+    /// </summary>
+    /// <param name="name">The configured name.</param>
+    [Theory]
+    [InlineData("File")]
+    [InlineData("file")]
+    public void AttestationKeyProviderFactory_Create_File_SelectsFileProvider(string name)
+    {
+        // Arrange: options with the name
+        var options = new AttestationOptions { Provider = name };
+
+        // Act: create the provider
+        using var provider = (IDisposable)AttestationKeyProviderFactory.Create(
+            options, TimeProvider.System, NullLoggerFactory.Instance, new EphemeralDataProtectionProvider(), allowCreate: true);
+
+        // Assert: the file provider
+        var file = Assert.IsType<FileKeyProvider>(provider);
+        Assert.Equal("File", file.Name);
+    }
+
+    /// <summary>
+    ///     Test that a negative number of warning days is refused, naming the setting and the value, for every provider.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderFactory_Create_NegativeExpiryWarningDays_ThrowsNamingTheSetting()
+    {
+        // Arrange: options with a number of days that is not valid
+        var options = new AttestationOptions { ExpiryWarningDays = -5 };
+
+        // Act: create the provider
+        var exception = Assert.Throws<AttestationKeyException>(
+            () => AttestationKeyProviderFactory.Create(
+                options, TimeProvider.System, NullLoggerFactory.Instance, new EphemeralDataProtectionProvider(), allowCreate: true));
+
+        // Assert: the message names the setting and the value
+        Assert.Contains("Attestation:ExpiryWarningDays", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("-5", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the expiry warning names the thumbprint and the date, and appears for a certificate that ends
+    ///     within the number of days and for one that has ended.
+    /// </summary>
+    /// <param name="daysUntilEnd">The days from now to the end of the validity; negative when it has ended.</param>
+    /// <param name="expectedWord">The word the warning uses.</param>
+    [Theory]
+    [InlineData(10, "expires")]
+    [InlineData(30, "expires")]
+    [InlineData(-1, "expired")]
+    [InlineData(-400, "expired")]
+    public void AttestationKeyPolicy_ExpiryWarning_EndsWithinDaysOrHasEnded_NamesThumbprintAndDate(int daysUntilEnd, string expectedWord)
+    {
+        // Arrange: a key, and a time that is the given number of days before the end of its certificate
+        using var key = TestKeys.Organization();
+        var now = key.Info.NotAfter.AddDays(-daysUntilEnd);
+
+        // Act: ask for the warning with the default 30 days
+        var warning = AttestationKeyPolicy.ExpiryWarning(key.Info, now, 30);
+
+        // Assert: it names the thumbprint and the date of the end
+        Assert.NotNull(warning);
+        Assert.Contains(expectedWord, warning, StringComparison.Ordinal);
+        Assert.Contains(key.Info.Thumbprint, warning, StringComparison.Ordinal);
+        Assert.Contains(key.Info.NotAfter.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that there is no expiry warning for a certificate that ends later than the number of days, and none at
+    ///     all when the number of days is 0, even for a certificate that has ended.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyPolicy_ExpiryWarning_FarAwayOrDisabled_ReturnsNull()
+    {
+        // Arrange: a key, a time 90 days before its end, and a time 5 days after it
+        using var key = TestKeys.Organization();
+        var before = key.Info.NotAfter.AddDays(-90);
+        var after = key.Info.NotAfter.AddDays(5);
+
+        // Act: ask with 30 days, and with the warning switched off
+        var farWarning = AttestationKeyPolicy.ExpiryWarning(key.Info, before, 30);
+        var disabledWarning = AttestationKeyPolicy.ExpiryWarning(key.Info, after, 0);
+
+        // Assert: nothing to warn about
+        Assert.Null(farWarning);
+        Assert.Null(disabledWarning);
+    }
+
+    /// <summary>
+    ///     Test that a certificate that has expired is warned about, and the key is still used, when the trusted-key
+    ///     policy is off, and that the warning is logged when it appears and not on every call.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderBase_GetSigningKey_ExpiredKeyWithoutPolicy_WarnsOnceAndStillSigns()
+    {
+        // Arrange: a provider whose certificate ended five days before the clock; the policy is off
+        var logs = new CapturingLoggerProvider();
+        using var factory = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        var key = TestKeys.Organization();
+        using var provider = new FixedKeyProvider(
+            key,
+            new AttestationOptions(),
+            factory.CreateLogger("test"),
+            new FixedTimeProvider(key.Info.NotAfter.AddDays(5)));
+
+        // Act: ask twice, then describe the key
+        var first = provider.GetSigningKey();
+        var second = provider.GetSigningKey();
+        var status = provider.Describe();
+
+        // Assert: the key is returned, one warning was logged, and the status carries it
+        Assert.Same(first, second);
+        var warning = Assert.Single(logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("expired", StringComparison.Ordinal));
+        Assert.Contains(first.Info.Thumbprint, warning.Message, StringComparison.Ordinal);
+        Assert.True(status.IsAvailable);
+        Assert.Single(status.Warnings, w => w.Contains("expired", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a certificate that ends soon is warned about in the status, and that the status of a certificate
+    ///     that ends later has no warning.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderBase_Describe_EndsSoonOrLater_WarnsOnlyWhenSoon()
+    {
+        // Arrange: one provider whose clock is ten days before the end of its certificate and one a year before
+        var soonKey = TestKeys.Organization();
+        var laterKey = TestKeys.Organization();
+        using var soon = new FixedKeyProvider(
+            soonKey, new AttestationOptions(), NullLogger.Instance, new FixedTimeProvider(soonKey.Info.NotAfter.AddDays(-10)));
+        using var later = new FixedKeyProvider(
+            laterKey, new AttestationOptions(), NullLogger.Instance, new FixedTimeProvider(laterKey.Info.NotAfter.AddDays(-365)));
+
+        // Act: describe both
+        var soonStatus = soon.Describe();
+        var laterStatus = later.Describe();
+
+        // Assert: only the first has a warning
+        Assert.Single(soonStatus.Warnings, w => w.Contains("expires", StringComparison.Ordinal));
+        Assert.Empty(laterStatus.Warnings);
+    }
+
+    /// <summary>
+    ///     Test that the self-signed provider does not add an expiry warning of its own to the one it logs when it
+    ///     replaces a key that has expired, however long the warning period is.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderFactory_Create_SelfSigned_StatusHasNoExpiryWarning()
+    {
+        // Arrange: a self-signed provider with a warning period that is longer than any validity
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterSelfSignedWarn-" + Guid.NewGuid().ToString("N"));
+        var options = new AttestationOptions { SelfSignedFolder = folder, ExpiryWarningDays = 1_000_000 };
+        try
+        {
+            using var provider = (IDisposable)AttestationKeyProviderFactory.Create(
+                options, TimeProvider.System, NullLoggerFactory.Instance, new EphemeralDataProtectionProvider(), allowCreate: true);
+
+            // Act: describe the key
+            var status = ((IAttestationKeyProvider)provider).Describe();
+
+            // Assert: available, and nothing to warn about
+            Assert.True(status.IsAvailable);
+            Assert.Empty(status.Warnings);
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
     }
 }

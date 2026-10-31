@@ -60,6 +60,11 @@ internal sealed class FakeAttestationKeyProvider : IAttestationKeyProvider, IDis
     public string? Problem { get; }
 
     /// <summary>
+    ///     Gets the warnings that the status reports.
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    /// <summary>
     ///     Gets the number of times a test asked for the key.
     /// </summary>
     public int Requests { get; private set; }
@@ -79,7 +84,7 @@ internal sealed class FakeAttestationKeyProvider : IAttestationKeyProvider, IDis
     {
         return _key is null
             ? new AttestationKeyStatus(Name, false, null, Problem)
-            : new AttestationKeyStatus(Name, true, _key.Info, null);
+            : new AttestationKeyStatus(Name, true, _key.Info, null) { Warnings = Warnings };
     }
 
     /// <inheritdoc />
