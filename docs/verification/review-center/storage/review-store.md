@@ -450,6 +450,12 @@ was and no entry is written. This scenario is tested by `ReviewStore_UpdateDueDa
 with different new dates are released together; exactly one wins, the stored date is the winner's, one entry exists,
 and the chain verifies. This scenario is tested by `ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`.
 
+**ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes**: One review is approved; others
+have no slot, an unsigned slot, two slots of which one is unsigned, or a signature that a reopening made out of date;
+one identifier is unknown and one is given twice. The batch answer contains only the approved review, equals the
+single-review definition for every identifier, and an empty input gives an empty set. This scenario is defined in
+`ReviewStoreSigningTests.cs` and is tested by `ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes`.
+
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The
 transaction that stores a change with its audit entry, and the linear chain of changes made through different

@@ -254,11 +254,15 @@ sections:
           recreated.
         justification: |
           The date is a commitment that must survive a restart and must not be lost when two people save at the same
-          time. The history of a change must stay true, so the entry is stored with the change or not at all.
+          time. The history of a change must stay true, so the entry is stored with the change or not at all. A list
+          that shows which dated reviews are overdue asks which of them are approved in one batch, so its cost does
+          not grow with a full read of every late review.
         children:
           - ReviewCenter-ReviewStore-DueDate
+          - ReviewCenter-ReviewStore-ApprovedReviewIds
           - ReviewCenter-DbContext-DueDate
         tests:
+          - ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes
           - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
           - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
           - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing

@@ -219,6 +219,19 @@ sections:
           - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
 
+      - id: ReviewCenter-ReviewStore-ApprovedReviewIds
+        title: >-
+          The ReviewStore class shall tell which of several reviews of a project are approved, by the same
+          definition of approved as the Core services, reading the slots and the signatures of all the reviews with
+          one query each in one read transaction and loading the record of a review only when every one of its slots
+          holds a signature, and shall leave out a review that does not exist.
+        justification: |
+          A list of reviews has to show which late reviews are approved, and so not overdue. One full snapshot read
+          per review would make the cost of the list grow with the number of late reviews; a review with an unsigned
+          slot can never be approved and so needs no record.
+        tests:
+          - ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes
+
       - id: ReviewCenter-ReviewStore-ApprovalLockInTransaction
         title: >-
           The ReviewStore class shall refuse with the ReviewLocked rule, inside the same transaction that would store

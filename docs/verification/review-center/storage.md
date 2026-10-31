@@ -198,7 +198,11 @@ nothing, and of two writers from the same date exactly one wins; these are teste
 `ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`,
 `ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited`,
 `ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing`, and
-`ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`, all defined in `ReviewDueDateStoreTests.cs`.
+`ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`, all defined in `ReviewDueDateStoreTests.cs`. The
+batch question of which dated reviews are approved (what a list needs for its overdue state) returns exactly the
+approved ones and agrees with the single-review definition; it is tested by
+`ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes`, defined in
+`ReviewStoreSigningTests.cs`.
 
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by

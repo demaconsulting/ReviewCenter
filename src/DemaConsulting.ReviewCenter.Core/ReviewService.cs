@@ -434,6 +434,29 @@ public sealed class ReviewService
     }
 
     /// <summary>
+    ///     Tells which of the reviews of a project that have a due date before today (UTC) are approved, so a list
+    ///     can show the overdue state without reading every review in full.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviews">The reviews of the project. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The identifiers of the approved reviews among those that have a due date before today (UTC); a review
+    ///     without such a date is never asked about, because only a past due date can make a review overdue.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="reviews"/> is null.</exception>
+    public async Task<IReadOnlySet<string>> ListApprovedWithPastDueDateAsync(
+        int projectId,
+        IEnumerable<Review> reviews,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviews);
+        var today = TodayUtc;
+        var late = reviews.Where(r => r.DueDate is { } due && due < today).Select(r => r.Id).ToList();
+        return await _store.ListApprovedReviewIdsAsync(projectId, late, cancellationToken);
+    }
+
+    /// <summary>
     ///     Reads the text of a due date as entered on a form or sent to the API.
     /// </summary>
     /// <param name="text">The text: an ISO calendar date (<c>yyyy-MM-dd</c>), or <c>null</c> or white space for no date.</param>

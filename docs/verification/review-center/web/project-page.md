@@ -190,6 +190,11 @@ is typed; the form says the date is in UTC. After submitting, the review carries
 names the due date and creates nothing; with the field emptied the review is created without a date. This scenario is
 tested by `NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing`.
 
+**NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate**: The upload form is filled in with a file
+and yesterday as the due date; the error names the due date and nothing is created. After the date is corrected and
+the form is submitted again, the review is created from the upload with the date. This scenario is tested by
+`NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate`, defined in `ProjectPageTests.cs`.
+
 **ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository**: A project without any repository shows the note and no
 link; after a repository is registered, the link goes to `/projects/{id}/plan` and the note is gone. This scenario is
 tested by `ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository`.

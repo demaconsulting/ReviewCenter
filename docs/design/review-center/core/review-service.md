@@ -141,9 +141,16 @@ token text); without a date the detail is exactly as before.
 text is no date, any other text raises `DueDateInvalid`.
 
 **IsOverdue**: `IsOverdue(Review review, bool isApproved)` is true only when the review has a date that is before
-today (UTC) and the review is not approved. The caller supplies `isApproved` (the pages and the API take it from
-`SigningService`), so an approved review keeps its date as history and is never overdue; the date `today` itself is
+today (UTC) and the review is not approved. The caller supplies `isApproved` (the review page takes it from
+`SigningService`, the list endpoint of the API from `ListApprovedWithPastDueDateAsync`), so an approved review keeps
+its date as history and is never overdue; the date `today` itself is
 not overdue.
+
+**ListApprovedWithPastDueDateAsync**: `ListApprovedWithPastDueDateAsync(int projectId, IEnumerable<Review> reviews,
+CancellationToken)` is what a list uses to show the overdue state without reading every review in full. It picks the
+reviews whose due date is before today (UTC), asks `IReviewStore.ListApprovedReviewIdsAsync` once for all of them, and
+returns the identifiers that are approved; with no past date the store is asked about no review and answers at once.
+The list endpoint of the API passes `isApproved` to `IsOverdue` from this set.
 
 **CanSetDueDateAsync**: tells whether an actor may change the due date of a review: never for a missing actor or an
 actor that came through a personal access token (a token does not change the settings of a review), and for a project

@@ -544,6 +544,36 @@ public class ReviewServiceDueDateTests
     }
 
     /// <summary>
+    ///     Test that the batch question for a list answers only for reviews whose date has passed, and names among
+    ///     them exactly the approved ones.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_ListApprovedWithPastDueDateAsync_OnlyPastDatedReviews_ReturnsTheApprovedOnes()
+    {
+        // Arrange: rev-1 is approved and dated today, rev-2 is unsigned and dated today, rev-3 has no date
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await CreateReviewAsync(world, _today);
+        await world.Reviews.CreateDraftAsync(
+            world.ProjectId, "rev-2", "Second", [new UploadedFile("a.txt", TestContent.A)], _creator, cancellationToken, dueDate: _today);
+        await world.Reviews.CreateDraftAsync(
+            world.ProjectId, "rev-3", "Third", [new UploadedFile("a.txt", TestContent.A)], _creator, cancellationToken);
+        var (_, second) = await SignFirstSlotAsync(world);
+        var digest = (await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", cancellationToken))!.Digest;
+        await world.Signing.SignAsync(_reviewerTwo, world.ProjectId, "rev-1", second, digest, Password, cancellationToken);
+        var list = await world.Reviews.ListAsync(world.ProjectId, cancellationToken);
+
+        // Act: ask today, when no date has passed, and three days later
+        var today = await world.Reviews.ListApprovedWithPastDueDateAsync(world.ProjectId, list, cancellationToken);
+        var later = new ReviewService(world.Store, new AllowAllProjectAccess(world.Store), new FixedTimeProvider(_now.AddDays(3)));
+        var afterwards = await later.ListApprovedWithPastDueDateAsync(world.ProjectId, list, cancellationToken);
+
+        // Assert: nothing is asked while no date has passed; later only the approved dated review is named
+        Assert.Empty(today);
+        Assert.Equal("rev-1", Assert.Single(afterwards));
+    }
+
+    /// <summary>
     ///     Test that the text of a due date is read in the ISO form only, and that no text means no date.
     /// </summary>
     [Fact]

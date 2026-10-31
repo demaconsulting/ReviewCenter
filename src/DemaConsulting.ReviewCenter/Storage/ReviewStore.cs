@@ -785,6 +785,53 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviewIds);
+        var approved = new HashSet<string>();
+        if (reviewIds.Count == 0)
+        {
+            return approved;
+        }
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // One read transaction, so the slots, the signatures and the records describe one state
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+        var ids = reviewIds.Distinct().ToList();
+        var slots = await context.ReviewerSlots.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+            .ToListAsync(cancellationToken);
+        var signatures = await context.Signatures.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var group in slots.GroupBy(s => s.ReviewId))
+        {
+            var own = signatures.Where(s => s.ReviewId == group.Key).ToList();
+
+            // A review with an unsigned slot cannot be approved, so its record is never loaded
+            if (!group.All(slot => own.Any(s => s.SlotId == slot.Id)))
+            {
+                continue;
+            }
+
+            var record = await LoadRecordAsync(context, projectId, group.Key, cancellationToken);
+            if (record is not null && ReviewLock.IsApproved(record, group.ToList(), own))
+            {
+                approved.Add(group.Key);
+            }
+        }
+
+        return approved;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
         int projectId,
         string reviewId,

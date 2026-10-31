@@ -276,7 +276,9 @@ sections:
           with an optional due date that is a calendar day in UTC, shall keep it outside the record digest, shall
           refuse a date before today or more than two years ahead with the DueDateInvalid rule, storing nothing,
           shall name the date in the audit entry of the creation only when one is set, and shall treat a review as
-          overdue only while its due date is before today (UTC) and the review is not approved.
+          overdue only while its due date is before today (UTC) and the review is not approved, and shall tell for a
+          list of reviews which of those with a due date before today are approved, with one batch question to the
+          store and not one full read per review.
         justification: |
           A lead needs to say when a review is expected without every review having a deadline. A date in the past
           is a mistake at creation, and one far in the future is most likely a typing error. The date is planning
@@ -287,6 +289,7 @@ sections:
           - ReviewService_CreateDraftAsync_NoDueDate_HasNoDateAndNoAuditText
           - ReviewService_CreateDraftAsync_DueDateOutOfRange_IsRefusedAndStoresNothing
           - ReviewService_IsOverdue_PastDateAndNotApproved_IsTheOnlyOverdueCase
+          - ReviewService_ListApprovedWithPastDueDateAsync_OnlyPastDatedReviews_ReturnsTheApprovedOnes
           - ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses
           - ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature
 

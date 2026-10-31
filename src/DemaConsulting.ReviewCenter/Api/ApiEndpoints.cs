@@ -355,7 +355,6 @@ internal static class ApiEndpoints
     /// <param name="http">The request context; supplies the token actor.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
-    /// <param name="signing">The signing service; says which late reviews are approved and so not overdue.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The reviews, or 404 when the project does not exist or is not visible to the token's owner.</returns>
     private static async Task<IResult> ListReviewsAsync(
@@ -363,7 +362,6 @@ internal static class ApiEndpoints
         HttpContext http,
         ProjectService projects,
         ReviewService reviews,
-        SigningService signing,
         CancellationToken cancellationToken)
     {
         if (await projects.GetAsync(ApiProblems.ActorOf(http.User), projectId, cancellationToken) is null)
@@ -373,13 +371,10 @@ internal static class ApiEndpoints
 
         var list = await reviews.ListAsync(projectId, cancellationToken);
 
-        // Only a review with a date in the past can be overdue; the approval is read for those alone
-        var late = list.Where(r => r.DueDate is { } due && due < reviews.TodayUtc).Select(r => r.Id).ToList();
-        var approvals = late.Count == 0
-            ? new Dictionary<string, ReviewApproval>()
-            : (await signing.GetApprovalsAsync(projectId, late, cancellationToken)).ToDictionary(p => p.Key, p => p.Value);
+        // Only a review with a date in the past can be overdue; one batch query says which of those are approved
+        var approved = await reviews.ListApprovedWithPastDueDateAsync(projectId, list, cancellationToken);
         return TypedResults.Ok(list
-            .Select(r => ToSummary(r, reviews, approvals.TryGetValue(r.Id, out var approval) && approval.IsApproved))
+            .Select(r => ToSummary(r, reviews, approved.Contains(r.Id)))
             .ToList());
     }
 

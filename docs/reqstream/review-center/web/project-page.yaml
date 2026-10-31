@@ -281,6 +281,7 @@ sections:
         tests:
           - NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview
           - NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate
 
       - id: ReviewCenter-ProjectPage-Interactive
         title: >-

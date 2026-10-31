@@ -504,6 +504,26 @@ public interface IReviewStore
     Task<ReviewSnapshot?> GetSnapshotAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Tells which of several reviews of a project are approved, without loading a full snapshot for each one.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers to check. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The identifiers among <paramref name="reviewIds"/> that are approved by the definition of
+    ///     <see cref="ReviewLock.IsApproved"/>; a review that does not exist is not in the set.
+    /// </returns>
+    /// <remarks>
+    ///     The slots and the signatures of all the reviews are read with one query each, in one read transaction. The
+    ///     record, which the current digest needs, is loaded only for a review whose every slot holds some signature,
+    ///     because no other review can be approved.
+    /// </remarks>
+    Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Lists the reviewer slots of a review.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
