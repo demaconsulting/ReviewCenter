@@ -1026,6 +1026,37 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the batch read takes the snapshots of all reviews with one store batch read and not one snapshot
+    ///     read per review, that a duplicated identifier is read once, and that every status, including the reopen
+    ///     history of a reopened review, equals the single read of the same review.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots()
+    {
+        // Arrange: a reopened review and a second review of the same project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, _, _) = await CreateApprovedAsync();
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Because.", cancellationToken);
+        await CreateAuthoredReviewAsync(fixture, TestActors.Ann);
+        var singleReadsBefore = fixture.Store.SnapshotReads;
+        var batchReadsBefore = fixture.Store.SnapshotBatchReads;
+
+        // Act
+        var batch = await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-1", "rev-2", "rev-1", "nope"], cancellationToken);
+        var singleReadsDuring = fixture.Store.SnapshotReads - singleReadsBefore;
+        var batchReadsDuring = fixture.Store.SnapshotBatchReads - batchReadsBefore;
+
+        // Assert: one batch read, no single snapshot read, and every status equals the single read
+        Assert.Equal(1, batchReadsDuring);
+        Assert.Equal(0, singleReadsDuring);
+        Assert.Equal(["rev-1", "rev-2"], batch.Keys.Order().ToArray());
+        Assert.Equal("Because.", Assert.Single(batch["rev-1"].Reopens!).Reason);
+        Assert.Null(batch["rev-2"].Reopens);
+        Assert.Equivalent(await ApprovalAsync(fixture, "rev-1"), batch["rev-1"]);
+        Assert.Equivalent(await ApprovalAsync(fixture, "rev-2"), batch["rev-2"]);
+    }
+
+    /// <summary>
     ///     Test that only enabled members of the project are offered for a slot, and without anything secret.
     /// </summary>
     [Fact]

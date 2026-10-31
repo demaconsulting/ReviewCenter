@@ -199,7 +199,8 @@ that every change made by an actor is re-authorized by the service, whatever the
 
 **Interface additions of IReviewStore**: `GetRecordAsync`, `GetSnapshotAsync`, `ListSlotsAsync`, `AddSlotAsync`,
 `UpdateSlotAsync`, `RemoveSlotAsync`, `ListSignaturesAsync`, `AddSignatureAsync`, `ReopenReviewAsync`, and
-`ListReopensAsync`. The store has no operation that
+`ListReopensAsync`. `GetApprovalsAsync` also uses the batch reads `ListSnapshotsAsync` and the `ListReopensAsync`
+overload for several reviews. The store has no operation that
 changes or deletes a signature or a reopen. `UpdateSlotAsync` and `RemoveSlotAsync` return `false` when the slot is
 not found.
 
@@ -214,7 +215,7 @@ not found.
   members of the project are read through `ListMembershipsAsync` to fill `SlotMember.IsMember`. The reopen history is
   read through `ListReopensAsync` only when the record's reopen count is above zero.
 - *Blocker counts*: `ReviewApproval` also carries `OpenThreads`, `UnansweredChecks`, and `FailedChecks`. They are
-  counted in the one place that writes the blocker sentences (`ReadApprovalAsync`, one additive region), so each number
+  counted in the one place that writes the blocker sentences (`BuildApproval`, one additive region), so each number
   equals the one in its sentence; the sentences are unchanged. `ReviewProgressService` and any later list of work use
   the counts and do not repeat the rule. `SlotMember.Enabled` tells whether the account of a person in a slot is enabled
   (true by default).
@@ -225,7 +226,11 @@ not found.
 - *Returns*: `Task<IReadOnlyDictionary<string, ReviewApproval>>` — the status of each review that exists, by review
   identifier; a review that does not exist is absent. Each status equals the one `GetApprovalAsync` gives.
 - *Postconditions*: The user list and the identities of the current project members are loaded once for the whole batch,
-  not once for each review, and not at all when there are no review identifiers; each review has its own snapshot read.
+  not once for each review, and not at all when there are no review identifiers. The snapshots of all the reviews come
+  from one `IReviewStore.ListSnapshotsAsync` call (a set-based read; no snapshot read per review), and the reopen history
+  of the reviews whose record counts a reopen from one `ListReopensAsync` call for those reviews. The status of each
+  review is built by the same private step (`BuildApproval`) as the single read, so the two cannot differ. A duplicated
+  identifier is read once.
 
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 

@@ -96,7 +96,11 @@
         <h2 class="section-title">Reviews</h2>
         @if (Progress.Count == 0)
         {
-            <p class="muted" data-testid="reviews-empty">This project has no reviews yet. Use + New review to add the first one.</p>
+            <p class="muted" data-testid="reviews-empty">
+                @(CanContribute
+                    ? "This project has no reviews yet. Use + New review to add the first one."
+                    : "This project has no reviews yet.")
+            </p>
         }
         else
         {
@@ -130,7 +134,8 @@
                     <input type="search" name="q" value="@SearchText" maxlength="100" placeholder="Id or title"
                            data-testid="filter-search" />
                 </label>
-                @if (SortColumn != "id")
+                @* Keep the sort state, also a descending order of the default column; the default (id ascending) adds nothing *@
+                @if (SortColumn != "id" || Descending)
                 {
                     <input type="hidden" name="sort" value="@SortColumn" />
                     <input type="hidden" name="dir" value="@(Descending ? "desc" : "asc")" />

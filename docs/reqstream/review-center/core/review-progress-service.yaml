@@ -103,7 +103,8 @@ sections:
       - id: ReviewCenter-ReviewProgressService-Performance
         title: >-
           The ReviewProgressService class shall need a number of reads that does not grow with the number of reviews
-          of the project: one read of the reviews, one batch read of the approval statuses, and one read of the last
+          of the project: one read of the reviews, one batch read of the approval statuses (itself one set-based read
+          of the snapshots of all the reviews), and one read of the last
           activity, so that a project with 300 reviews is answered within a loose time bound on a test database.
         justification: |
           The overview is the page that every user opens first. A read per review would make it slow exactly for the

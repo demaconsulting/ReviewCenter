@@ -291,7 +291,12 @@ with the GET method, so that the view is always the address. The state of the vi
 `signatures`), `dir` (`asc` or `desc`), `q`, and `page`. A value that is not understood is ignored (a `page` that is
 not a whole number is page 1), and a page out of range is brought into range. The text of `q` is shown encoded, never
 as markup.
-Values that equal the default are left out of the addresses the page builds. The column headers (`sort-id`,
+Values that equal the default are left out of the addresses the page builds. The filter form carries the sort state of
+the view as hidden `sort` and `dir` inputs whenever the view is not the default (id ascending), also for a descending
+order of the identifier (`sort=id`, `dir=desc`), so that applying a filter does not lose the order; the links of the
+headers and of the paging keep it in `dir`. A project without reviews shows `reviews-empty`: an invitation to use
+"+ New review" for a user who may contribute, and only "This project has no reviews yet." for a member who may only read,
+who has no such button. The column headers (`sort-id`,
 `sort-stage`, `sort-signatures`, `sort-activity`, `sort-due`) are links to the same view with that sort, and flip the
 direction when the column is the current one; the last activity sorts newest first by default, every other column
 ascending, a review without a due date comes last in either direction, and ties are broken by the review identifier.

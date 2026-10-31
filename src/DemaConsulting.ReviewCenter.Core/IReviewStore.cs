@@ -506,6 +506,23 @@ public interface IReviewStore
     Task<ReviewSnapshot?> GetSnapshotAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Reads the snapshots (see <see cref="GetSnapshotAsync"/>) of several reviews of a project with a constant
+    ///     number of queries, so a list of reviews costs no read per review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers; duplicates are read once.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The snapshot of each review that exists, by review identifier, each equal to what
+    ///     <see cref="GetSnapshotAsync"/> returns for it; a review that does not exist is absent. The result is empty,
+    ///     without a database read, when there are no identifiers. All snapshots come from one state of the database.
+    /// </returns>
+    Task<IReadOnlyDictionary<string, ReviewSnapshot>> ListSnapshotsAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Lists the reviewer slots of a review.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
@@ -641,5 +658,22 @@ public interface IReviewStore
     Task<IReadOnlyList<ReviewReopen>> ListReopensAsync(
         int projectId,
         string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the reopens of several reviews of a project with a constant number of queries.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers; duplicates are read once.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The reopens of each review that has any, by review identifier, each list equal to what
+    ///     <see cref="ListReopensAsync(int, string, CancellationToken)"/> returns for it (oldest first); a review
+    ///     without a reopen, or that does not exist, is absent. The result is empty, without a database read, when
+    ///     there are no identifiers.
+    /// </returns>
+    Task<IReadOnlyDictionary<string, IReadOnlyList<ReviewReopen>>> ListReopensAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
         CancellationToken cancellationToken = default);
 }

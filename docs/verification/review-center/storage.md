@@ -106,7 +106,9 @@ answered Pass are created through the services over a new database; a slot is ad
 alternate reviewer signs it with the correct password; the database is closed and opened again. The approval is read
 again: the review is approved, the single slot is signed by the alternate reviewer at the saved time, and the
 signature is current for the unchanged record. This scenario is tested by
-`StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
+`StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`. The set-based read of the snapshots of several reviews
+(`ReviewCenter-ReviewStore-SnapshotBatch`) is verified at the unit level, by the scenarios of
+`ReviewStoreSnapshotBatchTests.cs` in the verification of `ReviewStore`.
 
 **StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction**: Over a new database, a review created by
 one user is answered completely and signed by a second user through the services, so that it is approved. The store

@@ -166,6 +166,7 @@ sections:
           - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
           - SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember
           - SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce
+          - SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots
           - SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers
 
       - id: ReviewCenter-SigningService-Audit

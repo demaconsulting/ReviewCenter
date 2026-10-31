@@ -234,6 +234,13 @@ does not exist are read in one batch over a user store that counts list reads. T
 the status of a review equals the single read, and the user list was read once. This scenario is tested by
 `SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce`.
 
+**SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots**: A project holds a review that
+was approved and reopened and a second review. Reading the two reviews, one of them twice, and a missing one in one batch
+makes one store batch read and no single snapshot read (counted by the in-memory store). The batch has the two existing
+reviews, the reopen history of the reopened review is present and that of the other is null, and each status equals the
+single read. This scenario is tested by
+`SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots`.
+
 **SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers**: An empty sequence of review
 identifiers is read in one batch over a user store that counts list reads. The result is empty and the user list was
 never read. This scenario is tested by `SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers`.

@@ -34,7 +34,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     </para>
 ///     <para>
 ///         A project overview needs a constant number of reads however many reviews the project has: one read of the
-///         review list, one batch read of all approvals (<see cref="SigningService.GetApprovalsAsync"/>) and one read
+///         review list, one batch read of all approvals (<see cref="SigningService.GetApprovalsAsync"/>, itself one
+///         set-based read of the snapshots of all reviews, <see cref="IReviewStore.ListSnapshotsAsync"/>, plus one of
+///         the reopen history of the reviews that were reopened) and one read
 ///         of the last activity of all reviews (<see cref="IAuditStore.LastActivityAsync"/>). Reading is open to
 ///         everyone who may see the project (members, auditors and system administrators); a stranger gets the same
 ///         "no such project" refusal as everywhere else. The service holds no state and is safe for concurrent use

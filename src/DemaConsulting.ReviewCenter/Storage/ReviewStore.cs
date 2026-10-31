@@ -56,6 +56,11 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     /// </summary>
     private const int SqliteUniqueViolation = 2067;
 
+    /// <summary>
+    ///     The number of review identifiers in one statement of a batch read; far below the host parameter limit of SQLite.
+    /// </summary>
+    private const int IdChunkSize = 500;
+
     /// <inheritdoc />
     public async Task<Project> AddProjectAsync(
         Project project,
@@ -796,6 +801,50 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, ReviewSnapshot>> ListSnapshotsAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviewIds);
+        var snapshots = new Dictionary<string, ReviewSnapshot>();
+        if (reviewIds.Count == 0)
+        {
+            return snapshots;
+        }
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // One read transaction for all records, slots and signatures, like the snapshot of a single review
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+
+        // The same assembly path as the single read, so a batch entry cannot differ from GetSnapshotAsync
+        var records = await LoadRecordsAsync(context, projectId, reviewIds, cancellationToken);
+        foreach (var chunk in records.Keys.Chunk(IdChunkSize))
+        {
+            var ids = chunk.ToList();
+            var slots = (await context.ReviewerSlots.AsNoTracking()
+                    .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+                    .OrderBy(s => s.Id)
+                    .ToListAsync(cancellationToken))
+                .ToLookup(s => s.ReviewId);
+            var signatures = (await context.Signatures.AsNoTracking()
+                    .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+                    .OrderBy(s => s.Id)
+                    .ToListAsync(cancellationToken))
+                .ToLookup(s => s.ReviewId);
+            foreach (var id in ids)
+            {
+                snapshots[id] = new ReviewSnapshot(records[id], slots[id].ToList(), signatures[id].ToList());
+            }
+        }
+
+        return snapshots;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
         int projectId,
         string reviewId,
@@ -1032,6 +1081,37 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .ToListAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<ReviewReopen>>> ListReopensAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviewIds);
+        var reopens = new Dictionary<string, IReadOnlyList<ReviewReopen>>();
+        if (reviewIds.Count == 0)
+        {
+            return reopens;
+        }
+
+        // Ordered by identity, which grows with the order of the reopens (SQLite cannot order by a DateTimeOffset)
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        foreach (var chunk in reviewIds.Distinct().Chunk(IdChunkSize))
+        {
+            var ids = chunk.ToList();
+            var rows = await context.ReviewReopens.AsNoTracking()
+                .Where(r => r.ProjectId == projectId && ids.Contains(r.ReviewId))
+                .OrderBy(r => r.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var group in rows.GroupBy(r => r.ReviewId))
+            {
+                reopens[group.Key] = group.ToList();
+            }
+        }
+
+        return reopens;
+    }
+
     /// <summary>
     ///     Refuses the change when the review is approved; must run inside the audit transaction.
     /// </summary>
@@ -1124,53 +1204,106 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         string reviewId,
         CancellationToken cancellationToken)
     {
-        var header = await context.Reviews.AsNoTracking()
-            .Where(r => r.ProjectId == projectId && r.Id == reviewId)
-            .Select(r => new { r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId, r.FollowsReviewId })
-            .FirstOrDefaultAsync(cancellationToken);
-        if (header is null)
-        {
-            return null;
-        }
+        // The one assembly path: the single read is the batch read of one review
+        var records = await LoadRecordsAsync(context, projectId, [reviewId], cancellationToken);
+        return records.GetValueOrDefault(reviewId);
+    }
 
-        // The source and every change come from the frozen rows (hashes only; no file bytes are loaded)
-        var source = ReviewSource.Upload;
-        if (header.RepositoryId is not null)
+    /// <summary>
+    ///     Reads the records of several reviews with a constant number of queries, in one context so the parts are
+    ///     consistent with each other.
+    /// </summary>
+    /// <param name="context">The context to read with; inside a transaction opened by the caller.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers; duplicates are read once.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The record of each review that exists, by review identifier; a review that does not exist is absent.</returns>
+    /// <remarks>
+    ///     The identifiers are read in chunks of <see cref="IdChunkSize"/>, so no statement exceeds the parameter limit
+    ///     of SQLite; the number of queries grows with the number of chunks and not with the number of reviews.
+    /// </remarks>
+    private static async Task<Dictionary<string, ReviewRecord>> LoadRecordsAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        IEnumerable<string> reviewIds,
+        CancellationToken cancellationToken)
+    {
+        var records = new Dictionary<string, ReviewRecord>();
+        foreach (var chunk in reviewIds.Distinct().Chunk(IdChunkSize))
         {
-            var changes = await context.ReviewFiles.AsNoTracking()
-                .Where(f => f.ProjectId == projectId && f.ReviewId == reviewId)
-                .OrderBy(f => f.Path)
-                .Select(f => new { f.Path, f.ChangeKind, f.BaselineSha256, f.Sha256 })
+            var ids = chunk.ToList();
+            var headers = await context.Reviews.AsNoTracking()
+                .Where(r => r.ProjectId == projectId && ids.Contains(r.Id))
+                .Select(r => new { r.Id, r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId, r.FollowsReviewId })
                 .ToListAsync(cancellationToken);
-            source = new ReviewSource(
-                header.RepositoryId,
-                header.BaselineSha,
-                header.HeadSha,
-                header.Selection,
-                changes.Select(c => new ChangedFile(
-                    c.Path,
-                    c.ChangeKind,
-                    c.BaselineSha256,
-                    c.ChangeKind == ChangeKind.Deleted ? null : c.Sha256)).ToList(),
-                header.ReviewSetId);
+            if (headers.Count == 0)
+            {
+                continue;
+            }
+
+            // The source and every change come from the frozen rows (hashes only; no file bytes are loaded)
+            var files = (await context.ReviewFiles.AsNoTracking()
+                    .Where(f => f.ProjectId == projectId && ids.Contains(f.ReviewId))
+                    .OrderBy(f => f.Path)
+                    .Select(f => new { f.ReviewId, f.Path, f.ChangeKind, f.BaselineSha256, f.Sha256 })
+                    .ToListAsync(cancellationToken))
+                .ToLookup(f => f.ReviewId);
+            var checklists = (await context.ReviewChecklists.AsNoTracking()
+                    .Where(c => c.ProjectId == projectId && ids.Contains(c.ReviewId))
+                    .ToListAsync(cancellationToken))
+                .ToLookup(c => c.ReviewId);
+            var sections = (await context.ChecklistSectionStates.AsNoTracking()
+                    .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+                    .ToListAsync(cancellationToken))
+                .ToLookup(s => s.ReviewId);
+            var answers = (await context.ChecklistAnswers.AsNoTracking()
+                    .Where(a => a.ProjectId == projectId && ids.Contains(a.ReviewId))
+                    .ToListAsync(cancellationToken))
+                .ToLookup(a => a.ReviewId);
+            var threads = (await context.Threads.AsNoTracking()
+                    .Where(t => t.ProjectId == projectId && ids.Contains(t.ReviewId))
+                    .Include(t => t.Comments.OrderBy(c => c.Id))
+                    .OrderBy(t => t.Id)
+                    .ToListAsync(cancellationToken))
+                .ToLookup(t => t.ReviewId);
+            var reopens = (await context.ReviewReopens.AsNoTracking()
+                    .Where(r => r.ProjectId == projectId && ids.Contains(r.ReviewId))
+                    .GroupBy(r => r.ReviewId)
+                    .Select(g => new { ReviewId = g.Key, Count = g.Count() })
+                    .ToListAsync(cancellationToken))
+                .ToDictionary(g => g.ReviewId, g => g.Count);
+
+            foreach (var header in headers)
+            {
+                var source = ReviewSource.Upload;
+                if (header.RepositoryId is not null)
+                {
+                    source = new ReviewSource(
+                        header.RepositoryId,
+                        header.BaselineSha,
+                        header.HeadSha,
+                        header.Selection,
+                        files[header.Id].Select(c => new ChangedFile(
+                            c.Path,
+                            c.ChangeKind,
+                            c.BaselineSha256,
+                            c.ChangeKind == ChangeKind.Deleted ? null : c.Sha256)).ToList(),
+                        header.ReviewSetId);
+                }
+
+                records[header.Id] = new ReviewRecord(
+                    header.ContentFingerprint,
+                    checklists[header.Id].FirstOrDefault(),
+                    sections[header.Id].ToList(),
+                    answers[header.Id].ToList(),
+                    threads[header.Id].ToList(),
+                    source,
+                    reopens.GetValueOrDefault(header.Id),
+                    header.FollowsReviewId);
+            }
         }
 
-        var checklist = await context.ReviewChecklists.AsNoTracking()
-            .FirstOrDefaultAsync(c => c.ProjectId == projectId && c.ReviewId == reviewId, cancellationToken);
-        var sections = await context.ChecklistSectionStates.AsNoTracking()
-            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
-            .ToListAsync(cancellationToken);
-        var answers = await context.ChecklistAnswers.AsNoTracking()
-            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId)
-            .ToListAsync(cancellationToken);
-        var threads = await context.Threads.AsNoTracking()
-            .Where(t => t.ProjectId == projectId && t.ReviewId == reviewId)
-            .Include(t => t.Comments.OrderBy(c => c.Id))
-            .OrderBy(t => t.Id)
-            .ToListAsync(cancellationToken);
-        var reopens = await context.ReviewReopens.AsNoTracking()
-            .CountAsync(r => r.ProjectId == projectId && r.ReviewId == reviewId, cancellationToken);
-        return new ReviewRecord(header.ContentFingerprint, checklist, sections, answers, threads, source, reopens, header.FollowsReviewId);
+        return records;
     }
 
     /// <summary>

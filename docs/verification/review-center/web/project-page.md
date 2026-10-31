@@ -391,6 +391,11 @@ the rows are in that order, and the header of the sorted column links to the opp
 headers link to the ascending order. This scenario is tested by
 `ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle`.
 
+**ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState**: The page is opened with `sort=id&dir=desc`; the rows
+are in descending order of the identifier, and the filter form carries hidden `sort` (`id`) and `dir` (`desc`) inputs,
+so that applying a filter keeps the order. This scenario is tested by
+`ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState`.
+
 **ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters**: Thirty reviews are shown 25 to a page with the range
 and the previous and next links, which keep the filters and the sort of the query string. This scenario is tested by
 `ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters`.
@@ -413,6 +418,11 @@ element, and the markup appears only as encoded text. This scenario is tested by
 **ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing**: A read-only auditor of the project sees
 the same table as a member, without the New review and Plan controls; a user outside the project sees the not-found
 message and no table. This scenario is tested by `ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing`.
+
+**ProjectPage_Render_EmptyProject_InvitesOnlyContributors**: A project without reviews is opened by a contributor and by
+a read-only member. The contributor sees the invitation to use New review; the read-only member sees "This project has
+no reviews yet." and no mention of New review. Both keep the `reviews-empty` element. This scenario is tested by
+`ProjectPage_Render_EmptyProject_InvitesOnlyContributors`.
 
 **NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes**: Two files are chosen; each is listed with its name and
 size in bytes. This scenario is tested by `NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes`.

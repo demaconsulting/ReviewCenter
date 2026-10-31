@@ -215,6 +215,7 @@ sections:
           position in the list must survive a reload or a shared link.
         tests:
           - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
+          - ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState
           - ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters
 
       - id: ReviewCenter-ProjectPage-ReadOnly
@@ -228,6 +229,7 @@ sections:
           like a missing one.
         tests:
           - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
+          - ProjectPage_Render_EmptyProject_InvitesOnlyContributors
 
       - id: ReviewCenter-ProjectPage-Selection
         title: >-

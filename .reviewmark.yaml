@@ -1266,6 +1266,7 @@ reviews:
       - "test/**/Storage/ReviewStoreTests.cs"
       - "test/**/Storage/ReviewStoreRepositoryTests.cs"
       - "test/**/Storage/ReviewStoreSigningTests.cs"
+      - "test/**/Storage/ReviewStoreSnapshotBatchTests.cs"
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectChecklistStoreTests.cs"

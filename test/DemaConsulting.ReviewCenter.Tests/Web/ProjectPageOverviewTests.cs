@@ -432,4 +432,60 @@ public class ProjectPageOverviewTests : PageTestBase
         Assert.Empty(asStranger.FindAll("[data-testid='project-summary']"));
         Assert.DoesNotContain("Alpha design", asStranger.Markup, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    ///     Test that a project without reviews invites a contributor to add the first one, and that a read-only
+    ///     member, who does not see the New review button, gets a neutral message without the invitation.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_EmptyProject_InvitesOnlyContributors()
+    {
+        // Arrange: a project without reviews, a contributor and an auditor (who may only read)
+        var token = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        var contributor = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, token);
+        await Store.AddMembershipAsync(contributor.Id, project.Id, token);
+        var auditor = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, Password, token);
+        await Store.AddMembershipAsync(auditor.Id, project.Id, ProjectRole.Auditor, token);
+
+        // Act
+        SignInAs("ann", "Ann", false);
+        var asContributor = RenderAt(project.Id);
+        var contributorButtons = asContributor.FindAll("[data-testid='new-review-button']").Count;
+        SignInAs("aud", "Aud", false);
+        var asAuditor = RenderAt(project.Id);
+
+        // Assert
+        Assert.Equal(1, contributorButtons);
+        Assert.Contains("New review", asContributor.Find("[data-testid='reviews-empty']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(asAuditor.FindAll("[data-testid='new-review-button']"));
+        Assert.Equal("This project has no reviews yet.", asAuditor.Find("[data-testid='reviews-empty']").TextContent.Trim());
+        Assert.DoesNotContain("New review", asAuditor.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the filter form keeps a descending order of the default column (the review identifier) as hidden
+    ///     inputs, so applying a filter does not lose it, and that the default order adds no hidden input.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState()
+    {
+        // Arrange
+        var projectId = await SeedAsync();
+
+        // Act
+        var descending = RenderAt(projectId, "?sort=id&dir=desc");
+        var rows = RowIds(descending);
+        var sort = descending.FindAll("[data-testid='review-filter'] input[type='hidden'][name='sort']");
+        var direction = descending.FindAll("[data-testid='review-filter'] input[type='hidden'][name='dir']");
+        var defaultOrder = RenderAt(projectId);
+
+        // Assert: the order is descending and the form carries it
+        Assert.Equal(["REV-D", "REV-C", "REV-B", "REV-A"], rows);
+        Assert.Equal("id", Assert.Single(sort).GetAttribute("value"));
+        Assert.Equal("desc", Assert.Single(direction).GetAttribute("value"));
+
+        // Assert: id ascending, the default, adds nothing
+        Assert.Empty(defaultOrder.FindAll("[data-testid='review-filter'] input[type='hidden']"));
+    }
 }

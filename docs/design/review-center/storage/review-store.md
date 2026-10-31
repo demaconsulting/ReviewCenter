@@ -251,6 +251,24 @@ describe the same state. `SigningService.GetApprovalAsync` uses it, so the diges
 signatures never mix two states. Signing itself does not depend on it: `AddSignatureAsync` rechecks the digest inside
 its own transaction.
 
+**ListSnapshotsAsync**: Reads the snapshots of several reviews of a project with a constant number of queries.
+
+- *Parameters*: the project identity and the review identifiers (not null; duplicates are read once).
+- *Returns*: `Task<IReadOnlyDictionary<string, ReviewSnapshot>>` — the snapshot of each review that exists, by review
+  identifier, each equal to what `GetSnapshotAsync` returns for it; a review that does not exist is absent. An empty
+  input gives an empty result without opening a database connection.
+- *Postconditions*: Nothing is changed.
+
+The method opens one read transaction (the same plain read transaction as `GetSnapshotAsync`) and reads the records of
+all the reviews through the shared loader `LoadRecordsAsync`, which `GetSnapshotAsync` and `GetRecordAsync` use too (as
+the batch of one review), so a batch entry cannot differ from the single read. The loader reads the headers, the files,
+the checklists, the section states, the answers, the threads with their comments, and the number of reopens of all the
+reviews with one query each, filtered by project and by the identifier list, and assembles one record per review. The
+slots and the signatures follow with one query each, ordered by identity. The identifiers are processed in chunks of
+500, so no statement exceeds the parameter limit of SQLite; the number of queries grows with the number of chunks and
+not with the number of reviews. `SigningService.GetApprovalsAsync` uses it, so the progress overview of a project reads
+all its reviews in a constant number of round trips.
+
 **ListSlotsAsync**: Lists the reviewer slots of one review ordered by identity, which is the order they were added.
 
 **AddSlotAsync**: Stores a slot and returns it. A fresh entity is copied from the argument (project, review, primary
@@ -303,6 +321,12 @@ in the table as history. A reopen row is never updated or deleted by the store.
 
 **ListReopensAsync**: Lists the reopens of one review ordered by identity, which grows with the order of the reopens
 (SQLite cannot order by a `DateTimeOffset`); empty when there are none or the review does not exist.
+
+**ListReopensAsync (several reviews)**: The batch overload takes the project identity and the review identifiers and
+returns, by review identifier, the reopens of each review that has any, each list equal to the single-review read
+(ordered by identity); a review without a reopen is absent, and an empty input gives an empty result without a database
+read. The identifiers are chunked like those of `ListSnapshotsAsync`. `SigningService.GetApprovalsAsync` calls it only
+for the reviews whose record counts at least one reopen.
 
 #### Error Handling
 

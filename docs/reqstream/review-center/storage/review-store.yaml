@@ -142,6 +142,25 @@ sections:
           - ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures
           - ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull
 
+      - id: ReviewCenter-ReviewStore-SnapshotBatch
+        title: >-
+          The ReviewStore class shall read the snapshots of several reviews of a project, and the reopens of several
+          reviews, with a number of queries that does not grow with the number of reviews, in one read transaction
+          for the snapshots, through the same assembly of the record as the single-review read, so that each
+          snapshot equals the snapshot of that review read alone, shall leave out a review that does not exist,
+          shall read each identifier once, and shall return an empty result without reading the database when there
+          are no identifiers.
+        justification: |
+          A project overview needs the approval status and the blockers of every review of the project. Reading one
+          snapshot per review would make the cost of the overview grow with the number of reviews (about ten queries
+          each). One set-based read, sharing the code that assembles the record with the single read, keeps the cost
+          constant and cannot differ from the single read.
+        tests:
+          - ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory
+          - ReviewStore_ListSnapshotsAsync_EmptyUnknownDuplicateAndForeignIds_AreAbsentOrReadOnce
+          - ReviewStore_ListSnapshotsAsync_MoreIdsThanOneChunk_ReadsAll
+          - ReviewStore_ListSnapshotsAsync_MoreReviews_SendsTheSameNumberOfQueries
+
       - id: ReviewCenter-ReviewStore-Signatures
         title: >-
           The ReviewStore class shall keep signatures append-only, offering only to add a signature and to list

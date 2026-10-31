@@ -24,7 +24,7 @@ reopened after its approval is open again, so it is `InReview`.
 for a review that is not approved and has any open thread, unanswered check, or Fail answer.
 
 **Blocker counts**: the three counts are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`, `FailedChecks`).
-`SigningService` calculates them in the one step that also writes the blocker sentences (`ReadApprovalAsync`), so the
+`SigningService` calculates them in the one step that also writes the blocker sentences (`BuildApproval`), so the
 numbers and the sentences cannot disagree. This unit only copies them; it has no second rule for what blocks a review,
 and the later work list of the lead reuses the same counts. `SlotMember.Enabled` carries whether the account of a person
 in a slot is enabled.
@@ -55,7 +55,9 @@ The service holds the injected collaborators and no other state, so it is safe f
 - *Postconditions*: nothing is changed and nothing is recorded.
 
 The number of reads does not depend on the number of reviews: one read of the reviews (`ReviewService.ListAsync`), one
-batch read of the approval statuses (`SigningService.GetApprovalsAsync`), and one read of the last activity. A review
+batch read of the approval statuses (`SigningService.GetApprovalsAsync`, which itself takes one set-based read of the
+snapshots of all the reviews, `IReviewStore.ListSnapshotsAsync`, and one of the reopen history of the reviews that were
+reopened), and one read of the last activity. A review
 that is removed between the first two reads is left out. The page that lists the reviews of a project used to ask for the
 approval of each review on its own; it now uses this one call.
 

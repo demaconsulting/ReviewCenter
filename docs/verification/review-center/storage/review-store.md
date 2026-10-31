@@ -144,6 +144,28 @@ record equals the digest stored in the signature. This scenario is tested by
 **ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull**: The snapshot of an unknown review is requested; it is null.
 This scenario is tested by `ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull`.
 
+**ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory**: One project holds an approved review,
+a review reopened twice, a review whose signature a reopening made out of date and that then got a thread, a review with
+two threads, three comments, two answers, a section state, a checklist and two slots, a review without slots, a review
+from a repository with an added, a modified, and a deleted file, and a same-named review of another project. The batch
+read returns every review, each part of each snapshot equals the single read, the interesting parts are present, and the
+batch of reopens equals the single reads and leaves out the reviews that were never reopened. This scenario is tested by
+`ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory`.
+
+**ReviewStore_ListSnapshotsAsync_EmptyUnknownDuplicateAndForeignIds_AreAbsentOrReadOnce**: An empty input gives an empty
+result (also for the reopens), an unknown identifier is absent, a duplicated identifier is read once, a review is not
+found through another project, and a null list raises `ArgumentNullException`. This scenario is tested by
+`ReviewStore_ListSnapshotsAsync_EmptyUnknownDuplicateAndForeignIds_AreAbsentOrReadOnce`.
+
+**ReviewStore_ListSnapshotsAsync_MoreIdsThanOneChunk_ReadsAll**: Seven hundred identifiers, of which the first and the
+last exist, are read; both reviews are returned. This scenario is tested by
+`ReviewStore_ListSnapshotsAsync_MoreIdsThanOneChunk_ReadsAll`.
+
+**ReviewStore_ListSnapshotsAsync_MoreReviews_SendsTheSameNumberOfQueries**: A store over the same database counts the
+commands it sends (a command interceptor). Reading 2 reviews and reading 20 reviews send the same number of commands,
+and reading the 20 reviews one by one sends more than five times as many. This scenario is tested by
+`ReviewStore_ListSnapshotsAsync_MoreReviews_SendsTheSameNumberOfQueries`.
+
 **ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A slot is signed with the current digest; the
 signature is stored with a database-assigned identity and listed with the slot, user, display name, role, time, digest,
 and meaning unchanged. This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.

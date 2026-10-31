@@ -122,6 +122,7 @@ sections:
           - ReviewCenter-ReviewStore-Slots
           - ReviewCenter-ReviewStore-Record
           - ReviewCenter-ReviewStore-Signatures
+          - ReviewCenter-ReviewStore-SnapshotBatch
           - ReviewCenter-DbContext-Signatures
         tests:
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent

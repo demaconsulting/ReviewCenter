@@ -53,8 +53,9 @@ upload, by choosing a repository by hand, or through the API has none, and a mad
 review-set that nobody reviewed.
 
 **Cost**: The approvals of all reviews that have a review-set id are read with one call of
-`SigningService.GetApprovalsAsync`, which loads the user list once for the whole index and not once for each review. The
-snapshot of each review is still one read per review.
+`SigningService.GetApprovalsAsync`, which loads the user list once for the whole index and not once for each review, and
+reads the snapshots of all the reviews with one set-based store read (`IReviewStore.ListSnapshotsAsync`), so the cost
+does not grow with a read per review.
 
 #### Dependencies
 
