@@ -26,6 +26,7 @@ flowchart TD
     end
     subgraph Hosting
         ServerHost
+        KeyRingProtection
         UserCommand
         AuditCommand
     end
@@ -148,6 +149,8 @@ flowchart TD
     ServerHost --> RepositoryService
     ServerHost --> GitSource
     ServerHost --> CredentialProtector
+    ServerHost --> KeyRingProtection
+    KeyRingProtection --> SecretSource
     ServerHost --> AttestationKeyProvider
     ServerHost --> AttestationEndpoint
     ServerHost --> PersonalAccessTokenStore
@@ -312,7 +315,10 @@ the silent option from `Context`, configures structured logging, registers the s
 maps the `/health` endpoint, maps the user interface defined by the `Web` subsystem, and connects the pages to the
 database. `UserCommand` creates a user from the command line with the same configuration and registration, which is
 how the first system administrator is created. `AuditCommand` verifies the hash chain of the audit trail with the same
-configuration and registration and reports the result as the exit code.
+configuration and registration and reports the result as the exit code. `KeyRingProtection` decides how the key ring of
+the Data Protection system is protected at rest (Windows DPAPI, a certificate, or the permissions of its folder),
+applies it for `ServerHost`, and refuses a ring that the certificate does not open; the root of trust of the stored
+tokens is therefore the key ring and its certificate or account, not the database.
 The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell and router,
 `HomePage` is the landing page served at the root URL, `AboutPage` and `HelpPage` describe the product and explain how
 to use it, `ProjectsPage`, `ProjectPage`, `PlanPage`,
@@ -670,8 +676,9 @@ is running.
   (`DataProtection:KeysPath`, by default `keys` beside the database).
 - *Constraints*: A usable git must be installed, or reading a repository fails with an error that says so. The key ring
   folder must be writable (otherwise `serve` does not start) and must be kept: losing it makes the stored tokens
-  unreadable. The keys are not encrypted at rest, so the folder must be protected by file permissions and backed up with
-  the database.
+  unreadable. The keys are encrypted at rest with Windows DPAPI or with a certificate that the operator supplies;
+  without either (Linux and macOS) they are protected only by the permissions of the folder, which is logged as a
+  warning at every start, so the folder must also be backed up with the database.
 
 **Attestation signing key**: The key that signs the PDF attestations.
 

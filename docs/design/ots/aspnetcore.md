@@ -21,7 +21,8 @@ interface. ReviewCenter relies on it instead of implementing its own HTTP server
 - The Identity `PasswordHasher<string>` from `Microsoft.Extensions.Identity.Core`, which is part of the shared
   framework, to hash and verify passwords
 - Data Protection, with a key ring kept in a folder, to encrypt and decrypt the access tokens of git repositories
-  for a fixed purpose
+  for a fixed purpose, and its key encryptors that protect the key files of the ring at rest: the certificate
+  encryptor (`ProtectKeysWithCertificate` and `UnprotectKeysWithAnyCertificate`) and, on Windows, the DPAPI encryptor
 - Razor components with interactive server rendering (Blazor Server), including the router and `PageTitle`
 - Request forgery protection middleware and static asset mapping required by Razor components
 - `Microsoft.Extensions.Logging` structured logging
@@ -31,7 +32,8 @@ interface. ReviewCenter relies on it instead of implementing its own HTTP server
 ASP.NET Core is consumed through the web SDK of the `DemaConsulting.ReviewCenter` project, which references the shared
 framework; no separate package reference is needed, including for the password hasher and Data Protection. The
 `ServerHost` unit builds and runs the `WebApplication`, registers the authentication scheme, and sets up the key ring
-folder for Data Protection, and the `Identity` subsystem handles sign-in
+folder for Data Protection, with the protection of the key files chosen by the `KeyRingProtection` unit, and the
+`Identity` subsystem handles sign-in
 on top of it. The units of the `Web` subsystem are Razor components rendered by it. The shared framework ships with
 the .NET
 runtime, so there is no initialization beyond the host startup performed by `ServerHost`; the host is disposed when

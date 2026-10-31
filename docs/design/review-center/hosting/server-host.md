@@ -108,7 +108,11 @@ response.
   (its coalescing of repeated events uses the clock, so tests can move time). The `DataProtection` and `Git`
   settings are bound (an empty `Git:CachePath` becomes a `git-cache` folder beside the database, through
   `DatabaseSetup.ResolveDataDirectory`), the Data Protection system is registered with the application name
-  `DemaConsulting.ReviewCenter` and a file system key ring in the folder from `ResolveKeysPath`, and `RepositoryStore`,
+  `DemaConsulting.ReviewCenter` and a file system key ring in the folder from `ResolveKeysPath`, with the protection of
+  the key files that `KeyRingProtection.Prepare` and `KeyRingProtection.Apply` chose from the `DataProtection` settings
+  (the plan is made here, once, so the certificate is loaded when the services are registered; a problem in the
+  settings is kept in the plan and reported by `ValidateDataProtection`, so that registering the services never
+  throws), and `RepositoryStore`,
   `CredentialProtector`, `RepositoryService`, `GitRunner`, and `GitSource` are registered as singletons, the first
   two and the last as the Core interfaces `IRepositoryStore`, `ICredentialProtector`, and `IGitRepositoryProvider`.
   `ReviewMarkConfigParser` is registered as the Core interface `IReviewSetParser`, and `ReviewPlanner` as a singleton.
@@ -195,8 +199,8 @@ fails earlier, while the configuration is bound, with a message that names the k
 
 **ResolveKeysPath**: Chooses the folder of the Data Protection key ring.
 
-- *Parameters*: `DataProtectionSettings settings` — holds `KeysPath`; `DatabaseOptions database` — locates the
-  database.
+- *Parameters*: `KeyRingSettings settings` — holds `KeysPath` (see `KeyRingProtection`); `DatabaseOptions database` —
+  locates the database.
 - *Returns*: `string` — the configured `KeysPath` made absolute, or the `keys` folder in the folder of the database
   file.
 - *Notes*: Internal, so that tests check the choice without starting the server.
@@ -205,15 +209,21 @@ fails earlier, while the configuration is bound, with a message that names the k
 
 - *Parameters*: `WebApplication app` — supplies the settings and the Data Protection provider.
 - *Returns*: `void`.
-- *Postconditions*: The folder exists (on a system other than Windows with the Unix mode that only the owner can use),
-  a probe file can be written and deleted in it, and a test value can be protected and unprotected; otherwise the
-  application is disposed and an `InvalidOperationException` is thrown whose message names the folder and says "Set
-  DataProtection:KeysPath to a folder the server can write to and keep."
+- *Postconditions*: The key ring plan has no problem; the folder exists (on a system other than Windows with the Unix
+  mode that only the owner can use; on Windows with `PermissionsOnly`, with access rules that admit only the account
+  of the server and the system), a probe file can be written and deleted in it, the ring passes
+  `KeyRingProtection.CheckRing` (before any key can be created), a test value can be protected and unprotected, and the
+  key files are restricted to the owner on Unix (those that exist now; later ones as Data Protection creates them);
+  otherwise the application is disposed and an
+  `InvalidOperationException` is thrown. A plan with a problem or a failed check throws a message that names the
+  setting at fault ("Invalid key ring settings: ..." and the messages of `KeyRingProtection`); a folder that cannot be
+  used throws a message that names the folder and says "Set DataProtection:KeysPath to a folder the server can write to
+  and keep." On success the protection in force is logged (a warning for `PermissionsOnly`).
 
 Runs after `ValidateAuthOptions` in `CreateApplication`, so it applies to the `serve` verb only. The folder, write, and
 round trip failures (I/O, access, cryptographic, domain rule, argument, and not-supported errors) all become that one
-message, so an administrator gets a clear start-up error instead of failing at the first token. The keys in the folder
-are not encrypted at rest.
+message, so an administrator gets a clear start-up error instead of failing at the first token. The ring is checked
+before the probe round trip because the round trip creates a key when there is none that can be read.
 
 **ValidateAttestation**: Obtains the attestation signing key of a built application once.
 
@@ -258,7 +268,7 @@ Connect sign-in, two-factor sign-in, or git
 settings are reported, is
 written through `Context.WriteError` as is ("Failed to prepare the database: {detail}", "Invalid sign-in
 settings: {detail}", "Invalid OpenID Connect sign-in settings: {detail}", "Invalid two-factor sign-in
-settings: {detail}", "Invalid git settings: {detail}", "The Data
+settings: {detail}", "Invalid git settings: {detail}", "Invalid key ring settings: {detail}", "The Data
 Protection key ring folder '{path}' is not
 writable: ...", or "The attestation signing key is not usable: {detail}") and returns 1; and an
 `IOException`, which Kestrel uses to report an address that is in use or not bindable, is
@@ -285,6 +295,8 @@ always disposed.
   **AttestationSigner**, **AttestationService**, **AttestationEndpoint** — the signed attestation of the `Evidence`
   subsystem, which is registered, validated at the start, and mapped.
 - **ASP.NET Core Data Protection** — the key ring and the protection of tokens.
+- **KeyRingProtection**, **KeyRingSettings**, **KeyRingPlan** — the `DataProtection` settings, the protection of the key
+  files, and the check of the ring.
 - **PasswordHasher**, **SignIn** — the password hasher registered for the Core, and the cookie sign-in, authorization,
   and login and logout endpoints.
 - **OidcSignIn**, **OidcOptions**, **ReauthProofStore** — sign-in with an OpenID Connect provider (registered, validated

@@ -146,9 +146,12 @@ folder (`DataProtection:KeysPath`, by default a `keys` folder beside the databas
 when the server starts. Three facts about that folder matter for operations. First, **losing or replacing the key ring
 makes every stored token unreadable**: the repositories stay registered, and an administrator of each project must
 enter each token
-again; reading such a repository fails with an error that says so. Second, **the keys are not encrypted at rest**: anyone
-who can read the folder and the database can decrypt the tokens, so the folder must be protected with file permissions
-(the server restricts it to its owner on systems that support it), and it must be backed up together with the database.
+again; reading such a repository fails with an error that says so. Second, **the keys are encrypted at rest only when
+the operator allows it**: with Windows DPAPI (the default on Windows) or with a certificate
+(`DataProtection:CertificatePath`) a copy of the folder is not enough to decrypt the tokens; otherwise (Linux and macOS
+without a certificate) anyone who can read the folder and the database can decrypt them, so the folder must be
+protected with file permissions (the server restricts it to its owner on systems that support it, and logs a warning at
+every start), and it must be backed up together with the database (see `KeyRingProtection`).
 Third, using a persistent key ring changes the keys that protect the sign-in cookies once, so users sign in again after
 the first start with it.
 

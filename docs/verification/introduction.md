@@ -25,6 +25,7 @@ This document covers the verification design for the following software items:
     - **Context** — argument parser and I/O owner
   - **Hosting** subsystem
     - **ServerHost** — web host builder and runner
+    - **KeyRingProtection** — protection of the Data Protection key ring at rest (DPAPI, certificate, or permissions)
     - **UserCommand** — the `user add` verb
     - **AuditCommand** — the `audit verify` verb
   - **Identity** subsystem

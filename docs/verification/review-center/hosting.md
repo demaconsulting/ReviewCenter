@@ -67,8 +67,13 @@ a restart, and the clear error for a key ring folder that cannot be written are 
 `ServerHost`: `ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`,
 `ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`,
 `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`, and
-`ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`. The registration of the review planner and of the
-parser of the review-set file is verified by `ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
+`ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`. The protection of the key ring at rest and its
+start-up refusals are verified by the unit tests of `KeyRingProtection` and by
+`ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable`,
+`ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError`, and
+`ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey`. The registration of the
+review planner and of the parser of the review-set file is verified by
+`ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
 
 **Attestation services and the start-up check**: Starting the real pipeline with no attestation setting creates the
 self-signed key in an `attestation-selfsigned` folder beside the Data Protection keys and keeps the same key across a

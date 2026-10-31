@@ -15,9 +15,9 @@ the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
 start, run, and stop lifecycle of that application and
 the translation of start-up failures into ordinary error reports. The `user add` and `audit verify` verbs reuse the same
-registration of the database and the services to work without starting a server. The subsystem contains three
+registration of the database and the services to work without starting a server. The subsystem contains four
 units: `ServerHost`, together with its small options type `ServerHostOptions`, which is
-documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditCommand`.
+documented with `ServerHost` as a supporting type, `KeyRingProtection`, `UserCommand`, and `AuditCommand`.
 
 ### Interfaces
 
@@ -41,9 +41,9 @@ documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditComm
   an in-memory server and a temporary database.
 - *Constraints*: Throws `ArgumentNullException` for a null context and `InvalidOperationException`
   ("Failed to prepare the database: ..." or "Invalid sign-in settings: ..." or "Invalid OpenID Connect sign-in
-  settings: ...") when the database cannot be prepared or
-  the sign-in or the OpenID Connect settings are invalid. Nothing is bound to a
-  network port until the returned application is started.
+  settings: ..." or "Invalid key ring settings: ...") when the database cannot be prepared or
+  the sign-in, the OpenID Connect, or the key ring settings are invalid, or the key ring cannot be used. Nothing is
+  bound to a network port until the returned application is started.
 
 **ServerHost.AddServices**: Registers the persistence and the Core services.
 
@@ -249,14 +249,27 @@ seconds."
 
 The key ring of the Data Protection system is persisted in a folder, because the stored repository tokens are
 encrypted with it: with the default in-memory or profile-bound key ring, a restart or a move to another account could
-leave every token unreadable. The folder is `DataProtection:KeysPath`, or a `keys` folder beside the database. Like the
-database, the folder is checked once at start-up (`ValidateDataProtection`), by writing and deleting a probe file and
-by encrypting and decrypting a test value, so that a folder that cannot be written stops the start-up with one clear message
+leave every token unreadable. The folder is `DataProtection:KeysPath`, or a `keys` folder beside the database. The
+key files in the folder are protected at rest as the `KeyRingProtection` unit decides (see its design): with Windows
+DPAPI, with a certificate that the operator supplies, or, without a certificate, by the permissions
+of the folder and the files alone (0700 and 0600 on Linux and macOS, restricted as the files are created; on Windows
+with `PermissionsOnly` an owner-only access rule of the folder), with a warning at every start. `AddServices` reads the
+`DataProtection` section once (`KeyRingProtection.Prepare`), applies the protection to the Data Protection builder, and
+keeps the manual `XmlRepository` for the folder, wrapped so that new key files are restricted as they are created. Like
+the
+database, the folder is checked once at start-up (`ValidateDataProtection`): a plan with a problem or a ring that the
+certificate does not open (`KeyRingProtection.CheckRing`, which must run before anything can create a key) stops the
+start-up with one message that names the setting; then the folder is checked by writing and deleting a probe file and
+by encrypting and decrypting a test value, so that a folder that cannot be read or written stops the start-up with one
+clear message
 naming the setting. The check is part of `CreateApplication`, so it applies to the `serve` verb only; the command-line
-verbs register the same services but do not need the key ring unless a token is read. Three consequences are
+verbs register the same services (and therefore the same protection plan for the key files) but do not use the key
+ring, so
+they neither check nor probe it and report no problem of the plan. Three consequences are
 documented for the administrator (see the `ContentSources` design and the user guide): losing or replacing the key
-ring makes the stored tokens unreadable and they must be entered again; the keys are not encrypted at rest, so the
-folder must be protected with file permissions and backed up with the database; and persisting the key ring changes
+ring makes the stored tokens unreadable and they must be entered again; a ring protected with DPAPI cannot be restored
+on another machine or account, and a ring protected by a certificate cannot be read without it, so the certificate must
+be backed up apart from the ring; and persisting the key ring changes
 the keys of the sign-in cookies once, so users sign in again after the first start. The git cache folder is resolved
 the same way (`Git:CachePath`, or `git-cache` beside the database) and is created by the git source when first used.
 
