@@ -756,11 +756,12 @@ sections:
       - id: ReviewCenter-System-Users
         title: >-
           The tool shall let a system administrator list the users and create a user, make a user a system
-          administrator or an ordinary user, enable and disable a user, and set a password, let every user change
-          the own password, require a password of 12 to 128 characters, lock a user out for 5 minutes after 5
-          failed sign-ins in a row, never disable or demote the last enabled system administrator, tell an
-          administrator which open review work and which projects depend on a user, and keep the users, with only
-          a hash of the password, in the database across restarts.
+          administrator or an ordinary user, enable and disable a user, set a password that the user has to change at
+          the next sign-in, let every user change the own password, require a password of 12 to 128 characters,
+          lock a user out for 5 minutes after 5 failed sign-ins in a row and let a system administrator end the
+          lockout, show the lockout and the last sign-in of a user, never disable or demote the last enabled system
+          administrator, tell an administrator which open review work and which projects depend on a user before the
+          user is disabled, and keep the users, with only a hash of the password, in the database across restarts.
         tags: [system]
         justification: |
           Users are the accountable parties of a review. A password policy and a lockout make guessing hard (21

@@ -81,7 +81,8 @@ answered like any unknown address.
   `RequireEmailVerified` is set and the e-mail address is not verified, or when `UserService.SignInExternalAsync`
   refuses. The account is found by issuer and subject only; the user name claim (else the part of the e-mail address
   before the `@`, else the subject) only suggests the name of a new account. A new account has no project, no system
-  administrator right and no password. On success the normal session cookie is issued (not persistent) and the browser
+  administrator right and no password. On success (`SignInExternalAsync` has stored the time of the sign-in by then) the
+  normal session cookie is issued (not persistent) and the browser
   is sent to the local return address. Disabled accounts get the same answer as any failure; the audit trail says why.
 - `POST /auth/oidc/reauth` (signed-in user and antiforgery token required): takes the project, review identifier,
   slot and return address. It asks `SigningService.RequireConfirmableAsync` whether this user may sign this slot; a

@@ -106,6 +106,7 @@ administrator is not throttled but is a trusted actor).
 | `user.enabled`, `user.disabled` | `user 'bob'` |
 | `user.admin-changed` | `user 'bob': system administrator False -> True` |
 | `user.password-set-by-admin` | `user 'bob'` |
+| `user.unlocked` | `user 'bob'` |
 | `user.password-changed` | `user 'bob'` (the actor is the user who changed their own password) |
 | `repository.created` | `repository 'name', location 'L', user name set` (or `none`), `token set` (or `none`) |
 | `repository.updated` | `repository 'name'`, a colon, then the changes, such as `location`, `token replaced` |

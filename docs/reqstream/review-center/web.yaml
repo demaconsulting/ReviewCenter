@@ -342,6 +342,10 @@ sections:
           - ReviewCenter-UsersPage-Create
           - ReviewCenter-UsersPage-NewPage
           - ReviewCenter-UsersPage-Update
+          - ReviewCenter-UsersPage-Status
+          - ReviewCenter-UsersPage-SearchFilter
+          - ReviewCenter-UsersPage-DisableImpact
+          - ReviewCenter-UsersPage-Confirmations
           - ReviewCenter-UsersPage-SystemAdmin
           - ReviewCenter-UsersPage-LastAdmin
           - ReviewCenter-UsersPage-AdminCheck

@@ -510,7 +510,17 @@ public sealed class UserService
                 return new PasswordStep(user, true);
             }
 
-            await ResetFailuresAsync(user, cancellationToken);
+            // A password sign-in that needs no second factor is complete here; a fresh proof for an action is not a
+            // sign-in and must not move the last sign-in
+            if (purpose == PasswordCheckPurpose.SignIn)
+            {
+                await StampSignInAsync(user, cancellationToken);
+            }
+            else
+            {
+                await ResetFailuresAsync(user, cancellationToken);
+            }
+
             return new PasswordStep(user, false);
         }
         finally
@@ -588,6 +598,33 @@ public sealed class UserService
             if (user is not null)
             {
                 await ResetFailuresAsync(user, cancellationToken);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Records a complete sign-in with a second factor: stores the moment and clears the failure counter.
+    /// </summary>
+    /// <param name="username">The user name; compared without regard to case.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the state is stored; an unknown user is ignored.</returns>
+    /// <remarks>
+    ///     Called by the second step of a sign-in once the code is right. Not an audit event (the sign-in itself is
+    ///     recorded by the caller); the user is read again under the gate, so a stale copy is never written back.
+    /// </remarks>
+    internal async Task RecordSignInAsync(string username, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var user = await _store.GetByUsernameAsync(username, cancellationToken);
+            if (user is not null)
+            {
+                await StampSignInAsync(user, cancellationToken);
             }
         }
         finally
@@ -834,7 +871,10 @@ public sealed class UserService
     /// <param name="newPassword">The new password; same policy as for a new user.</param>
     /// <param name="actor">The administrator who sets the password; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the new hash is stored; a lockout of the user ends with it.</returns>
+    /// <returns>
+    ///     A task that completes when the new hash is stored; a lockout of the user ends with it. The password is
+    ///     temporary (<see cref="User.MustChangePassword"/> is set) unless the actor sets the own password.
+    /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.PasswordInvalid"/> when the password breaks the policy, or with
@@ -863,9 +903,65 @@ public sealed class UserService
             user.PasswordHash = _hasher.Hash(newPassword!);
             user.FailedLoginCount = 0;
             user.LockoutUntil = null;
+
+            // A password somebody else chose is known to that person: the user must replace it before anything else.
+            // An administrator who sets the own password chose it, so that does not force a change
+            var ownPassword = !actor.ViaApiToken
+                              && string.Equals(actor.Username, user.Username, StringComparison.OrdinalIgnoreCase);
+            if (!ownPassword)
+            {
+                user.MustChangePassword = true;
+            }
+
             await _store.UpdateAsync(
                 user,
                 AuditDraft.By(actor, "user.password-set-by-admin", $"user '{user.Username}'"),
+                cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Ends the lockout of a user and clears the failure counter, so the user can try to sign in again at once.
+    /// </summary>
+    /// <param name="actor">The system administrator who unlocks the account; recorded in the audit trail. Must not be null.</param>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the change is stored.</returns>
+    /// <remarks>
+    ///     Only an enabled system administrator without a temporary password may do this, not through an API token.
+    ///     The password, the second factor and the enabled flag are not touched. Recorded as <c>user.unlocked</c>.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the actor is not such an administrator, or with
+    ///     <see cref="DomainRule.UserNotFound"/> when there is no such user.
+    /// </exception>
+    public async Task UnlockAsync(Actor actor, int userId, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var admin = actor.ViaApiToken ? null : await _store.GetByUsernameAsync(actor.Username, cancellationToken);
+            if (admin is not { IsSystemAdmin: true, Enabled: true, MustChangePassword: false })
+            {
+                throw new DomainRuleException(
+                    DomainRule.ActorNotAllowed,
+                    "Only a system administrator can unlock a user.");
+            }
+
+            var user = (await _store.ListAsync(cancellationToken)).FirstOrDefault(u => u.Id == userId)
+                       ?? throw new DomainRuleException(DomainRule.UserNotFound, "The user does not exist.");
+            user.FailedLoginCount = 0;
+            user.LockoutUntil = null;
+            await _store.UpdateAsync(
+                user,
+                AuditDraft.By(actor, "user.unlocked", $"user '{user.Username}'"),
                 cancellationToken);
         }
         finally
@@ -945,6 +1041,7 @@ public sealed class UserService
                 return new ExternalSignInResult(null, ExternalSignInRefusal.Disabled, false);
             }
 
+            await StampSignInAsync(user, cancellationToken);
             await RecordAsync(user, "auth.oidc-sign-in", $"issuer {IssuerHost(issuer)}", cancellationToken);
             return new ExternalSignInResult(user, ExternalSignInRefusal.None, created);
         }
@@ -1194,11 +1291,24 @@ public sealed class UserService
     /// <summary>
     ///     Tells whether sign-in is refused for the account right now.
     /// </summary>
+    /// <param name="user">The user. Must not be null.</param>
+    /// <param name="now">The moment to check against.</param>
+    /// <returns><c>true</c> while the lockout lasts (<see cref="User.LockoutUntil"/> is later than <paramref name="now"/>).</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="user"/> is null.</exception>
+    public static bool IsLocked(User user, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return user.LockoutUntil is { } until && until > now;
+    }
+
+    /// <summary>
+    ///     Tells whether sign-in is refused for the account right now.
+    /// </summary>
     /// <param name="user">The user.</param>
     /// <returns><c>true</c> while the lockout lasts.</returns>
     private bool IsLockedOut(User user)
     {
-        return user.LockoutUntil is { } until && until > _timeProvider.GetUtcNow();
+        return IsLocked(user, _timeProvider.GetUtcNow());
     }
 
     /// <summary>
@@ -1347,6 +1457,20 @@ public sealed class UserService
             return;
         }
 
+        user.FailedLoginCount = 0;
+        user.LockoutUntil = null;
+        await _store.UpdateAsync(user, null, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Stores the moment of a complete sign-in and clears the failure counter, in one write.
+    /// </summary>
+    /// <param name="user">The user, as read from the store under the gate.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the state is stored.</returns>
+    private async Task StampSignInAsync(User user, CancellationToken cancellationToken)
+    {
+        user.LastSignInUtc = _timeProvider.GetUtcNow();
         user.FailedLoginCount = 0;
         user.LockoutUntil = null;
         await _store.UpdateAsync(user, null, cancellationToken);

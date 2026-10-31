@@ -9,7 +9,12 @@ trail, the database, and the git repositories of a project.
 
 Open `/users` (the Users link in the header); a user who is not a system administrator is refused with an "Access
 denied" page that links back to the projects. The page lists the users with their user name, display name, state, and
-a **System admin** badge for system administrators. A system administrator can:
+a **System admin** badge for system administrators. It also shows, for each user, the **Last sign-in** time in UTC
+(**Never** if the user has not signed in since the time was first recorded), a **Locked until HH:mm UTC** badge while
+the account is locked after too many failed sign-ins, and a **Temporary password** badge while the user still has to
+change the password. The time of the last sign-in is stored for information only; it is not an audit entry. A failed
+sign-in does not change it, and it is set by a successful sign-in with a password, with the code of the second factor,
+or with an identity provider. A system administrator can:
 
 ![The Users page with one system administrator and two ordinary users.](images/users-list.png)
 
@@ -19,13 +24,28 @@ a **System admin** badge for system administrators. A system administrator can:
    list, and so does a successful creation. A new user is a member of no project until a project administrator or a
    system administrator adds the user to one (see [Access and Visibility](#access-and-visibility)).
 2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
-   the user again.
+   the user again. **Disable** first opens a confirmation under the row that lists what the user leaves behind: the
+   open reviews that still wait for the user (as primary or alternate reviewer) as links to those reviews, and the
+   projects where the user is the only project administrator as links to those projects. It also says that the API
+   tokens of the user stop working. The list is a warning and never blocks: press **Disable anyway** to disable the
+   user, or **Cancel** to change nothing. If nothing is waiting for the user, the panel says so, and you still press
+   **Disable anyway**. **Enable** takes effect at once, with no confirmation.
 3. Make a user a system administrator (**Make system admin**) or take that away (**Remove system admin**).
-4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout, but it does
-   not turn off the second factor of the user. An account
+4. Set a new password for a user, for example when the user has forgotten it: type it in the field of the row and
+   press **Set password**; a confirmation explains the consequences and you press **Set password** again. The
+   password is temporary: the user must change it at the next sign-in and until then can only use the Account, Help,
+   and About pages, cannot sign a review, and the API tokens of the user are refused. This also ends a lockout, but it
+   does not turn off the second factor of the user. If you set your own password, it is not temporary. An account
    of an identity provider (marked **OIDC**) has no password, so there is no such action for it.
 5. Reset the second factor of a user who lost the phone and the recovery codes (**Reset two-factor**; see
-   Two-Factor Sign-in in the Users and Sign-in chapter).
+   Two-Factor Sign-in in the Users and Sign-in chapter). A confirmation explains that the user must set up the second
+   factor again, and that until then the user signs in with the password alone, because the second factor is not
+   enforced; open sessions stay valid. Press **Reset two-factor** in the confirmation to do it.
+6. End a lockout at once (**Unlock**, shown only for a locked user). It clears the lockout and the count of failed
+   sign-ins, needs no confirmation, and is recorded as `user.unlocked`.
+7. Find a user: type part of a user name or display name (letter case does not matter) in **Search**, and choose
+   **All users**, **Enabled**, **Disabled**, **Locked**, or **System administrators** in **Show**. Both apply
+   together.
 
 The last enabled system administrator cannot be disabled or demoted; the page shows an error instead. If you are no
 longer an enabled system administrator, the page shows an error for every action.
@@ -121,7 +141,8 @@ Account page, which asks for a new password. Until the password is changed, the 
 Help, and About pages: it has no access to any project, cannot sign a review (the password confirmation is refused),
 and cannot create, list, or use API tokens (an existing token of that user is refused like an unknown token). The new
 password must differ from the temporary one. After the change the person signs in again with the new password.
-Accounts made by a system administrator on the Users page do not have this rule.
+Accounts made by a system administrator on the Users page do not have this rule, but a password that a system
+administrator sets for an existing user later does (it is temporary).
 
 **Change a role or remove a member.** Use **Make project admin**, **Make member**, or **Remove** on a member. A
 project always keeps at least one project administrator: a project administrator cannot remove or demote the last
@@ -145,6 +166,78 @@ review page marks the reviewer as **No longer a project member**, and that revie
   shows whether a name is taken. There is still no list or search of users.
 
 Every member change is recorded in the audit trail (see [Recorded Actions](#recorded-actions)).
+
+## Onboarding and Offboarding (Runbook)
+
+A checklist for a system administrator who brings a person in or lets a person go. Every step uses a page that is
+described elsewhere in this chapter.
+
+### Onboarding
+
+1. **Create the account.** Either create it on the Users page (**+ New user**, which asks you for a password), or, for
+   a person who goes straight into one project, use **Create a new account** on the Members section of that project
+   (see [Managing Project Members](#managing-project-members)), which generates a temporary password and adds the
+   membership in one step. A person who signs in with an OpenID Connect provider needs no account in advance: the
+   account is created at the first sign-in, without a password and without any rights.
+2. **Give the temporary password safely.** Hand it over once, on a channel that only the person reads. A password that
+   you type on the Users page is not temporary, so for a new local account prefer the generated one, or press
+   **Set password** afterwards, which makes it temporary. Never write it in a ticket or a chat that others read.
+3. **Add the person to the projects.** A new account is a member of no project. Add the person on the Members section
+   of each project, with the role **Member**, or **Project admin** only where the person must manage the members.
+4. **First sign-in.** The person signs in with the temporary password, is taken to the Account page, and must choose a
+   new password before anything else works. Check the Users page afterwards: the **Temporary password** badge is gone
+   and **Last sign-in** shows a time.
+5. **Second factor.** Ask the person to set up two-factor sign-in on the Account page (see Two-Factor Sign-in in the
+   Users and Sign-in chapter). Two-factor sign-in is not enforced, so it is the person's choice unless you agree on
+   it. The Users page shows a **TOTP** badge for a person who has it on.
+6. **API token, if needed.** A person who runs scripts creates a personal access token on the Account page (see the
+   Automation and API Tokens chapter). The token carries the rights of its owner, so add the person to the projects
+   first.
+
+### Offboarding
+
+Follow these steps in order.
+
+1. **Open the Users page** and find the person with **Search**.
+2. **Press Disable** and read the list in the confirmation. It shows the open reviews that still wait for the person
+   and the projects where the person is the only project administrator. Do not press **Disable anyway** yet: note the
+   list (or press **Cancel**), and work through the next two steps first.
+3. **Reassign the open slots.** On each review in the list, replace the person as primary or alternate reviewer of
+   the slot. This works for a slot that is **Not signed** on a review that is not locked (a project member can edit
+   it). A slot that has been signed, even when its signature is **Out of date**, can no longer be changed or
+   removed; add a new slot with the new reviewers instead (see Reviewer slots in the Reviewing chapter). A reviewer
+   slot keeps its reviewer when the person is removed from the project, and a disabled person cannot sign, so a slot
+   that is not reassigned stays open.
+4. **Check the sole administrator projects.** For each project in the list, add a second project administrator on the
+   Members section of that project before you disable the person. The project page does not yet warn you when a
+   project depends on one administrator, so this list is the check.
+5. **Disable the account** with **Disable anyway**. The person can no longer sign in, and the API tokens of the person
+   stop working at once. If the person was a system administrator, ReviewCenter refuses the change when this is the
+   last enabled system administrator; make another person a system administrator first.
+6. **Confirm the result.** The row shows **Disabled**. Nothing else is deleted: the signatures, comments, and audit
+   entries of the person stay as they are, and the audit trail records `user.disabled`. Do not delete the account
+   (there is no such action); a disabled account keeps the record of who signed what.
+7. **Remove memberships if you want.** Removing the person from a project is optional, and it is recorded as
+   `project.member-removed`. It does not change a signature that the person made.
+
+If the person comes back, press **Enable**, set a new password (it is temporary), and add the person to the projects
+again if needed.
+
+### Periodic Access Review
+
+Do this at a regular interval that your organization chooses, for example every quarter, and keep the result.
+
+- Open the Users page and choose **System administrators** in **Show**: is every person on the list still entitled to
+  manage users and projects? Remove the flag from anyone who is not.
+- Choose **Enabled** and read **Last sign-in**: who has not signed in for a long time, or **Never**? Disable the
+  accounts that nobody needs, after the offboarding steps above.
+- Choose **Disabled**: are all of them accounts that should stay disabled?
+- Choose **Locked**: a lockout that lasts or comes back is a sign of someone guessing a password; look at
+  `auth.locked-out` and `auth.sign-in-failed` in the audit trail before you press **Unlock**.
+- Look for the **Temporary password** badge: an account that has had one for a long time was never taken into use, so
+  disable it or hand the password over again.
+- On the Members section of each project, check that every member and every project administrator is still right.
+- Read the audit trail for `user.*` actions since the last review (see [Recorded Actions](#recorded-actions)).
 
 ## Evidence Settings
 
@@ -503,6 +596,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`             |
 | Checklist | `checklist.answered`, `checklist.applicability-changed`                              |
 | Users     | `user.created`, `user.enabled`, `user.disabled`, `user.admin-changed`                |
+| Users     | `user.unlocked` (a system administrator ended the lockout of a user)                 |
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
 | Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                      |
@@ -610,7 +704,9 @@ review adds the column `Reviews.DueDate`, which the server also creates only whe
 The follow-up review adds the columns `Reviews.FollowsReviewId`, `Reviews.CarriedAnswerCount`, and
 `Reviews.CarriedThreadCount`, and the carried-from columns of the checklist answers, the section states, and the
 threads, again with no migration. A review that follows nothing keeps its record digest, because the lines for a
-followed review and for carried rows are added to the digest only when they exist.
+followed review and for carried rows are added to the digest only when they exist. The time of the last sign-in adds the
+column `Users.LastSignInUtc`, again with no migration: a development database created before it must be deleted and
+created again.
 
 ## Repositories and Credentials
 

@@ -661,7 +661,7 @@ public sealed class TotpService
             return Refused(TotpSignInOutcome.Failed);
         }
 
-        await _users.ClearFailuresAsync(user.Username, cancellationToken);
+        await _users.RecordSignInAsync(user.Username, cancellationToken);
         var recovery = result == CodeResult.Recovery;
         return new TotpSignInResult(
             TotpSignInOutcome.Success,

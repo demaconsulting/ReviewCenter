@@ -284,7 +284,8 @@ marker. They obtain `ProjectService`, `ReviewService`, and the other Core servic
 and `IProjectAccess`; `NewMemberPage` and `NewMemberAccountPage`: `ProjectService` and `IProjectAccess`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
-`UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
+`UserService`, `UserImpactService`, and `TotpService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage`
+also the user store through
 `UserService`; `AuditPage` also `ProjectService` for the project selector; `ProjectAuditPage`: `AuditService`,
 `ProjectService`, and `IProjectAccess`; `RepositoriesPage`:
 `RepositoryService`, `ProjectService`, and `IProjectAccess`; each other creation page

@@ -257,9 +257,10 @@ sections:
         title: >-
           The Core subsystem shall create users with a user name, a display name, a system administrator flag, and a
           password, keeping only a hash of the password, check a sign-in with a lockout after repeated failures,
-          enable and disable users, set the system administrator flag, change and set passwords, never leave
-          the system without an enabled system administrator, and let an account that has a temporary password sign
-          in but do nothing except choose a new password, which cannot be confirmed as a signature.
+          enable and disable users, set the system administrator flag, change and set passwords, make a password set by
+          an administrator a temporary one, store the last sign-in, tell whether a user is locked and end a lockout,
+          never leave the system without an enabled system administrator, and let an account that has a temporary
+          password sign in but do nothing except choose a new password, which cannot be confirmed as a signature.
         justification: |
           Accountability in a review needs verified users. The rules must hold whichever user interface or store
           is used, and keeping only a hash of the password protects the passwords if the database is copied. A
@@ -278,6 +279,10 @@ sections:
           - ReviewCenter-UserService-SetSystemAdmin
           - ReviewCenter-UserService-NotFound
           - ReviewCenter-UserService-TemporaryPassword
+          - ReviewCenter-UserService-AdminPasswordIsTemporary
+          - ReviewCenter-UserService-LastSignIn
+          - ReviewCenter-UserService-LockedStatus
+          - ReviewCenter-UserService-Unlock
         tests:
           - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
 

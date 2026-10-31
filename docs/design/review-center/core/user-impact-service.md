@@ -11,9 +11,8 @@ account is disabled. The unit computes the answer on demand from what is stored 
 disagree with the inbox, the review page, or the rule that protects the last administrator. The unit also holds the
 records that carry the answer: `UserImpact`, `UserOpenWork`, `SoleAdminProject`, and the store row `UserReviewSlot`.
 
-The service has no user-visible surface yet. It is consumed by the Users page and the Members card of the project page
-in later slices, which show the result to the person who asks. That is why this unit does not change the user guide or
-the administrator runbook.
+The service has no user-visible surface of its own. It is consumed by the Users page (the disable confirmation) and, in
+a later slice, by the Members card of the project page, which show the result to the person who asks.
 
 #### Data Model
 
@@ -105,4 +104,5 @@ calling it with a null actor, raises `ArgumentNullException`. Failures of the st
 #### Callers
 
 - **ServerHost** — registers the service as a single instance.
-- The Users page and the Members card of the project page call it in later slices; no page calls it yet.
+- The Users page calls it for the disable confirmation; the Members card of the project page calls it in a later
+  slice.

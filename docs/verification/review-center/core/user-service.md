@@ -30,7 +30,12 @@ N/A - standard test environment.
   the hash and the failure counter.
 - A user with a temporary password signs in but is refused (and audited) at a re-authentication for a signature; the
   change of the own password must differ from the temporary one and ends the temporary state; a password set by an
-  administrator leaves the state unchanged.
+  administrator for another user makes the state temporary, and one set for the own account does not.
+- The last sign-in is stored by a right password without a second factor, by the completed second step, and by an
+  accepted sign-in with a provider, and by no failed sign-in, re-authentication, or password step that waits for the
+  code; storing it writes no audit entry.
+- A user is locked until the end of the lockout and no longer; only an enabled system administrator without a
+  temporary password, not through an API token, unlocks a user, with the entry `user.unlocked`.
 - A change of a user that does not exist is reported as such.
 - A sign-in with an external identity finds the account by the exact issuer and subject only, creates an enabled
   account with no right, no project, and no password on the first sign-in, and never uses an account by its name;
@@ -232,8 +237,36 @@ the flag, after which the new password re-authenticates and the account has acce
 tested by `UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess`. Choosing the temporary password
 again is refused with `PasswordInvalid` and keeps the flag, which is tested by
 `UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag`. A password set by an administrator
-through `SetPasswordAsync` leaves the flag of a flagged account set and of a normal account clear, which is tested by
-`UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone`.
+through `SetPasswordAsync` makes the account temporary, a flagged one and a normal one alike, and setting the own
+password does not, which is tested by `UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporaryExceptOwn`
+in `MustChangePasswordTests.cs`.
+
+**UserService admin password scenarios**: These tests are defined in `UserServiceTests.cs`. A password set by another
+actor sets the flag, and a later change of the own password clears it, which is tested by
+`UserService_SetPasswordAsync_OtherUserOrOwn_OnlyOtherForcesAChange`. An administrator who sets the own password gets no
+forced change, which is tested by `UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange`. An actor that acts through
+an API token with the name of the user is not the own row, and an external account is refused with `PasswordInvalid`
+and stays without a password, which is tested by
+`UserService_SetPasswordAsync_ApiTokenActorOrExternalUser_ForcesAChangeOrIsRefused`.
+
+**UserService last sign-in scenarios**: A right password without a second factor stores the time of the clock in
+`LastSignInUtc` and writes no audit entry, while a wrong password, a re-authentication, and a user who never signed in
+leave it empty, which is tested by `UserService_AuthenticatePasswordAsync_SuccessOnly_RecordsLastSignIn`. An accepted
+sign-in with an identity provider stores it and the refusal of a disabled account does not, which is tested by
+`UserService_SignInExternalAsync_AcceptedOnly_RecordsLastSignIn`. The completed second step stores it only then, which
+is tested by `TotpService_CompleteSignInAsync_Success_RecordsLastSignInOnlyThen` in `TotpServiceTests.cs`. The three
+paths of the web application are tested end to end by `SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects`
+(a failed attempt stores nothing), `TotpSignIn_CodeStep_RightCode_SignsInAndRedirects` (the password step alone stores
+nothing), and `OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn`.
+
+**UserService lock and unlock scenarios**: `IsLocked` is true until the end of the lockout and false at and after it and
+for a user without a lockout, which is tested by `UserService_IsLocked_Lockout_IsLockedUntilItsEnd`. A system
+administrator unlocks a locked user by identifier: the counter and the lockout are cleared, `user.unlocked` is recorded
+with the actor and the user name, and the user signs in with the password at once, which is tested by
+`UserService_UnlockAsync_SystemAdmin_ClearsLockoutAndAudits`. An ordinary user, a disabled administrator, an
+administrator with a temporary password, an actor through an API token, and an unknown user identifier are refused with
+`ActorNotAllowed` or `UserNotFound`, and nothing is audited or changed, which is tested by
+`UserService_UnlockAsync_NotAllowedOrUnknown_IsRefused`.
 
 **UserService second factor scenarios**: These tests are defined in `UserServiceTotpTests.cs`, over the same fakes with
 `FakeTotpStore` and a switch for the feature (`TotpTestWorld`). The right password of an enrolled account reports that

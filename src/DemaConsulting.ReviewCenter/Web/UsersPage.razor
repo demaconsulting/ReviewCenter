@@ -6,9 +6,12 @@
    name of the provider); a user with two-factor sign-in turned on carries a "TOTP" badge and a "Reset two-factor"
    button for a user who lost the phone and the recovery codes; a "+ New user" button leads to the separate form page at "/users/new". Access is limited
    to system administrators by the attribute below. Which projects a user is a member of is managed on the project
-   page, not here. Every interactive element and every key value carries a stable kebab-case data-testid
-   (row-level ids carry the user id), and the data-interactive marker on the root flips to "true" once the live
-   circuit is connected.
+   page, not here. A search box and a status filter narrow the list; badges show a running lockout (with an
+   "Unlock" button), a temporary password and the last sign-in. Disabling a user, resetting two-factor sign-in and
+   setting a password open an inline confirmation panel that needs a second click (the disable panel lists what
+   the user leaves behind, with links). Every interactive element and every key value carries a stable kebab-case
+   data-testid (row-level ids carry the user id), and the data-interactive marker on the root flips to "true"
+   once the live circuit is connected.
 
    Human factors: (a) the badges show at a glance who is a system administrator and who is disabled; (b) memberships
    are deliberately not listed here, so the page stays short; (c) every action is a button next to the row it
@@ -51,11 +54,28 @@
 
     @if (!AccessLost)
     {
+    <div class="filter-bar" data-testid="users-filter-bar">
+        <label>Search
+            <input type="search" placeholder="User name or display name" data-testid="users-search"
+                   @bind:get="SearchText" @bind:set="value => SearchText = value ?? string.Empty"
+                   @bind:event="oninput" />
+        </label>
+        <label>Show
+            <select data-testid="users-filter" @bind:get="StatusFilter" @bind:set="value => StatusFilter = value ?? FilterAll">
+                <option value="all">All users</option>
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+                <option value="locked">Locked</option>
+                <option value="admins">System administrators</option>
+            </select>
+        </label>
+    </div>
     <ul class="row-list" data-testid="users-list">
-        @foreach (var user in Users)
+        @foreach (var user in VisibleUsers)
         {
             var userId = user.Id;
             var username = user.Username;
+            var locked = IsLocked(user);
             <li class="row-card static-row" data-testid="user-row-@userId">
                 <div class="row-main">
                     <strong class="row-title" data-testid="user-username-@userId">@user.Username</strong>
@@ -66,6 +86,16 @@
                             <span class="badge" data-testid="user-admin-@userId">System admin</span>
                         }
                         <span class="badge @(user.Enabled ? "approved" : null)" data-testid="user-enabled-@userId">@(user.Enabled ? "Enabled" : "Disabled")</span>
+                        @if (locked)
+                        {
+                            <span class="badge" title="Too many failed sign-ins; sign-in is refused until then"
+                                  data-testid="user-locked-@userId">@LockedText(user)</span>
+                        }
+                        @if (user.MustChangePassword)
+                        {
+                            <span class="badge" title="The user must change the password at the next sign-in"
+                                  data-testid="user-temporary-@userId">Temporary password</span>
+                        }
                         @if (user.IsExternal)
                         {
                             <span class="badge" title="Signs in with @Oidc.Value.DisplayName"
@@ -77,17 +107,24 @@
                                   data-testid="user-totp-@userId">TOTP</span>
                         }
                     </p>
+                    <p class="muted hint" data-testid="user-last-signin-@userId">Last sign-in: @LastSignInText(user)</p>
                 </div>
                 <div class="row-actions">
                     <button type="button" class="outline small" data-testid="user-toggle-enabled-@userId"
                             @onclick="() => ToggleEnabledAsync(user)">@(user.Enabled ? "Disable" : "Enable")</button>
+                    @if (locked)
+                    {
+                        <button type="button" class="outline small" data-testid="user-unlock-@userId"
+                                title="End the lockout so the user can try to sign in again"
+                                @onclick="() => UnlockAsync(user)">Unlock</button>
+                    }
                     <button type="button" class="outline small" data-testid="user-toggle-admin-@userId"
                             @onclick="() => ToggleSystemAdminAsync(user)">@(user.IsSystemAdmin ? "Remove system admin" : "Make system admin")</button>
                     @if (TotpUserIds.Contains(userId))
                     {
                         <button type="button" class="outline small" data-testid="user-reset-totp-@userId"
                                 title="Remove the two-factor sign-in of this user, for example after a lost phone"
-                                @onclick="() => ResetTotpAsync(user)">Reset two-factor</button>
+                                @onclick="() => BeginResetTotp(user)">Reset two-factor</button>
                     }
                 </div>
                 <div class="user-controls">
@@ -107,10 +144,115 @@
                                @bind:get="PasswordChoice(userId)" @bind:set="value => SetPasswordChoice(userId, value)"
                                @bind:event="oninput" />
                         <button type="button" class="outline small" data-testid="user-set-password-@userId"
-                                @onclick="() => SetPasswordAsync(user)">Set password</button>
+                                @onclick="() => BeginSetPasswordAsync(user)">Set password</button>
                     </div>
                     }
                 </div>
+                @if (Pending is { } pending && pending.UserId == userId)
+                {
+                    switch (pending.Kind)
+                    {
+                        case ConfirmKind.Disable:
+                            <div class="notice warning confirm-panel" role="alertdialog"
+                                 data-testid="user-confirm-disable-@userId">
+                                <p>
+                                    Disable '@username'? The user can no longer sign in and the API tokens of the user
+                                    stop working. Open review slots and signatures stay as they are; they are not
+                                    reassigned.
+                                </p>
+                                @if (pending.Impact is { IsEmpty: false } impact)
+                                {
+                                    <div data-testid="user-impact-@userId">
+                                        @if (impact.OpenWork.Count > 0)
+                                        {
+                                            <p>Open reviews that wait for this user:</p>
+                                            <ul>
+                                                @foreach (var work in impact.OpenWork)
+                                                {
+                                                    <li>
+                                                        <a href="/projects/@work.ProjectId/reviews/@work.ReviewId"
+                                                           data-testid="user-impact-review-@userId-@work.ReviewId-@work.SlotNumber">@work.ProjectName: @work.Title</a>
+                                                        (slot @work.SlotNumber, @work.Role, @SlotStateText(work.SlotState))
+                                                    </li>
+                                                }
+                                            </ul>
+                                        }
+                                        @if (impact.SoleAdminProjects.Count > 0)
+                                        {
+                                            <p>Projects where this user is the only project administrator:</p>
+                                            <ul>
+                                                @foreach (var project in impact.SoleAdminProjects)
+                                                {
+                                                    <li>
+                                                        <a href="/projects/@project.ProjectId"
+                                                           data-testid="user-impact-project-@userId-@project.ProjectId">@project.ProjectName</a>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p data-testid="user-impact-empty-@userId">
+                                        Nothing is waiting for this user: no open review slots and no project that
+                                        depends on this user as its only project administrator.
+                                    </p>
+                                }
+                                <div class="plan-actions">
+                                    <button type="button" data-testid="user-confirm-disable-yes-@userId"
+                                            @onclick="() => ConfirmAsync(user)">Disable anyway</button>
+                                    <button type="button" class="outline" @onclick="CancelConfirmation"
+                                            data-testid="user-confirm-disable-cancel-@userId">Cancel</button>
+                                </div>
+                            </div>
+                            break;
+                        case ConfirmKind.ResetTotp:
+                            <div class="notice warning confirm-panel" role="alertdialog"
+                                 data-testid="user-confirm-reset-totp-@userId">
+                                <p>
+                                    Reset two-factor sign-in of '@username'? The authenticator and the recovery codes
+                                    are removed and the user must set up two-factor sign-in again. Until then the
+                                    user signs in with the password alone, because two-factor sign-in is not
+                                    enforced. Open sessions stay valid.
+                                </p>
+                                <div class="plan-actions">
+                                    <button type="button" data-testid="user-confirm-reset-totp-yes-@userId"
+                                            @onclick="() => ConfirmAsync(user)">Reset two-factor</button>
+                                    <button type="button" class="outline" @onclick="CancelConfirmation"
+                                            data-testid="user-confirm-reset-totp-cancel-@userId">Cancel</button>
+                                </div>
+                            </div>
+                            break;
+                        default:
+                            <div class="notice warning confirm-panel" role="alertdialog"
+                                 data-testid="user-confirm-set-password-@userId">
+                                @if (pending.OwnPassword)
+                                {
+                                    <p>
+                                        Set your own password? You chose it yourself, so it is not temporary: you do not
+                                        have to change it at the next sign-in and nothing is restricted.
+                                    </p>
+                                }
+                                else
+                                {
+                                    <p>
+                                        Set this password for '@username'? The user must change it at the next sign-in
+                                        and can only use the Account, Help, and About pages until then. The user
+                                        cannot sign reviews, and API tokens of the user stop working until the
+                                        password is changed.
+                                    </p>
+                                }
+                                <div class="plan-actions">
+                                    <button type="button" data-testid="user-confirm-set-password-yes-@userId"
+                                            @onclick="() => ConfirmAsync(user)">Set password</button>
+                                    <button type="button" class="outline" @onclick="CancelConfirmation"
+                                            data-testid="user-confirm-set-password-cancel-@userId">Cancel</button>
+                                </div>
+                            </div>
+                            break;
+                    }
+                }
                 @if (MessageUserId == userId)
                 {
                     if (ErrorMessage is not null)

@@ -86,6 +86,7 @@ public partial class OidcSignInTests : IClassFixture<IdentityProviderFixture>
 
         // Assert: the account is plain, bound to the identity and has no password and no project
         var user = await OidcTestApp.UserAsync(app, "olive");
+        Assert.NotNull(user.LastSignInUtc);
         Assert.Equal("Olive Oidc", user.DisplayName);
         Assert.True(user.Enabled);
         Assert.False(user.IsSystemAdmin);

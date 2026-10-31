@@ -16,11 +16,13 @@ account but of its project memberships, which `ProjectAccess` and `ProjectServic
 #### Data Model
 
 **User**: a data class of `Id` (assigned by the store), `Username`, `DisplayName`, `IsSystemAdmin`, `Enabled`,
-`PasswordHash`, `FailedLoginCount`, `LockoutUntil` (`null` when the user is not locked out), `MustChangePassword`, and
+`PasswordHash`, `FailedLoginCount`, `LockoutUntil` (`null` when the user is not locked out), `MustChangePassword`,
+`LastSignInUtc` (`null` until the first successful sign-in), and
 `Created` (UTC), and the optional `ExternalIssuer` and `ExternalSubject` (both `null` for a local account).
 `Username`, `DisplayName`, `Created`, and the two external values are fixed once the user exists (they are init-only);
 `IsExternal` is true when `ExternalIssuer` is set. The system administrator flag,
-the enabled flag, the hash, the lockout state, and the must-change-password flag have setters, so the service can change
+the enabled flag, the hash, the lockout state, the must-change-password flag, and the last sign-in have setters, so the
+service can change
 a copy it has read and give it back to the store. The password hash is never shown, logged, or put into a message, and
 the password itself is never stored.
 
@@ -43,10 +45,22 @@ password alone is not enough). **PasswordCheckPurpose** (internal enumeration): 
 `Confirmation`, which tell the shared routine which extra rules apply.
 
 **Must change password**: `MustChangePassword` is set on an account that a project administrator created
-(`ProjectService.CreateMemberAccountAsync`) with a generated temporary password, and is cleared when the user changes the
+(`ProjectService.CreateMemberAccountAsync`) with a generated temporary password, and on an account whose password a
+system administrator sets for somebody else (`SetPasswordAsync`), and is cleared when the user changes the
 own password. While it is set the user can sign in but is confined to the password change (see _SignIn_,
 _ProjectAccess_, _PersonalAccessTokenService_, and _SigningService_ for what each refuses); the rules owned by this unit
 are the re-authentication refusal and the password change described below.
+
+**Last sign-in**: `LastSignInUtc` is stored when a sign-in succeeds and opens a session: a password sign-in of an
+account without a second factor (`AuthenticateAsync` and `AuthenticatePasswordAsync` through one private routine, which
+also clears the failure counter in the same store update), the completed second step (the internal
+`RecordSignInAsync`, called by `TotpService.CompleteSignInAsync`), and an accepted sign-in with an identity provider
+(`SignInExternalAsync`). A failed sign-in, a password step that waits for the code, and a re-authentication for a
+signature store nothing. It is not an audit event and holds no secret; it only lets an access review see which
+accounts are not used.
+
+**Locked status**: `IsLocked(user, now)` (public, static) is true while `LockoutUntil` is later than `now`. The sign-in
+check and the Users page use this one rule.
 
 **System administrator**: the flag `IsSystemAdmin` replaces the earlier global role. A system administrator runs the
 installation: manages users, creates projects, and may manage the members of every project, and may see every project.
@@ -135,7 +149,8 @@ is hashed only after the input is valid.
 - _Parameters_: `string? username`, `string? password`, and a cancellation token.
 - _Returns_: `Task<User?>` — the user when the account exists, is not locked out, is enabled, and the password is
   right; otherwise `null`.
-- _Postconditions_: A right password resets the failure counter. A wrong password counts as a failure and may start the
+- _Postconditions_: A right password resets the failure counter and, for an account without a second factor, stores
+  the time of the sign-in. A wrong password counts as a failure and may start the
   lockout.
 
 Every failure gives the same `null`: unknown user, wrong password, disabled account, and locked account, so a caller
@@ -157,7 +172,7 @@ can only check a password can never let such an account in with the password alo
 - _Postconditions_: The checks, the counting, the lockout, and the dummy hash are those of `AuthenticateAsync`. With a
   second factor required the failure counter is deliberately not reset: only a complete sign-in resets it, so a person
   who knows the password still runs into the lockout while guessing codes. Without a second factor a right password
-  resets the counter as before.
+  resets the counter as before and stores the time of the sign-in.
 
 **ReauthenticatePasswordAsync**: The same for the re-authentication of a signature (`SigningService`), with the rules
 of `ReauthenticateAsync` (own action code, the refusal of a temporary password) and the result of
@@ -276,10 +291,25 @@ use. A user without a second factor, with a temporary password, or while the fea
 
 **SetPasswordAsync**: Sets the password of a user without the current one (for an administrator). The password is
 checked (`PasswordInvalid`), an unknown user is reported as `UserNotFound`, and the failure counter and lockout of the
-user are cleared, so it also ends a lockout. Other sessions of the user are not ended.
+user are cleared, so it also ends a lockout. The password is temporary: `MustChangePassword` is set, so the user has to
+change it at the next sign-in, unless the actor is the user (the same user name, not through an API token), who chose
+the password. An external account is refused (`PasswordInvalid`). Other sessions of the user are not ended. The command
+line does not use this method: `UserCommand` only creates users.
+
+**UnlockAsync**: Ends the lockout of a user, by the identifier of the user.
+
+- _Parameters_: the `Actor`, `int userId`, and a cancellation token.
+- _Returns_: `Task`.
+- _Postconditions_: The failure counter is 0 and the lockout is cleared, with the audit entry `user.unlocked` (detail
+  `user 'x'`); the password, the second factor, and the enabled flag are not touched.
+
+Only an enabled system administrator without a temporary password, not through an API token, may do it
+(`ActorNotAllowed`, read from the store under the semaphore, so the page cannot be a way around the rule); an unknown
+user is reported as `UserNotFound`.
 
 **Audit**: The operations that change a user take the `Actor` and record `user.created` (detail `user 'x'`, with
-`, system administrator` added when the right is given), `user.enabled`, `user.disabled`, `user.admin-changed`, and
+`, system administrator` added when the right is given), `user.enabled`, `user.disabled`, `user.admin-changed`,
+`user.unlocked`, and
 `user.password-set-by-admin`; changing one's own password records
 `user.password-changed` with that user as the actor. These drafts are saved by the store in the same transaction as the
 change. The command line passes `Actor.CommandLine`. The constructor takes an optional `AuditService` (the web server
@@ -337,11 +367,12 @@ not an error: `AuthenticateAsync` returns
   cookie of each request.
 - **SigningService** — checks the password again at signing time through `ReauthenticatePasswordAsync`, and records a
   refused confirmation of an external user through `RecordExternalReauthFailureAsync`.
-- **TotpService** — confirms the password with `ConfirmPasswordAsync`, and counts wrong codes, clears the counter, and
-  asks about the lockout through the internal methods above.
+- **TotpService** — confirms the password with `ConfirmPasswordAsync`, and counts wrong codes, clears the counter, asks
+  about the lockout, and records the complete sign-in (`RecordSignInAsync`) through the internal methods above.
 - **OidcSignIn** — signs in an external identity through `SignInExternalAsync` and records the failures.
 - **AccountPage** — changes the password of the signed-in user (also the forced change of a temporary password).
-- **UsersPage** — lists, creates, enables, disables, and changes users.
+- **UsersPage** — lists, creates, enables, disables, unlocks, and changes users, and decides what to show with
+  `IsLocked`.
 - **UserCommand** — creates the first system administrator and other users from the command line.
 - **ProjectService** — validates new account input through the internal `ValidateUsername` and `ValidateDisplayName`
   rules of this unit, so that every way to create a user applies the same rules.

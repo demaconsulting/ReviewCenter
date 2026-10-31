@@ -82,7 +82,8 @@ repository registry is the one exception, see `Repositories`).
   ignores case; `DisplayName` is required, at most 100; `IsSystemAdmin` (false for an ordinary user); `Enabled`;
   `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out);
   `MustChangePassword` (true for an account created with a temporary password until the user changes it; false for
-  every other account); `Created`; `ExternalIssuer` (at most 512) and `ExternalSubject` (at most 256), both null for a
+  every other account); `LastSignInUtc` (null until the user has signed in); `Created`; `ExternalIssuer` (at most 512)
+  and `ExternalSubject` (at most 256), both null for a
   local account and set together for the account of an external identity provider, with the default binary collation
   so that they compare exactly. A unique index on the pair makes one account per identity; SQLite treats nulls as
   distinct, so any number of local accounts is allowed.
@@ -198,7 +199,9 @@ thread, `CarriedFromThreadId` of a thread) and the index on `ProjectId` and `Fol
 `ProjectMemberships` table, the
 `IsSystemAdmin` column of a user (which replaces the role column), and the `ProjectId` of a repository: a database
 created before the project access slice does not have them and must be deleted and created
-again. The same holds for the `MustChangePassword` column of a user (project members management): the schema is created
+again. The same holds for the `LastSignInUtc` column of a user (users page): there is no migration, so a development
+database created before it must be deleted and created again. The same holds for the `MustChangePassword` column of a
+user (project members management): the schema is created
 with `EnsureCreated` and has no migrations, so a development database created before that column existed does not have
 it and must be deleted and created again. The same holds for the seven evidence settings columns of a project: there is
 no migration for them either, `EnsureCreated` does not add a column to an existing table, and development databases

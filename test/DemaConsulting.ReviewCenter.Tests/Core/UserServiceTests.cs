@@ -513,6 +513,223 @@ public class UserServiceTests
     }
 
     /// <summary>
+    ///     Test that a successful password sign-in stores the time, that a failed one and a re-authentication do
+    ///     not, and that a user who never signed in has none.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticatePasswordAsync_SuccessOnly_RecordsLastSignIn()
+    {
+        // Arrange: a user who never signed in, and a clock that moves
+        var (service, store, clock) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
+        var created = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+
+        // Act: a wrong password, a re-authentication, then a sign-in five minutes later
+        await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
+        var afterFailure = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+        await service.ReauthenticatePasswordAsync("ann", Password, cancellationToken);
+        var afterReauth = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+        clock.Advance(TimeSpan.FromMinutes(5));
+        var auditsBefore = store.Audits.Count;
+        await service.AuthenticateAsync("ann", Password, cancellationToken);
+        var afterSuccess = (await store.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+
+        // Assert: only the sign-in stored the time of the sign-in, and storing it added no audit entry
+        Assert.Null(created);
+        Assert.Null(afterFailure);
+        Assert.Null(afterReauth);
+        Assert.Equal(_now + TimeSpan.FromMinutes(5), afterSuccess);
+        Assert.Equal(auditsBefore, store.Audits.Count);
+    }
+
+    /// <summary>
+    ///     Test that an OIDC sign-in stores the time, and that a refused one of a disabled account does not.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_AcceptedOnly_RecordsLastSignIn()
+    {
+        // Arrange: an account that is created by its first sign-in
+        var (service, store, clock) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: the first sign-in, a later one, and one after the account was disabled
+        var first = (await service.SignInExternalAsync("https://idp", "sub-1", "ann", "Ann", cancellationToken)).User!;
+        clock.Advance(TimeSpan.FromHours(1));
+        await service.SignInExternalAsync("https://idp", "sub-1", "ann", "Ann", cancellationToken);
+        var afterLater = (await store.GetByUsernameAsync(first.Username, cancellationToken))!.LastSignInUtc;
+        await service.SetEnabledAsync(first.Username, false, Actor.CommandLine, cancellationToken);
+        clock.Advance(TimeSpan.FromHours(1));
+        var refused = await service.SignInExternalAsync("https://idp", "sub-1", "ann", "Ann", cancellationToken);
+        var afterRefused = (await store.GetByUsernameAsync(first.Username, cancellationToken))!.LastSignInUtc;
+
+        // Assert
+        Assert.Equal(_now + TimeSpan.FromHours(1), afterLater);
+        Assert.Null(refused.User);
+        Assert.Equal(afterLater, afterRefused);
+    }
+
+    /// <summary>
+    ///     Test that a lockout counts as locked exactly until its end time.
+    /// </summary>
+    [Fact]
+    public void UserService_IsLocked_Lockout_IsLockedUntilItsEnd()
+    {
+        // Arrange: users with no lockout, a running one and an ended one
+        var none = new User();
+        var running = new User { LockoutUntil = _now + TimeSpan.FromMinutes(1) };
+        var ended = new User { LockoutUntil = _now };
+
+        // Act and assert: only the running lockout counts; the end instant itself is no longer locked
+        Assert.False(UserService.IsLocked(none, _now));
+        Assert.True(UserService.IsLocked(running, _now));
+        Assert.False(UserService.IsLocked(ended, _now));
+        Assert.True(UserService.IsLocked(ended, _now - TimeSpan.FromSeconds(1)));
+    }
+
+    /// <summary>
+    ///     Test that a system administrator can unlock a user, that the counter and the lockout are cleared, that
+    ///     the change is audited and that the user can sign in at once.
+    /// </summary>
+    [Fact]
+    public async Task UserService_UnlockAsync_SystemAdmin_ClearsLockoutAndAudits()
+    {
+        // Arrange: a locked-out user and an administrator
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+        var ann = await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        for (var i = 0; i < 5; i++)
+        {
+            await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
+        }
+
+        var locked = (await store.GetByUsernameAsync("ann", cancellationToken))!;
+
+        // Act
+        await service.UnlockAsync(new Actor(root.Username, root.DisplayName), ann.Id, cancellationToken);
+
+        // Assert: cleared, audited with the actor, and the right password works again
+        var unlocked = (await store.GetByUsernameAsync("ann", cancellationToken))!;
+        Assert.NotNull(locked.LockoutUntil);
+        Assert.Null(unlocked.LockoutUntil);
+        Assert.Equal(0, unlocked.FailedLoginCount);
+        var audit = Assert.Single(store.Audits, entry => entry.Action == "user.unlocked");
+        Assert.Equal("root", audit.ActorUsername);
+        Assert.Equal("user 'ann'", audit.Detail);
+        Assert.NotNull(await service.AuthenticateAsync("ann", Password, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that only an enabled system administrator who is not signed in through an API token and has no
+    ///     temporary password can unlock, and that nothing is audited or changed otherwise.
+    /// </summary>
+    [Fact]
+    public async Task UserService_UnlockAsync_NotAllowedOrUnknown_IsRefused()
+    {
+        // Arrange: a locked user, an ordinary user, an administrator with a temporary password
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+        var ann = await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        await service.CreateAsync("tmp", "Tmp", true, Password, Actor.CommandLine, cancellationToken);
+        await service.SetPasswordAsync("tmp", Password, Actor.CommandLine, cancellationToken);
+        for (var i = 0; i < 5; i++)
+        {
+            await service.AuthenticateAsync("ann", "wrong password!", cancellationToken);
+        }
+
+        // Act: a non-admin, an unknown actor, the command line, an API token and a temporary password
+        var refused = new List<DomainRuleException>
+        {
+            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("ann", "Ann"), ann.Id, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("nobody", "Nobody"), ann.Id, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(Actor.CommandLine, ann.Id, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("root", "Root") { ApiTokenId = "t1" }, ann.Id, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => service.UnlockAsync(new Actor("tmp", "Tmp"), ann.Id, cancellationToken))
+        };
+        var unknown = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.UnlockAsync(new Actor("root", "Root"), 9999, cancellationToken));
+
+        // Assert: every refusal names the right rule, and the user is still locked and nothing was audited
+        Assert.All(refused, exception => Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule));
+        Assert.Equal(DomainRule.UserNotFound, unknown.Rule);
+        Assert.NotNull((await store.GetByUsernameAsync("ann", cancellationToken))!.LockoutUntil);
+        Assert.DoesNotContain(store.Audits, entry => entry.Action == "user.unlocked");
+    }
+
+    /// <summary>
+    ///     Test that a password set by somebody else is temporary, that setting the own password is not, and that a
+    ///     later change of the own password ends the temporary state.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetPasswordAsync_OtherUserOrOwn_OnlyOtherForcesAChange()
+    {
+        // Arrange: two users
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+        await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        var created = (await store.GetByUsernameAsync("ann", cancellationToken))!.MustChangePassword;
+
+        // Act: the administrator sets the password of ann, and a command-line actor does the same for root
+        await service.SetPasswordAsync("ann", "another long password", new Actor("root", "Root"), cancellationToken);
+        var byAdmin = (await store.GetByUsernameAsync("ann", cancellationToken))!.MustChangePassword;
+        await service.SetPasswordAsync("root", "yet another password", Actor.CommandLine, cancellationToken);
+        var byCommandLine = (await store.GetByUsernameAsync("root", cancellationToken))!.MustChangePassword;
+        await service.ChangeOwnPasswordAsync("ann", "another long password", "my own new password", cancellationToken);
+        var afterOwnChange = (await store.GetByUsernameAsync("ann", cancellationToken))!.MustChangePassword;
+
+        // Assert
+        Assert.False(created);
+        Assert.True(byAdmin);
+        Assert.True(byCommandLine);
+        Assert.False(afterOwnChange);
+    }
+
+    /// <summary>
+    ///     Test that an administrator who sets their own password does not get a forced change.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange()
+    {
+        // Arrange: an administrator
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+
+        // Act: the administrator sets their own password, with the user name written in another case
+        await service.SetPasswordAsync("root", "own chosen password", new Actor("ROOT", "Root"), cancellationToken);
+
+        // Assert
+        Assert.False((await store.GetByUsernameAsync("root", cancellationToken))!.MustChangePassword);
+    }
+
+    /// <summary>
+    ///     Test that an API-token actor with the name of the user is not "the own row", and that an external user
+    ///     cannot get a password.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SetPasswordAsync_ApiTokenActorOrExternalUser_ForcesAChangeOrIsRefused()
+    {
+        // Arrange: a local user and an external one
+        var (service, store, _) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
+        var external = (await service.SignInExternalAsync("https://idp", "sub-1", "oidc", "Oidc", cancellationToken)).User!;
+
+        // Act
+        await service.SetPasswordAsync("ann", "another long password", new Actor("ann", "Ann") { ApiTokenId = "t1" }, cancellationToken);
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.SetPasswordAsync(external.Username, "another long password", Actor.CommandLine, cancellationToken));
+
+        // Assert
+        Assert.True((await store.GetByUsernameAsync("ann", cancellationToken))!.MustChangePassword);
+        Assert.Equal(DomainRule.PasswordInvalid, refused.Rule);
+        Assert.Equal(string.Empty, (await store.GetByUsernameAsync(external.Username, cancellationToken))!.PasswordHash);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses missing dependencies.
     /// </summary>
     [Fact]

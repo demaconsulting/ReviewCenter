@@ -44,9 +44,17 @@ public class SignInTests
         await using var app = await StartAsync();
         await CreateUserAsync(app, "ann");
         using var browser = new TestBrowser(app);
+        var users = app.Services.GetRequiredService<UserService>();
+        var failed = await browser.LoginAsync("ann", "not the password at all", "/projects");
+        var beforeLogin = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!.LastSignInUtc;
 
         // Act: log in with a return URL
         var response = await browser.LoginAsync("ann", TestBrowser.Password, "/projects");
+
+        // Assert: the failed attempt stored no sign-in time, the successful login stored one
+        Assert.NotEqual("/projects", failed.Headers.Location?.OriginalString);
+        Assert.Null(beforeLogin);
+        Assert.NotNull((await users.GetAsync("ann", TestContext.Current.CancellationToken))!.LastSignInUtc);
 
         // Assert: redirected to the return URL, with a session cookie that is HttpOnly, SameSite=Lax and has no expiry
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);

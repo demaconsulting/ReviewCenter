@@ -174,11 +174,11 @@ public class MustChangePasswordTests
     }
 
     /// <summary>
-    ///     Test that an administrator who sets a password does not set or clear the flag, and that a normal
-    ///     account may keep its password when it changes it to the same one.
+    ///     Test that an administrator who sets the password of another account makes it temporary, also for an
+    ///     account that was not flagged, and that setting the own password does not.
     /// </summary>
     [Fact]
-    public async Task UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone()
+    public async Task UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporaryExceptOwn()
     {
         // Arrange: a flagged account and a normal one
         var world = await WorldAsync();
@@ -188,9 +188,13 @@ public class MustChangePasswordTests
         // Act
         await world.Users.SetPasswordAsync("newbie", Chosen, Actor.CommandLine, cancellationToken);
         await world.Users.SetPasswordAsync("plain", Chosen, Actor.CommandLine, cancellationToken);
+        var other = (await world.UserStore.GetByUsernameAsync("plain", cancellationToken))!.MustChangePassword;
+        await world.Users.ChangeOwnPasswordAsync("plain", Chosen, "a password of my own", cancellationToken);
+        await world.Users.SetPasswordAsync("plain", "my own second password", new Actor("plain", "Plain"), cancellationToken);
 
-        // Assert
+        // Assert: the flag stays set for the flagged account and is set for the normal one; an own change leaves it off
         Assert.True((await world.UserStore.GetByUsernameAsync("newbie", cancellationToken))!.MustChangePassword);
+        Assert.True(other);
         Assert.False((await world.UserStore.GetByUsernameAsync("plain", cancellationToken))!.MustChangePassword);
     }
 
