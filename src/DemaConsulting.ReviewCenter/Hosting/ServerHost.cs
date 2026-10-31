@@ -358,7 +358,9 @@ internal static class ServerHost
         services.AddSingleton(provider => AttestationKeyProviderFactory.Create(
             provider.GetRequiredService<AttestationOptions>(),
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILoggerFactory>()));
+            provider.GetRequiredService<ILoggerFactory>(),
+            provider.GetRequiredService<IDataProtectionProvider>(),
+            allowCreate: true));
         services.AddSingleton<IAttestationRenderer, AttestationRenderer>();
         services.AddSingleton<IAttestationSigner, AttestationSigner>();
         services.AddSingleton<AttestationService>();

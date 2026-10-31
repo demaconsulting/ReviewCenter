@@ -21,8 +21,12 @@ certificate store tests need the store of the current user.
 
 - All tests pass with zero failures (or skip because the certificate store is not available).
 - The factory chooses the provider by the setting and refuses an unknown value, naming the setting.
-- The self-signed key is created once, with a limited validity, reloaded, and the same for every caller, also when many
-  start together.
+- The self-signed key is created once, protected by the key ring so that the file is not a readable PFX, with a limited
+  validity, reloaded with the same ring, and the same for every caller, also when many start together.
+- A plaintext file of an earlier version is ignored with a warning, never used or deleted; a file of another ring is an
+  error that names the file; an expired key is archived and replaced with a warning.
+- A provider that may not create creates and changes nothing and reports that the key will be created.
+- No message or log holds a key, a password, or ciphertext.
 - Every problem of the self-signed provider and of the certificate store provider names the setting or the file.
 - `RequireTrustedKey` is checked on every call; the rule accepts an organization certificate and refuses a self-signed
   one, one without a signing key usage, and one outside its validity.
@@ -95,6 +99,62 @@ provider is not exercised with a code-signing certificate; it shares this base c
 **SelfSignedKeyProvider_GetSigningKey_FirstUse_CreatesSelfSignedKeyFile**: The key is requested from an empty folder. A
 key file is created and the certificate is self-signed. This scenario is tested by
 `SelfSignedKeyProvider_GetSigningKey_FirstUse_CreatesSelfSignedKeyFile`.
+
+**SelfSignedKeyProvider_GetSigningKey_FirstUse_FileIsNotAReadablePfx**: The key is requested from an empty folder. The
+file `attestation-selfsigned.pfx.protected` is the only file, the runtime refuses to load it as a PFX, and the subject
+text of the certificate is not in its bytes. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_FirstUse_FileIsNotAReadablePfx`.
+
+**SelfSignedKeyProvider_GetSigningKey_RestartWithPersistedRing_ReloadsTheSameKey**: A key is created with a Data
+Protection provider over a temporary key folder, and a new provider over the same ring and folder is asked for it, as
+after a restart. It has the same thumbprint. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_RestartWithPersistedRing_ReloadsTheSameKey`.
+
+**SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt**: The key file was written with one
+ring and is read with another. The error names the file and tells the operator to restore the ring or delete the file,
+and the file is unchanged. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt`.
+
+**SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder**: A file stands where
+the folder should be, and a key file was written with another ring. The messages for the server log hold the folder
+path, while `MessageWithoutPath`, which the configuration check prints, names the setting `Attestation:SelfSignedFolder`
+or the file name and does not hold the folder. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder`.
+
+**SelfSignedKeyProvider_GetSigningKey_ProtectFails_IsNotReportedAsUnreadable**: The protector of the ring fails
+with a
+cryptographic error while the new key is protected. The error says that the key could not be created, is not flagged
+unreadable, does not say "decrypted", keeps the inner error, and no key file is left. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_ProtectFails_IsNotReportedAsUnreadable`.
+
+**SelfSignedKeyProvider_GetSigningKey_LegacyPlaintextFile_IsIgnoredWithWarning**: A plaintext
+`attestation-selfsigned.pfx` of an earlier version is in the folder. It is not used: a new key with another thumbprint
+is created and protected, a warning tells the operator to delete the old file, and the old file is left in place. This
+scenario is tested by `SelfSignedKeyProvider_GetSigningKey_LegacyPlaintextFile_IsIgnoredWithWarning`.
+
+**SelfSignedKeyProvider_GetSigningKey_ExpiredKey_IsArchivedAndRegeneratedWithWarning**: The clock is set past the
+validity of the key. The protected file is moved to a `.retired-<thumbprint>` file, a new key with another thumbprint is
+created, a warning names the expired key, and a later provider loads the new key. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_ExpiredKey_IsArchivedAndRegeneratedWithWarning`.
+
+**SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing**: A provider
+that may not create is asked for a key in a folder that does not exist. The error says that the key will be created on
+first start, the status is unavailable, and the folder does not exist. This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing`.
+
+**SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing**: A provider that may
+not create is asked for an expired key. It describes the key as it is, and the folder holds only the original file. This
+scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing`.
+
+**SelfSignedKeyProvider_GetSigningKey_AnyScenario_NoSecretOrCiphertextInMessages**: A key is created with a capturing
+log, and a provider with another ring fails to read it. No log entry, error message, or status problem holds a
+fragment of the key file (in base64 or hexadecimal) or the text "PRIVATE KEY". This scenario is tested by
+`SelfSignedKeyProvider_GetSigningKey_AnyScenario_NoSecretOrCiphertextInMessages`.
+
+**AttestationKeyProviderFactory_Create_CreationNotAllowed_ProviderCreatesNothing**: The factory is called with
+`allowCreate` set to `false` for an empty folder. The provider reports that the key will be created, and nothing is
+created. This scenario is tested by `AttestationKeyProviderFactory_Create_CreationNotAllowed_ProviderCreatesNothing`.
 
 **SelfSignedKeyProvider_GetSigningKey_FirstUse_SetsTheValidityPeriod**: The certificate that is created is examined.
 It is

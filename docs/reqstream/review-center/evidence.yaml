@@ -61,15 +61,18 @@ sections:
       - id: ReviewCenter-Evidence-Key
         title: >-
           The Evidence subsystem shall sign with a key that the operator chooses between a self-signed key that the
-          server creates and keeps for itself and a certificate in a certificate store, shall refuse a key that does not
-          meet the RequireTrustedKey rule, and shall tell the user and the reader of the document which kind of key
-          signed it.
+          server creates and keeps for itself, protected at rest by the Data Protection key ring, and a certificate
+          in a certificate store, shall refuse a key that does not meet the RequireTrustedKey rule, and shall tell the
+          user and the reader of the document which kind of key signed it.
         justification: |
           A new installation must work without configuration, and an organization must be able to sign with a key that
-          it controls. Nobody should mistake the default key for an organization key.
+          it controls. Nobody should mistake the default key for an organization key, and a key that the server keeps
+          for itself must not be usable by anyone who only copies its file.
         children:
           - ReviewCenter-AttestationKeyProvider-Selection
           - ReviewCenter-AttestationKeyProvider-SelfSigned
+          - ReviewCenter-AttestationKeyProvider-SelfSignedProtected
+          - ReviewCenter-AttestationKeyProvider-NoCreate
           - ReviewCenter-AttestationKeyProvider-SelfSignedWarning
           - ReviewCenter-AttestationKeyProvider-SelfSignedErrors
           - ReviewCenter-AttestationKeyProvider-CertificateStore

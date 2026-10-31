@@ -627,6 +627,8 @@ chooses how (the names are not case sensitive):
 | `DataProtection:RequireEncryptedKeys`     | When true, the server refuses a ring that is not encrypted at rest |
 | `DataProtection:AllowNewKeyRing`          | One-start escape hatch: accept a new, empty ring (default false)   |
 
+`AllowNewKeyRing` accepts only the loss of stored secrets; it does not delete or replace the protected attestation key.
+
 Set the list with indexed environment variables, for example `DataProtection__PreviousCertificatePaths__0`.
 
 Certificates are read from files only; the certificate store is not used. A wrong certificate, a wrong password, a
@@ -650,7 +652,9 @@ copies the key folder cannot; a certificate and its password beside the keys is 
 `LocalMachine`). Restoring it elsewhere makes the stored tokens unreadable, so use a certificate for a ring that must
 be restored on another machine. A database restored **without** its key ring is not silently accepted: when the key
 folder holds no key but the database holds protected secrets, the server refuses to start unless you set
-`DataProtection:AllowNewKeyRing` to `true` for one start, and when only some secrets cannot be decrypted it logs an
+`DataProtection:AllowNewKeyRing` to `true` for one start (this accepts only the loss of stored secrets; a protected
+attestation key file that the new ring cannot decrypt still stops the start, because the server never deletes or
+replaces a signing key), and when only some secrets cannot be decrypted it logs an
 error with the counts at every start; see Back Up and Restore in the Deployment chapter.
 
 **The server never replaces a ring that it cannot read.** Data Protection answers a key that it cannot decrypt by

@@ -37,11 +37,29 @@ does not check the chain or revocation for any of them; the PDF viewer does, aga
 The **self-signed provider** creates, when its file is missing, an RSA key of 3072 bits with a certificate that is signed
 by itself (SHA-256, the subject "ReviewCenter self-signed attestation key (not an organization key)", ten years of
 validity that start ten minutes in the past to allow for clock differences, and the key usage for digital signatures).
-The key is saved as `attestation-selfsigned.pfx` without a password in the folder, which is created with access for its
-owner only on systems that support it. The file is written to a temporary name and moved into place without
-overwriting, so two processes that start together end with one key, and the one that lost loads the file of the winner.
-The folder is, by default, `attestation-selfsigned` in the folder of the Data Protection keys, so it is backed up with
-them and is lost with them. **The key is unprotected on disk: it is for development and test only.**
+The key is saved, protected, in `attestation-selfsigned.pfx.protected` in the folder, which is created with access for its
+owner only on systems that support it. The exported PFX (without a password) is protected with an
+`IDataProtectionProvider`, purpose `DemaConsulting.ReviewCenter.AttestationSelfSignedKey.v1`, which is the provider of
+the server, so the file is only readable with the Data Protection key ring and is not a PFX on disk; the plaintext
+bytes are cleared after use and the certificate is loaded with an ephemeral key set. The file is written to a temporary
+name and moved into place without overwriting, so two processes that start together end with one key, and the one that
+lost loads the file of the winner. The folder is, by default, `attestation-selfsigned` in the folder of the Data
+Protection keys, so it is backed up with them and is lost with them. A plaintext `attestation-selfsigned.pfx` of an
+earlier version is **not** read or migrated: it is ignored with a warning that tells the operator to delete it (it is
+never deleted by the server), and a new key is created. A file that the ring cannot decrypt (the ring is lost or is
+another ring) is an error that names the file and says to restore the ring or delete the file; only a failure to decrypt
+or load the file is reported that way, while a cryptographic failure while a key is created is reported as a failure to
+create the key. The storage and unreadable errors also carry `MessageWithoutPath`, a message that names the setting or
+the file name but not the folder, which the configuration check prints instead of the full message. A key whose
+certificate
+has expired is moved to `attestation-selfsigned.pfx.protected.retired-<thumbprint>` and a new key is created, with a
+warning; PDFs that were signed earlier are not affected because they carry their own certificate. The replacement
+assumes one server per folder. **The key is still a self-signed key, for development and test only.**
+
+The factory and the provider take a flag `allowCreate`. With `false` (the mode of `--validate --check-config`) the
+provider only describes: it creates no folder and no file, does not archive an expired key, and, when no protected file
+exists, throws an `AttestationKeyException` with `WillBeCreated` set, whose message is "will be created on first
+start".
 
 The **certificate store provider** opens the configured store read-only and without creating it, finds the
 certificate by its thumbprint (the text is normalized, so a thumbprint copied from a dialog with spaces and the invisible
@@ -83,8 +101,10 @@ the signature carries what a reader needs to follow the chain, and the root is l
 
 **AttestationKeyProviderFactory.Create**: Chooses the provider.
 
-- *Parameters*: The options, the clock, and the logger factory.
-- *Returns*: The provider for `SelfSigned` (also for an empty value) or `CertificateStore`.
+- *Parameters*: The options, the clock, the logger factory, the `IDataProtectionProvider` that protects the
+  self-signed key, and `allowCreate` (`false` to describe without creating anything).
+- *Returns*: The provider for `SelfSigned` (also for an empty value) or `CertificateStore`; the certificate store
+  provider ignores both new parameters.
 
 **AttestationKeyPolicy.Enforce, HasSigningKeyUsage, IsCodeSigningOnly, Warnings**: The rules above.
 
@@ -93,7 +113,8 @@ the signature carries what a reader needs to follow the chain, and the root is l
 Every problem is an `AttestationKeyException` whose message names the setting or the file to correct: an unknown
 provider, a missing or malformed thumbprint, an unknown store location, a certificate that is not in the store (with the
 thumbprint and the store), a certificate without a private key or with a key of an unsupported kind, a self-signed
-folder that is not set or is a file, a key file that cannot be read, and a certificate that fails the policy. The
+folder that is not set or is a file, a key file that cannot be read or decrypted (the message names the file), and a
+certificate that fails the policy. The
 messages and the logs never contain a secret. `Describe` turns the exception into a status (and any other non-fatal
 exception into a generic status, with the detail in the log only). `ServerHost` calls
 `GetSigningKey` at start-up and turns the exception into a start-up error, so a configuration that cannot work stops the
@@ -110,9 +131,12 @@ would plug in.
 - **System.Security.Cryptography.X509Certificates** and the cryptography of the .NET runtime — the certificate, the
   store, the key, and the chain. These belong to the runtime and are not OTS software items of their own.
 - **Microsoft.Extensions.Options and Logging** — the options and the log of the application framework.
+- **Microsoft.AspNetCore.DataProtection** — the `IDataProtectionProvider` that protects the self-signed key.
 
 #### Callers
 
 - **AttestationService** — gets the key for each attestation.
-- **ServerHost** — registers the provider by the factory and obtains the key at start-up.
+- **ServerHost** — registers the provider by the factory (with the Data Protection provider of the server) and obtains
+  the key at start-up.
+- **ConfiguredKeysCheck** — describes the key with `allowCreate` set to `false`.
 - **ReviewPage** — asks `Describe` for the note under the download button.

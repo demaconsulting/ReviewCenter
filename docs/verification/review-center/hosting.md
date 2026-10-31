@@ -81,7 +81,9 @@ review planner and of the parser of the review-set file is verified by
 **Attestation services and the start-up check**: Starting the real pipeline with no attestation setting creates the
 self-signed key in an `attestation-selfsigned` folder beside the Data Protection keys and keeps the same key across a
 restart, which is tested by
-`ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys`; a chosen folder is
+`ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys`; a key file that
+the key ring cannot decrypt stops the start naming the file, which is tested by
+`ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile`; a chosen folder is
 used, which is tested by `ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere`. Each setting that
 cannot work stops the start with a message that names it, which is tested by
 `ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError`,

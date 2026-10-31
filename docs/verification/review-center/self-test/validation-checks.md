@@ -164,6 +164,30 @@ name.
 certificate file) fail with a fixed message that holds neither the path nor the password; an unsupported database
 provider fails and names the provider. These scenarios are tested by the tests of the same names.
 
+**ValidationChecks_ConfiguredKeys_AttestationKeyExists_ReportsSubjectThumbprintAndValidity**: A protected attestation
+key was created with the key ring. The line holds the provider, the subject, the thumbprint, and the validity of the
+key, and the check passes. When no key exists, the line says "will be created on first start" and the attestation
+folder is not created; that is asserted in the test of the passing ring,
+`ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything`. This scenario is tested by the
+test of the same name.
+
+**ValidationChecks_ConfiguredKeys_LegacyAttestationFile_ReportsWarningAndPasses**: A plaintext
+`attestation-selfsigned.pfx` of an earlier version is in the attestation folder and no protected file exists. The check
+passes, the line says that a key will be created on first start and has a warning that the legacy file is ignored and
+should be deleted, and nothing is changed. This scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_UnreadableAttestationKey_FailsNamingTheFile**: The protected attestation key file
+was written by another ring. The check fails with a message that names `attestation-selfsigned.pfx.protected` and the
+remedy, and holds no folder path and no key material. This scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_AttestationKeyIoError_FailsWithoutNamingTheFolder**: The protected attestation key file
+is held open exclusively by another handle, so that reading it fails with an I/O error. The check fails with a message
+that names `Attestation:SelfSignedFolder` and neither the attestation folder nor the data folder. This scenario is
+tested by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_UnsupportedAttestationProvider_FailsNamingTheSetting**: `Attestation:Provider` has a
+value that does not exist. The check fails and names the setting. This scenario is tested by the test of the same name.
+
 The hermetic behavior of the default run is verified at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic`.
 

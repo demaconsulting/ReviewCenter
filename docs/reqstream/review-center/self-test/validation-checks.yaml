@@ -151,10 +151,13 @@ sections:
           file, report the protection mode, the number of key files and how many are not encrypted, and the number of
           protected secrets and how many cannot be decrypted, fail when secrets cannot be decrypted, when the ring is
           empty but the database holds secrets, when the ring is not encrypted although
-          DataProtection:RequireEncryptedKeys is true, or when the newest key cannot be decrypted, never show a key, a
-          secret, a password, or a path other
-          than the key folder, and be skipped, with the reason, when nothing is configured, the database file does not
-          exist yet, or the key folder does not exist yet and there is nothing to protect.
+          DataProtection:RequireEncryptedKeys is true, or when the newest key cannot be decrypted, also report the
+          attestation key without creating it (its subject, thumbprint, and validity, or that it will be created at
+          the first start, with a warning note for a plaintext key file of an earlier version that is ignored) and
+          fail when the protected attestation key file cannot be decrypted, never show a key, a secret, a password, or a
+          path other than the key folder (a problem with the attestation key names only a file name or a setting), and
+          be skipped, with the reason, when nothing is configured, the database file does not exist yet, or the key
+          folder does not exist yet and there is nothing to protect.
         justification: |
           After a restore the operator wants to know, before starting the server, whether the key ring and the database
           belong together. The check must not create what it looks for: a key created while the ring is examined would
@@ -172,6 +175,11 @@ sections:
           - ValidationChecks_ConfiguredKeys_PlaintextRingWhenEncryptionRequired_Fails
           - ValidationChecks_ConfiguredKeys_UnusableSettings_FailsWithoutLeaking
           - ValidationChecks_ConfiguredKeys_UnsupportedProvider_Fails
+          - ValidationChecks_ConfiguredKeys_AttestationKeyExists_ReportsSubjectThumbprintAndValidity
+          - ValidationChecks_ConfiguredKeys_LegacyAttestationFile_ReportsWarningAndPasses
+          - ValidationChecks_ConfiguredKeys_UnreadableAttestationKey_FailsNamingTheFile
+          - ValidationChecks_ConfiguredKeys_AttestationKeyIoError_FailsWithoutNamingTheFolder
+          - ValidationChecks_ConfiguredKeys_UnsupportedAttestationProvider_FailsNamingTheSetting
 
       - id: ReviewCenter-ValidationChecks-Hermetic
         title: >-

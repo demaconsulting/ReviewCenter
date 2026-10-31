@@ -18,18 +18,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
 
 /// <summary>
-///     Unit tests for <see cref="SelfSignedKeyProvider"/>: creating, persisting and reloading the default key, the
-///     trusted-key policy, and the errors an administrator has to understand.
+///     Unit tests for <see cref="SelfSignedKeyProvider"/>: creating, persisting and reloading the default key, its
+///     protection at rest, the trusted-key policy, and the errors an administrator has to understand.
 /// </summary>
 public sealed class SelfSignedKeyProviderTests : IDisposable
 {
+    /// <summary>
+    ///     The key ring that protects the key files of the tests, unless a test needs another one.
+    /// </summary>
+    private static readonly IDataProtectionProvider Ring = new EphemeralDataProtectionProvider();
+
     /// <summary>
     ///     The folders that the tests created, removed when the test class is disposed.
     /// </summary>
@@ -62,7 +70,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     {
         // Arrange: an empty folder that does not exist yet
         var folder = NewFolder();
-        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
 
         // Act: ask for the key
         var key = provider.GetSigningKey();
@@ -84,7 +92,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     {
         // Arrange: a fixed clock
         var now = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero);
-        using var provider = new SelfSignedKeyProvider(Options(NewFolder()), new FixedTimeProvider(now), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var provider = new SelfSignedKeyProvider(Options(NewFolder()), new FixedTimeProvider(now), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
 
         // Act: create the key
         var info = provider.GetSigningKey().Info;
@@ -104,12 +112,12 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         // Arrange: a folder with a key created by a first provider
         var folder = NewFolder();
         string thumbprint;
-        using (var first = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance))
+        using (var first = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring))
         {
             thumbprint = first.GetSigningKey().Info.Thumbprint;
         }
 
-        using var second = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var second = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
 
         // Act: a second provider loads the key, and signs with it
         var key = second.GetSigningKey();
@@ -131,7 +139,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     public void SelfSignedKeyProvider_GetSigningKey_RepeatedCalls_ReturnTheSameKey()
     {
         // Arrange: a provider
-        using var provider = new SelfSignedKeyProvider(Options(NewFolder()), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var provider = new SelfSignedKeyProvider(Options(NewFolder()), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
 
         // Act: ask twice
         var first = provider.GetSigningKey();
@@ -155,7 +163,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         var thumbprints = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(
             () =>
             {
-                using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+                using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
                 return provider.GetSigningKey().Info.Thumbprint;
             },
             TestContext.Current.CancellationToken)));
@@ -174,7 +182,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     {
         // Arrange: a provider that already has its key
         var options = Options(NewFolder());
-        using var provider = new SelfSignedKeyProvider(options, TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var provider = new SelfSignedKeyProvider(options, TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
         Assert.NotNull(provider.GetSigningKey());
 
         // Act: the policy is switched on, asked, and switched off again
@@ -203,7 +211,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         // Arrange: a provider with a capturing logger
         var logs = new CapturingLoggerProvider();
         using var factory = LoggerFactory.Create(builder => builder.AddProvider(logs));
-        using var provider = new SelfSignedKeyProvider(Options(NewFolder()), TimeProvider.System, factory.CreateLogger("test"));
+        using var provider = new SelfSignedKeyProvider(Options(NewFolder()), TimeProvider.System, factory.CreateLogger("test"), Ring);
 
         // Act: create the key
         var key = provider.GetSigningKey();
@@ -224,7 +232,8 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         using var provider = new SelfSignedKeyProvider(
             new AttestationOptions { SelfSignedFolder = " " },
             TimeProvider.System,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+            Ring);
 
         // Act: ask for the key
         var exception = Assert.Throws<AttestationKeyException>(provider.GetSigningKey);
@@ -242,7 +251,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         // Arrange: a file where the folder should be
         var folder = NewFolder();
         File.WriteAllText(folder, "not a folder");
-        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
 
         // Act: ask for the key
         var exception = Assert.Throws<AttestationKeyException>(provider.GetSigningKey);
@@ -264,14 +273,15 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, SelfSignedKeyProvider.FileName);
         File.WriteAllText(path, "this is not a PFX file");
-        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
 
         // Act: ask for the key
         var exception = Assert.Throws<AttestationKeyException>(provider.GetSigningKey);
 
         // Assert: the file is named, with the remedy; the file is left alone
         Assert.Contains(path, exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Delete the file", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("delete the file", exception.Message, StringComparison.Ordinal);
+        Assert.True(exception.IsUnreadable);
         Assert.Equal("this is not a PFX file", File.ReadAllText(path));
     }
 
@@ -284,7 +294,7 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     {
         // Arrange: a folder name that the platform refuses with an exception that is not an attestation key error
         var folder = Path.Combine(Path.GetTempPath(), "bad\0folder");
-        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
         Assert.IsNotType<AttestationKeyException>(Record.Exception(provider.GetSigningKey));
 
         // Act: describe the key
@@ -296,6 +306,325 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
         Assert.Equal("SelfSigned", status.Provider);
         Assert.Contains("unexpected error", status.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("folder", status.Problem, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the key file is encrypted: its bytes are not a PFX, do not show the certificate subject, and the
+    ///     key cannot be loaded from the file without the key ring.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_FirstUse_FileIsNotAReadablePfx()
+    {
+        // Arrange: a provider that creates the key in a new folder
+        var folder = NewFolder();
+        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
+        provider.GetSigningKey();
+        var path = Path.Combine(folder, SelfSignedKeyProvider.FileName);
+
+        // Act: read the file as bytes and try to load it as a PFX
+        var bytes = File.ReadAllBytes(path);
+        var loaded = Record.Exception(() => X509CertificateLoader.LoadPkcs12(bytes, null));
+
+        // Assert: the loader refuses it, and the subject text is not in the file; the file is the only one
+        Assert.IsAssignableFrom<CryptographicException>(loaded);
+        Assert.False(System.Text.Encoding.ASCII.GetString(bytes).Contains("ReviewCenter", StringComparison.Ordinal));
+        Assert.Equal(new[] { SelfSignedKeyProvider.FileName }, Directory.GetFiles(folder).Select(Path.GetFileName));
+    }
+
+    /// <summary>
+    ///     Test that a key ring that is kept in a folder, as the server keeps it, decrypts the file after a restart.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_RestartWithPersistedRing_ReloadsTheSameKey()
+    {
+        // Arrange: a key created under a ring that lives in a folder
+        var folder = NewFolder();
+        var ringFolder = NewFolder();
+        string thumbprint;
+        using (var first = new SelfSignedKeyProvider(
+                   Options(folder),
+                   TimeProvider.System,
+                   Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+                   DataProtectionProvider.Create(new DirectoryInfo(ringFolder))))
+        {
+            thumbprint = first.GetSigningKey().Info.Thumbprint;
+        }
+
+        // Act: a new provider and a new ring object over the same folder, as after a restart
+        using var second = new SelfSignedKeyProvider(
+            Options(folder),
+            TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+            DataProtectionProvider.Create(new DirectoryInfo(ringFolder)));
+        var key = second.GetSigningKey();
+
+        // Assert: the same key, and no second key file
+        Assert.Equal(thumbprint, key.Info.Thumbprint);
+        Assert.Single(Directory.GetFiles(folder));
+    }
+
+    /// <summary>
+    ///     Test that a key ring that is not the one that protected the file is reported with the file named and the
+    ///     remedy, that the file is not deleted, and that nothing of the file is in the message.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_OtherKeyRing_ThrowsNamingTheFileAndKeepsIt()
+    {
+        // Arrange: a key created under one ring, and a provider with another
+        var folder = NewFolder();
+        using (var first = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring))
+        {
+            first.GetSigningKey();
+        }
+
+        var path = Path.Combine(folder, SelfSignedKeyProvider.FileName);
+        var before = File.ReadAllBytes(path);
+        using var other = new SelfSignedKeyProvider(
+            Options(folder),
+            TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+            new EphemeralDataProtectionProvider());
+
+        // Act: ask for the key
+        var exception = Assert.Throws<AttestationKeyException>(other.GetSigningKey);
+        var status = other.Describe();
+
+        // Assert: the file is named with the remedy, flagged unreadable, left alone, and not echoed
+        Assert.Contains(path, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("delete the file", exception.Message, StringComparison.Ordinal);
+        Assert.True(exception.IsUnreadable);
+        Assert.False(exception.WillBeCreated);
+        Assert.False(status.IsAvailable);
+        Assert.Equal(before, File.ReadAllBytes(path));
+        Assert.DoesNotContain(Convert.ToBase64String(before, 0, 24), exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a key file of the earlier format, a PFX without protection, is not used: a warning tells the
+    ///     operator to delete it, a new protected key is created, and the old file is left alone.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_LegacyPlaintextFile_IsIgnoredWithWarning()
+    {
+        // Arrange: a folder with a PFX of the earlier format, and a provider with a capturing logger
+        var folder = NewFolder();
+        Directory.CreateDirectory(folder);
+        var legacyPath = Path.Combine(folder, SelfSignedKeyProvider.LegacyFileName);
+        string legacyThumbprint;
+        using (var rsa = RSA.Create(2048))
+        {
+            var request = new CertificateRequest("CN=legacy", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            using var legacy = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(30));
+            legacyThumbprint = legacy.Thumbprint;
+            File.WriteAllBytes(legacyPath, legacy.Export(X509ContentType.Pfx));
+        }
+
+        var legacyBytes = File.ReadAllBytes(legacyPath);
+        var logs = new CapturingLoggerProvider();
+        using var factory = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, factory.CreateLogger("test"), Ring);
+
+        // Act: ask for the key
+        var key = provider.GetSigningKey();
+
+        // Assert: a new key, a protected file beside the untouched legacy file, and a warning that says to delete it
+        Assert.NotEqual(legacyThumbprint, key.Info.Thumbprint);
+        Assert.True(File.Exists(Path.Combine(folder, SelfSignedKeyProvider.FileName)));
+        Assert.Equal(legacyBytes, File.ReadAllBytes(legacyPath));
+        Assert.Contains(
+            logs.Entries,
+            e => e.Level == LogLevel.Warning
+                 && e.Message.Contains(SelfSignedKeyProvider.LegacyFileName, StringComparison.Ordinal)
+                 && e.Message.Contains("Delete it", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that an expired self-signed key is moved aside under its thumbprint and replaced, with a warning, and
+    ///     that the replacement is kept for the next start.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_ExpiredKey_IsArchivedAndRegeneratedWithWarning()
+    {
+        // Arrange: a key created now, and a provider that runs eleven years later
+        var folder = NewFolder();
+        var created = DateTimeOffset.UtcNow;
+        string oldThumbprint;
+        using (var first = new SelfSignedKeyProvider(Options(folder), new FixedTimeProvider(created), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring))
+        {
+            oldThumbprint = first.GetSigningKey().Info.Thumbprint;
+        }
+
+        var later = new FixedTimeProvider(created.AddDays(4000));
+        var logs = new CapturingLoggerProvider();
+        using var factory = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        string newThumbprint;
+        using (var second = new SelfSignedKeyProvider(Options(folder), later, factory.CreateLogger("test"), Ring))
+        {
+            // Act: ask for the key
+            newThumbprint = second.GetSigningKey().Info.Thumbprint;
+        }
+
+        // Assert: a new key, the old one archived under its thumbprint, a warning, and the new key is the one kept
+        var archive = Path.Combine(folder, SelfSignedKeyProvider.FileName + ".retired-" + oldThumbprint);
+        Assert.NotEqual(oldThumbprint, newThumbprint);
+        Assert.True(File.Exists(archive));
+        Assert.Contains(
+            logs.Entries,
+            e => e.Level == LogLevel.Warning
+                 && e.Message.Contains("expired", StringComparison.Ordinal)
+                 && e.Message.Contains(oldThumbprint, StringComparison.Ordinal));
+        using var third = new SelfSignedKeyProvider(Options(folder), later, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
+        Assert.Equal(newThumbprint, third.GetSigningKey().Info.Thumbprint);
+    }
+
+    /// <summary>
+    ///     Test that a provider that may not create anything reports a missing key as one that will be created, and
+    ///     leaves no folder and no file behind.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndNoKey_ReportsWillBeCreatedAndCreatesNothing()
+    {
+        // Arrange: a folder that does not exist, and a provider that may not create
+        var folder = NewFolder();
+        using var provider = new SelfSignedKeyProvider(
+            Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring, allowCreate: false);
+
+        // Act: ask for the key, and for its status
+        var exception = Assert.Throws<AttestationKeyException>(provider.GetSigningKey);
+        var status = provider.Describe();
+
+        // Assert: the key will be created, nothing was created, and it is not an unreadable key
+        Assert.True(exception.WillBeCreated);
+        Assert.False(exception.IsUnreadable);
+        Assert.Contains("will be created on first start", exception.Message, StringComparison.Ordinal);
+        Assert.False(status.IsAvailable);
+        Assert.False(Directory.Exists(folder));
+    }
+
+    /// <summary>
+    ///     Test that a provider that may not create anything still describes a key that exists, and neither changes
+    ///     the folder nor replaces an expired key.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_CreationNotAllowedAndExpiredKey_DescribesItAndChangesNothing()
+    {
+        // Arrange: a key created now, and an inspecting provider that runs eleven years later
+        var folder = NewFolder();
+        var created = DateTimeOffset.UtcNow;
+        string thumbprint;
+        using (var first = new SelfSignedKeyProvider(Options(folder), new FixedTimeProvider(created), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring))
+        {
+            thumbprint = first.GetSigningKey().Info.Thumbprint;
+        }
+
+        using var inspector = new SelfSignedKeyProvider(
+            Options(folder),
+            new FixedTimeProvider(created.AddDays(4000)),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+            Ring,
+            allowCreate: false);
+
+        // Act: ask for the key
+        var key = inspector.GetSigningKey();
+
+        // Assert: the expired key is described as it is, and the folder holds only the original file
+        Assert.Equal(thumbprint, key.Info.Thumbprint);
+        Assert.Equal(new[] { SelfSignedKeyProvider.FileName }, Directory.GetFiles(folder).Select(Path.GetFileName));
+    }
+
+    /// <summary>
+    ///     Test that no message, log entry or exception of any scenario holds a part of the key file, which is the
+    ///     ciphertext of the key.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_AnyScenario_NoSecretOrCiphertextInMessages()
+    {
+        // Arrange: a key created with a capturing logger, and a provider with another ring over the same file
+        var folder = NewFolder();
+        var logs = new CapturingLoggerProvider();
+        using var factory = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        using var first = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, factory.CreateLogger("test"), Ring);
+        first.GetSigningKey();
+        var bytes = File.ReadAllBytes(Path.Combine(folder, SelfSignedKeyProvider.FileName));
+        var fragments = new[] { Convert.ToBase64String(bytes, 8, 24), Convert.ToHexString(bytes, 8, 16), "PRIVATE KEY" };
+        using var other = new SelfSignedKeyProvider(
+            Options(folder), TimeProvider.System, factory.CreateLogger("test"), new EphemeralDataProtectionProvider());
+
+        // Act: the wrong ring fails, and the status is described
+        var exception = Assert.Throws<AttestationKeyException>(other.GetSigningKey);
+        var status = other.Describe();
+
+        // Assert: none of the texts holds a fragment of the file
+        var texts = logs.Entries.Select(e => e.Message).Append(exception.Message).Append(status.Problem ?? string.Empty);
+        Assert.All(
+            texts,
+            text => Assert.All(fragments, fragment => Assert.DoesNotContain(fragment, text, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>
+    ///     Test that a cryptographic failure while the key is created is not reported as a key file that cannot be
+    ///     decrypted: it is a failure to create the key, it is not flagged unreadable, and no file is left behind.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_ProtectFails_IsNotReportedAsUnreadable()
+    {
+        // Arrange: a ring whose protector fails with a cryptographic error when it protects the new key
+        var folder = NewFolder();
+        using var provider = new SelfSignedKeyProvider(
+            Options(folder),
+            TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+            new FailingProtectorProvider());
+
+        // Act: ask for the key
+        var exception = Assert.Throws<AttestationKeyException>(provider.GetSigningKey);
+
+        // Assert: a creation failure with the inner error, not the message of a key file that cannot be decrypted
+        Assert.False(exception.IsUnreadable);
+        Assert.False(exception.WillBeCreated);
+        Assert.Contains("could not be created", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("decrypted", exception.Message, StringComparison.Ordinal);
+        Assert.IsAssignableFrom<CryptographicException>(exception.InnerException);
+        Assert.False(File.Exists(Path.Combine(folder, SelfSignedKeyProvider.FileName)));
+    }
+
+    /// <summary>
+    ///     Test that the messages for a report that prints no path (the configuration check) name the key file, or the
+    ///     setting, but never the folder, while the messages for the server log keep the full path.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_GetSigningKey_StorageAndUnreadableFailures_MessageWithoutPathHoldsNoFolder()
+    {
+        // Arrange: a file where the folder should be, and a key file that another ring protected
+        var blocked = NewFolder();
+        File.WriteAllText(blocked, "not a folder");
+        using var storage = new SelfSignedKeyProvider(
+            Options(blocked), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring);
+        var folder = NewFolder();
+        using (var first = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, Ring))
+        {
+            first.GetSigningKey();
+        }
+
+        using var other = new SelfSignedKeyProvider(
+            Options(folder),
+            TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+            new EphemeralDataProtectionProvider());
+
+        // Act
+        var storageFailure = Assert.Throws<AttestationKeyException>(storage.GetSigningKey);
+        var unreadable = Assert.Throws<AttestationKeyException>(other.GetSigningKey);
+
+        // Assert: the server messages hold the folder, the path-free messages hold only the setting or the file name
+        Assert.Contains(blocked, storageFailure.Message, StringComparison.Ordinal);
+        Assert.NotNull(storageFailure.MessageWithoutPath);
+        Assert.DoesNotContain(blocked, storageFailure.MessageWithoutPath, StringComparison.Ordinal);
+        Assert.Contains("Attestation:SelfSignedFolder", storageFailure.MessageWithoutPath, StringComparison.Ordinal);
+        Assert.Contains(folder, unreadable.Message, StringComparison.Ordinal);
+        Assert.NotNull(unreadable.MessageWithoutPath);
+        Assert.DoesNotContain(folder, unreadable.MessageWithoutPath, StringComparison.Ordinal);
+        Assert.Contains(SelfSignedKeyProvider.FileName, unreadable.MessageWithoutPath, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -317,5 +646,41 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     private static AttestationOptions Options(string folder)
     {
         return new AttestationOptions { SelfSignedFolder = folder };
+    }
+
+    /// <summary>
+    ///     A Data Protection provider whose protectors fail with a cryptographic error when they protect.
+    /// </summary>
+    private sealed class FailingProtectorProvider : IDataProtectionProvider
+    {
+        /// <inheritdoc />
+        public IDataProtector CreateProtector(string purpose)
+        {
+            return new FailingProtector();
+        }
+    }
+
+    /// <summary>
+    ///     A protector that cannot protect.
+    /// </summary>
+    private sealed class FailingProtector : IDataProtector
+    {
+        /// <inheritdoc />
+        public IDataProtector CreateProtector(string purpose)
+        {
+            return this;
+        }
+
+        /// <inheritdoc />
+        public byte[] Protect(byte[] plaintext)
+        {
+            throw new CryptographicException("The key ring cannot protect.");
+        }
+
+        /// <inheritdoc />
+        public byte[] Unprotect(byte[] protectedData)
+        {
+            throw new CryptographicException("The key ring cannot unprotect.");
+        }
     }
 }

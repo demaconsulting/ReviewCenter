@@ -22,6 +22,7 @@ using System.Runtime.CompilerServices;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -121,7 +122,12 @@ internal static class TestDatabase
     /// <returns><c>true</c> when the key could be loaded.</returns>
     private static bool ReadAttestationKey(AttestationOptions options)
     {
-        using var provider = new SelfSignedKeyProvider(options, TimeProvider.System, NullLogger.Instance);
+        // The key is encrypted with the key ring that the applications of the run use (the keys folder beside the
+        // databases, under the application name of the product), so that they can read it
+        var ring = DataProtectionProvider.Create(
+            new DirectoryInfo(Path.Combine(_root, "keys")),
+            builder => builder.SetApplicationName("DemaConsulting.ReviewCenter"));
+        using var provider = new SelfSignedKeyProvider(options, TimeProvider.System, NullLogger.Instance, ring);
         _ = provider.GetSigningKey();
         return true;
     }

@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Text.RegularExpressions;
+using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.SelfTest;
 using DemaConsulting.ReviewCenter.SelfTest.Checks;
@@ -378,7 +379,138 @@ public partial class ValidationChecksTests
         Assert.DoesNotContain(KeysInstall.TokenText, detail);
         Assert.DoesNotContain(cipher, detail);
         Assert.DoesNotContain(install.Folder.DirectoryPath, detail);
+        Assert.Contains("attestation key SelfSigned: will be created on first start", detail);
+        Assert.False(Directory.Exists(install.AttestationFolder));
         Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check describes an existing protected self-signed attestation key by subject,
+    ///     thumbprint and validity, without a path, and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_AttestationKeyExists_ReportsSubjectThumbprintAndValidity()
+    {
+        // Arrange: an installation whose server has created the protected attestation key
+        using var install = new KeysInstall();
+        var thumbprint = install.CreateAttestationKey();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure();
+        var before = install.Snapshot();
+
+        // Act
+        var detail = await ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the public description of the key, no path, and nothing was changed
+        Assert.Contains("attestation key SelfSigned: subject 'CN=ReviewCenter self-signed attestation key", detail);
+        Assert.Contains($"thumbprint {thumbprint}", detail);
+        Assert.Contains(", valid ", detail);
+        Assert.DoesNotContain("will be created", detail);
+        Assert.DoesNotContain(install.Folder.DirectoryPath, detail);
+        Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check reports an attestation key file of the earlier format, which is not encrypted, as
+    ///     a warning and that the check still passes and creates no key.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_LegacyAttestationFile_ReportsWarningAndPasses()
+    {
+        // Arrange: a plaintext key file of the earlier format and no protected file
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        Directory.CreateDirectory(install.AttestationFolder);
+        await File.WriteAllTextAsync(
+            Path.Combine(install.AttestationFolder, SelfSignedKeyProvider.LegacyFileName),
+            "legacy",
+            TestContext.Current.CancellationToken);
+        using var configuration = install.Configure();
+        var before = install.Snapshot();
+
+        // Act
+        var detail = await ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the warning says to delete the file, the key will be created, and nothing was written
+        Assert.Contains("will be created on first start", detail);
+        Assert.Contains($"warning: the file {SelfSignedKeyProvider.LegacyFileName} of an earlier version", detail);
+        Assert.Contains("delete it", detail);
+        Assert.DoesNotContain(install.Folder.DirectoryPath, detail);
+        Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check fails when the protected attestation key cannot be decrypted with the key ring,
+    ///     naming the file and not the folder, and creates nothing.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_UnreadableAttestationKey_FailsNamingTheFile()
+    {
+        // Arrange: a protected key file that the ring cannot read
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        Directory.CreateDirectory(install.AttestationFolder);
+        await File.WriteAllBytesAsync(
+            Path.Combine(install.AttestationFolder, SelfSignedKeyProvider.FileName),
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            TestContext.Current.CancellationToken);
+        using var configuration = install.Configure();
+        var before = install.Snapshot();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the file and the remedy are named, the folder is not, and nothing was changed
+        Assert.Contains($"attestation key file {SelfSignedKeyProvider.FileName} cannot be decrypted", exception.Message);
+        Assert.Contains("delete the file", exception.Message);
+        Assert.DoesNotContain(install.Folder.DirectoryPath, exception.Message);
+        Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for an attestation key file that cannot be read because of an I/O error, and
+    ///     that the message names the setting to correct but not the key folder.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_AttestationKeyIoError_FailsWithoutNamingTheFolder()
+    {
+        // Arrange: a protected key file that another process holds open exclusively
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        Directory.CreateDirectory(install.AttestationFolder);
+        var path = Path.Combine(install.AttestationFolder, SelfSignedKeyProvider.FileName);
+        await File.WriteAllBytesAsync(path, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], TestContext.Current.CancellationToken);
+        using var configuration = install.Configure();
+        await using var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the setting is named, the folder is not
+        Assert.Contains("Attestation:SelfSignedFolder", exception.Message);
+        Assert.DoesNotContain(install.AttestationFolder, exception.Message);
+        Assert.DoesNotContain(install.Folder.DirectoryPath, exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the key check fails for an attestation provider that is not supported, naming the setting.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_UnsupportedAttestationProvider_FailsNamingTheSetting()
+    {
+        // Arrange: an installation with an attestation provider that does not exist
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(new KeyValuePair<string, string?>("Attestation__Provider", "Pfx"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the setting and the value are named
+        Assert.Contains("Attestation:Provider 'Pfx' is not supported", exception.Message);
     }
 
     /// <summary>
