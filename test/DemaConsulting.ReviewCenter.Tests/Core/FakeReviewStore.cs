@@ -122,6 +122,8 @@ internal sealed class FakeReviewStore : IReviewStore
             Created = project.Created,
             Evidence = project.Evidence,
             RequireIndependentReviewers = project.RequireIndependentReviewers,
+            RequireNonAuthorChecklistAnswers = project.RequireNonAuthorChecklistAnswers,
+            RequireNonReopenerSigning = project.RequireNonReopenerSigning,
             ChecklistDefinition = project.ChecklistDefinition
         };
         _projects.Add(stored);
@@ -135,16 +137,42 @@ internal sealed class FakeReviewStore : IReviewStore
         bool expected,
         bool updated,
         AuditDraft audit,
+        CancellationToken cancellationToken = default) =>
+        UpdateReviewRuleAsync(projectId, ReviewRule.IndependentReviewers, expected, updated, audit, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> UpdateReviewRuleAsync(
+        int projectId,
+        ReviewRule rule,
+        bool expected,
+        bool updated,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
         // Like the real store: compare and set in one step; a lost race or an unknown project changes nothing
+        if (!Enum.IsDefined(rule))
+        {
+            throw new ArgumentOutOfRangeException(nameof(rule), rule, "The rule is not a known value.");
+        }
+
         var index = _projects.FindIndex(p => p.Id == projectId);
-        if (index < 0 || _projects[index].RequireIndependentReviewers != expected)
+        if (index < 0)
         {
             return Task.FromResult(false);
         }
 
         var old = _projects[index];
+        var current = rule switch
+        {
+            ReviewRule.IndependentReviewers => old.RequireIndependentReviewers,
+            ReviewRule.NonAuthorChecklistAnswers => old.RequireNonAuthorChecklistAnswers,
+            _ => old.RequireNonReopenerSigning
+        };
+        if (current != expected)
+        {
+            return Task.FromResult(false);
+        }
+
         _projects[index] = new Project
         {
             Id = old.Id,
@@ -152,7 +180,9 @@ internal sealed class FakeReviewStore : IReviewStore
             Description = old.Description,
             Created = old.Created,
             Evidence = old.Evidence,
-            RequireIndependentReviewers = updated,
+            RequireIndependentReviewers = rule == ReviewRule.IndependentReviewers ? updated : old.RequireIndependentReviewers,
+            RequireNonAuthorChecklistAnswers = rule == ReviewRule.NonAuthorChecklistAnswers ? updated : old.RequireNonAuthorChecklistAnswers,
+            RequireNonReopenerSigning = rule == ReviewRule.NonReopenerSigning ? updated : old.RequireNonReopenerSigning,
             ChecklistDefinition = old.ChecklistDefinition
         };
         Audits.Add(audit);
@@ -217,6 +247,8 @@ internal sealed class FakeReviewStore : IReviewStore
             Created = old.Created,
             Evidence = updated,
             RequireIndependentReviewers = old.RequireIndependentReviewers,
+            RequireNonAuthorChecklistAnswers = old.RequireNonAuthorChecklistAnswers,
+            RequireNonReopenerSigning = old.RequireNonReopenerSigning,
             ChecklistDefinition = old.ChecklistDefinition
         };
         Audits.Add(audit);
@@ -248,6 +280,8 @@ internal sealed class FakeReviewStore : IReviewStore
             Created = old.Created,
             Evidence = old.Evidence,
             RequireIndependentReviewers = old.RequireIndependentReviewers,
+            RequireNonAuthorChecklistAnswers = old.RequireNonAuthorChecklistAnswers,
+            RequireNonReopenerSigning = old.RequireNonReopenerSigning,
             ChecklistDefinition = definitionJson
         };
         Audits.Add(audit);

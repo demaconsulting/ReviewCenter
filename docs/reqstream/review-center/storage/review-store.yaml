@@ -271,6 +271,24 @@ sections:
           - ReviewStore_AddProjectAsync_RequireIndependentReviewers_IsStoredAndReturned
           - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
 
+      - id: ReviewCenter-ReviewStore-ReviewRuleSwitches
+        title: >-
+          The ReviewStore class shall store the two further review rules (authors answering the checklist of their
+          own review, and the person who reopened a review signing it again) with the project, on for a project that
+          was not given another value, return them with every project it reads or lists, and change each only through
+          an atomic compare-and-set that stores the audit entry of the change in the same transaction, reports,
+          without a change and without an entry, a project that does not exist or a value that is no longer the
+          expected one, and never changes a rule other than the named one.
+        justification: |
+          The rules follow the same atomic rule as the other settings of a project: a change must neither be lost nor
+          silently overwrite the change of another administrator, must not be stored without its entry, and must not
+          touch another rule by mistake.
+        tests:
+          - ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned
+          - ReviewStore_UpdateReviewRuleAsync_CompareAndSet
+          - ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule
+          - ReviewStore_UpdateReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange
+
       - id: ReviewCenter-ReviewStore-Audit
         title: >-
           The ReviewStore class shall store every audited change (project, project membership, evidence settings,

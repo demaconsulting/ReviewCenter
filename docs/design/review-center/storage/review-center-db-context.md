@@ -23,7 +23,9 @@ repository registry is the one exception, see `Repositories`).
   `EvidenceSettings.Default`. `RequireIndependentReviewers` is a required boolean column of the same table. No
   database default is declared for it: the value always comes from the entity, whose initializer is `true`, so a
   project that was never given another value requires independent reviewers (this avoids the pitfall where Entity
-  Framework treats the CLR default of a boolean as "not set" and substitutes the database default). `ChecklistDefinition`
+  Framework treats the CLR default of a boolean as "not set" and substitutes the database default). The two further
+  review rules, `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning`, are required boolean columns of the
+  same table that are declared the same way (no database default; the entity initializer is `true`). `ChecklistDefinition`
   is a nullable text column with no length limit: the JSON of the checklist the project gives to its new reviews (a
   definition is up to `ReviewLimits.MaxChecklistBytes`, 256 KiB), and `NULL` stands for the built-in default checklist.
   There is no version column; the version label is part of the JSON.
@@ -178,8 +180,10 @@ same holds for the `UserTotps` and `TotpRecoveryCodes` tables (second factor sig
 development database created before them must be deleted and created again. The same holds for the `ReviewReopens`
 table and the `RequireIndependentReviewers` column of a project (approval lock and independent reviewers): there is no
 migration and `EnsureCreated` does not add a table or column to an existing database, so a development database created
-before them must be deleted and created again. The
-checklist keys are what makes "one answer per check" a rule of the database. The section and
+before them must be deleted and created again. The same holds for the `RequireNonAuthorChecklistAnswers` and
+`RequireNonReopenerSigning` columns of a project (review rule switches): a development database created before them
+must be deleted and created again. The checklist keys are what makes "one answer per check" a rule of the database.
+The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.
 

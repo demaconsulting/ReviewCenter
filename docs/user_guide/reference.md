@@ -226,6 +226,9 @@ independent reviewers. The chapters Reviewing and Administration explain how the
 | --------------------------------------- | ---------------------------------------------------- |
 | `review.reopened`                       | `previous digest <digest>; reason: <reason>`         |
 | `project.independent-reviewers-changed` | `RequireIndependentReviewers on->off` (or `off->on`) |
+| `project.review-rule-changed`           | `<setting> on->off` (or `off->on`)                   |
+
+For `project.review-rule-changed` the setting is `RequireNonAuthorChecklistAnswers` or `RequireNonReopenerSigning`.
 
 The messages that the user sees:
 
@@ -245,10 +248,14 @@ The messages that the user sees:
 The setting **Require independent reviewers** is a per-project setting on the project page, on by default, that only a
 project administrator or a system administrator changes in the web pages. The author that it compares is the
 ReviewCenter user who created the review (the owner of the token for a review created with an API token). Git commit
-authors are not matched.
+authors are not matched. Two further per-project settings, **Authors cannot answer the checklist of their own review** and
+**The person who reopened a review cannot sign it again**, are on by default and changed in the same way; ReviewCenter
+stores and audits them but does not apply them yet (the page marks them "Not applied yet.").
 
 A development database created before the approval lock existed lacks the table `ReviewReopens` and the column
-`Projects.RequireIndependentReviewers`. ReviewCenter has no migrations, so delete such a database and let the server
+`Projects.RequireIndependentReviewers`, and one created before the review rule switches lacks the columns
+`Projects.RequireNonAuthorChecklistAnswers` and `Projects.RequireNonReopenerSigning`. ReviewCenter has no migrations,
+so delete such a database and let the server
 create it again (see Database in the Administration chapter).
 
 ## Puppet Development Tool

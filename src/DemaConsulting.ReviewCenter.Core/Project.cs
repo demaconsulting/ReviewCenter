@@ -70,6 +70,24 @@ public sealed class Project
     public bool RequireIndependentReviewers { get; init; } = true;
 
     /// <summary>
+    ///     Gets a value indicating whether the person who created a review is kept from answering the checks of its
+    ///     checklist; <c>true</c> unless a project administrator switched it off.
+    /// </summary>
+    /// <remarks>
+    ///     The value is stored for the enforcement that follows; nothing reads it yet.
+    /// </remarks>
+    public bool RequireNonAuthorChecklistAnswers { get; init; } = true;
+
+    /// <summary>
+    ///     Gets a value indicating whether the person who reopened a review is kept from signing it again;
+    ///     <c>true</c> unless a project administrator switched it off.
+    /// </summary>
+    /// <remarks>
+    ///     The value is stored for the enforcement that follows; nothing reads it yet.
+    /// </remarks>
+    public bool RequireNonReopenerSigning { get; init; } = true;
+
+    /// <summary>
     ///     Gets the checklist definition of the project as JSON (the text <see cref="ChecklistDefinition.ToJson"/>
     ///     writes); <c>null</c> when the project uses the built-in <see cref="DefaultChecklist"/>.
     /// </summary>
@@ -81,4 +99,32 @@ public sealed class Project
     ///     alters an existing review.
     /// </remarks>
     public string? ChecklistDefinition { get; init; }
+}
+
+/// <summary>
+///     A per-project review rule that a project administrator can switch on or off.
+/// </summary>
+/// <remarks>
+///     Each member names one boolean property of <see cref="Project"/>; see
+///     <see cref="ProjectService.SetReviewRuleAsync"/> for how a rule is changed.
+/// </remarks>
+public enum ReviewRule
+{
+    /// <summary>
+    ///     The person who created a review cannot be one of its reviewers and cannot sign it
+    ///     (<see cref="Project.RequireIndependentReviewers"/>).
+    /// </summary>
+    IndependentReviewers,
+
+    /// <summary>
+    ///     The person who created a review cannot answer the checks of its checklist
+    ///     (<see cref="Project.RequireNonAuthorChecklistAnswers"/>); stored only, not applied yet.
+    /// </summary>
+    NonAuthorChecklistAnswers,
+
+    /// <summary>
+    ///     The person who reopened a review cannot sign it again
+    ///     (<see cref="Project.RequireNonReopenerSigning"/>); stored only, not applied yet.
+    /// </summary>
+    NonReopenerSigning,
 }

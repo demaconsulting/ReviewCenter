@@ -52,7 +52,8 @@ be loadable on the test platform.
 - The table for review reopens holds the reopen history of a review (who, when, why, and the previous digest), with the
   identity assigned by the database; it is removed together with its review; and a new project reads back with the
   `RequireIndependentReviewers` column set (a column of the `Projects` table without a database default, whose value
-  comes from the entity).
+  comes from the entity). The `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns of the project
+  table are created the same way and read back with the project.
 
 #### Test Scenarios
 
@@ -161,6 +162,14 @@ stored with the administrator, the time, the reason, and the previous digest and
 which is tested by `ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory`, and a new project reads back with the
 requirement on, a change is stored in the column by a compare-and-set and read back with the project, which is tested
 by `ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet`. The new table and column mean that a database
+that was created before them must be deleted and recreated (see the design of this unit).
+
+**Review rule columns**: The `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns of the `Projects`
+table are exercised by the tests of `ReviewStore`: a new project reads back with both rules on, and a project added with
+both rules off reads back that way from the read and from the listing, which is tested by
+`ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned` in `ReviewStoreTests.cs`; a change of each rule is
+stored in its own column by a compare-and-set and read back with the project, which is tested by
+`ReviewStore_UpdateReviewRuleAsync_CompareAndSet` in `ReviewStoreSigningTests.cs`. The new columns mean that a database
 that was created before them must be deleted and recreated (see the design of this unit).
 
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests

@@ -21,7 +21,8 @@ commits (see the `AuditStore` unit).
 #### Key Methods
 
 **Audit transaction of every change**: `AddProjectAsync`, `AddMembershipAsync`, `RemoveMembershipAsync`,
-`SetMembershipRoleAsync`, `UpdateEvidenceSettingsAsync`, `UpdateRequireIndependentReviewersAsync`, `AddReviewAsync`,
+`SetMembershipRoleAsync`, `UpdateEvidenceSettingsAsync`, `UpdateRequireIndependentReviewersAsync`,
+`UpdateReviewRuleAsync`, `AddReviewAsync`,
 `AddThreadAsync`, `AddCommentAsync`,
 `SetThreadStateAsync`, `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
 `RemoveSlotAsync`, `AddSignatureAsync`, and `ReopenReviewAsync` take the audit draft of the change (or a function
@@ -49,10 +50,12 @@ name, description, and creation time into a new entity, so an identity supplied 
 neither be persisted nor collide with an existing project; the returned project is the stored entity. The evidence
 settings of the project are copied too, and a project that was not given others has the defaults
 (`EvidenceSettings.Default`). So is `RequireIndependentReviewers` (true unless the caller gave another value), and the
-checklist definition (none unless the caller gave one).
+checklist definition (none unless the caller gave one). The two further review rules,
+`RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning`, are copied the same way (true unless the caller
+gave another value).
 
-**GetProjectAsync**: Reads one project by identity, with its evidence settings and its `RequireIndependentReviewers`
-value; null when absent.
+**GetProjectAsync**: Reads one project by identity, with its evidence settings and its review rules
+(`RequireIndependentReviewers` and the two further rules); null when absent.
 
 **ListProjectsAsync**: Lists all projects ordered by name and then identity, with their evidence settings and review
 rule. SQLite cannot
@@ -86,7 +89,23 @@ holds the value the caller started from (compare-and-set), in the same way.
 
 The comparison is part of one `ExecuteUpdate` statement (`WHERE Id = projectId AND RequireIndependentReviewers =
 expected`), so two administrators who save at the same time cannot both succeed. `ProjectService` turns the `false`
-into `RecordChanged`.
+into `RecordChanged`. This method is the same as `UpdateReviewRuleAsync` for the rule `IndependentReviewers`.
+
+**UpdateReviewRuleAsync**: Changes one named review rule of one project (`ReviewRule`: `IndependentReviewers`,
+`NonAuthorChecklistAnswers`, or `NonReopenerSigning`) if it still holds the value the caller started from
+(compare-and-set).
+
+- *Parameters*: the project identity, the rule, the `expected` value, the `updated` value, and the audit draft of the
+  change.
+- *Returns*: `Task<bool>` — `true` when the value was changed; `false` when the project does not exist or the stored
+  value is no longer `expected`.
+- *Preconditions*: the audit draft is not null (`ArgumentNullException`) and the rule is a defined value
+  (`ArgumentOutOfRangeException`, checked before any work).
+- *Postconditions*: Either the new value of that rule's column only and the audit entry are stored in the same
+  serialized transaction, or nothing is.
+
+The store picks the column from the rule with a switch and runs one `ExecuteUpdate` statement (`WHERE Id = projectId AND
+<column> = expected`); the other rules of the project are not written.
 
 **UpdateChecklistDefinitionAsync**: Changes the checklist definition of one project if the hash of the stored text still
 equals the hash the caller started from (compare-and-set).

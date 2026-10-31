@@ -378,6 +378,26 @@ audit entry is stored. A second call that still names `true` as the expected val
 not exist, report `false` and change nothing. This scenario is defined in `ReviewStoreSigningTests.cs` and is tested
 by `ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet`.
 
+**ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned**: A project is added with both further review rules
+(authors answering the checklist of their own review, and the person who reopened a review signing it again) switched
+off and another without saying; the read and the listing return false for both rules of the first and true for both
+rules of the second, and the independence rule of the first is still true. This scenario is tested by
+`ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned`.
+
+**ReviewStore_UpdateReviewRuleAsync_CompareAndSet**: For each of the three rules, a new project has the rule on. The rule
+is switched off with the expected value `true`; the call reports `true`, the new value is read back, and one audit entry
+is stored. A second call that still names `true` as the expected value, and a call for a project that does not exist,
+report `false` and change nothing, and the audit chain verifies. This scenario is defined in
+`ReviewStoreSigningTests.cs` and is tested by `ReviewStore_UpdateReviewRuleAsync_CompareAndSet`.
+
+**ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule**: The three rules of a new project are switched off one
+after the other; after each call exactly the rules switched off so far read back false and the others true. This scenario
+is defined in `ReviewStoreSigningTests.cs` and is tested by `ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule`.
+
+**ReviewStore_UpdateReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange**: A rule that is not a defined value is
+rejected with `ArgumentOutOfRangeException` and no audit entry is stored. This scenario is defined in
+`ReviewStoreSigningTests.cs` and is tested by `ReviewStore_UpdateReviewRuleAsync_UndefinedRule_ThrowsArgumentOutOfRange`.
+
 **ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven**: A project added without a
 checklist definition reads back with none; a project added with one reads back with it unchanged. This scenario is
 defined in `ProjectChecklistStoreTests.cs` and is tested by

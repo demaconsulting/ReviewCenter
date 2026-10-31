@@ -293,6 +293,21 @@ sections:
         tests:
           - WebSubsystem_ProjectAdmin_TogglesIndependentReviewers
 
+      - id: ReviewCenter-Web-ReviewRuleSwitches
+        title: >-
+          The Web subsystem shall let an administrator of the project or a system administrator switch the two
+          further review rules (authors answering the checklist of their own review, and the person who reopened a
+          review signing it again) on the project page, shall say next to them that they are stored but not applied
+          yet, and shall not show them to any other user.
+        justification: |
+          The rules are stored before they are applied, so a page that offered a switch without saying so would
+          promise a protection that does not exist yet. Only the people who administer the project may change a rule
+          that protects its reviews.
+        children:
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches
+        tests:
+          - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
+
       - id: ReviewCenter-Web-SignIn
         title: >-
           The Web subsystem shall show in the page header the name of the signed-in user with a link to the

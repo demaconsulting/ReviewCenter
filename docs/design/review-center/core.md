@@ -111,7 +111,10 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   admin or system administrator reopens it with a reason (`ReopenReviewAsync`; never with an API token), which keeps the
   earlier signatures as history and requires fresh ones. A project admin switches the project rule "require independent
   reviewers" (`ProjectService.SetRequireIndependentReviewersAsync`; on by default): the user who created a review can then
-  neither be chosen as a reviewer of it nor sign it. `RecordDigest` calculates the digest of a record. Every
+  neither be chosen as a reviewer of it nor sign it. The same administrators can switch two further stored rules
+  (`ProjectService.SetReviewRuleAsync`; on by default): the review author may not answer the checklist of the review,
+  and the person who reopened a review may not sign it again. These two are stored and audited only; no service applies
+  them yet. `RecordDigest` calculates the digest of a record. Every
   operation that changes data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
   and verifies its hash chain. Create a personal access token for the actor (the value is returned once), list the
@@ -140,7 +143,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   admin remains, checked inside the transaction); and change the evidence settings of a project by compare-and-set
   (`UpdateEvidenceSettingsAsync`: the new settings are stored only if the stored ones still equal the expected ones,
   and the project and its settings are read with every project), and change the "require independent reviewers" setting
-  of a project by compare-and-set in the same way (`UpdateRequireIndependentReviewersAsync`), and change the checklist
+  of a project by compare-and-set in the same way (`UpdateRequireIndependentReviewersAsync`; `UpdateReviewRuleAsync`
+  does the same for any named review rule), and change the checklist
   definition of a project by compare-and-set on the hash of the stored text (`UpdateChecklistDefinitionAsync`: the new
   text, or none for the built-in default, is stored only if the stored text still has the expected hash). Every operation
   that changes data takes an

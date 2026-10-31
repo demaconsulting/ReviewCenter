@@ -225,6 +225,44 @@ public class ReviewStoreTests
     }
 
     /// <summary>
+    ///     Test that the two further review rules are stored with a new project (on unless the caller says
+    ///     otherwise) and returned by both the single read and the listing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned()
+    {
+        // Arrange: an empty database
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+
+        // Act: add a project that switches both rules off, and one that does not say
+        var off = await db.Store.AddProjectAsync(
+            new Project
+            {
+                Name = "Off",
+                Created = _created,
+                RequireNonAuthorChecklistAnswers = false,
+                RequireNonReopenerSigning = false
+            },
+            cancellationToken);
+        var unset = await db.Store.AddProjectAsync(new Project { Name = "Unset", Created = _created }, cancellationToken);
+
+        // Assert: the stored values come back from the read and from the listing
+        var offRead = (await db.Store.GetProjectAsync(off.Id, cancellationToken))!;
+        var unsetRead = (await db.Store.GetProjectAsync(unset.Id, cancellationToken))!;
+        Assert.False(offRead.RequireNonAuthorChecklistAnswers);
+        Assert.False(offRead.RequireNonReopenerSigning);
+        Assert.True(offRead.RequireIndependentReviewers);
+        Assert.True(unsetRead.RequireNonAuthorChecklistAnswers);
+        Assert.True(unsetRead.RequireNonReopenerSigning);
+        var listed = await db.Store.ListProjectsAsync(cancellationToken);
+        Assert.False(listed.Single(p => p.Id == off.Id).RequireNonAuthorChecklistAnswers);
+        Assert.False(listed.Single(p => p.Id == off.Id).RequireNonReopenerSigning);
+        Assert.True(listed.Single(p => p.Id == unset.Id).RequireNonAuthorChecklistAnswers);
+        Assert.True(listed.Single(p => p.Id == unset.Id).RequireNonReopenerSigning);
+    }
+
+    /// <summary>
     ///     Test that projects are listed by name.
     /// </summary>
     [Fact]

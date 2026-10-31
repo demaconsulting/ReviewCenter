@@ -182,6 +182,12 @@ administrator shows the Review rules card with the switch on (the default), and 
 such card. The setting is switched off through `ProjectService` and the project page then shows the switch off. This
 scenario is tested by `WebSubsystem_ProjectAdmin_TogglesIndependentReviewers`.
 
+**WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches**: Through the real pipeline, the project page of a project
+administrator shows the two further review rule switches (authors answering the checklist of their own review, and the
+person who reopened a review signing it again) on (the default), and the page of a plain member has no Review rules card
+and no such switch. The author rule is switched off through `ProjectService` and the project page then shows that switch
+off and the other one still on. This scenario is tested by `WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches`.
+
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A system administrator is signed in, and every route
 (home, login, about, the help index, a help topic, an unknown help topic, account, users, the new user page,
 projects, the new project page, a project, the new review page of a project, the plan page of a project that has a

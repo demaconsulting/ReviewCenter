@@ -205,6 +205,13 @@ off the author is accepted as reviewer. This scenario is tested by
 and on again and each change is audited with `project.independent-reviewers-changed`; a plain member is refused with
 `ActorNotAllowed`. This scenario is tested by `CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly`.
 
+**CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale**: A plain member and an administrator's token are
+refused with `ActorNotAllowed`. A system administrator switches the two further rules (authors answering the checklist
+of their own review, and the person who reopened a review signing it again) off, each change is audited once with
+`project.review-rule-changed` and the details `RequireNonAuthorChecklistAnswers on->off` and
+`RequireNonReopenerSigning on->off`, a repeated change from the old value is refused with `RecordChanged`, and the
+independence rule is still on. This scenario is tested by `CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale`.
+
 **CoreSubsystem_ApiTokenReview_AuthorIsTokenUser**: A review created by an actor that came through a token has the
 owner of the token as its author, so that the owner is refused as reviewer of a slot while a different member is
 accepted. This scenario is tested by `CoreSubsystem_ApiTokenReview_AuthorIsTokenUser`.

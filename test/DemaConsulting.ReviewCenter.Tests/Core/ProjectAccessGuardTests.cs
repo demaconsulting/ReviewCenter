@@ -252,6 +252,7 @@ public class ProjectAccessGuardTests
         "ProjectService.RemoveMemberAsync",
         "ProjectService.SetMemberRoleAsync",
         "ProjectService.SetRequireIndependentReviewersAsync",
+        "ProjectService.SetReviewRuleAsync",
         "RepositoryService.CreateAsync",
         "RepositoryService.ListAsync",
         "RepositoryService.SetEnabledAsync",

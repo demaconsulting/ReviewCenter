@@ -118,6 +118,33 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Changes one review rule of a project, if it still holds the value the caller based its change on.
+    /// </summary>
+    /// <remarks>
+    ///     The comparison and the update are one atomic step (compare-and-set) inside the transaction that also
+    ///     stores the audit entry, like <see cref="UpdateRequireIndependentReviewersAsync"/>. Changing one rule
+    ///     never changes another.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="rule">The rule to change.</param>
+    /// <param name="expected">The value the caller read and based its change on.</param>
+    /// <param name="updated">The new value.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the rule was changed; <c>false</c> (and nothing recorded) when the project does not
+    ///     exist or the rule is no longer <paramref name="expected"/>.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="rule"/> is not defined.</exception>
+    Task<bool> UpdateReviewRuleAsync(
+        int projectId,
+        ReviewRule rule,
+        bool expected,
+        bool updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Changes the checklist definition of a project, if it still is the one whose hash the caller based its
     ///     change on.
     /// </summary>

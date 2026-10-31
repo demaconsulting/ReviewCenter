@@ -443,7 +443,9 @@ Approved review is locked: its comments, checklist, and reviewer slots can no lo
 administrator or a system administrator can reopen it, with a recorded reason; the earlier signatures then stay as
 history, are out of date, and the review needs new signatures. While the project rule "Require independent reviewers"
 is on (the default), the person who created the review in ReviewCenter cannot be one of its reviewers and cannot sign
-it; the authors of git commits are not matched. An
+it; the authors of git commits are not matched. Two further project rules, on by default and switched by the same
+administrators, keep the review author from answering the checklist of the review and the person who reopened a review
+from signing it again; they are stored and audited but not applied yet. An
 Approved review can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
 (a self-signed key by default, or a certificate from a certificate store), proves that the document is unchanged and
 comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
@@ -480,7 +482,8 @@ from a repository (its reviews have no source columns), before personal access t
 its reviews have no creator columns), or before project access control (it has no `ProjectMemberships` table, its
 users have no system administrator flag, and its repositories have no project), or before project members management (its
 users have no `MustChangePassword` column), or before the approval lock (its projects have no
-`RequireIndependentReviewers` column and it has no `ReviewReopens` table) must be
+`RequireIndependentReviewers` column and it has no `ReviewReopens` table), or before the review rule switches (its projects
+have no `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns) must be
 deleted and created again, because there are no migrations (the schema is created with `EnsureCreated`, so a
 development database must be deleted and recreated whenever the schema changes).
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
@@ -641,7 +644,8 @@ is running.
   creator columns), before project access control (it has no `ProjectMemberships` table, its users lack the system
   administrator flag, and its repositories lack the project), or before project members management (its users lack the
   `MustChangePassword` column), or before the approval lock (its projects lack the `RequireIndependentReviewers`
-  column and it has no `ReviewReopens` table) must be deleted and
+  column and it has no `ReviewReopens` table), or before the review rule switches (its projects lack the
+  `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns) must be deleted and
   created again; development databases are simply deleted and recreated. The audit table is append-only for the
   application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`

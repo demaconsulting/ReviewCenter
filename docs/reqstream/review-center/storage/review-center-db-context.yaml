@@ -238,6 +238,22 @@ sections:
         tests:
           - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
 
+      - id: ReviewCenter-DbContext-ReviewRuleColumns
+        title: >-
+          The ReviewCenterDbContext class shall map the two further review rules of a project (authors answering the
+          checklist of their own review, and the person who reopened a review signing it again) to boolean columns of
+          the project table whose value comes from the project, on for a project that was not given another value, so
+          that a changed rule is stored in its own column. The schema is created from the model without a migration,
+          so a database that was created before the columns existed has to be recreated.
+        justification: |
+          Each rule belongs to exactly one project and is read with it. The values are not declared as database
+          defaults, so the default of the project type is the only one and a stored false is never mistaken for an
+          unset value. The schema is not migrated while the product is not released, so development databases are
+          recreated.
+        tests:
+          - ReviewStore_UpdateReviewRuleAsync_CompareAndSet
+          - ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned
+
       - id: ReviewCenter-DbContext-ReviewReopens
         title: >-
           The ReviewCenterDbContext class shall map the reopenings of a review to a table in which each row belongs to

@@ -19,7 +19,13 @@ what is decided by `ProjectAccess`; this unit only asks.
 (`string`, may be empty), `Created` (`DateTimeOffset`, from the injected clock), `Evidence` (the evidence settings), and
 `RequireIndependentReviewers` (`bool`, default `true`): whether the person who created a review is kept out of its
 reviewer slots and cannot sign it (see the `SigningService` unit, which enforces it). Review Center only knows who
-created the review in the tool; the authors of git commits are not matched.
+created the review in the tool; the authors of git commits are not matched. Two further review rules are stored with
+the project and are on by default: `RequireNonAuthorChecklistAnswers` (`bool`): whether the author of a review may not
+answer the checklist of that review, and `RequireNonReopenerSigning` (`bool`): whether the person who reopened a
+review may not sign it again. They are stored and audited only; no unit applies them yet.
+
+**ReviewRule**: an enumeration of the rules of a project that an administrator can switch: `IndependentReviewers`,
+`NonAuthorChecklistAnswers`, and `NonReopenerSigning`.
 
 **ReviewLimits**: constants that define every limit of the domain once, so that the pages, the services, and the
 storage agree:
@@ -62,7 +68,8 @@ password).
 `ListReviewsAsync`, and `GetFileContentAsync`, for project membership `AddMembershipAsync`,
 `RemoveMembershipAsync`, `SetMembershipRoleAsync`, `GetMembershipAsync`, `ListMembershipsAsync` (the members of a
 project), and `ListMembershipsForUserAsync`. The setting of a project is changed with
-`UpdateRequireIndependentReviewersAsync`, a compare-and-set that takes the audit draft. The three changing
+`UpdateRequireIndependentReviewersAsync`, a compare-and-set that takes the audit draft; the same kind of change for any
+review rule is `UpdateReviewRuleAsync`, which names the rule. The three changing
 membership operations take the audit draft that is
 saved in the same transaction; the removal and the role change report whether a membership existed and take a
 `requireAnotherAdmin` flag that makes the store refuse, with `LastProjectAdmin`, a change that would leave the project
@@ -161,7 +168,31 @@ account can never be a system administrator and cannot exist without the members
   the audit entry `project.independent-reviewers-changed` (detail `RequireIndependentReviewers on->off` or
   `off->on`). When the stored value is no longer `expected`, `RecordChanged` is raised ("The setting was changed by
   someone else. Reload the page and try again.") and nothing is stored. The rule is not retroactive: it is applied
-  when a reviewer is chosen and when a review is signed, and existing signatures stay valid.
+  when a reviewer is chosen and when a review is signed, and existing signatures stay valid. This method is a thin
+  wrapper of `SetReviewRuleAsync` for the rule `IndependentReviewers`.
+
+**SetReviewRuleAsync**: Switches one review rule of a project.
+
+- *Parameters*: the `Actor`, the project identity, the `ReviewRule`, the `expected` value, the new `value`, and a
+  cancellation token.
+- *Returns*: `Task<bool>` — `true` when the value was changed, `false` when `value` equals `expected` (nothing is
+  stored or recorded).
+- *Preconditions*: The same as for `SetRequireIndependentReviewersAsync` (no API token, administers the project or is a
+  system administrator). A rule that is not a defined value is rejected with `ArgumentOutOfRangeException`.
+- *Postconditions*: The store changes the value only while it still equals `expected` (compare-and-set), together with
+  one audit entry; when the stored value is no longer `expected`, `RecordChanged` is raised with the same message as
+  above and nothing is stored.
+
+| Rule | Audit action | Property named in the detail |
+| ------ | -------------- | -------------- |
+| `IndependentReviewers` | `project.independent-reviewers-changed` | `RequireIndependentReviewers` |
+| `NonAuthorChecklistAnswers` | `project.review-rule-changed` | `RequireNonAuthorChecklistAnswers` |
+| `NonReopenerSigning` | `project.review-rule-changed` | `RequireNonReopenerSigning` |
+
+The audit detail is the property name followed by `on->off` or `off->on`.
+
+The two rules `NonAuthorChecklistAnswers` and `NonReopenerSigning` are stored, audited, and shown only: the checklist
+and signing services do not read them yet.
 
 **Audit**: `CreateAsync` builds the audit draft `project.created` (detail `project 'Name'`) from the stored project, so
 it can name the identity the database assigned, and passes it to the store, which saves it in the same transaction. A

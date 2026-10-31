@@ -148,6 +148,17 @@ public partial class ProjectPage : ComponentBase
     private bool RequireIndependentChoice { get; set; } = true;
 
     /// <summary>
+    ///     Gets the value of the "authors cannot answer the checklist" switch as the user set it (not yet saved).
+    /// </summary>
+    private bool RequireNonAuthorChoice { get; set; } = true;
+
+    /// <summary>
+    ///     Gets the value of the "the person who reopened a review cannot sign it again" switch as the user set it
+    ///     (not yet saved).
+    /// </summary>
+    private bool RequireNonReopenerChoice { get; set; } = true;
+
+    /// <summary>
     ///     Gets the message of the last rejected review rule change, or <c>null</c> when there is none.
     /// </summary>
     private string? RulesError { get; set; }
@@ -193,6 +204,8 @@ public partial class ProjectPage : ComponentBase
         }
 
         RequireIndependentChoice = Project.RequireIndependentReviewers;
+        RequireNonAuthorChoice = Project.RequireNonAuthorChecklistAnswers;
+        RequireNonReopenerChoice = Project.RequireNonReopenerSigning;
         Reviews = await ReviewService.ListAsync(ProjectId);
         Repositories = await RepositoryService.ListEnabledAsync(actor, ProjectId);
         CanAdminister = await Access.CanAdministerAsync(actor, ProjectId);
@@ -297,13 +310,14 @@ public partial class ProjectPage : ComponentBase
     }
 
     /// <summary>
-    ///     Saves the review rules (today: whether independent reviewers are required).
+    ///     Saves the review rules (independent reviewers, and the two stored-only rules).
     /// </summary>
-    /// <returns>A task that completes when the rule is stored or the problem is shown.</returns>
+    /// <returns>A task that completes when the rules are stored or the problem is shown.</returns>
     /// <remarks>
-    ///     Only while the user may still view and administer the project. The change is a compare-and-set against the
-    ///     value the page loaded, so two administrators cannot silently overwrite each other; a stale value is shown
-    ///     as an error and the page reloads the stored value.
+    ///     Only while the user may still view and administer the project. Each changed rule is a compare-and-set
+    ///     against the value the page loaded, so two administrators cannot silently overwrite each other; a stale
+    ///     value is shown as an error and the page reloads the stored values. The rules are saved one after the other,
+    ///     not atomically: rules saved before a refused one stay saved and their confirmation stays visible.
     /// </remarks>
     private async Task SaveReviewRulesAsync()
     {
@@ -317,19 +331,27 @@ public partial class ProjectPage : ComponentBase
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
-            var expected = Project?.RequireIndependentReviewers ?? true;
-            var changed = await ProjectService.SetRequireIndependentReviewersAsync(
-                actor, ProjectId, expected, RequireIndependentChoice);
-            Project = await ProjectService.GetAsync(actor, ProjectId);
-            var message = "The review rules were already set this way.";
-            if (changed)
+            var loaded = Project;
+            var messages = new List<string>();
+            foreach (var (rule, expected, choice) in new[]
+                     {
+                         (ReviewRule.IndependentReviewers, loaded?.RequireIndependentReviewers ?? true, RequireIndependentChoice),
+                         (ReviewRule.NonAuthorChecklistAnswers, loaded?.RequireNonAuthorChecklistAnswers ?? true, RequireNonAuthorChoice),
+                         (ReviewRule.NonReopenerSigning, loaded?.RequireNonReopenerSigning ?? true, RequireNonReopenerChoice),
+                     })
             {
-                message = RequireIndependentChoice
-                    ? "Independent reviewers are now required."
-                    : "Independent reviewers are no longer required.";
+                if (expected == choice
+                    || !await ProjectService.SetReviewRuleAsync(actor, ProjectId, rule, expected, choice))
+                {
+                    continue;
+                }
+
+                messages.Add(DescribeSavedRule(rule, choice));
+                RulesStatus = string.Join(' ', messages);
             }
 
-            RulesStatus = message;
+            Project = await ProjectService.GetAsync(actor, ProjectId);
+            RulesStatus = messages.Count > 0 ? string.Join(' ', messages) : "The review rules were already set this way.";
         }
         catch (DomainRuleException ex)
         {
@@ -341,8 +363,30 @@ public partial class ProjectPage : ComponentBase
                 var actor = await AuthenticationState.GetActorAsync();
                 Project = await ProjectService.GetAsync(actor, ProjectId);
                 RequireIndependentChoice = Project?.RequireIndependentReviewers ?? true;
+                RequireNonAuthorChoice = Project?.RequireNonAuthorChecklistAnswers ?? true;
+                RequireNonReopenerChoice = Project?.RequireNonReopenerSigning ?? true;
             }
         }
+    }
+
+    /// <summary>
+    ///     Words the confirmation of one stored review rule change.
+    /// </summary>
+    /// <param name="rule">The rule that was changed.</param>
+    /// <param name="value">The value it now has.</param>
+    /// <returns>The sentence for the status line.</returns>
+    private static string DescribeSavedRule(ReviewRule rule, bool value)
+    {
+        var state = value ? "on" : "off";
+        return rule switch
+        {
+            ReviewRule.IndependentReviewers => value
+                ? "Independent reviewers are now required."
+                : "Independent reviewers are no longer required.",
+            ReviewRule.NonAuthorChecklistAnswers =>
+                $"Authors cannot answer the checklist: now {state} (stored; not applied yet).",
+            _ => $"The person who reopened a review cannot sign it again: now {state} (stored; not applied yet).",
+        };
     }
 
     /// <summary>
