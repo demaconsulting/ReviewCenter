@@ -87,3 +87,8 @@ the output contains "user add", "--username", "--display-name", "--system-admin"
 `audit verify`. This scenario is tested by `Program_Run_Help_DocumentsAuditVerify`, which is defined in
 `CliSubsystemTests.cs`. No test dispatches `Program.Run` to `AuditCommand.Run`; the dispatch is a single branch that
 is verified by inspection, and the command itself is verified by the `AuditCommand` tests.
+
+**Program_Run_Help_DocumentsKeysReprotect**: `Program.Run` is called with a context from `["--help"]`; the output names
+`keys reprotect`. This scenario is tested by `Program_Run_Help_DocumentsKeysReprotect`, which is defined in
+`CliSubsystemTests.cs`. No test dispatches `Program.Run` to `KeysCommand.Run`; the dispatch is a single branch that is
+verified by inspection, and the command itself is verified by the `KeysCommand` tests.

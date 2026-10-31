@@ -191,3 +191,8 @@ command line. This scenario is tested by `Context_Create_PasswordOption_IsNotSup
 by `Context_Create_AuditVerifyVerb_SetsAuditVerify`; `audit` alone or with another action is rejected with an
 `ArgumentException`, which is tested by `Context_Create_AuditMisuse_ThrowsArgumentException`. Both tests are defined
 in `CliSubsystemTests.cs`.
+
+**Keys reprotect verb**: `Context.Create` with `keys reprotect` sets `KeysReprotect` and is off otherwise, which is
+tested by `Context_Create_KeysReprotectVerb_SetsKeysReprotect`; `keys` alone or with another action is rejected with an
+`ArgumentException`, which is tested by `Context_Create_KeysMisuse_ThrowsArgumentException`. Both tests are defined in
+`CliSubsystemTests.cs`.

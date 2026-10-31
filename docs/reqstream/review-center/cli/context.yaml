@@ -159,6 +159,18 @@ sections:
           - Context_Create_AuditVerifyVerb_SetsAuditVerify
           - Context_Create_AuditMisuse_ThrowsArgumentException
 
+      - id: ReviewCenter-Context-KeysReprotect
+        title: >-
+          The Context class shall accept the keys reprotect verb to signal that the Data Protection key is to be
+          rotated and the stored secrets protected again, and shall reject the keys verb without the reprotect action
+          or with another action.
+        justification: |
+          Rotating the key is an explicit action, and a mistyped action must be found when the arguments are parsed,
+          with a clear message.
+        tests:
+          - Context_Create_KeysReprotectVerb_SetsKeysReprotect
+          - Context_Create_KeysMisuse_ThrowsArgumentException
+
       - id: ReviewCenter-Context-CheckConfig
         title: >-
           The Context class shall accept the `--check-config` option to signal that the configured database and key ring

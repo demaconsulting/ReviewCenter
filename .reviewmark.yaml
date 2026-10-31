@@ -321,6 +321,20 @@ reviews:
       - "src/**/Hosting/AuditCommand.cs"
       - "test/**/Hosting/AuditCommandTests.cs"
 
+  - id: ReviewCenter-Hosting-KeysCommand
+    title: Review of ReviewCenter KeysCommand unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/hosting.md
+      - docs/reqstream/review-center/hosting.yaml
+    paths:
+      - "docs/reqstream/review-center/hosting/keys-command.yaml"
+      - "docs/design/review-center/hosting/keys-command.md"
+      - "docs/verification/review-center/hosting/keys-command.md"
+      - "src/**/Hosting/KeysCommand.cs"
+      - "test/**/Hosting/KeysCommandTests.cs"
+
   # ReviewCenter - Identity
   - id: ReviewCenter-Identity
     title: Review of ReviewCenter Identity subsystem architecture and interfaces

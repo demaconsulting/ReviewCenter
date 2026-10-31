@@ -120,7 +120,8 @@ internal static class Program
     /// </param>
     /// <remarks>
     ///     Dispatch is priority-ordered: version check first, then help, then self-validation,
-    ///     then the serve verb, then the user add verb, then the audit verify verb, then the default tool logic. Only the highest-priority
+    ///     then the serve verb, then the user add verb, then the audit verify verb, then the keys reprotect verb, then the
+    ///     default tool logic. Only the highest-priority
     ///     matching action is executed per invocation. The <c>serve</c> action blocks until the server stops.
     ///     A distinct method name (rather than an overload of <see cref="Run(Context)"/>) keeps
     ///     the common call site simple.
@@ -174,7 +175,14 @@ internal static class Program
             return;
         }
 
-        // Priority 7: Default tool functionality
+        // Priority 7: Re-protect the stored secrets with a new key
+        if (context.KeysReprotect)
+        {
+            KeysCommand.Run(context);
+            return;
+        }
+
+        // Priority 8: Default tool functionality
         RunToolLogic(context);
     }
 
@@ -199,12 +207,16 @@ internal static class Program
         context.WriteLine("       reviewcenter serve [--urls <url>] [options]");
         context.WriteLine("       reviewcenter user add --username <name> --display-name <text> [--system-admin] [options]");
         context.WriteLine("       reviewcenter audit verify [options]");
+        context.WriteLine("       reviewcenter keys reprotect [options]");
         context.WriteLine("");
         context.WriteLine("Verbs:");
         context.WriteLine("  serve                      Run the ReviewCenter web server until stopped");
         context.WriteLine("  user add                   Create a user; the password is read from the REVIEWCENTER_PASSWORD");
         context.WriteLine("                             environment variable, else standard input, else a prompt");
         context.WriteLine("  audit verify               Verify the audit trail hash chain; exit code 0 when intact, 1 when broken");
+        context.WriteLine("  keys reprotect             Roll a new Data Protection key and re-protect every stored repository token and");
+        context.WriteLine("                             two-factor secret with it, so that old key material can be retired; stop the");
+        context.WriteLine("                             server first; refuses (exit code 1, nothing changed) when a secret cannot be read");
         context.WriteLine("");
         context.WriteLine("Options:");
         context.WriteLine("  -v, --version              Display version information");

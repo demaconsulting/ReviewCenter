@@ -207,3 +207,17 @@ sections:
         tests:
           - Context_Create_AuditVerifyVerb_SetsAuditVerify
           - Program_Run_Help_DocumentsAuditVerify
+
+      - id: ReviewCenter-Cli-KeysReprotect
+        title: >-
+          The Cli subsystem shall support the keys reprotect verb to signal that the Data Protection key is to be
+          rotated and the stored secrets protected again, and shall reject the keys verb without the reprotect action
+          or with another action.
+        justification: |
+          Rotating the key writes to the key ring and the database, so it must be an explicit action, and a mistyped
+          action must be found when the arguments are parsed.
+        children:
+          - ReviewCenter-Context-KeysReprotect
+        tests:
+          - Context_Create_KeysReprotectVerb_SetsKeysReprotect
+          - Program_Run_Help_DocumentsKeysReprotect
