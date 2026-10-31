@@ -235,6 +235,56 @@ the document. It also says that the record digest covers the complete record, in
 Changing a setting does not change reviews, signatures, or the record digest. It changes what the next PDF contains and
 who can read the index and the PDFs.
 
+## Checklist Template
+
+**Where you are.** The **Checklist** button of the project page leads to `/projects/{id}/checklist`. The page is shown
+only to a project administrator of the project and to a system administrator; for anybody else it is the same message as
+for a project that does not exist. The **Review rules** card of the project page also shows one line with the checklist
+that new reviews start with, for example "default-1 (14 sections, 58 checks), built-in default".
+
+**What it is.** The checklist template is the list of sections and checks that a new review of the project starts with.
+A project uses the built-in default (version label `default-1`, 14 sections, 58 checks) until an administrator replaces
+it. The template is a JSON document with a version label and a list of sections, each with an identifier, a title, an
+optional hint, and a list of checks, each with an identifier and the wording of the question. An identifier consists of
+letters, digits, dots, underscores, and hyphens, starts with a letter or digit, and is unique across the whole template
+(sections and checks together, without regard to case).
+
+**Reviews keep their copy.** A review stores the checklist it was created with. Replacing or resetting the template
+changes only the reviews that are created afterwards; existing reviews, their answers, and their signatures are not
+touched.
+
+**The page.**
+
+- **Export current checklist** and **Export built-in default** download the definition as a JSON file named after its
+  version label. Export the built-in default to start a template of your own.
+- **Import.** Paste the JSON into the text area or choose a file of up to 256 KiB, then press **Validate**. Every
+  error is listed with the path of the place that is wrong (for example `sections[0].items[1].id`), and nothing is
+  changed while the definition is not valid.
+- **Preview and differences.** A valid definition is shown with every section and check, and with a short comparison
+  with the current checklist: the version label, and the sections and checks that were added, removed, or changed by
+  identifier.
+- **Replace checklist** is available for a valid definition that differs from the current one. It asks for a
+  confirmation that says that existing reviews keep their checklist and only later reviews use the new one. A definition
+  whose wording differs from the current one must also have **another version label**; the page refuses a changed
+  definition that keeps the label, because the label is what a review records about its checklist.
+- **Reset to built-in default** returns the project to the built-in default after a confirmation. It is not offered
+  while the project already uses it.
+
+If somebody else changed the template while your page was open, nothing is saved: the page shows the message that it
+was changed by someone else and the template that is stored now, and you decide again. If you lose the right to
+administer the project while the page is open, nothing is saved and the page closes as a project that does not exist.
+A personal access token cannot change the template; the API can only read it (see [Automation](automation.md)).
+
+**Audit.** Every replace and every reset is recorded in the audit trail as `project.checklist-changed` with the project
+and the new version label (or "reset to default"). The entries are on the audit page of the project.
+
+**Sample.** The repository contains an example template,
+[`samples/iec62304-checklist.json`](samples/iec62304-checklist.json), with six sections (requirements and risk, design
+and architecture including software of unknown provenance, implementation, verification, configuration management, and
+documentation). It is an example structure inspired by the lifecycle activities of IEC 62304. It does not make a review
+record compliant with that or any other standard: adapt it and have it reviewed by your quality or regulatory lead
+before you use it.
+
 ## Review Rules
 
 **Where you are.** The **Review rules** card on the project page (`/projects/{id}`), above the members. It is shown

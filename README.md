@@ -30,7 +30,7 @@ a project checklist, and sign the review with their credentials. Every action is
 - 🔍 **File-Set Reviews** - Review uploaded files or git revision changes
 - 🌿 **Git Sources** - Plan reviews from repository review-sets
 - 💬 **Threaded Comments** - Discuss files or line ranges inline
-- ✅ **Review Checklist** - 14-section Pass, Fail, or N/A checklist
+- ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own template)
 - 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot
 - ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to reviewed record
 - 🔒 **Approval Lock** - Approved reviews lock, admins reopen with a reason, authors cannot self-review

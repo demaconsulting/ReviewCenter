@@ -29,7 +29,8 @@ using Microsoft.AspNetCore.Http.Metadata;
 namespace DemaConsulting.ReviewCenter.Api;
 
 /// <summary>
-///     The JSON API under <c>/api</c>: list projects and reviews, read a review, create a review, download the
+///     The JSON API under <c>/api</c>: list projects and reviews, read a review, read the checklist template of a
+///     project, create a review, download the
 ///     attestation and read the evidence index, all with a personal access token (the attestation and the evidence
 ///     index can also be read without a token when the project allows it).
 /// </summary>
@@ -135,6 +136,19 @@ internal static class ApiEndpoints
                 + "only the projects they are a member of), in the order of the project list of the web pages.")
             .Produces<ProjectDto[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/projects/{projectId:int}/checklist", GetChecklistAsync)
+            .WithName("GetChecklist")
+            .WithSummary("Gets the checklist template of a project.")
+            .WithDescription(
+                "Returns the checklist that new reviews of the project start with: its definition (sections and checks), "
+                + "the version label, whether it is the built-in default, the SHA-256 hash of the definition text, and "
+                + "the number of sections and checks. Existing reviews keep the checklist they were created with. The "
+                + "template can be changed on the web pages only.")
+            .Produces<ProjectChecklistDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/projects/{projectId:int}/reviews", ListReviewsAsync)
             .WithName("ListReviews")
@@ -282,6 +296,50 @@ internal static class ApiEndpoints
     {
         var list = await projects.ListAsync(ApiProblems.ActorOf(http.User), cancellationToken);
         return TypedResults.Ok(list.Select(p => new ProjectDto(p.Id, p.Name, p.Description, p.Created)).ToList());
+    }
+
+    /// <summary>
+    ///     Gets the checklist template of a project.
+    /// </summary>
+    /// <param name="projectId">The project number.</param>
+    /// <param name="http">The request context; supplies the token actor.</param>
+    /// <param name="projects">The project service.</param>
+    /// <param name="templates">The project checklist service.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>
+    ///     The checklist; 404 when the project does not exist or is not visible to the token's owner; 400 when the
+    ///     stored definition cannot be read.
+    /// </returns>
+    private static async Task<IResult> GetChecklistAsync(
+        int projectId,
+        HttpContext http,
+        ProjectService projects,
+        ProjectChecklistService templates,
+        CancellationToken cancellationToken)
+    {
+        var actor = ApiProblems.ActorOf(http.User);
+        if (await projects.GetAsync(actor, projectId, cancellationToken) is null)
+        {
+            return ApiProblems.NotFound(ProjectNotFoundMessage);
+        }
+
+        var checklist = await templates.GetAsync(actor, projectId, cancellationToken);
+        var definition = checklist.Definition;
+        return TypedResults.Ok(new ProjectChecklistDto(
+            checklist.Version,
+            checklist.IsDefault,
+            checklist.Hash,
+            checklist.SectionCount,
+            checklist.ItemCount,
+            new ChecklistDefinitionDto(
+                definition.Version,
+                definition.Sections
+                    .Select(s => new ChecklistSectionDto(
+                        s.Id,
+                        s.Title,
+                        s.ApplicabilityHint,
+                        s.Items.Select(i => new ChecklistItemDto(i.Id, i.Text)).ToList()))
+                    .ToList())));
     }
 
     /// <summary>

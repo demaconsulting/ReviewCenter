@@ -83,6 +83,12 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   so they are verified at unit level by the component tests of `ProjectPage` (`EvidenceSettingsPageTests.cs`) and
   `HelpPage` (see the children of the requirement `ReviewCenter-Web-EvidenceSettings` in `web.yaml`). What the stored
   settings do to the API and the PDFs is verified in the `Api` and `Evidence` subsystems.
+- The checklist template page (who gets it, export, import and validation with every error, the preview and the
+  differences, replace and reset with their confirmations and audit entries, a change by someone else, and a lost
+  right), the link and summary on the project page, and the help topic need a live connection, so they are verified at
+  unit level by the component tests of `ProjectPage` (`ProjectChecklistPageTests.cs`, `ChecklistDiffTests.cs`) and
+  `HelpPage` (see the children of the requirement `ReviewCenter-Web-ChecklistTemplate` in `web.yaml`); the journey in a
+  browser is verified by the system test `ReviewCenter_ChecklistTemplate_ReplaceChangesOnlyNewReviewsAndResetRestoresTheDefault`.
 - Optional sign-in with an OpenID Connect provider: the login page offers the button of the provider beside the local
   form only while it is enabled, the users and account pages show that such an account has no password, the review
   page offers the confirmation at the provider instead of the password field, and the help topics mention it; the
@@ -293,6 +299,16 @@ verified by `HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitc
 page is verified by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons` and
 `ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`. The effect of the settings on the API and the PDFs is
 verified in the `Api` and `Evidence` subsystems.
+
+**Checklist template page and help**: The page, its export, validation, preview, replace, reset, conflict, and lost
+right are verified by the `ProjectChecklistPageTests` unit tests, which render the page with the component test host and
+the real `ProjectChecklistService` over a fake store:
+`ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary`,
+`ProjectChecklistPage_Validate_InvalidDefinition_ShowsAllErrorsWithPaths`, and
+`ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits` trace the subsystem requirement, and the help topic is
+verified by `HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies`. The button and the summary on
+the project page are verified by `ProjectPage_Render_ProjectAdmin_ShowsChecklistLinkAndSummary` and
+`ProjectPage_Render_PlainMember_ShowsNoChecklistLinkOrSummary`.
 
 **Temporary password**: A user who signed in with a temporary password is confined to the account page. The layout
 shows no navigation tabs and sends the browser to `/account` from every page except the account, help, and about pages,

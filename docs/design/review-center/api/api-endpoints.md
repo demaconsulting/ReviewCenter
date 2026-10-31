@@ -14,7 +14,8 @@ shape of a request.
 The unit is three files. `ApiEndpoints` is a static class with the extension method `MapApi` and the handlers of the
 routes. `ApiModels` holds the types of the requests and answers, all immutable records: `ProjectDto`,
 `ReviewSummaryDto`, `ReviewDetailDto` (with `SlotDto` and `ReviewCountsDto`), `CreateReviewRequest` (with
-`UploadFileDto` and `RepositorySourceDto`), and `CreatedReviewDto` (with `SkippedFileDto`). The types are separate from
+`UploadFileDto` and `RepositorySourceDto`), `CreatedReviewDto` (with `SkippedFileDto`), and `ProjectChecklistDto` (with
+`ChecklistDefinitionDto`, `ChecklistSectionDto`, and `ChecklistItemDto`). The types are separate from
 the Core types so that the shape of the API does not change when a Core class does. `ApiProblems` holds the mapping
 from a broken rule to a status and the helpers that build a problem description and the actor of a call.
 
@@ -39,6 +40,7 @@ step.
   - `GET /api/projects` (the projects that the owner of the token may see),
   - `GET /api/projects/{projectId}/reviews` (the project number must be an integer),
   - `GET /api/projects/{projectId}/reviews/{reviewId}`,
+  - `GET /api/projects/{projectId}/checklist` (the checklist template of the project),
   - `POST /api/projects/{projectId}/reviews`, which requires a JSON body (the OpenAPI description marks the body as
     required; the content type must be JSON, and a request with another content type or none is answered by a second
     `POST` route of lower priority with a 415 problem, before any body is read) up to a
@@ -108,6 +110,14 @@ without a token (anonymous) is the one exception for a review that is not comple
 a review that does not exist, so it cannot probe which review identifiers exist or whether they are complete. What the
 PDF contains follows the evidence settings of the project (see `AttestationService`), whoever asks.
 
+**Read the checklist template**: Checks the project first like every route (`ProjectService.GetAsync` with the actor of
+the token; a project that does not exist or that the owner may not see is the same 404 problem), then asks
+`ProjectChecklistService.GetAsync` and copies the result into `ProjectChecklistDto`: the version label, whether the
+built-in default is used, the SHA-256 hash of the definition text (the value the web page sends back when it replaces the
+template), the number of sections and checks, and the definition with the sections and checks in order. A stored
+definition that cannot be read is a `ChecklistDefinitionInvalid` rule exception, which `ApiProblems.StatusOf` maps
+explicitly to a 400 problem. The route only reads: no route under `/api` changes the template, and no API token can.
+
 **Read the evidence index**: For a caller with a token, answers 404 for a project that does not exist or that the owner
 may not see. A caller without a token (let through by the policy only when the project allows an anonymous evidence
 index) skips that check and is checked again by `EvidenceIndexService`, which refuses it with the not-found rule when
@@ -154,7 +164,8 @@ without credentials, for a project that does not allow it, gets the same generic
 
 #### Dependencies
 
-- **ProjectService**, **ReviewService**, **SigningService**, **ThreadService**, **ChecklistService** — Core; the work.
+- **ProjectService**, **ReviewService**, **SigningService**, **ThreadService**, **ChecklistService**,
+  **ProjectChecklistService** — Core; the work.
 - **AttestationService**, **AttestationEndpoint** — Evidence; the attestation and the shared mapping of its result.
 - **EvidenceIndexService** — Evidence; the entries of the evidence index.
 - **ApiTokenAuthentication**, **AnonymousRateLimit** — the policies of the groups and the limiter of anonymous callers.

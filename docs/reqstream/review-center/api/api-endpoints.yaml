@@ -27,7 +27,8 @@ sections:
       - id: ReviewCenter-ApiEndpoints-ProjectAccess
         title: >-
           The ApiEndpoints unit shall check, before anything else, on every route that names a project (the reviews of
-          the project, one review, the creation of a review, the attestation, and the evidence index), that the owner
+          the project, one review, the creation of a review, the attestation, the evidence index, and the checklist
+          template), that the owner
           of the token may see the project, and shall answer an owner who may not with the 404 problem document, and the
           same body, that it answers for a project that does not exist, for a bearer token and for HTTP Basic
           credentials, and shall list only the projects the owner may see. This applies to a request that carries a
@@ -64,7 +65,8 @@ sections:
           JSON of the right shape, with a status of 400 (415 for a content type that is not JSON) and a problem document
           that names the field where there is one, and shall answer a domain rule that refuses the request with the
           status of that rule, including 409 for the removal of the last project administrator, 429 for too many
-          attempts, and 403 for an account that has to change its password.
+          attempts, 403 for an account that has to change its password, and 400 for a checklist definition that is
+          not valid.
         justification: |
           A script cannot read a page, so the cause of a refusal must be in the answer. Naming the field tells the
           author which part of the request to fix.
@@ -74,6 +76,7 @@ sections:
           - ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem
           - ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus
           - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+          - ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage
 
       - id: ReviewCenter-ApiEndpoints-Limits
         title: >-
@@ -132,6 +135,28 @@ sections:
           - ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost
           - ApiEndpoints_Request_NoToken_Answers401
           - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+
+      - id: ReviewCenter-ApiEndpoints-Checklist
+        title: >-
+          The ApiEndpoints unit shall return the checklist template of a project at
+          GET /projects/{projectId}/checklist, to a client with a valid token whose owner may see the project, as a
+          JSON object with the definition (version label, sections, and checks), the version label, whether it is the
+          built-in default, the SHA-256 hash of the definition text, and the number of sections and checks, and shall
+          answer 404 with the problem document of a missing project for a project that does not exist or that the
+          owner may not see, answer 400 with a problem document for a stored definition that cannot be read, answer
+          401 to a request without a valid token, and offer no route that changes the template.
+        justification: |
+          A pipeline that files reviews can need to know which checklist new reviews of the project start with, for
+          example to check it against an approved version or to show it to the reviewers. Reading is the same right
+          as seeing the project, and changing the template stays a decision of a person who administers the project,
+          made on the web pages.
+        tests:
+          - ApiEndpoints_GetChecklist_Token_ReturnsDefaultThenCustomDefinition
+          - ApiEndpoints_GetChecklist_NonMemberUnknownProjectAndUnreadableDefinition_AnswerProblems
+          - ApiEndpoints_Request_NoToken_Answers401
+          - ApiProblems_StatusOf_ChecklistDefinitionInvalid_Is400WithTheMessage
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
 
       - id: ReviewCenter-ApiEndpoints-Errors
         title: >-

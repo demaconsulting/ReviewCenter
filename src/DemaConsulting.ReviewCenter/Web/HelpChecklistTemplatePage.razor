@@ -1,0 +1,52 @@
+@* HelpChecklistTemplatePage: help topic "Checklist template" at "/help/checklist-template". Static text only: what the
+   Checklist template page of a project does (export, import, validate, replace, reset) and that every review keeps
+   the checklist it was created with. *@
+@page "/help/checklist-template"
+
+<HelpTopicFrame Slug="checklist-template">
+    <section class="card">
+        <p>Every project has a <strong>checklist template</strong>: the list of sections and checks that each
+            <strong>new</strong> review of the project starts with. A project uses the <strong>built-in default</strong>
+            until an administrator replaces it with a checklist of its own. Only a <strong>project admin</strong> or a
+            <strong>system administrator</strong> can see and change it: use the <strong>Checklist</strong> button on
+            the project page. A person signed in with a browser changes it; an API token can only read it.</p>
+        <h2>Reviews keep their copy</h2>
+        <p>When a review is created, it receives a copy of the project's checklist, including the wording. Replacing
+            or resetting the template changes <strong>only the reviews created afterwards</strong>. Existing reviews,
+            approved and signed ones included, keep exactly the checklist they were created with, so no signed record
+            changes.</p>
+        <h2>Export</h2>
+        <p>Choose <strong>Export current checklist</strong> to download the project's checklist as a JSON file, or
+            <strong>Export built-in default</strong> to download the default. An exported file is a good starting point
+            for your own checklist: edit it in any text editor and import it again.</p>
+        <h2>Import, validate and preview</h2>
+        <p>Paste the JSON into the box (for a short definition), or upload a JSON file of up to 256 KiB. Then choose
+            <strong>Validate</strong>. Nothing is stored yet. If the definition is not valid, the page lists
+            <strong>every</strong> error with its path, for example <code>sections[1].items[0].id</code>, so you can
+            fix them all in one pass. If it is valid, the page shows a short summary of what differs from the current
+            checklist (the version label, and the sections and checks that were added, removed or reworded, by
+            identifier) and a preview of all sections and checks.</p>
+        <p>A definition has a <strong>version label</strong> and one or more sections; each section has an
+            identifier, a title, an optional applicability hint and a list of checks, each with an identifier and a
+            wording. Identifiers are letters, digits, dots, underscores and hyphens, and they are unique over the whole
+            definition.</p>
+        <h2>Replace</h2>
+        <p><strong>Replace checklist</strong> is enabled only for a valid definition that differs from the current one.
+            You are asked to confirm, because the wording becomes part of the signed records of the reviews created
+            from now on. A changed definition must have <strong>another version label</strong> than the current one, so
+            two reviews with the same label always have the same wording. If someone else changed the checklist while
+            you were working, nothing is overwritten: the page shows the current checklist and asks you to check and
+            try again.</p>
+        <h2>Reset to the built-in default</h2>
+        <p><strong>Reset to built-in default</strong> makes new reviews use the default checklist again, after a
+            confirmation. Reviews that were already created are not touched.</p>
+        <h2>Audit trail</h2>
+        <p>Every replace and every reset is recorded in the project's audit trail as
+            <code>project.checklist-changed</code>, with the new version label, the number of sections and checks and
+            the previous version label. The wording itself is not written to the audit trail.</p>
+        <h2>Examples</h2>
+        <p>The user guide ships an example definition inspired by the lifecycle activities of IEC 62304. It is an
+            example structure only: adapt it and have it reviewed by your quality or regulatory lead; using it does
+            not make a record compliant with any standard.</p>
+    </section>
+</HelpTopicFrame>

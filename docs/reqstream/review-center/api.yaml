@@ -135,6 +135,7 @@ sections:
           - ReviewCenter-ApiEndpoints-ProjectAccess
           - ReviewCenter-ApiEndpoints-EvidenceIndex
           - ReviewCenter-ApiEndpoints-Attestation
+          - ReviewCenter-ApiEndpoints-Checklist
         tests:
           - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused

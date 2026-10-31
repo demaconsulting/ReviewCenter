@@ -15,7 +15,8 @@ source file:
 - `HelpTopicFrame` (`HelpTopicFrame.razor`): the common frame of a topic page.
 - The topic pages `HelpGettingStartedPage`, `HelpCreatingReviewPage`, `HelpReadingReviewPage`, `HelpCommentsPage`,
   `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, `HelpPlanningPage`, `HelpAttestationPage`,
-  `HelpMembersPage`, `HelpApiTokensPage`, `HelpTwoFactorPage`, and `HelpEvidenceSettingsPage`: the text of one topic
+  `HelpMembersPage`, `HelpApiTokensPage`, `HelpTwoFactorPage`, `HelpEvidenceSettingsPage`, and
+  `HelpChecklistTemplatePage`: the text of one topic
   each.
 - `HelpNotFoundPage` (`HelpNotFoundPage.razor`): the catch-all for an unknown address.
 - `HelpTopics` (`HelpTopics.cs`): the list of topics.
@@ -138,8 +139,8 @@ are protected by the password alone), and that the changes are audited, never th
 `two-factor-1.png`, of the card with the factor on. The Account page links to it (see the `AccountPage` design), and
 the Reviewers and signing topic (`HelpSigningPage`) mentions the code.
 
-**Evidence settings topic** (`HelpEvidenceSettingsPage`, slug `evidence-settings`, title "Evidence settings"): The last
-topic, after Two-factor sign-in. It explains, in static text, that only a project admin or a system
+**Evidence settings topic** (`HelpEvidenceSettingsPage`, slug `evidence-settings`, title "Evidence settings"): The
+topic after Two-factor sign-in. It explains, in static text, that only a project admin or a system
 administrator can see and change the evidence settings, from the "Evidence settings" button of the project page, and
 that every change is recorded in the audit trail of the project with the old and new values; the two anonymous
 switches (Anonymous evidence index and Anonymous attestation PDFs), that both are off by default and independent, what
@@ -155,6 +156,17 @@ someone else changed the settings, a change applies to new downloads only). It h
 `evidence-settings-1.png` (the page with the defaults) and `evidence-settings-2.png` (the page with content left out,
 showing the warnings and the summary). The Signed attestation, Automation and API tokens, and Managing project members
 topics link to it.
+
+**Checklist template topic** (`HelpChecklistTemplatePage`, slug `checklist-template`, title "Checklist template"): The
+last topic, after Evidence settings. It explains, in static text, that a project admin or a system administrator can
+change the checklist that new reviews of the project start with, from the Checklist button of the project page, that
+a project uses the built-in default until it is replaced, and that only the reviews created afterwards use the new
+checklist while existing reviews keep exactly the checklist they were created with. It describes the steps (Export
+current checklist, paste or choose a file of up to 256 KiB, Validate with all errors and their paths, the preview and
+the differences, Replace checklist with its confirmation, and Reset to built-in default), the rule that a changed
+definition needs another version label, that every change is recorded as `project.checklist-changed`, and the sample
+that follows the lifecycle activities of IEC 62304, with the note that a template does not make a record compliant. It
+has no screenshot.
 
 **HelpNotFoundPage component**: It routes `/help/{*Slug}`, a catch-all with a parameter. The router prefers the fixed
 routes of the topic pages, so only an address that is not a topic reaches it. It shows a message that there is no help

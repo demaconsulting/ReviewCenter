@@ -46,6 +46,11 @@ N/A - standard test environment.
   review (a recovery code cannot sign and a used code needs the next one), turning off, the administrator reset (not for
   project administrators), that open sessions stay valid, and the setting `Identity:Totp:Enabled` with the warning that
   accounts are then protected by the password alone; the signing topic links to it.
+- The Checklist template topic follows the Evidence settings topic in the list, has the heading "Checklist template",
+  and describes who can change the template, the built-in default, that only later reviews use a new template while
+  existing reviews keep theirs, the export, the import limit of 256 KiB, the validation, the replace and the reset, the
+  rule of another version label, the audit action `project.checklist-changed`, and the IEC 62304 example with the note
+  that a template does not make a record compliant; it contains no link that begins with `#`.
 
 #### Test Scenarios
 
@@ -101,6 +106,15 @@ by their titles, mentions the regulatory warning, the Content scope section, and
 with `#`. This scenario is tested by `HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope`.
 The list of topics holds the topic at `/help/evidence-settings`, which
 `HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation` checks.
+
+**HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies**: The Checklist template page is rendered;
+the topic follows Evidence settings in the list, the heading is "Checklist template", and the text names the project
+admin, the built-in default, that only the reviews created afterwards use the new template and that existing reviews
+keep exactly the checklist they were created with. It names the steps Export current checklist, Validate, Replace
+checklist, and Reset to built-in default, the rule of another version label, the limit of 256 KiB, the audit action
+`project.checklist-changed`, and the IEC 62304 example with the note that a template does not make a record compliant;
+no link begins with `#`. This scenario is tested by
+`HelpChecklistTemplatePage_Render_ExplainsExportImportReplaceResetAndCopies`.
 
 **HelpTopicPage_Render_MentionsSignInWithProvider**: A theory over the topics `getting-started`,
 `reviewers-and-signing`, and `api-tokens` (in `OidcPageTests.cs`); each page is found by its route and rendered, and

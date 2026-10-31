@@ -299,8 +299,10 @@ appears later offers a sign-in link to the address the page was first opened at.
 
 ## Review Checklist
 
-Every new review gets a checklist: a copy of the default checklist, taken from the Continuous Compliance review
-template, with 14 sections and 58 checks. The review page shows a Checklist card with a summary such as "37 of 58
+Every new review gets a checklist: a copy of the checklist of its project. A project uses the default checklist,
+taken from the Continuous Compliance review template (14 sections and 58 checks), until a project administrator
+replaces it (see [Checklist Template](administration.md#checklist-template)). The review page shows a Checklist card
+with a summary such as "37 of 58
 checks answered" and a link to the checklist page; the review page's next-step line also counts the unanswered
 checks (for example "12 checklist checks unanswered, 1 open thread to resolve.") and says "Checklist complete and
 all threads resolved." when nothing is left.
@@ -326,8 +328,8 @@ and the first section with unanswered checks is open when you arrive.
 The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it
 counts as answered, and its justification records the finding.
 
-The checklist of a review is fixed when the review is created: a later release with a different default checklist
-does not change reviews that already exist, and there is no project-level checklist editor or import yet. Checklist
+The checklist of a review is fixed when the review is created: a later release with a different default checklist, or
+a project checklist that is replaced afterwards, does not change reviews that already exist. Checklist
 answers are not linked to comment threads. The checklist
 page is made for narrow screens too.
 
