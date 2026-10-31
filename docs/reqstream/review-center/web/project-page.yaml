@@ -283,6 +283,32 @@ sections:
           - NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing
           - NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate
 
+      - id: ReviewCenter-ProjectPage-FollowUp
+        title: >-
+          The ProjectPage unit shall offer on its page for a new review, when the project has an earlier review of
+          the chosen kind of source, a choice of the review to follow up, shall show for an upload what the
+          follow-up would carry (the Pass and N/A answers, the not-applicable sections, the open threads, the
+          resolved threads that are not carried, and the open threads of files that the new review does not have),
+          shall suggest the title Follow-up to the identifier without replacing a title that was typed, shall require
+          a confirmation before dropping open threads and pass it on, shall pass the choice on when it creates the
+          review from files or from a repository, shall show the message of the rule when the service refuses the
+          follow-up, shall offer nothing when the project has no earlier review, and shall mark a follow-up on the
+          list of reviews with a link to the review it follows.
+        justification: |
+          The creator decides what the new review is a follow-up of, and should see what that takes over before
+          creating it, and must confirm anything that would be dropped. The service decides what is allowed, so the
+          page shows its refusal instead of repeating its rules.
+        tests:
+          - NewReviewPage_FollowUp_NoEligibleReview_HidesSelectorOrShowsEmptyHint
+          - NewReviewPage_FollowUp_Selector_ListsEligibleReviewsOfTheChosenSource
+          - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
+          - NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion
+          - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
+          - NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal
+          - NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview
+          - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement
+          - ProjectPage_Render_FollowUpReview_ShowsFollowTag
+
       - id: ReviewCenter-ProjectPage-Interactive
         title: >-
           The ProjectPage unit shall report that it is interactive, through a marker on its root element, once

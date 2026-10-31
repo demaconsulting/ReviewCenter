@@ -5,8 +5,10 @@
 `ProjectPage`, `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, `EvidenceSettingsPage`, and
 `ProjectChecklistPage` are verified with
 component tests defined
-in `ProjectPageTests.cs`, which holds the tests of the first two pages and the member changes of the project page,
-`NewReviewPageRepositoryTests.cs`, `ProjectAccessPageTests.cs` (what a member, a non-member,
+in `ProjectPageTests.cs`, which holds the tests of the first two pages (including the follow-up tag in the list of
+reviews) and the member changes of the project page,
+`NewReviewPageRepositoryTests.cs`, `NewReviewPageFollowUpTests.cs` (the choice of an earlier review, with its preview
+and confirmation), `ProjectAccessPageTests.cs` (what a member, a non-member,
 and a system administrator see and do), `NewMemberPageTests.cs`, `NewMemberAccountPageTests.cs`,
 `EvidenceSettingsPageTests.cs`, `ProjectChecklistPageTests.cs`, and `ChecklistDiffTests.cs` (the pure comparison of two
 definitions), which use the
@@ -674,3 +676,43 @@ differences. This scenario is tested by `ChecklistDiff_Compare_CaseOrderAndMissi
 **ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator**: The exported text is indented, ends with a line break, and
 reads back as the same valid definition, also for the built-in default. This scenario is tested by
 `ChecklistDiff_ToIndentedJson_RoundTripsThroughTheValidator`.
+
+**NewReviewPage_FollowUp_NoEligibleReview_HidesSelectorOrShowsEmptyHint**: A project without a review shows no follow-up
+choice at all; for a repository source with no repository chosen, the choice offers only "No, this is a new review" and
+a hint to choose a repository. This scenario is tested by
+`NewReviewPage_FollowUp_NoEligibleReview_HidesSelectorOrShowsEmptyHint`.
+
+**NewReviewPage_FollowUp_Selector_ListsEligibleReviewsOfTheChosenSource**: For an upload the choice lists the earlier
+uploaded reviews, and for a repository source the reviews of the chosen repository, each with its identifier and title,
+after the option for no follow-up. This scenario is tested by
+`NewReviewPage_FollowUp_Selector_ListsEligibleReviewsOfTheChosenSource`.
+
+**NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp**: An earlier review is chosen and files are
+selected; the page shows the counts that `ReviewService.PreviewFollowUpAsync` reports, suggests the title "Follow-up to"
+and the identifier, and creating stores a review that follows the chosen one with the carried counts. This scenario is
+tested by `NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp`.
+
+**NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion**: A title that was typed stays when an earlier review is
+chosen. This scenario is tested by `NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion`.
+
+**NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement**: The files lack a file that has an open thread; the
+page lists the file and offers the confirmation box, creating without it shows the message of the service and stores
+nothing, and with it the review is created. This scenario is tested by
+`NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement`.
+
+**NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal**: Files that have nothing in common with the chosen review show
+the message of the refusal as the preview error, and creating refuses with the same message and stores nothing. This
+scenario is tested by `NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal`.
+
+**NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview**: Choosing no follow-up again removes the preview and the
+suggested title, and the review is created without a followed review. This scenario is tested by
+`NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview`.
+
+**NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement**: For a repository source the page shows a hint
+instead of a preview, creating without the confirmation is refused by the service when open threads would be dropped,
+and with it the review is created as a follow-up. This scenario is tested by
+`NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement`.
+
+**ProjectPage_Render_FollowUpReview_ShowsFollowTag**: In the list of reviews a follow-up carries a tag with a link to
+the review it follows, and a review that follows nothing carries none. This scenario is tested by
+`ProjectPage_Render_FollowUpReview_ShowsFollowTag`.

@@ -111,6 +111,16 @@ public sealed class ChecklistState
     }
 
     /// <summary>
+    ///     Gets the review a not-applicable section was carried over from.
+    /// </summary>
+    /// <param name="sectionId">The section identifier.</param>
+    /// <returns>The identifier of the earlier review, or <c>null</c> when the section applies or was marked in this review.</returns>
+    public string? CarriedFromFor(string sectionId)
+    {
+        return _sections.TryGetValue(sectionId, out var state) && !state.Applicable ? state.CarriedFromReviewId : null;
+    }
+
+    /// <summary>
     ///     Gets the answer to a check.
     /// </summary>
     /// <param name="itemId">The item identifier.</param>

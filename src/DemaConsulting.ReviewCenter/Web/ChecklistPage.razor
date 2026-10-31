@@ -86,6 +86,12 @@
                                   data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
                         </button>
                     </h2>
+                    @if (State.CarriedFromFor(section.Id) is { } carriedSection)
+                    {
+                        <p class="muted hint" data-testid="section-@sid-carried">
+                            Not applicable, carried from review <a href="@ReviewLinks.ForReview(ProjectId, carriedSection)" data-testid="section-@sid-carried-link">@carriedSection</a>
+                        </p>
+                    }
 
                     @if (isOpen)
                     {
@@ -132,6 +138,21 @@
                                         var needsJustification = shown is ChecklistOutcome.Fail or ChecklistOutcome.NotApplicable;
                                         <li class="check-row @(answer is null ? "unanswered" : null)" data-testid="check-@iid">
                                             <p class="check-text" id="check-text-@iid"><span class="check-id">@item.Id</span> @item.Text</p>
+                                            @if (answer?.CarriedFromReviewId is { } carriedFrom)
+                                            {
+                                                <p class="muted hint" data-testid="check-carried-@iid">
+                                                    <span class="badge">Carried from</span>
+                                                    <a href="@ReviewLinks.ForReview(ProjectId, carriedFrom)" data-testid="check-carried-link-@iid">@carriedFrom</a>
+                                                </p>
+                                            }
+                                            else if (EarlierFailFor(item) is { } earlierFail)
+                                            {
+                                                <p class="notice" data-testid="check-earlier-fail-@iid">
+                                                    Failed in review <a href="@ReviewLinks.ForReview(ProjectId, Review!.FollowsReviewId!)" data-testid="check-earlier-fail-link-@iid">@(Review.FollowsReviewId)</a>:
+                                                    @earlierFail.Justification
+                                                    Decide this check again.
+                                                </p>
+                                            }
                                             <div class="segmented" role="group" aria-labelledby="check-text-@iid">
                                                 <button type="button" class="secondary" aria-pressed="@PressedValue(shown, ChecklistOutcome.Pass)"
                                                         data-testid="check-pass-@iid" disabled="@IsLocked" data-locked="@LockedMarker" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Pass)">Pass</button>

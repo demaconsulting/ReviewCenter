@@ -82,6 +82,11 @@ for a diff that has rows. **NewSide**: the version (`Head` or `Baseline`) the ne
 **Threads**: all threads of the review, for every file, in creation order. The summary and the per-file counts are
 calculated from this list, and the selected file's threads are the ones with its path.
 
+**FollowUps**: the identifiers of the reviews of the project that follow this one (their `FollowsReviewId` is this
+review), oldest first, taken from `ReviewService.ListAsync` when the page loads. The page shows "Follows X" with the
+count of what was carried, and "Followed by" with these links; both are plain links, so nothing is offered that a
+user may not do.
+
 **Checklist**: the `ChecklistState` of the review, or `null` when it has none. The page only reads it for the summary
 strip; the answers are made on `ChecklistPage`.
 
@@ -196,6 +201,9 @@ unchanged line), `diff-row-old-{i}` (the left cell of an unchanged line), `diff-
 `diff-old-no-{i}`, `diff-new-no-{i}`, `diff-text-{i}`, `diff-text-old-{i}`, `diff-threads-{i}`,
 `diff-empty-left-{i}`, `diff-empty-right-{i}` (the empty placeholders), and `diff-composer` (all by row index),
 `review-repository`, `review-set-id` (only for a review planned from a review-set), `review-baseline-sha`,
+`review-follows`, `review-follows-link`, `review-carried-counts`, `review-followed-by`, `review-followed-by-link-{id}`
+(only for a follow-up, or a review that has follow-ups), `thread-carried-{id}` and `thread-carried-link-{id}` (a thread
+carried over from another review),
 `review-head-sha`, `review-selection` (in the details of a review from
 a repository), `threads-empty`, `threads-list`, `thread-{id}`,
 `thread-anchor-{id}`, `thread-state-{id}`, `thread-count-{id}`, `thread-expand-{id}` (resolved threads only),
@@ -512,7 +520,7 @@ page.
 - **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
   project; also asked (`CanAdministerAsync`) whether the user may see the reopen form.
 - **ReviewService** — reads the review, the head and baseline bytes of a file, and the comparison of a file
-  (`GetDiffAsync`).
+  (`GetDiffAsync`), and lists the reviews of the project to find the follow-ups of the review.
 - **DiffView** — draws the Diff view; it is a part of this unit.
 - **LineDiff** — groups the rows of a comparison into shown regions and collapsed runs, and arranges them side by side.
 - **ThreadService** — starts (on the Head or the Baseline side), answers, resolves, reopens, and lists threads, and

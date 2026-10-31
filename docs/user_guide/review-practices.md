@@ -56,13 +56,15 @@ complete reviews. A suggested path:
    author should change.
 2. The author fixes the code in the repository. The files of an existing review never change, so the fix needs a new
    review of the fixed revision.
-3. Create the new review, for example with **Plan reviews**, and ask the reviewers to check that the earlier
-   findings are fixed.
-4. Mention the earlier review in the title or in the first comment of the new one, for example "Follow-up to
-   review Core-12".
+3. Create a follow-up review of the fixed revision: choose the failed review under **Follow up on an earlier review**
+   in the form for a new review. The new review takes over what still holds and shows the Fail again, so the
+   reviewers decide it anew (see Follow-up Reviews in the Reviewing chapter).
+4. Ask the reviewers to check that the earlier findings are fixed, resolve the carried threads, answer the failed
+   check again, and sign.
 
 The earlier review stays In review. Teams that need evidence of a failed review should keep that unsigned review, with
-its threads, answers, and its **History** (the audit trail of the review), and refer to it from the follow-up review.
+its threads, answers, and its **History** (the audit trail of the review); the follow-up names it, and its attestation
+says which review it follows.
 There is no attestation PDF for a review that is not Approved, so the review record and its history are the evidence.
 
 ## Handling Minor Findings Without Blocking

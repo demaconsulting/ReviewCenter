@@ -125,7 +125,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   with the same title, and the open threads whose file is in the new review are carried over (`FollowUpCarry`, written
   with the review in one transaction), marked with the review they came from, while Fail answers, resolved threads,
   reviewer slots, signatures and reopenings are not; a review that does not fit, and open threads that would be dropped
-  without an acknowledgement, are refused with `FollowUpInvalid`. `RecordDigest` calculates the
+  without an acknowledgement, are refused with `FollowUpInvalid`. `PreviewFollowUpAsync` tells, for the files of a new
+  review, what such a follow-up would carry and drop, without storing or auditing anything. `RecordDigest` calculates the
   digest of a record. Every
   operation that changes data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages

@@ -7,9 +7,13 @@
 `ReviewService` owns the rules for reviews: it creates a draft review from uploaded files or from the changes in a
 registered git repository, computes each file's hash and the review fingerprint, and reads reviews and file content
 back. It is also the home of the review types: `Review`, `ReviewFile`, `ReviewState`, `ChangeKind`, and
-`UploadedFile`, and of the result type `RepositoryReviewResult`.
+`UploadedFile`, and of the result type `RepositoryReviewResult` and the result type `FollowUpPreview`.
 
 #### Data Model
+
+**FollowUpPreview**: the answer of `PreviewFollowUpAsync`, a record of `CarriedAnswers`, `CarriedSections`,
+`CarriedThreads`, `ResolvedThreadsNotCarried`, and `DroppedThreadFiles` (the sorted distinct paths of open threads whose
+file the new review does not have).
 
 **Review**: a data class (init-only properties) of `ProjectId`, `Id` (the review identifier, unique within its project),
 `Title`, `State`, `Created`, `ContentFingerprint`, `Files` (a list of `ReviewFile`), and `Checklist` (the frozen
@@ -139,8 +143,9 @@ existing review, nor its checklist wording, nor its record digest.
 **Follow-up reviews**: `CreateDraftAsync` and `CreateFromRepositoryAsync` take an optional `followsReviewId` and
 `CreateFromSessionAsync` takes the same two values through `SessionReviewRequest.FollowsReviewId` and
 `SessionReviewRequest.AcknowledgeDroppedThreads`. The planner passes neither, so the planned review of a set is not a
-follow-up (the planner option of a later slice will use the same two values). Blank text means no follow-up. The
-actor needs no right beyond creating a review (`RequireContributeAsync`), because the earlier review is read from the
+follow-up (a planner option for a follow-up of the latest earlier review of a set is not offered). Blank text means no
+follow-up. The actor needs no right beyond creating a review (`RequireContributeAsync`), because the earlier review is
+read from the
 same project only. After the checks that need no I/O, and after the identifier and the checklist of the new review
 are known (on the repository path also after the git session has read the files, because the files of the new review
 must be known), the private `PrepareFollowUpAsync` does the following in order, and every failure is `FollowUpInvalid`
@@ -307,7 +312,8 @@ store or clock at construction, raise `ArgumentNullException`. Store failures pr
 
 #### Callers
 
-- **ProjectPage** — creates reviews (uploaded or from a repository) and lists the reviews of a project.
+- **ProjectPage** — creates reviews (uploaded or from a repository), previews a follow-up, and lists the reviews of a
+  project.
 - **ReviewPlanner** — creates the reviews of a plan through `CreateFromSessionAsync`, one session for the batch.
 - **ReviewPage** — reads a review, the head and baseline content of a file, and (in the diff view) its differences.
 - **ApiEndpoints** — lists and reads reviews, and creates reviews (uploaded or from a repository) for a token actor.

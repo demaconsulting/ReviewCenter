@@ -625,6 +625,159 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that a follow-up review, created through the form from an earlier review that has a failed check, an
+    ///     open thread and sections that do not apply, carries the Pass and N/A answers, the sections and the open
+    ///     thread with visible marks, shows the earlier Fail for a new decision, can be signed once that is decided and
+    ///     the carried thread is resolved, leaves the earlier review as it was, and names the earlier review in its
+    ///     attestation.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn()
+    {
+        // Arrange: puppet fails a check in the planned review A, passes the rest of its section, marks the other
+        // sections as not applicable and leaves an open thread; second is the reviewer of the follow-up
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.", except: "req");
+        await Scenario.OpenSectionAsync(browser, "req");
+        await browser.OkAsync("click", "check-fail-req-01");
+        await browser.OkAsync("wait", "check-justification-req-01");
+        await browser.OkAsync("fill", "check-justification-req-01", "The requirement is not traceable.");
+        await browser.OkAsync("click", "check-save-req-01");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("check-answered-by-req-01"), "the Fail of REQ-01 to be saved");
+        for (var number = 2; number <= 8; number++)
+        {
+            await AnswerPassAsync(browser, $"req-0{number}");
+        }
+
+        await scenario.OpenReviewAsync();
+        await ClickFileAsync(browser, "guide.md");
+        await browser.OkAsync("wait", "new-thread-form");
+        await browser.OkAsync("fill", "thread-text-input", "Please check this guide before it is relied on.");
+        await browser.OkAsync("click", "start-thread-button");
+        await browser.OkAsync("wait", "css=[data-testid^=thread-state-]");
+        const string followId = "follow-up-b";
+        var titleSuggestion = $"Follow-up to {scenario.ReviewId}";
+
+        // Act: create the follow-up through the form, choosing the earlier review
+        await browser.GotoAsync("/projects/1/reviews/new", "new-review-page");
+        await browser.OkAsync("fill", "review-id-input", followId);
+        await browser.OkAsync("check", "source-repository-radio");
+        await browser.OkAsync("select", "repository-select", "1");
+        await browser.WaitUntilAsync(
+            async () => await browser.EvalAsync(
+                $"!!document.querySelector('[data-testid=follow-source-select] option[value=\"{scenario.ReviewId}\"]')") == "true",
+            "the earlier review to be offered");
+        await browser.OkAsync("select", "follow-source-select", scenario.ReviewId);
+        await browser.OkAsync("fill", "head-revision-input", "main");
+        await browser.WaitUntilAsync(
+            async () => await browser.EvalAsync("document.querySelector('[data-testid=review-title-input]').value") == titleSuggestion,
+            "the suggested title");
+        var hintShown = await browser.ExistsAsync("follow-preview-hint");
+        await browser.OkAsync("click", "create-review-button");
+        await browser.OkAsync("wait", "css=[data-testid=review-page][data-interactive=true]", "--timeout", "60000");
+
+        // Act: read what the follow-up page says about it
+        var followsLink = await browser.TextOfAsync("review-follows-link");
+        var carriedCounts = await browser.TextOfAsync("review-carried-counts");
+        await ClickFileAsync(browser, "guide.md");
+        await browser.OkAsync("wait", "css=[data-testid^=thread-state-]");
+        var threadId = await browser.EvalAsync(
+            "document.querySelector('[data-testid^=\"thread-state-\"]').getAttribute('data-testid').replace('thread-state-', '')");
+        var threadMarked = await browser.ExistsAsync($"thread-carried-{threadId}");
+
+        // Act: read the checklist of the follow-up
+        await browser.GotoAsync($"/projects/1/reviews/{followId}/checklist", "checklist-page");
+        await Scenario.OpenSectionAsync(browser, "req");
+        var passCarried = await browser.ExistsAsync("check-carried-req-02");
+        var sectionCarried = await browser.ExistsAsync("section-des-carried");
+        var failCarried = await browser.ExistsAsync("check-carried-req-01");
+        var earlierFail = await browser.TextOfAsync("check-earlier-fail-req-01");
+        var failAnswered = await browser.ExistsAsync("check-answered-by-req-01");
+
+        // Act: decide the failed check again, resolve the carried thread, add the reviewer, and sign as second
+        await browser.OkAsync("click", "check-pass-req-01");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("check-answered-by-req-01"), "the new answer of REQ-01");
+        var earlierFailAfter = await browser.ExistsAsync("check-earlier-fail-req-01");
+        await browser.GotoAsync($"/projects/1/reviews/{followId}", "review-page");
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await ClickFileAsync(browser, "guide.md");
+        await browser.OkAsync("wait", $"thread-toggle-{threadId}");
+        await browser.OkAsync("click", $"thread-toggle-{threadId}");
+        await browser.WaitUntilAsync(
+            async () => (await browser.TextOfAsync($"thread-state-{threadId}")).Contains("Resolved", StringComparison.Ordinal),
+            "the carried thread to be resolved");
+        await reviewer.GotoAsync($"/projects/1/reviews/{followId}", "review-page");
+        await Scenario.SignAsync(reviewer, slot);
+        var followApproval = await reviewer.TextOfAsync("review-approval");
+
+        // Act: the earlier review is as it was, and lists its follow-up
+        await scenario.OpenReviewAsync();
+        var earlierApproval = await browser.TextOfAsync("review-approval");
+        var followedBy = await browser.ExistsAsync($"review-followed-by-link-{followId}");
+
+        // Act: read the attestation of the follow-up with a token
+        var token = await Scenario.CreateTokenAsync(reviewer);
+        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(scenario.Server.Url) };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var attestation = await http.GetAsync($"/api/projects/1/reviews/{followId}/attestation.pdf", TestContext.Current.CancellationToken);
+        var pdf = System.Text.Encoding.Latin1.GetString(await attestation.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the form helped with the choice, and the follow-up names its source and what it took over
+        Assert.True(hintShown, "A repository follow-up must say that what is carried is counted when the review is created.");
+        Assert.Equal(scenario.ReviewId, followsLink);
+        Assert.Contains("thread carried", carriedCounts, StringComparison.Ordinal);
+        Assert.True(threadMarked, "A carried thread must be marked with the review it came from.");
+
+        // Assert: the Pass and the section are carried and marked; the Fail is not, and is shown for a new decision
+        Assert.True(passCarried);
+        Assert.True(sectionCarried);
+        Assert.False(failCarried, "A Fail must never be carried over.");
+        Assert.False(failAnswered, "The failed check must be open again in the follow-up.");
+        Assert.Contains("Failed in review", earlierFail, StringComparison.Ordinal);
+        Assert.Contains("The requirement is not traceable.", earlierFail, StringComparison.Ordinal);
+        Assert.False(earlierFailAfter, "Once the check is decided again the earlier Fail is no longer shown.");
+
+        // Assert: the follow-up is approved on its own, and the earlier review stays in review and lists it
+        Assert.Contains("Approved", followApproval, StringComparison.Ordinal);
+        Assert.Contains("In review", earlierApproval, StringComparison.Ordinal);
+        Assert.True(followedBy, "The earlier review must list its follow-up.");
+
+        // Assert: the attestation of the follow-up says what it follows
+        Assert.Equal(HttpStatusCode.OK, attestation.StatusCode);
+        Assert.Contains("Follows review", pdf, StringComparison.Ordinal);
+        Assert.Contains(scenario.ReviewId, pdf, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Answers a check as Pass and waits until the answer is stored.
+    /// </summary>
+    /// <param name="browser">The browser, showing the checklist with the section of the check open.</param>
+    /// <param name="check">The lower-case check identifier as used in test identifiers, for example <c>req-02</c>.</param>
+    /// <returns>A task that completes when the answer is shown.</returns>
+    private static async Task AnswerPassAsync(Browser browser, string check)
+    {
+        await browser.OkAsync("click", $"check-pass-{check}");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync($"check-answered-by-{check}"), $"the answer of {check}");
+    }
+
+    /// <summary>
+    ///     Selects the file of a review whose path contains a text, so that its content and threads are shown.
+    /// </summary>
+    /// <param name="browser">The browser, showing the review page.</param>
+    /// <param name="name">A part of the path of the file.</param>
+    /// <returns>A task that completes when the file was clicked.</returns>
+    private static async Task ClickFileAsync(Browser browser, string name)
+    {
+        await browser.OkAsync("wait", "file-select-0");
+        await browser.OkAsync(
+            "eval",
+            $"document.querySelector('[data-testid^=\"file-select-\"][aria-label$=\"{name}\"]').click()");
+    }
+
+    /// <summary>
     ///     Reads a JSON document from the API.
     /// </summary>
     /// <param name="http">The client, with its credentials.</param>
@@ -1041,11 +1194,12 @@ public class ReviewCenterSystemTests
         /// </summary>
         /// <param name="browser">The browser to use.</param>
         /// <param name="reason">The reason.</param>
+        /// <param name="except">The lower-case identifier of a section to leave alone, or <c>null</c> for none.</param>
         /// <returns>A task that completes when every section is saved.</returns>
-        public async Task MarkAllSectionsNotApplicableAsync(Browser browser, string reason)
+        public async Task MarkAllSectionsNotApplicableAsync(Browser browser, string reason, string? except = null)
         {
             await browser.GotoAsync($"/projects/1/reviews/{ReviewId}/checklist", "checklist-page");
-            foreach (var section in Sections)
+            foreach (var section in Sections.Where(section => section != except))
             {
                 await OpenSectionAsync(browser, section);
                 await browser.OkAsync("uncheck", $"section-{section}-applicable");

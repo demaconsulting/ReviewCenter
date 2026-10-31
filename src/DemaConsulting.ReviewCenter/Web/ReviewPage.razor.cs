@@ -291,6 +291,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private Review? Review { get; set; }
 
     /// <summary>
+    ///     Gets the identifiers of the reviews that follow this one up, oldest first; empty when there are none.
+    /// </summary>
+    private IReadOnlyList<string> FollowUps { get; set; } = [];
+
+    /// <summary>
     ///     Gets the path of the file whose content is shown, or <c>null</c> when no file is selected.
     /// </summary>
     private string? SelectedPath { get; set; }
@@ -649,6 +654,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
         RequireIndependent = project?.RequireIndependentReviewers == true;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         DueDateInput = Review?.DueDate is { } due ? FormatDueDate(due) : string.Empty;
+        FollowUps = Review is null
+            ? []
+            : (await ReviewService.ListAsync(ProjectId))
+                .Where(other => string.Equals(other.FollowsReviewId, ReviewId, StringComparison.Ordinal))
+                .OrderBy(other => other.Created)
+                .Select(other => other.Id)
+                .ToList();
         await RefreshAsync();
 
         // Open what the address names (a file, a line of it, or a thread); the address stays as it is
@@ -729,6 +741,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private void ResetState()
     {
         Review = null;
+        FollowUps = [];
         ProjectName = null;
         SelectedPath = null;
         SelectedLines = null;

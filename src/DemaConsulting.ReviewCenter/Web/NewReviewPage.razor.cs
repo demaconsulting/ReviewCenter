@@ -58,6 +58,16 @@ public partial class NewReviewPage : ComponentBase
     private int? _loadedProjectId;
 
     /// <summary>
+    ///     Backing field for <see cref="RepositoryIdText"/>.
+    /// </summary>
+    private string _repositoryIdText = string.Empty;
+
+    /// <summary>
+    ///     The title the page suggested for the follow-up, so that it is replaced only while the creator has not edited it.
+    /// </summary>
+    private string? _suggestedTitle;
+
+    /// <summary>
     ///     Gets or sets the identity of the project the review is created in, from the page address.
     /// </summary>
     [Parameter]
@@ -146,9 +156,18 @@ public partial class NewReviewPage : ComponentBase
     private bool FromRepository { get; set; }
 
     /// <summary>
-    ///     Gets or sets the identity of the chosen repository as the text of the select element; empty for none.
+    ///     Gets or sets the identity of the chosen repository as the text of the select element; empty for none. Choosing
+    ///     another repository drops a chosen earlier review that does not belong to it.
     /// </summary>
-    private string RepositoryIdText { get; set; } = string.Empty;
+    private string RepositoryIdText
+    {
+        get => _repositoryIdText;
+        set
+        {
+            _repositoryIdText = value;
+            DropIneligibleFollowSource();
+        }
+    }
 
     /// <summary>
     ///     Gets or sets the head revision typed into the form.
@@ -186,6 +205,51 @@ public partial class NewReviewPage : ComponentBase
     private bool SelectionRejected { get; set; }
 
     /// <summary>
+    ///     Gets the reviews of the project, newest first, from which the earlier review to follow up is chosen; empty
+    ///     when the project has none.
+    /// </summary>
+    private IReadOnlyList<Review> Candidates { get; set; } = [];
+
+    /// <summary>
+    ///     Gets the identifier of the earlier review the new review follows up; empty for an ordinary review.
+    /// </summary>
+    private string FollowSourceId { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets what the follow-up would carry over, or <c>null</c> when it is not known (no source, no files yet, a
+    ///     repository source, or a refusal).
+    /// </summary>
+    private FollowUpPreview? FollowPreview { get; set; }
+
+    /// <summary>
+    ///     Gets the message of the service when it refuses to preview the follow-up, or <c>null</c>.
+    /// </summary>
+    private string? FollowRefusal { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the creator has checked the open threads that are not carried.
+    /// </summary>
+    private bool AcknowledgeDropped { get; set; }
+
+    /// <summary>
+    ///     Lists the earlier reviews that suit the chosen kind of source: for an upload the uploaded reviews, for a
+    ///     repository the reviews of the chosen repository. The service decides the rest (a refusal is shown), so this
+    ///     is only a convenient shortlist.
+    /// </summary>
+    /// <returns>The reviews, newest first.</returns>
+    private IReadOnlyList<Review> EligibleCandidates()
+    {
+        if (!FromRepository)
+        {
+            return Candidates.Where(review => review.RepositoryId is null).ToList();
+        }
+
+        return int.TryParse(RepositoryIdText, out var repositoryId)
+            ? Candidates.Where(review => review.RepositoryId == repositoryId).ToList()
+            : [];
+    }
+
+    /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
     /// </summary>
     /// <remarks>
@@ -220,6 +284,8 @@ public partial class NewReviewPage : ComponentBase
             Selection = DefaultSelection;
             CreatedReview = null;
             SkippedEntries = [];
+            Candidates = [];
+            ResetFollowUp();
         }
 
         var actor = await AuthenticationState.GetActorOrNullAsync();
@@ -227,6 +293,11 @@ public partial class NewReviewPage : ComponentBase
         Repositories = actor is not null && Project is not null
             ? await RepositoryService.ListEnabledAsync(actor, ProjectId)
             : [];
+
+        // The shortlist of reviews to follow up; the service re-checks every choice when the review is created
+        Candidates = Project is null
+            ? []
+            : (await ReviewService.ListAsync(ProjectId)).OrderByDescending(review => review.Created).ToList();
         Loaded = true;
     }
 
@@ -263,6 +334,7 @@ public partial class NewReviewPage : ComponentBase
         ErrorMessage = null;
         SelectionRejected = false;
         SelectedFiles = [];
+        ClearPreview();
 
         // Reject a selection with too many files before touching any of them
         if (e.FileCount > ReviewLimits.MaxFileCount)
@@ -318,6 +390,7 @@ public partial class NewReviewPage : ComponentBase
         }
 
         SelectedFiles = files;
+        await RefreshPreviewAsync();
     }
 
     /// <summary>
@@ -366,6 +439,7 @@ public partial class NewReviewPage : ComponentBase
                 // The actor is audited; asking for it also refuses an ended sign-in state
                 var actor = await AuthenticationState.GetActorAsync();
                 var dueDate = ReviewService.ParseDueDate(DueDateText);
+                var follows = FollowSourceId.Length == 0 ? null : FollowSourceId;
                 if (FromRepository)
                 {
                     if (!int.TryParse(RepositoryIdText, out var repositoryId))
@@ -380,14 +454,23 @@ public partial class NewReviewPage : ComponentBase
                         ReviewTitle,
                         new RepositorySource(repositoryId, HeadRevision, BaselineRevision, Selection),
                         actor,
-                        dueDate: dueDate);
+                        dueDate: dueDate,
+                        followsReviewId: follows,
+                        acknowledgeDroppedThreads: follows is not null && AcknowledgeDropped);
                     review = result.Review;
                     skipped = result.Skipped;
                 }
                 else
                 {
                     review = await ReviewService.CreateDraftAsync(
-                        ProjectId, ReviewId, ReviewTitle, SelectedFiles, actor, dueDate: dueDate);
+                        ProjectId,
+                        ReviewId,
+                        ReviewTitle,
+                        SelectedFiles,
+                        actor,
+                        dueDate: dueDate,
+                        followsReviewId: follows,
+                        acknowledgeDroppedThreads: follows is not null && AcknowledgeDropped);
                 }
             }
             catch (DomainRuleException ex)
@@ -447,6 +530,8 @@ public partial class NewReviewPage : ComponentBase
     {
         Project = null;
         Repositories = [];
+        Candidates = [];
+        ResetFollowUp();
         ReviewId = string.Empty;
         ReviewTitle = string.Empty;
         SelectedFiles = [];
@@ -470,5 +555,97 @@ public partial class NewReviewPage : ComponentBase
     {
         FromRepository = fromRepository && Repositories.Count > 0;
         ErrorMessage = null;
+        DropIneligibleFollowSource();
+    }
+
+    /// <summary>
+    ///     Handles the choice of the earlier review to follow up: suggests a title, and counts what would be carried.
+    /// </summary>
+    /// <param name="e">The change event that carries the chosen identifier; empty for none.</param>
+    /// <returns>A task that completes when the preview is shown.</returns>
+    private async Task OnFollowSourceChangedAsync(ChangeEventArgs e)
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        var chosen = e.Value?.ToString() ?? string.Empty;
+        SuggestTitle(chosen);
+        FollowSourceId = chosen;
+        await RefreshPreviewAsync();
+    }
+
+    /// <summary>
+    ///     Suggests the title of a follow-up, as long as the creator has not typed another one.
+    /// </summary>
+    /// <param name="chosen">The identifier of the earlier review; empty for none.</param>
+    private void SuggestTitle(string chosen)
+    {
+        if (ReviewTitle.Length > 0 && ReviewTitle != _suggestedTitle)
+        {
+            return;
+        }
+
+        var title = chosen.Length == 0 ? null : $"Follow-up to {chosen}";
+        _suggestedTitle = title is null || title.Length > ReviewLimits.MaxReviewTitleLength ? null : title;
+        ReviewTitle = _suggestedTitle ?? string.Empty;
+    }
+
+    /// <summary>
+    ///     Counts what the follow-up would carry over, for uploaded files; a repository source has no files before it is
+    ///     read, so nothing is counted for it.
+    /// </summary>
+    /// <returns>A task that completes when the preview or the refusal is known.</returns>
+    private async Task RefreshPreviewAsync()
+    {
+        ClearPreview();
+        if (FollowSourceId.Length == 0 || FromRepository || SelectedFiles.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            FollowPreview = await ReviewService.PreviewFollowUpAsync(ProjectId, FollowSourceId, SelectedFiles, actor);
+        }
+        catch (DomainRuleException ex)
+        {
+            FollowRefusal = ex.Message;
+        }
+    }
+
+    /// <summary>
+    ///     Forgets the preview, its refusal and the acknowledgement that belonged to it.
+    /// </summary>
+    private void ClearPreview()
+    {
+        FollowPreview = null;
+        FollowRefusal = null;
+        AcknowledgeDropped = false;
+    }
+
+    /// <summary>
+    ///     Forgets the chosen earlier review, because the source of the files changed to one it does not suit.
+    /// </summary>
+    private void DropIneligibleFollowSource()
+    {
+        if (FollowSourceId.Length > 0 && EligibleCandidates().All(review => review.Id != FollowSourceId))
+        {
+            SuggestTitle(string.Empty);
+            FollowSourceId = string.Empty;
+            ClearPreview();
+        }
+    }
+
+    /// <summary>
+    ///     Forgets everything about the follow-up.
+    /// </summary>
+    private void ResetFollowUp()
+    {
+        FollowSourceId = string.Empty;
+        _suggestedTitle = null;
+        ClearPreview();
     }
 }

@@ -238,7 +238,13 @@ follow-up, the independence rule, and the signing blockers. They are tested by
 `ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`,
 `ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`,
 `RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest`, `RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest`, and the
-tests of `FollowUpCarryTests.cs`. The rule `FollowUpInvalid` is one row of the theory
+tests of `FollowUpCarryTests.cs`. The preview of a follow-up (`PreviewFollowUpAsync`) is verified to count what the
+creation carries, to change nothing, to refuse an unfit source with `FollowUpInvalid`, and to follow the access rule of
+the other operations of the service, by `ReviewService_PreviewFollowUpAsync_CountsWhatCreationCarries`,
+`ReviewService_PreviewFollowUpAsync_ChangesNothing`,
+`ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid`, and
+`ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing`. The rule `FollowUpInvalid` is one row of the
+theory
 `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
 
 **Audit trail of the services**: The unit tests of `AuditService` and `UserService` verify the subsystem requirement

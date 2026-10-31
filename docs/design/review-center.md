@@ -464,8 +464,9 @@ and marked with the review they came from, while Fail answers, resolved threads,
 are not; the person who creates the follow-up does not become the answerer of what was carried over, so the
 independence rules are unchanged, and a carried open thread blocks approval until it is resolved. The record digest
 binds to which review is followed and which rows were carried (and is unchanged for every review that is not a
-follow-up). An
-Approved review can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
+follow-up). The form for a new review offers the choice of the earlier review with a preview of what is carried, and the
+checklist and review pages mark what was carried and from which review. An Approved review
+can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
 (a self-signed key by default, or a certificate from a certificate store), proves that the document is unchanged and
 comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
 identified by the signatures in the record, and there is no time stamp authority in this version).
