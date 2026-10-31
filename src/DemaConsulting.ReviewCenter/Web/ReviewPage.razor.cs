@@ -120,6 +120,23 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private string? _pendingUrl;
 
     /// <summary>
+    ///     The highest comment identity the user had seen when the review was opened; comments by others above it
+    ///     are shown as new for the lifetime of the page.
+    /// </summary>
+    private int _unreadBaselineCommentId;
+
+    /// <summary>
+    ///     The time (UTC) read before the review was loaded, remembered as the time the user saw it.
+    /// </summary>
+    private DateTimeOffset _seenAt;
+
+    /// <summary>
+    ///     Whether the review was loaded and the read state still has to be stored after the next render on a live
+    ///     circuit.
+    /// </summary>
+    private bool _markSeenPending;
+
+    /// <summary>
     ///     Gets or sets the identity of the owning project, from the page address.
     /// </summary>
     [Parameter]
@@ -251,6 +268,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </summary>
     [Inject]
     private IProjectAccess Access { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the inbox service that reads and stores what the user has seen of this review, supplied by
+    ///     dependency injection.
+    /// </summary>
+    [Inject]
+    private InboxService Inbox { get; set; } = null!;
 
     /// <summary>
     ///     Writes the note that tells what kind of key signs the attestation.
@@ -493,6 +517,31 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private string CurrentUsername { get; set; } = string.Empty;
 
     /// <summary>
+    ///     Gets the number of comments by others that the user has not seen before this visit.
+    /// </summary>
+    private int UnreadCount => CurrentUsername.Length == 0
+        ? 0
+        : InboxService.CountUnread(Threads, CurrentUsername, _unreadBaselineCommentId);
+
+    /// <summary>
+    ///     Gets the sentence that tells how many comments are new to the user.
+    /// </summary>
+    private string UnreadSummary => UnreadCount == 1
+        ? "1 comment by someone else is new since your last visit."
+        : $"{UnreadCount} comments by others are new since your last visit.";
+
+    /// <summary>
+    ///     Reports whether a thread has a comment that is new to the user.
+    /// </summary>
+    /// <param name="thread">The thread.</param>
+    /// <returns><c>true</c> when a comment of the thread is by someone else and newer than the last visit.</returns>
+    private bool ThreadHasUnread(ReviewThread thread)
+    {
+        return CurrentUsername.Length > 0
+               && InboxService.CountUnread([thread], CurrentUsername, _unreadBaselineCommentId) > 0;
+    }
+
+    /// <summary>
     ///     Gets or sets the primary reviewer chosen in the add-slot form (a user id, or blank).
     /// </summary>
     private string NewSlotPrimary { get; set; } = string.Empty;
@@ -648,6 +697,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
         ResetState();
         Loaded = false;
 
+        // The time is read before anything is loaded, so a change made while the page loads stays new
+        _seenAt = Time.GetUtcNow();
+
         // A project the user may not see is treated like a missing one: nothing of its review is loaded
         var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
         ProjectName = project?.Name;
@@ -662,6 +714,16 @@ public partial class ReviewPage : ComponentBase, IDisposable
                 .Select(other => other.Id)
                 .ToList();
         await RefreshAsync();
+
+        // What the user had seen before this visit becomes the baseline of the New markers; the new state is stored
+        // after the first render on a live circuit (see OnAfterRenderAsync), not here, because this method also runs
+        // while the page is rendered on the server before the connection is live
+        var viewer = await AuthenticationState.GetActorOrNullAsync();
+        if (Review is not null && viewer is not null)
+        {
+            _unreadBaselineCommentId = await Inbox.GetReviewUnreadAsync(viewer, ProjectId, ReviewId);
+            _markSeenPending = true;
+        }
 
         // Open what the address names (a file, a line of it, or a thread); the address stays as it is
         await ApplyAddressAsync();
@@ -781,6 +843,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
         _scrollTarget = null;
         _focusTarget = null;
         _pendingUrl = null;
+        _unreadBaselineCommentId = 0;
+        _markSeenPending = false;
     }
 
     /// <summary>
@@ -1085,6 +1149,19 @@ public partial class ReviewPage : ComponentBase, IDisposable
         {
             _interactive = true;
             StateHasChanged();
+        }
+
+        // The review was shown on a live circuit, so the user has seen what was loaded: remember it (never moving
+        // the state backwards). The service checks the access again, so a user who may not view the review leaves
+        // no row behind
+        if (_markSeenPending)
+        {
+            _markSeenPending = false;
+            var viewer = await AuthenticationState.GetActorOrNullAsync();
+            if (viewer is not null)
+            {
+                await Inbox.MarkSeenAsync(viewer, ProjectId, ReviewId, InboxService.MaxCommentId(Threads), _seenAt);
+            }
         }
 
         if (_pendingUrl is not null)

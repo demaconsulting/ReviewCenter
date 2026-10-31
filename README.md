@@ -32,6 +32,7 @@ a project checklist, and sign the review with their credentials. Every action is
 - 📅 **Due Dates** - Optional UTC due date per review, with an Overdue badge
 - 🔁 **Follow-up Reviews** - A review after a failed one carries over the passed answers and open threads (web and API)
 - 💬 **Threaded Comments** - Discuss files or line ranges inline
+- 📥 **Inbox** - What waits for you: signatures to give, replies, failed checks, and unread comments
 - ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own template)
 - 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot
 - ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to reviewed record

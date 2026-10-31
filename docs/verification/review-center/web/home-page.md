@@ -17,9 +17,10 @@ N/A - standard test environment.
 - All component tests pass with zero failures.
 - The page shows the product title.
 - A visitor who is not signed in sees the tagline, no link, and no "Get started" section.
-- A signed-in user who is no system administrator sees the "Get started" section with exactly one link, to the
-  projects page.
-- A signed-in system administrator sees three links, to the projects, audit, and users pages, and no card for
+- A signed-in user who is no system administrator sees the "Get started" section with two links, to the inbox and to
+  the projects page, and the inbox card says how many reviews need the action of the user ("Nothing needs your
+  action.", "1 needs your action.", or "N need your action.").
+- A signed-in system administrator sees four links, to the inbox, projects, audit, and users pages, and no card for
   repositories, which belong to projects.
 
 #### Test Scenarios
@@ -31,10 +32,15 @@ scenario is tested by `HomePage_Render_Default_ShowsTitle`.
 "Web-based code review for regulated projects." is shown, and there is no link and no "Get started" section. This
 scenario is tested by `HomePage_Render_Anonymous_ShowsTaglineAndNoLinks`.
 
-**HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly**: An ordinary user is signed in and the page is rendered;
-the projects link points to `/projects` and it is the only link on the page. This scenario is tested by
-`HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly`.
+**HomePage_Render_Reviewer_ShowsInboxAndProjectsCards**: An ordinary user is signed in and the page is rendered; the
+inbox link points to `/inbox`, the projects link points to `/projects`, and these are the only two links on the page.
+This scenario is tested by `HomePage_Render_Reviewer_ShowsInboxAndProjectsCards`.
+
+**HomePage_Render_Reviewer_InboxCardShowsActionCount**: A reviewer with a signature to give is signed in and the page is
+rendered; the inbox card says "1 needs your action." for one review and "2 need your action." for two, and "Nothing
+needs your action." when nothing waits. This
+scenario is tested by `HomePage_Render_Reviewer_InboxCardShowsActionCount`.
 
 **HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks**: A system administrator is signed in and the page is
-rendered; there are three links, and those to the audit and users pages point to `/audit` and `/users`, and there is no
+rendered; there are four links, and those to the audit and users pages point to `/audit` and `/users`, and there is no
 repositories card. This scenario is tested by `HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks`.

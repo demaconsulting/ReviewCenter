@@ -746,6 +746,26 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that the host registers the inbox store and the inbox service as singletons.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersInboxService()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: resolve both
+        var inbox = app.Services.GetRequiredService<InboxService>();
+        var store = app.Services.GetRequiredService<IInboxStore>();
+
+        // Assert: singletons, and the service answers for a user who is not known
+        Assert.Same(inbox, app.Services.GetRequiredService<InboxService>());
+        Assert.Same(store, app.Services.GetRequiredService<IInboxStore>());
+        Assert.Equal(0, await inbox.CountAsync(new Actor("nobody", "Nobody"), TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that the host registers the repository registry and the git source, with the key ring and the git
     ///     cache folder placed beside the database by default.
     /// </summary>

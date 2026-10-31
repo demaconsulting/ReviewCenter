@@ -68,6 +68,7 @@ includes:
   - docs/reqstream/review-center/web/history-page.yaml
   - docs/reqstream/review-center/web/audit-page.yaml
   - docs/reqstream/review-center/web/repositories-page.yaml
+  - docs/reqstream/review-center/web/inbox-page.yaml
   - docs/reqstream/review-center/core.yaml
   - docs/reqstream/review-center/core/fingerprint.yaml
   - docs/reqstream/review-center/core/project-service.yaml
@@ -91,6 +92,7 @@ includes:
   - docs/reqstream/review-center/core/reauth-proof-store.yaml
   - docs/reqstream/review-center/core/totp-service.yaml
   - docs/reqstream/review-center/core/totp-challenge-store.yaml
+  - docs/reqstream/review-center/core/inbox-service.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
@@ -100,6 +102,7 @@ includes:
   - docs/reqstream/review-center/storage/database-setup.yaml
   - docs/reqstream/review-center/storage/personal-access-token-store.yaml
   - docs/reqstream/review-center/storage/totp-store.yaml
+  - docs/reqstream/review-center/storage/inbox-store.yaml
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml
   - docs/reqstream/review-center-puppet/puppet-program.yaml

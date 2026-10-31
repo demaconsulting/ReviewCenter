@@ -201,6 +201,10 @@
 
         <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@Approval?.NextStep</span></p>
 
+        @if (UnreadCount > 0)
+        {
+            <p class="status" data-testid="review-unread-summary"><span class="badge unread">New</span> @UnreadSummary</p>
+        }
         <section class="summary-strip" data-testid="review-summary" aria-label="Review summary">
             @if (Checklist is not null)
             {
@@ -487,6 +491,10 @@
                                 <span class="path" data-testid="index-file-@row.Id">@row.FilePath</span>
                                 <span data-testid="index-anchor-@row.Id">@AnchorLabel(row)</span>
                                 <span class="badge @(row.State == ReviewThreadState.Resolved ? "resolved" : null)" data-testid="index-state-@row.Id">@row.State</span>
+                                @if (ThreadHasUnread(row))
+                                {
+                                    <span class="badge unread" data-testid="index-unread-@row.Id">New</span>
+                                }
                                 <span class="muted" data-testid="index-count-@row.Id">@CommentCountLabel(row)</span>
                                 <span class="muted" data-testid="index-author-@row.Id">@row.Comments.FirstOrDefault()?.Author</span>
                                 <span class="muted" data-testid="index-activity-@row.Id">@FormatTime(row.LastActivity)</span>
@@ -534,6 +542,10 @@
                 <div class="thread-head">
                     <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(item)</span>
                     <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@item.State</span>
+                    @if (ThreadHasUnread(item))
+                    {
+                        <span class="badge unread" data-testid="thread-unread-@threadId">New</span>
+                    }
                     @if (item.CarriedFromReviewId is { } carriedFrom)
                     {
                         <span class="muted" data-testid="thread-carried-@threadId">carried from <a href="@ReviewLinks.ForReview(ProjectId, carriedFrom)" data-testid="thread-carried-link-@threadId">@carriedFrom</a></span>

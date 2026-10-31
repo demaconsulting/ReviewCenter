@@ -299,3 +299,26 @@ sections:
           relationship keeps the record consistent when two requests overlap or a programming error occurs.
         tests:
           - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
+
+      - id: ReviewCenter-DbContext-ReviewUserState
+        title: >-
+          The ReviewCenterDbContext class shall map what a user has seen of a review to a table in which each row
+          belongs to one user and one review, is found by that pair, holds the newest comment and the time seen, and
+          is deleted with the review or the user. The schema is created from the model without a migration, so a
+          database that was created before the table existed has to be recreated.
+        justification: |
+          The inbox keeps one row per user and review, and it doubles as the list of notifications, so no other table
+          is needed. Having the database own the relationships keeps the rows consistent when requests overlap.
+        tests:
+          - DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes
+          - InboxStore_DeletingTheReview_DeletesTheStates
+          - InboxStore_DeletingTheUser_DeletesTheStates
+
+      - id: ReviewCenter-DbContext-InboxIndexes
+        title: >-
+          The ReviewCenterDbContext class shall index the primary and the alternate user of the reviewer slots and the
+          creator of the reviews, so that the reviews of one user are found without reading all of them.
+        justification: |
+          The inbox is built on every visit of the home page, so the lookup by user must not scan the tables.
+        tests:
+          - DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes

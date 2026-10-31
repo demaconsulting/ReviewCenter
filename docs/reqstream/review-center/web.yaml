@@ -4,8 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
 # - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, AboutPage, HelpPage,
-#   ProjectsPage, ProjectPage, PlanPage, ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and
-#   RepositoriesPage units; the App unit includes the SessionGate
+#   ProjectsPage, ProjectPage, PlanPage, ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage,
+#   RepositoriesPage, and InboxPage units; the App unit includes the SessionGate
 #   component that replaces an open protected page when the sign-in state of its user ends
 # - Subsystem requirements describe the externally visible behavior of the web user interface, including what each
 #   kind of user (system administrator, project member, user who is no member) is shown
@@ -724,3 +724,27 @@ sections:
         tests:
           - TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName
           - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret
+
+      - id: ReviewCenter-Web-Inbox
+        title: >-
+          The Web subsystem shall give a signed-in user an inbox page that lists the reviews that wait for the user in
+          four groups with a summary, a chip and a New badge on each item, and a button to mark all as read, show the
+          number of reviews that need action on the home page, mark the new comments of a review in its index and its
+          threads, remember on a visit what the user has seen, serve the page only to a signed-in user, and explain all
+          of this in a help topic.
+        justification: |
+          A reviewer should learn from the first page what waits and be led to it, and the marks must show what is new
+          without a second place to look. The help topic explains what the number counts and what clears it.
+        children:
+          - ReviewCenter-InboxPage-Access
+          - ReviewCenter-InboxPage-Sections
+          - ReviewCenter-InboxPage-Summary
+          - ReviewCenter-InboxPage-MarkAllRead
+          - ReviewCenter-InboxPage-Interactive
+          - ReviewCenter-HomePage-InboxCard
+          - ReviewCenter-ReviewPage-UnreadMarkers
+          - ReviewCenter-ReviewPage-MarkSeen
+          - ReviewCenter-HelpPage-InboxTopic
+        tests:
+          - InboxPage_Render_ToSignAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - WebSubsystem_InboxPage_Unauthenticated_IsChallenged

@@ -641,3 +641,28 @@ sections:
         tests:
           - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
           - ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine
+
+      - id: ReviewCenter-ReviewPage-UnreadMarkers
+        title: >-
+          The ReviewPage unit shall mark a thread with a New badge when it holds a comment of
+          somebody else that is newer than the last one the user has seen, give the number of such comments in the
+          summary, and show no badge for the user's own comments or on a later visit.
+        justification: |
+          A reader who returns to a review wants to see what was said since the last visit without reading all of it
+          again.
+        tests:
+          - ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers
+          - ReviewPage_Render_OwnComments_ShowNoDot
+
+      - id: ReviewCenter-ReviewPage-MarkSeen
+        title: >-
+          The ReviewPage unit shall read what the user has seen before it shows the review, store the newest comment
+          and the time after the page was shown in the live session, store it again when the page is changed to
+          another review, and store nothing for a user who may not see the review.
+        justification: |
+          The badges must show the state of the previous visit, so it is read first, and only a rendered page counts as
+          seen. A user without access must leave no trace.
+        tests:
+          - ReviewPage_Render_AfterLiveRender_UpsertsLastSeen_AndSecondVisitShowsNoDots
+          - ReviewPage_Render_ParameterChangeToOtherReview_ReloadsBaselineAndMarksSeen
+          - ReviewPage_Render_NoViewAccess_WritesNoState

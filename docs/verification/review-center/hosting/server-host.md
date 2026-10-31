@@ -204,6 +204,11 @@ instance, which is then disposed; a second instance on the same database decrypt
 server and the `ReviewPlanner` and the `IReviewSetParser` are taken from the application services twice each; every
 call returns the same instance. This scenario is tested by `ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
 
+**ServerHost_AddServices_Configured_RegistersInboxService**: The real pipeline is started on an in-memory server and the
+`InboxService` and the `IInboxStore` are taken from the application services twice each; every call returns the same
+instance, and the service answers zero for a user who is not known. This scenario is tested by
+`ServerHost_AddServices_Configured_RegistersInboxService`.
+
 **ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError**: The pipeline is built with
 `DataProtection:KeysPath` set to an existing file; an `InvalidOperationException` whose message names the setting and the
 path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`.

@@ -752,6 +752,61 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that a reviewer who is named in a slot sees the review in the inbox as a signature to give, that the
+    ///     home page counts it, that the item is gone once the reviewer has signed, and that reading and signing leave
+    ///     no inbox or read-state event in the audit trail.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned()
+    {
+        // Arrange: a planned review by puppet with a finished checklist and a slot for second, who is signed in in a
+        // browser of their own
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
+        await scenario.OpenReviewAsync();
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+
+        // Act: the reviewer opens the home page, then the inbox
+        await reviewer.OkAsync("goto", "/");
+        await reviewer.OkAsync("wait", "home-inbox-count");
+        var homeCount = await reviewer.TextOfAsync("home-inbox-count");
+        await reviewer.GotoAsync("/inbox", "inbox-page");
+        var summary = await reviewer.TextOfAsync("inbox-summary");
+        var chip = await reviewer.TextOfAsync("inbox-chip-1");
+        var rowReview = await reviewer.TextOfAsync("inbox-review-1");
+        var inboxWhenEmpty = await reviewer.ExistsAsync("inbox-empty");
+
+        // Act: the reviewer follows the link, signs, and looks at the inbox again
+        await reviewer.OkAsync("click", "inbox-link-1");
+        await reviewer.OkAsync("wait", $"sign-form-{slot}");
+        await Scenario.SignAsync(reviewer, slot);
+        await reviewer.GotoAsync("/inbox", "inbox-page");
+        var inboxAfterSigning = await reviewer.ExistsAsync("inbox-empty");
+        var rowAfterSigning = await reviewer.ExistsAsync("inbox-row-1");
+
+        // Act: read the audit trail of the server
+        await browser.GotoAsync("/audit", "audit-page");
+        var trail = await browser.TextOfAsync("audit-page");
+
+        // Assert: one signature was waiting, named by the home page and the inbox with the review
+        Assert.Contains("1 needs your action", homeCount, StringComparison.Ordinal);
+        Assert.Contains("1 needs your action", summary, StringComparison.Ordinal);
+        Assert.Contains("Not signed", chip, StringComparison.Ordinal);
+        Assert.Contains(scenario.ReviewId, rowReview, StringComparison.Ordinal);
+        Assert.False(inboxWhenEmpty, "An inbox with a signature to give must not show the empty state.");
+
+        // Assert: after signing nothing is left, and the read state is not part of the audit trail
+        Assert.True(inboxAfterSigning, "The inbox must show the empty state once the review was signed.");
+        Assert.False(rowAfterSigning, "A signed review must leave the to-sign group.");
+        Assert.Contains("signature.added", trail, StringComparison.Ordinal);
+        Assert.DoesNotContain("inbox", trail, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("read-state", trail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     ///     Answers a check as Pass and waits until the answer is stored.
     /// </summary>
     /// <param name="browser">The browser, showing the checklist with the section of the check open.</param>

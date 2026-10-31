@@ -40,7 +40,10 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects, and for the
 ///     <c>DueDate</c> column of reviews, and for the follow-up columns (<c>FollowsReviewId</c>, <c>CarriedAnswerCount</c>
 ///     and <c>CarriedThreadCount</c> of reviews and the <c>CarriedFromReviewId</c> and <c>CarriedFromThreadId</c> columns
-///     of answers, section states and threads). Instances are
+///     of answers, section states and threads). The same is true for the <c>ReviewUserStates</c> table and for the
+///     indexes of the reviewer slots and of the creator of reviews (and for the case-insensitive collation of the
+///     creator column): a database from before them must be deleted and
+///     recreated. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -156,6 +159,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<ReviewReopen> ReviewReopens => Set<ReviewReopen>();
 
     /// <summary>
+    ///     Gets the table of review user states (what each user has seen of each review).
+    /// </summary>
+    public DbSet<ReviewUserState> ReviewUserStates => Set<ReviewUserState>();
+
+    /// <summary>
     ///     Gets the table of audit entries.
     /// </summary>
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
@@ -244,8 +252,11 @@ internal sealed class ReviewCenterDbContext : DbContext
             review.Property(r => r.ContentFingerprint).IsRequired().HasMaxLength(Sha256HexColumnLength);
 
             // Who created the review and whether through the API (provenance only; null and false for older rows)
-            review.Property(r => r.CreatedBy).HasMaxLength(ReviewLimits.MaxUsernameLength);
+            // The inbox finds the reviews a user created, so the creator is indexed; the NOCASE collation (like the user
+            // name column) makes the match without regard to case and lets the index serve it
+            review.Property(r => r.CreatedBy).HasMaxLength(ReviewLimits.MaxUsernameLength).UseCollation("NOCASE");
             review.Property(r => r.CreatedViaApi).HasDefaultValue(false);
+            review.HasIndex(r => r.CreatedBy);
 
             // The optional due date: a calendar day (UTC), stored as text by the SQLite provider; null when none is set
             review.Property(r => r.DueDate);
@@ -455,6 +466,10 @@ internal sealed class ReviewCenterDbContext : DbContext
         {
             slot.HasKey(s => s.Id);
             slot.Property(s => s.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+
+            // The inbox finds the slots of one user (as primary or as alternate), so both columns are indexed
+            slot.HasIndex(s => s.PrimaryUserId);
+            slot.HasIndex(s => s.AlternateUserId);
             slot.HasOne<Review>()
                 .WithMany()
                 .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
@@ -497,6 +512,24 @@ internal sealed class ReviewCenterDbContext : DbContext
             reopen.HasOne<Review>()
                 .WithMany()
                 .HasForeignKey(r => new { r.ProjectId, r.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Review user states: what a user has already seen of a review (the inbox and the unread markers). One row
+        // per user and review, so the composite key doubles as the guarantee that two parallel writes cannot store
+        // two rows. The row goes away with the user and with the review. It is not audited and not part of the
+        // signed record
+        modelBuilder.Entity<ReviewUserState>(state =>
+        {
+            state.HasKey(s => new { s.UserId, s.ProjectId, s.ReviewId });
+            state.Property(s => s.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            state.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            state.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

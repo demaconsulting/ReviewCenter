@@ -294,6 +294,8 @@ internal static class ServerHost
         services.AddSingleton<ProjectChecklistService>();
         services.AddSingleton<ReviewService>();
         services.AddSingleton<ThreadService>();
+        services.AddSingleton<IInboxStore, InboxStore>();
+        services.AddSingleton<InboxService>();
         services.AddSingleton<ChecklistService>();
         services.AddSingleton<UserService>();
         services.AddSingleton<PersonalAccessTokenService>();

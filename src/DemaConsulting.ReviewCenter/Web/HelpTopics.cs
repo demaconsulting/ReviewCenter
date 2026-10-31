@@ -46,6 +46,7 @@ internal static class HelpTopics
     public static IReadOnlyList<HelpTopic> All { get; } =
     [
         new("getting-started", "Getting started", "Sign in, find your project and open a review."),
+        new("inbox", "Your inbox", "The reviews waiting for you: to sign, replies waiting, failed checks and updates."),
         new("creating-a-review", "Creating a review", "Choose the files from a git repository or by uploading them."),
         new("reading-a-review", "Reading a review", "The Diff, Head and Baseline views and the change kinds."),
         new("comments-and-threads", "Comments and threads", "Comment on a line or a file, reply, resolve and share a link."),

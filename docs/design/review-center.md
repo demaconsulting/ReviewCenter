@@ -58,6 +58,7 @@ flowchart TD
         HistoryPage
         AuditPage
         RepositoriesPage
+        InboxPage
     end
     subgraph Core
         Fingerprint
@@ -71,6 +72,7 @@ flowchart TD
         PersonalAccessTokenService
         RecordDigest
         SigningService
+        InboxService
         ReauthProofStore
         TotpService
         TotpChallengeStore
@@ -88,6 +90,7 @@ flowchart TD
         PersonalAccessTokenStore
         AuditStore
         RepositoryStore
+        InboxStore
         TotpStore
         DatabaseSetup
     end
@@ -142,6 +145,8 @@ flowchart TD
     ServerHost --> ProjectChecklistService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
+    ServerHost --> InboxStore
+    ServerHost --> InboxService
     ServerHost --> ChecklistService
     ServerHost --> UserService
     ServerHost --> SigningService
@@ -204,6 +209,7 @@ flowchart TD
     App --> HistoryPage
     App --> AuditPage
     App --> RepositoriesPage
+    App --> InboxPage
     App --> SignIn
     LoginPage --> SignIn
     LoginPage --> OidcSignIn
@@ -246,6 +252,13 @@ flowchart TD
     AuditPage --> UserService
     RepositoriesPage --> RepositoryService
     RepositoriesPage --> UserService
+    InboxPage --> InboxService
+    ReviewPage --> InboxService
+    InboxService --> InboxStore
+    InboxService --> ReviewStore
+    InboxService --> UserStore
+    InboxService --> RecordDigest
+    InboxStore --> ReviewCenterDbContext
     ReviewService --> Fingerprint
     ProjectService --> ReviewStore
     ReviewService --> ReviewStore
@@ -334,7 +347,8 @@ checklists, `LoginPage`,
 `AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password and creating personal access
 tokens, and managing users, and
 `HistoryPage`, `AuditPage`, and `ProjectAuditPage` show the audit trail of a review, of the whole system, and of one
-project (through the shared `AuditEntryTable`), `RepositoriesPage` lets an
+project (through the shared `AuditEntryTable`), `InboxPage` lists the reviews that wait for the signed-in user,
+`RepositoriesPage` lets an
 administrator of a project register git repositories with it, and `NewMemberPage` and `NewMemberAccountPage` let an
 administrator of a project add an existing user or create a new account for it. A browser
 connects to the server,
@@ -838,7 +852,11 @@ and stores the
 signature through `ReviewStore`, which checks the digest once more inside the database transaction. `ProjectPage`
 calls `SigningService` to show whether each review is Approved. `AccountPage` and
 `UsersPage` call `UserService`, which stores users through `UserStore`; they also call `TotpService`, which keeps the
-second factor of a user through `TotpStore`. A request for the attestation of a review is
+second factor of a user through `TotpStore`. `InboxPage` and `HomePage` call `InboxService`, which builds the inbox of
+the signed-in user from the reviews, threads, answers, and signatures that `ReviewStore` reads, from the projects the
+user may see, and from the read state that `InboxStore` keeps (the inbox is also the notification list, so there is no
+separate notification record); `ReviewPage` reads and stores the same state to mark new comments. A request for the
+attestation of a review is
 answered by `AttestationEndpoint` after the same authorization: `AttestationService` checks through `SigningService`
 that the review is approved, reads the record, has `AttestationRenderer` and `PdfDocumentWriter` produce the PDF, has
 `AttestationSigner` sign it with the key from `AttestationKeyProvider`, records the generation through `AuditService`,

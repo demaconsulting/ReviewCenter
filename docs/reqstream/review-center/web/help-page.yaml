@@ -155,3 +155,12 @@ sections:
           topic is the place for the reasons and for the warning that a recovery code does not sign.
         tests:
           - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning
+
+      - id: ReviewCenter-HelpPage-InboxTopic
+        title: >-
+          The HelpPage unit shall offer a topic on the inbox that explains its four groups, the New badge, and how to
+          mark everything as read, and that notes that what a user has seen is not part of the signed record.
+        justification: |
+          A person who sees a number on the home page looks for what it counts and for what clears it.
+        tests:
+          - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead

@@ -157,6 +157,33 @@ sections:
           - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
           - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
 
+      - id: ReviewCenter-Inbox
+        title: >-
+          The tool shall give every signed-in user an inbox of the reviews that wait for them, in four groups: the
+          signatures to give or to give again, the open threads whose last comment is by someone else, the failed
+          checks of the reviews the user created, and, for information, the reviews that were approved or reopened
+          by someone else since the user last looked; shall count the reviews that need action on the home page,
+          mark what is new since the last visit, in the inbox and in the comments of a review, let the user mark all
+          as read, show only the reviews of projects the user may see and offer a signature or a reply only to a user
+          who may work in the project, and keep the state of what a user has seen out of the audit trail and out of
+          what a signature covers.
+        tags: [system]
+        justification: |
+          A reviewer should not have to open every project to learn what waits for them, and a late review should be
+          found by the one who must act. The inbox is also the list of notifications, so a separate notification
+          record is not needed. What a person has seen is personal information and not a change of a review, so it is
+          not part of the signed record (21 CFR Part 11 section 11.10(e), a trail of the changes of records) and
+          leaving it out keeps the signatures valid. The inbox follows the current access, so a person who lost
+          access to a project no longer learns anything about its reviews.
+        children:
+          - ReviewCenter-Core-Inbox
+          - ReviewCenter-Storage-Inbox
+          - ReviewCenter-Web-Inbox
+        tests:
+          - ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned
+          - CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts
+          - StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems
+
       # ----------------------------------------------------------------------------------------------
       # Review activity: the discussion and the checklist
       # ----------------------------------------------------------------------------------------------

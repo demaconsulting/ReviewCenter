@@ -53,6 +53,7 @@ This document covers the verification design for the following software items:
     - **HistoryPage** — audit history of one review
     - **AuditPage** — whole audit trail and chain verification for administrators
     - **RepositoriesPage** — git repository registry administration page
+    - **InboxPage** — inbox of the reviews that wait for the signed-in user
   - **Api** subsystem
     - **ApiTokenAuthentication** — bearer personal access token sign-in of the API
     - **ApiEndpoints** — JSON routes under /api
@@ -90,6 +91,7 @@ This document covers the verification design for the following software items:
     - **RepositoryService** — repository registry rules
     - **ReviewPlanner** — review planning from review-sets, baselines, and fallbacks
     - **PersonalAccessTokenService** — personal access token rules
+    - **InboxService** — inbox of a user, read state, and the unread rules
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface
@@ -98,6 +100,7 @@ This document covers the verification design for the following software items:
     - **RepositoryStore** — database implementation of the repository store interface
     - **PersonalAccessTokenStore** — database implementation of the personal access token store interface
     - **TotpStore** — database implementation of the second factor store interface
+    - **InboxStore** — database implementation of the inbox store interface
     - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner

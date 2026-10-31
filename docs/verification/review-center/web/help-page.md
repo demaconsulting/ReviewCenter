@@ -51,6 +51,8 @@ N/A - standard test environment.
   existing reviews keep theirs, the export, the import limit of 256 KiB, the validation, the replace and the reset, the
   rule of another version label, the audit action `project.checklist-changed`, and the IEC 62304 example with the note
   that a template does not make a record compliant; it contains no link that begins with `#`.
+- The Inbox topic follows the Getting started topic in the list (second), explains the four groups, the New marker and
+  Mark all as read, and links to the inbox.
 
 #### Test Scenarios
 
@@ -129,3 +131,8 @@ turning off, the reset by an administrator that project administrators cannot do
 the setting `Identity:Totp:Enabled` with the warning about the password alone. The signing topic contains the link
 `/help/two-factor`, and no link begins with `#`. This scenario is tested by
 `HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning`.
+
+**HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead**: The topic `inbox` is listed second, after the first
+topic. Its page is rendered; the text names the four groups (To sign, Replies waiting, Failed checks, and Updates), the
+New marker, and Mark all as read, and it links to `/inbox`. This scenario is tested by
+`HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead`.

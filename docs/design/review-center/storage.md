@@ -11,12 +11,13 @@ signatures, review reopens, personal access tokens, and the hash-chained audit t
 database through Entity
 Framework Core. It
 implements the store interfaces of the `Core` subsystem and owns everything about the database: the schema, the
-choice of provider, the location of the data, and the creation of the database. It contains eight units:
+choice of provider, the location of the data, and the creation of the database. It contains nine units:
 `ReviewCenterDbContext`, the mapping of the domain types to tables; `ReviewStore`, the implementation of the
 review store interface; `UserStore`, the implementation of the user store interface; `AuditStore`, the implementation
 of the audit store interface together with the `AuditAppender` that serializes and chains the entries;
 `RepositoryStore`, the implementation of the repository store interface; `PersonalAccessTokenStore`, the implementation
-of the personal access token store interface; `TotpStore`, the implementation of the second factor store interface; and
+of the personal access token store interface; `TotpStore`, the implementation of the second factor store interface;
+`InboxStore`, the implementation of the inbox store interface (what each user has seen of each review); and
 `DatabaseSetup`, the
 provider selection, connection string resolution, and database
 creation, together with its options type `DatabaseOptions`. The types of the subsystem are internal to the
@@ -117,6 +118,15 @@ application; the rest of the system sees only the Core store interfaces.
   decision with one winner is one conditional update. The store holds only the encrypted secret and the hashes of the
   recovery codes; a plain secret or a plain code never reaches it.
 
+**InboxStore (as IInboxStore)**: The persistence operations for the inbox.
+
+- *Type*: In-process .NET class implementing the Core interface.
+- *Role*: Provider.
+- *Contract*: Lists the reviews in which a user is the primary or the alternate of a reviewer slot or is the creator
+  (as light records, without any file), lists and reads the read-state rows of a user, and marks one or several reviews
+  as seen with a monotonic upsert that never moves the comment identity or the time back.
+- *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. A mark is
+  a compare-and-set that retries when it loses a race, so parallel calls never fail. Nothing is audited.
 **AuditStore (as IAuditStore)**: The persistence operations for the audit trail.
 
 - *Type*: In-process .NET class implementing the Core interface.
@@ -249,6 +259,13 @@ only when it is greater than the stored one, a recovery code is spent only while
 confirmed only while it is pending. Audited changes are stored with their entry in one transaction. The tables have no
 migration: a development database that was created before them is recreated.
 
+**Inbox read state**: The `ReviewUserStates` table holds one row per user and review with the highest comment identity
+the user has seen and the time of the last visit; it is deleted with the user and with the review. It is the only
+storage of the inbox, which is also the notification list: there is no notification table, because every row of the
+inbox is computed from the review data. The reviews of a user are found through indexes on the users of the reviewer
+slots and on the case-insensitive creator column of the reviews. The rows are not audited and are not part of the
+record digest, because what a person has seen is not a change of a review. The table and the indexes have no migration:
+a development database that was created before them is recreated.
 **Context lifetime and concurrency**: Blazor Server connections are long-lived and concurrent, and a database
 context is not thread-safe. The store therefore obtains a new context from a context factory for every
 operation and disposes it at the end, and never keeps a context in a page or in a service. `UserStore` follows the

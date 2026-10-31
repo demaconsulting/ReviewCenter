@@ -4,12 +4,12 @@
 
 The `Core` subsystem is verified by subsystem tests defined in `CoreSubsystemTests.cs`. The tests use the real
 `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
-`RepositoryService`, `PersonalAccessTokenService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`,
+`RepositoryService`, `PersonalAccessTokenService`, `InboxService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`,
 `RecordDigest`, `ReviewPlanner`, and `ProjectAccess`
 together, with
 a fixed clock (a clock the test can move for the lockout and the expiry of a token) and fakes for the stores
 (`FakeReviewStore`,
-`FakeUserStore`, `FakeRepositoryStore`, `FakePersonalAccessTokenStore`), a trivial password hasher
+`FakeUserStore`, `FakeRepositoryStore`, `FakeInboxStore`, `FakePersonalAccessTokenStore`), a trivial password hasher
 (`FakePasswordHasher`), and a trivial token protector
 (`FakeCredentialProtector`) in place of the database and the real hasher and protector,
 because the subsystem has no dependency on a
@@ -17,7 +17,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the twenty-one units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the twenty-two units.
 
 ### Test Environment
 
@@ -71,6 +71,10 @@ N/A - standard test environment.
   owner of the token); only a project administrator switches the rule, and every switch is audited.
 - Every change made through the services is recorded in the audit trail with the person, the action, and a detail
   that never holds a password or a token; recorded entries verify as an intact chain.
+- The inbox of a user lists the reviews that need the user (a signature to give, a reply waiting, failed checks) and
+  the updates (approval and reopening by others), counts the distinct reviews that need action, marks the comments of
+  others after the last seen one as unread, and gives nothing to users who may not act (see the unit tests of
+  `InboxService`).
 - A repository registry that only the administrator of the project (or a system administrator) can change: names,
   locations, and credentials are validated, tokens are stored encrypted and are never part of a listed registration,
   every repository belongs to one project, and every change is audited without a secret (see the unit tests of
@@ -271,3 +275,8 @@ enrolled user needs the password and a fresh code, which is tested by
 `SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs`. The six rules of the second factor are
 reported by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`. The challenge of the sign-in is
 verified by the unit tests of `TotpChallengeStore`.
+
+**Inbox**: The unit tests of `InboxService` verify the subsystem requirement for the inbox. The groups To sign,
+Replies waiting, Failed checks, and Updates, the count of the distinct reviews that need action, and the unread rules
+are tested over in-memory stores, and the whole path over the real services is tested by
+`CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts`. The rules class is tested by `InboxRules`.
