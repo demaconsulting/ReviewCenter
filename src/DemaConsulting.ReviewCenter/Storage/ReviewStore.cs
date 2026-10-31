@@ -415,15 +415,13 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
 
         // The same rule as the last-administrator check: only an enabled administrator is one, and only other
-        // enabled administrators count as another
-        if (!await context.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.Enabled, cancellationToken))
-        {
-            return [];
-        }
-
+        // enabled administrators count as another. It is one query, so the enabled state cannot change between reads.
         return await context.Projects.AsNoTracking()
             .Where(p => context.ProjectMemberships.Any(
-                            m => m.ProjectId == p.Id && m.UserId == userId && m.Role == ProjectRole.ProjectAdmin)
+                            m => m.ProjectId == p.Id
+                                 && m.UserId == userId
+                                 && m.Role == ProjectRole.ProjectAdmin
+                                 && context.Users.Any(u => u.Id == m.UserId && u.Enabled))
                         && !context.ProjectMemberships.Any(
                             m => m.ProjectId == p.Id
                                  && m.UserId != userId
