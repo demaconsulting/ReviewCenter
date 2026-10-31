@@ -277,6 +277,7 @@ public partial class IntegrationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var app = await Api.ApiTestSupport.StartAsync();
         await Api.ApiTestSupport.EnsureUserAsync(app, "ann");
+        await Api.ApiTestSupport.EnsureUserAsync(app, "bob");
         await Api.ApiTestSupport.EnsureUserAsync(app, "cyd");
         var users = app.Services.GetRequiredService<UserService>();
         var cyd = (await users.GetAsync("cyd", cancellationToken))!;
@@ -284,7 +285,7 @@ public partial class IntegrationTests
         var store = app.Services.GetRequiredService<IReviewStore>();
         await store.AddMembershipAsync(cyd.Id, project.Id, cancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "rev-1", "First review", [new("a.txt", Core.TestContent.A)], Core.TestActors.Ann, cancellationToken);
+            project.Id, "rev-1", "First review", [new("a.txt", Core.TestContent.A)], Core.TestActors.Bob, cancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {

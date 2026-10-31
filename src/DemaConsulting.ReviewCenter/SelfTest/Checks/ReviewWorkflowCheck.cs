@@ -135,8 +135,8 @@ internal static class ReviewWorkflowCheck
                 $"The review was not created: {created.Message}");
             var reviewId = created.ReviewId!;
 
-            // Answer every checklist item, show that the author cannot be a reviewer, then sign with the password
-            // as the separate reviewer
+            // Answer every checklist item as the separate reviewer (the author may not), show that the author cannot
+            // be a reviewer, then sign with the password as the separate reviewer
             await SignAsync(provider, projects, project.Id, reviewId, new People(user, actor, reviewer, reviewerActor), cancellationToken);
 
             // The signed review must be in the evidence index with its fingerprint and the record digest
@@ -155,9 +155,9 @@ internal static class ReviewWorkflowCheck
 
             // An approved review is locked: a change is refused, and only an administrator's reopen (with a reason)
             // takes it back to review
-            await CheckLockAndReopenAsync(provider, project.Id, reviewId, actor, cancellationToken);
+            await CheckLockAndReopenAsync(provider, project.Id, reviewId, actor, reviewerActor, cancellationToken);
 
-            return "embedded SQLite; review signed by a separate reviewer; author signature refused; " +
+            return "embedded SQLite; author answer refused; review answered and signed by a separate reviewer; author signature refused; " +
                 $"approved review locked and reopened by an administrator; evidence index fingerprint {Short(entry!.Fingerprint)}, " +
                 $"record digest {Short(approval!.Digest)}";
         }
@@ -171,15 +171,15 @@ internal static class ReviewWorkflowCheck
     /// <summary>
     ///     The two people of the workflow: the author of the review and the separate reviewer.
     /// </summary>
-    /// <param name="Author">The user who creates the review and answers its checklist.</param>
+    /// <param name="Author">The user who creates the review; the author cannot answer its checklist or sign it.</param>
     /// <param name="AuthorActor">The actor of the author.</param>
     /// <param name="Reviewer">The user who reviews and signs.</param>
     /// <param name="ReviewerActor">The actor of the reviewer.</param>
     private sealed record People(User Author, Actor AuthorActor, User Reviewer, Actor ReviewerActor);
 
     /// <summary>
-    ///     Answers every checklist item with Pass, shows that the author cannot be a reviewer, and lets the separate
-    ///     reviewer sign with a password re-authentication.
+    ///     Answers every checklist item with Pass as the separate reviewer (the author is refused), shows that the
+    ///     author cannot be a reviewer, and lets the separate reviewer sign with a password re-authentication.
     /// </summary>
     /// <param name="provider">The service provider.</param>
     /// <param name="projects">The project service, to switch the independence rule off and on again.</param>
@@ -197,11 +197,17 @@ internal static class ReviewWorkflowCheck
         People people,
         CancellationToken cancellationToken)
     {
+        // The author may not answer the checklist (the default rule), so the separate reviewer answers every item
         var checklists = provider.GetRequiredService<ChecklistService>();
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        var allItems = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ToList();
+        await ExpectRefusedAsync(
+            DomainRule.AuthorCannotAnswer,
+            () => checklists.SetAnswerAsync(
+                projectId, reviewId, allItems[0].Id, ChecklistOutcome.Pass, null, people.AuthorActor, cancellationToken));
+        foreach (var item in allItems)
         {
             await checklists.SetAnswerAsync(
-                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, people.AuthorActor, cancellationToken);
+                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, people.ReviewerActor, cancellationToken);
         }
 
         var signing = provider.GetRequiredService<SigningService>();
@@ -237,6 +243,10 @@ internal static class ReviewWorkflowCheck
     /// <param name="projectId">The project number.</param>
     /// <param name="reviewId">The approved review.</param>
     /// <param name="admin">The administrator who reopens the review.</param>
+    /// <param name="reviewer">
+    ///     The reviewer who answers the checklist; the change to be refused comes from the reviewer, because the author
+    ///     is refused as author before the lock is reached.
+    /// </param>
     /// <param name="cancellationToken">Cancels the work.</param>
     /// <returns>A task that completes when the review is reopened.</returns>
     /// <exception cref="ValidationFailedException">Thrown when the change is not refused or the review stays approved.</exception>
@@ -245,13 +255,14 @@ internal static class ReviewWorkflowCheck
         int projectId,
         string reviewId,
         Actor admin,
+        Actor reviewer,
         CancellationToken cancellationToken)
     {
         var firstItem = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
         await ExpectRefusedAsync(
             DomainRule.ReviewLocked,
             () => provider.GetRequiredService<ChecklistService>().SetAnswerAsync(
-                projectId, reviewId, firstItem.Id, ChecklistOutcome.Fail, "Changed after approval", admin, cancellationToken));
+                projectId, reviewId, firstItem.Id, ChecklistOutcome.Fail, "Changed after approval", reviewer, cancellationToken));
 
         var signing = provider.GetRequiredService<SigningService>();
         await signing.ReopenReviewAsync(admin, projectId, reviewId, "Self-test reopen", cancellationToken);

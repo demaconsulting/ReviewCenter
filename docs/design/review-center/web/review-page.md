@@ -46,8 +46,10 @@ affected. For a project administrator or system administrator the banner is foll
 button `reopen-button` ("Reopen review"), and a message area `reopen-error`. When the review has been reopened before, a
 Reopen history card (`reopen-history`) lists every reopen with who, when, the reason, and the short previous digest. The
 Reviewers card also tells the review author, while the project requires independent reviewers, that the author cannot be
-a reviewer (`author-independence-hint`), and the Reviewers card does not offer the author as a candidate. The page
-holds none of these
+a reviewer (`author-independence-hint`), and the Reviewers card does not offer the author as a candidate. While the
+project does not let the person who reopened a review sign it again, a signed-in user who occupies a slot and reopened
+the review (now or earlier) sees, in place of the sign form of that slot, the notice `reopener-cannot-sign-{id}`
+("You reopened this review; another reviewer must sign."). The page holds none of these
 rules; Core decides, and the page only shows the result.
 
 #### Data Model
@@ -116,8 +118,11 @@ answer of `ReviewService.IsOverdue` for the review and `IsLocked`; **DueDateInpu
 date field (`yyyy-MM-dd`) and the message of a refusal.
 **RequireIndependent**: the `RequireIndependentReviewers` setting of the project, read with the project
 in `RefreshAsync`; **VisibleCandidates**: `Candidates` without the review author (`Review.CreatedBy`) when
-`RequireIndependent` is on. **CanReopen**: whether the signed-in user is a project administrator of the project or a
-system administrator, asked with `IProjectAccess.CanAdministerAsync` in `RefreshAsync`. **ReopenReason**,
+`RequireIndependent` is on. **RequireNonReopener**: the `RequireNonReopenerSigning` setting of the project, read in
+the same place; **ReopenerBlocked**: whether the signed-in user is in the reopen history of the approval while that
+setting is on (a fact about the viewer, so it is not one of the blockers of the approval). **CanReopen**: whether the
+signed-in user is a project administrator of the project or
+a system administrator, asked with `IProjectAccess.CanAdministerAsync` in `RefreshAsync`. **ReopenReason**,
 **ReopenError**: the text typed into the reopen form and its message.
 
 **Warning**: the pending `PendingSignatureWarning` (`null` when there is none): which form or thread it belongs to, the
@@ -182,7 +187,8 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
 `slot-primary-unavailable-{id}`, `slot-alternate-unavailable-{id}`,
 `slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
-`slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `sign-form-{id}`, `sign-meaning-{id}`,
+`slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `reopener-cannot-sign-{id}`,
+`sign-form-{id}`, `sign-meaning-{id}`,
 `sign-password-{id}`, `sign-totp-{id}` (only for a user with a second factor), `sign-error-{id}`, `sign-button-{id}`
 (all by slot identity), and for an external user
 `sign-reauth-form-{id}`, `sign-reauth-{id}`, `sign-reauth-hint-{id}`, `sign-reauth-off-{id}`, and `sign-confirmed-{id}`,
@@ -417,7 +423,9 @@ record digest it displayed (`Approval.Digest`), so what
 is signed is exactly what the reader saw; a record that changed in the meantime is refused by Core, and the page shows
 that message. If a slot holds the review author while the project requires independent reviewers (for example because
 the rule was switched on after the slot was filled), the sign form is still drawn, and Core refuses the signature with
-`ReviewerNotIndependent`; the page shows that message in `sign-error-{id}`. A `DomainRuleException` (wrong password,
+`ReviewerNotIndependent`; the page shows that message in `sign-error-{id}`. If the signed-in user reopened the review
+while the project does not let a reopener sign again, the sign form is replaced by the notice, and a stale page that
+still sends the signature gets `ReopenerCannotSign` from Core. A `DomainRuleException` (wrong password,
 a user who is not in the slot, a locked-out user, a changed
 record) is shown in `sign-error-{id}`; the wrong-password message is the generic one Core produces, and a wrong or
 missing code gets the same message ("The password or the code is incorrect."). A reviewer who is no
@@ -446,7 +454,9 @@ are shown. Success reloads the review and the approval through `RefreshAsync`.
 the typed reason. The form is drawn only for an administrator (`CanReopen`) of a locked review, and Core checks the same
 again (an API token is never involved, because the page works with the signed-in user). A violated rule (an empty or
 too long reason, a review that is no longer locked, a user who is no administrator) is a `DomainRuleException` shown in
-`reopen-error`, with the typed reason kept. Success clears the reason and reloads through `RefreshAsync`, so the badge
+`reopen-error`, with the typed reason kept. A reopening that would leave a slot with nobody who may sign it
+(`ReopenWouldStrandSlot`, only while the project does not let a reopener sign again) is shown there too, with the
+message that names the slot. Success clears the reason and reloads through `RefreshAsync`, so the badge
 turns to In review, the signatures show as out of date, and the history lists the reopen.
 
 **Locked controls**: When `IsLocked` is true the markup disables the add-slot selects and button and shows the hint

@@ -59,7 +59,9 @@ public sealed record NewMemberAccount(ProjectMember Member, string TemporaryPass
 ///     the injected stores are; the last project administrator is protected by the store, atomically.
 ///     A project also carries the "require independent reviewers" rule (on by default), which a project administrator
 ///     switches with <see cref="SetRequireIndependentReviewersAsync"/>; <see cref="SigningService"/> applies it. Two
-///     further rules are stored only (not applied yet); <see cref="SetReviewRuleAsync"/> switches any of the three.
+///     further rules (the author does not answer the checklist, the reopener does not sign again) are applied by
+///     <see cref="ChecklistService"/> and <see cref="SigningService"/>; <see cref="SetReviewRuleAsync"/> switches any
+///     of the three.
 /// </remarks>
 public sealed class ProjectService
 {
@@ -633,9 +635,8 @@ public sealed class ProjectService
     ///     <see cref="ReviewRule.IndependentReviewers"/> rule records <see cref="IndependentReviewersChangedAction"/>
     ///     with the text <c>RequireIndependentReviewers on-&gt;off</c>; the other rules record
     ///     <see cref="ReviewRuleChangedAction"/> with the property name in the same form, for example
-    ///     <c>RequireNonReopenerSigning on-&gt;off</c>. Only <see cref="ReviewRule.IndependentReviewers"/> is applied
-    ///     today (when a reviewer is chosen and when a review is signed; existing signatures stay valid); the
-    ///     other rules are stored only.
+    ///     <c>RequireNonReopenerSigning on-&gt;off</c>. The rules are applied when they are checked (a reviewer is
+    ///     chosen, a review is signed or reopened, a checklist answer is given); existing signatures stay valid.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="rule"/> is not defined.</exception>
     /// <exception cref="DomainRuleException">

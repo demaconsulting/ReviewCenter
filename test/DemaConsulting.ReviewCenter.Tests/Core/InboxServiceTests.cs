@@ -519,8 +519,10 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_ReopenedByMe_ShowsNoUpdate()
     {
-        // Arrange: an approved review that ann reopens herself
+        // Arrange: an approved review that ann reopens herself (the rule that would stop her signing again is off)
         var world = await InboxTestWorld.CreateAsync();
+        await TestServices.Projects(world.Store, world.Clock).SetReviewRuleOffAsync(
+            world.ProjectId, ReviewRule.NonReopenerSigning, Ct);
         await world.CreateReviewAsync("r1");
         await world.AnswerAllAsync("r1");
         var first = await world.AddSlotAsync("r1", "ann");

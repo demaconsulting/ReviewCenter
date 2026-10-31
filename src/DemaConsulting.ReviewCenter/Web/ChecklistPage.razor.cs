@@ -149,6 +149,18 @@ public partial class ChecklistPage : ComponentBase
     private string? LockedMarker => IsLocked ? "true" : null;
 
     /// <summary>
+    ///     Gets the user name of the signed-in user, or <c>null</c> when nobody is signed in; it tells the checklist
+    ///     service whether the viewer is blocked as the author of the review.
+    /// </summary>
+    private string? CurrentUsername { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the answers and the applicability of sections can not be changed on this page:
+    ///     the review is locked, or the viewer created it and the project does not let the author answer.
+    /// </summary>
+    private bool ControlsDisabled => IsLocked || State?.AuthorBlocked == true;
+
+    /// <summary>
     ///     Gets the identifier of the open section, or <c>null</c> when none is open.
     /// </summary>
     private string? OpenSectionId { get; set; }
@@ -211,10 +223,12 @@ public partial class ChecklistPage : ComponentBase
         Loaded = false;
 
         // A project the user may not see is treated like a missing one: nothing of its review is loaded
-        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        var project = await ProjectService.GetAsync(actor, ProjectId);
         ProjectName = project?.Name;
+        CurrentUsername = actor?.Username;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
-        State = project is null ? null : await ChecklistService.GetAsync(ProjectId, ReviewId);
+        State = project is null ? null : await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
 
         // A follow-up shows what failed in the review it follows, so the reviewer decides that check again
         FollowedState = Review?.FollowsReviewId is { } followed && State is not null
@@ -506,7 +520,7 @@ public partial class ChecklistPage : ComponentBase
         ItemErrors.Remove(itemId);
         PendingOutcomes.Remove(itemId);
         JustificationTexts.Remove(itemId);
-        State = await ChecklistService.GetAsync(ProjectId, ReviewId);
+        State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
     }
 
     /// <summary>
@@ -558,7 +572,7 @@ public partial class ChecklistPage : ComponentBase
         SectionErrors.Remove(sectionId);
         PendingNotApplicable.Remove(sectionId);
         ReasonTexts.Remove(sectionId);
-        State = await ChecklistService.GetAsync(ProjectId, ReviewId);
+        State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
     }
 
     /// <summary>

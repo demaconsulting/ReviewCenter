@@ -505,6 +505,59 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that, while the project does not let authors answer the checklist, the author sees the notice and cannot
+    ///     answer while another member can, that an administrator can switch the rule off (which is audited), and that
+    ///     the author can then answer.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_ReviewRules_AuthorCannotAnswer_AdminCanSwitchTheRuleOff()
+    {
+        // Arrange: a review that puppet created; the rule is switched on again (the scenario switches it off)
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await using var other = await scenario.StartSignedInBrowserAsync("other", "second");
+        await scenario.SetReviewRuleAsync("author-checklist-switch", on: true);
+        var checklist = $"/projects/1/reviews/{scenario.ReviewId}/checklist";
+
+        // Act: the author opens the checklist
+        await browser.GotoAsync(checklist, "checklist-page");
+        var noticeWhenOn = await browser.ExistsAsync("author-answer-blocked");
+        var passDisabledWhenOn = await browser.IsDisabledAsync("check-pass-req-01");
+
+        // Act: another member answers a check
+        await other.GotoAsync(checklist, "checklist-page");
+        var noticeForOther = await other.ExistsAsync("author-answer-blocked");
+        await other.OkAsync("click", "check-pass-req-01");
+        await other.WaitUntilAsync(() => other.ExistsAsync("check-answered-by-req-01"), "the answer of the other member");
+
+        // Act: the administrator switches the rule off, and the author opens the checklist again
+        var statusOff = await scenario.SetReviewRuleAsync("author-checklist-switch", on: false);
+        await browser.GotoAsync(checklist, "checklist-page");
+        var noticeWhenOff = await browser.ExistsAsync("author-answer-blocked");
+        var passDisabledWhenOff = await browser.IsDisabledAsync("check-pass-req-02");
+
+        // Act: read the audit trail of the server
+        await browser.GotoAsync("/audit", "audit-page");
+        var trail = await browser.TextOfAsync("audit-page");
+
+        // Assert: while the rule is on the author is told, and cannot answer
+        Assert.True(noticeWhenOn, "The author must be told that somebody else has to answer the checklist.");
+        Assert.True(passDisabledWhenOn, "The author must not be able to answer while the rule is on.");
+
+        // Assert: another member is not affected
+        Assert.False(noticeForOther);
+
+        // Assert: once an administrator switched the rule off the author can answer
+        Assert.Contains("now off", statusOff, StringComparison.Ordinal);
+        Assert.False(noticeWhenOff);
+        Assert.False(passDisabledWhenOff);
+
+        // Assert: the audit trail shows that the rule was changed
+        Assert.Contains("project.review-rule-changed", trail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that an administrator can check a checklist definition on the checklist template page (every error of an
     ///     invalid one is listed with its path and nothing is stored), replace the checklist of the project with a valid
     ///     one, so that only reviews created afterwards start with it while a review created before keeps the default,
@@ -1391,10 +1444,21 @@ public class ReviewCenterSystemTests
         /// </summary>
         /// <param name="required">The new value.</param>
         /// <returns>The confirmation that the page shows.</returns>
-        public async Task<string> SetIndependentReviewersAsync(bool required)
+        public Task<string> SetIndependentReviewersAsync(bool required)
+        {
+            return SetReviewRuleAsync("independent-reviewers-switch", required);
+        }
+
+        /// <summary>
+        ///     Switches one of the rules of the project on or off on the project page.
+        /// </summary>
+        /// <param name="switchTestId">The test identifier of the switch.</param>
+        /// <param name="on">The new value.</param>
+        /// <returns>The confirmation that the page shows.</returns>
+        public async Task<string> SetReviewRuleAsync(string switchTestId, bool on)
         {
             await Browser.GotoAsync("/projects/1", "project-page");
-            await Browser.OkAsync(required ? "check" : "uncheck", "independent-reviewers-switch");
+            await Browser.OkAsync(on ? "check" : "uncheck", switchTestId);
             await Browser.OkAsync("click", "independent-reviewers-save");
             await Browser.OkAsync("wait", "review-rules-status");
             return await Browser.TextOfAsync("review-rules-status");
@@ -1589,6 +1653,10 @@ public class ReviewCenterSystemTests
                 await Browser.OkAsync("click", "new-member-submit");
                 await Browser.OkAsync("wait", $"member-row-{member}");
             }
+
+            // The administrator who creates the review also answers its checklist in these scenarios, which the
+            // default rule would refuse; the scenario that tests the rule switches it on again
+            await SetReviewRuleAsync("author-checklist-switch", on: false);
 
             await Browser.GotoAsync("/projects/1/plan", "plan-page");
             await Browser.OkAsync("select", "plan-repository-select", "1");

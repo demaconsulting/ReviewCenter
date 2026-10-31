@@ -692,6 +692,101 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that the author of a review cannot answer a check or set a section while the rule is on: both are
+    ///     refused with <see cref="DomainRule.AuthorCannotAnswer"/>, the message names the switch, the match ignores
+    ///     case, and nothing is stored. Another member may answer.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Answer_AuthorWhileRuleIsOn_ThrowsAuthorCannotAnswerAndStoresNothing()
+    {
+        // Arrange: a review created by the user "author"; the rule is on by default
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, service, projectId) = await CreateAsync();
+        var sectionId = DefaultChecklist.Current.Sections[0].Id;
+
+        // Act: the author (also with another case) answers and sets a section; bob answers
+        var answer = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetAnswerAsync(
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Author, cancellationToken));
+        var section = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetSectionApplicabilityAsync(
+            projectId, "rev-1", sectionId, false, "Reason", new Actor("AUTHOR", "Author"), cancellationToken));
+        await service.SetAnswerAsync(projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
+
+        // Assert: both refused with the rule and the switch named; only bob's answer is stored
+        Assert.Equal(DomainRule.AuthorCannotAnswer, answer.Rule);
+        Assert.Equal(DomainRule.AuthorCannotAnswer, section.Rule);
+        Assert.Contains("Authors cannot answer the checklist of their own review", answer.Message, StringComparison.Ordinal);
+        var state = (await service.GetAsync(projectId, "rev-1", cancellationToken))!;
+        Assert.Equal("Bob", state.AnswerFor("REQ-01")!.AnsweredBy);
+        Assert.Equal(1, state.Overall.Answered);
+        Assert.True(state.IsApplicable(sectionId));
+    }
+
+    /// <summary>
+    ///     Test that the author may answer once the project administrator has switched the rule off.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Answer_AuthorWhileRuleIsOff_Stores()
+    {
+        // Arrange: the rule is switched off
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        await TestServices.Projects(store, new FixedTimeProvider(_now)).SetReviewRuleOffAsync(
+            projectId, ReviewRule.NonAuthorChecklistAnswers, cancellationToken);
+
+        // Act
+        await service.SetAnswerAsync(projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Author, cancellationToken);
+
+        // Assert
+        Assert.Equal("Author", (await service.GetAsync(projectId, "rev-1", cancellationToken))!.AnswerFor("REQ-01")!.AnsweredBy);
+    }
+
+    /// <summary>
+    ///     Test that the author rule is checked before the lock: the author of an approved review is told about the
+    ///     rule, not that the review is locked.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Answer_AuthorOfApprovedReview_ReportsAuthorRuleBeforeLock()
+    {
+        // Arrange: an approved review created by the user "author"
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        await AuditTestExtensions.ApproveReviewAsync(store, new FixedTimeProvider(_now), projectId, "rev-1", "approver", cancellationToken);
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetAnswerAsync(
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "Wrong.", TestActors.Author, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.AuthorCannotAnswer, ex.Rule);
+    }
+
+    /// <summary>
+    ///     Test that the state tells whether the viewer is blocked: only for the author, only while the rule is on, and
+    ///     never without a viewer.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn()
+    {
+        // Arrange: a review created by the user "author"
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+
+        // Act, Assert: the author is blocked (in any case), others and a missing viewer are not
+        Assert.True((await service.GetAsync(projectId, "rev-1", cancellationToken, "author"))!.AuthorBlocked);
+        Assert.True((await service.GetAsync(projectId, "rev-1", cancellationToken, "AUTHOR"))!.AuthorBlocked);
+        Assert.False((await service.GetAsync(projectId, "rev-1", cancellationToken, "bob"))!.AuthorBlocked);
+        Assert.False((await service.GetAsync(projectId, "rev-1", cancellationToken))!.AuthorBlocked);
+        Assert.False((await service.GetAsync(projectId, "rev-1", cancellationToken, "  "))!.AuthorBlocked);
+
+        // Act: switch the rule off
+        await TestServices.Projects(store, new FixedTimeProvider(_now)).SetReviewRuleOffAsync(
+            projectId, ReviewRule.NonAuthorChecklistAnswers, cancellationToken);
+
+        // Assert: nobody is blocked
+        Assert.False((await service.GetAsync(projectId, "rev-1", cancellationToken, "author"))!.AuthorBlocked);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a missing store, access or clock.
     /// </summary>
     [Fact]

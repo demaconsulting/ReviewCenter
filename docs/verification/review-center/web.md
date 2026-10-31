@@ -158,8 +158,14 @@ address of a line link of a file whose name has a space and a hash, with a basel
 is `/login?ReturnUrl=` followed by the whole address escaped once more, and no review page is drawn. This scenario is
 tested by `Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery`.
 
-**WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload**: A review is created through the Core services of the
-real pipeline and two checks are answered, one Pass and one Fail with a justification. The checklist page is
+**WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers**: A review is created by ann through the Core services
+of the real pipeline. The checklist page is requested as ann and as bob. The page of ann shows the notice
+`author-answer-blocked` and disabled answer buttons; the page of bob shows neither the notice nor disabled buttons. This
+scenario is tested by `WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers`.
+
+**WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload**: A review is created by a second user through the Core
+services of the real pipeline (its author may not answer it) and two checks are answered, one Pass and one Fail with a
+justification. The checklist page is
 requested twice and the review page once. Both loads of the checklist page say "56 checks unanswered.", show the
 section progress "2 of 8", the pressed Pass button, and the saved justification; the review page shows "2 of 58
 checks answered", a link to the checklist page, and "56 checklist checks unanswered, 1 check answered Fail." as the

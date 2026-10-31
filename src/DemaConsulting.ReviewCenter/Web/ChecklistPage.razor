@@ -55,6 +55,13 @@
                 review; the signatures are then kept as history and the review must be signed again.
             </p>
         }
+        else if (State.AuthorBlocked)
+        {
+            <p class="notice" role="status" data-testid="author-answer-blocked">
+                You created this review, so you cannot answer its checklist in this project. Another project member has to
+                answer it. You can still start, answer and resolve comment threads.
+            </p>
+        }
 
         <section class="card">
             <p class="status" data-testid="checklist-status">@StatusLine()</p>
@@ -98,7 +105,7 @@
                         <div class="section-body">
                             <label class="switch" for="applicable-@sid">
                                 <input id="applicable-@sid" type="checkbox" checked="@(applicable || IsSwitchOnWaiting(section.Id))"
-                                       data-testid="section-@sid-applicable" disabled="@IsLocked" data-locked="@LockedMarker"
+                                       data-testid="section-@sid-applicable" disabled="@ControlsDisabled" data-locked="@LockedMarker"
                                        @onchange="e => SetApplicableAsync(sectionId, (bool)(e.Value ?? false))" />
                                 This section applies to the review
                             </label>
@@ -113,10 +120,10 @@
                                 <div class="field">
                                     <label for="reason-@sid">Reason it does not apply <span class="required">* required</span></label>
                                     <textarea id="reason-@sid" rows="2" maxlength="@ReviewLimits.MaxJustificationLength"
-                                              data-testid="section-@sid-reason" disabled="@IsLocked" value="@ReasonText(section.Id)"
+                                              data-testid="section-@sid-reason" disabled="@ControlsDisabled" value="@ReasonText(section.Id)"
                                               @oninput="e => ReasonTexts[sectionId] = e.Value?.ToString() ?? string.Empty"></textarea>
                                 </div>
-                                <button type="button" disabled="@IsLocked" data-testid="section-@sid-save" @onclick="() => SaveNotApplicableAsync(sectionId)">Save reason</button>
+                                <button type="button" disabled="@ControlsDisabled" data-testid="section-@sid-save" @onclick="() => SaveNotApplicableAsync(sectionId)">Save reason</button>
                                 @if (SectionErrors.TryGetValue(section.Id, out var sectionError))
                                 {
                                     <p class="error" role="alert" data-testid="section-@sid-error">@sectionError</p>
@@ -159,11 +166,11 @@
                                             }
                                             <div class="segmented" role="group" aria-labelledby="check-text-@iid">
                                                 <button type="button" class="secondary" aria-pressed="@PressedValue(shown, ChecklistOutcome.Pass)"
-                                                        data-testid="check-pass-@iid" disabled="@IsLocked" data-locked="@LockedMarker" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Pass)">Pass</button>
+                                                        data-testid="check-pass-@iid" disabled="@ControlsDisabled" data-locked="@LockedMarker" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Pass)">Pass</button>
                                                 <button type="button" class="secondary fail" aria-pressed="@PressedValue(shown, ChecklistOutcome.Fail)"
-                                                        data-testid="check-fail-@iid" disabled="@IsLocked" data-locked="@LockedMarker" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Fail)">Fail</button>
+                                                        data-testid="check-fail-@iid" disabled="@ControlsDisabled" data-locked="@LockedMarker" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Fail)">Fail</button>
                                                 <button type="button" class="secondary" aria-pressed="@PressedValue(shown, ChecklistOutcome.NotApplicable)"
-                                                        data-testid="check-na-@iid" disabled="@IsLocked" data-locked="@LockedMarker" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.NotApplicable)">N/A</button>
+                                                        data-testid="check-na-@iid" disabled="@ControlsDisabled" data-locked="@LockedMarker" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.NotApplicable)">N/A</button>
                                             </div>
 
                                             @if (needsJustification)
@@ -171,10 +178,10 @@
                                                 <div class="field">
                                                     <label for="justification-@iid">Justification <span class="required">* required for Fail and N/A</span></label>
                                                     <textarea id="justification-@iid" rows="2" maxlength="@ReviewLimits.MaxJustificationLength"
-                                                              data-testid="check-justification-@iid" disabled="@IsLocked" value="@JustificationText(item.Id)"
+                                                              data-testid="check-justification-@iid" disabled="@ControlsDisabled" value="@JustificationText(item.Id)"
                                                               @oninput="e => JustificationTexts[itemId] = e.Value?.ToString() ?? string.Empty"></textarea>
                                                 </div>
-                                                <button type="button" disabled="@IsLocked" data-testid="check-save-@iid" @onclick="() => SaveAsync(itemId)">Save</button>
+                                                <button type="button" disabled="@ControlsDisabled" data-testid="check-save-@iid" @onclick="() => SaveAsync(itemId)">Save</button>
                                                 @if (IsUnsaved(item.Id))
                                                 {
                                                     <span class="muted hint">Not saved yet.</span>

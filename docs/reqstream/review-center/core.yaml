@@ -371,17 +371,36 @@ sections:
         title: >-
           The Core subsystem shall keep, for each project, a switch for each of two further review rules (authors
           answering the checklist of their own review, and the person who reopened a review signing it again), on for
-          a new project, shall let only an administrator of the project or a system administrator change them, never
-          through an access token, and shall record each change in the audit trail; it only stores them and does not
-          apply them yet.
+          a new project and for every project that existed before the rules were enforced, shall let only an
+          administrator of the project or a system administrator change them, never through an access token, and shall
+          record each change in the audit trail.
         justification: |
-          The rules are stored before they are applied, so that every project has a recorded choice on the day they
-          take effect. The change rules are the ones of the independence rule, so that a project that has to relax a
-          rule does so in a way that is visible in the history.
+          Every project has a recorded choice, and the default is on. The change rules are the ones of the
+          independence rule, so that a project that has to relax a rule does so in a way that is visible in the
+          history.
         children:
           - ReviewCenter-ProjectService-ReviewRuleSwitches
         tests:
           - CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale
+
+      - id: ReviewCenter-Core-ReviewRules
+        title: >-
+          The Core subsystem shall enforce the two further review rules of a project through its services, whatever
+          the caller: while a project requires that authors do not answer the checklist, the author of a review cannot
+          answer a check or change the applicability of a section of it; while it requires that the person who
+          reopened a review does not sign it again, that person cannot sign it and an administrator cannot reopen a
+          review in a way that leaves a slot without a person who may sign; and a project that switched a rule off is
+          not restricted by it.
+        justification: |
+          Enforcing the rules in the services means that the web pages, the API, and the command line cannot bypass
+          them. The reopening guard keeps a review from becoming impossible to approve. A rule that an administrator
+          can switch off, with a record, leaves a project that has to let one person do everything able to do so.
+        children:
+          - ReviewCenter-ChecklistService-AuthorRule
+          - ReviewCenter-SigningService-ReopenerRule
+          - ReviewCenter-SigningService-StrandedSlot
+        tests:
+          - CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff
 
       - id: ReviewCenter-Core-AuditTrail
         title: >-

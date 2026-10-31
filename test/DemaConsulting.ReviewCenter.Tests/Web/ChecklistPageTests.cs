@@ -645,6 +645,80 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the author of the review, while the project does not let the author answer, sees the notice and
+    ///     cannot use the answer and section controls, that another member sees neither, and that with the rule off the
+    ///     author sees no notice either.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls()
+    {
+        // Arrange: a review created by the user "author", viewed by the author, by Bea, and by the author again with
+        // the rule off
+        var projectId = await CreateReviewAsync();
+        SignInAs("author", "Author");
+
+        // Act
+        var asAuthor = RenderPage(projectId);
+        SignInAs("bea", "Bea");
+        var asMember = RenderPage(projectId);
+        await Projects.SetReviewRuleOffAsync(projectId, ReviewRule.NonAuthorChecklistAnswers, TestContext.Current.CancellationToken);
+        SignInAs("author", "Author");
+        var ruleOff = RenderPage(projectId);
+
+        // Assert: the notice and the disabled controls only for the author while the rule is on
+        Assert.Contains("You created this review", asAuthor.Find("[data-testid='author-answer-blocked']").TextContent, StringComparison.Ordinal);
+        Assert.True(asAuthor.Find("[data-testid='check-pass-req-01']").HasAttribute("disabled"));
+        Assert.True(asAuthor.Find("[data-testid='section-req-applicable']").HasAttribute("disabled"));
+        Assert.Empty(asAuthor.FindAll("[data-testid='checklist-locked']"));
+        Assert.Empty(asMember.FindAll("[data-testid='author-answer-blocked']"));
+        Assert.False(asMember.Find("[data-testid='check-pass-req-01']").HasAttribute("disabled"));
+        Assert.Empty(ruleOff.FindAll("[data-testid='author-answer-blocked']"));
+        Assert.False(ruleOff.Find("[data-testid='check-pass-req-01']").HasAttribute("disabled"));
+    }
+
+    /// <summary>
+    ///     Test that an approved review shows only the lock notice to its author: the lock is the reason that counts.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice()
+    {
+        // Arrange: an approved review, viewed by its author
+        var projectId = await CreateReviewAsync();
+        await AuditTestExtensions.ApproveReviewAsync(Store, Time, projectId, "REV-1", cancellationToken: TestContext.Current.CancellationToken);
+        SignInAs("author", "Author");
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.NotNull(cut.Find("[data-testid='checklist-locked']"));
+        Assert.Empty(cut.FindAll("[data-testid='author-answer-blocked']"));
+    }
+
+    /// <summary>
+    ///     Test that a page that was loaded while the rule was off shows the refusal of the service when the rule is
+    ///     switched on meanwhile and the author answers, and that nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing()
+    {
+        // Arrange: the rule is off while the author loads the page, and then switched on
+        var projectId = await CreateReviewAsync();
+        await Projects.SetReviewRuleOffAsync(projectId, ReviewRule.NonAuthorChecklistAnswers, TestContext.Current.CancellationToken);
+        SignInAs("author", "Author");
+        var cut = RenderPage(projectId);
+        await Projects.SetReviewRuleAsync(
+            TestActors.Ann, projectId, ReviewRule.NonAuthorChecklistAnswers, false, true, TestContext.Current.CancellationToken);
+
+        // Act: the author passes the first check
+        await cut.Find("[data-testid='check-pass-req-01']").ClickAsync();
+
+        // Assert: the message of the rule is shown, and nothing is stored
+        Assert.Contains("Authors cannot answer the checklist", cut.Find("[data-testid='check-error-req-01']").TextContent, StringComparison.Ordinal);
+        Assert.Null((await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01"));
+    }
+
+    /// <summary>
     ///     Test that marking a section as not applicable without a reason shows an error and changes nothing.
     /// </summary>
     [Fact]

@@ -136,6 +136,21 @@ sections:
         tests:
           - ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls
 
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked
+        title: >-
+          The ChecklistPage unit shall show to the author of the review, while the project does not let authors answer
+          the checklist, a notice that another project member has to answer it, with the answer buttons, the
+          justification fields, the save buttons, and the applicability switches disabled, shall show neither to any
+          other user nor when the rule is switched off, shall show only the lock notice for a locked review, and shall
+          show the message of the rule when a stale page still sends the answer.
+        justification: |
+          A user who cannot answer must see why and what to do instead. The rule itself is enforced by the checklist
+          service, which refuses the change with the message of the rule if a stale page still sends it.
+        tests:
+          - ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls
+          - ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice
+          - ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing
+
       - id: ReviewCenter-ChecklistPage-CarriedMarks
         title: >-
           The ChecklistPage unit shall mark on the checklist of a follow-up review every answer and every section

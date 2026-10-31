@@ -194,6 +194,10 @@ threads and comments are as they were, and the review is still approved with the
 judge the lock itself, so the test shows that the service does. This scenario is tested by
 `ThreadService_Mutations_ApprovedReview_ThrowReviewLocked`.
 
+**ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected**: With the rule that keeps the author from answering the
+checklist on, the author of the review starts a thread, replies, and resolves it; none is refused, because the rule
+concerns the checklist only. This scenario is tested by `ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected`.
+
 **ThreadService_StartThreadAsync_Signed_NeedsAcknowledgement**: A thread is started on a review with a current
 signature; without an acknowledgement it is refused naming the slot and the signer and nothing is stored, and with the
 acknowledgement it is stored and the signature is out of date. This scenario is tested by

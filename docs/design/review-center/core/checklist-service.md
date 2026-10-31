@@ -120,6 +120,17 @@ applicable that has no row, does not change the record and needs no acknowledgem
 same value does, because the person who answered is part of the digest. The check is the last one, after
 `ReviewLocked`, and nothing is stored when it fails.
 
+**Author rule**: while the project's `RequireNonAuthorChecklistAnswers` setting is on (the default, also for projects
+that existed before the rule was enforced; see `ProjectService`), the author of the review (`Review.CreatedBy`, the
+owner of the token for an API-token review, compared ignoring case; a review without an author is not restricted)
+cannot answer a check or change the applicability of a section: `SetAnswerAsync` and `SetSectionApplicabilityAsync`
+throw `AuthorCannotAnswer` ("You created this review, so you cannot answer its checklist..."). The check runs right
+after the access check, before the checklist is read and before the lock check, so an author of an approved review is
+told about the rule and not about the lock, and nothing is stored. `GetAsync` takes an optional `viewerUsername`; when
+it is the author and the rule is on, the returned `ChecklistState.AuthorBlocked` is true, so the page can disable the
+controls without a second read. Threads
+and comments are not affected by the rule.
+
 **GetAsync**: Reads the checklist of a review.
 
 - *Parameters*: `int projectId`, `string reviewId`, and a cancellation token.
@@ -143,7 +154,8 @@ same value does, because the person who answered is part of the digest. The chec
   time from the clock; an
   earlier answer is replaced. Nothing is stored when a rule fails (including `ReviewLocked`).
 
-The rules are checked in this order, and the first violation is reported: that the review has a checklist
+The rules are checked in this order, and the first violation is reported: that the author is not refused by the
+project rule (`AuthorCannotAnswer`); that the review has a checklist
 (`ChecklistNotFound`); that the section or check is in the frozen checklist
 (`ChecklistItemNotFound`); the justification or reason (`ChecklistJustificationInvalid`); that the review is not
 locked (`ReviewLocked`); and that no current signature would silently become out of date

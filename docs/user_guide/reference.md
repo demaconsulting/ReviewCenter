@@ -110,8 +110,8 @@ Example validation report:
 
 ✓ ReviewCenter_GitAvailable - Passed (432 ms): git version 2.51.0.windows.2 (minimum 2.31)
 ✓ ReviewCenter_GitRoundTrip - Passed (4363 ms): 2 commits, 2 changes, file read back unchanged
-✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; review signed by a separate reviewer;
-    author signature refused; approved review locked and reopened by an administrator;
+✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; author answer refused; review answered and signed by
+    a separate reviewer; author signature refused; approved review locked and reopened by an administrator;
     evidence index fingerprint 13e028da0629…, record digest 5ab1c0de42f7…
 ✓ ReviewCenter_Fingerprint - Passed (28 ms): 3 files, fingerprint 13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2
 ✓ ReviewCenter_PasswordHash - Passed (219 ms): right password accepted, wrong password refused, hashes salted
@@ -306,6 +306,13 @@ The messages that the user sees:
   a project administrator can switch off 'Require independent reviewers'." when the author tries to sign.
 - "*Name* created this review and cannot be one of its reviewers while independent reviewers are required." when a
   slot is added or changed to hold the author.
+- "You created this review, so you cannot answer its checklist in this project. Another project member must answer it,
+  or a project administrator can switch off 'Authors cannot answer the checklist of their own review'." when the author
+  answers a check or changes a section of the checklist.
+- "You reopened this review, so you cannot sign it again. Another reviewer must sign it, or a project administrator can
+  switch off 'The person who reopened a review cannot sign it again'." when the person who reopened a review tries to
+  sign it, and "Slot 1 would have no one who may sign; ask another administrator or switch the rule off." (the slot
+  numbers are listed) when a reopen would leave a slot without anyone who may sign.
 - "The setting was changed by someone else. Reload the page and try again." when the review rules were changed while
   the page was open.
 - "Reviewer slots and signatures cannot be changed with an API token; sign in to the web pages." for a reopen with an
@@ -316,7 +323,11 @@ project administrator or a system administrator changes in the web pages. The au
 ReviewCenter user who created the review (the owner of the token for a review created with an API token). Git commit
 authors are not matched. Two further per-project settings, **Authors cannot answer the checklist of their own review** and
 **The person who reopened a review cannot sign it again**, are on by default and changed in the same way; ReviewCenter
-stores and audits them but does not apply them yet (the page marks them "Not applied yet.").
+applies and audits them.
+
+> **These rules apply to all existing projects.** The rules are on by default and apply to ALL existing projects, also
+> those created before this version (the stored columns default to on). A project that needs one person to do
+> everything switches them off on the project page.
 
 A development database created before the approval lock existed lacks the table `ReviewReopens` and the column
 `Projects.RequireIndependentReviewers`, and one created before the review rule switches lacks the columns

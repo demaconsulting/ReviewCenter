@@ -291,8 +291,12 @@ before you use it.
 
 **Where you are.** The **Review rules** card on the project page (`/projects/{id}`), above the members. It is shown
 only to a project administrator of the project and to a system administrator; other members do not see it. It holds three
-switches, saved together with **Save review rules**: **Require independent reviewers**, which ReviewCenter applies, and
-two further switches that ReviewCenter only stores and records for now (see below).
+switches, saved together with **Save review rules**: **Require independent reviewers** and two further switches (see
+below). ReviewCenter applies all three.
+
+> **These rules apply to all existing projects.** The rules are on by default and apply to ALL existing projects, also
+> those created before this version (the stored columns default to on). A project that needs one person to do
+> everything switches them off on the project page.
 
 **Require independent reviewers.** The setting is **on by default**, for every project of a newly created database (a
 database made before this setting existed must be recreated, because the schema has no migrations). While it is on,
@@ -317,18 +321,31 @@ the setting ("Project settings cannot be changed with an API token; sign in to t
 in the audit trail as `project.independent-reviewers-changed` with the project and the detail
 `RequireIndependentReviewers on->off` (or `off->on`).
 
-**Two further switches: not applied yet.** The card also holds **Authors cannot answer the checklist of their own
-review** and **The person who reopened a review cannot sign it again**. Both are **on by default** and are marked "Not
-applied yet." on the page: ReviewCenter stores each setting and records every change in the audit trail, but it does not
-apply either setting yet, so nothing is refused for these reasons today. A later version will apply them, and because
-they are on by default they will then affect every project that still has them on; if your team must not be affected,
-switch them off beforehand. Saving works as described above; the page says, for example, "Authors cannot answer the
-checklist: now off (stored; not applied yet)." or "The person who reopened a review cannot sign it again: now on
-(stored; not applied yet).", and each change is a separate change, so a refusal of a later switch does not undo an
-earlier one. Each change is recorded in the audit trail as `project.review-rule-changed` with the project and the detail
-`RequireNonAuthorChecklistAnswers on->off` or `RequireNonReopenerSigning on->off` (or `off->on`). The same rules apply
-as for the first switch: only a project administrator or a system administrator changes them, and a personal access
-token cannot.
+**Two further switches: authors and reopening.** The card also holds **Authors cannot answer the checklist of their own
+review** and **The person who reopened a review cannot sign it again**. Both are **on by default** and ReviewCenter
+applies them to every project that has them on, including the projects that existed before this version, so a team that
+must not be affected switches them off.
+
+- **Authors cannot answer the checklist.** The person who created a review cannot answer its checks or change which
+  sections apply; the service refuses it with the message "You created this review, so you cannot answer its
+  checklist..." and the checklist page shows the author a notice and disabled controls. Reading the checklist and the
+  comment threads
+  (starting, answering, and resolving them) are not affected, and a review created from the command line has no
+  recorded author, so nobody is excluded from it.
+- **The person who reopened cannot sign again.** After an administrator reopens an approved review, that administrator
+  cannot sign any slot of the review (the sign form is replaced by a notice, and the service refuses it before the
+  password is checked, so it does not count as a failed attempt). A reopen is also refused when it would leave a slot in
+  which nobody may sign, for example because the administrator is the only reviewer of a slot; the message names the
+  slots ("Slot 1 would have no one who may sign; ask another administrator or switch the rule off."). Earlier signatures
+  are not touched. The check compares user names, so it also holds for an earlier reopening of the same review, and a
+  slot whose other reviewer is disabled or no longer a member is not counted as stranded by this check.
+
+Saving works as described above; the page says, for example, "Authors cannot answer the checklist: now off." or "The
+person who reopened a review cannot sign it again: now on.", and each change is a separate change, so a refusal of a
+later switch does not undo an earlier one. Each change is recorded in the audit trail as `project.review-rule-changed`
+with the project and the detail `RequireNonAuthorChecklistAnswers on->off` or `RequireNonReopenerSigning on->off` (or
+`off->on`). The same rules apply as for the first switch: only a project administrator or a system administrator
+changes them, and a personal access token cannot. Over the API, a refusal for one of these rules is a 409 problem.
 
 ## Reopening an Approved Review
 

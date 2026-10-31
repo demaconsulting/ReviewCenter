@@ -45,8 +45,9 @@ hint that the person who created a review cannot be one of its reviewers and can
 turned off for a project where one person has to do both, and that ReviewCenter only knows who created the review in
 this tool and does not match the authors of commits, and a "Save review rules" button. Two more switches follow, "Authors
 cannot answer the checklist of their own review" and "The person who reopened a review cannot sign it again", both on
-by default; each shows the marker "Not applied yet." and a hint, because the rules are stored and audited but not applied
-yet. One "Save review rules" button saves all three. The card also holds one line,
+by default; each shows a hint that says what the rule does, that it is on by default and applies to every project,
+including the ones created before it was enforced, and that every change is audited. One "Save review rules" button
+saves all three. The card also holds one line,
 "Checklist: ...", that names the version label of the checklist new reviews start with, its number of sections and
 checks, and whether it is the built-in default or custom, with a link to the checklist template page; the line is read
 with `ProjectChecklistService.GetAsync` for an administrator only, and a stored definition that cannot be read shows a
@@ -209,10 +210,10 @@ review is one row
 of `reviews-list`: the identifier is the link, followed by the title, the approval badge, and the creation
 date. `evidence-settings-link` is the "Evidence settings" button, shown to whoever administers the project. The Review
 rules card of an administrator has `review-rules-card`, `review-rule-independent-reviewers` (the row),
-`independent-reviewers-switch` (the checkbox), `author-checklist-switch` and `reopener-signing-switch` (the two stored-only
-rules, each with its row `review-rule-author-checklist` or `review-rule-reopener-signing` and its "Not applied yet." marker
-`author-checklist-pending` or `reopener-signing-pending`), `independent-reviewers-save`, `review-rules-status`, and
-`review-rules-error`. `checklist-link` is the "Checklist" button, shown to whoever administers the project; the
+`independent-reviewers-switch` (the checkbox), `author-checklist-switch` and `reopener-signing-switch` (the two further
+rules, each with its row `review-rule-author-checklist` or `review-rule-reopener-signing`),
+`independent-reviewers-save`, `review-rules-status`, and `review-rules-error`. `checklist-link` is the "Checklist"
+button, shown to whoever administers the project; the
 Review rules card also has `review-rule-checklist` (the row), `project-checklist-summary` (the one line), and
 `review-rules-checklist-link`.
 
@@ -331,8 +332,8 @@ an API token, performs the compare-and-set, and appends the audit entry (`projec
 independence rule and `project.review-rule-changed` for the two others) in the
 same step. The page then reloads the project and shows one sentence per changed rule, joined with a space:
 "Independent reviewers are now required." or "Independent
-reviewers are no longer required."; "Authors cannot answer the checklist: now on (stored; not applied yet)." or "now off";
-"The person who reopened a review cannot sign it again: now on (stored; not applied yet)." or "now off"; or, when no
+reviewers are no longer required."; "Authors cannot answer the checklist: now on." or "now off";
+"The person who reopened a review cannot sign it again: now on." or "now off"; or, when no
 switch was changed, "The review rules were
 already set this way." Each rule is its own change, so when a later rule is refused the earlier ones were already
 saved; the page then loads the stored values again. A `DomainRuleException` (for example the refusal of a save over a
@@ -521,7 +522,7 @@ the subsystem.
   when the sign-in state of the open page ends.
 - **ProjectService** — reads the project for the actor, lists the members, adds a member by exact user name, creates a
   member account with a temporary password, removes a member, changes a role, and changes the review rules
-  (`SetReviewRuleAsync`; `RequireIndependentReviewers` and the two stored-only rules).
+  (`SetReviewRuleAsync`; `RequireIndependentReviewers` and the two further rules).
 - **ReviewService** — lists the earlier reviews that can be followed, previews a follow-up, and creates reviews
   (`NewReviewPage`).
 - **ReviewProgressService** (Core) — the progress of every review of the project in one call (`ProjectPage`): stage,
