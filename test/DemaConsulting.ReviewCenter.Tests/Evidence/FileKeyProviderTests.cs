@@ -20,6 +20,7 @@
 
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Tests.Core;
@@ -465,6 +466,67 @@ public sealed class FileKeyProviderTests
         Assert.Contains("'signing.pfx' is not protected by a password", warning, StringComparison.Ordinal);
         Assert.DoesNotContain(folder.DirectoryPath, warning, StringComparison.Ordinal);
         Assert.Single(logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("not protected by a password", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a password that the PFX file does not use does not make it protected: the file has a MAC with the
+    ///     password but a plain key bag, so it is warned about, and refused when encryption is required.
+    /// </summary>
+    [Fact]
+    public void FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected()
+    {
+        // Arrange: a PFX with a password-based MAC but a plain (unencrypted) key bag, so the password protects nothing
+        using var folder = new TemporaryDirectory();
+        using var issued = Issue();
+        var localKeyId = new Pkcs9LocalKeyId(issued.Signer.GetCertHash());
+        var contents = new Pkcs12SafeContents();
+        contents.AddCertificate(issued.Signer).Attributes.Add(localKeyId);
+        contents.AddKeyUnencrypted(issued.Key).Attributes.Add(localKeyId);
+        var builder = new Pkcs12Builder();
+        builder.AddSafeContentsUnencrypted(contents);
+        builder.SealWithMac(Password, HashAlgorithmName.SHA256, 2048);
+        var path = folder.GetFilePath("signing.pfx");
+        File.WriteAllBytes(path, builder.Encode());
+        RestrictToOwner(path);
+        var options = new AttestationOptions { CertificatePath = path, CertificatePassword = Password };
+        using var lenient = Create(options);
+        using var strict = Create(options, requireEncryptedKeys: true);
+
+        // Act: load it leniently and strictly
+        var key = lenient.GetSigningKey();
+        var status = lenient.Describe();
+        var exception = Assert.Throws<AttestationKeyException>(strict.GetSigningKey);
+
+        // Assert: it loads with the unprotected warning, and is refused under RequireEncryptedKeys
+        Assert.Equal(issued.Signer.Thumbprint, key.Info.Thumbprint, ignoreCase: true);
+        Assert.Contains("is not protected by a password", Assert.Single(status.Warnings), StringComparison.Ordinal);
+        Assert.Contains("DataProtection:RequireEncryptedKeys", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a message about a separate key file calls it the private key file, not the certificate file.
+    /// </summary>
+    [Fact]
+    public void FileKeyProvider_GetSigningKey_SeparateEncryptedKeyProblems_NameThePrivateKeyFile()
+    {
+        // Arrange: a certificate with an encrypted key in a separate file, without and with a wrong password
+        using var folder = new TemporaryDirectory();
+        using var issued = Issue();
+        var (certificatePath, keyPath) = WritePem(folder, issued, Password, separateKey: true, chain: false);
+        using var withoutPassword = Create(new AttestationOptions { CertificatePath = certificatePath, PrivateKeyPath = keyPath });
+        using var wrongPassword = Create(
+            new AttestationOptions { CertificatePath = certificatePath, PrivateKeyPath = keyPath, CertificatePassword = "not-the-password-99" });
+
+        // Act: ask each for the key
+        var needs = Assert.Throws<AttestationKeyException>(withoutPassword.GetSigningKey);
+        var wrong = Assert.Throws<AttestationKeyException>(wrongPassword.GetSigningKey);
+
+        // Assert: both messages, and their check forms, say private key file
+        foreach (var message in new[] { needs.Message, needs.MessageWithoutPath!, wrong.Message, wrong.MessageWithoutPath! })
+        {
+            Assert.Contains("private key file '", message, StringComparison.Ordinal);
+            Assert.DoesNotContain("certificate file", message, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>

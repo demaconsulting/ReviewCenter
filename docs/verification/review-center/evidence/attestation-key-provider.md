@@ -304,6 +304,11 @@ The same message. This scenario is tested by `FileKeyProvider_GetSigningKey_Encr
 password and holds neither password. This scenario is tested by
 `FileKeyProvider_GetSigningKey_WrongPassword_SaysSoAndEchoesNoPassword`.
 
+**FileKeyProvider_GetSigningKey_SeparateEncryptedKeyProblems_NameThePrivateKeyFile**: An encrypted PEM key in a
+separate file, once without a password and once with a wrong one. Both messages, and their check forms, call the file
+the private key file and never the certificate file. This scenario is tested by
+`FileKeyProvider_GetSigningKey_SeparateEncryptedKeyProblems_NameThePrivateKeyFile`.
+
 **FileKeyProvider_GetSigningKey_FileThatIsNotACertificate_SaysSo**: The file holds text that is neither PEM nor PFX. The
 message says so. This scenario is tested by `FileKeyProvider_GetSigningKey_FileThatIsNotACertificate_SaysSo`.
 
@@ -326,6 +331,12 @@ shown. This scenario is tested by
 **FileKeyProvider_GetSigningKey_UnprotectedPfx_LoadsWithWarning**: A PFX without a password and no requirement. The key
 loads, and a warning names the file and not the folder. This scenario is tested by
 `FileKeyProvider_GetSigningKey_UnprotectedPfx_LoadsWithWarning`.
+
+**FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected**: A PFX that has a MAC with a
+password but holds its private key in a plain, unencrypted key bag, so the password that is set protects nothing. The
+key loads with the unprotected warning, and the same file is refused with `RequireEncryptedKeys`. This scenario is
+tested by
+`FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected`.
 
 **FileKeyProvider_GetSigningKey_UnprotectedKeyWithRequireEncryptedKeys_IsRefused**: The same file with
 `RequireEncryptedKeys`. An exception names `DataProtection:RequireEncryptedKeys`. This scenario is tested by

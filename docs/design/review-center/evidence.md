@@ -76,9 +76,10 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
   by default) for the certificate store; `CertificatePath`, `PrivateKeyPath`, `CertificatePassword` (a secret) and
   `CertificatePasswordFile` for the File provider; `ExpiryWarningDays` (default 30, 0 for no warning) for the
   certificate store and the File provider; `SelfSignedFolder` for the self-signed key.
-- *Constraints*: An unknown provider, a missing or malformed thumbprint, a missing, unreadable or unprotected
-  certificate file, a missing or wrong password, a negative `ExpiryWarningDays`, or a key that does not meet the rule
-  stops the server at start-up with an error that names the setting.
+- *Constraints*: An unknown provider, a missing or malformed thumbprint, a missing or unreadable certificate file, a
+  missing or wrong password, a negative `ExpiryWarningDays`, or a key that does not meet the rule stops the server at
+  start-up with an error that names the setting. A private key that is not protected by a password stops it only when
+  `DataProtection:RequireEncryptedKeys` is set; otherwise it is loaded with a warning.
 
 **Core services (consumed)**: `SigningService`, `AuditService`, `IReviewStore`, `IProjectAccess`, and
 `EvidenceSettingsService`.

@@ -251,7 +251,58 @@ internal sealed class FileKeyProvider(
                 name => $"{CertificateSetting} '{name}' could not be loaded: the file holds no certificate with a private key.");
         }
 
-        return new LoadedCertificate(signer, TakeIntermediates(all, signer), password is not null);
+        return new LoadedCertificate(signer, TakeIntermediates(all, signer), IsPkcs12KeyProtected(content, password));
+    }
+
+    /// <summary>
+    ///     Tells from the structure of a PKCS #12 file whether its private key is protected by the password.
+    /// </summary>
+    /// <param name="content">The bytes of the file, which loaded successfully.</param>
+    /// <param name="password">The password that opened the file, or <c>null</c> when none is set.</param>
+    /// <returns>
+    ///     <c>true</c> only when a password is set and the file holds an encrypted (shrouded) private key and no
+    ///     plain one; a password that the file does not use protects nothing.
+    /// </returns>
+    private static bool IsPkcs12KeyProtected(byte[] content, string? password)
+    {
+        if (password is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var shrouded = false;
+            foreach (var safe in Pkcs12Info.Decode(content, out _).AuthenticatedSafe)
+            {
+                if (safe.ConfidentialityMode == Pkcs12ConfidentialityMode.Password)
+                {
+                    safe.Decrypt(password);
+                }
+                else if (safe.ConfidentialityMode != Pkcs12ConfidentialityMode.None)
+                {
+                    return false;
+                }
+
+                foreach (var bag in safe.GetBags())
+                {
+                    if (bag is Pkcs12KeyBag)
+                    {
+                        return false;
+                    }
+
+                    shrouded |= bag is Pkcs12ShroudedKeyBag;
+                }
+            }
+
+            return shrouded;
+        }
+        catch (Exception ex) when (ex is CryptographicException or System.Formats.Asn1.AsnContentException
+                                       or InvalidOperationException)
+        {
+            // What cannot be inspected is not shown to be protected
+            return false;
+        }
     }
 
     /// <summary>
@@ -325,9 +376,11 @@ internal sealed class FileKeyProvider(
                         + "'openssl pkcs8 -topk8 -in old.key -out new.key', and use the new file.");
         }
 
+        // The file that holds the key is the one the messages name
+        var fileKind = keyPath is null ? "certificate file" : "private key file";
         if (encrypted && password is null)
         {
-            throw Problem(keyFile, name => $"The certificate file '{name}' needs a password. Set {PasswordSettings}.");
+            throw Problem(keyFile, name => $"The {fileKind} '{name}' needs a password. Set {PasswordSettings}.");
         }
 
         X509Certificate2 signer;
@@ -343,8 +396,8 @@ internal sealed class FileKeyProvider(
             throw encrypted
                 ? Problem(
                     keyFile,
-                    name => $"The certificate file '{name}' could not be opened with the password that is set: "
-                            + "wrong password, or not a certificate with a private key.",
+                    name => $"The {fileKind} '{name}' could not be opened with the password that is set: "
+                            + "wrong password, or not a private key.",
                     ex)
                 : Problem(
                     path,

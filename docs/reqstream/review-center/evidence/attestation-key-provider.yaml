@@ -54,6 +54,7 @@ sections:
           - FileKeyProvider_GetSigningKey_PfxWithoutPassword_AsksForThePassword
           - FileKeyProvider_GetSigningKey_EncryptedPemWithoutPassword_AsksForThePassword
           - FileKeyProvider_GetSigningKey_WrongPassword_SaysSoAndEchoesNoPassword
+          - FileKeyProvider_GetSigningKey_SeparateEncryptedKeyProblems_NameThePrivateKeyFile
           - FileKeyProvider_GetSigningKey_FileThatIsNotACertificate_SaysSo
           - FileKeyProvider_GetSigningKey_LegacyEncryptedPemKey_AsksToConvertToPkcs8
           - FileKeyProvider_GetSigningKey_PfxWithPrivateKeyPath_IgnoresIt
@@ -75,6 +76,7 @@ sections:
           - FileKeyProvider_GetSigningKey_PfxWithPasswordFile_LoadsSigner
           - FileKeyProvider_GetSigningKey_PasswordSettingsConflictOrFileMissing_AreRefusedWithTheirMessages
           - FileKeyProvider_GetSigningKey_UnprotectedPfx_LoadsWithWarning
+          - FileKeyProvider_GetSigningKey_PfxWithPlainKeyAndPasswordSet_IsTreatedAsUnprotected
           - FileKeyProvider_GetSigningKey_UnprotectedKeyWithRequireEncryptedKeys_IsRefused
 
       - id: ReviewCenter-AttestationKeyProvider-FilePermissions

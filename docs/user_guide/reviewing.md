@@ -713,9 +713,12 @@ format from the content (a file with `-----BEGIN` is PEM). The same rules for a 
   with `openssl pkcs8 -topk8 -in old.key -out new.key`.
 - *PFX and `PrivateKeyPath`.* `Attestation:PrivateKeyPath` is for PEM only; for a PFX it is ignored, because the PFX
   holds the key.
-- *The key stays in memory.* The server loads the key into memory and writes it nowhere; the bytes that it read from the
-  files are cleared after the load.
-- *Protect the key.* A key without a password is loaded with a warning. When `DataProtection:RequireEncryptedKeys` is
+- *The key stays in memory.* The server loads the key into memory and writes it nowhere (on macOS, where a PFX cannot
+  be loaded without the key store of the user, the default key set is used, so the key may be written there); the bytes
+  that it read from the files are cleared after the load.
+- *Protect the key.* A key without a password is loaded with a warning. The server decides from the content of the
+  file, not from the setting: a password that is set for a PFX that has no encrypted key protects nothing, so such a
+  file counts as unprotected. When `DataProtection:RequireEncryptedKeys` is
   `true`, the server refuses it: "The private key in '...' is not protected by a password, and
   DataProtection:RequireEncryptedKeys is set." Set a password with `Attestation:CertificatePassword` (for example from
   the environment variable `Attestation__CertificatePassword`) or, better, `Attestation:CertificatePasswordFile`; the

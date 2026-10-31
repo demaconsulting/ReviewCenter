@@ -92,7 +92,11 @@ file that does not exist, is refused with the messages of that unit. A PFX is lo
 as a collection with an ephemeral key set, so the key lives in memory only and is not written to the key store of the
 user (on macOS, where an ephemeral key set is not supported for a PFX, the default key set is used, as the key ring
 protection does). `PrivateKeyPath` is for PEM only: for a PFX it is ignored (not read, not checked, and not used for the
-permission check). The signer is the first certificate of the collection with a private key; the other certificates are
+permission check). Whether the key is protected is decided from the structure of the PKCS #12 file (`Pkcs12Info`: a
+password is set, the safes that hold the key are encrypted or the key is a shrouded key bag, and no plain key bag
+exists), not from whether a password is set: a password that the file does not use protects nothing, so such a file
+is treated as unprotected. The signer is the first certificate of the collection with a private key; the other
+certificates are
 the chain, without the signer itself and without a self-signed root, which the reader has to trust. A PEM
 certificate is loaded with `CreateFromPemFile`, or `CreateFromEncryptedPemFile` when the key is an
 `ENCRYPTED PRIVATE KEY`, with the key in the same file or in `PrivateKeyPath`; the other certificates of the PEM file
