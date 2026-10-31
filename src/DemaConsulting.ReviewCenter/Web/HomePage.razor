@@ -1,9 +1,10 @@
 @* HomePage: the landing page at "/".
 
-   Static server-side rendered on purpose: it is plain markup (the product name and tagline), so it needs no live
-   connection and no code-behind. Signed-in users also see a "Get started" list of links to the main pages; the
-   administration pages are listed only for a system administrator, as in the layout header. Repositories belong to
-   projects, so they are reached from the project page and have no card here. *@
+   Static server-side rendered on purpose: it needs no live connection (the product name, the tagline and links;
+   the inbox count is read once when the page is rendered, by the code-behind). Signed-in users also see a
+   "Get started" list of links to the main pages, starting with the inbox and its count of reviews that need their
+   action; the administration pages are listed only for a system administrator, as in the layout header.
+   Repositories belong to projects, so they are reached from the project page and have no card here. *@
 @page "/"
 @using DemaConsulting.ReviewCenter.Identity
 @using Microsoft.AspNetCore.Components.Authorization
@@ -18,6 +19,10 @@
         <section class="card" data-testid="home-get-started">
             <h2>Get started</h2>
             <ul class="item-list">
+                <li>
+                    <a href="/inbox" data-testid="home-card-inbox">Inbox</a>
+                    <p class="muted" data-testid="home-inbox-count">@InboxSummary</p>
+                </li>
                 <li>
                     <a href="/projects" data-testid="home-card-projects">Projects</a>
                     <p class="muted">Open a project to see its reviews, add reviews from a git repository or by uploading files.</p>

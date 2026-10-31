@@ -114,6 +114,12 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(pageSigning);
         Services.AddSingleton(new ReviewProgressService(pageReviews, pageSigning, AuditStore, Access));
         Services.AddSingleton(new ReviewPlanner(store, pageReviews, pageRepositories, Git, pageSigning, SetParser, Access));
+
+        // The inbox page, the home page and the review page enforce the real access rules for the signed-in user;
+        // the in-memory read state is exposed so that a test can arrange and check it
+        InboxStore = new FakeInboxStore(store);
+        Inbox = new InboxService(InboxStore, store, Access, userStore, Time);
+        Services.AddSingleton(Inbox);
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
 
         // The evidence settings page enforces the real access rules; EvidenceSettingsService is exposed for arranging
@@ -145,6 +151,16 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory store behind the services, for arranging data the services would not create.
     /// </summary>
     internal FakeReviewStore Store { get; }
+
+    /// <summary>
+    ///     Gets the in-memory store of the read state behind the inbox service.
+    /// </summary>
+    internal FakeInboxStore InboxStore { get; }
+
+    /// <summary>
+    ///     Gets the inbox service the pages use (the real access rules of the signed-in user).
+    /// </summary>
+    protected InboxService Inbox { get; }
 
     /// <summary>
     ///     Gets the in-memory audit store behind the audit service, for arranging and tampering with entries.

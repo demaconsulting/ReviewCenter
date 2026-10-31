@@ -204,6 +204,11 @@ instance, which is then disposed; a second instance on the same database decrypt
 server and the `ReviewPlanner` and the `IReviewSetParser` are taken from the application services twice each; every
 call returns the same instance. This scenario is tested by `ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
 
+**ServerHost_AddServices_Configured_RegistersInboxService**: The real pipeline is started on an in-memory server and the
+`InboxService` and the `IInboxStore` are taken from the application services twice each; every call returns the same
+instance, and the service answers zero for a user who is not known. This scenario is tested by
+`ServerHost_AddServices_Configured_RegistersInboxService`.
+
 **ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError**: The pipeline is built with
 `DataProtection:KeysPath` set to an existing file; an `InvalidOperationException` whose message names the setting and the
 path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`.
@@ -299,6 +304,21 @@ is started twice on the same database folder with no attestation setting. The ke
 `attestation-selfsigned` folder inside the `keys` folder, and the key (its thumbprint) is the same after the restart.
 This scenario is tested by
 `ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys`.
+
+**ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile**: The server is started once, which creates
+the protected attestation key, then the key ring folder is deleted and the server is started again. The start fails with
+a message that names `attestation-selfsigned.pfx.protected` and says to delete the file, and the file is still there.
+This scenario is tested by `ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile`. That `user add`
+and `audit verify` create no attestation key is shown by `UserCommand_Run_ValidUser_CreatesNoKeyFile` and
+`AuditCommand_Run_IntactTrail_CreatesNoKeyFile`: the default attestation folder is inside the key folder, which stays
+absent.
+
+**ServerHost_CreateApplication_AttestationKeyOfLostRingWithAllowNewKeyRing_StillThrowsNamingTheFile**: The server is
+started once with secrets in the database, then the key ring folder is deleted and the server is started again with
+`DataProtection:AllowNewKeyRing` set to `true`. The setting accepts the loss of the stored secrets, but the start still
+fails with a message that names `attestation-selfsigned.pfx.protected` and says to delete the file, and the file is
+unchanged (the server never deletes or replaces a signing key). This scenario is tested by
+`ServerHost_CreateApplication_AttestationKeyOfLostRingWithAllowNewKeyRing_StillThrowsNamingTheFile`.
 
 **ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere**: `Attestation:SelfSignedFolder` names a
 folder; the key file is created there and the provider reports an available key. This scenario is tested by

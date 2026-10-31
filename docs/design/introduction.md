@@ -86,10 +86,11 @@ The ReviewCenter system is divided as follows:
   the HomePage, AboutPage, and HelpPage units, the ProjectsPage, ProjectPage (with the new review and member pages),
   PlanPage, ReviewPage, and ChecklistPage
   units, the LoginPage, TotpLoginPage,
-  AccountPage, and UsersPage units, the HistoryPage and AuditPage (with the project audit page) units, and the
-  RepositoriesPage unit
+  AccountPage, and UsersPage units, the HistoryPage and AuditPage (with the project audit page) units, the
+  RepositoriesPage unit, and the InboxPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
-  users, personal access tokens, second factor enrollments, reviewer signatures, the hash-chained audit trail, and the
+  users, personal access tokens, second factor enrollments, reviewer signatures, the inbox and read state of a user,
+  the hash-chained audit trail, and the
   registry of git
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
   ProjectService, EvidenceSettingsService, ProjectChecklistService, ReviewProgressService, ReviewService, ThreadService,
@@ -97,14 +98,15 @@ The ReviewCenter system is divided as follows:
   UserService,
   PersonalAccessTokenService,
   SigningService, ReauthProofStore, TotpService, TotpChallengeStore, RepositoryService, SelectionMatcher,
-  RevisionValidator, ReviewPlanner, and LineDiff
+  RevisionValidator, ReviewPlanner, LineDiff, and InboxService
   units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
-  tokens, second factor enrollments, reviewer slots, signatures, the audit trail, and the registered repositories in a
+  tokens, second factor enrollments, reviewer slots, signatures, the read state of the inbox, the audit trail, and the
+  registered repositories in a
   database
   through Entity
   Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, PersonalAccessTokenStore, AuditStore,
-  RepositoryStore, TotpStore, and DatabaseSetup units
+  RepositoryStore, TotpStore, InboxStore, and DatabaseSetup units
 - **ContentSources** (subsystem): reads content from outside the system, currently from git repositories, and protects
   the access tokens of private repositories; contains the GitRunner, GitSource, ReviewSetParser, and CredentialProtector
   units

@@ -220,3 +220,8 @@ reading and verification of stored entries is verified in the unit tests of `Aud
 **Second factor**: The race of the step is tested by `TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner`
 and the race of a recovery code by `TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner`, both
 defined in `TotpStoreTests.cs` and run on a real SQLite file.
+
+**Inbox**: The candidate reviews of a user and the read state that never moves backwards, also when many writers race,
+are verified in the unit tests of `InboxStore`. The read state of a user is still present, and still honored, after the
+database is closed and opened again, which is tested by
+`StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems`.

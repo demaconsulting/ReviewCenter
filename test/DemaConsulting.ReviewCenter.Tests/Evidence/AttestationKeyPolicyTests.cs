@@ -21,6 +21,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using DemaConsulting.ReviewCenter.Evidence;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -288,10 +289,33 @@ public class AttestationKeyPolicyTests
         var options = new AttestationOptions { Provider = name };
 
         // Act: create the provider
-        using var provider = (IDisposable)AttestationKeyProviderFactory.Create(options, TimeProvider.System, NullLoggerFactory.Instance);
+        using var provider = (IDisposable)AttestationKeyProviderFactory.Create(
+            options, TimeProvider.System, NullLoggerFactory.Instance, new EphemeralDataProtectionProvider(), allowCreate: true);
 
         // Assert: the self-signed provider
         Assert.IsType<SelfSignedKeyProvider>(provider);
+    }
+
+    /// <summary>
+    ///     Test that a provider that the factory creates without the right to create a key reports a missing key as
+    ///     one that will be created, and creates no folder and no file.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderFactory_Create_CreationNotAllowed_ProviderCreatesNothing()
+    {
+        // Arrange: options with a folder that does not exist, and a provider that may not create the key
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterNoCreate-" + Guid.NewGuid().ToString("N"));
+        var options = new AttestationOptions { SelfSignedFolder = folder };
+        var provider = AttestationKeyProviderFactory.Create(
+            options, TimeProvider.System, NullLoggerFactory.Instance, new EphemeralDataProtectionProvider(), allowCreate: false);
+        using var owner = (IDisposable)provider;
+
+        // Act: ask for the key
+        var exception = Assert.Throws<AttestationKeyException>(provider.GetSigningKey);
+
+        // Assert: it will be created at the first start, and the folder does not exist
+        Assert.True(exception.WillBeCreated);
+        Assert.False(Directory.Exists(folder));
     }
 
     /// <summary>
@@ -307,7 +331,8 @@ public class AttestationKeyPolicyTests
         var options = new AttestationOptions { Provider = name };
 
         // Act: create the provider
-        using var provider = (IDisposable)AttestationKeyProviderFactory.Create(options, TimeProvider.System, NullLoggerFactory.Instance);
+        using var provider = (IDisposable)AttestationKeyProviderFactory.Create(
+            options, TimeProvider.System, NullLoggerFactory.Instance, new EphemeralDataProtectionProvider(), allowCreate: true);
 
         // Assert: the certificate store provider
         Assert.IsType<CertificateStoreKeyProvider>(provider);
@@ -324,7 +349,8 @@ public class AttestationKeyPolicyTests
 
         // Act: create the provider
         var exception = Assert.Throws<AttestationKeyException>(
-            () => AttestationKeyProviderFactory.Create(options, TimeProvider.System, NullLoggerFactory.Instance));
+            () => AttestationKeyProviderFactory.Create(
+                options, TimeProvider.System, NullLoggerFactory.Instance, new EphemeralDataProtectionProvider(), allowCreate: true));
 
         // Assert: the message names the setting and the supported values
         Assert.Contains("Attestation:Provider", exception.Message, StringComparison.Ordinal);

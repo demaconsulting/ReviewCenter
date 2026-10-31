@@ -25,8 +25,30 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// </summary>
 /// <remarks>
 ///     The message is meant for an administrator and for the page that shows why attestation is unavailable. It names
-///     the <c>Attestation:*</c> setting to correct and never contains a secret.
+///     the <c>Attestation:*</c> setting to correct and never contains a secret; it may name a folder or a file, which
+///     is fine for the server log but not for the configuration check, which uses <see cref="MessageWithoutPath"/>.
+///     Two flags let a caller that only inspects the key (the configuration check) tell the two expected situations
+///     from a real failure.
 /// </remarks>
 /// <param name="message">The user-safe message.</param>
 /// <param name="inner">The underlying error, or <c>null</c>.</param>
-public sealed class AttestationKeyException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class AttestationKeyException(string message, Exception? inner = null) : Exception(message, inner)
+{
+    /// <summary>
+    ///     Gets a value indicating whether the key does not exist yet and the provider was told not to create it; the
+    ///     server creates it at its first start.
+    /// </summary>
+    public bool WillBeCreated { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the key exists but cannot be decrypted or read, typically because the key
+    ///     ring that protected it is not the one in use.
+    /// </summary>
+    public bool IsUnreadable { get; init; }
+
+    /// <summary>
+    ///     Gets a message that names no folder and no path, for a report that must not print one (the configuration
+    ///     check), or <c>null</c> when <see cref="Exception.Message"/> already contains none.
+    /// </summary>
+    public string? MessageWithoutPath { get; init; }
+}

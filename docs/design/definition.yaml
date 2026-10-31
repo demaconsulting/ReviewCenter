@@ -57,6 +57,7 @@ input-files:
   - docs/design/review-center/web/account-page.md
   - docs/design/review-center/web/users-page.md
   - docs/design/review-center/web/repositories-page.md
+  - docs/design/review-center/web/inbox-page.md
   - docs/design/review-center/core.md
   - docs/design/review-center/core/fingerprint.md
   - docs/design/review-center/core/project-service.md
@@ -79,6 +80,7 @@ input-files:
   - docs/design/review-center/core/repository-service.md
   - docs/design/review-center/core/review-planner.md
   - docs/design/review-center/core/line-diff.md
+  - docs/design/review-center/core/inbox-service.md
   - docs/design/review-center/storage.md
   - docs/design/review-center/storage/review-center-db-context.md
   - docs/design/review-center/storage/review-store.md
@@ -87,6 +89,7 @@ input-files:
   - docs/design/review-center/storage/totp-store.md
   - docs/design/review-center/storage/database-setup.md
   - docs/design/review-center/storage/repository-store.md
+  - docs/design/review-center/storage/inbox-store.md
   - docs/design/review-center/content-sources.md
   - docs/design/review-center/content-sources/git-runner.md
   - docs/design/review-center/content-sources/git-source.md

@@ -1176,6 +1176,13 @@ button:disabled {
     color: var(--error-text);
 }
 
+/* The "New" marker of the inbox and of the review page: something happened since the user last looked */
+.badge.unread {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
 /* Keep the result badge off the set id that precedes it */
 .plan-result .badge {
     margin-left: 0.5rem;

@@ -374,3 +374,8 @@ are tested in the unit tests of `LoginPage`, `UsersPage`, `AccountPage`, and `He
 codes once and no secret, which is tested by `AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret`. The
 other states of the pages are tested in the unit tests of `TotpLoginPage`, `LoginPage`, `AccountPage`, `UsersPage`,
 `ReviewPage`, and `HelpPage`.
+
+**Inbox**: A visitor who is not signed in is sent to the login page by the inbox route and sees nothing of the inbox,
+which is tested by `WebSubsystem_InboxPage_Unauthenticated_IsChallenged`. The groups, the markers, and Mark all as read
+are tested in the unit tests of `InboxPage`, the unread markers of the review in those of `ReviewPage`, the card in
+those of `HomePage`, and the topic in those of `HelpPage`.

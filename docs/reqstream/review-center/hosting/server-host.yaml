@@ -252,6 +252,25 @@ sections:
           - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
           - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
 
+      - id: ReviewCenter-ServerHost-AttestationKeyProtection
+        title: >-
+          The ServerHost class shall build the attestation key provider with the Data Protection provider of the
+          server, so that the self-signed key is protected by the key ring and created at the start of the server, and
+          shall fail before serving requests, with an error that names the protected key file and says to delete it,
+          when the key ring cannot decrypt that file, also when DataProtection:AllowNewKeyRing is set, because that
+          setting accepts only the loss of stored secrets and the server never deletes or replaces a signing key.
+          The command-line verbs shall not create the key.
+        justification: |
+          The self-signed key is a secret in a folder that backups copy. Binding it to the key ring makes the ring the
+          single root of trust to protect and to restore. A ring that was lost must not silently yield a second key
+          that signs under the same name, so the operator has to decide to delete the old file.
+        tests:
+          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+          - ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile
+          - ServerHost_CreateApplication_AttestationKeyOfLostRingWithAllowNewKeyRing_StillThrowsNamingTheFile
+          - UserCommand_Run_ValidUser_CreatesNoKeyFile
+          - AuditCommand_Run_IntactTrail_CreatesNoKeyFile
+
       - id: ReviewCenter-ServerHost-AttestationKeyFailure
         title: >-
           The ServerHost class shall obtain the signing key at start-up and fail, before serving requests, with an

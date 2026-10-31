@@ -20,6 +20,7 @@
 
 using System.Security.Cryptography;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
@@ -100,6 +101,18 @@ internal sealed class KeysInstall : IDisposable
     ///     Gets the connection string of the database.
     /// </summary>
     private string ConnectionString => _settings["Database:ConnectionString"]!;
+
+    /// <summary>
+    ///     Gets the folder of the self-signed attestation key.
+    /// </summary>
+    public string AttestationFolder => Path.Combine(Folder.DirectoryPath, "attestation");
+
+    /// <summary>
+    ///     Makes the production attestation key provider create the protected self-signed key.
+    /// </summary>
+    /// <returns>The thumbprint of the key.</returns>
+    public string CreateAttestationKey() =>
+        _provider.GetRequiredService<IAttestationKeyProvider>().GetSigningKey().Info.Thumbprint;
 
     /// <summary>
     ///     Makes the ring create its first key.

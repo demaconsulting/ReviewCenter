@@ -196,10 +196,20 @@ also **skipped**, with that reason; a file that exists but is not a database of 
 key, no folder, no file. It reports the protection in force, the number of key files (and how many are not
 encrypted), the number of protected secrets (stored repository tokens and second-factor secrets), and how many of them
 the key ring cannot decrypt, for example `protection Dpapi; key files 1 (0 not encrypted); protected secrets 3
-(repository tokens 2, second-factor secrets 1); unreadable 0`. It **fails** (exit code 1) when secrets cannot be
+(repository tokens 2, second-factor secrets 1); unreadable 0; attestation key SelfSigned: subject 'CN=...', thumbprint
+..., valid ... to ...`. The last clause describes the attestation signing key: the provider, subject, thumbprint, and
+validity of the key, or `will be created on first start` when the self-signed key does not exist yet (with a note
+`(expired; a new key is created at the first start)` for a key whose certificate has expired). It adds a warning when a
+plaintext `attestation-selfsigned.pfx` of an earlier version is still in the attestation key folder (the server ignores
+that file; delete it). It **fails** (exit code 1) when secrets cannot be
 decrypted (the message gives the counts and the repository and user ids), when the key folder is empty or missing but
-the database holds secrets, when the ring is not encrypted and `DataProtection:RequireEncryptedKeys` is true, and when
-the newest key cannot be decrypted. It never prints a key, a secret, a password, or a path other than the key folder.
+the database holds secrets, when the ring is not encrypted and `DataProtection:RequireEncryptedKeys` is true, when
+the newest key cannot be decrypted, and when the protected attestation key file
+`attestation-selfsigned.pfx.protected` cannot be decrypted with the key ring (restore the ring that protected it, or
+delete the file to create a new key at the next start). With `Attestation:RequireTrustedKey` set to true and no key
+yet, the check passes with `will be created on first start`, but the server then refuses to start, because the new
+self-signed key is not trusted; use the `CertificateStore` provider for a trusted key. It never prints a key, a secret,
+a password, or a path other than the key folder: a problem with the attestation key names only the file or the setting.
 It is **skipped** when no database is configured or the database file does not exist yet, and when the database
 holds no secret and the key folder does not exist yet. See Back Up and Restore in the Deployment chapter.
 
@@ -275,6 +285,31 @@ of a review existed: it lacks the column `Reviews.DueDate`, which is created onl
 same holds for a database created before the follow-up review existed: it lacks the columns `Reviews.FollowsReviewId`,
 `Reviews.CarriedAnswerCount`, `Reviews.CarriedThreadCount`, and the carried-from columns of the answers, the section
 states, and the threads.
+
+## Inbox Reference
+
+This section lists the rules of the inbox (see Your Inbox in the Reviewing chapter) in one place.
+
+| Group | A review is listed when | Needs action |
+| ----- | ----------------------- | ------------ |
+| To sign | You are primary or alternate of a slot that is not signed or out of date; not approved | Yes |
+| Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
+| Failed checks | You authored the review, it is not approved, and an applicable check is answered Fail | Yes |
+| Updates | Someone else completed the approval, or reopened the review, after you last saw it | No |
+
+- Only members who may contribute are given To sign and Replies waiting; an auditor gets neither. A user who is
+  disabled, has a temporary password, or is not a known user gets an empty inbox.
+- The count on the home page is the number of distinct reviews in the first three groups, so a review in two groups
+  counts once. Updates are never counted.
+- A comment is unread when it is by someone else and newer than the last comment you saw in that review. Your own
+  comments are never unread, whatever the case of your user name. A review to sign is marked New again when someone
+  else signs it, answers a check, writes a comment, or reopens it after you last saw it.
+- The read state is one row for each user and review, in the table `ReviewUserStates`, with the last time and the
+  highest comment seen. It only moves forward, it is removed with its review or user, and it is neither audited nor
+  part of the record digest.
+- A development database created before the inbox existed lacks the table `ReviewUserStates` and the indexes on the
+  reviewer slots and the creator of a review. ReviewCenter has no migrations, so delete such a database and let the
+  server create it again (see Database in the Administration chapter).
 
 ## Puppet Development Tool
 

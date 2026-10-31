@@ -1,0 +1,149 @@
+---
+# Software Unit Requirements for the InboxService Class
+#
+# The InboxService class builds the inbox of a user: the reviews that wait for the user, in four groups, and the
+# count of the reviews that need action. It also keeps what a user has seen of a review, so that new comments and
+# changes can be marked. It holds the rules in the pure InboxRules helper, reads the reviews through the stores and
+# decides who may see what through ProjectAccess.
+
+sections:
+  - title: InboxService Unit Requirements
+    requirements:
+      - id: ReviewCenter-InboxService-ToSign
+        title: >-
+          The InboxService class shall list as to sign every review that is not approved and in which the user is the
+          primary or the alternate reviewer of a slot that has no current signature, with the chip Not signed when
+          nothing was signed and the chip Out of date, sign again when the signature no longer covers the record, shall
+          list nothing for a slot that is signed, and shall give the item the due date, and the Overdue mark when the
+          date is past, while the review is not approved.
+        justification: |
+          A reviewer must find the signatures that are theirs to give, and a signature that went out of date because
+          the review changed is as much work as one that was never given. The state of a slot is decided as the
+          approval of the review decides it, so the inbox and the review page never disagree.
+        tests:
+          - InboxService_GetInboxAsync_PrimarySlotNotSigned_ShowsToSignItem
+          - InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem
+          - InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip
+          - InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem
+          - InboxService_GetInboxAsync_DueDateInPast_ShowsOverdueChip_ApprovedShowsNone
+          - InboxRules_SlotState_MatchesSigningServiceApproval
+          - InboxRules_IsAssigned_PrimaryAndAlternate_AreAssigned
+
+      - id: ReviewCenter-InboxService-RepliesWaiting
+        title: >-
+          The InboxService class shall list as replies waiting every review that is not approved and has an open
+          thread whose last comment is by someone else, a comment of the system counting as someone else, in which the
+          user wrote a comment while holding a slot of the review, or whose review the user created, with a chip that
+          gives the number of such threads, and
+          shall list nothing for a thread that is resolved or whose last comment is the user's own.
+        justification: |
+          A discussion stops when the person who was asked does not see the question. The inbox shows the threads in
+          which the user is the one expected to answer, and never the ones that wait for somebody else.
+        tests:
+          - InboxService_GetInboxAsync_LatestCommentByOther_IAnswered_ShowsRepliesWaiting
+          - InboxService_GetInboxAsync_LatestCommentByMe_HasNoRepliesWaiting
+          - InboxService_GetInboxAsync_ResolvedThread_HasNoRepliesWaiting
+          - InboxService_GetInboxAsync_AuthorOfReview_ThreadByOther_ShowsRepliesWaiting
+          - InboxService_GetInboxAsync_SystemCommentLast_CountsAsOther
+          - InboxRules_WaitingThreads_OpenLatestByOther_AreWaiting
+
+      - id: ReviewCenter-InboxService-FailedChecks
+        title: >-
+          The InboxService class shall list as failed checks every review that is not approved and was created by the
+          user and has at least one check answered Fail in a section that applies, with a chip that gives the number of
+          failed checks, and shall ignore a Fail in a section that is marked not applicable.
+        justification: |
+          The creator of a review answers for it. A failed check is the signal that the content must change, and a
+          check of a section that does not apply to the review is not a finding.
+        tests:
+          - InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount
+          - InboxService_GetInboxAsync_FailInNotApplicableSection_IsIgnored
+          - InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound
+
+      - id: ReviewCenter-InboxService-Updates
+        title: >-
+          The InboxService class shall list as updates, for information and never counted as action, a review of which
+          the user is a reviewer or the creator when it was approved by a signature of somebody else or was reopened by
+          somebody else after the user last saw it, with the chip Approved or Reopened and the name of that person,
+          and shall list no update for a signature or a reopening of the user's own, nor for a review that was seen
+          since.
+        justification: |
+          A person who waited for a review wants to learn that it is finished, and the creator wants to learn that an
+          administrator reopened it. These facts need no work, so they are shown apart from the work and do not raise
+          the count that the home page shows.
+        tests:
+          - InboxService_GetInboxAsync_ApprovedSinceLastSeen_ShowsUpdate_NotCountedAsAction
+          - InboxService_GetInboxAsync_ReopenedByOther_ShowsUpdate
+          - InboxService_GetInboxAsync_ReopenedByMe_ShowsNoUpdate
+          - InboxRules_CompletingSignature_LatestOfCurrentDigest_IsFound
+
+      - id: ReviewCenter-InboxService-Access
+        title: >-
+          The InboxService class shall consider only reviews of the projects the user may see, at the time of the
+          call, shall offer a signature to give and a reply only to a user who may work in the project and, for a
+          signature, is a member of it, so that an auditor gets none of them, shall give a user who is disabled, has a
+          temporary password, is unknown, or is anonymous an empty inbox and a count of zero without an error, shall
+          show a review that is approved no action, and shall give a system administrator only the reviews in which
+          the administrator is a reviewer or the creator.
+        justification: |
+          The inbox must never reveal a project to somebody who may not see it, nor ask a read-only member for work
+          that the rules would refuse. Deciding on the current access means that a removed member stops seeing the
+          reviews of the project at once.
+        tests:
+          - InboxService_GetInboxAsync_Auditor_GetsNoSignOrReplyItems
+          - InboxService_GetInboxAsync_NonMemberOrRemovedMember_GetsEmptyView
+          - InboxService_GetInboxAsync_DisabledUser_GetsEmptyView
+          - InboxService_GetInboxAsync_TemporaryPasswordUser_GetsEmptyView
+          - InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView
+          - InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems
+          - InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews
+
+      - id: ReviewCenter-InboxService-Count
+        title: >-
+          The InboxService class shall count the reviews that need the action of the user as the number of distinct
+          reviews in the groups to sign, replies waiting and failed checks, so that a review in several groups counts
+          once and an update is not counted, and shall show a review that is in several groups in each of them.
+        justification: |
+          The number on the home page says how many reviews wait, which is what a person can act on. Counting a review
+          twice, or counting information, would inflate it.
+        tests:
+          - InboxService_CountAsync_EqualsDistinctActionReviews
+          - InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach
+
+      - id: ReviewCenter-InboxService-Unread
+        title: >-
+          The InboxService class shall treat a comment as unread when it was written by somebody else and is newer than
+          the last comment the user has seen, compare the user names without regard to case, treat every comment of
+          somebody else as unread when the user has never seen the review, never treat a comment of the user as unread,
+          and mark an item of the inbox as unread when it holds an unread comment or a change after the time the user
+          last saw the review, also an item to sign of a review the user has seen before.
+        justification: |
+          The user wants to see what is new, and the own words are never news. Comment identities grow with time, so
+          one number per review is enough to tell what has been seen. A review that waits for a signature must show
+          what happened to it after the last visit, not only before the first one.
+        tests:
+          - InboxService_GetInboxAsync_NoStateRow_AllCommentsByOthersAreUnread
+          - InboxService_GetInboxAsync_OwnComments_AreNeverUnread
+          - InboxService_GetInboxAsync_CommentsAfterLastSeen_AreUnread
+          - InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread
+          - InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread
+          - InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments
+          - InboxRules_SameUser_IgnoresCase
+          - InboxRules_IsUnread_OtherAndNewer_IsTheOnlyUnread
+          - InboxRules_CountUnreadAndMaxCommentId_AllThreads_AreCounted
+
+      - id: ReviewCenter-InboxService-MarkSeen
+        title: >-
+          The InboxService class shall store the newest comment and the time a user has seen of a review, never move
+          either back, store nothing for a user who may not see the review or for a review that does not exist, mark
+          every review of the inbox as seen on request, with the time read before the inbox was read and only the
+          comments written up to that time, and refuse a missing user.
+        justification: |
+          What a user has seen must only grow, or an old page that is opened late would bring old news back. A user
+          who may not see a review must leave no trace of it, and a change or comment that happens while the inbox is
+          read must stay new.
+        tests:
+          - InboxService_MarkSeenAsync_NeverMovesBackwards
+          - InboxService_MarkAllReadAsync_UpsertsEveryListedReview
+          - InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread
+          - InboxService_NullArguments_Throw

@@ -3,8 +3,8 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Storage subsystem
-# - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore, and
-#   DatabaseSetup units
+# - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore,
+#   InboxStore, and DatabaseSetup units
 # - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, reviews,
 #   checklists, comment threads, reviewer slots, signatures, project memberships, the evidence settings of projects,
 #   the audit trail, and git repositories
@@ -410,3 +410,21 @@ sections:
         tests:
           - TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner
           - TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner
+
+      - id: ReviewCenter-Storage-Inbox
+        title: >-
+          The Storage subsystem shall keep what each user has seen of each review in the database, find the reviews
+          in which a user is a reviewer or the creator without loading their files, decide every race between visits
+          so that the stored values only grow and none of them fails, and delete the rows with the review or the user.
+        justification: |
+          The inbox is built on every visit of the home page, so the lookup must be cheap, and two tabs of one user
+          must not lose the newer value. One table serves as the list of notifications, so the schema stays small.
+        children:
+          - ReviewCenter-InboxStore-Candidates
+          - ReviewCenter-InboxStore-UserState
+          - ReviewCenter-InboxStore-Cascade
+          - ReviewCenter-DbContext-ReviewUserState
+          - ReviewCenter-DbContext-InboxIndexes
+        tests:
+          - StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems
+          - InboxStore_MarkSeenAsync_ParallelCalls_NoExceptionAndHighestWins

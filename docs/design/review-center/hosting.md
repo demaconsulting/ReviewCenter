@@ -224,7 +224,8 @@ self-signed key is kept in `Attestation:SelfSignedFolder`, or in an `attestation
 the Data Protection key ring, so that it persists and is backed up with the other keys. `CreateApplication` calls
 `ValidateAttestation` right after the key ring check: it obtains the signing key, and an `AttestationKeyException`
 (an unknown provider, a missing thumbprint, a certificate that is not in the store, `RequireTrustedKey` with a
-self-signed key or a certificate without a signing key usage, or an unusable folder) becomes an
+self-signed key or a certificate without a signing key usage, an unusable folder, or a protected key file that the key
+ring cannot decrypt, which names the file) becomes an
 `InvalidOperationException` "The attestation signing key is not
 usable: ..." that names the setting. The same reasoning applies as for the database and the key ring: an operator who
 chose a certificate must learn at the start that the choice does not work. The price is that a server whose key is in a

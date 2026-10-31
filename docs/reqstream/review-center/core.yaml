@@ -5,7 +5,8 @@
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
-#   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, and ProjectChecklistService units, with the
+#   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, ProjectChecklistService, and InboxService
+#   units, with the
 #   domain types they share
 #   (project, evidence settings, review,
 #   review file, thread, comment, checklist, user, project membership, actor, reviewer slot, signature, upload,
@@ -586,6 +587,30 @@ sections:
           - ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker
           - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
           - RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest
+
+      - id: ReviewCenter-Core-Inbox
+        title: >-
+          The Core subsystem shall build for a user an inbox of the reviews that wait for the user, in the groups to
+          sign, replies waiting, failed checks, and updates, decide on the current access of the user which reviews
+          and which actions are shown, count the reviews that need action, keep what the user has seen of each review
+          so that new comments and changes are marked, never move it back, and never put it into the audit trail or
+          the record digest.
+        justification: |
+          The inbox joins facts that the review, thread, checklist and signature rules already decide, so it is a rule
+          of the domain and not of the page. Keeping it in the Core subsystem lets every page and later every client
+          show the same list, and the same rules of access apply to it as to the reviews themselves.
+        children:
+          - ReviewCenter-InboxService-ToSign
+          - ReviewCenter-InboxService-RepliesWaiting
+          - ReviewCenter-InboxService-FailedChecks
+          - ReviewCenter-InboxService-Updates
+          - ReviewCenter-InboxService-Access
+          - ReviewCenter-InboxService-Count
+          - ReviewCenter-InboxService-Unread
+          - ReviewCenter-InboxService-MarkSeen
+        tests:
+          - CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts
+          - InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach
 
       - id: ReviewCenter-Core-AccessTokens
         title: >-

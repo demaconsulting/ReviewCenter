@@ -92,8 +92,20 @@ The opt-in tenth and eleventh checks are run only with `--validate --check-confi
   names the settings, because the reason can hold a certificate path). It throws `ValidationSkippedException` when no
   database is configured, when the database file does not exist yet, and when the key folder does not exist yet and the
   database holds no secret, because a fresh installation creates both at the first start. It never creates a key, a
-  folder, or a file, and never prints a key, a secret, a password, or a path other than the key folder. The status of
-  the attestation key is not part of it.
+  folder, or a file, and never prints a key, a secret, a password, or a path other than the key folder. It then adds
+  one clause for the attestation key (`DescribeAttestationKey`), built with the production factory with `allowCreate`
+  set to `false`, from the `Attestation` settings: for the SelfSigned provider the subject, thumbprint, and validity of
+  the key, or "will be created on first start" when the protected file does not exist yet; a plaintext
+  `attestation-selfsigned.pfx` of an earlier version is added as a warning note (it is ignored, delete it). It fails,
+  naming only the file `attestation-selfsigned.pfx.protected`, when the key ring cannot decrypt that file, and fails
+  with the path-free message of the key (`AttestationKeyException.MessageWithoutPath`, which names a setting or a file
+  name but never the folder) when another problem makes the key unusable. The clause does not mention what
+  `Attestation:RequireTrustedKey` would do to a key that does not exist yet: with that setting true and no key, the
+  check still passes with "will be created on first start", while the server refuses to start because the new
+  self-signed key is not trusted (the check does not create a key, so it cannot apply the trust policy to it). The
+  certificate store provider is not covered by a test of the check; it relies on the describe path of the provider
+  itself (`GetSigningKey` and its trust policy), which is tested in the `Evidence` subsystem. The clause is only added
+  when the check runs, not when it is skipped.
 
 **FastCommitInterceptor** (internal, `SelfTestServices`): an EF Core connection interceptor that sets
 `synchronous=OFF` and `journal_mode=MEMORY` when a connection opens, so that the many commits of the review
@@ -122,7 +134,8 @@ so a hung git process or host ends as a failure instead of hanging the run.
 - **ValidationRunner** — the types `ValidationFailedException` and `ValidationSkippedException`.
 - **Core, Storage, ContentSources, Evidence and the web host** — the production services the checks call; the
   checks never reimplement the production logic. `TotpCheck` calls `TotpAlgorithm` of the `Identity` subsystem.
-  `ConfiguredKeysCheck` calls `SecretScan` and `KeyRingProtection` of the `Hosting` subsystem.
+  `ConfiguredKeysCheck` calls `SecretScan` and `KeyRingProtection` of the `Hosting` subsystem, and
+  `AttestationKeyProviderFactory` of the `Evidence` subsystem.
 - **System.Security.Cryptography.Pkcs** — the independent verification of the attestation signature.
 
 #### Callers

@@ -329,6 +329,36 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the inbox topic is listed second, explains the four groups, the New marker and Mark all as read,
+    ///     and links to the inbox.
+    /// </summary>
+    [Fact]
+    public void HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead()
+    {
+        // Assert: the topic follows the getting started topic in the index
+        var slugs = HelpTopics.All.Select(topic => topic.Slug).ToList();
+        Assert.Equal(slugs.IndexOf("getting-started") + 1, slugs.IndexOf("inbox"));
+
+        // Act: render the topic page
+        var page = Render<HelpInboxPage>();
+
+        // Assert: the title and the link to the inbox
+        var text = page.Markup;
+        Assert.Equal("Your inbox", page.Find("h1").TextContent);
+        Assert.Equal("/inbox", page.Find("[data-testid='help-inbox-link']").GetAttribute("href"));
+
+        // Assert: the four groups, the marker, mark all as read, and that updates are not work
+        Assert.Contains("<strong>To sign</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Replies waiting</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Failed checks</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Updates</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>New</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Mark all as read</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("not counted as work", text, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
+    }
+
+    /// <summary>
     ///     Test that an unknown help address shows a friendly message and a link back to the index.
     /// </summary>
     [Fact]

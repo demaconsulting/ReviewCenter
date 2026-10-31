@@ -746,6 +746,26 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that the host registers the inbox store and the inbox service as singletons.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersInboxService()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: resolve both
+        var inbox = app.Services.GetRequiredService<InboxService>();
+        var store = app.Services.GetRequiredService<IInboxStore>();
+
+        // Assert: singletons, and the service answers for a user who is not known
+        Assert.Same(inbox, app.Services.GetRequiredService<InboxService>());
+        Assert.Same(store, app.Services.GetRequiredService<IInboxStore>());
+        Assert.Equal(0, await inbox.CountAsync(new Actor("nobody", "Nobody"), TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that the host registers the repository registry and the git source, with the key ring and the git
     ///     cache folder placed beside the database by default.
     /// </summary>
@@ -1599,6 +1619,9 @@ public class ServerHostKeyRingTests
         }
 
         Directory.Delete(Path.Combine(folder.DirectoryPath, "keys"), recursive: true);
+
+        // The attestation key lives beside the ring by default, so it is lost with it; these settings keep it apart
+        Directory.Delete(Path.Combine(folder.DirectoryPath, "attestation"), recursive: true);
         var logs = new CapturingLoggerProvider();
 
         // Act: start with the escape hatch
@@ -1611,6 +1634,64 @@ public class ServerHostKeyRingTests
             entry => entry.Level == LogLevel.Warning && entry.Message.Contains("AllowNewKeyRing", StringComparison.Ordinal));
         Assert.Contains("2 protected secrets", warning.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("tkn-lost-ring", warning.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a self-signed attestation key that the new key ring cannot decrypt stops the start with an error
+    ///     that names the protected file and tells the operator to delete it, and leaves the file in place.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_AttestationKeyOfLostRing_ThrowsNamingTheFile()
+    {
+        // Arrange: a start that creates the protected attestation key, then the ring is lost but the key file is not
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder);
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            Assert.True(File.Exists(Path.Combine(folder.DirectoryPath, "attestation", SelfSignedKeyProvider.FileName)));
+        }
+
+        var keyFile = Path.Combine(folder.DirectoryPath, "attestation", SelfSignedKeyProvider.FileName);
+        Directory.Delete(Path.Combine(folder.DirectoryPath, "keys"), recursive: true);
+
+        // Act
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(settings, new CapturingLoggerProvider()));
+
+        // Assert: the file is named, the remedy is given, and the file is untouched
+        Assert.Contains(SelfSignedKeyProvider.FileName, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("delete the file", exception.Message, StringComparison.Ordinal);
+        Assert.True(File.Exists(keyFile));
+    }
+
+    /// <summary>
+    ///     Test that <c>DataProtection:AllowNewKeyRing</c> does not help for the protected attestation key: it accepts
+    ///     that stored secrets become unreadable, but the server never deletes or replaces a signing key, so the start
+    ///     still stops with an error that names the file, and the file is left untouched.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_AttestationKeyOfLostRingWithAllowNewKeyRing_StillThrowsNamingTheFile()
+    {
+        // Arrange: a start that creates the secrets and the protected attestation key, then the ring is lost
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder);
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            SeedSecrets(settings, first, 3, 4);
+        }
+
+        var keyFile = Path.Combine(folder.DirectoryPath, "attestation", SelfSignedKeyProvider.FileName);
+        Assert.True(File.Exists(keyFile));
+        var before = await File.ReadAllBytesAsync(keyFile, TestContext.Current.CancellationToken);
+        Directory.Delete(Path.Combine(folder.DirectoryPath, "keys"), recursive: true);
+
+        // Act: start with the escape hatch for the lost ring
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => Create(Settings(folder, ("DataProtection:AllowNewKeyRing", "true")), new CapturingLoggerProvider()));
+
+        // Assert: the file is named with the remedy, and it was neither deleted nor replaced
+        Assert.Contains(SelfSignedKeyProvider.FileName, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("delete the file", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(before, await File.ReadAllBytesAsync(keyFile, TestContext.Current.CancellationToken));
     }
 
     /// <summary>

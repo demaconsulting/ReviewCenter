@@ -26,6 +26,7 @@ using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Utilities;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
@@ -67,7 +68,8 @@ internal static class AttestationPdfCheck
         using var keys = new SelfSignedKeyProvider(
             new AttestationOptions { SelfSignedFolder = Path.Combine(folder.DirectoryPath, "attestation") },
             TimeProvider.System,
-            NullLogger.Instance);
+            NullLogger.Instance,
+            new EphemeralDataProtectionProvider());
         var key = keys.GetSigningKey();
 
         // Production rendering and signing

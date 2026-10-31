@@ -1,9 +1,10 @@
 ---
 # Software Unit Requirements for the HomePage Unit
 #
-# The HomePage unit is the landing page served at the root URL, with the product name and tagline. It is static
-# markup with no interactive behavior. A signed-in user also sees a "Get started" list of links to the pages the
-# user can use; the administration pages are listed only for a system administrator. There is no card for the
+# The HomePage unit is the landing page served at the root URL, with the product name and tagline. It is
+# server-rendered markup with no interactive behavior. A signed-in user also sees a "Get started" list of links to
+# the pages the user can use, the inbox first with the number of reviews that need action; the administration pages
+# are listed only for a system administrator. There is no card for the
 # repositories, which belong to the projects.
 
 sections:
@@ -30,22 +31,32 @@ sections:
       - id: ReviewCenter-HomePage-GetStarted
         title: >-
           The HomePage unit shall show a signed-in user a Get started section with a link, and a one-line
-          description, for the projects page.
+          description, for the inbox page and for the projects page.
         justification: |
-          A new user needs a clear first step after signing in. The projects page is where every review starts, so
-          the home page points to it directly.
+          A new user needs a clear first step after signing in. The inbox says what waits for the user and the
+          projects page is where every review starts, so the home page points to both directly.
         tests:
-          - HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly
+          - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards
+
+      - id: ReviewCenter-HomePage-InboxCard
+        title: >-
+          The HomePage unit shall show on the inbox card a sentence with the number of reviews that need the action of
+          the user, and the sentence that nothing needs action when the number is zero.
+        justification: |
+          The number is the reason to open the inbox, and a card without work should not suggest any.
+        tests:
+          - HomePage_Render_Reviewer_InboxCardShowsActionCount
+          - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards
 
       - id: ReviewCenter-HomePage-AdminLinks
         title: >-
           The HomePage unit shall add to the Get started section, each with a one-line description, links to the
           audit and users pages only while an enabled system administrator is signed in, so that a system
-          administrator sees three cards and any other user one, and shall offer no link to a repositories page.
+          administrator sees four cards and any other user two, and shall offer no link to a repositories page.
         justification: |
           The links must not invite other users to pages they cannot open, and a system administrator needs the same
           first steps for the pages that administration involves. Repositories belong to projects and are reached
           from the page of a project.
         tests:
           - HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks
-          - HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly
+          - HomePage_Render_Reviewer_ShowsInboxAndProjectsCards

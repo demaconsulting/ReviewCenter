@@ -158,6 +158,10 @@ N/A - standard test environment.
   when the date has passed and the review is not approved. An administrator or the creator can set (also to a date in
   the past) and clear the date, a text that is not a date is refused with a message and stores nothing, another member
   sees no edit form, and an approved review keeps its date without a badge and without a form.
+- A viewer who opens a review for the first time sees the comments of others marked as new in the summary, the index,
+  and the thread; the viewer's own comments are never marked; once the page is live the read state is stored, so the
+  next visit shows no markers; a change of the address to another review loads the baseline of that review; and a user
+  who may not see the project leaves no read state behind.
 
 #### Test Scenarios
 
@@ -816,3 +820,25 @@ the review's own is not. This scenario is tested by `ReviewPage_Render_FollowUp_
 **ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine**: The followed review lists its follow-ups with
 links and shows no follows line, and a follow-up that nothing follows shows no list. This scenario is tested by
 `ReviewPage_Render_FollowedReview_ListsFollowUpsAndShowsNoFollowsLine`.
+
+**ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers**: A viewer without a stored read state opens a review
+with comments of others; the summary, the index of the threads, and the thread carry the New marker. This scenario is
+tested by `ReviewPage_Render_FirstVisit_ShowsUnreadDotsForCommentsByOthers` in `ReviewPageUnreadTests.cs`.
+
+**ReviewPage_Render_AfterLiveRender_UpsertsLastSeen_AndSecondVisitShowsNoDots**: After the live render the read state is
+stored with the highest comment; a second visit shows no marker. This scenario is tested by
+`ReviewPage_Render_AfterLiveRender_UpsertsLastSeen_AndSecondVisitShowsNoDots`.
+
+**ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen**: A comment written after the time the page
+began loading is not part of the stored watermark, so it is still new at the next visit. This scenario is tested by
+`ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen`.
+
+**ReviewPage_Render_OwnComments_ShowNoDot**: The comments of the viewer are never marked as new. This scenario is tested
+by `ReviewPage_Render_OwnComments_ShowNoDot`.
+
+**ReviewPage_Render_ParameterChangeToOtherReview_ReloadsBaselineAndMarksSeen**: When the address changes to another
+review, the baseline of that review is loaded and that review is marked as seen. This scenario is tested by
+`ReviewPage_Render_ParameterChangeToOtherReview_ReloadsBaselineAndMarksSeen`.
+
+**ReviewPage_Render_NoViewAccess_WritesNoState**: A user who may not see the project gets the not-found body and no read
+state is written. This scenario is tested by `ReviewPage_Render_NoViewAccess_WritesNoState`.

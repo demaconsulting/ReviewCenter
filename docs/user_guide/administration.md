@@ -346,6 +346,19 @@ Open the review; in the locked notice, enter a **Reason for reopening** (require
 - Reopen only when the approval must really be undone: it makes every signature of the review worthless for the
   current record, and nothing takes the reopen back.
 
+## Inbox and Read State
+
+Every user has an inbox of the reviews that wait for them (see Your Inbox in the Reviewing chapter). It is built from
+the reviews in which the user is named in a slot or is the author, and from what is stored about what the user has
+seen. Nothing needs to be set up, and no setting turns it off.
+
+- The read state (when a user last saw a review, and the highest comment seen) is stored for each user and review. It
+  is not an entry of the audit trail and it is not part of the record that a signature binds to, so reading a review
+  never makes a signature out of date and never adds an audit entry.
+- Administrators cannot read the inbox of another user, and a system administrator who is no member of a project sees
+  in the inbox only the reviews in which that person is named as a reviewer or the author.
+- Deleting a user or a review deletes the read state that belongs to it.
+
 ## Audit Trail
 
 ReviewCenter records every change that the application makes to projects, reviews, comments, checklists, reviewer
@@ -627,6 +640,8 @@ chooses how (the names are not case sensitive):
 | `DataProtection:RequireEncryptedKeys`     | When true, the server refuses a ring that is not encrypted at rest |
 | `DataProtection:AllowNewKeyRing`          | One-start escape hatch: accept a new, empty ring (default false)   |
 
+`AllowNewKeyRing` accepts only the loss of stored secrets; it does not delete or replace the protected attestation key.
+
 Set the list with indexed environment variables, for example `DataProtection__PreviousCertificatePaths__0`.
 
 Certificates are read from files only; the certificate store is not used. A wrong certificate, a wrong password, a
@@ -650,7 +665,9 @@ copies the key folder cannot; a certificate and its password beside the keys is 
 `LocalMachine`). Restoring it elsewhere makes the stored tokens unreadable, so use a certificate for a ring that must
 be restored on another machine. A database restored **without** its key ring is not silently accepted: when the key
 folder holds no key but the database holds protected secrets, the server refuses to start unless you set
-`DataProtection:AllowNewKeyRing` to `true` for one start, and when only some secrets cannot be decrypted it logs an
+`DataProtection:AllowNewKeyRing` to `true` for one start (this accepts only the loss of stored secrets; a protected
+attestation key file that the new ring cannot decrypt still stops the start, because the server never deletes or
+replaces a signing key), and when only some secrets cannot be decrypted it logs an
 error with the counts at every start; see Back Up and Restore in the Deployment chapter.
 
 **The server never replaces a ring that it cannot read.** Data Protection answers a key that it cannot decrypt by

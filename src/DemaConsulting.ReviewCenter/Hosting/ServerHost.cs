@@ -294,6 +294,8 @@ internal static class ServerHost
         services.AddSingleton<ProjectChecklistService>();
         services.AddSingleton<ReviewService>();
         services.AddSingleton<ThreadService>();
+        services.AddSingleton<IInboxStore, InboxStore>();
+        services.AddSingleton<InboxService>();
         services.AddSingleton<ChecklistService>();
         services.AddSingleton<UserService>();
         services.AddSingleton<PersonalAccessTokenService>();
@@ -359,7 +361,9 @@ internal static class ServerHost
         services.AddSingleton(provider => AttestationKeyProviderFactory.Create(
             provider.GetRequiredService<AttestationOptions>(),
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILoggerFactory>()));
+            provider.GetRequiredService<ILoggerFactory>(),
+            provider.GetRequiredService<IDataProtectionProvider>(),
+            allowCreate: true));
         services.AddSingleton<IAttestationRenderer, AttestationRenderer>();
         services.AddSingleton<IAttestationSigner, AttestationSigner>();
         services.AddSingleton<AttestationService>();
