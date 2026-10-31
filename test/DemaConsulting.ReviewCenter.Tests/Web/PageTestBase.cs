@@ -69,6 +69,9 @@ public abstract class PageTestBase : BunitContext
         var clock = new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         Time = new ManualTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         Services.AddSingleton<TimeProvider>(Time);
+
+        // The layout keeps the count of the Inbox tab in the memory cache, as the server does
+        Services.AddMemoryCache();
         AuditStore = new FakeAuditStore(clock);
         Audit = new AuditService(AuditStore);
         var userStore = new FakeUserStore(store);

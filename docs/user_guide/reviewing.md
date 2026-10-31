@@ -254,7 +254,8 @@ The page never shows text printed by git, the location of the repository, or a c
 
 ## Your Inbox
 
-The **Inbox** (`/inbox`, linked from the home page) lists the reviews that wait for you, so you do not have to open
+The **Inbox** (`/inbox`, linked from the home page and from the **Inbox** tab of the page header) lists the reviews that
+wait for you, so you do not have to open
 every project to find them. Each row shows the project, the review, a short chip, and a link that opens the review.
 A review appears in the inbox only when you are named in it: as the primary or alternate reviewer of a slot, or as the
 author of the review. Someone who only wrote a comment in another person's review is not shown it.
@@ -271,6 +272,13 @@ past, and the home page card and the summary line at the top of the inbox count 
 in them. The Updates group is for information: it is not counted, and a row goes away once you open the review.
 An approved review needs no one's action any more, so it appears only as an update for the others. Auditors, who may
 only read, are shown no signature to give and no reply waiting. An empty inbox says that nothing needs your action.
+
+The **Inbox** tab in the page header shows a small badge with the same number as the home page card, the number of
+reviews that need your action, so you see from any page that something waits. The badge is hidden when the number is
+zero and reads **99+** above ninety-nine. The number is read when you open a page and is kept for 30 seconds, so after
+you sign or reply the badge can be up to 30 seconds behind; the inbox itself is always current. If the number cannot
+be read, the badge is left out and the page works as usual. A user who still has to replace a temporary password sees
+no Inbox tab.
 
 A row you have not looked at yet carries a **New** marker. Opening the review marks it seen. **Mark all as read**
 (shown when the inbox has rows) marks every listed review as seen at once, also the ones you never opened; it changes

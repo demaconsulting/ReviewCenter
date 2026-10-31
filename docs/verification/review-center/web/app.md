@@ -6,7 +6,9 @@
 shell is verified by starting the real server pipeline on an in-memory server and requesting the root document. The
 router (`Routes`) and the layout (`MainLayout`) are verified with component tests that set the navigation address and
 the signed-in user (through the test authentication state of `PageTestBase`) and render the component in a test
-context. No mocking is applied.
+context. The Inbox badge is verified over the real inbox service and fake stores; the only wrapper is a user store that
+counts, and can fail, the user look-up that starts every count, and the cache age is moved with the test clock, so
+no test waits for time to pass. Otherwise no mocking is applied.
 
 #### Test Environment
 
@@ -40,6 +42,16 @@ N/A - standard test environment.
   is sent to `/account` from the projects and review pages but not from the account, help, and about pages.
 - The footer shows the product name, the copyright holder, a version that begins with the version of the program and is
   no longer than it, and a link to the About page, also when nobody is signed in.
+- A signed-in user sees the Inbox tab, a link to `/inbox`, with a badge of the number of reviews that need the user's
+  action (accessible label with the exact number, singular for one); the badge is absent at zero, shows `99+` above
+  ninety-nine, and the tab itself stays.
+- Nobody signed in and a user with a temporary password see no Inbox tab and no badge, and the inbox service is not
+  asked for a count (the user look-up that starts every count is not made).
+- The count is normally read once per user in 30 seconds however many times the layout is rendered (the badge may be
+  that much behind), again once the injected clock has moved past 30 seconds, separately for each user, and again on
+  a navigation after it has expired but not on one inside the 30 seconds; the age is counted from the moment the read
+  finished; a layout that was disposed no longer reads it, also when a navigation reaches it.
+- A failure to read the count hides the badge, keeps the rest of the page (name, tab, footer), and is not cached.
 - The page frame component `SessionGate` shows its content while somebody is signed in, shows the "Session ended"
   message with a link to the login page that returns to the page, and none of the content, when nobody is, and
   replaces the content by the message when the sign-in state becomes anonymous while the page is open.
@@ -143,6 +155,55 @@ not redirected, and to `/projects`, which is sent to `/account`. After the layou
 
 **MainLayout_Navigate_OrdinaryUser_IsNotRedirected**: A signed-in user without the claim navigates from `/help` to
 `/projects` and stays there. This scenario is tested by `MainLayout_Navigate_OrdinaryUser_IsNotRedirected`.
+
+**MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount**: A theory over one and two reviews in which an
+ordinary member has to sign; `MainLayout` is rendered for the member and the Inbox tab links to `/inbox` and holds a
+badge with the number and the label "1 review needs your action" or "2 reviews need your action". This scenario is
+tested by `MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount`.
+
+**MainLayout_Render_NoActionItems_ShowsInboxTabWithoutBadge**: A member has nothing to do; the Inbox tab is shown and
+the badge is not. This scenario is tested by `MainLayout_Render_NoActionItems_ShowsInboxTabWithoutBadge`.
+
+**MainLayout_Render_ManyActionItems_CapsBadgeAt99Plus**: A hundred reviews wait for the member; the badge shows `99+`
+and its label says "100 reviews need your action". This scenario is tested by
+`MainLayout_Render_ManyActionItems_CapsBadgeAt99Plus`.
+
+**MainLayout_Render_NobodyOrTemporaryPassword_ShowsNoInboxTabAndReadsNoCount**: A review waits for a member; the layout
+is rendered with nobody signed in and then for the member with a temporary password; neither shows the Inbox tab or the
+badge, and the counting user store, which the count would call first, records no look-up. This scenario is tested by
+`MainLayout_Render_NobodyOrTemporaryPassword_ShowsNoInboxTabAndReadsNoCount`.
+
+**MainLayout_Render_WithinThirtySeconds_ReadsCountOnceThenAgainAfterwards**: The layout is rendered twice, a second
+review is assigned, and it is rendered after 29 seconds of the test clock and after 31 seconds; the first three show 1
+and made one look-up, the last shows 2 after a second look-up. This scenario is tested by
+`MainLayout_Render_WithinThirtySeconds_ReadsCountOnceThenAgainAfterwards`.
+
+**MainLayout_Render_TwoUsers_KeepsTheirCountsApart**: The layout is rendered for a member with a review to sign and then
+for another member with none; the first shows 1, the second no badge, and each caused a look-up. This scenario is tested
+by `MainLayout_Render_TwoUsers_KeepsTheirCountsApart`.
+
+**MainLayout_Navigate_ChangedCount_RefreshesBadgeAndStopsAfterDispose**: The layout shows 1, a review is assigned, and
+the user navigates within 30 seconds (no new look-up, still 1); after the clock moves 31 seconds a navigation makes the
+badge show 2 with one more look-up; after the layout is disposed and the clock has moved again, a navigation makes no
+look-up. This scenario is tested by `MainLayout_Navigate_ChangedCount_RefreshesBadgeAndStopsAfterDispose`.
+
+**MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead**: The look-up moves the test clock by 20 seconds while the
+count is read; 15 seconds after the read finished (35 after it started) the layout is rendered again and shows the same
+number with no second look-up. This scenario is tested by `MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead`.
+
+**MainLayout_Navigate_DisposedLayout_DoesNothing**: A layout is rendered and disposed, the cache is expired, and the
+navigation handler is invoked on it anyway; no look-up is made. This scenario is tested by
+`MainLayout_Navigate_DisposedLayout_DoesNothing`.
+
+**MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose**: The cache is expired and the renderer is
+kept busy on another thread, so the refresh that a navigation starts is queued and not yet run; the layout is disposed
+and the renderer released. The queued refresh runs after the disposal and makes no look-up. This scenario is tested by
+`MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose`.
+
+**MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage**: The user store throws on the look-up; the layout shows
+the name, the Inbox tab, and the footer and no badge; when the store works again within 30 seconds the next render shows
+the badge, so the failure was not cached. This scenario is tested by
+`MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage`.
 
 **SessionGate_Render_SignedInUser_ShowsContent**: `SessionGate` is rendered around some content for a signed-in user;
 the content is shown and no session-ended message. This scenario is tested by

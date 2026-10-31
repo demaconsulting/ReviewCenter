@@ -280,7 +280,8 @@ the interactive pages: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
 `ThreadService`, `ChecklistService`, `SigningService`, and `InboxService` (for the unread markers); `InboxPage` and
-`HomePage`: `InboxService`; `ProjectPage`: also `SigningService`, `RepositoryService`,
+`HomePage`: `InboxService`; the page frame `MainLayout` (`App` unit) also calls `InboxService` for the count on its
+Inbox tab; `ProjectPage`: also `SigningService`, `RepositoryService`,
 and `IProjectAccess`; `NewMemberPage` and `NewMemberAccountPage`: `ProjectService` and `IProjectAccess`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
@@ -308,7 +309,8 @@ on the project; they ask the `Core` access service. The checks are made
 by the
 authorization of the `Identity` subsystem before the page is rendered, so a page never shows data to an anonymous
 visitor. The page frame (`MainLayout` in the `App` unit) is a menu bar with the product name, which links to the home
-page, then a tab for the projects page and, for a system administrator, the audit page and the users
+page, then a tab for the projects page, a tab for the inbox with the number of reviews that need the user's action
+(see the `App` unit) and, for a system administrator, the audit page and the users
 page (there is no tab for repositories, which belong to the projects), and at the right the Help link, the display
 name of the signed-in user, a link to the account page, and a logout
 button, or the Help link and a link to the login page when nobody is signed in. The tab of the section that is open
