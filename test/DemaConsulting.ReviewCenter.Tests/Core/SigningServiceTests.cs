@@ -95,7 +95,7 @@ public class SigningServiceTests
 
     /// <summary>
     ///     Creates the review <c>rev-2</c>, authored by <paramref name="author"/>, with every check answered by Dee
-    ///     (an author may not answer the checklist of the own review).
+    ///     (an author may not answer the checklist of their own review).
     /// </summary>
     /// <param name="fixture">The fixture.</param>
     /// <param name="author">The user who creates the review, and so its author; not Dee.</param>

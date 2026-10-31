@@ -1153,7 +1153,7 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Answers every check of <c>REV-1</c> as Pass, as Cyd (an author may not answer the checklist of the own review).
+    ///     Answers every check of <c>REV-1</c> as Pass, as Cyd (an author may not answer the checklist of their own review).
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <returns>A task that completes when every check is answered.</returns>

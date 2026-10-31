@@ -238,7 +238,8 @@ sections:
       - id: ReviewCenter-ApiEndpoints-RuleConflict
         title: >-
           The ApiEndpoints unit shall answer a request that a service refuses because of a review rule of the project
-          (an author answering the checklist of the own review, the person who reopened a review signing it again, or a
+          (an author answering the checklist of their own review, the person who reopened a review signing it
+          again, or a
           reopening that would leave a slot without a person who may sign it) with status 409 and a problem document
           that carries the message of the rule.
         justification: |

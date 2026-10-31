@@ -163,7 +163,7 @@ public partial class WebSubsystemTests
     [Fact]
     public async Task WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers()
     {
-        // Arrange: start the real pipeline and create a review that ann authored
+        // Arrange: start the real pipeline and create a review that Ann authored
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var annBrowser = await TestBrowser.SignedInAsync(app, "ann");
