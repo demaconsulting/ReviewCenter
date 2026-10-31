@@ -1624,11 +1624,11 @@ public class ServerHostKeyRingTests
     [InlineData(true)]
     public void ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey(bool allowNewKeyRing)
     {
-        // Arrange: a database file that is not a database, and a ring without keys
+        // Arrange: a database that opens but cannot be scanned, and a ring without keys
         using var folder = new TemporaryDirectory();
         var settings = Settings(folder, ("DataProtection:AllowNewKeyRing", allowNewKeyRing ? "true" : "false"));
         var databaseFile = new SqliteConnectionStringBuilder(settings["Database:ConnectionString"]).DataSource;
-        File.WriteAllText(databaseFile, new string('x', 4096));
+        CreateBrokenViewDatabase(databaseFile);
         var keys = Path.Combine(folder.DirectoryPath, "keys");
 
         // Act
@@ -1641,9 +1641,31 @@ public class ServerHostKeyRingTests
             "'reviewcenter --validate --check-config' for the details.",
             exception.Message);
         Assert.DoesNotContain(databaseFile, exception.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("not a database", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Missing", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Null(exception.InnerException);
         Assert.Empty(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Creates a database file that opens and holds a table (so the schema is not created again) but whose
+    ///     <c>Repositories</c> view reads a table that does not exist, so the secret scan fails with a database error
+    ///     after the start-up prepared the database.
+    /// </summary>
+    /// <param name="databaseFile">The path of the database file to create.</param>
+    private static void CreateBrokenViewDatabase(string databaseFile)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(databaseFile)!);
+        using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databaseFile }.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                "CREATE TABLE \"Placeholder\" (\"Id\" INTEGER); " +
+                "CREATE VIEW \"Repositories\" AS SELECT \"Id\" AS \"Id\", \"Id\" AS \"EncryptedToken\" FROM \"Missing\";";
+            command.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
     }
 
     /// <summary>
@@ -1653,7 +1675,7 @@ public class ServerHostKeyRingTests
     [Fact]
     public async Task ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning()
     {
-        // Arrange: a ring with a key, and a database file that is then replaced by one that is not a database
+        // Arrange: a ring with a key, and a database that opens but cannot be scanned
         using var folder = new TemporaryDirectory();
         var settings = Settings(folder);
         await using (var first = Create(settings, new CapturingLoggerProvider()))
@@ -1663,7 +1685,8 @@ public class ServerHostKeyRingTests
 
         var databaseFile = new SqliteConnectionStringBuilder(settings["Database:ConnectionString"]).DataSource;
         SqliteConnection.ClearAllPools();
-        await File.WriteAllTextAsync(databaseFile, new string('x', 4096), TestContext.Current.CancellationToken);
+        File.Delete(databaseFile);
+        CreateBrokenViewDatabase(databaseFile);
         var logs = new CapturingLoggerProvider();
 
         // Act
