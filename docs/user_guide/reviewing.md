@@ -32,7 +32,7 @@ unchanged, together with a fingerprint of that content.
    size and open comment threads, and the thread index. Select a file to read
    its content as numbered lines (see [Review Comments](#review-comments)); the page scrolls to the code. Binary
    files, and files that are not valid UTF-8 text, show a notice instead of their content. At the bottom, the
-   collapsed "Details" section holds the identifier, state (`Draft`; the only state in this release), the review
+   collapsed "Details" section holds the identifier, the review
    fingerprint, and the SHA-256 hash of each file; open it when you need them.
 
 The review fingerprint is calculated exactly as in the ReviewMark tool (see the "Fingerprinting" section of the
@@ -244,11 +244,13 @@ selected, its lines are highlighted, and the page scrolls to them.
 1. To start a thread, either press the Comment button of a line, which fills in that line, or type a first and a last
    line number yourself (a first line without a last line means that one line), or leave both line fields empty to
    comment on the whole file. The form shows where the comment will go. Enter the comment text (1 to 4000
-   characters) and press the start button. The author of the comment is you, the signed-in user.
+   characters) and press the start button, or press Ctrl+Enter in the text field. When you open the form with a line
+   button, the text field is focused, so you can type at once. The author of the comment is you, the signed-in user.
 2. A thread is listed below the file's code with the lines it covers (the whole file, a line, or a range of lines)
    and its comments in the order they were posted; the form to start a new thread follows it. Lines that have a
    thread are marked.
-3. Any member of the project can reply to a thread. Press the resolve button to mark a thread resolved, and the reopen
+3. Any member of the project can reply to a thread (Ctrl+Enter in the reply field sends it as well). Press the
+   resolve button to mark a thread resolved, and the reopen
    button to open it again. A resolved thread is shown as one line (lines, state, and number of comments); press its
    expand button to read it, reply, or reopen it, and the collapse button to fold it again.
 
@@ -259,7 +261,8 @@ first line must not be after the last line. Leading and trailing spaces of the t
 problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
 
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
-changes. While a review is approved it is locked and no thread can be started, answered, resolved, or reopened (see
+changes. While a review is approved it is locked: the comment forms and reply fields are not shown, the line buttons are
+disabled, and no thread can be started, answered, resolved, or reopened (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)). Comments posted by other people appear when you reload
 the page or take an action on it. Comment text is
 always shown as plain text; any markup in it is displayed as typed.
@@ -322,7 +325,9 @@ and the first section with unanswered checks is open when you arrive.
    with the UTC time, and shown as "Answered by" with your
    display name.
 2. If a section does not apply to the review, clear its "This section applies to the review" switch, give the reason
-   (required), and press Save reason. A section that does not apply counts as done and its checks leave the totals.
+   (required), and press Save reason. Until you save the reason nothing is stored: the section heading says "Reason
+   needed" and the section still counts as applying. A section that does not apply counts as done and its checks leave
+   the totals.
    Switch it on again to answer its checks; the reason is then cleared.
 
 The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it
@@ -485,13 +490,10 @@ too long reason with "A reason of at most 250 characters is required to reopen a
 The review can be approved and locked again by new signatures, and reopened again; each reopen is one more entry of
 the history. A review that was reopened is not in the evidence index until it is approved again.
 
-**Known limitation: a Draft badge next to an Approved badge.** Every review row of the project page shows two badges:
-the state of the review and the approval. The state is stored with the review, and `Draft` is the only state in this
-release, so every row shows **Draft**, also the row of a review that is **Approved**. A review can therefore appear as
-"Draft" and "Approved" at once. The two badges mean different things: **Draft** is the stored state, which no action
-changes yet, and **Approved** or **In review** is the signature status that is computed from the record. The review
-page itself shows only the Approved or In review badge in its header; the state `Draft` is listed in its Details
-section. Read **Approved** as the status of the signatures. A later release is planned to add more review states.
+**The project page shows the approval only.** Every review row of the project page shows the Approved or In review
+badge, which is the signature status computed from the record. The stored state of a review (`Draft`, the only state in
+this release) is not shown, because it has one value and no action changes it yet; a later release is planned to add
+more review states.
 
 ## Signed Attestation
 

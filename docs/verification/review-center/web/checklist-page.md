@@ -28,7 +28,8 @@ N/A - standard test environment.
 - The page has no field for a name; an answer is recorded under the user name and display name of the signed-in
   user.
 - A section marked as not applicable without a reason shows an error and changes nothing; with a reason it counts as
-  done, shows no checks, and leaves the totals.
+  done, shows no checks, and leaves the totals; while the switch is off and no reason is saved yet, the section says
+  "Reason needed" and that nothing is saved until the reason is saved.
 - The next-unanswered button opens the section of the first unanswered check and asks the browser to scroll to
   it; when everything is answered the page says the checklist is complete and offers a link back to the review
   instead of that button.
@@ -84,6 +85,12 @@ by `ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError`.
 applicable and saved with a reason; the section shows "Not applicable", its checks are hidden, and the totals
 exclude its checks. This scenario is tested by
 `ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks`.
+
+**ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded**: A section is switched off without a
+reason; its progress label reads "Reason needed" with the `pending` style, the hint "Not saved until you press Save
+reason." is shown, the totals are unchanged, and the stored section still applies. After a reason is typed and saved the
+section shows "Not applicable" and the hint is gone. This scenario is tested by
+`ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded`.
 
 **ChecklistPage_NextUnanswered_Click_OpensSectionOfFirstUnansweredCheck**: With all but the last check of the first
 section answered and another section open, the next-unanswered button is clicked; the first section is open, its

@@ -36,7 +36,10 @@ outlet, the `Routes` component, a second small inline script, and a script refer
   when that is refused, a hidden text area with `document.execCommand('copy')`; it never rejects) and
   `window.reviewCenter.replaceUrl` (the review page calls it to put the link of the chosen file or thread in
   the address bar with `history.replaceState`, which adds no history entry and does not run the router; it accepts only
-  a path that starts with a single `/`).
+  a path that starts with a single `/`), `window.reviewCenter.focusTestId` (the review page calls it to move the focus to
+  the comment field that was just opened, without scrolling again), and a document-level `keydown` listener: when Ctrl
+  or Cmd and Enter are pressed in an element with the attribute `data-ctrl-enter-submits`, it presses the enabled button
+  whose `data-testid` is the attribute value, so Ctrl+Enter submits a comment without a server round trip per key.
 
 **Routes component**: A router that searches the application assembly for page components. For a matched URL it
 renders the page through an authorize route view, inside `MainLayout` as the default layout; for an unmatched URL it

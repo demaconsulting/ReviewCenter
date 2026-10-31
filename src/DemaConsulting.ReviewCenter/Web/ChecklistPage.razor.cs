@@ -580,7 +580,7 @@ public partial class ChecklistPage : ComponentBase
     ///     Words the progress of one section for its heading.
     /// </summary>
     /// <param name="sectionId">The section identifier.</param>
-    /// <returns>"Not applicable", "Done" or, for example, "3 of 8".</returns>
+    /// <returns>"Not applicable", "Reason needed" (switch off, reason not saved), "Done" or, for example, "3 of 8".</returns>
     private string SectionProgressLabel(string sectionId)
     {
         if (!State!.IsApplicable(sectionId))
@@ -588,8 +588,30 @@ public partial class ChecklistPage : ComponentBase
             return "Not applicable";
         }
 
+        // The switch was turned off but the reason is not saved yet, so nothing is stored
+        if (PendingNotApplicable.Contains(sectionId))
+        {
+            return "Reason needed";
+        }
+
         var progress = State.SectionProgress(sectionId);
         return progress.IsDone ? "Done" : $"{progress.Answered} of {progress.Total}";
+    }
+
+    /// <summary>
+    ///     Gets the extra style class of the progress badge in a section heading.
+    /// </summary>
+    /// <param name="sectionId">The section identifier.</param>
+    /// <param name="isDone">Whether every check of the section is answered.</param>
+    /// <returns>"pending" while the switch is off but no reason is saved, "resolved" when done, otherwise <c>null</c>.</returns>
+    private string? SectionBadgeClass(string sectionId, bool isDone)
+    {
+        if (PendingNotApplicable.Contains(sectionId))
+        {
+            return "pending";
+        }
+
+        return State!.IsApplicable(sectionId) && isDone ? "resolved" : null;
     }
 
     /// <summary>

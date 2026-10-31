@@ -397,6 +397,28 @@ public class AppTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the document defines the focus helper and the Ctrl+Enter listener that presses the button a
+    ///     comment field names, so a comment can be sent from the keyboard without a server round trip per key.
+    /// </summary>
+    [Fact]
+    public async Task App_Render_ServedAtRoot_DefinesFocusHelperAndCtrlEnterListener()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request the root document
+        var html = await client.GetStringAsync("/", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: the focus helper, the key listener, and the attribute that names the button are all there
+        Assert.Contains("focusTestId", html, StringComparison.Ordinal);
+        Assert.Contains("addEventListener('keydown'", html, StringComparison.Ordinal);
+        Assert.Contains("data-ctrl-enter-submits", html, StringComparison.Ordinal);
+        Assert.Contains("e.ctrlKey || e.metaKey", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the address of the new-review form is handled by the form, not by a review called "new".
     /// </summary>
     [Fact]

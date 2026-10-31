@@ -50,7 +50,8 @@ Test identifiers: `checklist-page` (root), `breadcrumb-projects-link`, `project-
 `checklist-loading`, `checklist-not-found`, `checklist-missing`, `checklist-review-title`, `checklist-status`,
 `checklist-progress`, `next-unanswered-button`, `back-to-review-link`, `checklist-locked`, and, per section,
 `section-{id}`, `section-{id}-toggle`, `section-{id}-progress`, `section-{id}-applicable`, `section-{id}-reason`,
-`section-{id}-save`, `section-{id}-error`, `section-{id}-next`, and `section-{id}-back`, and, per check, `check-{item}`,
+`section-{id}-save`, `section-{id}-error`, `section-{id}-unsaved-hint` (shown while the switch is off and the reason is
+not saved), `section-{id}-next`, and `section-{id}-back`, and, per check, `check-{item}`,
 `check-pass-{item}`, `check-fail-{item}`, `check-na-{item}`, `check-justification-{item}`, `check-save-{item}`,
 `check-error-{item}`, and `check-answered-by-{item}`. Section and check identifiers are written in lower case (`section-req-toggle`,
 `check-pass-req-01`). The justification box, its Save button, the reason box and its Save button exist only while
@@ -79,7 +80,10 @@ behalf of the signed-in user, who comes from the authentication state (`SignIn.G
 which a name could be typed.
 
 **SetApplicableAsync** and **SaveNotApplicableAsync**: Switching a section to "applies" is stored at once; switching
-it off shows a required reason field, and the section is stored as not applicable when the reason is saved. A
+it off shows a required reason field, and the section is stored as not applicable when the reason is saved. Until then
+the section is still stored as applying, so its progress label reads "Reason needed" (`SectionProgressLabel`), its
+badge has the `pending` style (`SectionBadgeClass`), and a hint "Not saved until you press Save reason." is shown
+(`section-{id}-unsaved-hint`). A
 section that does not apply shows its reason and no checks.
 
 A violated rule is shown in an alert next to the check (`check-error-{item}`) or the section

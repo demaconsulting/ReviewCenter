@@ -1,7 +1,8 @@
 @* DiffView: the changes of one file, side by side: the baseline on the left and the head on the right.
 
    Presentation only; state and event handling live in DiffView.razor.cs. From the top: a one-line summary
-   ("3 added, 1 removed"), a hint that says how to comment, then the rows. Each row has a left cell (baseline line
+   ("3 added, 1 removed"), a hint that says how to comment (or that comments are read-only when the review is
+   locked), then the rows. Each row has a left cell (baseline line
    number and text) and a right cell (head line number and text). Unchanged lines show on both sides; a run of
    removed lines is paired row by row with the run of added lines that follows it (see LineDiff.Pair), and the
    leftover cells of the shorter run are muted, empty placeholders. Removed cells are red and added cells green and
@@ -18,7 +19,7 @@
     <p class="diff-summary" data-testid="diff-summary">@SummaryText()</p>
     @if (Result.Lines.Count > 0)
     {
-        <p class="muted hint" data-testid="diff-hint">Click + to comment on a line.</p>
+        <p class="muted hint" data-testid="diff-hint">@(CommentsDisabled ? "This review is locked; comments are read-only." : "Click + to comment on a line.")</p>
     }
     <div class="diff-code" data-testid="diff-content">
         @{

@@ -61,13 +61,17 @@ sections:
           The ChecklistPage unit shall let the reviewer mark the open section as not applying, asking for a
           required reason and storing it when the reviewer saves, show such a section as not applicable with no
           checks to answer and leave it out of the progress totals, show a violated rule next to the reason, and
-          let the reviewer mark the section as applying again.
+          let the reviewer mark the section as applying again. While the switch is off and the reason is not
+          saved yet, the section shall show a "Reason needed" state with a hint that nothing is saved until the
+          reason is saved.
         justification: |
           Sections that do not fit the review, such as code checks in a documentation-only review, must not
-          leave the checklist incomplete forever, but skipping one must be a visible, explained decision.
+          leave the checklist incomplete forever, but skipping one must be a visible, explained decision. A switch
+          that looks off while nothing is stored would mislead the reviewer.
         tests:
           - ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError
           - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+          - ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded
 
       - id: ReviewCenter-ChecklistPage-NextUnanswered
         title: >-

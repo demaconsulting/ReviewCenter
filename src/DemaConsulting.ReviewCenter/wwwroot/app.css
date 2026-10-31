@@ -537,6 +537,13 @@ a.action:active {
     line-height: inherit;
 }
 
+.line-comment:hover,
+.line-comment:focus-visible {
+    border-color: transparent;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
 .line-no {
     min-width: 2.75rem;
     padding-right: 0.5rem;
@@ -599,6 +606,7 @@ a.action:active {
 }
 
 .badge.outdated,
+.badge.pending,
 .badge.locked {
     border-color: var(--warning-border);
     background: var(--warning-background);
@@ -961,6 +969,13 @@ a.action:active {
     background: transparent;
     color: var(--text);
     text-align: left;
+}
+
+.section-toggle:hover,
+.section-toggle:focus-visible {
+    border-color: transparent;
+    background: var(--accent-soft);
+    color: var(--text);
 }
 
 .section-toggle[aria-expanded="true"] {

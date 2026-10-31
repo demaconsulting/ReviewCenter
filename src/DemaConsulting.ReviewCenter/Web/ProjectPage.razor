@@ -99,7 +99,6 @@
                             <p class="muted" data-testid="review-title-@review.Id">@review.Title</p>
                         </div>
                         <div class="row-meta">
-                            <span class="badge" data-testid="review-state-@review.Id">@review.State</span>
                             <span class="badge @(IsApproved(review.Id) ? "approved" : null)" data-testid="review-approval-@review.Id">@(IsApproved(review.Id) ? "Approved" : "In review")</span>
                             <time class="muted" datetime="@review.Created.UtcDateTime.ToString("O")" data-testid="review-created-@review.Id">@review.Created.UtcDateTime.ToString("yyyy-MM-dd")</time>
                         </div>

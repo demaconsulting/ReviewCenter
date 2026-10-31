@@ -133,10 +133,10 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that existing reviews are listed with id link, title and state.
+    ///     Test that existing reviews are listed with id link, title and approval badge, and without a state badge.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState()
+    public async Task ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval()
     {
         // Arrange: a project with one review
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -145,12 +145,12 @@ public class ProjectPageTests : PageTestBase
         // Act: render the page
         var cut = RenderProjectPage(project.Id);
 
-        // Assert: the review row shows a link to the review, its title and its state
+        // Assert: the review row shows a link to the review, its title and its approval, but no separate state badge
         var link = cut.Find("[data-testid='review-link-REV-1']");
         Assert.Equal("REV-1", link.TextContent);
         Assert.Equal($"/projects/{project.Id}/reviews/REV-1", link.GetAttribute("href"));
         Assert.Equal("First review", cut.Find("[data-testid='review-title-REV-1']").TextContent);
-        Assert.Equal("Draft", cut.Find("[data-testid='review-state-REV-1']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-state-REV-1']"));
         Assert.Equal("In review", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='reviews-empty']"));
     }

@@ -5,7 +5,7 @@
 #### Purpose
 
 The `ProjectPage` unit consists of six pages. `ProjectPage` is the page at `/projects/{id}`: its responsibilities are
-to show one project and its reviews as clickable rows, each with its state and approval status, to lead to the page
+to show one project and its reviews as clickable rows, each with its approval status, to lead to the page
 that creates a review, to lead to the plan page and, for whoever administers the project, to the repositories page, the
 audit trail of the project, the evidence settings page, and the checklist template page, to let an administrator of the
 project (a project admin or a
@@ -183,7 +183,7 @@ repository and the entries that were skipped, shown before the review is opened.
 
 Test identifiers of `ProjectPage`: `project-page` (root), `breadcrumb-projects-link`, `project-loading`, `project-not-found`,
 `project-name`, `project-description`, `new-review-button` (the link that leads to the form page), `reviews-list`,
-`reviews-empty`, `review-row-{id}`, `review-link-{id}`, `review-title-{id}`, `review-state-{id}`,
+`reviews-empty`, `review-row-{id}`, `review-link-{id}`, `review-title-{id}`,
 `review-approval-{id}`, `review-created-{id}`, `plan-reviews-link` (the link to the plan page, shown when at least
 one repository of the project is enabled), `plan-reviews-unavailable` (the note shown when none is),
 `repositories-link` (the Repositories button, shown to whoever administers the project), `project-audit-link` (the
@@ -192,7 +192,7 @@ one repository of the project is enabled), `plan-reviews-unavailable` (the note 
 name) `member-row-{username}`, `member-name-{username}`, `member-role-{username}`, `member-toggle-role-{username}`,
 and `member-remove-{username}`, then `add-member-button` (the "+ Add member" link button to the add member page). Each
 review is one row
-of `reviews-list`: the identifier is the link, followed by the title, the state and approval badges, and the creation
+of `reviews-list`: the identifier is the link, followed by the title, the approval badge, and the creation
 date. `evidence-settings-link` is the "Evidence settings" button, shown to whoever administers the project. The Review
 rules card of an administrator has `review-rules-card`, `review-rule-independent-reviewers` (the row),
 `independent-reviewers-switch` (the checkbox), `independent-reviewers-save`, `review-rules-status`, and
@@ -257,9 +257,10 @@ When the project does not exist or the user may not see it, `Project` is null, n
 shows the same message for both. Otherwise it loads the reviews, the enabled repositories of the project, and whether
 the user administers the project, and, only for an administrator, the members, then asks
 `SigningService.GetApprovalAsync` once for each review to learn whether it is approved (N+1 lookups, accepted because
-the list of reviews of a project is short). Each review row shows, next to its state, a badge that reads "Approved" when
+the list of reviews of a project is short). Each review row shows a badge that reads "Approved" when
 the review is in
-`ApprovedReviews` and "In review" otherwise; a review without slots is therefore In review.
+`ApprovedReviews` and "In review" otherwise; a review without slots is therefore In review. The stored state of the
+review (`Draft` is its only value) is not shown on the row.
 
 **RemoveMemberAsync**, **ToggleRoleAsync** (`ProjectPage`): Remove a member (`ProjectService.RemoveMemberAsync`) and
 switch a member between `ProjectRole.User` and `ProjectRole.ProjectAdmin` (`SetMemberRoleAsync`). Each goes through one

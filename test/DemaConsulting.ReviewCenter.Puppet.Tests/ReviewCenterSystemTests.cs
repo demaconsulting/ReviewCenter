@@ -319,9 +319,9 @@ public class ReviewCenterSystemTests
                             && await browser.IsDisabledAsync("new-slot-alternate-select")
                             && await browser.IsDisabledAsync("new-slot-add-button");
         await browser.OkAsync("click", "file-select-0");
-        await browser.OkAsync("wait", "new-thread-form");
-        var commentDisabled = await browser.IsDisabledAsync("thread-text-input")
-                              && await browser.IsDisabledAsync("start-thread-button");
+        await browser.OkAsync("wait", "selected-file-path");
+        var commentDisabled = await browser.EvalAsync(
+            "document.querySelectorAll('[data-testid=\"new-thread-form\"], [data-testid=\"thread-text-input\"], [data-testid=\"start-thread-button\"]').length") == "0";
         await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
         await browser.OkAsync("wait", "checklist-locked");
         await Scenario.OpenSectionAsync(browser, "req");
@@ -367,7 +367,7 @@ public class ReviewCenterSystemTests
         Assert.Contains("Approved", approvalLocked, StringComparison.Ordinal);
         Assert.Contains("Locked", lockedBadge, StringComparison.Ordinal);
         Assert.True(slotsDisabled, "The reviewer slots of a locked review must not be changeable.");
-        Assert.True(commentDisabled, "A locked review must not accept a new comment.");
+        Assert.True(commentDisabled, "A locked review must not offer a form for a new comment.");
         Assert.True(checklistDisabled, "The checklist of a locked review must be read-only.");
         Assert.True(memberSeesLock);
         Assert.False(memberCanReopen, "Only an administrator may be offered the reopening.");
