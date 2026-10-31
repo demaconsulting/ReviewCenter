@@ -152,15 +152,16 @@ sections:
       - id: ReviewCenter-UserService-Audit
         title: >-
           The UserService class shall record creating a user, enabling, disabling, changing the system
-          administrator right, setting a password as an administrator, and changing one's own password in the
-          audit trail, in the same transaction as the change, naming the actor (the command line for a user
-          created from it), and never recording a password.
+          administrator right, setting a password as an administrator, changing one's own password, and unlocking
+          a user in the audit trail, in the same transaction as the change, naming the actor (the command line for a
+          user created from it), and never recording a password.
         justification: |
           Changes of accounts and rights are what an auditor looks for first, and a password in a history that
           cannot be edited could never be removed.
         tests:
           - UserService_AdministrationEvents_AreRecordedWithoutPasswords
           - UserService_CreateAsync_CommandLineActor_IsRecordedAsCommandLine
+          - UserService_UnlockAsync_SystemAdmin_ClearsLockoutAndAudits
 
       - id: ReviewCenter-UserService-SignInAudit
         title: >-
@@ -210,20 +211,72 @@ sections:
           The UserService class shall let a user whose password is a temporary one sign in, so that the user can
           reach the page that replaces it, shall refuse that user a re-authentication for a signature and record the
           refusal in the audit trail with the reason that a password change is pending, shall refuse a new password
-          that is the same as the temporary one and keep the temporary state in that case, shall end the temporary
-          state when the user changes the own password, and shall leave the temporary state unchanged when an
-          administrator sets a password.
+          that is the same as the temporary one and keep the temporary state in that case, and shall end the
+          temporary state when the user changes the own password.
         justification: |
           A temporary password has been handed over by somebody else, so it is good enough to prove who arrives at
           the password page but not to confirm a signature, which is a personal statement. The state must end only
-          when the person has really chosen a password of their own, and an administrator who sets a password is
-          not that person.
+          when the person has really chosen a password of their own.
         tests:
           - UserService_AuthenticateAsync_TemporaryPassword_SignsIn
           - UserService_ReauthenticateAsync_TemporaryPassword_IsRefusedAndAudited
           - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess
           - UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag
-          - UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone
+
+      - id: ReviewCenter-UserService-AdminPasswordIsTemporary
+        title: >-
+          The UserService class shall make the password that a system administrator sets for another user a
+          temporary one, so that the user has to change it at the next sign-in, also for a user who had no temporary
+          password before, shall not do so when the actor sets the password of the own account, and shall keep an
+          account of a provider without a password.
+        justification: |
+          An administrator who types a password knows it, so the user must replace it before using the account. A
+          person who sets the own password has chosen it and needs no second change. The rule is in the service, so
+          every caller gets it.
+        tests:
+          - UserService_SetPasswordAsync_ByAdministrator_MakesThePasswordTemporaryExceptOwn
+          - UserService_SetPasswordAsync_OtherUserOrOwn_OnlyOtherForcesAChange
+          - UserService_SetPasswordAsync_OwnRow_DoesNotForceAChange
+          - UserService_SetPasswordAsync_OwnRow_ClearsAPendingChange
+          - UserService_SetPasswordAsync_ApiTokenActorOrExternalUser_ForcesAChangeOrIsRefused
+
+      - id: ReviewCenter-UserService-LastSignIn
+        title: >-
+          The UserService class shall store the time of the last successful sign-in of a user, by password without
+          a second factor, by the completed second factor, and by a provider, and shall store nothing for a failed
+          sign-in, a password step that still waits for the second factor, or a re-authentication for a signature.
+        justification: |
+          An administrator who reviews who still has access needs to see which accounts are not used any more. Only a
+          sign-in that opened a session counts, so a guessed password cannot make an unused account look active.
+        tests:
+          - UserService_AuthenticatePasswordAsync_SuccessOnly_RecordsLastSignIn
+          - UserService_SignInExternalAsync_AcceptedOnly_RecordsLastSignIn
+          - TotpService_CompleteSignInAsync_Success_RecordsLastSignInOnlyThen
+          - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+          - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
+          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+
+      - id: ReviewCenter-UserService-LockedStatus
+        title: >-
+          The UserService class shall offer a check that tells whether a user is locked out at a given time, which is
+          the case until the end of the lockout and no longer.
+        justification: |
+          The page that shows the lockout and the sign-in that refuses a locked user must use one rule, or the page
+          could show a user as free who cannot sign in.
+        tests:
+          - UserService_IsLocked_Lockout_IsLockedUntilItsEnd
+
+      - id: ReviewCenter-UserService-Unlock
+        title: >-
+          The UserService class shall let a system administrator end the lockout of a user by user identifier,
+          clearing the count of failed sign-ins, record that in the audit trail as an unlock of the named user,
+          refuse every other actor, and report an unknown user as a user not found rule violation.
+        justification: |
+          A person who mistyped the password has to wait out the lockout unless an administrator can end it. The
+          right is the administrator's alone, and the trail shows who used it.
+        tests:
+          - UserService_UnlockAsync_SystemAdmin_ClearsLockoutAndAudits
+          - UserService_UnlockAsync_NotAllowedOrUnknown_IsRefused
 
       - id: ReviewCenter-UserService-ExternalSignIn
         title: >-

@@ -214,6 +214,7 @@ internal sealed class FakeUserStore : IUserStore
             FailedLoginCount = user.FailedLoginCount,
             LockoutUntil = user.LockoutUntil,
             MustChangePassword = user.MustChangePassword,
+            LastSignInUtc = user.LastSignInUtc,
             Created = user.Created,
             ExternalIssuer = user.ExternalIssuer,
             ExternalSubject = user.ExternalSubject

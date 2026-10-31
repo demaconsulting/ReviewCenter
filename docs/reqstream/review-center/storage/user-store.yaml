@@ -9,18 +9,19 @@ sections:
       - id: ReviewCenter-UserStore-Persist
         title: >-
           The UserStore class shall save a user with its user name, display name, system administrator flag, enabled
-          state, password
-          hash, must-change-password flag, failed sign-in count, lockout end, and creation time, assign its
-          identifier, find it again by user
-          name, change a saved user, and list all users ordered by user name, with every value coming back as it
-          was saved.
+          state, password hash, must-change-password flag, failed sign-in count, lockout end, time of the last
+          sign-in, and creation time, assign its identifier, find it again by user name, change a saved user, and
+          list all users ordered by user name, with every value coming back as it was saved, and the time of the
+          last sign-in empty for a user who never signed in.
         justification: |
           The user record is the basis of every sign-in. The lockout state must survive a restart, or a restart
           would reset the protection against password guessing, and the flag that confines an account with a
-          temporary password must survive it too, or a restart would lift the confinement.
+          temporary password must survive it too, or a restart would lift the confinement. The last sign-in is kept
+          so that an access review can see which accounts are not used.
         tests:
           - UserStore_AddAsync_User_RoundTripsEveryField
           - UserStore_UpdateAsync_ChangedFields_AreStored
+          - UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault
           - UserStore_ListAsync_Users_AreOrderedByUsername
           - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
 

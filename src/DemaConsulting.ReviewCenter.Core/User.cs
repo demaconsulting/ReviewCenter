@@ -82,6 +82,16 @@ public sealed class User
     public bool MustChangePassword { get; set; }
 
     /// <summary>
+    ///     Gets or sets the moment of the last completed sign-in (UTC), or <c>null</c> when the user never signed in.
+    /// </summary>
+    /// <remarks>
+    ///     Written by <see cref="UserService"/> when a sign-in is complete (password without a second factor, the
+    ///     second step with a code, or the identity provider); a failed or unfinished sign-in and a fresh proof of
+    ///     identity for a signature do not change it. It is stored state, not an audit event, and holds nothing secret.
+    /// </remarks>
+    public DateTimeOffset? LastSignInUtc { get; set; }
+
+    /// <summary>
     ///     Gets the moment the account was created (UTC).
     /// </summary>
     public DateTimeOffset Created { get; init; }

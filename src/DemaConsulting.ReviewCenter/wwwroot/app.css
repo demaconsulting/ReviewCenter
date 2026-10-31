@@ -1749,8 +1749,13 @@ button.small {
 
 .row-card .inline-form,
 .row-card .user-controls,
+.row-card .confirm-panel,
 .row-card .row-message {
     flex: 1 1 100%;
+}
+
+.row-card .confirm-panel {
+    margin: 0;
 }
 
 .row-card .row-message {

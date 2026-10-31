@@ -273,8 +273,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 - *Constraints*: Read state is stored in one row per user and review, never moves back, is not audited, and is not part
   of the record digest. There is no notification record: the inbox is computed from the review data.
 
-**UserImpactService**: The offboarding impact of a user. It is consumed by the Users page and the Members card in later
-slices; no page uses it yet.
+**UserImpactService**: The offboarding impact of a user. It is consumed by the Users page (the disable confirmation) and
+by the Members card in a later slice.
 
 - *Type*: In-process .NET class.
 - *Role*: Provider.

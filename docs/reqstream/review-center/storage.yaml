@@ -79,7 +79,8 @@ sections:
       - id: ReviewCenter-Storage-Users
         title: >-
           The Storage subsystem shall keep users, with their system administrator flags, enabled states, password
-          hashes, must-change-password flags, and lockout state, in the database file, so that they are all still
+          hashes, must-change-password flags, lockout state, and last sign-in times, in the database file, so that
+          they are all still
           there, unchanged, when the database is opened again, and shall keep user names unique regardless of letter
           case.
         justification: |

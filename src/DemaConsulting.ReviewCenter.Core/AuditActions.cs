@@ -93,7 +93,8 @@ public static class AuditActions
         "user.disabled",
         "user.enabled",
         "user.password-changed",
-        "user.password-set-by-admin"
+        "user.password-set-by-admin",
+        "user.unlocked"
     ];
 
     /// <summary>

@@ -16,7 +16,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- A user is stored with every field, and its identity is assigned by the database; a supplied identity is ignored.
+- A user is stored with every field, including the time of the last sign-in, and its identity is assigned by the
+  database; a supplied identity is ignored.
 - A user name that differs from an existing one only in case is refused with the rule `UserNameTaken`, and a lookup
   by user name ignores case; an unknown user name gives no user.
 - A change of the system administrator flag, the enabled flag, the password hash, the failure count, and the lockout time
@@ -34,7 +35,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 **UserStore_AddAsync_User_RoundTripsEveryField**: A user with every field set and a supplied identity is added; the
 identity is the database's, and the user name, display name, system administrator flag, enabled flag, password hash,
 failure count,
-lockout time, and creation time are read back unchanged. This scenario is tested by
+lockout time, last sign-in time, and creation time are read back unchanged. This scenario is tested by
 `UserStore_AddAsync_User_RoundTripsEveryField`.
 
 **UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase**: A user "Ann" exists; adding "ANN"
@@ -46,6 +47,10 @@ only one user is stored. This scenario is tested by
 count, and
 lockout time of a stored user are changed and updated; they are read back as changed. This scenario is tested by
 `UserStore_UpdateAsync_ChangedFields_AreStored`.
+
+**UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault**: A new user has no last sign-in; a time is
+stored by an update and read back, and an update with no time clears it. This scenario is tested by
+`UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault`.
 
 **UserStore_ListAsync_Users_AreOrderedByUsername**: Three users are added out of order; they are listed ordered by
 user name. This scenario is tested by `UserStore_ListAsync_Users_AreOrderedByUsername`.

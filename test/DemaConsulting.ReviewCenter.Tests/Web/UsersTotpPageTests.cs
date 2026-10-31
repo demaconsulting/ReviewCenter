@@ -89,8 +89,9 @@ public class UsersTotpPageTests : PageTestBase
         await EnrollTotpAsync("ann", Password);
         var cut = Render<UsersPage>();
 
-        // Act: reset
+        // Act: reset (first click opens the confirmation, the second carries it out)
         await cut.Find($"[data-testid='user-reset-totp-{ann.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='user-confirm-reset-totp-yes-{ann.Id}']").ClickAsync();
 
         // Assert: nothing is enrolled any more, the page says so, and the badge and the button are gone
         Assert.False(await Totp.IsEnrolledAsync("ann", TestContext.Current.CancellationToken));
@@ -134,8 +135,9 @@ public class UsersTotpPageTests : PageTestBase
         var cut = Render<UsersPage>();
         SignOutQuietly();
 
-        // Act: try to reset
+        // Act: try to reset (the second click is the one that is checked)
         await cut.Find($"[data-testid='user-reset-totp-{ann.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='user-confirm-reset-totp-yes-{ann.Id}']").ClickAsync();
 
         // Assert: a message says why, and the enrollment is unchanged
         Assert.Contains("no longer signed in", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);

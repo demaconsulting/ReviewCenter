@@ -113,7 +113,8 @@ not reveal which names exist. Otherwise the user name and password are checked w
 right password gives back the address slot, while the counter of the name stays), asks
 `TotpService.BeginSignIn` for a challenge bound to the user, the client address, and the safe return URL, appends the
 challenge cookie (see `TotpSignIn`), and redirects to `/login/totp`. No session cookie is issued and no `auth.sign-in`
-is recorded at this step. Otherwise, on success `SignInThrottle.Succeeded` gives the attempts back (it is given the
+is recorded at this step. Otherwise, on success (`AuthenticatePasswordAsync` has stored the time of the sign-in as
+`LastSignInUtc` by then; this unit stores nothing) `SignInThrottle.Succeeded` gives the attempts back (it is given the
 reservation that `TryBegin` returned, so it only touches the windows that attempt was counted in), the principal (see
 Claims) is signed in with the cookie scheme as a session cookie and the response redirects to the safe return URL, or to
 `AccountPath` when the user has to change a temporary password, whatever address the user asked for. On
@@ -223,9 +224,8 @@ address is only in the web server log.
 - **SignInThrottle** (Identity) — decides whether an attempt may go on, and takes attempts back after a success or
   gives back the address slot after a right password that needs a code.
 - **TotpSignIn** (Identity) — the cookie options of the challenge cookie and the page and endpoint of the second step.
-- **Actor**, **User**, and **DomainRuleException** (Core) — the type produced for the pages, the user
-  that `IsCurrent` compares with (its `IsSystemAdmin` and `MustChangePassword` flags), and the refusal of
-  `GetActorAsync`.
+- **Actor**, **User**, and **DomainRuleException** (Core) — the type produced for the pages, the user that `IsCurrent`
+  compares with (its `IsSystemAdmin` and `MustChangePassword` flags), and the refusal of `GetActorAsync`.
 - **RevalidatingAuthenticationStateProvider** (Identity) — registered by `AddSignIn`; it calls `IsCurrent`.
 - **ASP.NET Core shared framework** — cookie authentication, authorization, antiforgery, and the Blazor
   authentication state; see the ASP.NET Core integration design in the OTS chapter.

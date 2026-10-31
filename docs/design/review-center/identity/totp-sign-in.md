@@ -56,7 +56,8 @@ is required.
   4. On success the throttle is told (`Succeeded`, which clears the counter of the name), the session cookie is issued
      with the principal of `SignIn` (not persistent), the challenge cookie is deleted, `auth.sign-in` is recorded with
      the detail `second factor: authenticator code` or `second factor: recovery code`, and the person goes to the
-     account page when a password change is pending, otherwise to the safe return address of the challenge.
+     account page when a password change is pending, otherwise to the safe return address of the challenge. The time of
+     the sign-in has been stored by `TotpService` by then (`LastSignInUtc` of the user); this unit stores nothing.
 - A wrong code is not given back to the throttle, so guessing codes uses up the same quota as guessing passwords.
 
 **CookieOptions**: Builds the options of the challenge cookie for a request.

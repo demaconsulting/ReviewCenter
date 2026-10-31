@@ -20,6 +20,7 @@
 
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -128,8 +129,9 @@ public class UsersPageTests : PageTestBase
         var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
         var cut = Render<UsersPage>();
 
-        // Act: disable, then enable
+        // Act: disable (first click opens the confirmation, the second carries it out), then enable
         await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='user-confirm-disable-yes-{ann.Id}']").ClickAsync();
         var disabled = (await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled;
         var shownDisabled = cut.Find($"[data-testid='user-enabled-{ann.Id}']").TextContent;
         await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
@@ -180,8 +182,9 @@ public class UsersPageTests : PageTestBase
         var cut = Render<UsersPage>();
         await cut.Find($"[data-testid='user-password-input-{ann.Id}']").InputAsync("brand new password");
 
-        // Act: set the password
+        // Act: set the password (first click opens the confirmation, the second carries it out)
         await cut.Find($"[data-testid='user-set-password-{ann.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='user-confirm-set-password-yes-{ann.Id}']").ClickAsync();
 
         // Assert: the new password works, the old does not, the field is empty, no error
         Assert.NotNull(await Users.AuthenticateAsync("ann", "brand new password", TestContext.Current.CancellationToken));
@@ -203,6 +206,7 @@ public class UsersPageTests : PageTestBase
 
         // Act: try to disable, then try to demote
         await cut.Find($"[data-testid='user-toggle-enabled-{root.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='user-confirm-disable-yes-{root.Id}']").ClickAsync();
         var afterDisable = cut.Find("[data-testid='users-error']").TextContent;
         await cut.Find($"[data-testid='user-toggle-admin-{root.Id}']").ClickAsync();
 
@@ -255,7 +259,7 @@ public class UsersPageTests : PageTestBase
         await cut.Find($"[data-testid='user-password-input-{ann.Id}']").InputAsync("typed secret password");
         await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
 
-        // Act: try to set the password from the page that is still open
+        // Act: try to set the password from the page that is still open (the first click already checks who acts)
         await cut.Find($"[data-testid='user-set-password-{ann.Id}']").ClickAsync();
 
         // Assert: the reason is shown instead of the list, the typed password is gone, and nothing changed
@@ -341,6 +345,451 @@ public class UsersPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='users-list']"));
         Assert.Empty(cut.FindAll("[data-testid^='user-row-']"));
         Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that the badges show a running lockout, a temporary password and the last sign-in, and that a user
+    ///     without any of them shows none of the first two and "Never" as the last sign-in.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Render_StatusBadges_ShowLockedTemporaryAndLastSignIn()
+    {
+        // Arrange: a locked user, a user with a temporary password who signed in, and a plain user
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var bea = await Users.CreateAsync("bea", "Bea", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cyd = await Users.CreateAsync("cyd", "Cyd", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await UpdateUserAsync("ann", user => user.LockoutUntil = Time.GetUtcNow() + TimeSpan.FromMinutes(5));
+        await UpdateUserAsync("bea", user =>
+        {
+            user.MustChangePassword = true;
+            user.LastSignInUtc = new DateTimeOffset(2025, 2, 3, 4, 5, 6, TimeSpan.Zero);
+        });
+
+        // Act: render the page
+        var cut = Render<UsersPage>();
+
+        // Assert: each badge shows where it applies and only there; the lockout end is the time of day in UTC
+        Assert.Equal("Locked until 05:11 UTC", cut.Find($"[data-testid='user-locked-{ann.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='user-locked-{bea.Id}']"));
+        Assert.Equal("Temporary password", cut.Find($"[data-testid='user-temporary-{bea.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='user-temporary-{ann.Id}']"));
+        Assert.Equal("Last sign-in: 2025-02-03 04:05 UTC", cut.Find($"[data-testid='user-last-signin-{bea.Id}']").TextContent);
+        Assert.Equal("Last sign-in: Never", cut.Find($"[data-testid='user-last-signin-{cyd.Id}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a lockout that has run out is not shown as locked, and has no Unlock button.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Render_ExpiredLockout_IsNotShownAsLocked()
+    {
+        // Arrange: a user whose lockout ended a minute ago
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await UpdateUserAsync("ann", user => user.LockoutUntil = Time.GetUtcNow() - TimeSpan.FromMinutes(1));
+
+        // Act: render the page
+        var cut = Render<UsersPage>();
+
+        // Assert: neither the badge nor the button is there
+        Assert.Empty(cut.FindAll($"[data-testid='user-locked-{ann.Id}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='user-unlock-{ann.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that the search matches the user name and the display name without regard to case.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Search_TypedText_MatchesUserNameOrDisplayNameIgnoringCase()
+    {
+        // Arrange: three users
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Annabel Lee", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var bea = await Users.CreateAsync("bea", "Beatrice", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cyd = await Users.CreateAsync("cyd", "Cyd", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+
+        // Act: search for part of a display name in another case
+        await cut.Find("[data-testid='users-search']").InputAsync("ANNABEL");
+        var byDisplayName = ShownUserIds(cut);
+
+        // Act: search for part of a user name
+        await cut.Find("[data-testid='users-search']").InputAsync("yd");
+        var byUserName = ShownUserIds(cut);
+
+        // Act: clear the search
+        await cut.Find("[data-testid='users-search']").InputAsync(string.Empty);
+
+        // Assert: only the matching user is listed each time, and everyone again after clearing
+        Assert.Equal([ann.Id], byDisplayName);
+        Assert.Equal([cyd.Id], byUserName);
+        Assert.Equal(4, ShownUserIds(cut).Count);
+        Assert.Contains(bea.Id, ShownUserIds(cut));
+    }
+
+    /// <summary>
+    ///     Test that each status filter lists exactly the users it names.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Filter_EachStatus_ListsOnlyMatchingUsers()
+    {
+        // Arrange: root (system admin, enabled), a disabled user, a locked user and a plain user
+        await SignInAsNewAdminAsync();
+        var root = (await Users.GetAsync("root", TestContext.Current.CancellationToken))!;
+        var off = await Users.CreateAsync("off", "Off", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var locked = await Users.CreateAsync("locked", "Locked", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var plain = await Users.CreateAsync("plain", "Plain", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await UpdateUserAsync("off", user => user.Enabled = false);
+        await UpdateUserAsync("locked", user => user.LockoutUntil = Time.GetUtcNow() + TimeSpan.FromMinutes(5));
+        var cut = Render<UsersPage>();
+
+        // Act and assert: every filter value shows the matching users only
+        await cut.Find("[data-testid='users-filter']").ChangeAsync("enabled");
+        Assert.Equal([locked.Id, plain.Id, root.Id], ShownUserIds(cut));
+        await cut.Find("[data-testid='users-filter']").ChangeAsync("disabled");
+        Assert.Equal([off.Id], ShownUserIds(cut));
+        await cut.Find("[data-testid='users-filter']").ChangeAsync("locked");
+        Assert.Equal([locked.Id], ShownUserIds(cut));
+        await cut.Find("[data-testid='users-filter']").ChangeAsync("admins");
+        Assert.Equal([root.Id], ShownUserIds(cut));
+        await cut.Find("[data-testid='users-filter']").ChangeAsync("all");
+        Assert.Equal(4, ShownUserIds(cut).Count);
+    }
+
+    /// <summary>
+    ///     Test that the search and the filter work together.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_SearchAndFilter_Combined_BothApply()
+    {
+        // Arrange: two users with "a" in the name, one of them disabled
+        await SignInAsNewAdminAsync();
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var abe = await Users.CreateAsync("abe", "Abe", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await UpdateUserAsync("abe", user => user.Enabled = false);
+        var cut = Render<UsersPage>();
+
+        // Act
+        await cut.Find("[data-testid='users-search']").InputAsync("a");
+        await cut.Find("[data-testid='users-filter']").ChangeAsync("disabled");
+
+        // Assert
+        Assert.Equal([abe.Id], ShownUserIds(cut));
+    }
+
+    /// <summary>
+    ///     Test that disabling opens a confirmation first, which lists the open reviews and the projects the user
+    ///     is the only administrator of as links, and that nothing is changed before the second click.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Disable_UserWithImpact_ShowsLinksAndChangesNothingUntilConfirmed()
+    {
+        // Arrange: ann waits for a review in Apollo and is its only project administrator
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(ann.Id, project.Id, ProjectRole.ProjectAdmin, TestContext.Current.CancellationToken);
+        await Reviews.CreateDraftAsync(
+            project.Id,
+            "REV-1",
+            "First review",
+            [new UploadedFile("a.txt", TestContent.A)],
+            new Actor("root", "Root"),
+            TestContext.Current.CancellationToken);
+        await Signing.AddSlotAsync(new Actor("root", "Root"), project.Id, "REV-1", ann.Id, null, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+
+        // Act: the first click
+        await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
+
+        // Assert: the panel lists both with links, and ann is still enabled
+        Assert.NotNull(cut.Find($"[data-testid='user-confirm-disable-{ann.Id}']"));
+        var review = cut.Find($"[data-testid='user-impact-review-{ann.Id}-REV-1-1']");
+        Assert.Equal($"/projects/{project.Id}/reviews/REV-1", review.GetAttribute("href"));
+        Assert.Contains("First review", review.TextContent, StringComparison.Ordinal);
+        var impactText = cut.Find($"[data-testid='user-impact-{ann.Id}']").TextContent;
+        Assert.Contains("Not signed", impactText, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotSigned", impactText, StringComparison.Ordinal);
+        var projectLink = cut.Find($"[data-testid='user-impact-project-{ann.Id}-{project.Id}']");
+        Assert.Equal($"/projects/{project.Id}", projectLink.GetAttribute("href"));
+        Assert.Empty(cut.FindAll($"[data-testid='user-impact-empty-{ann.Id}']"));
+        Assert.Equal("Disable anyway", cut.Find($"[data-testid='user-confirm-disable-yes-{ann.Id}']").TextContent);
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+
+        // Act: the second click
+        await cut.Find($"[data-testid='user-confirm-disable-yes-{ann.Id}']").ClickAsync();
+
+        // Assert: the warning does not block, the user is disabled and the panel is gone
+        Assert.False((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+        Assert.Empty(cut.FindAll($"[data-testid='user-confirm-disable-{ann.Id}']"));
+        Assert.Equal("Disabled 'ann'.", cut.Find("[data-testid='users-status']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that an empty impact says so and still needs the second click.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Disable_UserWithoutImpact_SaysNothingIsWaitingAndStillNeedsTheClick()
+    {
+        // Arrange: a user nothing depends on
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+
+        // Act
+        await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
+
+        // Assert: the empty message is shown, no links, and the user is still enabled
+        Assert.Contains("Nothing is waiting", cut.Find($"[data-testid='user-impact-empty-{ann.Id}']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll($"[data-testid='user-impact-{ann.Id}']"));
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that cancelling the disable confirmation closes it and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Disable_Cancel_ClosesThePanelAndChangesNothing()
+    {
+        // Arrange: the confirmation is open
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+        await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
+
+        // Act
+        await cut.Find($"[data-testid='user-confirm-disable-cancel-{ann.Id}']").ClickAsync();
+
+        // Assert: the panel is gone, the user is enabled, and nothing is reported
+        Assert.Empty(cut.FindAll($"[data-testid='user-confirm-disable-{ann.Id}']"));
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+        Assert.Empty(cut.FindAll("[data-testid='users-status']"));
+        Assert.Empty(cut.FindAll("[data-testid='users-error']"));
+    }
+
+    /// <summary>
+    ///     Test that enabling a disabled user stays one click, without a confirmation.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Enable_DisabledUser_NeedsNoConfirmation()
+    {
+        // Arrange: a disabled user
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await UpdateUserAsync("ann", user => user.Enabled = false);
+        var cut = Render<UsersPage>();
+
+        // Act
+        await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
+
+        // Assert
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+        Assert.Empty(cut.FindAll($"[data-testid='user-confirm-disable-{ann.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that a domain error while loading the impact is shown in the page's error style, without a panel.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Disable_ImpactLoadRefused_ShowsErrorAndOpensNoPanel()
+    {
+        // Arrange: the impact service reads a user store that does not know ann, so it answers with "user not found"
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        Services.AddSingleton(new UserImpactService(Store, new FakeUserStore(Store), Access));
+        var cut = Render<UsersPage>();
+
+        // Act
+        await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
+
+        // Assert: the domain error is shown in the error style and no panel opened
+        Assert.Contains("does not exist", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll($"[data-testid='user-confirm-disable-{ann.Id}']"));
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that the two-factor reset explains the consequence first and removes nothing before the second
+    ///     click, and that cancelling keeps the enrollment.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing()
+    {
+        // Arrange: an enrolled user
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await EnrollTotpAsync("ann", Password);
+        var cut = Render<UsersPage>();
+
+        // Act: the first click
+        await cut.Find($"[data-testid='user-reset-totp-{ann.Id}']").ClickAsync();
+
+        // Assert: the panel explains the consequence and nothing is removed
+        var text = cut.Find($"[data-testid='user-confirm-reset-totp-{ann.Id}']").TextContent;
+        Assert.Contains("set up two-factor sign-in again", text, StringComparison.Ordinal);
+        Assert.Contains("password alone", text, StringComparison.Ordinal);
+        Assert.True(await Totp.IsEnrolledAsync("ann", TestContext.Current.CancellationToken));
+
+        // Act: cancel
+        await cut.Find($"[data-testid='user-confirm-reset-totp-cancel-{ann.Id}']").ClickAsync();
+
+        // Assert: closed and still enrolled
+        Assert.Empty(cut.FindAll($"[data-testid='user-confirm-reset-totp-{ann.Id}']"));
+        Assert.True(await Totp.IsEnrolledAsync("ann", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that setting a password explains the consequences first, changes nothing before the second click,
+    ///     and makes the password temporary.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary()
+    {
+        // Arrange: a typed password
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+        await cut.Find($"[data-testid='user-password-input-{ann.Id}']").InputAsync("brand new password");
+
+        // Act: the first click
+        await cut.Find($"[data-testid='user-set-password-{ann.Id}']").ClickAsync();
+
+        // Assert: the panel names the consequences and the old password still works
+        var text = cut.Find($"[data-testid='user-confirm-set-password-{ann.Id}']").TextContent;
+        Assert.Contains("must change it at the next sign-in", text, StringComparison.Ordinal);
+        Assert.Contains("only use the Account, Help, and About pages", text, StringComparison.Ordinal);
+        Assert.Contains("cannot sign reviews", text, StringComparison.Ordinal);
+        Assert.Contains("API tokens", text, StringComparison.Ordinal);
+        Assert.NotNull(await Users.AuthenticateAsync("ann", Password, TestContext.Current.CancellationToken));
+
+        // Act: the second click
+        await cut.Find($"[data-testid='user-confirm-set-password-yes-{ann.Id}']").ClickAsync();
+
+        // Assert: the password is temporary and shown so
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.MustChangePassword);
+        Assert.Equal("Temporary password", cut.Find($"[data-testid='user-temporary-{ann.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='user-confirm-set-password-{ann.Id}']"));
+        Assert.Equal(
+            "Password of 'ann' set; the user must change it at the next sign-in.",
+            cut.Find("[data-testid='users-status']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the panel and the message for the own row of the signed-in administrator say that the password
+    ///     is not temporary, and that it really is not.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_SetPassword_OwnRow_SaysThePasswordIsNotTemporary()
+    {
+        // Arrange: the signed-in administrator types a new password in the own row
+        await SignInAsNewAdminAsync();
+        var root = (await Users.GetAsync("root", TestContext.Current.CancellationToken))!;
+        var cut = Render<UsersPage>();
+        await cut.Find($"[data-testid='user-password-input-{root.Id}']").InputAsync("brand new password");
+
+        // Act: the first click
+        await cut.Find($"[data-testid='user-set-password-{root.Id}']").ClickAsync();
+
+        // Assert: the panel does not claim a forced change or a restriction
+        var text = cut.Find($"[data-testid='user-confirm-set-password-{root.Id}']").TextContent;
+        Assert.Contains("Set your own password", text, StringComparison.Ordinal);
+        Assert.Contains("is not temporary", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("must change it", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Account, Help", text, StringComparison.Ordinal);
+
+        // Act: the second click
+        await cut.Find($"[data-testid='user-confirm-set-password-yes-{root.Id}']").ClickAsync();
+
+        // Assert: the password is set, not temporary, and the message says so
+        Assert.NotNull(await Users.AuthenticateAsync("root", "brand new password", TestContext.Current.CancellationToken));
+        Assert.False((await Users.GetAsync("root", TestContext.Current.CancellationToken))?.MustChangePassword);
+        Assert.Empty(cut.FindAll($"[data-testid='user-temporary-{root.Id}']"));
+        Assert.Equal("Password of 'root' set; it is not temporary.", cut.Find("[data-testid='users-status']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that cancelling the set-password confirmation changes nothing, and that an empty field opens no
+    ///     confirmation and asks for a password.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_SetPassword_CancelOrEmptyField_ChangesNothing()
+    {
+        // Arrange
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+
+        // Act: an empty field
+        await cut.Find($"[data-testid='user-set-password-{ann.Id}']").ClickAsync();
+
+        // Assert: asked to type a password, no panel
+        Assert.Equal("Type a new password first.", cut.Find("[data-testid='users-error']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='user-confirm-set-password-{ann.Id}']"));
+
+        // Act: type, open, cancel
+        await cut.Find($"[data-testid='user-password-input-{ann.Id}']").InputAsync("brand new password");
+        await cut.Find($"[data-testid='user-set-password-{ann.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='user-confirm-set-password-cancel-{ann.Id}']").ClickAsync();
+
+        // Assert: the old password still works and the user is not marked
+        Assert.NotNull(await Users.AuthenticateAsync("ann", Password, TestContext.Current.CancellationToken));
+        Assert.False((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.MustChangePassword);
+    }
+
+    /// <summary>
+    ///     Test that the Unlock button ends a lockout in one click and is shown for locked users only.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Unlock_LockedUser_ClearsLockoutInOneClick()
+    {
+        // Arrange: a locked and an unlocked user
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var bea = await Users.CreateAsync("bea", "Bea", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await UpdateUserAsync("ann", user =>
+        {
+            user.LockoutUntil = Time.GetUtcNow() + TimeSpan.FromMinutes(5);
+            user.FailedLoginCount = 5;
+        });
+        var cut = Render<UsersPage>();
+        Assert.Empty(cut.FindAll($"[data-testid='user-unlock-{bea.Id}']"));
+
+        // Act
+        await cut.Find($"[data-testid='user-unlock-{ann.Id}']").ClickAsync();
+
+        // Assert: unlocked in the store, the badge and the button are gone, and the page says so
+        var stored = await Users.GetAsync("ann", TestContext.Current.CancellationToken);
+        Assert.Null(stored?.LockoutUntil);
+        Assert.Equal(0, stored?.FailedLoginCount);
+        Assert.Empty(cut.FindAll($"[data-testid='user-locked-{ann.Id}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='user-unlock-{ann.Id}']"));
+        Assert.Equal("Unlocked 'ann'.", cut.Find("[data-testid='users-status']").TextContent);
+    }
+
+    /// <summary>
+    ///     Reads the identities of the users that are listed, in the order shown.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    /// <returns>The user identities of the rows.</returns>
+    private static List<int> ShownUserIds(IRenderedComponent<UsersPage> cut)
+    {
+        const string prefix = "user-row-";
+        return [.. cut.FindAll("[data-testid^='user-row-']")
+            .Select(row => int.Parse(row.GetAttribute("data-testid")![prefix.Length..], System.Globalization.CultureInfo.InvariantCulture))];
+    }
+
+    /// <summary>
+    ///     Changes a stored user directly, as a fixture would.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="change">The change to apply to the stored user.</param>
+    /// <returns>A task that completes when the change is stored.</returns>
+    private async Task UpdateUserAsync(string username, Action<User> change)
+    {
+        var user = (await UserStore.GetByUsernameAsync(username, TestContext.Current.CancellationToken))!;
+        change(user);
+        await UserStore.UpdateAsync(user, null, TestContext.Current.CancellationToken);
     }
 
     /// <summary>

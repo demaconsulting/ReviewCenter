@@ -44,8 +44,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     of answers, section states and threads). The same is true for the <c>ReviewUserStates</c> table and for the
 ///     indexes of the reviewer slots and of the creator of reviews (and for the case-insensitive collation of the
 ///     creator column) and of the audit trail (the project, actor and action indexes and the fixed-width UTC text
-///     form of the entry timestamp): a database from before them must be deleted and
-///     recreated. Instances are
+///     form of the entry timestamp) and for the <c>LastSignInUtc</c> column of users: a database from before them
+///     must be deleted and recreated. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -339,6 +339,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             user.Property(u => u.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
             user.Property(u => u.IsSystemAdmin);
             user.Property(u => u.MustChangePassword);
+            user.Property(u => u.LastSignInUtc);
             user.Property(u => u.PasswordHash).IsRequired();
 
             // The identity at an external provider (both null for a local account): compared exactly, unique as a

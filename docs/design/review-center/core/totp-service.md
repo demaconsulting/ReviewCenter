@@ -146,7 +146,8 @@ step.
   `UserService.RegisterSecondFactorFailureAsync` and recorded as `auth.totp-failed` (sign-in); when it starts the
   lockout the result is `LockedOut`, otherwise the challenge is returned (`Failed`) unless the user was invalidated while
   the code was checked (see `TotpChallengeStore.Return`). A right code clears the failure
-  counter and gives `Success`.
+  counter, stores the time of the sign-in (`UserService.RecordSignInAsync`, one store update with the counter), and
+  gives `Success`.
 
 **Checking a code** (private): a code of exactly six digits is an authenticator code: the secret is decrypted, checked
 with `TryVerify`, and the matched step is recorded with `TryAdvanceStepAsync`; the secret array is cleared afterwards.

@@ -86,7 +86,8 @@ application; the rest of the system sees only the Core store interfaces.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Stores a user with its system administrator and must-change-password flags and, for an account of an
+- *Contract*: Stores a user with its system administrator and must-change-password flags, its last sign-in time, and,
+  for an account of an
   identity provider, its external issuer and subject, reads a user by user name
   without regard to case or by the pair of issuer and subject (exact match), lists the users, and replaces the
   stored state of a user. An attempt to store a user whose name exists, in any capitalization, or whose pair of issuer

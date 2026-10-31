@@ -110,6 +110,7 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(new ThreadService(store, Access, clock));
         Services.AddSingleton(new ChecklistService(store, Access, clock));
         Services.AddSingleton(Users);
+        Services.AddSingleton(new UserImpactService(store, userStore, Access));
         Services.AddSingleton(pageRepositories);
         Services.AddSingleton(pageSigning);
         Services.AddSingleton(new ReviewProgressService(pageReviews, pageSigning, AuditStore, Access));

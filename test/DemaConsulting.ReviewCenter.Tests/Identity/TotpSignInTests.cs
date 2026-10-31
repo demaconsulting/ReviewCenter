@@ -124,9 +124,15 @@ public class TotpSignInTests
         var secret = await world.AddEnrolledUserAsync("ann");
         using var browser = new TestBrowser(world.App);
         await browser.LoginAsync("ann", TestBrowser.Password, "/projects");
+        var users = world.App.Services.GetRequiredService<UserService>();
+        var afterPasswordStep = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!.LastSignInUtc;
 
         // Act: the code of the current step
         var response = await browser.PostFormAsync("/auth/login-totp", Code(world.CodeNow(secret)));
+
+        // Assert: the password step alone stored no sign-in time, the completed sign-in did
+        Assert.Null(afterPasswordStep);
+        Assert.NotNull((await users.GetAsync("ann", TestContext.Current.CancellationToken))!.LastSignInUtc);
 
         // Assert: redirected to the requested place with a session; the challenge is gone
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);

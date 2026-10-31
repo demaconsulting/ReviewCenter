@@ -26,10 +26,14 @@ The issuer and the subject of an account of an external identity provider (see `
 nullable columns of the user, both `null` for a local account. The columns keep the default binary collation, so the
 lookup compares exactly (case-sensitive), unlike the user name.
 
+The time of the last sign-in (`LastSignInUtc`) is a nullable column of the user, `null` until the first successful
+sign-in; `UpdateAsync` replaces it with the rest of the state, with no audit draft of its own.
+
 #### Key Methods
 
 **AddAsync**: Stores a user and returns it with the identity assigned by the database. The unit copies the fields of
-the argument (including the must-change-password flag and the external issuer and subject) into a new entity through
+the argument (including the must-change-password flag, the last sign-in, and the external issuer and subject) into a new
+entity through
 the private `InsertAsync`, so an
 identity supplied by the caller is ignored and can neither be persisted nor
 collide with an existing user; the returned user is the stored entity. The audit draft is built from the stored user (so

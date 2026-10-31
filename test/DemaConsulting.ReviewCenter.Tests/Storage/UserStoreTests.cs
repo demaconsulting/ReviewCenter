@@ -72,6 +72,7 @@ public class UserStoreTests
             PasswordHash = "hash",
             FailedLoginCount = 2,
             LockoutUntil = _created.AddMinutes(5),
+            LastSignInUtc = _created.AddHours(1),
             Created = _created
         };
     }
@@ -96,6 +97,36 @@ public class UserStoreTests
         Assert.Equal(added.Id, read.Id);
         Assert.Equal(("Ann", "Display Ann", true, true), (read.Username, read.DisplayName, read.IsSystemAdmin, read.Enabled));
         Assert.Equal(("hash", 2, _created.AddMinutes(5), _created), (read.PasswordHash, read.FailedLoginCount, read.LockoutUntil, read.Created));
+        Assert.Equal(_created.AddHours(1), read.LastSignInUtc);
+    }
+
+    /// <summary>
+    ///     Test that a user who never signed in has no last sign-in, and that an update stores and clears it.
+    /// </summary>
+    [Fact]
+    public async Task UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault()
+    {
+        // Arrange: a store with a user who never signed in
+        var store = Open(out var provider);
+        using var _ = provider;
+        var fresh = NewUser("Ann");
+        fresh.LastSignInUtc = null;
+        await store.AddAsync(fresh, TestContext.Current.CancellationToken);
+        var user = (await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!;
+        var initial = user.LastSignInUtc;
+
+        // Act: store a sign-in time, read it, then clear it
+        user.LastSignInUtc = _created.AddDays(2);
+        await store.UpdateAsync(user, TestContext.Current.CancellationToken);
+        var stored = (await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!.LastSignInUtc;
+        user.LastSignInUtc = null;
+        await store.UpdateAsync(user, TestContext.Current.CancellationToken);
+        var cleared = (await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!.LastSignInUtc;
+
+        // Assert
+        Assert.Null(initial);
+        Assert.Equal(_created.AddDays(2), stored);
+        Assert.Null(cleared);
     }
 
     /// <summary>

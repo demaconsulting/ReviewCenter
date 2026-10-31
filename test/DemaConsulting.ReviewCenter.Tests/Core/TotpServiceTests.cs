@@ -334,6 +334,37 @@ public partial class TotpServiceTests
     }
 
     /// <summary>
+    ///     Test that the last sign-in of an enrolled user is stored when the second step succeeds, and not by the
+    ///     password step or by a failed code.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_CompleteSignInAsync_Success_RecordsLastSignInOnlyThen()
+    {
+        // Arrange: an enrolled user who never signed in
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var before = (await world.Users.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+
+        // Act: the password step, a wrong code, then the code of the next step
+        var token = await world.BeginSignInAsync("ann");
+        var afterPassword = (await world.Users.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+        var failed = await world.Totp.CompleteSignInAsync(token, "10.0.0.1", "000000", cancellationToken);
+        var afterFailure = (await world.Users.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+        var success = await world.Totp.CompleteSignInAsync(await world.BeginSignInAsync("ann"), "10.0.0.1", world.CodeNow(secret, 1), cancellationToken);
+        var afterSuccess = (await world.Users.GetByUsernameAsync("ann", cancellationToken))!.LastSignInUtc;
+
+        // Assert: only the completed sign-in stored the time
+        Assert.Null(before);
+        Assert.Null(afterPassword);
+        Assert.Equal(TotpSignInOutcome.Failed, failed.Outcome);
+        Assert.Null(afterFailure);
+        Assert.Equal(TotpSignInOutcome.Success, success.Outcome);
+        Assert.Equal(world.Clock.GetUtcNow(), afterSuccess);
+    }
+
+    /// <summary>
     ///     Test the window of one step: a code one step away is accepted, two steps away is refused, and a code is
     ///     never accepted again once a later step was used.
     /// </summary>

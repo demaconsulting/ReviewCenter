@@ -109,7 +109,8 @@ Some things to know:
 - A password has 12 to 128 characters. There are no other composition rules, so a long phrase is a good password.
   Spaces are part of the password.
 - After 5 failed sign-ins in a row for a user name, that user name is locked for 5 minutes, even for the right
-  password. A successful sign-in before that resets the count.
+  password. A successful sign-in before that resets the count. A system administrator can end a lockout at once with
+  **Unlock** on the Users page (see Manage Users in the Administration chapter).
 - The server also limits the sign-in attempts of one client address, whatever the user name. By default an address
   may try one user name 5 times and all user names 20 times in 5 minutes; after that the login page says "Too many
   sign-in attempts. Try again in a few minutes." and refuses even the right password until the time has passed. The
@@ -221,7 +222,8 @@ password, and press the change button. If your account has a second factor (see
 [Two-Factor Sign-in](#two-factor-sign-in)), the form also asks for a current code of your authenticator app or a
 recovery code, and the password alone is not enough. A wrong current password or a wrong code counts as a failed
 sign-in for the lockout. The fields are cleared afterwards. If you signed in with a temporary password (an account
-that a project administrator created for you), the page shows only this form, asks for the temporary password as the
+that a project administrator created for you, or a password that a system administrator set for you), the page shows
+only this form, asks for the temporary password as the
 current one, and sends you to the sign-in page with a notice when the password is changed; see
 Managing Project Members in the Administration chapter.
 

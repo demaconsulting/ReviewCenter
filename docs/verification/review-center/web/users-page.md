@@ -21,6 +21,15 @@ N/A - standard test environment.
   administrator, and with the controls to disable or enable, grant or take away the system administrator flag, and set
   a password (there is no role selection); the list page has a button that leads to the page of the creation form
   but not the form itself; no password or hash is shown.
+- A locked user shows the end of the lockout in UTC and a button to unlock, which acts at once; a user with a temporary
+  password shows a badge; the last sign-in shows in UTC or as "Never".
+- The search matches the user name and the display name in any letter case, the filter shows only enabled, disabled,
+  locked, or system administrator users, and both apply together.
+- Disabling a user first shows a panel with the open reviews and the sole-administrator projects as links, or the note
+  that nothing is waiting, changes nothing until the second click, and changes nothing when cancelled; a failure to load
+  the impact shows an error and no panel; enabling needs no confirmation.
+- Resetting the second factor and setting a password also need a second click after an explanation, and change nothing
+  when cancelled.
 - On the creation page, a valid new user is created with the chosen "System administrator" checkbox, the password field
   is emptied, and the browser returns to the list; the page has a Cancel link to the list; a rule violation is shown as
   an error, creates nothing, keeps the typed user name, and drops the typed password.
@@ -63,8 +72,9 @@ short password; an error that mentions the characters is shown, no user is store
 and the password field is empty. This scenario is tested by
 `NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing`.
 
-**UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain**: The toggle button of an ordinary user is used twice; the user
-is stored as disabled and shown as "Disabled", and then stored as enabled and shown as "Enabled". This scenario is
+**UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain**: The toggle button of an ordinary user is used, then the
+button "Disable anyway" of the confirmation; the user is stored as disabled and shown as "Disabled", and then the
+button is used again and the user is stored as enabled and shown as "Enabled" without a confirmation. This scenario is
 tested by `UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain`.
 
 **UsersPage_ToggleSystemAdmin_User_GrantsAndTakesAwayTheFlag**: The system administrator button of an ordinary user is
@@ -73,8 +83,9 @@ without the flag and shown without the badge. This scenario is tested by
 `UsersPage_ToggleSystemAdmin_User_GrantsAndTakesAwayTheFlag`.
 
 **UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField**: A new password is typed in the row of a user
-and set; the new password works, the old one does not, there is no error, and the field is empty. This scenario is
-tested by `UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField`.
+and set after the confirmation; the new password works, the old one does not, there is no error, and the field is
+empty. This scenario is tested by
+`UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField`.
 
 **UsersPage_LastAdmin_DisableOrDemote_IsRefusedWithError**: The only system administrator is disabled and demoted
 through the row controls; an error that mentions the administrator is shown, and the user stays enabled and a system
@@ -129,3 +140,46 @@ session ended shows the error "no longer signed in" and the user stays enrolled,
 caller who is not a system administrator (a project administrator is an ordinary user) with `ActorNotAllowed` and keeps
 the enrollment, which is tested by `TotpService_Reset_NotSystemAdmin_IsRefusedAndKeepsEnrollment`, defined in the same
 file.
+
+**UsersPage status scenarios**: These tests are in `UsersPageTests.cs` over the fake store and a clock the test sets. A
+user who is locked for five more minutes shows the badge "Locked until 05:11 UTC" and the button "Unlock"; a user with a
+temporary password shows the badge "Temporary password"; the last sign-in shows as `yyyy-MM-dd HH:mm UTC` or "Never";
+and an unlocked user has no badge and no button, which is tested by
+`UsersPage_Render_StatusBadges_ShowLockedTemporaryAndLastSignIn`. A lockout that ended is not shown, which is tested by
+`UsersPage_Render_ExpiredLockout_IsNotShownAsLocked`. The button "Unlock" clears the lockout at once, with no
+confirmation, shows a status and removes the badge, which is tested by
+`UsersPage_Unlock_LockedUser_ClearsLockoutInOneClick`.
+
+**UsersPage search and filter scenarios**: The search matches part of the user name or the display name in any letter
+case, and clearing the search lists everybody again, which is tested by
+`UsersPage_Search_TypedText_MatchesUserNameOrDisplayNameIgnoringCase`. Each of the choices Enabled, Disabled, Locked,
+and System administrators lists exactly the matching users, and All lists everybody, which is tested by
+`UsersPage_Filter_EachStatus_ListsOnlyMatchingUsers`. The search and a filter apply together, which is tested by
+`UsersPage_SearchAndFilter_Combined_BothApply`.
+
+**UsersPage disable confirmation scenarios**: A user who holds an open review slot and the only administrator of a
+project is disabled through the row; the first click only opens the panel, which lists the review and the project as
+links to `/projects/{projectId}/reviews/{reviewId}` and `/projects/{projectId}`, and the user stays enabled; the button
+"Disable anyway" then disables the user and closes the panel. Each open slot is listed with its state in words, "Not
+signed" or "Out of date", never as an enumeration name. This is tested by
+`UsersPage_Disable_UserWithImpact_ShowsLinksAndChangesNothingUntilConfirmed`. For a user with nothing waiting the panel
+says so and still needs the second click, which is tested by
+`UsersPage_Disable_UserWithoutImpact_SaysNothingIsWaitingAndStillNeedsTheClick`. The button "Cancel" closes the panel
+and changes nothing, which is tested by `UsersPage_Disable_Cancel_ClosesThePanelAndChangesNothing`. Enabling a disabled
+user needs no confirmation, which is tested by `UsersPage_Enable_DisabledUser_NeedsNoConfirmation`. When the impact
+cannot be loaded (here the user does not exist in the store the impact service reads) the error of the row is shown and
+no panel opens, which is tested by `UsersPage_Disable_ImpactLoadRefused_ShowsErrorAndOpensNoPanel`.
+
+**UsersPage other confirmation scenarios**: The first click on "Reset two-factor" opens a panel that says that the
+authenticator and the recovery codes are removed and the user has to set up two-factor sign-in again, and removes
+nothing; "Cancel" closes it and the enrollment stays; this is tested by
+`UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing` in `UsersTotpPageTests.cs`. The first click on "Set
+password" with a typed password opens a panel that says that the user must change the password at the next sign-in, can
+only use the Account, Help, and About pages, cannot sign reviews, and that API tokens stop working until then, and
+changes nothing; the second click sets the password and the account has the temporary state, and the status says that
+the user must change the password, which is tested by
+`UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary`. In the row of the signed-in administrator
+the panel says instead that the own password is not temporary, with no forced change and no restriction; the second
+click sets the password, the account does not get the temporary state, and the status says "it is not temporary",
+which is tested by `UsersPage_SetPassword_OwnRow_SaysThePasswordIsNotTemporary`. "Cancel", and an empty password
+field, change nothing, which is tested by `UsersPage_SetPassword_CancelOrEmptyField_ChangesNothing`.

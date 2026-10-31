@@ -46,13 +46,77 @@ sections:
       - id: ReviewCenter-UsersPage-Update
         title: >-
           The UsersPage unit shall let a system administrator disable and enable a user and set a new password for a
-          user, clearing the password field afterwards.
+          user, clearing the password field afterwards, and shall tell that the password has to be changed at the next
+          sign-in.
         justification: |
           Disabling takes access away without losing the record of what the user did, and a new password lets a
-          system administrator help a user who forgot the password.
+          system administrator help a user who forgot the password. The password is a temporary one, and the page
+          says so, so that nobody expects it to stay.
         tests:
           - UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain
           - UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField
+          - UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary
+
+      - id: ReviewCenter-UsersPage-Status
+        title: >-
+          The UsersPage unit shall show for each user a badge with the end of the lockout, in UTC, while the user is
+          locked, a badge for a temporary password, and the time of the last sign-in in UTC or the word Never, and
+          shall offer a button that ends the lockout only for a locked user, which acts at once and shows the outcome.
+        justification: |
+          An administrator who reviews access must see which accounts are locked, waiting for a first password
+          change, or not used, and must be able to help a person who is locked out without waiting.
+        tests:
+          - UsersPage_Render_StatusBadges_ShowLockedTemporaryAndLastSignIn
+          - UsersPage_Render_ExpiredLockout_IsNotShownAsLocked
+          - UsersPage_Unlock_LockedUser_ClearsLockoutInOneClick
+
+      - id: ReviewCenter-UsersPage-SearchFilter
+        title: >-
+          The UsersPage unit shall narrow the list to the users whose user name or display name contains the typed
+          text in any letter case, and to the users that are enabled, disabled, locked, or system administrators,
+          both together, without a new request to the store.
+        justification: |
+          A list of many users is hard to review as a whole, and a short list of the locked or disabled accounts is
+          what an access review looks at first.
+        tests:
+          - UsersPage_Search_TypedText_MatchesUserNameOrDisplayNameIgnoringCase
+          - UsersPage_Filter_EachStatus_ListsOnlyMatchingUsers
+          - UsersPage_SearchAndFilter_Combined_BothApply
+
+      - id: ReviewCenter-UsersPage-DisableImpact
+        title: >-
+          The UsersPage unit shall, when a system administrator disables a user, first show a confirmation that lists
+          the open reviews of the user as links to the reviews and the projects where the user is the only
+          administrator as links to the projects, or says that nothing is waiting, shall disable the user only after
+          the second click on the button that confirms, shall change nothing when the confirmation is cancelled, and
+          shall show an error and open no confirmation when the impact cannot be loaded.
+        justification: |
+          Disabling a person who holds open review slots or administers a project alone leaves work stuck. The list
+          warns without blocking, because a person who has left must be disabled whatever is open, and the second
+          click keeps a mistaken click from taking access away.
+        tests:
+          - UsersPage_Disable_UserWithImpact_ShowsLinksAndChangesNothingUntilConfirmed
+          - UsersPage_Disable_UserWithoutImpact_SaysNothingIsWaitingAndStillNeedsTheClick
+          - UsersPage_Disable_Cancel_ClosesThePanelAndChangesNothing
+          - UsersPage_Disable_ImpactLoadRefused_ShowsErrorAndOpensNoPanel
+          - UsersPage_Enable_DisabledUser_NeedsNoConfirmation
+
+      - id: ReviewCenter-UsersPage-Confirmations
+        title: >-
+          The UsersPage unit shall, before it resets the second factor of a user, explain that the user has to set it
+          up again, and, before it sets a password, explain that the user has to change it at the next sign-in and
+          can only use the Account, Help, and About pages, cannot sign reviews, and cannot use the API tokens until
+          then (for the own password of the administrator, which is not temporary, say that instead), and shall
+          act only after the second click that confirms and not at all when the confirmation is cancelled.
+        justification: |
+          Both actions change how a person gets in, and the person who performs them should know what follows
+          before it happens. The explanation is shown on the page, in the place of the action, without a dialog of
+          the browser.
+        tests:
+          - UsersPage_ResetTotp_FirstClickAndCancel_ExplainsAndRemovesNothing
+          - UsersPage_SetPassword_FirstClick_ExplainsThenSecondClickMakesItTemporary
+          - UsersPage_SetPassword_OwnRow_SaysThePasswordIsNotTemporary
+          - UsersPage_SetPassword_CancelOrEmptyField_ChangesNothing
 
       - id: ReviewCenter-UsersPage-SystemAdmin
         title: >-

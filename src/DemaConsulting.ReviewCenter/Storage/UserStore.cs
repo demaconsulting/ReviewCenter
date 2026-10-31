@@ -110,6 +110,7 @@ internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory
             FailedLoginCount = user.FailedLoginCount,
             LockoutUntil = user.LockoutUntil,
             MustChangePassword = user.MustChangePassword,
+            LastSignInUtc = user.LastSignInUtc,
             Created = user.Created,
             ExternalIssuer = user.ExternalIssuer,
             ExternalSubject = user.ExternalSubject
