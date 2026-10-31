@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Reflection;
 using DemaConsulting.ReviewCenter.Core;
 
 namespace DemaConsulting.ReviewCenter.Tests.Core;
@@ -196,6 +197,248 @@ public class ProjectAccessGuardTests
     }
 
     /// <summary>
+    ///     The operations that change something in a project and are therefore refused to a member who may only read
+    ///     (an auditor), as <c>Class.Method</c>. The classification test checks that every public method of a
+    ///     service that takes an actor is either here or in one of the lists of reads and administer-only methods.
+    /// </summary>
+    private static readonly string[] _refusedForAuditor =
+    [
+        "ChecklistService.SetAnswerAsync",
+        "ChecklistService.SetSectionApplicabilityAsync",
+        "RepositoryService.ListEnabledAsync",
+        "ReviewPlanner.CreateAsync",
+        "ReviewPlanner.PlanAsync",
+        "ReviewService.CreateDraftAsync",
+        "ReviewService.CreateFromRepositoryAsync",
+        "SigningService.AddSlotAsync",
+        "SigningService.ListCandidatesAsync",
+        "SigningService.RemoveSlotAsync",
+        "SigningService.ReopenReviewAsync",
+        "SigningService.RequireConfirmableAsync",
+        "SigningService.SignAsync",
+        "SigningService.SignWithCredentialsAsync",
+        "SigningService.UpdateSlotAsync",
+        "ThreadService.ReopenAsync",
+        "ThreadService.ReplyAsync",
+        "ThreadService.ResolveAsync",
+        "ThreadService.StartThreadAsync"
+    ];
+
+    /// <summary>
+    ///     The methods that take an actor and only read, so an auditor keeps them, as <c>Class.Method</c>.
+    /// </summary>
+    private static readonly string[] _reads =
+    [
+        "ProjectChecklistService.GetAsync",
+        "ProjectService.GetAsync",
+        "ProjectService.ListAsync",
+        "SigningService.HasReauthProofAsync"
+    ];
+
+    /// <summary>
+    ///     The methods that take an actor and need an administrator of the project or a system administrator, so an
+    ///     auditor never passes them, as <c>Class.Method</c>.
+    /// </summary>
+    private static readonly string[] _administerOnly =
+    [
+        "EvidenceSettingsService.GetAsync",
+        "EvidenceSettingsService.SetAsync",
+        "ProjectChecklistService.ResetAsync",
+        "ProjectChecklistService.SetAsync",
+        "ProjectService.AddMemberAsync",
+        "ProjectService.CreateAsync",
+        "ProjectService.CreateMemberAccountAsync",
+        "ProjectService.ListMembersAsync",
+        "ProjectService.RemoveMemberAsync",
+        "ProjectService.SetMemberRoleAsync",
+        "ProjectService.SetRequireIndependentReviewersAsync",
+        "RepositoryService.CreateAsync",
+        "RepositoryService.ListAsync",
+        "RepositoryService.SetEnabledAsync",
+        "RepositoryService.UpdateAsync"
+    ];
+
+    /// <summary>
+    ///     Test that a member whose role is auditor is refused every operation that changes something (thread,
+    ///     comment, checklist, slot, signature, review creation, planning and the pickers behind them) as not
+    ///     allowed, not as a missing project, and that nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing()
+    {
+        // Arrange: the usual review, and an auditor of its project
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = await AddAuditorAsync(world);
+        var project = world.Own;
+        var item = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        var section = DefaultChecklist.Current.Sections[0].Id;
+        var auditBefore = world.Store.Audits.Count;
+        var operations = new Dictionary<string, Func<Task>>
+        {
+            ["ReviewService.CreateDraftAsync"] = () => world.Reviews.CreateDraftAsync(
+                project, "rev-2", "Second", [new UploadedFile("a.txt", [1])], actor, cancellationToken),
+            ["ReviewService.CreateFromRepositoryAsync"] = () => world.Reviews.CreateFromRepositoryAsync(
+                project, "rev-3", "Third", new RepositorySource(1, "main", null, "**/*"), actor, cancellationToken),
+            ["ThreadService.StartThreadAsync"] = () => world.Threads.StartThreadAsync(
+                project, "rev-1", new ThreadAnchor("a.txt"), actor, "hello", cancellationToken),
+            ["ThreadService.ReplyAsync"] = () => world.Threads.ReplyAsync(
+                project, "rev-1", world.ThreadId, actor, "hello", cancellationToken),
+            ["ThreadService.ResolveAsync"] = () => world.Threads.ResolveAsync(
+                project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["ThreadService.ReopenAsync"] = () => world.Threads.ReopenAsync(
+                project, "rev-1", world.ThreadId, actor, cancellationToken),
+            ["ChecklistService.SetAnswerAsync"] = () => world.Checklists.SetAnswerAsync(
+                project, "rev-1", item, ChecklistOutcome.Pass, null, actor, cancellationToken),
+            ["ChecklistService.SetSectionApplicabilityAsync"] = () => world.Checklists.SetSectionApplicabilityAsync(
+                project, "rev-1", section, false, "not needed", actor, cancellationToken),
+            ["SigningService.AddSlotAsync"] = () => world.Signing.AddSlotAsync(
+                actor, project, "rev-1", world.Ids["usr"], null, cancellationToken),
+            ["SigningService.UpdateSlotAsync"] = () => world.Signing.UpdateSlotAsync(
+                actor, project, "rev-1", world.SlotId, world.Ids["usr"], null, cancellationToken),
+            ["SigningService.RemoveSlotAsync"] = () => world.Signing.RemoveSlotAsync(
+                actor, project, "rev-1", world.SlotId, cancellationToken),
+            ["SigningService.SignAsync"] = () => world.Signing.SignAsync(
+                actor, project, "rev-1", world.SlotId, "digest", Password, cancellationToken),
+            ["SigningService.SignWithCredentialsAsync"] = () => world.Signing.SignWithCredentialsAsync(
+                actor, project, "rev-1", world.SlotId, "digest", new SignerCredentials(Password), cancellationToken),
+            ["SigningService.ReopenReviewAsync"] = () => world.Signing.ReopenReviewAsync(
+                actor, project, "rev-1", "why", cancellationToken),
+            ["SigningService.RequireConfirmableAsync"] = () => world.Signing.RequireConfirmableAsync(
+                actor, project, "rev-1", world.SlotId, cancellationToken),
+            ["SigningService.ListCandidatesAsync"] = () => world.Signing.ListCandidatesAsync(
+                actor, project, cancellationToken),
+            ["ReviewPlanner.PlanAsync"] = () => world.Planner.PlanAsync(
+                actor, project, 1, "main", BaselineMode.Explicit, "v1", cancellationToken),
+            ["ReviewPlanner.CreateAsync"] = () => world.Planner.CreateAsync(
+                project, 1, new string('a', 40), [], actor, cancellationToken),
+            ["RepositoryService.ListEnabledAsync"] = () => world.Repositories.ListEnabledAsync(
+                actor, project, cancellationToken)
+        };
+
+        // Act
+        var rules = new Dictionary<string, DomainRule>();
+        foreach (var (name, operation) in operations)
+        {
+            var exception = await Assert.ThrowsAsync<DomainRuleException>(operation);
+            rules[name] = exception.Rule;
+        }
+
+        // Assert: every operation of the list was run, each is refused as not allowed, and nothing was stored
+        Assert.Equal(_refusedForAuditor.Order(), operations.Keys.Order());
+        Assert.All(rules, pair => Assert.Equal(DomainRule.ActorNotAllowed, pair.Value));
+        Assert.Equal(auditBefore, world.Store.Audits.Count);
+        Assert.Single(world.Store.Threads);
+        Assert.Single(await world.Store.ListSlotsAsync(project, "rev-1", cancellationToken));
+        Assert.Empty(await world.Store.ListSignaturesAsync(project, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that an auditor can still read everything a member reads: the project, the review and its
+    ///     threads, checklist and approval status.
+    /// </summary>
+    [Fact]
+    public async Task ReviewReads_Auditor_AreAllowed()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = await AddAuditorAsync(world);
+
+        // Act
+        var canView = await world.Access.CanViewAsync(actor, world.Own, cancellationToken);
+        var project = await world.Projects.GetAsync(actor, world.Own, cancellationToken);
+        var projects = await world.Projects.ListAsync(actor, cancellationToken);
+        var review = await world.Reviews.GetAsync(world.Own, "rev-1", cancellationToken);
+        var reviews = await world.Reviews.ListAsync(world.Own, cancellationToken);
+        var threads = await world.Threads.ListAsync(world.Own, "rev-1", cancellationToken);
+        var checklist = await world.Checklists.GetAsync(world.Own, "rev-1", cancellationToken);
+        var approval = await world.Signing.GetApprovalAsync(world.Own, "rev-1", cancellationToken);
+
+        // Assert
+        Assert.True(canView);
+        Assert.NotNull(project);
+        Assert.Equal([world.Own], projects.Select(p => p.Id));
+        Assert.NotNull(review);
+        Assert.Single(reviews);
+        Assert.Single(threads);
+        Assert.NotNull(checklist);
+        Assert.NotNull(approval);
+    }
+
+    /// <summary>
+    ///     Test that a project administrator and a system administrator who is no member keep the right to work, so
+    ///     the new level did not take anything from the roles that could work before.
+    /// </summary>
+    [Fact]
+    public async Task ReviewOperations_ProjectAdminAndSystemAdmin_AreAllowed()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var padm = await world.Users.CreateAsync("padm", "padm", false, Password, Actor.CommandLine, cancellationToken);
+        await world.Store.AddMembershipAsync(padm.Id, world.Own, ProjectRole.ProjectAdmin, cancellationToken);
+        var item = DefaultChecklist.Current.Sections[0].Items[0].Id;
+
+        // Act, Assert
+        foreach (var actor in new[] { new Actor("padm", "padm"), new Actor("root", "root") })
+        {
+            var thread = await world.Threads.StartThreadAsync(
+                world.Own, "rev-1", new ThreadAnchor("a.txt"), actor, "hello", cancellationToken);
+            await world.Threads.ReplyAsync(world.Own, "rev-1", thread.Id, actor, "again", cancellationToken);
+            await world.Checklists.SetAnswerAsync(
+                world.Own, "rev-1", item, ChecklistOutcome.Pass, null, actor, cancellationToken);
+            Assert.NotEmpty(await world.Signing.ListCandidatesAsync(actor, world.Own, cancellationToken));
+            Assert.Empty(await world.Repositories.ListEnabledAsync(actor, world.Own, cancellationToken));
+        }
+    }
+
+    /// <summary>
+    ///     Test that every public method of the project services that takes an actor is classified as a change an
+    ///     auditor is refused, a read, or administer-only, so a method added later without a decision fails here.
+    /// </summary>
+    [Fact]
+    public void AccessCoverage_PublicActorMethods_AreAllClassified()
+    {
+        // Arrange: the services that act on a project for an actor
+        var services = new[]
+        {
+            typeof(ChecklistService), typeof(ThreadService), typeof(ReviewService), typeof(ReviewPlanner),
+            typeof(SigningService), typeof(RepositoryService), typeof(ProjectService), typeof(ProjectChecklistService),
+            typeof(EvidenceSettingsService)
+        };
+
+        // Act
+        var actual = services
+            .SelectMany(
+                type => type
+                    .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                    .Where(method => method.GetParameters().Any(parameter => parameter.ParameterType == typeof(Actor)))
+                    .Select(method => $"{type.Name}.{method.Name}"))
+            .Distinct()
+            .Order()
+            .ToList();
+        var classified = _refusedForAuditor.Concat(_reads).Concat(_administerOnly).Order().ToList();
+
+        // Assert: nothing unclassified, nothing classified twice, nothing classified that no longer exists
+        Assert.Equal(classified.Count, classified.Distinct().Count());
+        Assert.Equal(classified, actual);
+    }
+
+    /// <summary>
+    ///     Adds an auditor to the own project of an arranged world.
+    /// </summary>
+    /// <param name="world">The arranged world.</param>
+    /// <returns>The actor of the auditor.</returns>
+    private static async Task<Actor> AddAuditorAsync(World world)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var auditor = await world.Users.CreateAsync("aud", "aud", false, Password, Actor.CommandLine, cancellationToken);
+        await world.Store.AddMembershipAsync(auditor.Id, world.Own, ProjectRole.Auditor, cancellationToken);
+        return new Actor("aud", "aud");
+    }
+
+    /// <summary>
     ///     Arranges two projects, the users, a review of the first project with a thread and a slot.
     /// </summary>
     /// <returns>The arranged world.</returns>
@@ -235,7 +478,8 @@ public class ProjectAccessGuardTests
         var thread = await threads.StartThreadAsync(own.Id, "rev-1", new ThreadAnchor("a.txt"), member, "first", cancellationToken);
         var slot = await signing.AddSlotAsync(member, own.Id, "rev-1", ids["usr"], null, cancellationToken);
         return new World(
-            store, users, repositories, reviews, threads, checklists, signing, planner, own.Id, other.Id, thread.Id, slot.Id, ids);
+            store, users, repositories, reviews, threads, checklists, signing, planner, projects, access, own.Id, other.Id,
+            thread.Id, slot.Id, ids);
     }
 
     /// <summary>
@@ -249,6 +493,8 @@ public class ProjectAccessGuardTests
     /// <param name="Checklists">The checklist service.</param>
     /// <param name="Signing">The signing service.</param>
     /// <param name="Planner">The review planner.</param>
+    /// <param name="Projects">The project service.</param>
+    /// <param name="Access">The access rules.</param>
     /// <param name="Own">The project with the review.</param>
     /// <param name="Other">The project of the user <c>oth</c>.</param>
     /// <param name="ThreadId">The thread of the review.</param>
@@ -263,6 +509,8 @@ public class ProjectAccessGuardTests
         ChecklistService Checklists,
         SigningService Signing,
         ReviewPlanner Planner,
+        ProjectService Projects,
+        ProjectAccess Access,
         int Own,
         int Other,
         int ThreadId,

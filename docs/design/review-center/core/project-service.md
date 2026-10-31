@@ -102,10 +102,10 @@ an administrator of the project (`ProjectNotFound` when it is not visible, `Acto
 - *Parameters*: the `Actor`, the project identity, the user name, the `ProjectRole`, and a cancellation token.
 - *Returns*: `Task<ProjectMember>` — the new member.
 - *Preconditions*: The actor administers the project or is a system administrator (`ProjectNotFound` or
-  `ActorNotAllowed` otherwise, as `RequireAdministerAsync` decides); the role is defined
-  (`ArgumentOutOfRangeException`); a non-exempt actor has fewer than `MaxFailedAttempts` reserved attempts in the last
-  `ThrottleWindow` (`TooManyAttempts` otherwise); the attempt is reserved atomically before the user lookup and stays
-  counted unless the add succeeds.
+  `ActorNotAllowed` otherwise, as `RequireAdministerAsync` decides); the role is defined and offered
+  (`ArgumentOutOfRangeException`; `Auditor` is declared but refused until it is offered); a non-exempt actor has fewer
+  than `MaxFailedAttempts` reserved attempts in the last `ThrottleWindow` (`TooManyAttempts` otherwise); the attempt is
+  reserved atomically before the user lookup and stays counted unless the add succeeds.
 - *Postconditions*: The membership is stored with the audit event `project.member-added`. The name is trimmed and looked
   up exactly: there is no search and no operation lists users, so a project administrator cannot browse the user base.
   A name that does not exist and the name of a disabled user are refused with the same message and the rule
@@ -121,7 +121,8 @@ an administrator of the project (`ProjectNotFound` when it is not visible, `Acto
 - *Preconditions*: The same access and throttle checks as `AddMemberAsync` (the attempt is reserved before the account
   is stored; input refused before any write gives the reservation back, so a typing mistake is not a failed guess);
   the user name and display name pass the same
-  rules as for a user created by a system administrator (`UserNameInvalid`, `DisplayNameInvalid`).
+  rules as for a user created by a system administrator (`UserNameInvalid`, `DisplayNameInvalid`); the role is
+  defined and offered, as for `AddMemberAsync`.
 - *Postconditions*: The account is created with `IsSystemAdmin` false, enabled, `MustChangePassword` true, and the hash
   of a generated temporary password, and the membership is created, in one transaction through
   `IUserStore.AddToProjectAsync`, with the audit event `project.account-created` (detail
@@ -137,7 +138,9 @@ account can never be a system administrator and cannot exist without the members
 
 - *Parameters*: the `Actor`, the project identity, the user name, the `ProjectRole` where one is needed, and a
   cancellation token. `SetMemberRoleAsync` returns the `ProjectMember` as it is now; `RemoveMemberAsync` returns a task.
-- *Preconditions*: The actor administers the project or is a system administrator. An unknown name and a non-member are
+- *Preconditions*: The actor administers the project or is a system administrator. The role passed to
+  `SetMemberRoleAsync` is defined and offered (`ArgumentOutOfRangeException`; `Auditor` is refused until it is
+  offered). An unknown name and a non-member are
   refused with `MembershipNotFound` and one message, so the name of an unrelated user is never confirmed.
 - *Postconditions*: A project administrator may not remove or demote the last enabled project administrator, themselves
   included (`LastProjectAdmin`, with a friendly message); a system administrator may. The service passes

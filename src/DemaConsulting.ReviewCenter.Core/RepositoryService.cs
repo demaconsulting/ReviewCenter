@@ -360,14 +360,17 @@ public sealed class RepositoryService
     }
 
     /// <summary>
-    ///     Lists the enabled repositories of a project that a member may choose from.
+    ///     Lists the enabled repositories of a project that a member may choose from when creating a review.
     /// </summary>
-    /// <param name="actor">The signed-in user, who must be able to see the project. Must not be null.</param>
+    /// <param name="actor">The signed-in user, who must be able to work in the project. Must not be null.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The identity and name of each enabled repository, ordered by name; nothing about location or credentials.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and with
+    ///     <see cref="DomainRule.ActorNotAllowed"/> when the actor may only read it.
+    /// </exception>
     public async Task<IReadOnlyList<RepositorySummary>> ListEnabledAsync(
         Actor actor,
         int projectId,
@@ -375,7 +378,7 @@ public sealed class RepositoryService
     {
         ArgumentNullException.ThrowIfNull(actor);
 
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
         var all = await _store.ListAsync(projectId, cancellationToken);
         return all.Where(r => r.Enabled).Select(r => new RepositorySummary(r.Id, r.Name)).ToList();
     }

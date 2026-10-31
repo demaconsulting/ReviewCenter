@@ -62,9 +62,10 @@ same display name. A null actor is a programming error and raises `ArgumentNullE
 author, because the display name of a user was validated when the user was created.
 
 **Access**: every change (`StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, `ReopenAsync`) first requires that the
-actor may see the project (`IProjectAccess.RequireViewAsync`), so a user outside the project, like an anonymous or
-disabled one, gets `ProjectNotFound`, identical to a project that does not exist, before the review or the input is
-looked at. Every member can take part in the discussion; the unsigned-slot and membership rules of signing do not
+actor may work in the project (`IProjectAccess.RequireContributeAsync`), so a user outside the project, like an
+anonymous or disabled one, gets `ProjectNotFound`, identical to a project that does not exist, and a read-only member
+(an auditor) gets `ActorNotAllowed`, before the review or the input is looked at. Every member who may work in the
+project can take part in the discussion; the unsigned-slot and membership rules of signing do not
 apply to comments. Reads (`ListAsync`) take no actor; the boundary guards them (every page and API handler first
 reads the project as the actor).
 
@@ -158,7 +159,7 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 #### Dependencies
 
 - **IReviewStore** — checks the review, reads file content, and stores and reads threads (injected).
-- **IProjectAccess** — requires that the actor may see the project (injected).
+- **IProjectAccess** — requires that the actor may work in the project (injected).
 - **ReviewLock** (part of the `SigningService` unit) — refuses a change while the review is approved.
 - **TimeProvider** — supplies the creation times (injected).
 

@@ -1,8 +1,8 @@
 ---
 # Software Unit Requirements for the ProjectAccess Class
 #
-# The ProjectAccess class is the single place that decides who may see and who may administer a project. It reads
-# the user and the memberships fresh on every call, so taking rights away works at once.
+# The ProjectAccess class is the single place that decides who may see, work in, administer, and audit a project.
+# It reads the user and the memberships fresh on every call, so taking rights away works at once.
 
 sections:
   - title: ProjectAccess Unit Requirements
@@ -55,6 +55,47 @@ sections:
           - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
           - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
           - Repositories_OfAnotherProject_CannotBeUsedOrChanged
+
+      - id: ReviewCenter-ProjectAccess-Contribute
+        title: >-
+          The ProjectAccess class shall let a member whose role is User or ProjectAdmin and an enabled system
+          administrator work in a project, shall let a member whose role is Auditor see the project but not work
+          in it, shall treat a stored role that is not defined as read-only, and shall refuse, when it is asked to
+          require the right to work, a project that is not visible with the project not found failure and a
+          member who may only read with the actor not allowed failure.
+        justification: |
+          A read-only oversight role must be enforced in one place, or every service would have to remember it.
+          The member already sees the project, so telling a read-only member that the action is not allowed
+          leaks nothing, and a role that no code defines must never gain more power than the least one.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+          - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
+          - ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFollowTheNextCall
+          - ProjectAccess_Matrix_UndefinedRole_FailsClosedAsReadOnly
+          - ReviewOperations_Auditor_AreRefusedAsNotAllowedAndChangeNothing
+          - ReviewOperations_ProjectAdminAndSystemAdmin_AreAllowed
+          - ReviewReads_Auditor_AreAllowed
+          - AccessCoverage_PublicActorMethods_AreAllClassified
+          - ProjectViewGuard_GuardContribute_Member_ReturnsTrueWithoutCallback
+          - ProjectViewGuard_GuardContribute_Auditor_ReturnsFalseWithoutCallback
+          - ProjectViewGuard_GuardContribute_NonMember_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardContribute_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+
+      - id: ReviewCenter-ProjectAccess-AuditAccess
+        title: >-
+          The ProjectAccess class shall let a project administrator, a member whose role is Auditor, and an
+          enabled system administrator read the audit trail of a project, shall refuse any other member with the
+          actor not allowed failure, and shall refuse anybody who cannot see the project with the project not
+          found failure.
+        justification: |
+          The audit trail records what everybody did in the project, so it is for those who manage or oversee the
+          project and not for every member. A hidden project must not reveal that it exists.
+        tests:
+          - ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights
+          - ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule
+          - ProjectViewGuard_GuardAudit_AuditorAndProjectAdmin_ReturnTrueWithoutCallback
+          - ProjectViewGuard_GuardAudit_PlainMember_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardAudit_NobodySignedIn_ReturnsFalseAndCallsBackOnce
 
       - id: ReviewCenter-ProjectAccess-TemporaryPassword
         title: >-

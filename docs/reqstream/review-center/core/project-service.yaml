@@ -89,9 +89,10 @@ sections:
           not exist, and to act on a project that does not exist, and shall change nothing in each case.
         justification: |
           A repeated or mistaken request must fail visibly and leave the access rights as they were, and a role
-          outside the defined roles must never be stored.
+          outside the defined roles, or the read-only role until it is offered, must never be stored.
         tests:
           - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
+          - ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered
 
       - id: ReviewCenter-ProjectService-MemberLookup
         title: >-

@@ -35,6 +35,7 @@ N/A - standard test environment.
   entries that carry the project; a plain member is refused with `ActorNotAllowed` and an actor who cannot see the
   project gets `ProjectNotFound`; a project administrator lists the members of the own project only.
 - A repeated add, an unknown membership, an unknown user, and an unknown project are refused with the matching rule.
+- The `Auditor` role is declared but cannot be assigned: it is refused like an undefined role until it is offered.
 - A member is added only by the exact user name; an unknown name and a disabled user give one rule and one message,
   and an unknown name and a non-member give one rule and one message for a removal or role change.
 - After ten failed attempts within ten minutes an actor who is no system administrator is refused with
@@ -193,6 +194,11 @@ project ordered by user name; for another project the answer is `ProjectNotFound
 adding to an unknown project gives `ProjectNotFound`; adding a member twice gives `MembershipExists`; removing a user
 who is no member gives `MembershipNotFound`; an undefined role is rejected with an `ArgumentOutOfRangeException`. This
 scenario is tested by `ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules`.
+
+**ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered**: Adding a member, creating a member account, and
+changing the role of a member with the declared but not yet offered `Auditor` role are refused with an
+`ArgumentOutOfRangeException`, and nothing is stored. This scenario is tested by
+`ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered`.
 
 **ProjectService_GetAsync_HiddenProject_ReadsAsMissing**: A member reads the own project; the same member reading
 another project, a non-member reading the project, and a system administrator reading a project that does not exist

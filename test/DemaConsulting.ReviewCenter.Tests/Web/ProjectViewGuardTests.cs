@@ -28,8 +28,8 @@ using TestContext = Xunit.TestContext;
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
 /// <summary>
-///     Unit tests for <see cref="ProjectViewGuard"/>, the one re-check of access (view, administer and system
-///     administrator) that the pages run at the start of every action on an open circuit.
+///     Unit tests for <see cref="ProjectViewGuard"/>, the one re-check of access (view, contribute, administer, audit
+///     and system administrator) that the pages run at the start of every action on an open circuit.
 /// </summary>
 public class ProjectViewGuardTests : PageTestBase
 {
@@ -320,6 +320,182 @@ public class ProjectViewGuardTests : PageTestBase
 
         // Act
         var allowed = await GuardSystemAdminAsync(() => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Creates the project <c>Apollo</c> with <c>pam</c> as a project admin, <c>mem</c> as a plain member and
+    ///     <c>aud</c> as a read-only auditor.
+    /// </summary>
+    /// <returns>The project identity.</returns>
+    private async Task<int> ArrangeAuditorAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await ArrangeAdminAsync();
+        var auditor = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(auditor.Id, projectId, ProjectRole.Auditor, cancellationToken);
+        return projectId;
+    }
+
+    /// <summary>
+    ///     Runs the contribute guard for the signed-in user.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="lost">Counts how many times the access-lost callback ran.</param>
+    /// <returns><c>true</c> when the user may still work in the project.</returns>
+    private async Task<bool> GuardContributeAsync(int projectId, Action lost)
+    {
+        return await Access.GuardContributeAsync(
+            Services.GetRequiredService<AuthenticationStateProvider>(), projectId, lost);
+    }
+
+    /// <summary>
+    ///     Runs the audit guard for the signed-in user.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="lost">Counts how many times the access-lost callback ran.</param>
+    /// <returns><c>true</c> when the user may still read the audit trail of the project.</returns>
+    private async Task<bool> GuardAuditAsync(int projectId, Action lost)
+    {
+        return await Access.GuardAuditAsync(
+            Services.GetRequiredService<AuthenticationStateProvider>(), projectId, lost);
+    }
+
+    /// <summary>
+    ///     Test that a member who may work in the project continues and that the callback does not run.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardContribute_Member_ReturnsTrueWithoutCallback()
+    {
+        // Arrange: a plain member is signed in
+        var projectId = await ArrangeAuditorAsync();
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardContributeAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.True(allowed);
+        Assert.Equal(0, lost);
+    }
+
+    /// <summary>
+    ///     Test that a read-only member is refused without the callback, so the page can keep its data and say the
+    ///     access is read-only.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardContribute_Auditor_ReturnsFalseWithoutCallback()
+    {
+        // Arrange: an auditor is signed in
+        var projectId = await ArrangeAuditorAsync();
+        SignInAs("aud", "Aud", UserRole.Reviewer);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardContributeAsync(projectId, () => lost++);
+
+        // Assert: refused, but the project is still visible, so nothing is dropped
+        Assert.False(allowed);
+        Assert.Equal(0, lost);
+    }
+
+    /// <summary>
+    ///     Test that a user who cannot see the project is refused and that the callback runs once.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardContribute_NonMember_ReturnsFalseAndCallsBackOnce()
+    {
+        // Arrange: a user who is no member is signed in
+        var projectId = await ArrangeAuditorAsync();
+        await Users.CreateAsync("out", "Out", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        SignInAs("out", "Out", UserRole.Reviewer);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardContributeAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that nobody being signed in is refused by the contribute guard and that the callback runs once.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardContribute_NobodySignedIn_ReturnsFalseAndCallsBackOnce()
+    {
+        // Arrange: a project and nobody signed in
+        var projectId = await ArrangeAuditorAsync();
+        SignOut();
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardContributeAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that a project admin and an auditor may read the audit trail and that the callback does not run.
+    /// </summary>
+    /// <param name="who">The user name of the signed-in user.</param>
+    [Theory]
+    [InlineData("pam")]
+    [InlineData("aud")]
+    public async Task ProjectViewGuard_GuardAudit_AuditorAndProjectAdmin_ReturnTrueWithoutCallback(string who)
+    {
+        // Arrange
+        var projectId = await ArrangeAuditorAsync();
+        SignInAs(who, who, UserRole.Reviewer);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardAuditAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.True(allowed);
+        Assert.Equal(0, lost);
+    }
+
+    /// <summary>
+    ///     Test that a plain member may not read the audit trail and that the callback runs once.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardAudit_PlainMember_ReturnsFalseAndCallsBackOnce()
+    {
+        // Arrange: a plain member is signed in
+        var projectId = await ArrangeAuditorAsync();
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardAuditAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that nobody being signed in is refused by the audit guard and that the callback runs once.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardAudit_NobodySignedIn_ReturnsFalseAndCallsBackOnce()
+    {
+        // Arrange: a project and nobody signed in
+        var projectId = await ArrangeAuditorAsync();
+        SignOut();
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardAuditAsync(projectId, () => lost++);
 
         // Assert
         Assert.False(allowed);

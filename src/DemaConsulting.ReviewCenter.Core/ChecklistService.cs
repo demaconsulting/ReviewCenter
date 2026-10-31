@@ -118,7 +118,7 @@ public sealed class ChecklistService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
         var definition = await GetDefinitionAsync(projectId, reviewId, cancellationToken);
         if (!definition.Sections.Any(section => section.Id == sectionId))
         {
@@ -184,7 +184,7 @@ public sealed class ChecklistService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
         if (!Enum.IsDefined(outcome))
         {
             throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "The outcome is not a known value.");

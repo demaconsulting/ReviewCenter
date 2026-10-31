@@ -73,12 +73,27 @@ public sealed class ProjectAccess : IProjectAccess
     }
 
     /// <inheritdoc />
+    public async Task<bool> CanContributeAsync(
+        Actor? actor,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return await RoleOfAsync(actor, projectId, cancellationToken) is Level.Contribute or Level.Administer;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> CanAdministerAsync(
         Actor? actor,
         int projectId,
         CancellationToken cancellationToken = default)
     {
         return await RoleOfAsync(actor, projectId, cancellationToken) == Level.Administer;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> CanAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        return await RoleOfAsync(actor, projectId, cancellationToken) is Level.Read or Level.Administer;
     }
 
     /// <inheritdoc />
@@ -119,6 +134,26 @@ public sealed class ProjectAccess : IProjectAccess
     }
 
     /// <inheritdoc />
+    public async Task RequireContributeAsync(
+        Actor? actor,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var level = await RoleOfAsync(actor, projectId, cancellationToken);
+        if (level is null)
+        {
+            throw ProjectNotFound();
+        }
+
+        if (level == Level.Read)
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "Your role in the project is read-only.");
+        }
+    }
+
+    /// <inheritdoc />
     public async Task RequireAdministerAsync(
         Actor? actor,
         int projectId,
@@ -135,6 +170,23 @@ public sealed class ProjectAccess : IProjectAccess
             throw new DomainRuleException(
                 DomainRule.ActorNotAllowed,
                 "Only an administrator of the project may do this.");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task RequireAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        var level = await RoleOfAsync(actor, projectId, cancellationToken);
+        if (level is null)
+        {
+            throw ProjectNotFound();
+        }
+
+        if (level == Level.Contribute)
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "Only an administrator or an auditor of the project may do this.");
         }
     }
 
@@ -200,16 +252,28 @@ public sealed class ProjectAccess : IProjectAccess
             return null;
         }
 
-        return membership.Role == ProjectRole.ProjectAdmin ? Level.Administer : Level.View;
+        // An undefined stored role fails closed: it may see the project but never work in it
+        return membership.Role switch
+        {
+            ProjectRole.ProjectAdmin => Level.Administer,
+            ProjectRole.User => Level.Contribute,
+            ProjectRole.Auditor => Level.Read,
+            _ => Level.Read
+        };
     }
 
     /// <summary>
-    ///     What an actor may do in a project.
+    ///     What an actor may do in a project; the levels are ordered, each includes the one before it except that
+    ///     reading the audit trail is open to <see cref="Read"/> and <see cref="Administer"/> but not to
+    ///     <see cref="Contribute"/>.
     /// </summary>
     private enum Level
     {
-        /// <summary>See the project and work in it.</summary>
-        View,
+        /// <summary>See the project and read its audit trail; change nothing.</summary>
+        Read,
+
+        /// <summary>Also work in the project: create reviews, comment, answer checklists and sign.</summary>
+        Contribute,
 
         /// <summary>Also manage the project.</summary>
         Administer

@@ -16,9 +16,9 @@ verified by its own unit and by the `Storage` subsystem; the digest is verified 
 use the test double `AllowAllProjectAccess` as project access, which lets every actor see the project that exists and
 administer it, but decides membership from the memberships stored in the fake store; the access rules themselves are
 verified by the `ProjectAccess` unit. The tests of the rules that depend on who the actor is (who may reopen a review,
-and that whoever may see the project may change its slots, also a system administrator who is not a member) use the real
-`ProjectAccess` over the fake stores. The rules
-are checked through the `DomainRuleException` that names the broken rule, and through the state of the fake store, so
+and that whoever may work in the project may change its slots, also a system administrator who is not a member) use the
+real `ProjectAccess` over the fake stores. The rules are checked through the `DomainRuleException` that names the broken
+rule, and through the state of the fake store, so
 that a refused request is shown to store nothing. The fake store does not re-check the approval lock inside a write
 (the real store does, and its tests are in the `ReviewStore` unit), so these tests show the lock decided by the
 service. The fake store records the audit drafts it is given, which shows that the service passes each draft with the
@@ -36,7 +36,7 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- Any actor who may see the project adds slots (a member, and also a system administrator who is not a member), which
+- Any actor who may work in the project adds slots (a member, and also a system administrator who is not a member), which
   are numbered in creation order; a slot has a primary and an optional alternate reviewer, and a review may have no
   slot. A user who cannot see the project, and a project that does not exist, are refused with `ProjectNotFound`.
 - The reviewers of a slot must be enabled members of the project (a system administrator who is not a member is
