@@ -42,6 +42,7 @@ internal sealed record ProjectDto(int Id, string Name, string Description, DateT
 /// <param name="IsFromRepository"><c>true</c> when the review was created from a git repository, <c>false</c> for an upload.</param>
 /// <param name="DueDate">The due date as a UTC calendar day in <c>yyyy-MM-dd</c> form, or <c>null</c> when there is none.</param>
 /// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not approved.</param>
+/// <param name="FollowsReviewId">The review this one follows up, or <c>null</c> when it is not a follow-up.</param>
 internal sealed record ReviewSummaryDto(
     string Id,
     string Title,
@@ -52,7 +53,8 @@ internal sealed record ReviewSummaryDto(
     bool CreatedViaApi,
     bool IsFromRepository,
     string? DueDate,
-    bool Overdue);
+    bool Overdue,
+    string? FollowsReviewId = null);
 
 /// <summary>
 ///     A reviewer slot of a review.
@@ -114,6 +116,9 @@ internal sealed record ReviewCountsDto(
 /// <param name="Counts">The progress counts.</param>
 /// <param name="Blockers">The plain-language reasons the review cannot be signed yet; empty when it can be.</param>
 /// <param name="NextStep">One short sentence that words what to do next.</param>
+/// <param name="FollowsReviewId">The review this one follows up, or <c>null</c> when it is not a follow-up.</param>
+/// <param name="CarriedAnswerCount">How many checklist answers were carried over from the followed review; 0 when none.</param>
+/// <param name="CarriedThreadCount">How many open threads were carried over from the followed review; 0 when none.</param>
 internal sealed record ReviewDetailDto(
     string Id,
     string Title,
@@ -135,7 +140,10 @@ internal sealed record ReviewDetailDto(
     IReadOnlyList<SlotDto> Slots,
     ReviewCountsDto Counts,
     IReadOnlyList<string> Blockers,
-    string NextStep);
+    string NextStep,
+    string? FollowsReviewId = null,
+    int CarriedAnswerCount = 0,
+    int CarriedThreadCount = 0);
 
 /// <summary>
 ///     One file of an upload.
@@ -165,12 +173,16 @@ internal sealed record RepositorySourceDto(
 /// <param name="Files">The files to review; set this or <paramref name="Repository"/>.</param>
 /// <param name="Repository">The repository source to review; set this or <paramref name="Files"/>.</param>
 /// <param name="DueDate">The optional due date (UTC calendar day, <c>yyyy-MM-dd</c>): not before today, at most two years ahead.</param>
+/// <param name="FollowsReviewId">The optional identifier of an earlier review of the same project that the new review follows up; Pass and not-applicable answers, not-applicable sections and open threads of that review are carried over.</param>
+/// <param name="AcknowledgeDroppedThreads"><c>true</c> to confirm that open threads of the followed review on files that are not in the new review are not carried over; without it such a case is refused.</param>
 internal sealed record CreateReviewRequest(
     string? Id,
     string? Title,
     IReadOnlyList<UploadFileDto>? Files,
     RepositorySourceDto? Repository,
-    string? DueDate = null);
+    string? DueDate = null,
+    string? FollowsReviewId = null,
+    bool AcknowledgeDroppedThreads = false);
 
 /// <summary>
 ///     A repository entry that was left out of a review.

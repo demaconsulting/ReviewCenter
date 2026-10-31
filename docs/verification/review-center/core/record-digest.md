@@ -39,6 +39,11 @@ N/A - standard test environment.
   before reopening existed, with the same version line; a record that was reopened gets a final `reopens {count}` line,
   so its digest differs from that of the same record without reopens and from that of the same record with another
   count.
+- A review that follows nothing and has no carried row has exactly the canonical text and digest it had before
+  follow-up reviews existed (the known digest is unchanged); a follow-up gets a `follows {id}` line after the source
+  block and the suffix `carried {id}`, after a space, on a carried answer, not-applicable section, and thread line, and
+  any change of
+  these marks changes the digest, while the number that a carried thread had in the earlier review does not.
 - A null record is rejected with an `ArgumentNullException` by both methods.
 
 #### Test Scenarios
@@ -135,6 +140,30 @@ another time, gives the same digest. This scenario is tested by
 **RecordDigest_Compute_ReorderedAndRenumbered_SameDigest**: The same answers, sections, and threads, listed in another
 order and with other row identities, give the same digest. This scenario is tested by
 `RecordDigest_Compute_ReorderedAndRenumbered_SameDigest`.
+
+**The follow-up lines** are verified in `RecordDigestFollowUpTests.cs` with the same hand-built records.
+
+**RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest**: The smallest known record (an upload with the fingerprint `abc`)
+still has the digest it had before follow-up reviews existed, a null `FollowsReviewId` is the same as none, and the
+text of a full record without markers has neither `follows` nor `carried`. This scenario is tested by
+`RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest`.
+
+**RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat**: A record that follows `rev-0` and carries an
+answer, a not-applicable section, and a thread has the `follows` line straight after the source and the `carried`
+suffix on the three lines, exactly as the design states. This scenario is tested by
+`RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat`.
+
+**RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest**: A theory: another followed review, and a missing or other
+carried mark on the answer, the section, or the thread, each gives a digest that differs from the baseline and from the
+same record that follows nothing. This scenario is tested by `RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest`.
+
+**RecordDigest_Compute_CarriedFromThreadId_NotCovered**: Two records whose carried thread had different numbers in the
+earlier review give the same digest. This scenario is tested by `RecordDigest_Compute_CarriedFromThreadId_NotCovered`.
+
+**ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange**: At the level of the service, the digest
+of a follow-up differs from that of a review that follows nothing and is not changed by a later change of the checklist
+of the project. This scenario is tested by `ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange`,
+which is defined in `ReviewServiceFollowUpTests.cs`.
 
 **RecordDigest_Compute_CommentOrder_ChangesDigest**: The same two comments of a thread in the other order give another
 digest. This scenario is tested by `RecordDigest_Compute_CommentOrder_ChangesDigest`.

@@ -190,7 +190,7 @@
           "ApiEndpoints"
         ],
         "summary": "Creates a review.",
-        "description": "Creates a draft review from uploaded files (Base64) or from a registered git repository; send exactly one of 'files' and 'repository'. The optional 'dueDate' is a UTC calendar day (yyyy-MM-dd), not before today and not more than two years ahead. The review is recorded as created with an API token. Reviewer slots and signatures cannot be changed with an API token.",
+        "description": "Creates a draft review from uploaded files (Base64) or from a registered git repository; send exactly one of 'files' and 'repository'. The optional 'dueDate' is a UTC calendar day (yyyy-MM-dd), not before today and not more than two years ahead. The optional 'followsReviewId' names an earlier review of the project to follow up: its Pass and not-applicable answers, not-applicable sections and open threads are carried over, and 'acknowledgeDroppedThreads' confirms that open threads on files that are not in the new review are not carried (an unfit review or an unacknowledged drop is a 400 problem). The review is recorded as created with an API token. Reviewer slots and signatures cannot be changed with an API token.",
         "operationId": "CreateReview",
         "parameters": [
           {
@@ -695,6 +695,18 @@
               "string"
             ],
             "description": "The optional due date (UTC calendar day, `yyyy-MM-dd`): not before today, at most two years ahead."
+          },
+          "followsReviewId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The optional identifier of an earlier review of the same project that the new review follows up; Pass and not-applicable answers, not-applicable sections and open threads of that review are carried over."
+          },
+          "acknowledgeDroppedThreads": {
+            "type": "boolean",
+            "description": "`true` to confirm that open threads of the followed review on files that are not in the new review are not carried over; without it such a case is refused.",
+            "default": false
           }
         },
         "description": "The request to create a review: either uploaded files or a repository source, never both."
@@ -1157,6 +1169,33 @@
           "nextStep": {
             "type": "string",
             "description": "One short sentence that words what to do next."
+          },
+          "followsReviewId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The review this one follows up, or `null` when it is not a follow-up."
+          },
+          "carriedAnswerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How many checklist answers were carried over from the followed review; 0 when none.",
+            "format": "int32",
+            "default": 0
+          },
+          "carriedThreadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How many open threads were carried over from the followed review; 0 when none.",
+            "format": "int32",
+            "default": 0
           }
         },
         "description": "A review with its details, approval status and counts."
@@ -1222,6 +1261,13 @@
           "overdue": {
             "type": "boolean",
             "description": "`true` when the due date is before today (UTC) and the review is not approved."
+          },
+          "followsReviewId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The review this one follows up, or `null` when it is not a follow-up."
           }
         },
         "description": "A review in a list, without its details."

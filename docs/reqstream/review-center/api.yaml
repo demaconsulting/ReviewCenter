@@ -73,6 +73,19 @@ sections:
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
           - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
 
+      - id: ReviewCenter-Api-FollowUp
+        title: >-
+          The Api subsystem shall let a client with a valid token create a review as a follow-up of an earlier review
+          of the project by naming it in the request that creates the review, refuse a review that cannot be followed
+          with a problem document, creating nothing, and show the followed review in the reviews that it returns.
+        justification: |
+          A pipeline that creates the next draft after a failed review must be able to carry over the work that was
+          fine, and a script that polls the reviews must see which ones are follow-ups without reading a page.
+        children:
+          - ReviewCenter-ApiEndpoints-CreateFollowUp
+        tests:
+          - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
+
       - id: ReviewCenter-Api-EvidenceJourney
         title: >-
           The Api subsystem shall let ReviewMark read the evidence index of a project and follow the file address of an

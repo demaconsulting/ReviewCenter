@@ -148,3 +148,16 @@ sections:
           A missing collaborator is a mistake in the composition root that must show at once.
         tests:
           - AttestationService_Constructor_NullCollaborator_Throws
+
+      - id: ReviewCenter-AttestationService-FollowUp
+        title: >-
+          The AttestationService class shall give the document the review that the reviewed review follows, with the
+          numbers of answers and threads it carried, and the review that a checklist answer, a not-applicable section
+          and a thread came from, taken from the record that the signatures cover, and nothing of the kind for a
+          review that does not follow another.
+        justification: |
+          A reader of the attestation must be able to tell which answers the reviewers of this review gave and which
+          they took over from an earlier review, because the signature approves both and the record says which is
+          which.
+        tests:
+          - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers

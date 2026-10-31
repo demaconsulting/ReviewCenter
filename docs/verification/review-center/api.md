@@ -125,6 +125,12 @@ is not valid is a 400 problem that creates nothing. They are tested by
 `ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag` and
 `ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing`.
 
+**Follow-up review**: The unit tests of `ApiEndpoints` verify the subsystem requirement for the follow-up review: a
+review created with a `followsReviewId` shows it in the answer, the list, and the details, a review that follows
+nothing shows null, and a source that does not exist or has no file in common is a 400 problem that creates nothing.
+It is tested by `ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid`; the rule row is
+verified by `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus`.
+
 **Units**: The bearer sign-in, the refusals, the throttle, and the audit record are verified in the unit tests of
 `ApiTokenAuthentication`; the routes, the creation, and the problem documents in the unit tests of `ApiEndpoints`; the
 document in the unit tests of `ApiDocument`. The rules of the tokens are verified in the `Core` subsystem (the unit

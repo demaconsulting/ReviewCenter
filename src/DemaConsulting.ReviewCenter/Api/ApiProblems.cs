@@ -69,7 +69,7 @@ internal static class ApiProblems
             DomainRule.GitUnavailable => StatusCodes.Status503ServiceUnavailable,
             DomainRule.GitAccessFailed => StatusCodes.Status502BadGateway,
             DomainRule.GitTimeout => StatusCodes.Status504GatewayTimeout,
-            DomainRule.ChecklistDefinitionInvalid or DomainRule.DueDateInvalid => StatusCodes.Status400BadRequest,
+            DomainRule.ChecklistDefinitionInvalid or DomainRule.DueDateInvalid or DomainRule.FollowUpInvalid => StatusCodes.Status400BadRequest,
             DomainRule.ActorNotAllowed
                 or DomainRule.SigningNotAllowed
                 or DomainRule.PasswordChangeRequired => StatusCodes.Status403Forbidden,

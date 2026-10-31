@@ -258,7 +258,10 @@ A development database created before the approval lock existed lacks the table 
 `Projects.RequireNonAuthorChecklistAnswers` and `Projects.RequireNonReopenerSigning`. ReviewCenter has no migrations,
 so delete such a database and let the server
 create it again (see Database in the Administration chapter). The same holds for a database created before the due date
-of a review existed: it lacks the column `Reviews.DueDate`, which is created only for a new database (no migration).
+of a review existed: it lacks the column `Reviews.DueDate`, which is created only for a new database (no migration). The
+same holds for a database created before the follow-up review existed: it lacks the columns `Reviews.FollowsReviewId`,
+`Reviews.CarriedAnswerCount`, `Reviews.CarriedThreadCount`, and the carried-from columns of the answers, the section
+states, and the threads.
 
 ## Puppet Development Tool
 

@@ -16,7 +16,11 @@ line are.
 `FilePath` (the path of one file of the review), `Side` (which version of the file the lines belong to, default
 `Head`), `StartLine` and `EndLine` (both null for a thread on the whole
 file, otherwise an inclusive 1-based range), `State`, `Created`, `Comments` (a list of `ReviewComment`), and the
-derived, not stored, `LastActivity`.
+derived, not stored, `LastActivity`. A thread that was carried over into a follow-up review also has
+`CarriedFromReviewId` (the earlier review it was carried from) and `CarriedFromThreadId` (its number there); both are
+null for every other thread. The carried comments are copies with their original author, user name, text and time.
+When the anchor of a carried thread could not be kept, its last comment is a note by the author `ReviewCenter` (user
+name `(system)`) that names the old anchor (see `ReviewService`).
 
 **ThreadSide**: a closed enumeration with the values `Head` (the version under review) and `Baseline` (the version
 before the change, only for a review from a repository that has a baseline commit). A thread on the whole file is

@@ -83,6 +83,36 @@ public sealed class Review
     public DateOnly? DueDate { get; init; }
 
     /// <summary>
+    ///     Gets the identifier of the earlier review of the same project that this review follows up, or <c>null</c>
+    ///     when it is not a follow-up; at most <see cref="ReviewLimits.MaxReviewIdLength"/> characters.
+    /// </summary>
+    /// <remarks>
+    ///     Always the immediate source (a chain of follow-ups points one step back each time). It is a plain value, not a
+    ///     foreign key, and the source is in the same project by rule. It is part of the record digest (see
+    ///     <see cref="RecordDigest"/>), so a signature binds to what the review was a follow-up of.
+    /// </remarks>
+    public string? FollowsReviewId { get; init; }
+
+    /// <summary>
+    ///     Gets how many checklist answers were carried over from <see cref="FollowsReviewId"/> when the review was
+    ///     created; zero for a review that is not a follow-up. A display and audit value; the carried answers themselves
+    ///     are marked on the answers (<see cref="ChecklistAnswer.CarriedFromReviewId"/>).
+    /// </summary>
+    public int CarriedAnswerCount { get; init; }
+
+    /// <summary>
+    ///     Gets how many open threads were carried over from <see cref="FollowsReviewId"/> when the review was created;
+    ///     zero for a review that is not a follow-up. A display and audit value; see <see cref="ReviewThread.CarriedFromReviewId"/>.
+    /// </summary>
+    public int CarriedThreadCount { get; init; }
+
+    /// <summary>
+    ///     Gets the rows carried over from the followed review, set only when the review is created so that the store
+    ///     writes them in the same transaction; reviews read back from the store do not carry it.
+    /// </summary>
+    public ReviewCarryOver? CarryOver { get; init; }
+
+    /// <summary>
     ///     Gets the content fingerprint of the file set, as computed by <see cref="Fingerprint"/>.
     /// </summary>
     public string ContentFingerprint { get; init; } = string.Empty;

@@ -457,7 +457,14 @@ be before today (UTC) or more than 2 years ahead when the review is created (the
 review that is not approved and whose due date has passed is shown as Overdue. The date can be set or cleared later,
 also to a past day, by a project administrator, a system administrator, or the creator of the review, never with an API
 token, and not while the review is Approved (locked). The change is audited, and the date is not part of the record
-digest, so it does not make a signature out of date. An
+digest, so it does not make a signature out of date. A review can be created as a follow-up of an earlier review of the
+same project (typically after a review had a Fail): the Pass and N/A answers of checks whose wording is unchanged, the
+not-applicable sections with the same title, and the open threads on files that are in the new review are carried over
+and marked with the review they came from, while Fail answers, resolved threads, reviewer slots, signatures and reopenings
+are not; the person who creates the follow-up does not become the answerer of what was carried over, so the
+independence rules are unchanged, and a carried open thread blocks approval until it is resolved. The record digest
+binds to which review is followed and which rows were carried (and is unchanged for every review that is not a
+follow-up). An
 Approved review can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
 (a self-signed key by default, or a certificate from a certificate store), proves that the document is unchanged and
 comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
@@ -496,7 +503,8 @@ users have no system administrator flag, and its repositories have no project), 
 users have no `MustChangePassword` column), or before the approval lock (its projects have no
 `RequireIndependentReviewers` column and it has no `ReviewReopens` table), or before the review rule switches (its projects
 have no `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns), or before the review due date (its
-reviews have no `DueDate` column) must be
+reviews have no `DueDate` column), or before the follow-up review (its reviews, answers, section states and threads lack
+the follow-up columns) must be
 deleted and created again, because there are no migrations (the schema is created with `EnsureCreated`, so a
 development database must be deleted and recreated whenever the schema changes).
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
@@ -659,7 +667,8 @@ is running.
   `MustChangePassword` column), or before the approval lock (its projects lack the `RequireIndependentReviewers`
   column and it has no `ReviewReopens` table), or before the review rule switches (its projects lack the
   `RequireNonAuthorChecklistAnswers` and `RequireNonReopenerSigning` columns), or before the review due date (its
-  reviews lack the `DueDate` column) must be deleted and
+  reviews lack the `DueDate` column), or before the follow-up review (its reviews, answers, section states and threads
+  lack the follow-up columns) must be deleted and
   created again; development databases are simply deleted and recreated. The audit table is append-only for the
   application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`

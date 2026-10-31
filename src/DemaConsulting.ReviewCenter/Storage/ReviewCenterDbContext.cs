@@ -38,7 +38,9 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     <c>TotpRecoveryCodes</c>): a database from before them must be deleted and recreated. The same is true for
 ///     the <c>ReviewReopens</c> table, for the <c>RequireIndependentReviewers</c>,
 ///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects, and for the
-///     <c>DueDate</c> column of reviews. Instances are
+///     <c>DueDate</c> column of reviews, and for the follow-up columns (<c>FollowsReviewId</c>, <c>CarriedAnswerCount</c>
+///     and <c>CarriedThreadCount</c> of reviews and the <c>CarriedFromReviewId</c> and <c>CarriedFromThreadId</c> columns
+///     of answers, section states and threads). Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -259,6 +261,13 @@ internal sealed class ReviewCenterDbContext : DbContext
             // of the earlier reviews of a set; it is not unique because a set is reviewed again and again
             review.Property(r => r.ReviewSetId).HasMaxLength(ReviewLimits.MaxReviewSetIdLength);
             review.HasIndex(r => new { r.ProjectId, r.RepositoryId, r.ReviewSetId });
+
+            // The review a follow-up follows: a plain value (no foreign key; the source is in the same project by rule),
+            // indexed so the reviews that follow a review can be found. The carried rows travel with the review only
+            // when it is created, so the property that holds them is not mapped
+            review.Property(r => r.FollowsReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            review.HasIndex(r => new { r.ProjectId, r.FollowsReviewId });
+            review.Ignore(r => r.CarryOver);
             review.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
             review.HasMany(r => r.Files)
                 .WithOne()
@@ -288,6 +297,9 @@ internal sealed class ReviewCenterDbContext : DbContext
             thread.Property(t => t.FilePath).IsRequired().HasMaxLength(ReviewLimits.MaxPathLength);
             thread.Property(t => t.State).HasConversion<string>().HasMaxLength(StateColumnLength);
             thread.Property(t => t.Side).HasConversion<string>().HasMaxLength(StateColumnLength).HasDefaultValue(ThreadSide.Head);
+
+            // A carried thread names the review and the thread it was copied from (plain values, no foreign keys)
+            thread.Property(t => t.CarriedFromReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             thread.HasOne<ReviewFile>()
                 .WithMany()
                 .HasForeignKey(t => new { t.ProjectId, t.ReviewId, t.FilePath })
@@ -414,6 +426,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             section.Property(s => s.Reason).HasMaxLength(ReviewLimits.MaxJustificationLength);
             section.Property(s => s.SetBy).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
             section.Property(s => s.SetByUsername).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength);
+            section.Property(s => s.CarriedFromReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             section.HasOne<Review>()
                 .WithMany()
                 .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
@@ -429,6 +442,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             answer.Property(a => a.Justification).HasMaxLength(ReviewLimits.MaxJustificationLength);
             answer.Property(a => a.AnsweredBy).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
             answer.Property(a => a.AnsweredByUsername).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength);
+            answer.Property(a => a.CarriedFromReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             answer.HasOne<Review>()
                 .WithMany()
                 .HasForeignKey(a => new { a.ProjectId, a.ReviewId })

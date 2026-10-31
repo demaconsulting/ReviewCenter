@@ -423,6 +423,17 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             async context =>
             {
                 context.Reviews.Add(review);
+
+                // The rows carried over from the review this one follows are saved in the same call, so the review and
+                // everything carried exist together or not at all. Threads are copied so the database assigns their
+                // identities without touching the caller's objects
+                if (review.CarryOver is { } carry)
+                {
+                    context.ChecklistAnswers.AddRange(carry.Answers);
+                    context.ChecklistSectionStates.AddRange(carry.SectionStates);
+                    context.Threads.AddRange(carry.Threads.Select(CopyCarriedThread));
+                }
+
                 try
                 {
                     await context.SaveChangesAsync(cancellationToken);
@@ -1162,7 +1173,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     {
         var header = await context.Reviews.AsNoTracking()
             .Where(r => r.ProjectId == projectId && r.Id == reviewId)
-            .Select(r => new { r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId })
+            .Select(r => new { r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId, r.FollowsReviewId })
             .FirstOrDefaultAsync(cancellationToken);
         if (header is null)
         {
@@ -1206,7 +1217,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .ToListAsync(cancellationToken);
         var reopens = await context.ReviewReopens.AsNoTracking()
             .CountAsync(r => r.ProjectId == projectId && r.ReviewId == reviewId, cancellationToken);
-        return new ReviewRecord(header.ContentFingerprint, checklist, sections, answers, threads, source, reopens);
+        return new ReviewRecord(header.ContentFingerprint, checklist, sections, answers, threads, source, reopens, header.FollowsReviewId);
     }
 
     /// <summary>
@@ -1228,7 +1239,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     .SetProperty(x => x.Reason, state.Reason)
                     .SetProperty(x => x.SetBy, state.SetBy)
                     .SetProperty(x => x.SetByUsername, state.SetByUsername)
-                    .SetProperty(x => x.SetAt, state.SetAt),
+                    .SetProperty(x => x.SetAt, state.SetAt)
+                    .SetProperty(x => x.CarriedFromReviewId, state.CarriedFromReviewId),
                 cancellationToken);
     }
 
@@ -1251,8 +1263,32 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     .SetProperty(x => x.Justification, answer.Justification)
                     .SetProperty(x => x.AnsweredBy, answer.AnsweredBy)
                     .SetProperty(x => x.AnsweredByUsername, answer.AnsweredByUsername)
-                    .SetProperty(x => x.AnsweredAt, answer.AnsweredAt),
+                    .SetProperty(x => x.AnsweredAt, answer.AnsweredAt)
+                    .SetProperty(x => x.CarriedFromReviewId, answer.CarriedFromReviewId),
                 cancellationToken);
+    }
+
+    /// <summary>
+    ///     Copies a carried thread into a fresh entity without identities, so the database assigns them.
+    /// </summary>
+    /// <param name="thread">The carried thread.</param>
+    /// <returns>The fresh thread with fresh copies of its comments.</returns>
+    private static ReviewThread CopyCarriedThread(ReviewThread thread)
+    {
+        return new ReviewThread
+        {
+            ProjectId = thread.ProjectId,
+            ReviewId = thread.ReviewId,
+            FilePath = thread.FilePath,
+            Side = thread.Side,
+            StartLine = thread.StartLine,
+            EndLine = thread.EndLine,
+            State = thread.State,
+            Created = thread.Created,
+            CarriedFromReviewId = thread.CarriedFromReviewId,
+            CarriedFromThreadId = thread.CarriedFromThreadId,
+            Comments = thread.Comments.Select(c => NewComment(c)).ToList()
+        };
     }
 
     /// <summary>

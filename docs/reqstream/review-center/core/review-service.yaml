@@ -320,3 +320,73 @@ sections:
           - ReviewService_SetDueDateAsync_MissingReview_IsNotFound
           - ReviewService_SetDueDateAsync_ApprovedReview_IsLockedAndNeverOverdue
           - ReviewService_SetDueDateAsync_ChangedByOtherMeanwhile_FailsAsRecordChanged
+
+      - id: ReviewCenter-ReviewService-FollowUp
+        title: >-
+          The ReviewService class shall let a review be created, from files, from a repository, or from a plan, as a
+          follow-up of an earlier review of the same project, given by an optional review identifier, that points to
+          that review only (a follow-up of a follow-up points to the one before it), shall accept the earlier review
+          whether it is still in review or approved, shall refuse with the FollowUpInvalid rule, storing nothing, an
+          earlier review that does not exist in the project (with one message that does not tell whether it exists in
+          another project), reviews that both belong to a review-set but to different ones, reviews that do not have
+          the same kind of source or were made from different repositories, and reviews that have no file in common,
+          shall refuse the same way, naming the files, a follow-up that would drop open threads of files that the new
+          review does not have unless the creator acknowledges it, and shall name the followed review and what was
+          carried in the audit entry of the creation, and only when a review follows another.
+        justification: |
+          A review that failed is followed by a new review of the corrected content, and the people who answered the
+          earlier review should not have to do their work twice. The rules keep a follow-up to a real continuation of
+          the same work: a review of other files, another repository or another set would carry answers and threads
+          that do not belong to it. Nothing that is dropped may be dropped silently, so the creator confirms it. A
+          message that did not distinguish an unknown review from one of another project would let a user probe the
+          reviews of projects they cannot see.
+        tests:
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
+          - ReviewService_CreateDraftAsync_NoFollowUp_HasNoCarriedData
+          - ReviewService_CreateDraftAsync_UnknownOrForeignSource_IsRefusedWithoutRevealing
+          - ReviewService_CreateDraftAsync_UploadFollowUp_NeedsACommonFile
+          - ReviewService_CreateFollowUp_UploadRepositoryAndOtherRepository_AreRefused
+          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
+          - ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless
+          - ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource
+          - ReviewService_CreateFromSessionAsync_ReviewSet_MustMatch
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts
+          - ReviewService_FollowUp_DuplicateId_IsRefusedAndNothingChanges
+          - FollowUpCarry_CheckFit_Matrix
+          - FollowUpCarry_DroppedMessage_ListsFilesAndTheRest
+          - FollowUpCarry_NullArguments_Throw
+
+      - id: ReviewCenter-ReviewService-FollowUpCarry
+        title: >-
+          The ReviewService class shall, for a follow-up review, work out what it takes over with a pure function and
+          store it together with the review in one call: the Pass and N/A answers of checks that are in the checklist
+          of the new review with the same wording, with their outcome, justification, answerer and time, but not the
+          Fail answers; the not-applicable sections that are in the new checklist with the same title, with their
+          reasons; and the open threads whose file is in the new review, with every comment unchanged and the thread
+          open. A thread keeps its line anchor only when the file has the same content on the side it is anchored to,
+          and otherwise refers to the whole file, with a note from the system, added after the comments, that gives the
+          original anchor. Resolved threads, reviewer slots, signatures and reopenings are not carried, the person who
+          creates the follow-up does not become the answerer of anything, and everything that is carried is marked with
+          the review it came from.
+        justification: |
+          What a person has already answered and not failed is still true of unchanged wording, and answering it again
+          wastes time and invites mistakes. A Fail is the reason for the follow-up, so it must be answered again. A
+          line number of a file that changed would point at other code, so the thread moves to the whole file and says
+          where it was. The original text and author of a comment are evidence, so they are copied unchanged. Slots and
+          signatures belong to the record that was signed, and the person who creates the review must not look like
+          the one who answered. A failed carry must not leave a half-built review, so all rows are stored together.
+        tests:
+          - FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer
+          - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
+          - FollowUpCarry_Compute_SourceWithoutChecklist_CarriesNoChecklistRows
+          - FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame
+          - FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim
+          - FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed
+          - FollowUpCarry_Compute_LineAnchor_IsKeptOnlyForIdenticalContent
+          - FollowUpCarry_Compute_SingleLineWholeFileAndUnknownHash_AreHandled
+          - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered
+          - ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried
+          - ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors
+          - ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor
+          - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
+          - ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened

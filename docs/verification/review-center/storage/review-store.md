@@ -460,3 +460,21 @@ single-review definition for every identifier, and an empty input gives an empty
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The
 transaction that stores a change with its audit entry, and the linear chain of changes made through different
 stores, are verified in the tests of `AuditStore`.
+
+**The follow-up review** is verified in `ReviewFollowUpStoreTests.cs` against a real SQLite database file, with the real
+`AuditAppender` and a helper store that has a project with the review `REV-1`.
+
+**ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn**: A follow-up review is added with a carried answer, a
+carried not-applicable section, and a carried thread with a comment. Read back, the review has `FollowsReviewId` and the
+two counts, the answer, the section, and the thread have the carried marks (and the thread its original number), the
+comment is unchanged, the record that a signature covers has them, and the audit chain verifies. This scenario is tested
+by `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`.
+
+**ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing**: A carried thread names a file that the new review does
+not have, so the database refuses. Afterwards the review, every carried row, and the audit entry do not exist, and the
+followed review is unchanged. This scenario is tested by `ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing`.
+
+**ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker**: An answer and a section state
+that were carried are set again by another person; the stored rows are the new ones, have no marker, and there is still
+one row each, while the carried thread keeps its marker. This scenario is tested by
+`ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`.

@@ -33,6 +33,12 @@ name when only that is known. Only the structured name fields (the author of a c
 signer, the slot members, who reopened the review, who asked) are replaced; names that people typed into a comment
 or a justification are the author's own text and stay.
 
+The document also carries what a follow-up review took over: `FollowsReviewId` and the two counts from the review
+(`CarriedAnswerCount`, `CarriedThreadCount`), and for every answer, not-applicable section, and listed thread the review
+it was carried from (`CarriedFromReviewId` of the record rows). They are all absent or zero for a review that follows
+nothing, and then the document is the same as before. The review identifiers are not personal data, so the reviewer
+names switch does not affect them.
+
 The document also carries the reopen history of the approval (`ReviewApproval.Reopens`, read by `SigningService`): for
 every time an administrator reopened the review after an approval, when, by whom (written as "display name (user name)"
 with the reviewer names switch on and as a participant label with it off, like every other person), the reason, and the

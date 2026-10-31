@@ -458,7 +458,10 @@ internal sealed class AttestationService
                     people.Name(r.ReopenedByDisplayName, r.ReopenedBy, true),
                     r.Reason,
                     r.PreviousDigest))
-                .ToList());
+                .ToList(),
+            record.FollowsReviewId,
+            review.CarriedAnswerCount,
+            review.CarriedThreadCount);
     }
 
     /// <summary>
@@ -489,8 +492,12 @@ internal sealed class AttestationService
                         item.Text,
                         answer is null ? "Not answered" : OutcomeText(answer.Outcome),
                         answer?.Justification,
-                        answer is null ? null : people.Name(answer.AnsweredBy, answer.AnsweredByUsername, false));
-                }).ToList()))
+                        answer is null ? null : people.Name(answer.AnsweredBy, answer.AnsweredByUsername, false),
+                        answer?.CarriedFromReviewId);
+                }).ToList(),
+                state.IsApplicable(section.Id)
+                    ? null
+                    : record.SectionStates.FirstOrDefault(s => s.SectionId == section.Id && !s.Applicable)?.CarriedFromReviewId))
             .ToList();
     }
 
@@ -532,7 +539,8 @@ internal sealed class AttestationService
         return new AttestationThread(
             thread.FilePath + lines,
             text.Length <= SummaryLength ? text : text[..SummaryLength] + "...",
-            thread.Comments.Count);
+            thread.Comments.Count,
+            thread.CarriedFromReviewId);
     }
 
     /// <summary>

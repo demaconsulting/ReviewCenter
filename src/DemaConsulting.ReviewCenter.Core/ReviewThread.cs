@@ -78,6 +78,18 @@ public sealed class ReviewThread
     public DateTimeOffset Created { get; init; }
 
     /// <summary>
+    ///     Gets the identifier of the earlier review this thread was carried over from when the review was created as a
+    ///     follow-up, or <c>null</c> for a thread started in this review. Part of the record digest.
+    /// </summary>
+    public string? CarriedFromReviewId { get; init; }
+
+    /// <summary>
+    ///     Gets the identity the thread had in <see cref="CarriedFromReviewId"/>, or <c>null</c> for a thread started in
+    ///     this review. It is not part of the record digest (identities never are).
+    /// </summary>
+    public int? CarriedFromThreadId { get; init; }
+
+    /// <summary>
     ///     Gets the comments of the thread in posting order; never empty for a stored thread.
     /// </summary>
     public List<ReviewComment> Comments { get; init; } = [];

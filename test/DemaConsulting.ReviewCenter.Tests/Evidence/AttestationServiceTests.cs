@@ -417,6 +417,38 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that the attestation of an approved follow-up review names the review it follows with the counts of
+    ///     what was carried, and marks the carried checklist answers, while the review that follows nothing has
+    ///     neither the row nor the marks.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers()
+    {
+        // Arrange: an approved review and an approved follow-up that carried every Pass answer
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        await fixture.CreateSignedFollowUpAsync("rev-2");
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+        var answerCount = DefaultChecklist.Current.Sections.Sum(section => section.Items.Count);
+
+        // Act
+        var followUp = await service.GenerateAsync(fixture.ProjectId, "rev-2", TestActors.Ann, cancellationToken);
+        var original = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
+
+        // Assert: the row and the marks only on the follow-up
+        Assert.Equal(AttestationStatus.Ok, followUp.Status);
+        Assert.Equal(AttestationStatus.Ok, original.Status);
+        var followText = string.Join("\n", new PdfInspector(followUp.Content!).TextLines);
+        Assert.Contains("Follows review", followText, StringComparison.Ordinal);
+        Assert.Contains($"rev-1 ({answerCount} answers and 0 threads carried)", followText, StringComparison.Ordinal);
+        Assert.Contains("Carried from review rev-1", followText, StringComparison.Ordinal);
+        var originalText = string.Join("\n", new PdfInspector(original.Content!).TextLines);
+        Assert.DoesNotContain("Follows review", originalText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Carried from review", originalText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the creation is recorded in the audit trail with the digest, the chain head, the hash of the
     ///     PDF and the key, under the name of the user who asked.
     /// </summary>

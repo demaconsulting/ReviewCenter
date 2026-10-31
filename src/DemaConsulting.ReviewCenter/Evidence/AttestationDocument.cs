@@ -67,6 +67,9 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     The times the review was reopened by an administrator after an earlier approval, oldest first; <c>null</c> or
 ///     empty when it never was. The renderer prints the reopen history only when there is any.
 /// </param>
+/// <param name="FollowsReviewId">The review this one follows up, or <c>null</c>; the renderer prints a row only when it is set.</param>
+/// <param name="CarriedAnswerCount">How many checklist answers were carried over from the followed review.</param>
+/// <param name="CarriedThreadCount">How many open threads were carried over from the followed review.</param>
 internal sealed record AttestationDocument(
     int ProjectId,
     string ProjectName,
@@ -94,7 +97,10 @@ internal sealed record AttestationDocument(
     string GeneratedBy,
     EvidenceSettings Content,
     bool IsAnonymousRequest,
-    IReadOnlyList<AttestationReopen>? Reopens = null);
+    IReadOnlyList<AttestationReopen>? Reopens = null,
+    string? FollowsReviewId = null,
+    int CarriedAnswerCount = 0,
+    int CarriedThreadCount = 0);
 
 /// <summary>A time the review was reopened after an approval.</summary>
 /// <param name="ReopenedAt">The time of the reopen.</param>
@@ -116,12 +122,14 @@ internal sealed record AttestationFile(string Path, string Status, string Sha256
 /// <param name="IsApplicable">Whether the section applies to the review.</param>
 /// <param name="Reason">The reason the section does not apply, or <c>null</c>.</param>
 /// <param name="Items">The checks of the section.</param>
+/// <param name="CarriedFrom">The review the not-applicable state was carried over from, or <c>null</c>.</param>
 internal sealed record AttestationSection(
     string Id,
     string Title,
     bool IsApplicable,
     string? Reason,
-    IReadOnlyList<AttestationCheck> Items);
+    IReadOnlyList<AttestationCheck> Items,
+    string? CarriedFrom = null);
 
 /// <summary>A check of the checklist and its answer.</summary>
 /// <param name="Id">The identifier of the check.</param>
@@ -129,13 +137,21 @@ internal sealed record AttestationSection(
 /// <param name="Outcome">The outcome: <c>Pass</c>, <c>Fail</c>, <c>N/A</c> or <c>Not answered</c>.</param>
 /// <param name="Comment">The justification the reviewer gave, or <c>null</c>.</param>
 /// <param name="AnsweredBy">The display name of the user who answered, or <c>null</c>.</param>
-internal sealed record AttestationCheck(string Id, string Text, string Outcome, string? Comment, string? AnsweredBy);
+/// <param name="CarriedFrom">The review the answer was carried over from, or <c>null</c> for an answer given in this review.</param>
+internal sealed record AttestationCheck(
+    string Id,
+    string Text,
+    string Outcome,
+    string? Comment,
+    string? AnsweredBy,
+    string? CarriedFrom = null);
 
 /// <summary>A comment thread that was resolved.</summary>
 /// <param name="Location">Where the thread is: the file and lines.</param>
 /// <param name="Summary">The first comment, shortened, with its author.</param>
 /// <param name="CommentCount">The number of comments in the thread.</param>
-internal sealed record AttestationThread(string Location, string Summary, int CommentCount);
+/// <param name="CarriedFrom">The review the thread was carried over from, or <c>null</c> for a thread started in this review.</param>
+internal sealed record AttestationThread(string Location, string Summary, int CommentCount, string? CarriedFrom = null);
 
 /// <summary>A reviewer slot and the signature that approves the record.</summary>
 /// <param name="Number">The number of the slot.</param>

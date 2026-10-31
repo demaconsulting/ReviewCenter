@@ -61,6 +61,7 @@ public class ApiEndpointsTests
     [InlineData(DomainRule.PasswordChangeRequired, 403)]
     [InlineData(DomainRule.ChecklistDefinitionInvalid, 400)]
     [InlineData(DomainRule.DueDateInvalid, 400)]
+    [InlineData(DomainRule.FollowUpInvalid, 400)]
     public void ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus(DomainRule rule, int status)
     {
         // Arrange: nothing to prepare
@@ -530,6 +531,64 @@ public class ApiEndpointsTests
         var list = await client.GetAsync($"/api/projects/{project.Id}/reviews", TestContext.Current.CancellationToken);
         using var json = await JsonAsync(list);
         Assert.Empty(json.RootElement.EnumerateArray());
+    }
+
+    /// <summary>
+    ///     Test that a review created with <c>followsReviewId</c> says so in the answer, the details and the list, that
+    ///     a review that follows nothing shows null, and that a source that does not exist or has no file in
+    ///     common is a 400 problem and creates nothing.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid()
+    {
+        // Arrange: a project, a token and an earlier review with one file
+        await using var app = await StartAsync();
+        var token = await CreateTokenAsync(app);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        object Body(string id, string? followsReviewId, string path = "a.txt") => new
+        {
+            id,
+            title = "Follow",
+            followsReviewId,
+            acknowledgeDroppedThreads = false,
+            files = new[] { new { path, contentBase64 = Convert.ToBase64String("one\n"u8.ToArray()) } }
+        };
+
+        // Act
+        var first = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(Body("REV-1", null)), TestContext.Current.CancellationToken);
+        var second = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(Body("REV-2", "REV-1")), TestContext.Current.CancellationToken);
+        var unknown = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(Body("REV-3", "NOPE")), TestContext.Current.CancellationToken);
+        var disjoint = await client.PostAsync($"/api/projects/{project.Id}/reviews", Json(Body("REV-4", "REV-1", "other.txt")), TestContext.Current.CancellationToken);
+        using var secondJson = await JsonAsync(second);
+        var detail = await client.GetAsync($"/api/projects/{project.Id}/reviews/REV-2", TestContext.Current.CancellationToken);
+        var plain = await client.GetAsync($"/api/projects/{project.Id}/reviews/REV-1", TestContext.Current.CancellationToken);
+        var list = await client.GetAsync($"/api/projects/{project.Id}/reviews", TestContext.Current.CancellationToken);
+        using var detailJson = await JsonAsync(detail);
+        using var plainJson = await JsonAsync(plain);
+        using var listJson = await JsonAsync(list);
+
+        // Assert: created, shown in the answer, the details and the list
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        Assert.Equal("REV-1", secondJson.RootElement.GetProperty("review").GetProperty("followsReviewId").GetString());
+        Assert.Equal("REV-1", detailJson.RootElement.GetProperty("followsReviewId").GetString());
+        Assert.Equal(0, detailJson.RootElement.GetProperty("carriedAnswerCount").GetInt32());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, plainJson.RootElement.GetProperty("followsReviewId").ValueKind);
+        var rows = listJson.RootElement.EnumerateArray().ToDictionary(r => r.GetProperty("id").GetString()!);
+        Assert.Equal("REV-1", rows["REV-2"].GetProperty("followsReviewId").GetString());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, rows["REV-1"].GetProperty("followsReviewId").ValueKind);
+
+        // Assert: the invalid ones are problems that name the reason, and created nothing
+        foreach (var refused in new[] { unknown, disjoint })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            Assert.Equal("application/problem+json", refused.Content.Headers.ContentType?.MediaType);
+        }
+
+        Assert.Contains("cannot be followed up", await unknown.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Contains("no file in common", await disjoint.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(["REV-1", "REV-2"], rows.Keys.Order());
     }
 
     /// <summary>

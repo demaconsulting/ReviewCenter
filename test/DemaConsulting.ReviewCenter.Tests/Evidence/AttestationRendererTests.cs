@@ -224,6 +224,42 @@ public class AttestationRendererTests
     }
 
     /// <summary>
+    ///     Test that a follow-up document shows the followed review with the carried counts and the carried-from marks
+    ///     of checklist items, sections and threads, and that a document that follows nothing shows none of them.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks()
+    {
+        // Arrange: the sample, once as a follow-up with marks on one check, the section and the thread, once plain
+        var plain = Sample();
+        var followUp = plain with
+        {
+            FollowsReviewId = "rev-0",
+            CarriedAnswerCount = 4,
+            CarriedThreadCount = 1,
+            Sections =
+            [
+                plain.Sections[0] with
+                {
+                    Items = [plain.Sections[0].Items[0] with { CarriedFrom = "rev-0" }]
+                },
+                plain.Sections[1] with { CarriedFrom = "rev-0" }
+            ],
+            ResolvedThreads = [plain.ResolvedThreads[0] with { CarriedFrom = "rev-0" }]
+        };
+
+        // Act
+        var followText = string.Join("\n", Render(followUp).TextLines);
+        var plainText = string.Join("\n", Render(plain).TextLines);
+
+        // Assert: the row, and one mark per carried part; none without a follow-up
+        Assert.Contains("Follows review\nrev-0 (4 answers and 1 threads carried)", followText, StringComparison.Ordinal);
+        Assert.Equal(3, followText.Split("Carried from review rev-0", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("Follows review", plainText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Carried from review", plainText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the thread summary gives the open and resolved counts and describes resolved threads.
     /// </summary>
     [Fact]

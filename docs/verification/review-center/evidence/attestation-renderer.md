@@ -148,3 +148,9 @@ uploaded review is not affected. This scenario is tested by
 **AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts**: A document with every switch off is rendered.
 The parts that are always included are still printed, and every omitted part is named in the Content scope section. This
 scenario is tested by `AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts`.
+
+**AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks**: A document that follows a review, with
+carried marks on a check, a section, and a thread, is rendered. The Review section has the row "Follows review"
+with the followed review and the counts, and the marked parts say they were carried from that review; a document that
+follows nothing shows none of them. This scenario is tested by
+`AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks`.

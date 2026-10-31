@@ -100,6 +100,9 @@ N/A - standard test environment.
 - A user without a second factor signs with the password alone and gets the message that names only the password; an
   external user is not affected; an actor that came through a token is refused and does not spend the code; after an
   administrator reset the user signs with the password alone again.
+- The answers a follow-up review carried count as answered and do not block approval, a carried open thread blocks it
+  until it is resolved, the creator of the follow-up stays the author for the independence rule, and an approved
+  follow-up is locked and can be reopened like any review.
 
 #### Test Scenarios
 
@@ -418,3 +421,10 @@ and no code, which is tested by `SigningService_SignAsync_ExternalUser_IsNotAffe
 came through a token is refused with `ActorNotAllowed` and the code is still good for the person, which is tested by
 `SigningService_SignAsync_ApiTokenActorWithPasswordAndCode_IsRefusedAndKeepsTheCode`. After an administrator reset the
 user signs with the password alone, which is tested by `SigningService_SignAsync_AfterAdministratorReset_NeedsNoCode`.
+
+**SigningService follow-up scenarios**: The review of a follow-up that carried answers and threads is verified in
+`ReviewServiceFollowUpTests.cs` with the real `SigningService`: the carried answers do not block approval and the
+carried open thread does, which is tested by `ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`;
+the creator of the follow-up is still the author for the rule of independent reviewers, which is tested by
+`ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`; and a follow-up is locked when approved and can be
+reopened like any review, which is tested by `ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened`.

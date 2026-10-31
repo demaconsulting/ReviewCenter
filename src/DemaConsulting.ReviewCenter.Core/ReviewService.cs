@@ -120,11 +120,20 @@ public sealed class ReviewService
     ///     The optional due date: a calendar day in UTC that is not before today and not more than
     ///     <see cref="MaxDueDateYearsAhead"/> years ahead; <c>null</c> for none.
     /// </param>
+    /// <param name="followsReviewId">
+    ///     The identifier of an earlier review of the same project that the new review follows up, or <c>null</c> (or
+    ///     blank) for an ordinary review; see <see cref="FollowUpCarry"/> for what is carried over.
+    /// </param>
+    /// <param name="acknowledgeDroppedThreads">
+    ///     <c>true</c> when the creator has checked the open threads of the earlier review whose files are not in the new
+    ///     review (they are not carried); without it such threads make the creation fail with
+    ///     <see cref="DomainRule.FollowUpInvalid"/>.
+    /// </param>
     /// <returns>The created review, including its fingerprint and file metadata.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="files"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when any rule is violated (see <see cref="DomainRule"/>), among them
-    ///     <see cref="DomainRule.DueDateInvalid"/>; nothing is stored then.
+    ///     <see cref="DomainRule.DueDateInvalid"/> and <see cref="DomainRule.FollowUpInvalid"/>; nothing is stored then.
     /// </exception>
     public async Task<Review> CreateDraftAsync(
         int projectId,
@@ -133,7 +142,9 @@ public sealed class ReviewService
         IReadOnlyList<UploadedFile> files,
         Actor actor,
         CancellationToken cancellationToken = default,
-        DateOnly? dueDate = null)
+        DateOnly? dueDate = null,
+        string? followsReviewId = null,
+        bool acknowledgeDroppedThreads = false)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(actor);
@@ -169,13 +180,17 @@ public sealed class ReviewService
             .ToList();
 
         // The fingerprint covers the file hashes only; see Fingerprint for the exact algorithm
+        var created = _timeProvider.GetUtcNow();
+        var follow = NormalizeFollows(followsReviewId);
+        var carry = await PrepareFollowUpAsync(
+            projectId, id!, follow, acknowledgeDroppedThreads, null, null, reviewFiles, checklistDefinition, created, cancellationToken);
         var review = new Review
         {
             ProjectId = projectId,
             Id = id!,
             Title = trimmedTitle,
             State = ReviewState.Draft,
-            Created = _timeProvider.GetUtcNow(),
+            Created = created,
             CreatedBy = actor.Username,
             CreatedViaApi = actor.ViaApiToken,
             DueDate = dueDate,
@@ -184,16 +199,22 @@ public sealed class ReviewService
 
             // The checklist is frozen now: later changes of the project's definition or of the default never alter
             // this review's checks
-            Checklist = NewChecklist(projectId, id!, checklistDefinition)
+            Checklist = NewChecklist(projectId, id!, checklistDefinition),
+            FollowsReviewId = follow,
+            CarriedAnswerCount = carry?.Answers.Count ?? 0,
+            CarriedThreadCount = carry?.Threads.Count ?? 0,
+            CarryOver = carry
         };
 
-        // An API-created review says so in the trail (at the end: the upload detail is short enough to always fit)
+        // An API-created review says so in the trail (at the end: the upload detail is short enough to always fit); a
+        // follow-up uses a shorter title so the follow-up text always fits as well
+        var titleText = follow is null ? trimmedTitle : AuditText.Clean(trimmedTitle, 100);
         await _store.AddReviewAsync(
             review,
             AuditDraft.By(
                 actor,
                 "review.created",
-                $"review '{trimmedTitle}', fingerprint {review.ContentFingerprint}, {reviewFiles.Count} file{(reviewFiles.Count == 1 ? string.Empty : "s")}{DueText(dueDate)}{CreatedViaText(actor)}",
+                $"review '{titleText}', fingerprint {review.ContentFingerprint}, {reviewFiles.Count} file{(reviewFiles.Count == 1 ? string.Empty : "s")}{FollowText(follow, carry)}{DueText(dueDate)}{CreatedViaText(actor)}",
                 projectId,
                 id),
             cancellationToken);
@@ -214,13 +235,15 @@ public sealed class ReviewService
     /// <param name="actor">The signed-in user creating the review; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <param name="dueDate">The optional due date; same rules as for <see cref="CreateDraftAsync"/>.</param>
+    /// <param name="followsReviewId">The earlier review to follow up; same rules as for <see cref="CreateDraftAsync"/>.</param>
+    /// <param name="acknowledgeDroppedThreads">Whether dropped open threads are acknowledged; see <see cref="CreateDraftAsync"/>.</param>
     /// <returns>The created review and the entries that were skipped (symbolic links, submodules, unusable paths).</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the service was created without repository access.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
-    ///     <see cref="DomainRule.NothingToReview"/> when no file matching the selection changed and
-    ///     <see cref="DomainRule.DueDateInvalid"/>; nothing is stored then.
+    ///     <see cref="DomainRule.NothingToReview"/> when no file matching the selection changed,
+    ///     <see cref="DomainRule.DueDateInvalid"/> and <see cref="DomainRule.FollowUpInvalid"/>; nothing is stored then.
     /// </exception>
     /// <remarks>
     ///     The server fetches the repository, resolves both revisions to commits, lists the changes, keeps those that
@@ -236,7 +259,9 @@ public sealed class ReviewService
         RepositorySource source,
         Actor actor,
         CancellationToken cancellationToken = default,
-        DateOnly? dueDate = null)
+        DateOnly? dueDate = null,
+        string? followsReviewId = null,
+        bool acknowledgeDroppedThreads = false)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(actor);
@@ -266,7 +291,9 @@ public sealed class ReviewService
             session,
             access,
             projectId,
-            new SessionReviewRequest(id!, trimmedTitle, headSha, baselineSha, patterns, selectionText, null, head, baseline, dueDate),
+            new SessionReviewRequest(
+                id!, trimmedTitle, headSha, baselineSha, patterns, selectionText, null, head, baseline, dueDate,
+                NormalizeFollows(followsReviewId), acknowledgeDroppedThreads),
             actor,
             cancellationToken);
     }
@@ -300,7 +327,7 @@ public sealed class ReviewService
         Actor actor,
         CancellationToken cancellationToken)
     {
-        var (id, trimmedTitle, headSha, baselineSha, patterns, selectionText, reviewSetId, headLabel, baselineLabel, dueDate) = request;
+        var (id, trimmedTitle, headSha, baselineSha, patterns, selectionText, reviewSetId, headLabel, baselineLabel, dueDate, follow, acknowledgeDroppedThreads) = request;
 
         // The due date is checked here too, so every creation path (the planner calls this method directly) is covered
         // and a bad date fails before the repository is read
@@ -352,13 +379,16 @@ public sealed class ReviewService
         }
 
         // Only files that exist at the head take part in the fingerprint, as in the ReviewMark checkout
+        var created = _timeProvider.GetUtcNow();
+        var carry = await PrepareFollowUpAsync(
+            projectId, id, follow, acknowledgeDroppedThreads, access.RepositoryId, reviewSetId, files, checklistDefinition, created, cancellationToken);
         var review = new Review
         {
             ProjectId = projectId,
             Id = id,
             Title = trimmedTitle,
             State = ReviewState.Draft,
-            Created = _timeProvider.GetUtcNow(),
+            Created = created,
             CreatedBy = actor.Username,
             CreatedViaApi = actor.ViaApiToken,
             DueDate = dueDate,
@@ -370,17 +400,22 @@ public sealed class ReviewService
             Selection = selectionText,
             ReviewSetId = reviewSetId,
             Files = files,
-            Checklist = NewChecklist(projectId, id, checklistDefinition)
+            Checklist = NewChecklist(projectId, id, checklistDefinition),
+            FollowsReviewId = follow,
+            CarriedAnswerCount = carry?.Answers.Count ?? 0,
+            CarriedThreadCount = carry?.Threads.Count ?? 0,
+            CarryOver = carry
         };
 
         // The title is shortened so the SHAs and the fingerprint always fit in the audit detail; an API-created review
-        // names its token right after the title (a shorter title) so the statement can never be cut off at the end
+        // names its token right after the title (a shorter title) so the statement can never be cut off at the end;
+        // a follow-up adds its own text after the fingerprint and so shortens the title a little more
         var added = files.Count(f => f.ChangeKind == ChangeKind.Added);
         var modified = files.Count(f => f.ChangeKind == ChangeKind.Modified);
         var deleted = files.Count(f => f.ChangeKind == ChangeKind.Deleted);
         var setText = reviewSetId is null ? string.Empty : $", set '{AuditText.Clean(reviewSetId, 60)}'";
         var viaText = CreatedViaText(actor);
-        var titleText = AuditText.Clean(trimmedTitle, viaText.Length == 0 ? 60 : 40);
+        var titleText = AuditText.Clean(trimmedTitle, (viaText.Length == 0 ? 60 : 40) - (follow is null ? 0 : 20));
         await _store.AddReviewAsync(
             review,
             AuditDraft.By(
@@ -388,11 +423,123 @@ public sealed class ReviewService
                 "review.created",
                 $"review '{titleText}'{viaText} from repository '{access.Name}', baseline {baselineSha ?? "none"}, head {headSha}, " +
                 $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")}: {added} added, {modified} modified, {deleted} deleted, " +
-                $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}{setText}{DueText(dueDate)}",
+                $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}{FollowText(follow, carry)}{setText}{DueText(dueDate)}",
                 projectId,
                 id),
             cancellationToken);
         return new RepositoryReviewResult(review, skipped);
+    }
+
+    /// <summary>
+    ///     Reads the review a new review follows up, checks that it fits and works out what is carried over.
+    /// </summary>
+    /// <remarks>
+    ///     Pure reading: nothing is stored; the result travels with the new review (<see cref="Review.CarryOver"/>) so the
+    ///     store writes it in the same transaction. A review that does not exist in the project (also one that exists only in
+    ///     another project) gets one message that reveals nothing about other projects. The checks run in this order:
+    ///     the review exists, it fits (<see cref="FollowUpCarry.CheckFit"/>), and open threads on files that are not in the
+    ///     new review are acknowledged.
+    /// </remarks>
+    /// <param name="projectId">The project of the new review.</param>
+    /// <param name="reviewId">The identifier of the new review.</param>
+    /// <param name="follow">The normalized identifier of the earlier review, or <c>null</c> for an ordinary review.</param>
+    /// <param name="acknowledge">Whether the creator acknowledged threads on files that are not in the new review.</param>
+    /// <param name="repositoryId">The repository of the new review, or <c>null</c> for an upload.</param>
+    /// <param name="reviewSetId">The review-set of the new review, or <c>null</c>.</param>
+    /// <param name="newFiles">The files of the new review.</param>
+    /// <param name="definition">The checklist of the new review.</param>
+    /// <param name="now">The creation time of the new review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>What to carry, or <c>null</c> when the review is not a follow-up.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.FollowUpInvalid"/> when a check fails.</exception>
+    private async Task<ReviewCarryOver?> PrepareFollowUpAsync(
+        int projectId,
+        string reviewId,
+        string? follow,
+        bool acknowledge,
+        int? repositoryId,
+        string? reviewSetId,
+        IReadOnlyList<ReviewFile> newFiles,
+        ChecklistDefinition definition,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (follow is null)
+        {
+            return null;
+        }
+
+        // The store is asked within this project only, so another project's review is "not found" like a missing one
+        var missing = new DomainRuleException(
+            DomainRule.FollowUpInvalid,
+            $"The review '{follow}' does not exist in this project and cannot be followed up.");
+        var source = await _store.GetReviewAsync(projectId, follow, cancellationToken) ?? throw missing;
+        var misfit = FollowUpCarry.CheckFit(source, repositoryId, reviewSetId, newFiles.Select(f => f.Path));
+        if (misfit is not null)
+        {
+            throw new DomainRuleException(DomainRule.FollowUpInvalid, misfit);
+        }
+
+        var record = await _store.GetRecordAsync(projectId, follow, cancellationToken) ?? throw missing;
+        var carry = FollowUpCarry.Compute(follow, record, source.Files, projectId, reviewId, newFiles, definition, now);
+        if (carry.DroppedThreadFiles.Count > 0 && !acknowledge)
+        {
+            throw new DomainRuleException(DomainRule.FollowUpInvalid, FollowUpCarry.DroppedMessage(carry.DroppedThreadFiles));
+        }
+
+        return carry;
+    }
+
+    /// <summary>
+    ///     Normalizes the identifier of the review to follow.
+    /// </summary>
+    /// <param name="followsReviewId">The identifier as given, possibly null or blank.</param>
+    /// <returns>The trimmed identifier, or <c>null</c> when none was given.</returns>
+    private static string? NormalizeFollows(string? followsReviewId)
+    {
+        return string.IsNullOrWhiteSpace(followsReviewId) ? null : followsReviewId.Trim();
+    }
+
+    /// <summary>
+    ///     Builds the part of the <c>review.created</c> detail that tells about a follow-up.
+    /// </summary>
+    /// <param name="follow">The identifier of the earlier review, or <c>null</c>.</param>
+    /// <param name="carry">What was carried, or <c>null</c>.</param>
+    /// <returns>
+    ///     The empty string for an ordinary review; otherwise <c>, follows 'X'; carried N answers, M threads</c> with, when
+    ///     there are any, the number of resolved threads that were not carried and the number of files whose open threads
+    ///     were dropped on the creator's acknowledgement.
+    /// </returns>
+    private static string FollowText(string? follow, ReviewCarryOver? carry)
+    {
+        if (follow is null || carry is null)
+        {
+            return string.Empty;
+        }
+
+        var text = $", follows '{AuditText.Clean(follow, 60)}'; carried {Plural(carry.Answers.Count, "answer")}, {Plural(carry.Threads.Count, "thread")}";
+        if (carry.ResolvedThreadsNotCarried > 0)
+        {
+            text += $", {Plural(carry.ResolvedThreadsNotCarried, "resolved thread")} not carried";
+        }
+
+        if (carry.DroppedThreadFiles.Count > 0)
+        {
+            text += $", open threads on {Plural(carry.DroppedThreadFiles.Count, "file")} dropped";
+        }
+
+        return text;
+    }
+
+    /// <summary>
+    ///     Writes a count with its noun in the singular or plural.
+    /// </summary>
+    /// <param name="count">The count.</param>
+    /// <param name="noun">The noun in the singular.</param>
+    /// <returns>For example <c>1 answer</c> or <c>3 answers</c>.</returns>
+    private static string Plural(int count, string noun)
+    {
+        return $"{count.ToString(CultureInfo.InvariantCulture)} {noun}{(count == 1 ? string.Empty : "s")}";
     }
 
     /// <summary>
@@ -1086,6 +1233,8 @@ public sealed class ReviewService
 /// <param name="HeadLabel">How the head is named in the "nothing to review" message.</param>
 /// <param name="BaselineLabel">How the baseline is named in that message, or <c>null</c> for none.</param>
 /// <param name="DueDate">The optional due date of the review (a UTC calendar day), or <c>null</c>.</param>
+/// <param name="FollowsReviewId">The normalized identifier of the earlier review this one follows up, or <c>null</c>.</param>
+/// <param name="AcknowledgeDroppedThreads">Whether the creator acknowledged open threads on files that are not in the new review.</param>
 internal sealed record SessionReviewRequest(
     string Id,
     string TrimmedTitle,
@@ -1096,4 +1245,6 @@ internal sealed record SessionReviewRequest(
     string? ReviewSetId,
     string HeadLabel,
     string? BaselineLabel,
-    DateOnly? DueDate = null);
+    DateOnly? DueDate = null,
+    string? FollowsReviewId = null,
+    bool AcknowledgeDroppedThreads = false);

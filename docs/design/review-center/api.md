@@ -45,7 +45,8 @@ validate, and revoke them, and `AccountPage` of `Web` is where a user manages th
   - `POST /api/projects/{projectId}/reviews` creates a draft review from `files` or from a `repository` (exactly one of
     them) and answers 201 with a `Location` header and the created review. The request can carry an optional `dueDate`
     (`yyyy-MM-dd`, a UTC day); the review summaries and details show it as `dueDate` and as an `overdue` flag. The API
-    does not change a due date.
+    does not change a due date. The request can also carry `followsReviewId` (and `acknowledgeDroppedThreads`) to create
+    the review as a follow-up of an earlier review of the project (rule `FollowUpInvalid`, a 400).
   - `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns the signed PDF of a complete review. What
     it contains follows the evidence settings of the project. It can be read without a token when the project allows
     anonymous attestation PDFs.
@@ -193,7 +194,9 @@ rules to 404, conflicts (including the removal of the last project admin and a c
 409, too many attempts to 429, an unusable
 or failing git to 503, 502, or 504, a not allowed actor and a pending password change to 403, and every
 other rule to 400, among them `DueDateInvalid` for a due date that is not a date, is before today (UTC), or is more than
-2 years ahead. A request body that cannot be read, or that has none or both of the sources of a review, is a 400
+2 years ahead, and `FollowUpInvalid` for a follow-up that names an unknown review, does not fit it, or drops open
+threads without an acknowledgement. A request body that cannot be read, or that has none or both of the sources of a
+review, is a 400
 that names the field. An unexpected exception is the generic 500 of the host and shows no detail.
 
 **The description of the interface**: The OpenAPI document is generated from the endpoints, so it cannot describe a

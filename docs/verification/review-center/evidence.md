@@ -121,6 +121,12 @@ check of the settings before the signing (`AttestationService_GenerateAsync_Sett
 The same PDF is downloaded without credentials by `AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous`
 in the `Api` subsystem. The page that changes the settings is verified in the `Web` subsystem.
 
+**Follow-up review**: The attestation of a review that follows another names the followed review and the numbers of
+carried answers and threads in the Review section and marks the carried checks, sections, and threads, while the
+attestation of a review that follows nothing shows none of it. This is tested by
+`AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks` and
+`AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers`.
+
 **Units**: The file structure and the layout are verified in the unit tests of `PdfDocumentWriter`; the content and the
 statements of the document in the unit tests of `AttestationRenderer`; the signature, its structure, and its resistance
 to a change in the unit tests of `AttestationSigner`; the keys, the certificate store, and `RequireTrustedKey` in the

@@ -144,8 +144,8 @@ unknown project are sent. The answers are 409, 400, 400, and 404, each a problem
 This scenario is tested by `ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus`.
 
 **ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus**: The status for each of the rules `LastProjectAdmin`,
-`TooManyAttempts`, `PasswordChangeRequired`, and `DueDateInvalid` is asked of `ApiProblems`; the answers are 409, 429, 403,
-and 400. This
+`TooManyAttempts`, `PasswordChangeRequired`, `DueDateInvalid`, and `FollowUpInvalid` is asked of `ApiProblems`; the
+answers are 409, 429, 403, 400, and 400. This
 scenario is tested by `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus`.
 
 **ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409**: The status for each of the rules `ReviewLocked` and
@@ -219,3 +219,12 @@ is tested by `ApiEndpoints_Request_UnknownRoute_AnswersJsonNotFound`.
 **ApiEndpoints_Routes_NoSigningOrSlotRoutes**: The routes under `/api` are listed from the endpoint data source, and a
 slot route and a signing route are posted with a token. No route pattern mentions slots, signing, or approval, and each
 post is a 404. This scenario is tested by `ApiEndpoints_Routes_NoSigningOrSlotRoutes`.
+
+**ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid**: A review is created with a
+`followsReviewId` of an earlier review and answers 201 with the followed review in the answer, the details (with the
+counts of carried answers, 0 here) and the list; a review that follows nothing shows null. A source that does not
+exist, and one with no file in common, are each a 400 `application/problem+json` that names the reason, and no review is
+created. This scenario is tested by `ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid`.
+The rule `FollowUpInvalid` is also one row of the theory `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus` with
+the status 400, and the field is part of the committed description, which is verified by
+`ApiDocument_Get_MatchesCommittedSnapshot`.

@@ -34,8 +34,9 @@ approve it."
 
 **ReviewRecord**: the immutable snapshot of a review that the digest and the blockers are computed from: the content
 fingerprint, the frozen checklist (or `null`), the section decisions, the answers, and the threads with their
-comments, and `Reopens`, the number of times an administrator reopened the review (default `0`). See `RecordDigest`
-for what the digest covers.
+comments, `Reopens`, the number of times an administrator reopened the review (default `0`), and `FollowsReviewId`, the
+review it follows (default null; carried rows are marked on the answers, section states, and threads themselves). See
+`RecordDigest` for what the digest covers.
 
 **ReviewReopen**: an immutable record of one reopen: `Id` (assigned by the store), `ProjectId`, `ReviewId`,
 `ReopenedAt` (UTC), `ReopenedBy` (user name), `ReopenedByDisplayName` (copied, so it stays readable), `Reason`
@@ -116,6 +117,9 @@ is.
 no check of an applicable section is answered Fail, and no thread is open. Otherwise the blockers are returned as
 plain sentences, in this order: "This review has no checklist.", "{n} checklist check(s) is/are unanswered", "{n}
 check(s) is/are answered Fail", and "{n} thread(s) is/are open". The checklist of a review is fixed when it is created.
+Carried answers (see `ReviewService`) count as answered and carried open threads count as open threads, so the
+blockers need no extra rule: only a carried thread that is still open, never a carried Pass or N/A answer, blocks the
+signature of a follow-up. A carried answer is not a Fail, because Fail answers are never carried.
 
 **Next step**: "Approved. Every reviewer slot has a current signature." when the review is approved; otherwise, when
 there are blockers, the sentence of `ThreadService.NextStep` for the threads, the checklist progress, and the

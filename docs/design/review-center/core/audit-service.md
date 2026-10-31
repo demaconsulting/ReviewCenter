@@ -86,7 +86,7 @@ administrator is not throttled but is a trusted actor).
 | `project.member-add-failed` | `user name '<typed>'` (failed add or account creation; best-effort; project id apart) |
 | `project.evidence-settings-changed` | `AnonymousIndex off->on; IncludeThreads on->off` (changed keys; project apart) |
 | `project.checklist-changed` | `version V, N sections, M items, sha256 {8 hex}, previous version P` (or reset) |
-| `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)`, plus `, due yyyy-MM-dd` if a due date is set |
+| `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)`, plus follow-up and due date text (see below) |
 | `review.due-date-changed` | `none -> 2030-01-31` (old and new due date, `none` for no date; review in its own field) |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {number}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {number}, role {Primary or Alternate}, record digest <64 hex>` |
@@ -117,6 +117,10 @@ administrator is not throttled but is a trusted actor).
 | `auth.totp-recovery-regenerated` | `10 new recovery codes issued` (same transaction as the change) |
 | `auth.totp-failed` | `wrong or reused code (sign-in)`, `(enrollment)`, or `(account page)` (fixed text; best-effort) |
 | `audit.events-suppressed` | `tracking table full, events of new keys are not recorded` (see below) |
+
+The detail of `review.created` has, after the file text, the text `, follows 'X'; carried N answers, M threads` for a
+follow-up, with `, R resolved threads not carried` and `, open threads on F files dropped` when they apply, and the text
+`, due yyyy-MM-dd` when a due date is set.
 
 An overflow entry (`audit.events-suppressed`) has the actor text `audit service`. It is written at most once per
 minute, when the coalescing table is full; the second form of its detail,
