@@ -74,7 +74,8 @@ public sealed class Project
     ///     checklist; <c>true</c> unless a project administrator switched it off.
     /// </summary>
     /// <remarks>
-    ///     The value is stored for the enforcement that follows; nothing reads it yet.
+    ///     <see cref="ChecklistService"/> applies it to every project, also to one that existed before the rule was
+    ///     enforced, because the stored value defaults to <c>true</c>.
     /// </remarks>
     public bool RequireNonAuthorChecklistAnswers { get; init; } = true;
 
@@ -83,7 +84,8 @@ public sealed class Project
     ///     <c>true</c> unless a project administrator switched it off.
     /// </summary>
     /// <remarks>
-    ///     The value is stored for the enforcement that follows; nothing reads it yet.
+    ///     <see cref="SigningService"/> applies it to every project, also to one that existed before the rule was
+    ///     enforced, because the stored value defaults to <c>true</c>.
     /// </remarks>
     public bool RequireNonReopenerSigning { get; init; } = true;
 
@@ -118,13 +120,13 @@ public enum ReviewRule
 
     /// <summary>
     ///     The person who created a review cannot answer the checks of its checklist
-    ///     (<see cref="Project.RequireNonAuthorChecklistAnswers"/>); stored only, not applied yet.
+    ///     (<see cref="Project.RequireNonAuthorChecklistAnswers"/>).
     /// </summary>
     NonAuthorChecklistAnswers,
 
     /// <summary>
     ///     The person who reopened a review cannot sign it again
-    ///     (<see cref="Project.RequireNonReopenerSigning"/>); stored only, not applied yet.
+    ///     (<see cref="Project.RequireNonReopenerSigning"/>).
     /// </summary>
     NonReopenerSigning,
 }

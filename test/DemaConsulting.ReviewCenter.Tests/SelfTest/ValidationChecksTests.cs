@@ -137,8 +137,9 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
-    ///     Test that the review workflow check signs with a separate reviewer and also shows that the author's
-    ///     signature is refused, that the approved review is locked and that an administrator's reopen unlocks it.
+    ///     Test that the review workflow check shows that the author's checklist answer is refused, answers and signs
+    ///     with a separate reviewer, also shows that the author's signature is refused, that the approved review is
+    ///     locked and that an administrator's reopen unlocks it.
     /// </summary>
     [Fact]
     public void ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails()
@@ -151,7 +152,8 @@ public partial class ValidationChecksTests
         // Assert: the check passed and reports what it proved, in the order of the workflow
         Assert.Equal("ReviewCenter_ReviewWorkflow", ReviewWorkflowCheck.Name);
         Assert.Matches(
-            @"ReviewCenter_ReviewWorkflow - Passed \(\d+ ms\): embedded SQLite; review signed by a separate reviewer; "
+            @"ReviewCenter_ReviewWorkflow - Passed \(\d+ ms\): embedded SQLite; author answer refused; "
+            + @"review answered and signed by a separate reviewer; "
             + @"author signature refused; approved review locked and reopened by an administrator; "
             + @"evidence index fingerprint \w+…, record digest \w+…",
             log);

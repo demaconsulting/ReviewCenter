@@ -478,7 +478,11 @@ history, are out of date, and the review needs new signatures. While the project
 is on (the default), the person who created the review in ReviewCenter cannot be one of its reviewers and cannot sign
 it; the authors of git commits are not matched. Two further project rules, on by default and switched by the same
 administrators, keep the review author from answering the checklist of the review and the person who reopened a review
-from signing it again; they are stored and audited but not applied yet. A review can have an optional due date, a UTC
+from signing it again; both are enforced by the services for every project, also a project that existed before they
+were, and an administrator of the project can switch each off with an audited change. The author of a review cannot
+answer a check or change the applicability of a section of it, and the person who reopened a review cannot sign it
+again, and an administrator cannot reopen a review in a way that leaves a slot with nobody who may sign it. A review
+can have an optional due date, a UTC
 calendar day that cannot
 be before today (UTC) or more than 2 years ahead when the review is created (the planner can give a default date). A
 review that is not approved and whose due date has passed is shown as Overdue. The date can be set or cleared later,

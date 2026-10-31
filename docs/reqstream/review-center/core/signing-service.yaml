@@ -306,6 +306,44 @@ sections:
           - SigningService_AddSlotAsync_AuthorAndIndependenceOff_Succeeds
           - SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent
 
+      - id: ReviewCenter-SigningService-ReopenerRule
+        title: >-
+          The SigningService class shall, when the project requires that the person who reopened a review does not
+          sign it again, refuse the signature of a user who reopened the review at any time before, with the
+          ReopenerCannotSign rule, after the independence check and before the password is checked, so that no failed
+          attempt is counted or recorded, and shall enforce nothing when the project switched the rule off.
+        justification: |
+          A reopening followed by a signature of the same person would turn the reopening into a re-stamp: the approval
+          that was withdrawn is approved again by the one who withdrew it. Checking before the password means that the
+          refusal is a rule and not a failed login. The rule is on by default and applies to every project, also those
+          created before it was enforced; an administrator can switch it off per project.
+        tests:
+          - SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword
+          - SigningService_SignAsync_EarlierReopener_StaysBlocked
+          - SigningService_SignAsync_ReopenerWhileRuleIsOff_Signs
+
+      - id: ReviewCenter-SigningService-StrandedSlot
+        title: >-
+          The SigningService class shall, when the project requires that the person who reopened a review does not
+          sign it again, refuse a reopening with the ReopenWouldStrandSlot rule that names the slots, when after it a
+          slot of the review would have nobody who may sign it, counting the primary reviewer and the alternate of every
+          slot and treating the user who reopens and every user who reopened the review before as unable to sign, before
+          anything is stored, and shall reopen when the rule is switched off or every slot keeps somebody.
+        justification: |
+          Without this check an administrator who is the only person of a slot could reopen a review that nobody could
+          approve again. The pure function that decides which slots would be stranded is separate from the service, so
+          that the rule can be tested without a store. Occupants that are disabled or no longer members are not
+          considered; the message points to another administrator or to switching the rule off.
+        tests:
+          - ReopenRules_StrandedSlots_PrimaryAndAlternate_StrandsOnlyWhenNobodyIsFree
+          - ReopenRules_StrandedSlots_UnorderedSlotsAndNoBlockedUsers_NumbersByIdentity
+          - ReopenRules_StrandedSlots_NullArguments_Throw
+          - ReopenRules_StrandedMessage_OneOrMoreSlots_NamesThem
+          - ReopenRules_StrandedMessage_NullOrEmpty_Throws
+          - SigningService_ReopenReviewAsync_WouldStrandSlot_ThrowsAndRecordsNothing
+          - SigningService_ReopenReviewAsync_EarlierReopenerCounts_ThrowsForTheLastFreePerson
+          - SigningService_ReopenReviewAsync_WouldStrandSlotWhileRuleIsOff_Reopens
+
       - id: ReviewCenter-SigningService-CarriedRecord
         title: >-
           The SigningService class shall treat the answers that a follow-up review carried from an earlier review as

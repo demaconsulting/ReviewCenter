@@ -31,7 +31,9 @@ N/A - standard test environment (a temporary database and key folder are created
   body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status; the rule
   for the last project administrator is 409, too many attempts 429, a required password change 403, and the rules for a
   locked review (`ReviewLocked`) and for a review that is not locked (`ReviewNotLocked`) are 409, and so is the rule
-  for a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`).
+  for a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`), and
+  the three rules of the project that refuse the author or the reopener (`AuthorCannotAnswer`, `ReopenerCannotSign`,
+  `ReopenWouldStrandSlot`).
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
   is a 413, and no review is created in these cases. A file count above the limit, or a Base64 text longer than that of
   the largest file, is a 400 validation problem that is answered before anything is decoded.
@@ -167,6 +169,11 @@ scenario is tested by `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus`.
 **ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409**: The status of the rule `SignaturesWouldBecomeOutOfDate`
 is asked of `ApiProblems`, and the exception is turned into a result; the status is 409 and the problem detail holds the
 message that names the slot. This scenario is tested by `ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409`.
+
+**ApiProblems_StatusOf_ReviewRuleRefusals_Is409**: A theory over the rules `AuthorCannotAnswer`, `ReopenerCannotSign`,
+and `ReopenWouldStrandSlot`; the status of each is asked of `ApiProblems` and its exception is turned into a result;
+the status is 409 and the problem detail is the message of the rule. This scenario is tested by
+`ApiProblems_StatusOf_ReviewRuleRefusals_Is409`.
 
 **ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem**: The attestation of a complete review and of a review that
 does

@@ -22,7 +22,8 @@ reviewer slots and cannot sign it (see the `SigningService` unit, which enforces
 created the review in the tool; the authors of git commits are not matched. Two further review rules are stored with
 the project and are on by default: `RequireNonAuthorChecklistAnswers` (`bool`): whether the author of a review may not
 answer the checklist of that review, and `RequireNonReopenerSigning` (`bool`): whether the person who reopened a
-review may not sign it again. They are stored and audited only; no unit applies them yet.
+review may not sign it again. Both are enforced (`ChecklistService` and `SigningService`; see those units) and, as
+the stored columns default to on, they apply to every project, also one that existed before they were enforced.
 
 **ReviewRule**: an enumeration of the rules of a project that an administrator can switch: `IndependentReviewers`,
 `NonAuthorChecklistAnswers`, and `NonReopenerSigning`.
@@ -191,8 +192,9 @@ account can never be a system administrator and cannot exist without the members
 
 The audit detail is the property name followed by `on->off` or `off->on`.
 
-The two rules `NonAuthorChecklistAnswers` and `NonReopenerSigning` are stored, audited, and shown only: the checklist
-and signing services do not read them yet.
+The two rules `NonAuthorChecklistAnswers` and `NonReopenerSigning` are read by `ChecklistService` (author answers) and
+`SigningService` (reopener signing and the stranded-slot check) at the time of each change; the service only stores,
+audits, and shows them. A rule that is switched off is not retroactive for what happened while it was on.
 
 **Audit**: `CreateAsync` builds the audit draft `project.created` (detail `project 'Name'`) from the stored project, so
 it can name the identity the database assigned, and passes it to the store, which saves it in the same transaction. A

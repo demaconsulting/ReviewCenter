@@ -346,24 +346,30 @@ sections:
         title: >-
           The tool shall keep, for each project, a switch for each of two further review rules, one for authors
           answering the checklist of their own review and one for the person who reopened a review signing it again,
-          each on for a new project, shall let only an administrator of the project or a system administrator change
-          them, never through an access token, shall record each change in the audit trail, and shall only store
-          them, because it does not apply them yet.
+          each on for a new project and for every project that existed before the rules were enforced, shall let only
+          an administrator of the project or a system administrator change them, never through an access token, shall
+          record each change in the audit trail, and shall enforce each rule that is on: the author of a review cannot
+          answer its checklist, and the person who reopened a review cannot sign it again, nor reopen it in a way that
+          leaves a slot without a person who may sign.
         tags: [system]
         justification: |
-          A project must be able to say beforehand which review rules it wants, and the choice must be in the history
-          so that it can be shown who relaxed a rule and when. The switches are stored first, so that every project
-          has a recorded value on the day the rules are applied; until then the tool says on the page that they are
-          not applied, so nobody takes a stored switch for a protection that does not exist yet. The system tests
-          verify the audited, administrator-only change and the page; the storage across a restart is verified by the
-          tests of the child requirements.
+          A project must be able to say which review rules it wants, and the choice must be in the history so that it
+          can be shown who relaxed a rule and when. The rules are on by default for every project, also the ones
+          that were created before they were enforced, so that no project is left without the protection by
+          accident; a project that has to let one person do everything switches the rules off with a record. The
+          system tests verify the audited, administrator-only change and the page; the storage across a restart and
+          the enforcement are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-ReviewRuleSwitches
+          - ReviewCenter-Core-ReviewRules
           - ReviewCenter-Storage-ReviewRuleSwitches
           - ReviewCenter-Web-ReviewRuleSwitches
+          - ReviewCenter-Web-ReviewRuleNotices
         tests:
           - CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale
+          - CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff
           - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
+          - WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers
 
       - id: ReviewCenter-System-SignatureReauthentication
         title: >-

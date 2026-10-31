@@ -36,7 +36,9 @@
         <p>The <strong>Review rules</strong> card of the project page, also only for a project admin or a system
             administrator, switches on or off whether the person who created a review may also be one of its
             reviewers. It is on by default, and every change is recorded in the audit trail. Two more switches
-            (authors answering the checklist of their own review, and the person who reopened a review signing it
-            again) are stored and audited but are not applied yet.</p>
+            keep the author of a review from answering its checklist, and keep the person who reopened a review from
+            signing it again (a reopen that would leave a slot without anyone who may sign is refused). All three
+            rules are on by default and apply to every project, also one that was created before they were
+            enforced; a project that needs one person to do everything switches them off.</p>
     </section>
 </HelpTopicFrame>

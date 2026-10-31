@@ -1153,7 +1153,7 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Answers every check of <c>REV-1</c> as Pass.
+    ///     Answers every check of <c>REV-1</c> as Pass, as Cyd (an author may not answer the checklist of the own review).
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <returns>A task that completes when every check is answered.</returns>
@@ -1162,7 +1162,7 @@ public partial class ReviewPageTests : PageTestBase
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await Checklists.SetAnswerAsync(
-                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, new Actor("cyd", "Cyd"), TestContext.Current.CancellationToken);
         }
     }
 
@@ -1624,7 +1624,7 @@ public partial class ReviewPageTests : PageTestBase
         await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
 
         // Act: an administrator reopens the approved review, so the record changes, and the page is opened again
-        await Signing.ReopenReviewAsync(TestActors.Ann, projectId, "REV-1", "Late remark", TestContext.Current.CancellationToken);
+        await Signing.ReopenReviewAsync(new Actor("bob", "Bob"), projectId, "REV-1", "Late remark", TestContext.Current.CancellationToken);
         var reopened = RenderPage(projectId);
 
         // Assert: out of date and In review, the slot is still locked, and signing again is offered
@@ -2704,6 +2704,69 @@ public partial class ReviewPageTests : PageTestBase
         Assert.NotEmpty(cut.Find("[data-testid='reopen-error']").TextContent);
         Assert.NotNull(cut.Find("[data-testid='review-locked']"));
         Assert.Empty(await Store.ListReopensAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the person who reopened a review is told that another reviewer must sign, and gets no sign form,
+    ///     while the other occupant of the slot still has the form and, with the rule off, the reopener has it again.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ReopenerOfTheReview_ShowsNoticeInsteadOfSignForm()
+    {
+        // Arrange: ann signed the slot of ann and bob, and bob reopened the approved review
+        var (projectId, slotId) = await CreateApprovedAsync();
+        await Signing.ReopenReviewAsync(
+            new Actor("bob", "Bob"), projectId, "REV-1", "Found a problem", TestContext.Current.CancellationToken);
+
+        // Act: bob, ann, and bob again once the rule is switched off, open the page
+        SignInAs("bob", "Bob", UserRole.Reviewer);
+        var asReopener = RenderPage(projectId);
+        SignInAs("ann", "Ann", UserRole.Reviewer);
+        var asOther = RenderPage(projectId);
+        await Projects.SetReviewRuleOffAsync(projectId, ReviewRule.NonReopenerSigning, TestContext.Current.CancellationToken);
+        SignInAs("bob", "Bob", UserRole.Reviewer);
+        var ruleOff = RenderPage(projectId);
+
+        // Assert: the notice replaces the form for the reopener only while the rule is on
+        Assert.Contains(
+            "You reopened this review; another reviewer must sign",
+            asReopener.Find($"[data-testid='reopener-cannot-sign-{slotId}']").TextContent,
+            StringComparison.Ordinal);
+        Assert.Empty(asReopener.FindAll($"[data-testid='sign-form-{slotId}']"));
+        Assert.Empty(asOther.FindAll($"[data-testid='reopener-cannot-sign-{slotId}']"));
+        Assert.NotNull(asOther.Find($"[data-testid='sign-form-{slotId}']"));
+        Assert.Empty(ruleOff.FindAll($"[data-testid='reopener-cannot-sign-{slotId}']"));
+        Assert.NotNull(ruleOff.Find($"[data-testid='sign-form-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that a reopen that would leave a slot without a person who may sign shows the message of the rule and
+    ///     reopens nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Reopen_WouldStrandSlot_ShowsMessageAndReopensNothing()
+    {
+        // Arrange: ann signed, then reopened the review once and bob signed it again, so that bob is the only person
+        // left to sign the slot of ann and bob; bob is an administrator who opens the approved review
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        await SignSlotAsync(projectId, slotId);
+        await Signing.ReopenReviewAsync(
+            new Actor("ann", "Ann"), projectId, "REV-1", "First reason", TestContext.Current.CancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        await Signing.SignAsync(
+            new Actor("bob", "Bob"), projectId, "REV-1", slotId, approval!.Digest, SigningPassword, TestContext.Current.CancellationToken);
+        SignInAs("bob", "Bob", true);
+        await ChangeMemberRoleAsync(projectId, "bob", ProjectRole.ProjectAdmin);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='reopen-reason']").InputAsync("Second reason");
+
+        // Act: reopen
+        await cut.Find("[data-testid='reopen-form']").SubmitAsync();
+
+        // Assert: the message is shown, the review is still locked, and only the first reopen is recorded
+        Assert.Contains("Slot 1 would have no one who may sign", cut.Find("[data-testid='reopen-error']").TextContent, StringComparison.Ordinal);
+        Assert.NotNull(cut.Find("[data-testid='review-locked']"));
+        Assert.Single(await Store.ListReopensAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
     }
 
     /// <summary>

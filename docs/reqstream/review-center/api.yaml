@@ -135,14 +135,15 @@ sections:
         title: >-
           The Api subsystem shall keep a review that is approved and locked readable to a client with a valid token,
           with its attestation and its evidence index, shall report a change that the lock refuses, or that would make
-          a signature out of date without acknowledgement, as a problem document with status 409, and shall not let a
-          token reopen a review.
+          a signature out of date without acknowledgement, or that a review rule of the project refuses, as a problem
+          document with status 409, and shall not let a token reopen a review.
         justification: |
           The approved record is what pipelines and auditors read, so the lock must not hide it, while a script that
           tries to change it must learn the reason in a form it can act on.
         children:
           - ReviewCenter-ApiEndpoints-LockedReview
           - ReviewCenter-ApiEndpoints-OutOfDateConflict
+          - ReviewCenter-ApiEndpoints-RuleConflict
         tests:
           - ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409
 

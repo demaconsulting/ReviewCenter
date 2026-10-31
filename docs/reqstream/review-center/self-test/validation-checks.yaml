@@ -37,7 +37,8 @@ sections:
       - id: ReviewCenter-ValidationChecks-ReviewWorkflow
         title: >-
           The ReviewWorkflow check shall, on a temporary embedded SQLite database, create a project and a review as one
-          user, answer the checklist, sign the review as a separate reviewer with a local-password re-authentication,
+          user, show that the author is refused when answering the checklist while the rule is on, answer the checklist
+          as a separate reviewer, sign the review as a separate reviewer with a local-password re-authentication,
           show that the author is refused as a signer while independent reviewers are required, show that the approved
           review is locked and that a change is refused with the ReviewLocked rule, show that an administrator can
           reopen it, which returns it to not approved, and read the evidence index back with the content fingerprint and

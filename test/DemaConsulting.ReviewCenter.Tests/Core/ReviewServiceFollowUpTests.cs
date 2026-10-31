@@ -265,12 +265,13 @@ public class ReviewServiceFollowUpTests
     /// </summary>
     /// <param name="w">The world.</param>
     /// <param name="review">The review.</param>
+    /// <param name="by">Who answers; Bob when omitted.</param>
     /// <returns>A task that completes when all checks are answered.</returns>
-    private static async Task AnswerAllAsync(World w, string review)
+    private static async Task AnswerAllAsync(World w, string review, Actor? by = null)
     {
         foreach (var item in new[] { "a-01", "a-02", "b-01" })
         {
-            await AnswerAsync(w, review, item);
+            await AnswerAsync(w, review, item, by: by);
         }
     }
 
@@ -781,15 +782,15 @@ public class ReviewServiceFollowUpTests
 
     /// <summary>
     ///     Test that carrying makes nobody independent: the creator of the follow-up cannot be seated as reviewer
-    ///     (although the answers carried are Bob's), while Bob, who answered, can be.
+    ///     (although the answers carried are hers), while Bob, who created the earlier review, can be.
     /// </summary>
     [Fact]
     public async Task ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence()
     {
-        // Arrange: Ann creates the follow-up of a review that Bob answered
+        // Arrange: Ann creates the follow-up of a review that Bob created and Ann answered (Bob may not answer it)
         var w = await CreateAsync();
         await UploadAsync(w, "rev-1", creator: TestActors.Bob);
-        await AnswerAllAsync(w, "rev-1");
+        await AnswerAllAsync(w, "rev-1", TestActors.Ann);
         await UploadAsync(w, "rev-2", follows: "rev-1");
 
         // Act

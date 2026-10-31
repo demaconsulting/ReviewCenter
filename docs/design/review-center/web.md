@@ -533,8 +533,11 @@ author is not offered as a reviewer while the project requires independent revie
 (Core refuses the author as a reviewer or signer in any case). The project page has the admin-only "Review rules" card
 that saves the `RequireIndependentReviewers` setting of the project through `ProjectService`, based on the value it
 loaded, so that a change by someone else is shown and never overwritten. The card has two more switches (authors cannot
-answer the checklist of their own review; the person who reopened a review cannot sign it again) that are stored and
-audited and are marked "Not applied yet." because no page or service enforces them. Reading, the attestation download,
+answer the checklist of their own review; the person who reopened a review cannot sign it again) that are saved and
+audited in the same way and are enforced by Core: `ChecklistPage` shows an author a notice instead of answer controls,
+and `ReviewPage` shows the person who reopened a review a notice instead of the sign form and the refusal of a reopen
+that would leave a slot without anyone who may sign. Both rules are on by default and apply to every project, also
+the ones created before they were enforced. Reading, the attestation download,
 and the
 evidence index are unaffected by the lock.
 

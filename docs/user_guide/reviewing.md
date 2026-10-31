@@ -386,7 +386,10 @@ and the first section with unanswered checks is open when you arrive.
    time until the review is approved; an approved review is locked and its checklist is read-only (see
    [Locked Reviews and Reopening](#locked-reviews-and-reopening)). Each answer is stored under your user, together
    with the UTC time, and shown as "Answered by" with your
-   display name.
+   display name. If you created the review and the project does not let authors answer (the default; see Review Rules
+   in the Administration chapter), the page shows the notice "You created this review, so you cannot answer its
+   checklist in this project. Another project member has to answer it. You can still start, answer and resolve comment
+   threads." and the controls are disabled.
 2. If a section does not apply to the review, clear its "This section applies to the review" switch, give the reason
    (required), and press Save reason. Until you save the reason nothing is stored: the section heading says "Reason
    needed" and the section still counts as applying. A section that does not apply counts as done and its checks leave
@@ -484,6 +487,22 @@ the review in ReviewCenter is not excluded. The rule helps to keep the creator o
 it is not proof that the reviewer did not write the code. A project in which one person has to do both can switch the
 rule off.
 
+**Who may answer the checklist.** In a project that does not let authors answer the checklist of their own review
+(the default), the person who created the review cannot answer a check or change whether a section applies; the
+service refuses it with a message that starts "You created this review, so you cannot answer its checklist". The
+comment threads are not affected. A review created from the command line has no recorded author.
+
+**The person who reopened cannot sign again.** In a project with that rule (the default), the administrator who reopened
+a review cannot sign a slot of it. The review page shows "You reopened this review; another reviewer must sign." instead
+of the sign form, and a signature attempt is refused with a message that starts "You reopened this review, so you
+cannot sign it again", before the password is checked. A reopen that would leave a slot without anyone who may sign
+is refused on the review page with, for example, "Slot 1 would have no one who may sign; ask another administrator or
+switch the rule off."
+
+> **These rules apply to all existing projects.** The rules are on by default and apply to ALL existing projects, also
+> those created before this version (the stored columns default to on). A project that needs one person to do
+> everything switches them off on the project page.
+
 **Signing.** The reviewer of a slot sees a signing form on the slot, if the review can be signed. Signing needs
 membership of the project and being the assigned reviewer; a system administrator who is not a member cannot sign. The
 form shows
@@ -578,7 +597,10 @@ administrator opens the locked review and, in the locked notice at the top of th
 reopening** (required, 1 to 250 characters) and presses **Reopen review**. Other users do not see the form. An API
 token cannot reopen a review: it is a step of the web pages, and a request with a token is refused. A reopen of a
 review that is not locked is refused with "The review is not locked, so there is nothing to reopen.", and an empty or
-too long reason with "A reason of at most 250 characters is required to reopen a review.".
+too long reason with "A reason of at most 250 characters is required to reopen a review.". While the project does not
+let the person who reopened a review sign it again (the default), a reopen is also refused when a slot would be left
+without anyone who may sign, and the administrator who reopens cannot sign the review afterward (see The person who
+reopened cannot sign again above).
 
 **What a reopen does.**
 

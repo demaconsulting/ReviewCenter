@@ -82,21 +82,23 @@ public class SigningServiceTests
     /// </summary>
     /// <param name="fixture">The fixture.</param>
     /// <param name="reviewId">The review to answer.</param>
+    /// <param name="answerer">Who answers; Ann when omitted.</param>
     /// <returns>A task that completes when all checks are answered.</returns>
-    private static async Task AnswerAllAsync(Fixture fixture, string reviewId = "rev-1")
+    private static async Task AnswerAllAsync(Fixture fixture, string reviewId = "rev-1", Actor? answerer = null)
     {
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await fixture.Checklists.SetAnswerAsync(
-                fixture.ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+                fixture.ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, answerer ?? TestActors.Ann, TestContext.Current.CancellationToken);
         }
     }
 
     /// <summary>
-    ///     Creates the review <c>rev-2</c>, authored by <paramref name="author"/>, with every check answered.
+    ///     Creates the review <c>rev-2</c>, authored by <paramref name="author"/>, with every check answered by Dee
+    ///     (an author may not answer the checklist of the own review).
     /// </summary>
     /// <param name="fixture">The fixture.</param>
-    /// <param name="author">The user who creates the review, and so its author.</param>
+    /// <param name="author">The user who creates the review, and so its author; not Dee.</param>
     /// <returns>A task that completes when the review is ready to be signed.</returns>
     private static async Task CreateAuthoredReviewAsync(Fixture fixture, Actor author)
     {
@@ -107,7 +109,7 @@ public class SigningServiceTests
             [new("a.txt", TestContent.A)],
             author,
             TestContext.Current.CancellationToken);
-        await AnswerAllAsync(fixture, "rev-2");
+        await AnswerAllAsync(fixture, "rev-2", new Actor("dee", "Dee"));
     }
 
     /// <summary>
@@ -1724,6 +1726,177 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Approves <c>rev-1</c> with slot 1 (cyd primary, ann alternate) signed by ann, so that cyd can reopen the
+    ///     review and still leave a person who may sign.
+    /// </summary>
+    /// <returns>The fixture and the slot.</returns>
+    private static async Task<(Fixture Fixture, ReviewerSlot Slot)> CreateApprovedWithAlternateAsync()
+    {
+        var fixture = await CreateAsync();
+        await AnswerAllAsync(fixture);
+        var slot = await fixture.Signing.AddSlotAsync(
+            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["cyd"], fixture.Ids["ann"], TestContext.Current.CancellationToken);
+        await fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, (await ApprovalAsync(fixture)).Digest, Password, TestContext.Current.CancellationToken);
+        return (fixture, slot);
+    }
+
+    /// <summary>
+    ///     Test that the person who reopened a review cannot sign it again while the rule is on: the refusal comes
+    ///     before the password, so repeated wrong passwords neither count nor leave a re-authentication entry, and the
+    ///     other person of the slot can sign.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword()
+    {
+        // Arrange: an approved review that cyd (primary of the slot) reopens
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateApprovedWithAlternateAsync();
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
+        var digest = (await ApprovalAsync(fixture)).Digest;
+
+        // Act: cyd tries more wrong passwords than the lockout allows
+        var rules = new List<DomainRule>();
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            var failure = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+                Cyd, fixture.ProjectId, "rev-1", slot.Id, digest, "wrong password here", cancellationToken));
+            rules.Add(failure.Rule);
+        }
+
+        // Act: the alternate signs with the right password
+        var signature = await fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken);
+
+        // Assert: the rule every time, no re-authentication entries, and ann's signature is stored
+        Assert.All(rules, rule => Assert.Equal(DomainRule.ReopenerCannotSign, rule));
+        Assert.DoesNotContain(fixture.Store.Audits, a => a.Action == "signature.reauth-failed");
+        Assert.Equal(fixture.Ids["ann"], signature.UserId);
+        Assert.True((await ApprovalAsync(fixture)).IsApproved);
+    }
+
+    /// <summary>
+    ///     Test that an earlier reopener stays blocked after a later reopen by somebody else.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_EarlierReopener_StaysBlocked()
+    {
+        // Arrange: cyd reopens, ann signs again, and then bob (who holds no slot) reopens again
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateApprovedWithAlternateAsync();
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
+        await fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, (await ApprovalAsync(fixture)).Digest, Password, cancellationToken);
+        await fixture.Signing.ReopenReviewAsync(TestActors.Bob, fixture.ProjectId, "rev-1", "And again.", cancellationToken);
+
+        // Act: cyd, who reopened first, tries to sign
+        var digest = (await ApprovalAsync(fixture)).Digest;
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+            Cyd, fixture.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ReopenerCannotSign, ex.Rule);
+    }
+
+    /// <summary>
+    ///     Test that the reopener signs again once the project administrator has switched the rule off, and that a
+    ///     signature on a review that was never reopened is not affected by the rule.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_ReopenerWhileRuleIsOff_Signs()
+    {
+        // Arrange: the rule is off, and cyd reopens an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateApprovedWithAlternateAsync();
+        await TestServices.Projects(fixture.Store, fixture.Clock).SetReviewRuleOffAsync(
+            fixture.ProjectId, ReviewRule.NonReopenerSigning, cancellationToken);
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
+
+        // Act: cyd signs again
+        var signature = await fixture.Signing.SignAsync(
+            Cyd, fixture.ProjectId, "rev-1", slot.Id, (await ApprovalAsync(fixture)).Digest, Password, cancellationToken);
+
+        // Assert
+        Assert.Equal(fixture.Ids["cyd"], signature.UserId);
+        Assert.True((await ApprovalAsync(fixture)).IsApproved);
+    }
+
+    /// <summary>
+    ///     Test that a reopen that would leave a slot in which nobody may sign is refused with
+    ///     <see cref="DomainRule.ReopenWouldStrandSlot"/>, naming the slot, and that nothing is recorded.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ReopenReviewAsync_WouldStrandSlot_ThrowsAndRecordsNothing()
+    {
+        // Arrange: two slots, one of ann alone and one of bob alone, both signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        await AnswerAllAsync(fixture);
+        var first = await fixture.Signing.AddSlotAsync(Cyd, fixture.ProjectId, "rev-1", fixture.Ids["ann"], null, cancellationToken);
+        var second = await fixture.Signing.AddSlotAsync(Cyd, fixture.ProjectId, "rev-1", fixture.Ids["bob"], null, cancellationToken);
+        var digest = (await ApprovalAsync(fixture)).Digest;
+        await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", first.Id, digest, Password, cancellationToken);
+        await fixture.Signing.SignAsync(TestActors.Bob, fixture.ProjectId, "rev-1", second.Id, digest, Password, cancellationToken);
+
+        // Act: ann reopens
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.ReopenReviewAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", "Look again.", cancellationToken));
+
+        // Assert: refused naming slot 1 only, still approved, nothing recorded
+        Assert.Equal(DomainRule.ReopenWouldStrandSlot, ex.Rule);
+        Assert.Equal("Slot 1 would have no one who may sign; ask another administrator or switch the rule off.", ex.Message);
+        Assert.True((await ApprovalAsync(fixture)).IsApproved);
+        Assert.Empty(await fixture.Store.ListReopensAsync(fixture.ProjectId, "rev-1", cancellationToken));
+        Assert.DoesNotContain(fixture.Store.Audits, a => a.Action == "review.reopened");
+    }
+
+    /// <summary>
+    ///     Test that earlier reopens count in the guard: after cyd reopened a slot of cyd and ann, a reopen by ann
+    ///     would leave nobody for it and is refused, while a reopen by somebody without a slot is allowed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ReopenReviewAsync_EarlierReopenerCounts_ThrowsForTheLastFreePerson()
+    {
+        // Arrange: slot of cyd and ann, reopened by cyd and signed again by ann
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateApprovedWithAlternateAsync();
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
+        await fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, (await ApprovalAsync(fixture)).Digest, Password, cancellationToken);
+
+        // Act: ann reopens; then bob, who holds no slot, reopens
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.ReopenReviewAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", "Once more.", cancellationToken));
+        await fixture.Signing.ReopenReviewAsync(TestActors.Bob, fixture.ProjectId, "rev-1", "Once more.", cancellationToken);
+
+        // Assert
+        Assert.Equal(DomainRule.ReopenWouldStrandSlot, ex.Rule);
+        Assert.Equal(2, (await fixture.Store.ListReopensAsync(fixture.ProjectId, "rev-1", cancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     Test that the guard is not applied while the rule is off: the only reviewer may reopen the review.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ReopenReviewAsync_WouldStrandSlotWhileRuleIsOff_Reopens()
+    {
+        // Arrange: a slot of ann alone, signed, and the rule off
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateReadyAsync();
+        await TestServices.Projects(fixture.Store, fixture.Clock).SetReviewRuleOffAsync(
+            fixture.ProjectId, ReviewRule.NonReopenerSigning, cancellationToken);
+        await fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, (await ApprovalAsync(fixture)).Digest, Password, cancellationToken);
+
+        // Act: ann (the primary of the slot) reopens
+        await fixture.Signing.ReopenReviewAsync(TestActors.Ann, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
+
+        // Assert
+        Assert.False((await ApprovalAsync(fixture)).IsApproved);
+        Assert.Single(await fixture.Store.ListReopensAsync(fixture.ProjectId, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses null arguments.
     /// </summary>
     [Fact]
@@ -1768,10 +1941,12 @@ public class SigningServiceTests
         await TestServices.Reviews(store, clock).CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], rootActor, cancellationToken);
         var checklists = TestServices.Checklists(store, clock);
+        var projectAdminActor = new Actor("pro", "pro");
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
+            // root created the review and may not answer it, so the project administrator does
             await checklists.SetAnswerAsync(
-                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, rootActor, cancellationToken);
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, projectAdminActor, cancellationToken);
         }
 
         var signing = new SigningService(store, users, access, clock);

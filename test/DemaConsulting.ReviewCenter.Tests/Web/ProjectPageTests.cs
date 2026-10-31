@@ -961,7 +961,7 @@ public class ProjectPageTests : PageTestBase
 
     /// <summary>
     ///     Test that the two further review rule switches start on, that a changed switch is saved through the
-    ///     service with its own audit entry and a confirmation that says it is stored only, and that several changed
+    ///     service with its own audit entry and a confirmation of the new state, and that several changed
     ///     switches are saved together.
     /// </summary>
     [Fact]
@@ -978,10 +978,10 @@ public class ProjectPageTests : PageTestBase
         await cut.Find("[data-testid='author-checklist-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
         await cut.Find("[data-testid='independent-reviewers-save']").ClickAsync();
 
-        // Assert: stored alone, confirmed as stored only, and audited with the fixed action and detail
+        // Assert: stored alone, confirmed with the new state, and audited with the fixed action and detail
         var status = cut.Find("[data-testid='review-rules-status']").TextContent;
-        Assert.Contains("Authors cannot answer the checklist", status, StringComparison.Ordinal);
-        Assert.Contains("stored; not applied yet", status, StringComparison.Ordinal);
+        Assert.Contains("Authors cannot answer the checklist: now off.", status, StringComparison.Ordinal);
+        Assert.DoesNotContain("not applied yet", status, StringComparison.Ordinal);
         var stored = (await Projects.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken))!;
         Assert.False(stored.RequireNonAuthorChecklistAnswers);
         Assert.True(stored.RequireNonReopenerSigning);
@@ -1037,20 +1037,26 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the two further switches say that they are stored but not applied yet. This test and the
-    ///     markers go away when the rules are applied.
+    ///     Test that the two further switches describe what they enforce, that the hints say the rules are on by
+    ///     default for every project, and that the earlier "not applied yet" markers are gone.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_ReviewRules_NewSwitches_SayNotAppliedYet()
+    public async Task ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement()
     {
         // Arrange and act: a project administrator with the page open
         var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
         var cut = RenderProjectPage(projectId);
 
-        // Assert: both further switches carry the marker; the independence switch does not
-        Assert.Contains("Not applied yet", cut.Find("[data-testid='author-checklist-pending']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("Not applied yet", cut.Find("[data-testid='reopener-signing-pending']").TextContent, StringComparison.Ordinal);
-        Assert.DoesNotContain("Not applied yet", cut.Find("[data-testid='review-rule-independent-reviewers']").TextContent, StringComparison.Ordinal);
+        // Assert: both hints describe the rule and name that it applies to existing projects; no pending marker
+        var author = cut.Find("[data-testid='review-rule-author-checklist']").TextContent;
+        var reopener = cut.Find("[data-testid='review-rule-reopener-signing']").TextContent;
+        Assert.Contains("applies to every project", author, StringComparison.Ordinal);
+        Assert.Contains("created before it was enforced", author, StringComparison.Ordinal);
+        Assert.Contains("applies to every project", reopener, StringComparison.Ordinal);
+        Assert.Contains("nobody may sign", reopener, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='author-checklist-pending']"));
+        Assert.Empty(cut.FindAll("[data-testid='reopener-signing-pending']"));
+        Assert.DoesNotContain("Not applied yet", cut.Markup, StringComparison.Ordinal);
     }
 
     /// <summary>

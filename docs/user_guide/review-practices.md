@@ -24,9 +24,24 @@ The product also constrains the reviewers: a slot holds only enabled members of 
 one slot, and only the primary or the alternate of a slot can sign it. In addition, a project requires independent
 reviewers by default: the person who created the review in ReviewCenter cannot be a reviewer of it or sign it. That
 setting can be switched off per project, it compares only the creator of the review (not the authors of git commits),
-and it does not apply to a review created from the command line, which has no recorded author. See the Reviewing and
+and it does not apply to a review created from the command line, which has no recorded author. Two more rules are on by
+default: the person who created a review cannot answer its checklist, and the person who reopened an approved review
+cannot sign it again (see *Who May Answer the Checklist* and *Approved Reviews Are Locked*). See the Reviewing and
 Administration chapters (Review Rules) for the exact rules. Everything else is up to the team: who writes a comment,
 who resolves it, and how it is worded.
+
+> **These rules apply to all existing projects.** The rules are on by default and apply to ALL existing projects, also
+> those created before this version (the stored columns default to on). A project that needs one person to do
+> everything switches them off on the project page.
+
+## Who May Answer the Checklist
+
+While the project requires it (the default), the person who created the review in ReviewCenter cannot answer its
+checks or change which sections apply; another member of the project has to. The checklist page tells the author so and
+disables the controls. The author can still start, answer, and resolve comment threads, because the discussion is
+where the author explains the change. Plan for it: create the review, then ask a second member to go through the
+checklist, or let a reviewer do it. A project where one person has to do everything switches the rule off on the
+project page; every change of the rule is audited.
 
 ## What Makes a Signature Out of Date
 
@@ -176,6 +191,11 @@ approved again.
   approved. Reopen is for correcting the judgment on the same files.
 - **Sign again with care.** After a reopen, the reviewers read what changed (the **Reopen history** and the **History**
   of the review) before they sign the new record.
+- **Reopen is not a re-stamp.** While the project requires it (the default), the person who reopened a review cannot
+  sign it again, so the one who undoes an approval cannot approve the new record alone. The review page shows that
+  person a notice instead of the sign form. A reopen is refused when it would leave a slot in which nobody may sign (for
+  example, the administrator is the only reviewer of a slot), and the message names the slots. Give each slot an
+  alternate, or ask another administrator to reopen, or switch the rule off for the project.
 
 ## Signing Hygiene
 

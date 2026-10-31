@@ -232,6 +232,12 @@ of their own review, and the person who reopened a review signing it again) off,
 `RequireNonReopenerSigning on->off`, a repeated change from the old value is refused with `RecordChanged`, and the
 independence rule is still on. This scenario is tested by `CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale`.
 
+**CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff**: With both rules at their default, the author's answer to a
+check is refused with `AuthorCannotAnswer` and stores nothing; once the rule is switched off the same answer is
+stored. The only person who may sign the single slot signs, and reopening the review by that person is refused with
+`ReopenWouldStrandSlot` and leaves the review approved; once the second rule is switched off the person reopens the
+review and signs it again. This scenario is tested by `CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff`.
+
 **CoreSubsystem_ApiTokenReview_AuthorIsTokenUser**: A review created by an actor that came through a token has the
 owner of the token as its author, so that the owner is refused as reviewer of a slot while a different member is
 accepted. This scenario is tested by `CoreSubsystem_ApiTokenReview_AuthorIsTokenUser`.

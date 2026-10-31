@@ -682,15 +682,16 @@ sections:
           The ProjectPage unit shall show to an administrator of the project or a system administrator, and to nobody
           else, two further switches in the Review rules card (authors answering the checklist of their own review,
           and the person who reopened a review signing it again), on for a project that was not given another value,
-          each with the statement that the rule is stored but not applied yet, shall save each changed switch through
+          each with the statement that the rule is on by default and applies to every project, also one that was
+          created before, shall save each changed switch through
           the project service from the value that was loaded, and shall show the confirmation or the message of the
           rule, for example when someone else changed the setting first, and the stored values after a refusal.
         justification: |
-          The rules are stored before they are applied, so the page must say so, or an administrator would believe a
-          switch protects the reviews when it does not yet. Saving from the loaded value keeps two administrators from
+          The rules are enforced for every project, so the page must say that an existing project is affected too, or an
+          administrator would be surprised by a refusal. Saving from the loaded value keeps two administrators from
           silently overwriting each other, and showing the stored values after a refusal keeps the page true.
         tests:
           - ProjectPage_ReviewRules_NewSwitches_DefaultOnAndSaveEachRule
           - ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads
-          - ProjectPage_ReviewRules_NewSwitches_SayNotAppliedYet
+          - ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement
           - ProjectPage_ReviewRules_NonAdmin_HidesCard

@@ -332,9 +332,20 @@ the two further review rule switches (authors answering the checklist of their o
 a review signing it again). In the Core scenario a plain member and an administrator's token are refused, the
 administrator switches both rules off with one audit entry `project.review-rule-changed` each, and a stale change is
 refused. In the Web scenario the real pipeline shows both switches, on by default, only to the administrator, and shows
-a rule as off after it was changed. The rules are stored only, so no scenario here expects a refusal of a checklist
-answer or of a signature. These scenarios are tested by `CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale`
-and `WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches`.
+a rule as off after it was changed. These scenarios are tested by
+`CoreSubsystem_ReviewRuleSwitches_ChangeIsAuditedAdminOnlyAndStale` and
+`WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches`.
+
+**CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff** and
+**WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers**: These subsystem scenarios verify the enforcement
+of the two further rules. In the Core scenario the author's answer to a check is refused with `AuthorCannotAnswer`
+and stores nothing, a reopening by the only person who may sign the slot is refused (`ReopenWouldStrandSlot`) and
+leaves the review approved, and with each rule switched off the same call succeeds, so that the administrator reopens
+the review and signs it again. In the Web scenario the author sees the notice and disabled controls on the
+checklist page and another member answers a check. The refusal of the reopener's signature is verified by the
+SigningService scenarios. These scenarios are tested by
+`CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff` and
+`WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers`.
 
 **ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited**: In the same setting, a review without a due
 date says so. A review that is planned with a due date a week ahead shows that date, labeled as UTC, without an Overdue
