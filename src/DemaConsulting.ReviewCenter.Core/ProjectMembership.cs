@@ -29,7 +29,13 @@ public enum ProjectRole
     User,
 
     /// <summary>A project administrator: a member who also manages the repositories of the project.</summary>
-    ProjectAdmin
+    ProjectAdmin,
+
+    /// <summary>
+    ///     An auditor: reserved, read-only. Sees everything a member sees and reads the audit trail, but changes
+    ///     nothing. The role cannot be assigned yet; <c>ProjectService</c> refuses it until it is offered.
+    /// </summary>
+    Auditor
 }
 
 /// <summary>

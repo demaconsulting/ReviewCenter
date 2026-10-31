@@ -646,15 +646,24 @@ public sealed class ProjectService
     private static string OnOff(bool value) => value ? "on" : "off";
 
     /// <summary>
-    ///     Rejects a role that is not a defined value.
+    ///     Rejects a role that is not a defined value, and the read-only <see cref="ProjectRole.Auditor"/> role
+    ///     until it is offered.
     /// </summary>
     /// <param name="role">The role.</param>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when the role is not defined.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     Thrown when the role is not defined or is not offered yet.
+    /// </exception>
     private static void ValidateRole(ProjectRole role)
     {
         if (!Enum.IsDefined(role))
         {
             throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not a known value.");
+        }
+
+        // Declared so access can be enforced, but nobody can be given it until the role is offered
+        if (role == ProjectRole.Auditor)
+        {
+            throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not offered yet.");
         }
     }
 

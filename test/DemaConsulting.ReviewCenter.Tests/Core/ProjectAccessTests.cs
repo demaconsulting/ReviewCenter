@@ -366,6 +366,171 @@ public class ProjectAccessTests
     }
 
     /// <summary>
+    ///     Test that every kind of actor, the read-only auditor included, gets the right view, contribute,
+    ///     administer and audit answers for the project it belongs to and for another one.
+    /// </summary>
+    /// <param name="who">The actor to test.</param>
+    /// <param name="own">The rights in the own project, as words joined by commas.</param>
+    /// <param name="other">The rights in the other project, written the same way.</param>
+    [Theory]
+    [InlineData("root", "view,contribute,administer,audit", "view,contribute,administer,audit")]
+    [InlineData("padm", "view,contribute,administer,audit", "")]
+    [InlineData("usr", "view,contribute", "")]
+    [InlineData("aud", "view,audit", "")]
+    [InlineData("out", "", "")]
+    [InlineData("off", "", "")]
+    [InlineData("offadm", "", "")]
+    [InlineData("ghost", "", "")]
+    [InlineData("", "", "")]
+    public async Task ProjectAccess_Matrix_ViewContributeAdministerAudit_EachActorKind_GetTheirRights(
+        string who,
+        string own,
+        string other)
+    {
+        // Arrange: the usual world plus an auditor of the own project
+        var world = await WorldWithAuditorAsync();
+        var actor = new Actor(who, who);
+
+        // Act
+        var ownRights = await RightsAsync(world, actor, world.Own);
+        var otherRights = await RightsAsync(world, actor, world.Other);
+
+        // Assert
+        Assert.Equal(own, ownRights);
+        Assert.Equal(other, otherRights);
+    }
+
+    /// <summary>
+    ///     Test that the require methods for the right to work and to audit fail with the right rule: a hidden or
+    ///     missing project is not found, a member of the wrong kind is not allowed, and the allowed pass.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAccess_Require_ContributeAndAudit_FailWithTheRightRule()
+    {
+        // Arrange
+        var world = await WorldWithAuditorAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var outsider = new Actor("out", "Out");
+        var member = new Actor("usr", "Usr");
+        var padm = new Actor("padm", "Padm");
+        var auditor = new Actor("aud", "Aud");
+        var root = new Actor("root", "Root");
+
+        // Act
+        var hiddenContribute = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Access.RequireContributeAsync(outsider, world.Own, cancellationToken));
+        var missingContribute = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Access.RequireContributeAsync(root, 9999, cancellationToken));
+        var hiddenAudit = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Access.RequireAuditAsync(outsider, world.Own, cancellationToken));
+        var missingAudit = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Access.RequireAuditAsync(root, 9999, cancellationToken));
+        var auditorContribute = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Access.RequireContributeAsync(auditor, world.Own, cancellationToken));
+        var memberAudit = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Access.RequireAuditAsync(member, world.Own, cancellationToken));
+        await world.Access.RequireContributeAsync(member, world.Own, cancellationToken);
+        await world.Access.RequireContributeAsync(padm, world.Own, cancellationToken);
+        await world.Access.RequireContributeAsync(root, world.Other, cancellationToken);
+        await world.Access.RequireAuditAsync(auditor, world.Own, cancellationToken);
+        await world.Access.RequireAuditAsync(padm, world.Own, cancellationToken);
+        await world.Access.RequireAuditAsync(root, world.Other, cancellationToken);
+
+        // Assert: a hidden project is told apart from a missing one by nothing at all
+        Assert.All(
+            [hiddenContribute, missingContribute, hiddenAudit, missingAudit],
+            e => Assert.Equal(DomainRule.ProjectNotFound, e.Rule));
+        Assert.Equal(missingContribute.Message, hiddenContribute.Message);
+        Assert.Equal(missingAudit.Message, hiddenAudit.Message);
+        Assert.Equal(DomainRule.ActorNotAllowed, auditorContribute.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, memberAudit.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a role changed between two calls changes the next answer for the right to work and to audit,
+    ///     because nothing is cached.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAccess_Revocation_RoleChangedBetweenCalls_ContributeAndAuditFollowTheNextCall()
+    {
+        // Arrange
+        var world = await WorldWithAuditorAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var member = new Actor("usr", "Usr");
+        Assert.True(await world.Access.CanContributeAsync(member, world.Own, cancellationToken));
+        Assert.False(await world.Access.CanAuditAsync(member, world.Own, cancellationToken));
+
+        // Act: the member becomes an auditor
+        await world.Store.SetMembershipRoleAsync(
+            world.Own, world.Ids["usr"], ProjectRole.Auditor, AuditTestExtensions.Draft(), false, cancellationToken);
+
+        // Assert
+        Assert.False(await world.Access.CanContributeAsync(member, world.Own, cancellationToken));
+        Assert.True(await world.Access.CanAuditAsync(member, world.Own, cancellationToken));
+        Assert.True(await world.Access.CanViewAsync(member, world.Own, cancellationToken));
+
+        // Act: and back to a user
+        await world.Store.SetMembershipRoleAsync(
+            world.Own, world.Ids["usr"], ProjectRole.User, AuditTestExtensions.Draft(), false, cancellationToken);
+
+        // Assert
+        Assert.True(await world.Access.CanContributeAsync(member, world.Own, cancellationToken));
+        Assert.False(await world.Access.CanAuditAsync(member, world.Own, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a stored role that is not defined fails closed: the member sees the project but cannot work in
+    ///     it or administer it.
+    /// </summary>
+    [Fact]
+    public async Task ProjectAccess_Matrix_UndefinedRole_FailsClosedAsReadOnly()
+    {
+        // Arrange: a membership with a role value that no code defines
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await world.Store.AddMembershipAsync(world.Ids["out"], world.Own, (ProjectRole)99, cancellationToken);
+        var actor = new Actor("out", "Out");
+
+        // Act
+        var rights = await RightsAsync(world, actor, world.Own);
+
+        // Assert
+        Assert.Equal("view,audit", rights);
+    }
+
+    /// <summary>
+    ///     Test that the read-only auditor role cannot be assigned yet by any of the three operations that store a
+    ///     role, and that a refused call changes and records nothing.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = new Actor("root", "Root");
+        var membersBefore = (await world.Store.ListMembershipsAsync(world.Own, cancellationToken)).Count;
+        var auditBefore = world.Store.Audits.Count;
+
+        // Act
+        var add = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => world.Projects.AddMemberAsync(root, world.Own, "out", ProjectRole.Auditor, cancellationToken));
+        var create = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => world.Projects.CreateMemberAccountAsync(
+                root, world.Own, "fresh", "Fresh Auditor", ProjectRole.Auditor, cancellationToken));
+        var change = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => world.Projects.SetMemberRoleAsync(root, world.Own, "usr", ProjectRole.Auditor, cancellationToken));
+
+        // Assert
+        Assert.All([add, create, change], e => Assert.Equal("role", e.ParamName));
+        Assert.Equal(membersBefore, (await world.Store.ListMembershipsAsync(world.Own, cancellationToken)).Count);
+        Assert.Equal(auditBefore, world.Store.Audits.Count);
+        Assert.Equal(
+            ProjectRole.User,
+            (await world.Store.GetMembershipAsync(world.Ids["usr"], world.Own, cancellationToken))!.Role);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses missing dependencies.
     /// </summary>
     [Fact]
@@ -374,6 +539,53 @@ public class ProjectAccessTests
         // Arrange, Act, Assert
         Assert.Throws<ArgumentNullException>(() => new ProjectAccess(null!, new FakeReviewStore()));
         Assert.Throws<ArgumentNullException>(() => new ProjectAccess(new FakeUserStore(), null!));
+    }
+
+    /// <summary>
+    ///     Writes the rights an actor has in a project as words.
+    /// </summary>
+    /// <param name="world">The arranged world.</param>
+    /// <param name="actor">The actor.</param>
+    /// <param name="projectId">The project.</param>
+    /// <returns>The words view, contribute, administer and audit, in that order, joined by commas.</returns>
+    private static async Task<string> RightsAsync(World world, Actor actor, int projectId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var rights = new List<string>();
+        if (await world.Access.CanViewAsync(actor, projectId, cancellationToken))
+        {
+            rights.Add("view");
+        }
+
+        if (await world.Access.CanContributeAsync(actor, projectId, cancellationToken))
+        {
+            rights.Add("contribute");
+        }
+
+        if (await world.Access.CanAdministerAsync(actor, projectId, cancellationToken))
+        {
+            rights.Add("administer");
+        }
+
+        if (await world.Access.CanAuditAsync(actor, projectId, cancellationToken))
+        {
+            rights.Add("audit");
+        }
+
+        return string.Join(',', rights);
+    }
+
+    /// <summary>
+    ///     Arranges the usual world plus the user <c>aud</c>, an auditor of the own project.
+    /// </summary>
+    /// <returns>The arranged world.</returns>
+    private static async Task<World> WorldWithAuditorAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var auditor = await world.Users.CreateAsync("aud", "aud", false, Password, Actor.CommandLine, cancellationToken);
+        await world.Store.AddMembershipAsync(auditor.Id, world.Own, ProjectRole.Auditor, cancellationToken);
+        return world;
     }
 
     /// <summary>

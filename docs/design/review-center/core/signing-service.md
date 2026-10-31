@@ -102,8 +102,9 @@ is.
   candidate; only a membership does.
 - A user occupies at most one slot of a review, as primary or as alternate. Otherwise one person could fill a review
   with their own approvals.
-- Any actor who may see the project can add, change, and remove slots: a member, and also a system administrator who
-  is not a member; the actor must have an enabled account (`ActorNotAllowed` otherwise), and an actor who may not see
+- Any actor who may work in the project can add, change, and remove slots: a member with the right to work, and also a
+  system administrator who is not a member; the actor must have an enabled account (`ActorNotAllowed` otherwise), a
+  read-only member (an auditor) is refused (`ActorNotAllowed`), and an actor who may not see
   the project is refused as if it did not exist (`ProjectNotFound`). Membership is not required to arrange the slots,
   only to be a reviewer in one (see the rule above) and to sign (step 1 of signing). A slot that has any signature,
   current or out of date, can
@@ -124,7 +125,8 @@ is one.
 **Signing** takes the actor (the signed-in user, never a form value), the slot, the digest the signer was looking at
 (`expectedDigest`), and the password. It checks, in this order, and stops at the first failure:
 
-1. The actor can see the project (`ProjectNotFound`), has an existing, enabled account (`ActorNotAllowed`), and is a
+1. The actor can work in the project (`ProjectNotFound` when it is not visible, `ActorNotAllowed` for a read-only
+   member), has an existing, enabled account (`ActorNotAllowed`), and is a
    member of the project (`ActorNotAllowed`: "Only a member of the project can sign its reviews."). A system
    administrator who is not a member cannot sign.
 2. The review and the slot exist (`ReviewNotFound`, `SlotNotFound`).
@@ -177,7 +179,7 @@ start again, for an authenticator code with the next one. The password is never 
 identity) answers whether an enabled external user has a live proof for exactly this slot, without spending it; it is
 `false` for a local user, an API token, an unknown user, and a service without a store of proofs. A page uses it to show
 "Identity confirmed". `RequireConfirmableAsync` (same arguments) checks, read-only, that the actor may be asked to
-confirm for a slot: not an API token, able to see the project, an enabled external account that is a member of the
+confirm for a slot: not an API token, able to work in the project, an enabled external account that is a member of the
 project and a reviewer (primary or alternate) of the slot; it returns the stored user whose identity the confirmation
 must match, and otherwise raises `ProjectNotFound`, `SlotNotFound`, or `ActorNotAllowed`. The sign-in endpoint calls it
 before anything is sent to the provider, so no confirmation is asked for a signature the user could not make.
@@ -219,7 +221,8 @@ not found.
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 
 - *Parameters*: the actor, the project identity, and a cancellation token.
-- *Preconditions*: The actor may see the project (`ProjectNotFound` otherwise).
+- *Preconditions*: The actor may work in the project (`ProjectNotFound` otherwise, `ActorNotAllowed` for a read-only
+  member).
 - *Returns*: `Task<IReadOnlyList<SlotMember>>` — the enabled members of the project ordered by display name and then
   user name; nothing secret is included.
 
@@ -311,7 +314,7 @@ never contain a password or a hash. An infrastructure failure of the store passe
 
 - **IReviewStore** — reads the record, the slots, the signatures, the review, the project, and the reopen history, and
   stores slots, signatures, and reopens.
-- **IProjectAccess** — requires that the actor may see the project, that the signer and the reviewers are members, and
+- **IProjectAccess** — requires that the actor may work in the project, that the signer and the reviewers are members, and
   (for a reopen) that the actor administers the project.
 - **UserService** — looks up users, describes the reviewers, re-authenticates the signer (`ReauthenticatePasswordAsync`),
   and records a refused confirmation of an external user.

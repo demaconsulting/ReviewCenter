@@ -120,8 +120,9 @@ public sealed class ReviewService
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(actor);
 
-        // Whoever may not see the project learns nothing about it, not even from a validation message
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        // Whoever may not see the project learns nothing about it, not even from a validation message; a member
+        // who may only read is refused as well
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
 
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ValidateId(id);
@@ -221,7 +222,7 @@ public sealed class ReviewService
             throw new InvalidOperationException("This service was created without access to repositories.");
         }
 
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
 
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ValidateId(id);

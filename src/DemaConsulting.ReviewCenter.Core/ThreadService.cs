@@ -112,7 +112,7 @@ public sealed class ThreadService
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ArgumentNullException.ThrowIfNull(anchor);
         ArgumentNullException.ThrowIfNull(actor);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
         var (filePath, startLine, endLine, side) = anchor;
         if (!Enum.IsDefined(side))
         {
@@ -239,7 +239,7 @@ public sealed class ThreadService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
         var comment = new ReviewComment
         {
             Author = actor.DisplayName,
@@ -457,7 +457,7 @@ public sealed class ThreadService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
 
         // An approved review is locked: a thread can neither be resolved nor reopened until the review is reopened
         await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);

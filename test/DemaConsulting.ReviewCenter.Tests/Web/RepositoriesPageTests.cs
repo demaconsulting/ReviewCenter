@@ -655,6 +655,18 @@ public class RepositoriesPageTests : PageTestBase
         }
 
         /// <inheritdoc />
+        public Task<bool> CanContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.CanContributeAsync(actor, projectId, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<bool> CanAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.CanAuditAsync(actor, projectId, cancellationToken);
+        }
+
+        /// <inheritdoc />
         public Task<bool> IsMemberAsync(int userId, int projectId, CancellationToken cancellationToken = default)
         {
             return _inner.IsMemberAsync(userId, projectId, cancellationToken);
@@ -683,6 +695,18 @@ public class RepositoriesPageTests : PageTestBase
                 Revoked = true;
                 await _revoke();
             }
+        }
+
+        /// <inheritdoc />
+        public Task RequireContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.RequireContributeAsync(actor, projectId, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task RequireAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.RequireAuditAsync(actor, projectId, cancellationToken);
         }
 
         /// <inheritdoc />

@@ -33,6 +33,18 @@ internal sealed class AllowAllProjectAccess(IReviewStore store) : IProjectAccess
     }
 
     /// <inheritdoc />
+    public Task<bool> CanContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        return CanViewAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> CanAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        return CanViewAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<bool> IsMemberAsync(int userId, int projectId, CancellationToken cancellationToken = default)
     {
         return await store.GetMembershipAsync(userId, projectId, cancellationToken) is not null;
@@ -57,6 +69,18 @@ internal sealed class AllowAllProjectAccess(IReviewStore store) : IProjectAccess
 
     /// <inheritdoc />
     public Task RequireAdministerAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        return RequireViewAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task RequireContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        return RequireViewAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task RequireAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
     {
         return RequireViewAsync(actor, projectId, cancellationToken);
     }

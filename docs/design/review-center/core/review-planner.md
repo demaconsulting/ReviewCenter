@@ -32,13 +32,14 @@ most five suffixes are tried when a create is refused as a duplicate.
 - *Parameters*: `Actor actor`, `int projectId`, `int repositoryId`, `string? headRevision`, `BaselineMode mode`,
   `string? baselineRevision`, `CancellationToken cancellationToken`.
 - *Returns*: `ReviewPlan` — one row per review-set, in file order.
-- *Preconditions*: `actor` is not null and may see the project (`IProjectAccess.RequireViewAsync`, which gives
-  `ProjectNotFound` for a project that does not exist and for one that is hidden, before anything else); the revisions
+- *Preconditions*: `actor` is not null and may work in the project (`IProjectAccess.RequireContributeAsync`, which gives
+  `ProjectNotFound` for a project that does not exist and for one that is hidden, before anything else, and
+  `ActorNotAllowed` for a read-only member such as an auditor); the revisions
   pass `RevisionValidator`; the baseline revision is required for `Explicit` and ignored otherwise; the repository is
   registered, enabled, and belongs to the project.
 - *Postconditions*: Nothing is stored. The repository was fetched once, because one session served the whole plan.
 - *Algorithm*:
-  1. Check that the actor may see the project, validate the revisions, and get the access data from
+  1. Check that the actor may work in the project, validate the revisions, and get the access data from
      `RepositoryService` (`GetAccessAsync(projectId, repositoryId)`, which refuses a repository of another project as
      not found); open one session;
      resolve the head and, for `Explicit`, the baseline to commits.
@@ -70,7 +71,7 @@ most five suffixes are tried when a create is refused as a duplicate.
   `IReadOnlyList<PlanCreateRequest> requests`, and `CancellationToken cancellationToken`.
 - *Returns*: one `PlanCreateResult` for every request, in the same order.
 - *Preconditions*: `requests` and `actor` are not null; there are at most `MaxReviewSets` requests; `headSha` is a full
-  commit id; the actor may see the project and the repository is usable and belongs to the project.
+  commit id; the actor may work in the project and the repository is usable and belongs to the project.
 - *Postconditions*: Every created review has its review-set id and is stored in its own transaction by
   `ReviewService`, with its own audit entry; the batch is not one transaction.
 - *Algorithm*: Open one session for the batch. For each request, build the id (below) and the title, and call
@@ -120,7 +121,7 @@ repository with hundreds of sets is slow to plan.
 
 - **IReviewStore**, **ReviewService**, **RepositoryService**, **SigningService** — reviews, creation, access data, and
   the signed state.
-- **IProjectAccess** — requires that the actor may see the project before the plan or the batch does any work.
+- **IProjectAccess** — requires that the actor may work in the project before the plan or the batch does any work.
 - **IGitRepositoryProvider** and **IGitRepository** — the session, the commits, the listings, the configuration blob,
   and the ancestor check.
 - **IReviewSetParser** — the review-sets of the configuration.

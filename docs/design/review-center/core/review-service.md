@@ -60,9 +60,10 @@ constants are in `ReviewLimits`; see `ProjectService`).
   checklist, in
   the same transaction. Nothing is stored when a rule fails.
 
-The first check is that the actor may see the project (`IProjectAccess.RequireViewAsync`): a project that does not
-exist and a project the actor may not see are refused alike with `ProjectNotFound`, before the input is examined, so
-a validation message never reveals a hidden project. Any member of the project (and a system administrator) can create
+The first check is that the actor may work in the project (`IProjectAccess.RequireContributeAsync`): a project that
+does not exist and a project the actor may not see are refused alike with `ProjectNotFound`, before the input is
+examined, so a validation message never reveals a hidden project; a read-only member (an auditor) is refused with
+`ActorNotAllowed`. Any member of the project who may work in it (and a system administrator) can create
 reviews. The other rules are checked in this order, and the first violation is reported: the identifier
 (`ReviewIdInvalid`);
 the title (`ReviewTitleInvalid`); the files (`NoFiles`, `TooManyFiles`, `PathInvalid`, `DuplicatePath`,
@@ -82,7 +83,8 @@ covers two requests that pass the check at the same time.
 - *Postconditions*: The review is stored with the frozen copies described below, or nothing is stored.
 
 The service is constructed with an optional `RepositoryService` and `IGitRepositoryProvider`; without them the
-method throws `InvalidOperationException`. The first check is that the actor may see the project (`ProjectNotFound`,
+method throws `InvalidOperationException`. The first check is that the actor may work in the project
+(`ProjectNotFound`, or `ActorNotAllowed` for a read-only member,
 as for a draft). The checks that need no I/O come next (identifier, title, the head and
 baseline revision names through `RevisionValidator`, the selection (a `null` selection means every changed file and
 becomes `**/*`; empty or blank text is refused) through `SelectionMatcher.Parse` and its
@@ -167,7 +169,7 @@ store or clock at construction, raise `ArgumentNullException`. Store failures pr
 #### Dependencies
 
 - **IReviewStore** — checks, stores, and reads reviews (injected).
-- **IProjectAccess** — requires that the actor may see the project before a review is created (injected).
+- **IProjectAccess** — requires that the actor may work in the project before a review is created (injected).
 - **TimeProvider** — supplies the creation time (injected).
 - **Fingerprint** — calculates the file hashes and the review fingerprint.
 - **RepositoryService** and **IGitRepositoryProvider** — resolve the access to a repository and open the git session

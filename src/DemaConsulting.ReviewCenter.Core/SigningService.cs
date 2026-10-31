@@ -359,19 +359,22 @@ public sealed class SigningService
     /// <summary>
     ///     Lists the users that can be chosen for a slot of a project: its enabled members.
     /// </summary>
-    /// <param name="actor">The signed-in user who asks; must be able to see the project. Must not be null.</param>
+    /// <param name="actor">The signed-in user who asks; must be able to work in the project. Must not be null.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The enabled members ordered by display name and then user name; nothing secret is included.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and with
+    ///     <see cref="DomainRule.ActorNotAllowed"/> when the actor may only read it.
+    /// </exception>
     public async Task<IReadOnlyList<SlotMember>> ListCandidatesAsync(
         Actor actor,
         int projectId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
         var memberIds = (await _store.ListMembershipsAsync(projectId, cancellationToken))
             .Select(membership => membership.UserId)
             .ToHashSet();
@@ -1083,7 +1086,7 @@ public sealed class SigningService
     }
 
     /// <summary>
-    ///     Checks that the signed-in user still has an enabled account and may see the project.
+    ///     Checks that the signed-in user still has an enabled account and may work in the project.
     /// </summary>
     /// <param name="actor">The signed-in user.</param>
     /// <param name="projectId">The project identity.</param>
@@ -1091,11 +1094,12 @@ public sealed class SigningService
     /// <returns>The stored user.</returns>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and with
-    ///     <see cref="DomainRule.ActorNotAllowed"/> when the account is gone or disabled.
+    ///     <see cref="DomainRule.ActorNotAllowed"/> when the actor may only read it or the account is gone or
+    ///     disabled.
     /// </exception>
     private async Task<User> EnsureActorAsync(Actor actor, int projectId, CancellationToken cancellationToken)
     {
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
         var user = await _users.GetAsync(actor.Username, cancellationToken);
         if (user is null || !user.Enabled)
         {

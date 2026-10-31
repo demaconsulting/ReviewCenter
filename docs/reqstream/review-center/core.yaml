@@ -34,7 +34,8 @@ sections:
         title: >-
           The Core subsystem shall give access to a project by membership: a system administrator sees and
           administers every project and manages the members, a project administrator manages the members and the
-          repositories of the own project, a member sees the own project and works in it, and every other actor,
+          repositories of the own project, a member sees the own project and works in it, a member whose role is
+          auditor sees the own project and reads its audit trail but does not work in it, and every other actor,
           including a disabled, unknown, anonymous, or command line actor, gets the answer for a project that does
           not exist. A user who still has a temporary password has no access to any project. The subsystem shall
           decide on the current state of the user and the memberships at every call, treat an actor that came
@@ -53,6 +54,8 @@ sections:
           - ReviewCenter-ProjectAccess-SystemAdmin
           - ReviewCenter-ProjectAccess-NoAccount
           - ReviewCenter-ProjectAccess-NotFound
+          - ReviewCenter-ProjectAccess-Contribute
+          - ReviewCenter-ProjectAccess-AuditAccess
           - ReviewCenter-ProjectAccess-TemporaryPassword
           - ReviewCenter-ProjectAccess-Revocation
           - ReviewCenter-ProjectAccess-TokenOwner

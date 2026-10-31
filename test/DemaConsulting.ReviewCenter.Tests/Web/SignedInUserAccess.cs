@@ -43,6 +43,20 @@ internal sealed class SignedInUserAccess(
     }
 
     /// <inheritdoc />
+    public async Task<bool> CanContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        await EnsureAsync(actor, cancellationToken);
+        return await inner.CanContributeAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> CanAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        await EnsureAsync(actor, cancellationToken);
+        return await inner.CanAuditAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<bool> IsMemberAsync(int userId, int projectId, CancellationToken cancellationToken = default)
     {
         return inner.IsMemberAsync(userId, projectId, cancellationToken);
@@ -69,6 +83,20 @@ internal sealed class SignedInUserAccess(
     {
         await EnsureAsync(actor, cancellationToken);
         await inner.RequireAdministerAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task RequireContributeAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        await EnsureAsync(actor, cancellationToken);
+        await inner.RequireContributeAsync(actor, projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task RequireAuditAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+    {
+        await EnsureAsync(actor, cancellationToken);
+        await inner.RequireAuditAsync(actor, projectId, cancellationToken);
     }
 
     /// <inheritdoc />

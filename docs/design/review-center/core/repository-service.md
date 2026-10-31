@@ -73,7 +73,8 @@ that `GetAccessAsync` returns always belong to the same version of a registratio
 
 **ListAsync**: Lists all registrations of a project for an administrator of that project (`Actor actor`, `int
 projectId`), ordered by name. **ListEnabledAsync** (`Actor actor`, `int projectId`) lists the `RepositorySummary` of the
-enabled repositories of the project for any actor who may see the project.
+enabled repositories of the project for any actor who may work in the project (a read-only member, such as an
+auditor, is refused: the list feeds the review-creation pickers).
 
 **GetAccessAsync** (internal to Core): Returns the access data for a read.
 

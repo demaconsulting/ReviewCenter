@@ -177,7 +177,7 @@ public sealed class ReviewPlanner
         ArgumentNullException.ThrowIfNull(actor);
 
         // Whoever may not see the project learns nothing about it, and git is never reached on their behalf
-        await EnsureProjectAsync(actor, projectId, cancellationToken);
+        await EnsureContributorAsync(actor, projectId, cancellationToken);
 
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         if (!Enum.IsDefined(mode))
@@ -299,7 +299,7 @@ public sealed class ReviewPlanner
         }
 
         // The commits come from a page, so they are checked like anything else that reaches git
-        await EnsureProjectAsync(actor, projectId, cancellationToken);
+        await EnsureContributorAsync(actor, projectId, cancellationToken);
         RequireCommit(headSha);
         var access = await _repositories.GetAccessAsync(projectId, repositoryId, cancellationToken);
 
@@ -437,16 +437,20 @@ public sealed class ReviewPlanner
     }
 
     /// <summary>
-    ///     Checks that the actor may see the project.
+    ///     Checks that the actor may work in the project.
     /// </summary>
     /// <param name="actor">The signed-in user.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the actor may see the project.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/>.</exception>
-    private Task EnsureProjectAsync(Actor actor, int projectId, CancellationToken cancellationToken)
+    /// <returns>A task that completes when the actor may work in the project.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and with
+    ///     <see cref="DomainRule.ActorNotAllowed"/> when the actor may only read it (an auditor cannot plan or create
+    ///     reviews).
+    /// </exception>
+    private Task EnsureContributorAsync(Actor actor, int projectId, CancellationToken cancellationToken)
     {
-        return _access.RequireViewAsync(actor, projectId, cancellationToken);
+        return _access.RequireContributeAsync(actor, projectId, cancellationToken);
     }
 
     /// <summary>
