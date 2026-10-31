@@ -781,6 +781,8 @@ public class ReviewCenterSystemTests
 
         // Act: the reviewer follows the link, signs, and looks at the inbox again
         await reviewer.OkAsync("click", "inbox-link-1");
+        await reviewer.OkAsync(
+            "wait", "css=[data-testid=review-page][data-interactive=true]", "--timeout", "30000");
         await reviewer.OkAsync("wait", $"sign-form-{slot}");
         await Scenario.SignAsync(reviewer, slot);
         await reviewer.GotoAsync("/inbox", "inbox-page");
