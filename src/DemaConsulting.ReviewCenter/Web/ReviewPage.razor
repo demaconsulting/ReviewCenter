@@ -576,6 +576,10 @@
                                 @onclick="() => ToggleThreadAsync(item)">@(resolved ? "Reopen" : "Resolve")</button>
                     }
                 </div>
+                @if (Warning?.Key == ToggleWarningKey(threadId))
+                {
+                    <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
+                }
                 @if (expanded)
                 {
                     @for (var n = 1; n <= item.Comments.Count; n++)
@@ -600,6 +604,10 @@
                             @if (ReplyErrors.TryGetValue(threadId, out var replyError))
                             {
                                 <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
+                            }
+                            @if (Warning?.Key == ReplyWarningKey(threadId))
+                            {
+                                <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
                             }
                             <button type="button" class="secondary" data-testid="reply-button-@threadId"
                                     aria-label="Post reply to thread @threadId"
@@ -649,6 +657,10 @@
                 @if (NewThreadError is not null)
                 {
                     <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
+                }
+                @if (Warning?.Key == NewThreadWarningKey)
+                {
+                    <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
                 }
                 <div class="form-actions">
                     <button type="submit" data-testid="start-thread-button">Start thread</button>

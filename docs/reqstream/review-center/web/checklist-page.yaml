@@ -55,7 +55,6 @@ sections:
           - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
           - ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy
           - ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy
-          - ChecklistPage_Answer_SignedReview_StoresTheAnswerAndMarksTheSignatureOutOfDate
 
       - id: ReviewCenter-ChecklistPage-Applicability
         title: >-
@@ -73,6 +72,27 @@ sections:
           - ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError
           - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
           - ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning
+        title: >-
+          The ChecklistPage unit shall, when an answer or a change of the applicability of a section would make a
+          current signature out of date, store nothing and show a warning next to the control that was used that
+          names every affected slot and its signer, repeat the change with those slots acknowledged only when the
+          reviewer confirms, show the warning again with every affected slot when another signature appeared
+          meanwhile, and leave the signatures and the record unchanged, and keep the unsaved choice and reason, when
+          the reviewer cancels.
+        justification: |
+          A changed answer after a signature silently voids the signature. The reviewer has to see whose signature
+          is affected and decide, so that nobody learns afterwards that a reviewer has to sign again. A signature
+          that appears while the warning is open must be shown before it is voided.
+        tests:
+          - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
+          - ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores
+          - ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring
+          - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
+          - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
+          - ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning
+          - ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId
 
       - id: ReviewCenter-ChecklistPage-NextUnanswered
         title: >-

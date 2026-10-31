@@ -184,6 +184,12 @@ public partial class ChecklistPage : ComponentBase
     private Dictionary<string, string> SectionErrors { get; } = [];
 
     /// <summary>
+    ///     Gets the change that waits for the person to confirm that it makes signatures out of date, or
+    ///     <c>null</c>; only one such change waits at a time.
+    /// </summary>
+    private PendingSignatureWarning? Warning { get; set; }
+
+    /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
     /// </summary>
     /// <remarks>
@@ -272,6 +278,7 @@ public partial class ChecklistPage : ComponentBase
         PendingNotApplicable.Clear();
         ReasonTexts.Clear();
         SectionErrors.Clear();
+        Warning = null;
         _scrollTarget = null;
     }
 
@@ -360,6 +367,11 @@ public partial class ChecklistPage : ComponentBase
         }
 
         SectionErrors.Remove(sectionId);
+        if (IsSwitchOnWaiting(sectionId))
+        {
+            Warning = null;
+        }
+
         if (!applicable)
         {
             PendingNotApplicable.Add(sectionId);
@@ -388,11 +400,7 @@ public partial class ChecklistPage : ComponentBase
             return;
         }
 
-        if (await SaveSectionAsync(sectionId, applicable: false, ReasonText(sectionId)))
-        {
-            PendingNotApplicable.Remove(sectionId);
-            ReasonTexts.Remove(sectionId);
-        }
+        await SaveSectionAsync(sectionId, applicable: false, ReasonText(sectionId));
     }
 
     /// <summary>
@@ -451,23 +459,50 @@ public partial class ChecklistPage : ComponentBase
     /// <param name="itemId">The check identifier.</param>
     /// <param name="outcome">The outcome to store.</param>
     /// <param name="justification">The justification, or <c>null</c> for none.</param>
-    /// <returns>A task that completes when the answer is stored or the problem is shown.</returns>
-    private async Task SaveAnswerAsync(string itemId, ChecklistOutcome outcome, string? justification)
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the answer is stored or the warning or problem is shown.</returns>
+    /// <remarks>
+    ///     A change that would make signatures out of date is not stored; the page asks the person to confirm it
+    ///     first (see <see cref="Warning"/>), then repeats it with exactly the answer shown at the first attempt.
+    /// </remarks>
+    private async Task SaveAnswerAsync(
+        string itemId,
+        ChecklistOutcome outcome,
+        string? justification,
+        IReadOnlyList<AffectedSignature>? confirmed = null)
     {
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
-            await SignatureAcknowledgement.RunAsync(acknowledged => ChecklistService.SetAnswerAsync(
-                ProjectId, ReviewId, itemId, outcome, justification, actor, acknowledgedSlotIds: acknowledged));
+            await ChecklistService.SetAnswerAsync(
+                ProjectId,
+                ReviewId,
+                itemId,
+                outcome,
+                justification,
+                actor,
+                acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            ItemErrors.Remove(itemId);
+            Warning = PendingSignatureWarning.Create(
+                ItemWarningKey(itemId),
+                confirmed,
+                ex,
+                slots => SaveAnswerAsync(itemId, outcome, justification, slots));
+            return;
         }
         catch (DomainRuleException ex)
         {
             // Somebody signed the last slot while the page was open: show the page as locked from now on
             IsLocked |= ex.Rule == DomainRule.ReviewLocked;
+            Warning = null;
             ItemErrors[itemId] = ex.Message;
             return;
         }
 
+        Warning = null;
         ItemErrors.Remove(itemId);
         PendingOutcomes.Remove(itemId);
         JustificationTexts.Remove(itemId);
@@ -480,25 +515,131 @@ public partial class ChecklistPage : ComponentBase
     /// <param name="sectionId">The section identifier.</param>
     /// <param name="applicable">Whether the section applies.</param>
     /// <param name="reason">The reason it does not apply, or <c>null</c>.</param>
-    /// <returns><c>true</c> when the change was stored.</returns>
-    private async Task<bool> SaveSectionAsync(string sectionId, bool applicable, string? reason)
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the change is stored or the warning or problem is shown.</returns>
+    /// <remarks>
+    ///     When the change is stored, the unsaved state of the section (the switch and the typed reason) is dropped.
+    ///     A change that would make signatures out of date is handled as for <see cref="SaveAnswerAsync"/>.
+    /// </remarks>
+    private async Task SaveSectionAsync(
+        string sectionId, bool applicable, string? reason, IReadOnlyList<AffectedSignature>? confirmed = null)
     {
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
-            await SignatureAcknowledgement.RunAsync(acknowledged => ChecklistService.SetSectionApplicabilityAsync(
-                ProjectId, ReviewId, sectionId, applicable, reason, actor, acknowledgedSlotIds: acknowledged));
+            await ChecklistService.SetSectionApplicabilityAsync(
+                ProjectId,
+                ReviewId,
+                sectionId,
+                applicable,
+                reason,
+                actor,
+                acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            SectionErrors.Remove(sectionId);
+            Warning = PendingSignatureWarning.Create(
+                SectionWarningKey(sectionId, applicable),
+                confirmed,
+                ex,
+                slots => SaveSectionAsync(sectionId, applicable, reason, slots));
+            return;
         }
         catch (DomainRuleException ex)
         {
             IsLocked |= ex.Rule == DomainRule.ReviewLocked;
+            Warning = null;
             SectionErrors[sectionId] = ex.Message;
-            return false;
+            return;
         }
 
+        Warning = null;
         SectionErrors.Remove(sectionId);
+        PendingNotApplicable.Remove(sectionId);
+        ReasonTexts.Remove(sectionId);
         State = await ChecklistService.GetAsync(ProjectId, ReviewId);
-        return true;
+    }
+
+    /// <summary>
+    ///     Repeats the change that waits for confirmation, now acknowledging the signatures it named.
+    /// </summary>
+    /// <returns>A task that completes when the change has been repeated.</returns>
+    /// <remarks>
+    ///     The waiting change is taken out first, so a second click cannot repeat it twice. The access is checked
+    ///     again, and the service checks again: when more signatures have become affected in the meantime, the
+    ///     warning is shown again with all of them, so the person only ever confirms what was shown.
+    /// </remarks>
+    private async Task ConfirmWarningAsync()
+    {
+        var warning = Warning;
+        Warning = null;
+        if (warning is not null && await GuardAsync())
+        {
+            await warning.Retry(warning.Slots);
+        }
+    }
+
+    /// <summary>
+    ///     Drops the waiting change; nothing is stored and the unsaved choice or text stays.
+    /// </summary>
+    private void CancelWarning()
+    {
+        Warning = null;
+    }
+
+    /// <summary>
+    ///     Gets the slot identities to acknowledge for a confirmation.
+    /// </summary>
+    /// <param name="confirmed">The confirmed signatures, or <c>null</c> when none are confirmed.</param>
+    /// <returns>The identities, or <c>null</c> when there is nothing to acknowledge.</returns>
+    private static int[]? SlotIds(IReadOnlyList<AffectedSignature>? confirmed)
+    {
+        return confirmed?.Select(slot => slot.SlotId).ToArray();
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for the answer of a check.
+    /// </summary>
+    /// <param name="itemId">The check identifier.</param>
+    /// <returns>The key.</returns>
+    private static string ItemWarningKey(string itemId)
+    {
+        return $"check-{itemId}";
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for the applicability of a section.
+    /// </summary>
+    /// <param name="sectionId">The section identifier.</param>
+    /// <param name="applicable">Whether the change makes the section apply.</param>
+    /// <returns>The key; it differs for switching the section on and for saving its reason.</returns>
+    private static string SectionWarningKey(string sectionId, bool applicable)
+    {
+        return applicable ? $"section-on-{sectionId}" : $"section-{sectionId}";
+    }
+
+    /// <summary>
+    ///     Reports whether the change that waits for confirmation is the switching on of a section.
+    /// </summary>
+    /// <param name="sectionId">The section identifier.</param>
+    /// <returns><c>true</c> when the switch of the section must be shown on until the person decides.</returns>
+    private bool IsSwitchOnWaiting(string sectionId)
+    {
+        return Warning?.Key == SectionWarningKey(sectionId, applicable: true);
+    }
+
+    /// <summary>
+    ///     Gets the change that waits for confirmation when it is a change of the applicability of the section.
+    /// </summary>
+    /// <param name="sectionId">The section identifier.</param>
+    /// <returns>The waiting change, or <c>null</c> when none waits for this section.</returns>
+    private PendingSignatureWarning? SectionWarningFor(string sectionId)
+    {
+        return Warning?.Key == SectionWarningKey(sectionId, applicable: true)
+            || Warning?.Key == SectionWarningKey(sectionId, applicable: false)
+            ? Warning
+            : null;
     }
 
     /// <summary>

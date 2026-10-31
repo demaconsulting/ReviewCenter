@@ -17,8 +17,9 @@
             <li>A slot can be signed only when every checklist check is answered, no check is answered Fail, and no
                 thread is open.</li>
             <li>Any later change to the review, such as a new comment or a changed answer, makes the earlier signatures
-                out of date, and the reviewer signs again. The review is <strong>Approved</strong> when every slot is
-                signed for its current state.</li>
+                out of date, and the reviewer signs again. Before it does that, ReviewCenter shows a warning that names
+                the affected slots and signers, and you choose <strong>Confirm change</strong> or <strong>Cancel</strong>.
+                The review is <strong>Approved</strong> when every slot is signed for its current state.</li>
             <li>An approved review is <strong>locked</strong>: nobody can add comments, change answers, change the
                 files or the reviewers. A project admin or a system administrator can <strong>reopen</strong> it with
                 a reason; this is recorded in the audit trail, the old signatures are kept as history, and the

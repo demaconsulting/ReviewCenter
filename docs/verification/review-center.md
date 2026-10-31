@@ -282,6 +282,14 @@ is refused because the record changed. After the page is drawn again, the right 
 Approved. The audit page lists the failed proof and the signature but neither password, and its verification reports an
 intact chain. This scenario is tested by `ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen`.
 
+**ReviewCenter_Signing_ChangeAfterSignature_AsksToConfirmAndOnlyThenMakesItOutOfDate**: In the same setting, a review
+has slots for `second` and `third` and every checklist section answered as not applicable; `second` signs, so the
+review is not approved. The administrator changes the reason of a section on the checklist page; the page shows the
+warning, which names "Slot 1" and "Second Reviewer" and stores nothing. After Cancel the slot of `second` still shows
+"Signed by". The administrator saves the change again and clicks Confirm; the warning goes and the slot shows "Signature
+out of date". This scenario is tested by
+`ReviewCenter_Signing_ChangeAfterSignature_AsksToConfirmAndOnlyThenMakesItOutOfDate`.
+
 **ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised**: A comment thread is started on the
 review and resolved, every checklist section is answered, and a personal access token of the signer (`second`) is
 created in the browser. Through the API with the token, the review is not approved, the attestation is refused, and

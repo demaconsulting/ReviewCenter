@@ -110,6 +110,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private const string ScrollCenter = "center";
 
     /// <summary>
+    ///     The key of the confirmation for the new-thread form.
+    /// </summary>
+    private const string NewThreadWarningKey = "new-thread";
+
+    /// <summary>
     ///     Where the element of <see cref="_scrollTarget"/> lands in the window: <c>start</c> or <c>center</c>.
     /// </summary>
     private string _scrollBlock = ScrollCenter;
@@ -677,6 +682,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private Dictionary<int, string> ReplyErrors { get; } = [];
 
     /// <summary>
+    ///     Gets the change that waits for the person to confirm that it makes signatures out of date, or
+    ///     <c>null</c>; only one such change waits at a time.
+    /// </summary>
+    private PendingSignatureWarning? Warning { get; set; }
+
+    /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
     /// </summary>
     /// <remarks>
@@ -835,6 +846,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         SignErrors.Clear();
         ReplyTexts.Clear();
         ReplyErrors.Clear();
+        Warning = null;
         IndexFilter = ReviewThreadState.Open;
         ExpandedThreads.Clear();
         FocusedThreadId = null;
@@ -1027,6 +1039,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
             Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
             Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
             Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
+            if (IsLocked)
+            {
+                // A locked review accepts no change, so nothing is left to confirm
+                Warning = null;
+            }
+
             CanReopen = actor is not null && await Access.CanAdministerAsync(actor, ProjectId);
             CanSetDueDate = await ReviewService.CanSetDueDateAsync(actor, Review);
             try
@@ -1681,7 +1699,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <remarks>
     ///     Both line fields blank anchors the whole file; only a start line anchors that single line. On a
     ///     rule violation the message is shown next to the form and everything typed stays, so it can be fixed.
-    ///     Success clears the text and the line fields.
+    ///     Success clears the text and the line fields. A change that would make signatures out of date waits for
+    ///     the person to confirm it (see <see cref="Warning"/>); the text stays until then.
     /// </remarks>
     private async Task StartThreadAsync()
     {
@@ -1696,19 +1715,41 @@ public partial class ReviewPage : ComponentBase, IDisposable
             return;
         }
 
+        var anchor = new ThreadAnchor(SelectedPath, start, end ?? start, start is null ? ThreadSide.Head : NewSide);
+        await SubmitThreadAsync(anchor, NewText, null);
+    }
+
+    /// <summary>
+    ///     Stores a new thread, or asks for confirmation when that would make signatures out of date.
+    /// </summary>
+    /// <param name="anchor">Where the thread is placed, as it was when the person submitted the form.</param>
+    /// <param name="text">The comment text, as it was when the person submitted the form.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the thread is stored or the warning or problem is shown.</returns>
+    private async Task SubmitThreadAsync(
+        ThreadAnchor anchor, string text, IReadOnlyList<AffectedSignature>? confirmed)
+    {
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
-            var anchor = new ThreadAnchor(SelectedPath, start, end ?? start, start is null ? ThreadSide.Head : NewSide);
-            await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.StartThreadAsync(
-                ProjectId, ReviewId, anchor, actor, NewText, acknowledgedSlotIds: acknowledged));
+            await ThreadService.StartThreadAsync(
+                ProjectId, ReviewId, anchor, actor, text, acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            NewThreadError = null;
+            Warning = PendingSignatureWarning.Create(
+                NewThreadWarningKey, confirmed, ex, slots => SubmitThreadAsync(anchor, text, slots));
+            return;
         }
         catch (DomainRuleException ex)
         {
+            Warning = null;
             NewThreadError = ex.Message;
             return;
         }
 
+        Warning = null;
         NewThreadError = null;
         NewText = string.Empty;
         ClearAnchor();
@@ -1716,45 +1757,61 @@ public partial class ReviewPage : ComponentBase, IDisposable
     }
 
     /// <summary>
-    ///     Adds the typed reply to a thread.
+    ///     Adds a reply to a thread, or asks for confirmation when that would make signatures out of date.
     /// </summary>
     /// <param name="threadId">The identity of the thread.</param>
-    /// <returns>A task that completes when the reply is stored or the problem is shown.</returns>
-    private async Task ReplyAsync(int threadId)
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <param name="confirmedText">
+    ///     The text to send, as it was at the first attempt; <c>null</c> to take the text typed for the thread.
+    /// </param>
+    /// <returns>A task that completes when the reply is stored or the warning or problem is shown.</returns>
+    private async Task ReplyAsync(
+        int threadId, IReadOnlyList<AffectedSignature>? confirmed = null, string? confirmedText = null)
     {
         if (!await GuardAsync())
         {
             return;
         }
 
+        var text = confirmedText ?? ReplyTexts.GetValueOrDefault(threadId) ?? string.Empty;
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
-            var text = ReplyTexts.GetValueOrDefault(threadId);
-            await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.ReplyAsync(
-                ProjectId, ReviewId, threadId, actor, text, acknowledgedSlotIds: acknowledged));
+            await ThreadService.ReplyAsync(
+                ProjectId, ReviewId, threadId, actor, text, acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            ReplyErrors.Remove(threadId);
+            Warning = PendingSignatureWarning.Create(
+                ReplyWarningKey(threadId), confirmed, ex, slots => ReplyAsync(threadId, slots, text));
+            return;
         }
         catch (DomainRuleException ex)
         {
+            Warning = null;
             ReplyErrors[threadId] = ex.Message;
             return;
         }
 
+        Warning = null;
         ReplyErrors.Remove(threadId);
         ReplyTexts.Remove(threadId);
         await RefreshAsync();
     }
 
     /// <summary>
-    ///     Resolves an open thread or reopens a resolved one.
+    ///     Resolves an open thread or reopens a resolved one, or asks for confirmation when that would make
+    ///     signatures out of date.
     /// </summary>
     /// <param name="thread">The thread as shown.</param>
-    /// <returns>A task that completes when the state is stored or the problem is shown.</returns>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the state is stored or the warning or problem is shown.</returns>
     /// <remarks>
     ///     Refused, with a message, when the sign-in state of the page has already ended. Resolving or reopening
     ///     changes the approval state, so it must not run for a user who is no longer signed in.
     /// </remarks>
-    private async Task ToggleThreadAsync(ReviewThread thread)
+    private async Task ToggleThreadAsync(ReviewThread thread, IReadOnlyList<AffectedSignature>? confirmed = null)
     {
         if (!await GuardAsync())
         {
@@ -1767,24 +1824,90 @@ public partial class ReviewPage : ComponentBase, IDisposable
             var actor = await AuthenticationState.GetActorAsync();
             if (thread.State == ReviewThreadState.Open)
             {
-                await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.ResolveAsync(
-                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: acknowledged));
+                await ThreadService.ResolveAsync(
+                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: SlotIds(confirmed));
                 ExpandedThreads.Remove(thread.Id);
             }
             else
             {
-                await SignatureAcknowledgement.RunAsync(acknowledged => ThreadService.ReopenAsync(
-                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: acknowledged));
+                await ThreadService.ReopenAsync(
+                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: SlotIds(confirmed));
             }
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            ReplyErrors.Remove(thread.Id);
+            Warning = PendingSignatureWarning.Create(
+                ToggleWarningKey(thread.Id), confirmed, ex, slots => ToggleThreadAsync(thread, slots));
+            return;
         }
         catch (DomainRuleException ex)
         {
+            Warning = null;
             ReplyErrors[thread.Id] = ex.Message;
             return;
         }
 
+        Warning = null;
         ReplyErrors.Remove(thread.Id);
         await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Repeats the change that waits for confirmation, now acknowledging the signatures it named.
+    /// </summary>
+    /// <returns>A task that completes when the change has been repeated.</returns>
+    /// <remarks>
+    ///     The waiting change is taken out first, so a second click cannot repeat it twice. The access is checked
+    ///     again, and the service checks again: when more signatures have become affected in the meantime, the
+    ///     warning is shown again with all of them, so the person only ever confirms what was shown.
+    /// </remarks>
+    private async Task ConfirmWarningAsync()
+    {
+        var warning = Warning;
+        Warning = null;
+        if (warning is not null && await GuardAsync())
+        {
+            await warning.Retry(warning.Slots);
+        }
+    }
+
+    /// <summary>
+    ///     Drops the waiting change; nothing is stored and what was typed stays.
+    /// </summary>
+    private void CancelWarning()
+    {
+        Warning = null;
+    }
+
+    /// <summary>
+    ///     Gets the slot identities to acknowledge for a confirmation.
+    /// </summary>
+    /// <param name="confirmed">The confirmed signatures, or <c>null</c> when none are confirmed.</param>
+    /// <returns>The identities, or <c>null</c> when there is nothing to acknowledge.</returns>
+    private static int[]? SlotIds(IReadOnlyList<AffectedSignature>? confirmed)
+    {
+        return confirmed?.Select(slot => slot.SlotId).ToArray();
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for a reply to a thread.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>The key.</returns>
+    private static string ReplyWarningKey(int threadId)
+    {
+        return $"reply-{threadId}";
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for resolving or reopening a thread.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>The key.</returns>
+    private static string ToggleWarningKey(int threadId)
+    {
+        return $"toggle-{threadId}";
     }
 
     /// <summary>
@@ -2287,13 +2410,17 @@ public partial class ReviewPage : ComponentBase, IDisposable
     }
 
     /// <summary>
-    ///     Empties the new-thread form fields and its message.
+    ///     Empties the new-thread form fields and its message, and drops a waiting confirmation for it.
     /// </summary>
     private void ClearNewThreadForm()
     {
         ClearAnchor();
         NewText = string.Empty;
         NewThreadError = null;
+        if (Warning?.Key == NewThreadWarningKey)
+        {
+            Warning = null;
+        }
     }
 
     /// <summary>

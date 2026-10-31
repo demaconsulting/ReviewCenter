@@ -456,10 +456,42 @@ whole file and created by the signed-in user with the text only, with no author 
 the text is cleared. This scenario is tested by
 `ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText`.
 
-**ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate**: A review has two slots and only the
-first is signed. A thread is started on the page; the page acknowledges the signature for now (temporary behavior until
-the page asks for confirmation), so the thread is stored without an error and the slot shows "Signature out of date".
-This scenario is tested by `ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate`.
+**ReviewPage_StartThread_SignedReview_ShowsWarningAndConfirmStoresTheThreadAndMarksTheSignatureOutOfDate**: A review has
+two slots and only the first is signed. A thread is started on the page; the page shows the warning naming "Slot 1
+(Ann)" and stores nothing, the slot still shows "Signed by Ann". After Confirm the thread is stored, the warning, the
+error, and the text are gone, and the slot shows "Signature out of date". This scenario is tested by
+`ReviewPage_StartThread_SignedReview_ShowsWarningAndConfirmStoresTheThreadAndMarksTheSignatureOutOfDate`.
+
+**ReviewPage_StartThread_SignedReview_CancelStoresNothingAndKeepsTheText**: The warning is shown for a new thread and
+Cancel is clicked; the warning is gone, no thread is stored, the signature stands, and the typed text is still in the
+field. This scenario is tested by `ReviewPage_StartThread_SignedReview_CancelStoresNothingAndKeepsTheText`.
+
+**ReviewPage_StartThread_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring**: A review has three slots and
+the warning names the first signature. Another reviewer signs the second slot, then Confirm is clicked; nothing is
+stored and the warning names both slots. A second Confirm stores the thread and both signatures are out of date. This
+scenario is tested by `ReviewPage_StartThread_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring`.
+
+**ReviewPage_StartThread_ConfirmClickedTwice_StoresExactlyOneThread**: Confirm is clicked twice before the page has
+drawn the result; exactly one thread is stored. This scenario is tested by
+`ReviewPage_StartThread_ConfirmClickedTwice_StoresExactlyOneThread`.
+
+**ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning**: The review is approved after the page was drawn
+and the new-thread form is then submitted; the normal error is shown, no warning is shown, and nothing is stored. This
+scenario is tested by `ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning`.
+
+**ReviewPage_Reply_SignedReview_ShowsWarningInTheThreadAndConfirmStoresTheReply**: A resolved thread exists and the
+first of two slots is signed. A reply is sent; the warning is shown inside the thread and nothing is stored. After
+Confirm the reply is stored and the signature is out of date. This scenario is tested by
+`ReviewPage_Reply_SignedReview_ShowsWarningInTheThreadAndConfirmStoresTheReply`.
+
+**ReviewPage_Reopen_SignedReview_ConfirmReopensTheThread**: A resolved thread exists and the first of two slots is
+signed. Reopening shows the warning and leaves the thread resolved; Cancel leaves it resolved and signed; reopening
+again and Confirm open the thread and the signature is out of date. This scenario is tested by
+`ReviewPage_Reopen_SignedReview_ConfirmReopensTheThread`.
+
+**ReviewPage_Render_SignatureWarningOpen_EveryInteractiveElementHasTestId**: With a warning open, every link, button,
+input, and text area of the page, including the two buttons of the warning, has a kebab-case `data-testid`. This
+scenario is tested by `ReviewPage_Render_SignatureWarningOpen_EveryInteractiveElementHasTestId`.
 
 **ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines**: A range and a single line are stored with the
 entered anchors and shown with the matching labels. This scenario is tested by

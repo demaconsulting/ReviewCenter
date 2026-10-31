@@ -168,6 +168,60 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that a change to the checklist after a signature does not go through silently: the page names the
+    ///     signature in a warning, cancelling leaves the signature as it was, and confirming stores the change and
+    ///     makes the signature out of date.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_Signing_ChangeAfterSignature_AsksToConfirmAndOnlyThenMakesItOutOfDate()
+    {
+        // Arrange: a review with two slots and an answered checklist, of which second has signed, so the review is
+        // not approved and not locked
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
+        await scenario.OpenReviewAsync();
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await scenario.AddSlotAsync("Third Reviewer (third)", alternate: null);
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.OpenReviewAsync(reviewer);
+        await reviewer.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
+        await reviewer.OkAsync("click", $"sign-button-{slot}");
+        await reviewer.WaitUntilAsync(
+            async () => (await reviewer.TextOfAsync($"slot-status-{slot}")).Contains("Signed by", StringComparison.Ordinal),
+            "the signature");
+
+        // Act: puppet changes a reason of the checklist, which the signature covers, and is warned
+        await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
+        await Scenario.OpenSectionAsync(browser, "req");
+        await browser.OkAsync("fill", "section-req-reason", "Changed after the signature.");
+        await browser.OkAsync("click", "section-req-save");
+        await browser.OkAsync("wait", "signature-warning");
+        var warned = await browser.TextOfAsync("signature-warning-slots");
+
+        // Act: cancel, and look at the signature
+        await browser.OkAsync("click", "signature-warning-cancel");
+        await browser.WaitUntilAsync(async () => !await browser.ExistsAsync("signature-warning"), "the warning to go");
+        await scenario.OpenReviewAsync(reviewer);
+        var statusAfterCancel = await reviewer.TextOfAsync($"slot-status-{slot}");
+
+        // Act: change it again, confirm, and look at the signature
+        await browser.OkAsync("click", "section-req-save");
+        await browser.OkAsync("wait", "signature-warning");
+        await browser.OkAsync("click", "signature-warning-confirm");
+        await browser.WaitUntilAsync(async () => !await browser.ExistsAsync("signature-warning"), "the warning to go");
+        await scenario.OpenReviewAsync(reviewer);
+        var statusAfterConfirm = await reviewer.TextOfAsync($"slot-status-{slot}");
+
+        // Assert: the warning names the slot and its signer, cancelling left the signature, confirming outdated it
+        Assert.Contains("Slot 1", warned, StringComparison.Ordinal);
+        Assert.Contains("Second Reviewer", warned, StringComparison.Ordinal);
+        Assert.Contains("Signed by", statusAfterCancel, StringComparison.Ordinal);
+        Assert.Contains("out of date", statusAfterConfirm, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that an approved review is delivered as a signed attestation and listed in the evidence index, that a
     ///     token can read it but never sign or arrange reviewers, that nothing is released without credentials, that a
     ///     later change (the reopening of the locked review by an administrator) makes the approval out of date without
