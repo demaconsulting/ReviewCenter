@@ -133,11 +133,42 @@ save buttons, and the applicability switches are disabled and marked `data-locke
 opened. The same page for a review that is not approved shows no notice and no disabled control. This scenario is
 tested by `ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls`.
 
-**ChecklistPage_Answer_SignedReview_StoresTheAnswerAndMarksTheSignatureOutOfDate**: A review is fully answered, has two
-slots, and only the first is signed. A check is changed to Fail with a justification on the page; the page acknowledges
-the signature for now (temporary behavior until the page asks for confirmation), so the answer is stored and the first
-slot's signature is out of date. This scenario is tested by
-`ChecklistPage_Answer_SignedReview_StoresTheAnswerAndMarksTheSignatureOutOfDate`.
+**ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate**: A review is
+fully answered, has two slots, and only the first is signed. A check is changed to Fail with a justification; the page
+shows the warning naming "Slot 1 (Rita)", the old answer and the signature stand. Cancel removes the warning and keeps
+the unsaved Fail and its text. Saving again and Confirm store the answer and the first slot's signature is out of date.
+This scenario is tested by
+`ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate`.
+
+**ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores**: A check is changed to Pass on a
+signed review; the warning is shown inside that check and the stored answer is unchanged until Confirm, which stores it
+and makes the signature out of date. This scenario is tested by
+`ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores`.
+
+**ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring**: With a warning open, another
+reviewer signs a second slot and Confirm is clicked; nothing is stored and the warning names both slots. A second
+Confirm stores the answer. This scenario is tested by
+`ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring`.
+
+**ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores**: A section is switched off and
+its reason saved on a signed review; the warning is shown in the section and nothing is stored. Cancel removes the
+warning and keeps the unsaved switch and reason. Saving again and Confirm store the section as not applicable and the
+signature is out of date. This scenario is tested by
+`ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores`.
+
+**ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores**: A section that is not
+applicable is switched on, on a signed review; the warning is shown. Cancel returns the switch to its stored state;
+switching on again and Confirm store the section as applicable. This scenario is tested by
+`ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores`.
+
+**ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning**: While the switch-on warning is open,
+the section is switched off again; the warning is gone, the switch is off, and nothing is stored. This scenario is
+tested by `ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning`.
+
+**ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId**: With a warning open, every
+link, button, input, and text area of the page, including the two buttons of the warning, has a kebab-case
+`data-testid`. This scenario is tested by
+`ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId`.
 
 **ChecklistPage_Render_NonMember_LooksLikeAMissingReview**: A review is opened by a user who is no member of the
 project. The not-found text equals the text for a project that does not exist (apart from the project number), and no

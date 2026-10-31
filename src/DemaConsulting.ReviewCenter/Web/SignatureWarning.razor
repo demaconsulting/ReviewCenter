@@ -1,0 +1,18 @@
+@* SignatureWarning: the inline banner that asks the person to confirm a change that makes signatures out of date
+   (a helper of the ReviewPage and ChecklistPage units).
+
+   The parent shows it only for the change that waits, and decides what Confirm and Cancel do. Presentation only; the
+   text of the slots is built in SignatureWarning.razor.cs. The signer names are user data and are rendered as plain
+   text (Razor encodes them; no raw markup). The buttons are plain buttons, not submit buttons, because the banner
+   can sit inside a form. Every key value carries a stable kebab-case data-testid. *@
+<div class="notice" role="alert" data-testid="signature-warning">
+    <p>
+        This change makes these signatures out of date:
+        <strong data-testid="signature-warning-slots">@SlotsText</strong>.
+        Those reviewers must sign again.
+    </p>
+    <div class="form-actions">
+        <button type="button" data-testid="signature-warning-confirm" @onclick="OnConfirm">Confirm change</button>
+        <button type="button" class="secondary" data-testid="signature-warning-cancel" @onclick="OnCancel">Cancel</button>
+    </div>
+</div>

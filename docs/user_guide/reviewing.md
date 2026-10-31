@@ -312,6 +312,12 @@ an empty file can be commented on as a whole only. A line number must be a whole
 first line must not be after the last line. Leading and trailing spaces of the text are removed. A
 problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
 
+When a review already has a current signature but is not yet approved, a new thread, a reply, a resolve, or a reopen
+makes that signature out of date. The page does not store the change at once: it shows a warning under the form, in the
+thread, or at the head of the thread, that names every affected slot and its signer, for example "Slot 1 (Ann)". Press
+**Confirm change** to store it (the named signatures go out of date and those reviewers sign again), or **Cancel** to
+store nothing; the text you typed stays in the form or the reply field.
+
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
 changes. While a review is approved it is locked: the comment forms and reply fields are not shown, the line buttons are
 disabled, and no thread can be started, answered, resolved, or reopened (see
@@ -391,7 +397,11 @@ The checklist is complete when every check of every applicable section is answer
 counts as answered, and its justification records the finding. A review with a Fail cannot be signed, and the files
 of a review never change, so the usual way on is a new review of the fixed revision (see When a Check Fails in the
 Review Practices chapter). Any later change to the record, including a checklist answer of another reviewer, makes the
-signatures given so far out of date, so answer first and sign last (see Sign Last in the same chapter).
+signatures given so far out of date, so answer first and sign last (see Sign Last in the same chapter). When a change
+of an answer or of the applicability of a section would do that, the page first shows a warning next to the check or the
+section that names every affected slot and signer. **Confirm change** stores the change; **Cancel** stores nothing, and
+the unsaved choice, justification, and reason stay as you typed them (a section you switched on goes back to not
+applicable).
 
 The checklist of a review is fixed when the review is created: a later release with a different default checklist, or
 a project checklist that is replaced afterwards, does not change reviews that already exist. Checklist
@@ -515,7 +525,9 @@ changes while you are signing, the signature is refused and you are asked to rev
 record, "Signature out of date" when it has signatures but the record has changed since (for example a new comment or
 a changed answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot and every slot is
 signed for the current record. While some slots are still unsigned, a change to the record makes the signatures given
-so far out of date, and the reviewers sign the new record again; the earlier signatures stay as history. Once the
+so far out of date, and the reviewers sign the new record again; the earlier signatures stay as history. Before the
+page stores such a change it names the affected slots and signers in a warning and asks you to confirm it; see
+*What Makes a Signature Out of Date* in the Review Practices chapter. Once the
 review is Approved it is locked and cannot change any more, unless an administrator reopens it (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)); it then goes back to In review.
 

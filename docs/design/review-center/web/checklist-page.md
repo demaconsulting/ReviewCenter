@@ -47,6 +47,10 @@ justification typed, and the message of a violated rule. **PendingNotApplicable*
 **SectionErrors**: the same per section for a "does not apply" decision. All of these are cleared when the route
 parameters change. The page also keeps the test id to scroll to after the next render, and the interactive marker.
 
+**Warning**: the pending `PendingSignatureWarning` (`null` when there is none): which control it belongs to, the
+affected slots, and the call to repeat when the person confirms. Only one exists at a time. It is cleared when the route
+parameters change.
+
 Test identifiers: `checklist-page` (root), `breadcrumb-projects-link`, `project-link`, `review-link`,
 `checklist-loading`, `checklist-not-found`, `checklist-missing`, `checklist-review-title`, `checklist-status`,
 `checklist-progress`, `next-unanswered-button`, `back-to-review-link`, `checklist-locked`, and, per section,
@@ -54,7 +58,9 @@ Test identifiers: `checklist-page` (root), `breadcrumb-projects-link`, `project-
 `section-{id}-save`, `section-{id}-error`, `section-{id}-unsaved-hint` (shown while the switch is off and the reason is
 not saved), `section-{id}-next`, and `section-{id}-back`, and, per check, `check-{item}`,
 `check-pass-{item}`, `check-fail-{item}`, `check-na-{item}`, `check-justification-{item}`, `check-save-{item}`,
-`check-error-{item}`, and `check-answered-by-{item}`; for a follow-up review also `section-{id}-carried` and
+`check-error-{item}`, and `check-answered-by-{item}`; when a refusal is pending, `signature-warning`,
+`signature-warning-slots`, `signature-warning-confirm`, and `signature-warning-cancel` (one banner at a time); for a
+follow-up review also `section-{id}-carried` and
 `section-{id}-carried-link` (a not-applicable section carried over), `check-carried-{item}` and
 `check-carried-link-{item}` (an answer carried over), and `check-earlier-fail-{item}` and
 `check-earlier-fail-link-{item}` (a check that failed in the followed review and is not answered here). Section and
@@ -84,11 +90,19 @@ before choosing. Choosing the stored outcome again leaves nothing unsaved.
 behalf of the signed-in user, who comes from the authentication state (`SignIn.GetActorAsync`); there is no field in
 which a name could be typed.
 
-**Temporary acknowledgement**: `SaveAsync` and the applicability saves call the service through the internal
-`SignatureAcknowledgement.RunAsync` helper. It calls the service without an acknowledgement and, when the service
-refuses with `SignaturesWouldBecomeOutOfDate`, calls it once more acknowledging the slots named in the exception, so
-that the change still proceeds and the signature goes out of date, as it did before the service asked. This is a
-temporary shim; the follow-up slice removes it and shows the affected signatures for confirmation.
+**Signature warning**: `SaveAsync` and the applicability saves call the service without an acknowledgement. When it
+refuses with `SignaturesWouldBecomeOutOfDate`, the page keeps the request and shows the `SignatureWarning` component
+(`signature-warning`) next to the control that was used: inside the check (after `check-error`) for an answer, and
+inside
+the section (after the section error) for a reason saved to make a section not applicable or a switch back to
+"applies". The banner names every affected slot and its signer (`signature-warning-slots`, for example "Slot 1 (Rita)").
+Nothing is stored; an unsaved Fail, N/A, or reason stays as typed, and a section just switched to "applies" stays shown
+as switched until the person decides. **Confirm change** (`signature-warning-confirm`) repeats the call with the
+identities of the affected slots as the acknowledgement. When another signature appeared meanwhile, the service
+refuses again and the page shows the banner again with the slots of both refusals merged. **Cancel**
+(`signature-warning-cancel`) only removes the banner; the switch of a section to "applies" returns to its stored
+state, and the typed reason and chosen outcome stay. The page holds one banner at a time, and Confirm runs the
+session check of the page again. A refusal for any other rule is shown as before.
 
 **SetApplicableAsync** and **SaveNotApplicableAsync**: Switching a section to "applies" is stored at once; switching
 it off shows a required reason field, and the section is stored as not applicable when the reason is saved. Until then
@@ -144,6 +158,8 @@ in" message on this page.
 - **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
   project.
 - **ReviewService** — reads the review.
+- **SignatureWarning** — draws the signature warning banner and holds the pending request (`PendingSignatureWarning`);
+  it is a part of this unit.
 - **ChecklistService** — reads the checklist and records answers and section decisions; it refuses a change of a locked
   review with `ReviewLocked`.
 - **SigningService** — tells whether the review is approved (`GetApprovalAsync`), which is what locks the page.

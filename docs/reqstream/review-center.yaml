@@ -299,6 +299,7 @@ sections:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
+          - ReviewCenter_Signing_ChangeAfterSignature_AsksToConfirmAndOnlyThenMakesItOutOfDate
           - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
 
       - id: ReviewCenter-System-ReviewerIndependence

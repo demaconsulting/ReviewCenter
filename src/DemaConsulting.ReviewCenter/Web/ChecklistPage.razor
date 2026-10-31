@@ -97,7 +97,7 @@
                     {
                         <div class="section-body">
                             <label class="switch" for="applicable-@sid">
-                                <input id="applicable-@sid" type="checkbox" checked="@applicable"
+                                <input id="applicable-@sid" type="checkbox" checked="@(applicable || IsSwitchOnWaiting(section.Id))"
                                        data-testid="section-@sid-applicable" disabled="@IsLocked" data-locked="@LockedMarker"
                                        @onchange="e => SetApplicableAsync(sectionId, (bool)(e.Value ?? false))" />
                                 This section applies to the review
@@ -120,6 +120,10 @@
                                 @if (SectionErrors.TryGetValue(section.Id, out var sectionError))
                                 {
                                     <p class="error" role="alert" data-testid="section-@sid-error">@sectionError</p>
+                                }
+                                @if (SectionWarningFor(sectionId) is { } sectionWarning)
+                                {
+                                    <SignatureWarning Slots="sectionWarning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
                                 }
                             }
                             else
@@ -180,6 +184,11 @@
                                             @if (ItemErrors.TryGetValue(item.Id, out var itemError))
                                             {
                                                 <p class="error" role="alert" data-testid="check-error-@iid">@itemError</p>
+                                            }
+
+                                            @if (Warning?.Key == ItemWarningKey(item.Id))
+                                            {
+                                                <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
                                             }
 
                                             @if (answer is not null)

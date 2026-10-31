@@ -259,6 +259,8 @@ sections:
           - ReviewCenter-ReviewPage-Sign
           - ReviewCenter-ReviewPage-Digest
           - ReviewCenter-ProjectPage-Approval
+          - ReviewCenter-ReviewPage-SignatureWarning
+          - ReviewCenter-ChecklistPage-SignatureWarning
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
 

@@ -1956,16 +1956,28 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a comment on a review with a current signature is stored by the page, because the page
-    ///     acknowledges the signature on the person's behalf for now, and that the signature then shows as out of
-    ///     date (temporary behavior until the page asks the person to acknowledge).
+    ///     Creates a review with two slots (ann or bob, and cyd) and no signature, so that signing the first slot
+    ///     leaves the review not approved.
+    /// </summary>
+    /// <returns>The project identity, the first and the second slot identity, and the user identities.</returns>
+    private async Task<(int ProjectId, int SlotId, int SecondSlotId, Dictionary<string, int> Ids)> CreateTwoSlotsAsync()
+    {
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        var second = await Signing.AddSlotAsync(
+            TestActors.Ann, projectId, "REV-1", ids["cyd"], null, TestContext.Current.CancellationToken);
+        return (projectId, slotId, second.Id, ids);
+    }
+
+    /// <summary>
+    ///     Test that a comment on a review with a current signature is not stored at once: the page names the
+    ///     signature in a warning, and storing the thread waits for the person to confirm, after which the
+    ///     signature shows as out of date.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate()
+    public async Task ReviewPage_StartThread_SignedReview_ShowsWarningAndConfirmStoresTheThreadAndMarksTheSignatureOutOfDate()
     {
         // Arrange: a review with two slots of which the first is signed, so that it is not yet approved
-        var (projectId, slotId, ids) = await CreateSignableAsync();
-        await Signing.AddSlotAsync(TestActors.Ann, projectId, "REV-1", ids["cyd"], null, TestContext.Current.CancellationToken);
+        var (projectId, slotId, _, _) = await CreateTwoSlotsAsync();
         await SignSlotAsync(projectId, slotId);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
@@ -1974,10 +1986,239 @@ public partial class ReviewPageTests : PageTestBase
         await cut.Find("[data-testid='thread-text-input']").InputAsync("Found something");
         await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
 
-        // Assert: the thread is stored without an error, and the signature is out of date
+        // Assert: the warning names slot and signer, and nothing is stored yet
+        Assert.Equal("Slot 1 (Ann)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.StartsWith("Signed by Ann", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent, StringComparison.Ordinal);
+
+        // Act: confirm
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: the thread is stored, the warning and the text are gone, and the signature is out of date
         Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
         Assert.Empty(cut.FindAll("[data-testid='thread-error']"));
+        Assert.Equal(string.Empty, cut.Find("[data-testid='thread-text-input']").GetAttribute("value") ?? string.Empty);
         Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that cancelling the warning stores nothing, keeps the signature and keeps the typed text.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_SignedReview_CancelStoresNothingAndKeepsTheText()
+    {
+        // Arrange: a signed first slot and a thread that waits for confirmation
+        var (projectId, slotId, _, _) = await CreateTwoSlotsAsync();
+        await SignSlotAsync(projectId, slotId);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Found something");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+        Assert.NotEmpty(cut.FindAll("[data-testid='signature-warning']"));
+
+        // Act: cancel
+        await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
+
+        // Assert: the warning is gone, nothing is stored, the signature stands and the text is still typed
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.StartsWith("Signed by Ann", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent, StringComparison.Ordinal);
+        Assert.Equal(
+            "Found something",
+            cut.Find("[data-testid='thread-text-input']").GetAttribute("value") ?? cut.Find("[data-testid='thread-text-input']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that when another signature appears while the warning is open, confirming does not store the
+    ///     thread but shows the warning again with every signature, and only the second confirmation stores it.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring()
+    {
+        // Arrange: three slots with the first signed, and a thread that waits for confirmation
+        var (projectId, slotId, secondSlotId, _) = await CreateTwoSlotsAsync();
+        var dee = await Users.CreateAsync("dee", "Dee", UserRole.Reviewer, SigningPassword, TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(dee.Id, projectId, TestContext.Current.CancellationToken);
+        await Signing.AddSlotAsync(
+            TestActors.Ann, projectId, "REV-1", dee.Id, null, TestContext.Current.CancellationToken);
+        await SignSlotAsync(projectId, slotId);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Found something");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+        Assert.Equal("Slot 1 (Ann)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
+
+        // Act: cyd signs the second slot, then the person confirms what was shown
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        await Signing.SignAsync(
+            new Actor("cyd", "Cyd"), projectId, "REV-1", secondSlotId, approval!.Digest, SigningPassword, TestContext.Current.CancellationToken);
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: nothing is stored, and the warning now names both signatures
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Equal("Slot 1 (Ann), Slot 2 (Cyd)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
+
+        // Act: confirm again
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: the thread is stored and both signatures are out of date
+        Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+        Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{secondSlotId}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a second click on Confirm cannot store the thread twice.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_ConfirmClickedTwice_StoresExactlyOneThread()
+    {
+        // Arrange: a signed first slot and a thread that waits for confirmation
+        var (projectId, slotId, _, _) = await CreateTwoSlotsAsync();
+        await SignSlotAsync(projectId, slotId);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Found something");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+        var confirm = cut.Find("[data-testid='signature-warning-confirm']");
+
+        // Act: click Confirm twice before the page has drawn the result (the second click may be refused outright)
+        var first = confirm.ClickAsync();
+        _ = await Record.ExceptionAsync(() => confirm.ClickAsync());
+        await first;
+
+        // Assert: one thread
+        Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a refusal for another reason, here a review that was approved meanwhile, shows the normal
+    ///     message and no warning.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning()
+    {
+        // Arrange: a review that the page shows as open, with a thread typed
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Found something");
+
+        // Act: the review is approved by a direct service call, then the form is submitted
+        await SignSlotAsync(projectId, slotId);
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: the normal error, no warning and nothing stored
+        Assert.NotEmpty(cut.Find("[data-testid='thread-error']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a reply on a signed review waits for confirmation in the thread, and that confirming stores the
+    ///     reply and makes the signature out of date.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Reply_SignedReview_ShowsWarningInTheThreadAndConfirmStoresTheReply()
+    {
+        // Arrange: a resolved thread, then a signed first slot (an open thread would block the signature)
+        var (projectId, slotId, _, _) = await CreateTwoSlotsAsync();
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "First", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestActors.Bob, TestContext.Current.CancellationToken);
+        await SignSlotAsync(projectId, slotId);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find($"[data-testid='thread-expand-{thread.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='reply-text-{thread.Id}']").InputAsync("Second");
+
+        // Act: reply
+        await cut.Find($"[data-testid='reply-button-{thread.Id}']").ClickAsync();
+
+        // Assert: the warning is shown inside the thread and nothing is stored yet
+        Assert.Equal("Slot 1 (Ann)", cut.Find($"[data-testid='thread-{thread.Id}'] [data-testid='signature-warning-slots']").TextContent);
+        Assert.Single((await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken))[0].Comments);
+
+        // Act: confirm
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: the reply is stored and the signature is out of date
+        Assert.Equal(2, (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken))[0].Comments.Count);
+        Assert.Equal("Second", cut.Find($"[data-testid='comment-text-{thread.Id}-2']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that reopening a resolved thread of a signed review waits for confirmation, that cancelling leaves the
+    ///     thread resolved, and that confirming reopens it and makes the signature out of date. (Resolving an open
+    ///     thread cannot meet a current signature, because an open thread blocks signing.)
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Reopen_SignedReview_ConfirmReopensTheThread()
+    {
+        // Arrange: a resolved thread, then a signed first slot
+        var (projectId, slotId, _, _) = await CreateTwoSlotsAsync();
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "First", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestActors.Bob, TestContext.Current.CancellationToken);
+        await SignSlotAsync(projectId, slotId);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find($"[data-testid='thread-expand-{thread.Id}']").ClickAsync();
+
+        // Act: reopen
+        await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+
+        // Assert: the warning names the signature and the thread is still resolved
+        Assert.Equal("Slot 1 (Ann)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
+        Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);
+
+        // Act: cancel
+        await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
+
+        // Assert: still resolved and signed
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);
+        Assert.StartsWith("Signed by Ann", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent, StringComparison.Ordinal);
+
+        // Act: reopen again, then confirm
+        await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: open again and the signature is out of date
+        Assert.Equal("Open", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);
+        Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that every interactive element of the page, including the elements of an open warning, has a
+    ///     kebab-case <c>data-testid</c>.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SignatureWarningOpen_EveryInteractiveElementHasTestId()
+    {
+        // Arrange: a signed first slot and a thread that waits for confirmation
+        var (projectId, slotId, _, _) = await CreateTwoSlotsAsync();
+        await SignSlotAsync(projectId, slotId);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Found something");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Act: collect the interactive elements
+        var elements = cut.FindAll("a, button, input, select, textarea");
+
+        // Assert: the warning's buttons are among them, and each element has a kebab-case test id
+        Assert.NotEmpty(cut.FindAll("[data-testid='signature-warning-confirm']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='signature-warning-cancel']"));
+        foreach (var element in elements)
+        {
+            var testId = element.GetAttribute("data-testid");
+            Assert.True(
+                testId is not null && KebabCaseTestId().IsMatch(testId),
+                $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
+        }
     }
 
     /// <summary>

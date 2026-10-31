@@ -15,7 +15,8 @@ Know the hard rules first, because the practices build on them. A review can be 
 
 Signing asks the signer to confirm their identity again (the password, or a fresh sign-in at the identity provider),
 and a signature covers the whole record as it was at that moment. While only some slots are signed, any change to the
-record, such as a new comment or a changed answer, makes the signatures given so far out of date. When the last slot is
+record, such as a new comment or a changed answer, makes the signatures given so far out of date; the page warns you
+and asks for a confirmation first (see *What Makes a Signature Out of Date*). When the last slot is
 signed, the review is Approved and **locked**: ReviewCenter then refuses every change of its threads, checklist, and
 reviewers until a project administrator reopens it (see *Approved Reviews Are Locked* below).
 
@@ -26,6 +27,24 @@ setting can be switched off per project, it compares only the creator of the rev
 and it does not apply to a review created from the command line, which has no recorded author. See the Reviewing and
 Administration chapters (Review Rules) for the exact rules. Everything else is up to the team: who writes a comment,
 who resolves it, and how it is worded.
+
+## What Makes a Signature Out of Date
+
+A signature stays current only while the record is the one that was signed. These changes alter the record, so each one
+makes the current signatures out of date: a new comment thread, a reply, resolving or reopening a thread, a changed
+checklist answer (also the justification, or who gave the answer), and switching a checklist section to not applicable
+or back. A save that changes nothing, such as the same person saving the same answer again, does not. The due date of
+a review is planning information and is not part of the record, so changing it leaves the signatures current.
+
+ReviewCenter does not let such a change go through silently. When the change would make a current signature out of
+date, the page stores nothing and shows a warning where you worked. It names every affected slot and its signer, for
+example "Slot 1 (Ann)". **Confirm change** makes the change and the named signatures go out of date; **Cancel** removes
+the warning and changes nothing, and what you typed stays in its field so that you can still use it. If another
+reviewer signs while the warning is open, the first **Confirm change** is answered with a new warning that names every
+signature, so you only confirm what you have seen. The signers then sign the new record again.
+
+The warning is the moment to ask whether the change is needed now. Most of the time it is better to cancel, wait until
+the signers are done, or agree with them first (see *Sign Last* below).
 
 ## Answering the Checklist
 
@@ -44,7 +63,8 @@ Do not answer N/A to avoid a Fail. If the check should hold and does not, it is 
 Any change to the record, including a checklist answer of another reviewer (even an identical one), a new comment, or
 a resolved thread, makes the signatures given so far out of date. So agree who is still to answer or comment, let them
 finish, and only then sign; the signature of the last reviewer is the one that approves the review. If a late change
-is needed, the reviewers who already signed sign the new record again.
+is needed, the page warns you which signatures it voids; after you confirm, the reviewers who already signed sign the
+new record again.
 
 ## When a Check Fails
 

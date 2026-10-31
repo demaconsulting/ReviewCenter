@@ -120,6 +120,10 @@ in `RefreshAsync`; **VisibleCandidates**: `Candidates` without the review author
 system administrator, asked with `IProjectAccess.CanAdministerAsync` in `RefreshAsync`. **ReopenReason**,
 **ReopenError**: the text typed into the reopen form and its message.
 
+**Warning**: the pending `PendingSignatureWarning` (`null` when there is none): which form or thread it belongs to, the
+affected slots, and the call to repeat when the person confirms. Only one exists at a time. It is cleared when the route
+parameters change, when the review is found locked, and when the new-thread form is cleared.
+
 **AttestationKeys**: the `IAttestationKeyProvider` of the `Evidence` subsystem, injected so that the page can ask for the
 status of the signing key (`Describe`) without ever reading the key.
 
@@ -194,8 +198,10 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`,
 `thread-start-line-input`, `thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`,
 `start-thread-button`, `thread-submit-hint`, `thread-cancel-button` and `thread-whole-file-button` (only in the form
-under a diff row),
-`file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`, `thread-link-{id}`,
+under a diff row), `signature-warning`, `signature-warning-slots`, `signature-warning-confirm` and
+`signature-warning-cancel` (while a refusal is pending; one banner at a time),
+`file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`,
+`thread-link-{id}`,
 `thread-copy-link-{id}`, `thread-copy-status-{id}`,
 `line-text-{n}` (all by 1-based line number), `file-kind-{index}` (the change kind of a file in the list, shown for
 reviews from a repository only), `selected-file-kind`, `file-version-toggle` (shown when the file can be compared),
@@ -333,11 +339,20 @@ thread.
 **ToggleThreadAsync**: Resolves an open thread or reopens a resolved one, then reloads the threads. Resolving also
 collapses the thread. A thread that no longer exists is reported inside the thread.
 
-**Temporary acknowledgement**: `StartThreadAsync`, `ReplyAsync`, and `ToggleThreadAsync` call the service through the
-internal `SignatureAcknowledgement.RunAsync` helper. It calls the service without an acknowledgement and, when the
-service refuses with `SignaturesWouldBecomeOutOfDate`, calls it once more acknowledging the slots named in the
-exception, so that the change still proceeds and the signature goes out of date, as it did before the service asked.
-This is a temporary shim; the follow-up slice removes it and shows the affected signatures for confirmation.
+**Signature warning**: `StartThreadAsync`, `ReplyAsync`, and `ToggleThreadAsync` call the service without an
+acknowledgement. When it refuses with `SignaturesWouldBecomeOutOfDate`, the page keeps the request and shows the
+`SignatureWarning` component (`signature-warning`) where the action was taken: under the new-thread form, in the thread
+of the reply, or in the head of the toggled thread. The banner names every affected slot and its signer
+(`signature-warning-slots`, for example "Slot 1 (Ann)"). Nothing is stored and everything typed stays. **Confirm
+change**
+(`signature-warning-confirm`) repeats the call with the identities of the affected slots as the acknowledgement. When
+another signature appeared meanwhile, the service refuses again and the page shows the banner again with the slots of
+both refusals merged, so a person confirms only what they have been shown. **Cancel** (`signature-warning-cancel`) only
+removes the banner; the typed text and an unsaved choice stay. The page holds one banner at a time, so the test
+identifiers stay unique; a new refusal replaces the earlier banner, and a reload of a locked review removes it. Confirm
+runs the session check of the page again, so an expired session is handled like any other action. A refusal for any
+other rule is shown as before and no banner is shown. The reopen of a whole review (`ReopenReviewAsync`) is not part of
+the acknowledgement and does not show the banner.
 
 **SetFilter**: Sets the state the thread index shows. Each index row is a button whose accessible name states the
 anchor, file, state, comment count, first author, and last activity, so a screen-reader user hears what a sighted
@@ -550,6 +565,8 @@ page.
 - **ReviewService** — reads the review, the head and baseline bytes of a file, and the comparison of a file
   (`GetDiffAsync`), and lists the reviews of the project to find the follow-ups of the review.
 - **DiffView** — draws the Diff view; it is a part of this unit.
+- **SignatureWarning** — draws the signature warning banner and holds the pending request (`PendingSignatureWarning`);
+  it is a part of this unit.
 - **LineDiff** — groups the rows of a comparison into shown regions and collapsed runs, and arranges them side by side.
 - **ThreadService** — starts (on the Head or the Baseline side), answers, resolves, reopens, and lists threads, and
   shapes them for the index.

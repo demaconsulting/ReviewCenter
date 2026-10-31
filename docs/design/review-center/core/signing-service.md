@@ -104,11 +104,11 @@ between them is not named in the refusal and goes out of date silently. This is 
 of date, as the digest rule always does, so the record stays correct, and the warning is best effort. Closing the gap
 would need the store to repeat the check inside its transaction.
 
-**Temporary behavior of the pages**: until the confirmation is offered on the pages, `ReviewPage` and `ChecklistPage`
-acknowledge on the person's behalf. The internal `SignatureAcknowledgement` helper of the `Web` subsystem calls the
-service without an acknowledgement and, when `SignaturesWouldBecomeOutOfDate` is raised, calls it once more
-acknowledging the slots that the exception names, so a change after a partial signing still proceeds and the signature
-goes out of date, as before. The follow-up slice removes the helper and shows the warning instead.
+**Behavior of the pages**: `ReviewPage` and `ChecklistPage` of the `Web` subsystem call the service without an
+acknowledgement. When `SignaturesWouldBecomeOutOfDate` is raised they show a warning that names the slots and signers
+of `AffectedSlots`, and only when the person confirms do they call the service again with those slot identities. A
+signature that appeared in the meantime is named in the next refusal, and the page asks again with the merged list.
+Cancelling stores nothing.
 
 **Reopen**: `ReopenReviewAsync` is the only way out of the lock. It needs a project administrator or a system
 administrator (anyone else: `ActorNotAllowed`; an API token is always refused) and a reason of 1 to 250 characters after

@@ -319,7 +319,6 @@ sections:
           - ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues
           - ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing
           - ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused
-          - ReviewPage_StartThread_SignedReview_StoresTheThreadAndMarksTheSignatureOutOfDate
 
       - id: ReviewCenter-ReviewPage-ThreadShow
         title: >-
@@ -346,6 +345,27 @@ sections:
           - ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread
           - ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen
           - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
+
+      - id: ReviewCenter-ReviewPage-SignatureWarning
+        title: >-
+          The ReviewPage unit shall, when a new thread, a reply, or the resolving or reopening of a thread would make
+          a current signature out of date, store nothing and show a warning where the action was taken that names
+          every affected slot and its signer, repeat the action with those slots acknowledged only when the reader
+          confirms, show the warning again with every affected slot when another signature appeared meanwhile, and
+          leave the signatures and the record unchanged, and keep the typed text, when the reader cancels.
+        justification: |
+          A comment after a signature silently voids the signature. The reader has to see whose signature is
+          affected and decide, so that nobody learns afterwards that a reviewer has to sign again. A signature that
+          appears while the warning is open must be shown before it is voided.
+        tests:
+          - ReviewPage_StartThread_SignedReview_ShowsWarningAndConfirmStoresTheThreadAndMarksTheSignatureOutOfDate
+          - ReviewPage_StartThread_SignedReview_CancelStoresNothingAndKeepsTheText
+          - ReviewPage_StartThread_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring
+          - ReviewPage_StartThread_ConfirmClickedTwice_StoresExactlyOneThread
+          - ReviewPage_StartThread_ApprovedMeanwhile_ShowsErrorAndNoWarning
+          - ReviewPage_Reply_SignedReview_ShowsWarningInTheThreadAndConfirmStoresTheReply
+          - ReviewPage_Reopen_SignedReview_ConfirmReopensTheThread
+          - ReviewPage_Render_SignatureWarningOpen_EveryInteractiveElementHasTestId
 
       - id: ReviewCenter-ReviewPage-Reviewers
         title: >-
