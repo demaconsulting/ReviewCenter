@@ -36,6 +36,8 @@ proves the decision (restrict on Unix, do nothing on Windows) without touching t
   with no certificate, passes an empty ring (no keys and no key files), refuses key files from which no key can be read,
   and reports an older unreadable key as an error without stopping.
 - `RequireEncryptedKeys` refuses `PermissionsOnly` and a plain key file.
+- `AllowNewKeyRing` is false by default, and the inspection of a ring counts its key files by kind, counts a missing
+  folder as zero, and creates and changes nothing.
 - On Linux and macOS the key files are restricted to the owner, also when Data Protection stores a new key file while
   the server runs. The warning of `PermissionsOnly` is logged.
 - On Windows the `PermissionsOnly` protection restricts the key folder to the current account and the system, without
@@ -120,6 +122,22 @@ contents.
 
 **KeyRingProtection_LogProtection_EachMode_LogsTheProtectionInForce**: Each mode logs its protection; the permissions
 mode logs a warning. This scenario is tested by the test of the same name.
+
+**KeyRingProtection_InspectKeyFiles_MixedFolder_CountsByKindAndChangesNothing**: A temporary folder holds an
+unencrypted key file, an encrypted one, one that is neither, and a file that is not a key file. The inspection counts
+three key files, one unencrypted and one encrypted, counts zero for a folder that does not exist without creating it,
+and the folder is as it was. This scenario is tested by the test of the same name.
+
+**KeyRingProtection_InspectKeyFiles_AccessDeniedKeyFile_CountsOnlyInTheTotal**: A temporary folder holds a key file
+that the current account may not read (a deny rule for reading on Windows, mode 0 on Linux and macOS; skipped for a
+privileged account on Linux and macOS, which can read it anyway), an unencrypted one, and an encrypted one. The
+inspection counts three key files, one unencrypted and one encrypted, and the search for plaintext keys finds only the
+unencrypted readable one; neither throws, so the unreadable file raises `UnauthorizedAccessException` and is treated
+like one that is being written. The rule or mode is removed afterwards. This scenario is tested by the test of the same
+name.
+
+**KeyRingSettings_AllowNewKeyRing_DefaultsToFalse**: The escape hatch of the lost-ring refusal is off unless it is set.
+This scenario is tested by the test of the same name, which lives with the `ServerHost` key ring tests.
 
 **KeyRingProtection_RestrictKeyFiles_UnixKeyFiles_AreOwnerReadWriteOnly**: On Linux and macOS only, key files that were
 created with wider modes are restricted to 0600. This scenario is tested by the test of the same name.

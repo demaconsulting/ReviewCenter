@@ -26,6 +26,7 @@ This document covers the verification design for the following software items:
   - **Hosting** subsystem
     - **ServerHost** — web host builder and runner
     - **KeyRingProtection** — protection of the Data Protection key ring at rest (DPAPI, certificate, or permissions)
+    - **SecretScan** — read-only count of the key files and of the protected secrets that the key ring can still decrypt
     - **UserCommand** — the `user add` verb
     - **AuditCommand** — the `audit verify` verb
   - **Identity** subsystem

@@ -69,7 +69,7 @@ The default run has nine checks:
   static asset, expects HTTP 200 for both, and stops the host cleanly before the temporary folder is disposed. The
   host is started once.
 
-The opt-in tenth check is run only with `--validate --check-config`:
+The opt-in tenth and eleventh checks are run only with `--validate --check-config`:
 
 - **ConfiguredDatabaseCheck** (`ReviewCenter_ConfiguredDatabase`): loads the configuration the way the server does
   (`appsettings.json` and the environment variables), recognizes the provider, opens the database read-only, and
@@ -79,6 +79,21 @@ The opt-in tenth check is run only with `--validate --check-config`:
   exist yet (a fresh installation creates it at the first start), it throws `ValidationSkippedException` with that
   reason; a database file that exists but cannot be opened or has the wrong schema still fails.
   The database has no schema version number, so the comparison of tables and columns is the version check.
+- **ConfiguredKeysCheck** (`ReviewCenter_ConfiguredKeys`, the eleventh): answers whether the key ring that the server is
+  configured to use belongs to the database, which is the question after a restore. It loads the configuration the way
+  the server does, registers the production services with automatic key generation of Data Protection switched off, and
+  reads the ring and the database read-only. It runs `KeyRingProtection.CheckRing` when the key folder exists (the
+  newest key must be decrypted, and a plain key file is refused with `DataProtection:RequireEncryptedKeys`), then
+  `SecretScan`, and reports one line: the protection mode, the number of key files and how many of them are not
+  encrypted, the number of protected secrets (repository tokens and second-factor secrets) and how many cannot be
+  decrypted. It fails when a secret cannot be decrypted (the message gives the counts per kind and the ids of the rows),
+  when the ring is empty but the database holds secrets, when the ring is not encrypted although encryption is
+  required, when its newest key cannot be decrypted, and when the key ring settings cannot be used (a fixed message that
+  names the settings, because the reason can hold a certificate path). It throws `ValidationSkippedException` when no
+  database is configured, when the database file does not exist yet, and when the key folder does not exist yet and the
+  database holds no secret, because a fresh installation creates both at the first start. It never creates a key, a
+  folder, or a file, and never prints a key, a secret, a password, or a path other than the key folder. The status of
+  the attestation key is not part of it.
 
 **FastCommitInterceptor** (internal, `SelfTestServices`): an EF Core connection interceptor that sets
 `synchronous=OFF` and `journal_mode=MEMORY` when a connection opens, so that the many commits of the review
@@ -107,6 +122,7 @@ so a hung git process or host ends as a failure instead of hanging the run.
 - **ValidationRunner** — the types `ValidationFailedException` and `ValidationSkippedException`.
 - **Core, Storage, ContentSources, Evidence and the web host** — the production services the checks call; the
   checks never reimplement the production logic. `TotpCheck` calls `TotpAlgorithm` of the `Identity` subsystem.
+  `ConfiguredKeysCheck` calls `SecretScan` and `KeyRingProtection` of the `Hosting` subsystem.
 - **System.Security.Cryptography.Pkcs** — the independent verification of the attestation signature.
 
 #### Callers

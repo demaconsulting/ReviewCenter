@@ -176,6 +176,8 @@ reviews:
       - "docs/verification/review-center/self-test/validation-checks.md"
       - "src/**/SelfTest/Checks/*.cs"
       - "test/**/SelfTest/ValidationChecksTests.cs"
+      - "test/**/SelfTest/KeysInstall.cs"
+      - "test/**/SelfTest/ConfiguredKeysEnvironment.cs"
 
   # ReviewCenter - Utilities
   - id: ReviewCenter-Utilities
@@ -275,6 +277,21 @@ reviews:
       - "src/**/Hosting/KeyRingProtectionMode.cs"
       - "test/**/Hosting/KeyRingProtectionTests.cs"
       - "test/**/Hosting/KeyRingTestCertificates.cs"
+
+  - id: ReviewCenter-Hosting-SecretScan
+    title: Review of ReviewCenter SecretScan unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/hosting.md
+      - docs/reqstream/review-center/hosting.yaml
+    paths:
+      - "docs/reqstream/review-center/hosting/secret-scan.yaml"
+      - "docs/design/review-center/hosting/secret-scan.md"
+      - "docs/verification/review-center/hosting/secret-scan.md"
+      - "src/**/Hosting/SecretScan.cs"
+      - "test/**/Hosting/SecretScanTests.cs"
+      - "test/**/Hosting/SecretSeed.cs"
 
   - id: ReviewCenter-Hosting-UserCommand
     title: Review of ReviewCenter UserCommand unit implementation

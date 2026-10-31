@@ -58,6 +58,27 @@ public class AuditCommandTests
     }
 
     /// <summary>
+    ///     Test that verifying the audit trail neither creates a key nor scans the secrets: the key folder it is
+    ///     pointed at stays absent.
+    /// </summary>
+    [Fact]
+    public void AuditCommand_Run_IntactTrail_CreatesNoKeyFile()
+    {
+        // Arrange: a database with an audited event, and a key folder that does not exist
+        var connectionString = TestDatabase.NewConnectionString();
+        AddUser(connectionString, "ann");
+        using var folder = new Utilities.TemporaryDirectory();
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+
+        // Act
+        var (exitCode, _) = Verify(connectionString, keys);
+
+        // Assert: verified, and no key or folder
+        Assert.Equal(0, exitCode);
+        Assert.False(Directory.Exists(keys), "audit verify must not create the key ring");
+    }
+
+    /// <summary>
     ///     Test that a database without any audit entries is intact.
     /// </summary>
     [Fact]
@@ -242,8 +263,9 @@ public class AuditCommandTests
     ///     Runs <c>audit verify</c> against a database.
     /// </summary>
     /// <param name="connectionString">The connection string of the database.</param>
+    /// <param name="keysPath">The key folder to configure, or <c>null</c> for the default.</param>
     /// <returns>The exit code and everything the command wrote.</returns>
-    private static (int ExitCode, string Output) Verify(string connectionString)
+    private static (int ExitCode, string Output) Verify(string connectionString, string? keysPath = null)
     {
         var log = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N") + ".log");
         try
@@ -251,7 +273,14 @@ public class AuditCommandTests
             int exitCode;
             using (var context = Context.Create(["audit", "verify", "--silent", "--log", log]))
             {
-                AuditCommand.Run(context, Configure(connectionString));
+                AuditCommand.Run(context, configuration =>
+                {
+                    Configure(connectionString)(configuration);
+                    if (keysPath is not null)
+                    {
+                        configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["DataProtection:KeysPath"] = keysPath });
+                    }
+                });
                 exitCode = context.ExitCode;
             }
 

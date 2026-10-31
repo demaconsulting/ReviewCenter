@@ -31,6 +31,7 @@ using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -1501,6 +1502,283 @@ public class ServerHostKeyRingTests
         // Assert
         Assert.Contains("DataProtection:RequireEncryptedKeys", exception.Message, StringComparison.Ordinal);
         Assert.Contains(Path.GetFileName(KeyFiles(folder).Single()), exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Stores a protected repository token and a protected second-factor secret of a running host in its database.
+    /// </summary>
+    /// <param name="settings">The isolated settings of the host.</param>
+    /// <param name="app">The host whose ring protects the values.</param>
+    /// <param name="repositoryId">The id of the repository row.</param>
+    /// <param name="userId">The id of the user row.</param>
+    private static void SeedSecrets(Dictionary<string, string?> settings, WebApplication app, int repositoryId, int userId)
+    {
+        var connectionString = settings["Database:ConnectionString"]!;
+        SecretSeed.AddRepositoryToken(
+            connectionString, repositoryId, app.Services.GetRequiredService<ICredentialProtector>().Protect("tkn-lost-ring"));
+        SecretSeed.AddTotpSecret(
+            connectionString,
+            userId,
+            app.Services.GetRequiredService<ITotpSecretProtector>().Protect(userId, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
+    }
+
+    /// <summary>
+    ///     Test that a fresh installation (a new database and an empty ring) starts and creates its ring, without a
+    ///     warning or an error about the secrets.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing()
+    {
+        // Arrange: nothing yet
+        using var folder = new TemporaryDirectory();
+        var logs = new CapturingLoggerProvider();
+
+        // Act
+        await using var app = Create(Settings(folder), logs);
+
+        // Assert: one key, and nothing about lost or unreadable secrets
+        Assert.Single(KeyFiles(folder));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Level >= LogLevel.Error);
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains("AllowNewKeyRing", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a database with protected secrets and a key folder without keys stops the start with the
+    ///     documented message and creates no key.
+    /// </summary>
+    /// <param name="removeFolder"><c>true</c> to remove the key folder, <c>false</c> to leave it empty.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey(bool removeFolder)
+    {
+        // Arrange: a database with two secrets protected by a ring that is then lost
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder);
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            SeedSecrets(settings, first, 3, 4);
+        }
+
+        foreach (var file in KeyFiles(folder))
+        {
+            File.Delete(file);
+        }
+
+        if (removeFolder)
+        {
+            Directory.Delete(keys, recursive: true);
+        }
+
+        // Act
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(settings, new CapturingLoggerProvider()));
+
+        // Assert: the message of the guard, no secret, and no key was created by the refused start
+        Assert.Equal(
+            $"Key ring '{keys}' is empty but the database holds 2 protected secrets. Restore the keys folder that belongs " +
+            "to this database, or set DataProtection:AllowNewKeyRing=true for one start to accept that they become unreadable.",
+            exception.Message);
+        Assert.DoesNotContain("tkn-lost-ring", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Test that <c>DataProtection:AllowNewKeyRing</c> lets the start go on after the ring was lost, with a warning
+    ///     that names the number of secrets, and that the new ring is created.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning()
+    {
+        // Arrange: the ring of a database with two secrets is lost
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder);
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            SeedSecrets(settings, first, 3, 4);
+        }
+
+        Directory.Delete(Path.Combine(folder.DirectoryPath, "keys"), recursive: true);
+        var logs = new CapturingLoggerProvider();
+
+        // Act: start with the escape hatch
+        await using var app = Create(Settings(folder, ("DataProtection:AllowNewKeyRing", "true")), logs);
+
+        // Assert: a new key, and a warning with the count that does not reveal a secret
+        Assert.Single(KeyFiles(folder));
+        var warning = Assert.Single(
+            logs.Entries,
+            entry => entry.Level == LogLevel.Warning && entry.Message.Contains("AllowNewKeyRing", StringComparison.Ordinal));
+        Assert.Contains("2 protected secrets", warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("tkn-lost-ring", warning.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an empty ring next to a database that cannot be read stops the start without creating a key, even
+    ///     with <c>DataProtection:AllowNewKeyRing</c>, and that the message holds neither the exception text nor the
+    ///     location of the database.
+    /// </summary>
+    /// <param name="allowNewKeyRing"><c>true</c> to set <c>DataProtection:AllowNewKeyRing</c>.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey(bool allowNewKeyRing)
+    {
+        // Arrange: a database that opens but cannot be scanned, and a ring without keys
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder, ("DataProtection:AllowNewKeyRing", allowNewKeyRing ? "true" : "false"));
+        var databaseFile = new SqliteConnectionStringBuilder(settings["Database:ConnectionString"]).DataSource;
+        CreateBrokenViewDatabase(databaseFile);
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+
+        // Act
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(settings, new CapturingLoggerProvider()));
+
+        // Assert: the sanitized message of the guard, and no key was created by the refused start
+        Assert.Equal(
+            $"Key ring '{keys}' is empty and the database (Database:ConnectionString) could not be read to check whether " +
+            "it holds protected secrets, so no key was created. Fix the access to the database and start again; run " +
+            "'reviewcenter --validate --check-config' for the details.",
+            exception.Message);
+        Assert.DoesNotContain(databaseFile, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Missing", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(exception.InnerException);
+        Assert.Empty(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Creates a database file that opens and holds a table (so the schema is not created again) but whose
+    ///     <c>Repositories</c> view reads a table that does not exist, so the secret scan fails with a database error
+    ///     after the start-up prepared the database.
+    /// </summary>
+    /// <param name="databaseFile">The path of the database file to create.</param>
+    private static void CreateBrokenViewDatabase(string databaseFile)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(databaseFile)!);
+        using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databaseFile }.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                "CREATE TABLE \"Placeholder\" (\"Id\" INTEGER); " +
+                "CREATE VIEW \"Repositories\" AS SELECT \"Id\" AS \"Id\", \"Id\" AS \"EncryptedToken\" FROM \"Missing\";";
+            command.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+    }
+
+    /// <summary>
+    ///     Test that a ring with keys next to a database that cannot be read still starts, with a warning, as the
+    ///     database is reported by the start-up that opens it.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning()
+    {
+        // Arrange: a ring with a key, and a database that opens but cannot be scanned
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder);
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            Assert.Single(KeyFiles(folder));
+        }
+
+        var databaseFile = new SqliteConnectionStringBuilder(settings["Database:ConnectionString"]).DataSource;
+        SqliteConnection.ClearAllPools();
+        File.Delete(databaseFile);
+        CreateBrokenViewDatabase(databaseFile);
+        var logs = new CapturingLoggerProvider();
+
+        // Act
+        await using var app = Create(settings, logs);
+
+        // Assert: started on the same key, with the warning that the database could not be read
+        Assert.Single(KeyFiles(folder));
+        Assert.Single(
+            logs.Entries,
+            entry => entry.Level == LogLevel.Warning &&
+                     entry.Message.Contains("database could not be read", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a restart over the same ring is not refused, logs nothing about the secrets, and still reads
+    ///     them.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint()
+    {
+        // Arrange: a database with secrets of the ring
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder);
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            SeedSecrets(settings, first, 3, 4);
+        }
+
+        var logs = new CapturingLoggerProvider();
+
+        // Act: restart with the same folders
+        await using var second = Create(settings, logs);
+
+        // Assert: still one key, no error and no mention of the escape hatch
+        Assert.Single(KeyFiles(folder));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Level >= LogLevel.Error);
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains("AllowNewKeyRing", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that secrets of another ring (the ring has keys, but not these) are logged as an error with the counts
+    ///     and the remedy, and do not stop the start.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts()
+    {
+        // Arrange: a database with one readable and two unreadable secrets (protected by the ring of another installation)
+        using var folder = new TemporaryDirectory();
+        using var other = new TemporaryDirectory();
+        var settings = Settings(folder);
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            SeedSecrets(settings, first, 3, 4);
+        }
+
+        var connectionString = settings["Database:ConnectionString"]!;
+        await using (var foreign = Create(Settings(other), new CapturingLoggerProvider()))
+        {
+            SecretSeed.AddRepositoryToken(
+                connectionString, 7, foreign.Services.GetRequiredService<ICredentialProtector>().Protect("tkn-foreign"));
+            SecretSeed.AddTotpSecret(
+                connectionString,
+                9,
+                foreign.Services.GetRequiredService<ITotpSecretProtector>().Protect(9, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
+        }
+
+        var logs = new CapturingLoggerProvider();
+
+        // Act
+        await using var app = Create(settings, logs);
+
+        // Assert: the start went on, and the error names the counts per kind, the ids and the remedy
+        var error = Assert.Single(logs.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.Contains("cannot decrypt 2 of 4 protected secrets", error.Message, StringComparison.Ordinal);
+        Assert.Contains("1 repository token(s) (repository ids 7)", error.Message, StringComparison.Ordinal);
+        Assert.Contains("1 second-factor secret(s) (user ids 9)", error.Message, StringComparison.Ordinal);
+        Assert.Contains("administrator resets the two-factor secret", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("tkn-foreign", error.Message, StringComparison.Ordinal);
+        Assert.Single(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Test that the escape hatch is off by default.
+    /// </summary>
+    [Fact]
+    public void KeyRingSettings_AllowNewKeyRing_DefaultsToFalse()
+    {
+        // Arrange / Act
+        var settings = new KeyRingSettings();
+
+        // Assert
+        Assert.False(settings.AllowNewKeyRing);
     }
 
     /// <summary>

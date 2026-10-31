@@ -625,6 +625,7 @@ chooses how (the names are not case sensitive):
 | `DataProtection:CertificatePasswordFile`  | A file that holds the password; set only one of the two            |
 | `DataProtection:PreviousCertificatePaths` | A list of earlier certificates that can still decrypt the ring     |
 | `DataProtection:RequireEncryptedKeys`     | When true, the server refuses a ring that is not encrypted at rest |
+| `DataProtection:AllowNewKeyRing`          | One-start escape hatch: accept a new, empty ring (default false)   |
 
 Set the list with indexed environment variables, for example `DataProtection__PreviousCertificatePaths__0`.
 
@@ -647,7 +648,10 @@ copies the key folder cannot; a certificate and its password beside the keys is 
 
 **Windows DPAPI cannot be moved.** A ring that DPAPI protects can be read only by the same account (or machine, with
 `LocalMachine`). Restoring it elsewhere makes the stored tokens unreadable, so use a certificate for a ring that must
-be restored on another machine.
+be restored on another machine. A database restored **without** its key ring is not silently accepted: when the key
+folder holds no key but the database holds protected secrets, the server refuses to start unless you set
+`DataProtection:AllowNewKeyRing` to `true` for one start, and when only some secrets cannot be decrypted it logs an
+error with the counts at every start; see Back Up and Restore in the Deployment chapter.
 
 **The server never replaces a ring that it cannot read.** Data Protection answers a key that it cannot decrypt by
 creating a new key, which would make the stored tokens unreadable. At start the server therefore checks the ring first:

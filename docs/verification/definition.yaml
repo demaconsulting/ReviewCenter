@@ -34,6 +34,7 @@ input-files:
   - docs/verification/review-center/hosting.md
   - docs/verification/review-center/hosting/server-host.md
   - docs/verification/review-center/hosting/key-ring-protection.md
+  - docs/verification/review-center/hosting/secret-scan.md
   - docs/verification/review-center/hosting/user-command.md
   - docs/verification/review-center/identity.md
   - docs/verification/review-center/identity/password-hasher.md

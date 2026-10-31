@@ -21,9 +21,10 @@ suite (they start git, a database, a signer and a web host):
   endpoint variable, `DOTNET_ENVIRONMENT` and `Database__*` settings, sentinel paths, and a private
   `TEMP`/`TMP`: the run must pass, the host must bind a loopback port that is not the poisoned one, the sentinels must
   not be created, and the private temporary folder must be empty afterwards.
-- The opt-in `ConfiguredDatabase` check is run directly against temporary databases that the test
-  creates with the production schema, and against the process configuration, which the test sets
-  through the `Database__ConnectionString` and `Database__Provider` environment variables and
+- The opt-in `ConfiguredDatabase` and `ConfiguredKeys` checks are run directly against temporary databases and key
+  rings that the test creates with the production schema and the production protectors (in-memory certificates; no
+  DPAPI, certificate store, or home directory), and against the process configuration, which the test sets
+  through the `Database__*` and `DataProtection__*` environment variables and
   restores afterwards.
 
 No check is replaced by a test double: the production services, the production git source, the
@@ -49,7 +50,15 @@ every supported platform provides, and no network beyond it.
   current schema without changing the file, fails naming the missing table for a database with a
   table dropped, fails for a missing file without creating it, and fails naming an unsupported
   provider; none of its messages contains the folder or the connection string.
-- The default run never creates the configured database and never runs `ConfiguredDatabase`.
+- The default run never creates the configured database and never runs `ConfiguredDatabase` or `ConfiguredKeys`.
+- `ConfiguredKeys` is skipped when nothing is configured, when the database file is missing (and nothing is created),
+  and when the key folder is missing and the database holds no secret (the folder is not created). It passes for a
+  ring that matches the database, also with a certificate ring, reports the mode, the file counts and the secret
+  counts, and changes no file. It fails, without creating a key, for an empty ring or a lost folder next to a database
+  with secrets, for secrets of another ring (with the counts and the row ids), for a ring that the configured
+  certificate does not open, for a plain ring when `DataProtection:RequireEncryptedKeys` is true, for key ring
+  settings that cannot be used, and for an unsupported database provider. None of its messages holds a secret, a
+  password, a certificate path, or a path other than the key folder.
 - The `HostStart` check passes in a hostile environment, binds one loopback address, and leaves no sentinel and no
   file in the private temporary folder.
 - The interceptor of the self-test database relaxes only a writable file database inside the folder of the check:
@@ -117,6 +126,43 @@ scenario is tested by `ValidationChecks_ConfiguredDatabase_MissingFile_IsSkipped
 **ValidationChecks_ConfiguredDatabase_UnsupportedProvider_Fails**: The configured provider is not
 supported; the check fails and names the provider. This scenario is tested by
 `ValidationChecks_ConfiguredDatabase_UnsupportedProvider_Fails`.
+
+**ValidationChecks_ConfiguredKeys_NothingConfigured_IsSkipped**: No connection string is configured and no database
+exists at the default location; the check is skipped with the reason. This scenario is tested by
+`ValidationChecks_ConfiguredKeys_NothingConfigured_IsSkipped`.
+
+**ValidationChecks_ConfiguredKeys_MissingDatabase_IsSkippedWithoutCreatingAnything** and
+**ValidationChecks_ConfiguredKeys_NoKeyFolderAndNoSecrets_IsSkippedWithoutCreatingTheFolder**: A configured database
+file that does not exist yet, and a database without secrets next to a key folder that does not exist yet (a fresh
+installation), are skipped with the reason that the first start creates them; neither the database nor the folder is
+created. These scenarios are tested by the tests of the same names.
+
+**ValidationChecks_ConfiguredKeys_RingMatchesDatabase_PassesWithoutChangingAnything** and
+**ValidationChecks_ConfiguredKeys_CertificateRing_PassesAndNeverPrintsThePassword**: A database with a repository token
+and a second-factor secret next to the ring that protected them passes, with a ring that is not encrypted and with a
+ring protected by a certificate; the line reports the mode, the file counts and the secret counts, the database and
+the key folder are unchanged (the snapshot leaves out `-wal` and `-shm` side files, which SQLite may leave empty), and
+no password appears. These scenarios are tested by the tests of the same names.
+
+**ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey**: An empty key folder, or none, next to a
+database with secrets fails with the message of the lost ring, and no key file is created. This scenario is tested by
+the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_SecretsOfAnotherRing_FailsWithCountsAndIds**: The ring has a key, but the secrets were
+protected by another ring; the check fails with the counts per kind and the repository and user ids, and never the
+secret. This scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_WrongCertificate_FailsAndCreatesNoKey**: A ring protected by one certificate is
+checked with another; the check fails and no second key is created. This scenario is tested by the test of the same
+name.
+
+**ValidationChecks_ConfiguredKeys_PlaintextRingWhenEncryptionRequired_Fails**: A plain ring with
+`DataProtection:RequireEncryptedKeys` true fails. This scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredKeys_UnusableSettings_FailsWithoutLeaking** and
+**ValidationChecks_ConfiguredKeys_UnsupportedProvider_Fails**: Key ring settings that cannot be used (a missing
+certificate file) fail with a fixed message that holds neither the path nor the password; an unsupported database
+provider fails and names the provider. These scenarios are tested by the tests of the same names.
 
 The hermetic behavior of the default run is verified at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic`.

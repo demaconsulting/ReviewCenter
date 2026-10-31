@@ -565,7 +565,7 @@ public partial class ValidationTests
     }
 
     /// <summary>
-    ///     Test that the default check list has the nine hermetic checks in their order, with the opt-in check absent.
+    ///     Test that the default check list has the nine hermetic checks in their order, with the opt-in checks absent.
     /// </summary>
     [Fact]
     public void Validation_CreateChecks_Default_ListsNineHermeticChecks()
@@ -573,25 +573,26 @@ public partial class ValidationTests
         // Arrange: no setup; the default list is asked for
 
         // Act: create the default check list
-        var checks = Validation.CreateChecks(includeConfiguredDatabase: false);
+        var checks = Validation.CreateChecks(includeConfigured: false);
 
-        // Assert: nine checks, in order, all with the ReviewCenter_ prefix and no configured-database check
+        // Assert: nine checks, in order, all with the ReviewCenter_ prefix and no configured-database or key check
         Assert.Equal(RealValidationRun.CheckNames, checks.Select(check => check.Name));
     }
 
     /// <summary>
-    ///     Test that the opt-in check list adds only the configured-database check, after the default ones.
+    ///     Test that the opt-in check list adds only the configured-database and key checks, after the default ones.
     /// </summary>
     [Fact]
-    public void Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast()
+    public void Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseAndKeysLast()
     {
         // Arrange: no setup; the opt-in list is asked for
 
         // Act: create the opt-in check list
-        var checks = Validation.CreateChecks(includeConfiguredDatabase: true);
+        var checks = Validation.CreateChecks(includeConfigured: true);
 
-        // Assert: ten checks and the configured-database check is the last
-        Assert.Equal(10, checks.Count);
-        Assert.Equal("ReviewCenter_ConfiguredDatabase", checks[^1].Name);
+        // Assert: eleven checks; the configured-database check and then the configured-keys check come last
+        Assert.Equal(11, checks.Count);
+        Assert.Equal("ReviewCenter_ConfiguredDatabase", checks[^2].Name);
+        Assert.Equal("ReviewCenter_ConfiguredKeys", checks[^1].Name);
     }
 }

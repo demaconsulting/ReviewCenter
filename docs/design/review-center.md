@@ -27,6 +27,7 @@ flowchart TD
     subgraph Hosting
         ServerHost
         KeyRingProtection
+        SecretScan
         UserCommand
         AuditCommand
     end
@@ -150,6 +151,8 @@ flowchart TD
     ServerHost --> GitSource
     ServerHost --> CredentialProtector
     ServerHost --> KeyRingProtection
+    ServerHost --> SecretScan
+    SecretScan --> KeyRingProtection
     KeyRingProtection --> SecretSource
     ServerHost --> AttestationKeyProvider
     ServerHost --> AttestationEndpoint
@@ -318,7 +321,11 @@ how the first system administrator is created. `AuditCommand` verifies the hash 
 configuration and registration and reports the result as the exit code. `KeyRingProtection` decides how the key ring of
 the Data Protection system is protected at rest (Windows DPAPI, a certificate, or the permissions of its folder),
 applies it for `ServerHost`, and refuses a ring that the certificate does not open; the root of trust of the stored
-tokens is therefore the key ring and its certificate or account, not the database.
+tokens is therefore the key ring and its certificate or account, not the database. `SecretScan` reads the database and
+the key folder without changing either and tells how many protected secrets the key ring can still decrypt; `ServerHost`
+uses it to refuse a start with an empty key ring next to a database that holds secrets, and the `ConfiguredKeys` check
+of `ValidationChecks` (opt-in with `--check-config`) uses it to tell an operator, before a start, whether keys and
+database belong together.
 The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell and router,
 `HomePage` is the landing page served at the root URL, `AboutPage` and `HelpPage` describe the product and explain how
 to use it, `ProjectsPage`, `ProjectPage`, `PlanPage`,

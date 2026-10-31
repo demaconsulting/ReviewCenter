@@ -34,8 +34,8 @@ namespace DemaConsulting.ReviewCenter.SelfTest;
 /// </summary>
 /// <remarks>
 ///     The default run is hermetic: it never reads or changes the configured database or configuration and never
-///     binds the configured port (see <see cref="Checks"/>). The one opt-in exception is the read-only check of
-///     the configured database that <c>--check-config</c> adds. Timing, outcome and reporting of each check are
+///     binds the configured port (see <see cref="Checks"/>). The opt-in exceptions are the two read-only checks of
+///     the configured database and key ring that <c>--check-config</c> adds. Timing, outcome and reporting of each check are
 ///     done by <see cref="ValidationRunner"/>; this class only decides which checks run and summarizes them. The
 ///     checks run at the same time, each in its own temporary folder, and are reported in their listed order.
 ///     The class is stateless and therefore thread-safe.
@@ -45,11 +45,12 @@ internal static class Validation
     /// <summary>
     ///     Gets the checks of the default run, in the order they are executed.
     /// </summary>
-    /// <param name="includeConfiguredDatabase">
-    ///     <c>true</c> to append the opt-in read-only check of the configured database (<c>--check-config</c>).
+    /// <param name="includeConfigured">
+    ///     <c>true</c> to append the opt-in read-only checks of the configured database and of the configured key
+    ///     ring and its secrets (<c>--check-config</c>).
     /// </param>
-    /// <returns>The checks; the default run has nine, the opt-in run ten.</returns>
-    public static IReadOnlyList<ValidationCheck> CreateChecks(bool includeConfiguredDatabase)
+    /// <returns>The checks; the default run has nine, the opt-in run eleven.</returns>
+    public static IReadOnlyList<ValidationCheck> CreateChecks(bool includeConfigured)
     {
         var checks = new List<ValidationCheck>
         {
@@ -64,10 +65,11 @@ internal static class Validation
             new(HostStartCheck.Name, HostStartCheck.RunAsync)
         };
 
-        // The configured database is the only thing outside the temporary folders, so it is opt-in
-        if (includeConfiguredDatabase)
+        // The configured database and key ring are the only things outside the temporary folders, so they are opt-in
+        if (includeConfigured)
         {
             checks.Add(new(ConfiguredDatabaseCheck.Name, ConfiguredDatabaseCheck.RunAsync));
+            checks.Add(new(ConfiguredKeysCheck.Name, ConfiguredKeysCheck.RunAsync));
         }
 
         return checks;

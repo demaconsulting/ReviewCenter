@@ -20,7 +20,7 @@ The following command-line options are supported:
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
 | `--validate`                          | Run self-validation                                          |
-| `--check-config`                      | With `--validate`, also check the configured database        |
+| `--check-config`                      | With `--validate`, also check the database and keys          |
 | `--results <file>`, `--result <file>` | Write validation results to file (TRX or JUnit format)       |
 | `--depth <#>`                         | Set heading depth for markdown output (default: 1)           |
 | `--log <file>`                        | Write output to log file                                     |
@@ -167,16 +167,18 @@ does not hang. The temporary folders are deleted at the end of each test; a file
 (for example by a virus scanner) is retried for a short time and, if it stays locked, left to the operating system's
 temporary cleanup without failing the run.
 
-### Checking the Configured Database
+### Checking the Configured Database and Keys
 
 The default run never looks at your configuration. To also check that the database your server is configured to
-use can be reached and has the schema of this version, add `--check-config`:
+use can be reached and has the schema of this version, and that the key ring decrypts what the database holds, add
+`--check-config`:
 
 ```bash
 reviewcenter --validate --check-config
 ```
 
-This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**. It loads the configuration the way `serve` does
+This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**, and an eleventh, **`ReviewCenter_ConfiguredKeys`**.
+The first loads the configuration the way `serve` does
 (`appsettings.json` and the environment variables), recognizes the database provider, opens the database
 **read-only**, and compares its tables and columns with the ones this version expects. It never writes to the
 database and never creates it, and it never prints the connection string or other secrets; a problem is reported
@@ -189,6 +191,17 @@ configured and there is no database at the default location, the test is
 executed (TRX) or skipped (JUnit), and the run does not fail. `--check-config` is only valid together with
 `--validate`. A database file that does not exist yet (a fresh installation, which creates it at the first start) is
 also **skipped**, with that reason; a file that exists but is not a database of this version still fails.
+
+**`ReviewCenter_ConfiguredKeys`** reads the key ring folder and the database **read-only** and creates nothing: no
+key, no folder, no file. It reports the protection in force, the number of key files (and how many are not
+encrypted), the number of protected secrets (stored repository tokens and second-factor secrets), and how many of them
+the key ring cannot decrypt, for example `protection Dpapi; key files 1 (0 not encrypted); protected secrets 3
+(repository tokens 2, second-factor secrets 1); unreadable 0`. It **fails** (exit code 1) when secrets cannot be
+decrypted (the message gives the counts and the repository and user ids), when the key folder is empty or missing but
+the database holds secrets, when the ring is not encrypted and `DataProtection:RequireEncryptedKeys` is true, and when
+the newest key cannot be decrypted. It never prints a key, a secret, a password, or a path other than the key folder.
+It is **skipped** when no database is configured or the database file does not exist yet, and when the database
+holds no secret and the key folder does not exist yet. See Back Up and Restore in the Deployment chapter.
 
 ## Silent Mode
 

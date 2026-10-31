@@ -161,8 +161,9 @@ sections:
 
       - id: ReviewCenter-Context-CheckConfig
         title: >-
-          The Context class shall accept the `--check-config` option to signal that the configured database is to be
-          checked as part of the self-validation run, and shall reject the option when `--validate` is not given.
+          The Context class shall accept the `--check-config` option to signal that the configured database and key ring
+          are to be checked as part of the self-validation run, and shall reject the option when `--validate` is not
+          given.
         justification: |
           The option adds a check to a validation run, so on its own it would silently do nothing; the mistake must be
           found when the arguments are parsed, with a clear message.

@@ -826,6 +826,28 @@ sections:
           - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
 
+      - id: ReviewCenter-System-KeyRestore
+        title: >-
+          The tool shall detect a database that is restored without the key ring that belongs to it: at the server
+          start it shall refuse to start, with a message that names the key folder, when the folder holds no key and
+          the database holds protected secrets (unless the operator sets DataProtection:AllowNewKeyRing for one start),
+          and log an error with the counts and the remedy when only some secrets cannot be decrypted, and the opt-in
+          `--validate --check-config` shall report, read-only and without creating a key, the protection mode, the key
+          files, the protected secrets, and how many cannot be decrypted, and fail when the ring cannot read them.
+        tags: [system, security]
+        justification: |
+          The database and the key ring are backed up and restored separately. A database restored without its keys
+          would otherwise start with a new, empty ring and make every stored repository token and second-factor secret
+          unreadable without a word. The operator must learn that at the restore, before the loss is final, and must
+          be able to test a restore without starting the server.
+        children:
+          - ReviewCenter-Hosting-SecretScan
+          - ReviewCenter-Hosting-KeyRingLost
+          - ReviewCenter-ValidationChecks-ConfiguredKeys
+        tests:
+          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+          - ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey
+
       # ----------------------------------------------------------------------------------------------
       # Automation: pipelines and tests
       # ----------------------------------------------------------------------------------------------
@@ -940,7 +962,7 @@ sections:
           never touches the configured database, writing the outcome to a TRX or JUnit result file chosen by the
           `--results` flag (with `--result` as a legacy alias) at a heading depth chosen by the `--depth` flag, and
           returning a non-zero exit code when the validation fails or the result file cannot be written in a
-          supported format, with an opt-in, read-only check of the configured database by `--check-config`.
+          supported format, with an opt-in, read-only check of the configured database and key ring by `--check-config`.
         tags: [system]
         justification: |
           Regulated environments require qualification evidence to show that the tool functions correctly in its

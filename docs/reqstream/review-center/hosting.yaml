@@ -203,12 +203,53 @@ sections:
           - ReviewCenter-KeyRingProtection-Require
           - ReviewCenter-KeyRingProtection-PreviousCertificates
           - ReviewCenter-KeyRingProtection-WrongKeyGuard
+          - ReviewCenter-KeyRingProtection-AllowNewKeyRing
           - ReviewCenter-KeyRingProtection-Validation
           - ReviewCenter-ServerHost-KeyProtection
         tests:
           - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
           - ServerHost_CreateApplication_InvalidKeyRingSettings_ThrowsClearError
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
+
+      - id: ReviewCenter-Hosting-SecretScan
+        title: >-
+          The Hosting subsystem shall be able to scan the database and the key ring without changing either, counting
+          the key files and how many are not encrypted and the protected repository tokens and second-factor secrets
+          and how many of them the ring can no longer decrypt, never creating a key, and never disclosing a secret or
+          a path.
+        justification: |
+          The key ring and the database are backed up and restored separately, and a restore that mixes them loses
+          every stored secret without any error. Finding that needs a look that is true to what the server can decrypt
+          and has no side effect, so that it can run before the server starts and on a restored copy.
+        children:
+          - ReviewCenter-SecretScan-RingState
+          - ReviewCenter-SecretScan-SecretReadability
+          - ReviewCenter-SecretScan-ReadOnly
+          - ReviewCenter-SecretScan-NoDisclosure
+        tests:
+          - SecretScan_ScanAsync_SecretsOfTheRing_AreCountedReadable
+          - SecretScan_ScanAsync_OtherRing_CountsEverySecretUnreadableWithIds
+          - SecretScan_ScanAsync_AnyRing_LeavesDatabaseAndRingUnchanged
+
+      - id: ReviewCenter-Hosting-KeyRingLost
+        title: >-
+          The Hosting subsystem shall refuse to start, with a message that names the key folder and the setting
+          DataProtection:AllowNewKeyRing, when the key folder holds no key file and the database holds protected
+          secrets, shall start with a warning when that setting is true, and shall log an error with the counts and the
+          remedy, without refusing, when the ring has keys but some secrets cannot be decrypted. When the database
+          cannot be read to tell, it shall refuse an empty ring, without creating a key, and start with a warning
+          otherwise.
+        justification: |
+          A database restored without its key ring would otherwise start with a new ring and silently make every stored
+          repository token and second-factor secret unreadable. The operator must decide, knowingly, that the loss is
+          acceptable. A database that cannot be read does not tell whether there is a loss to accept.
+        children:
+          - ReviewCenter-ServerHost-LostKeyRing
+        tests:
+          - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
+          - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
+          - ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts
+          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
 
       - id: ReviewCenter-Hosting-AttestationServices
         title: >-

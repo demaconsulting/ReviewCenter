@@ -34,6 +34,7 @@ sections:
           - ReviewCenter-ValidationChecks-AttestationPdf
           - ReviewCenter-ValidationChecks-HostStart
           - ReviewCenter-ValidationChecks-ConfiguredDatabase
+          - ReviewCenter-ValidationChecks-ConfiguredKeys
         tests:
           - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound
