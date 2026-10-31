@@ -1,13 +1,15 @@
 @* MainLayout: the frame around every page (part of the App unit).
 
-   It is static server-side rendered markup, so it never needs a live connection. The header spans the full width of
-   the window. On the left it shows the logo and product name (the link home) followed by the main navigation
-   (Projects, and for system administrators Audit and Users); on the right it shows who is signed in (display
-   name, an Account link and a Logout button) or a Sign in link when nobody is. Logout is a form that posts to
-   /auth/logout with an antiforgery token, because signing out changes state and must not be triggered by a plain
-   link. The footer on every page shows the version, the copyright and a link to the About page. A user who still has a
-   temporary password sees no navigation tabs and is sent to the Account page from every page except Account, Login,
-   Help and About. *@
+   It is static server-side rendered markup, so it never needs a live connection. The only service call besides the
+   authentication state is the number on the Inbox tab (see MainLayout.razor.cs): it comes from a per-user cache of
+   30 seconds when the layout starts and on each navigation, and a failure only hides it. The header spans the full
+   width of the window. On the left it shows the logo and product name (the link home) followed by the main
+   navigation (Projects, Inbox, and for system administrators Audit and Users); on the right it shows who is signed
+   in (display name, an Account link and a Logout button) or a Sign in link when nobody is. Logout is a form that
+   posts to /auth/logout with an antiforgery token, because signing out changes state and must not be triggered by
+   a plain link. The footer on every page shows the version, the copyright and a link to the About page. A user who
+   still has a temporary password sees no navigation tabs and is sent to the Account page from every page except
+   Account, Login, Help and About. *@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Routing
 
@@ -24,6 +26,12 @@
         @if (Actor is not null && !MustChangePassword)
         {
             <NavLink href="/projects" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="projects-link">Projects</NavLink>
+            <NavLink href="/inbox" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="inbox-link">Inbox
+                @if (ActionCount > 0)
+                {
+                    <span class="badge unread" data-testid="nav-inbox-count" role="img" aria-label="@ActionCountLabel">@ActionCountText</span>
+                }
+            </NavLink>
             @if (IsAdmin)
             {
                 <NavLink href="/audit" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="audit-link">Audit</NavLink>

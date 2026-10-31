@@ -512,6 +512,8 @@ reviews:
       - "src/**/Web/MainLayout.razor.cs"
       - "src/**/Web/SessionGate.razor"
       - "test/**/Web/AppTests.cs"
+      - "test/**/Web/InboxWebTestBase.cs"
+      - "test/**/Web/PageTestBase.cs"
 
   - id: ReviewCenter-Web-HomePage
     title: Review of ReviewCenter HomePage unit implementation

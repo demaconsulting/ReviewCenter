@@ -353,7 +353,9 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 - Only members who may contribute are given To sign and Replies waiting; an auditor gets neither. A user who is
   disabled, has a temporary password, or is not a known user gets an empty inbox.
 - The count on the home page is the number of distinct reviews in the first three groups, so a review in two groups
-  counts once. Updates are never counted.
+  counts once. Updates are never counted. The badge of the Inbox tab in the header shows the same count, read when a
+  page is opened and kept for 30 seconds for each user, so it can be up to 30 seconds behind; it is hidden at zero and
+  shown as 99+ above ninety-nine.
 - A comment is unread when it is by someone else and newer than the last comment you saw in that review. Your own
   comments are never unread, whatever the case of your user name. A review to sign is marked New again when someone
   else signs it, answers a check, writes a comment, or reopens it after you last saw it.

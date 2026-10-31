@@ -24,6 +24,7 @@ using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using TestContext = Xunit.TestContext;
 
@@ -32,7 +33,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <summary>
 ///     Unit tests for the App unit: the HTML shell (<c>App.razor</c>) and the router (<c>Routes.razor</c>).
 /// </summary>
-public class AppTests : PageTestBase
+public class AppTests : InboxWebTestBase
 {
     /// <summary>
     ///     Test that the HTML shell declares a base href, the head outlet output, and the Blazor client script.
@@ -303,6 +304,253 @@ public class AppTests : PageTestBase
 
         // Assert
         Assert.EndsWith("/projects", navigation.Uri, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a user with a single review that needs action sees the Inbox tab with a badge that says so, and
+    ///     with two the plural form.
+    /// </summary>
+    /// <param name="reviews">The number of reviews that need the user's action.</param>
+    /// <param name="label">The accessible label the badge must have.</param>
+    [Theory]
+    [InlineData(1, "1 review needs your action")]
+    [InlineData(2, "2 reviews need your action")]
+    public async Task MainLayout_Render_UserWithActionItems_ShowsInboxTabWithCount(int reviews, string label)
+    {
+        // Arrange: ann must sign the given number of reviews
+        UseCountingUsers();
+        await ArrangeActionItemsAsync(reviews);
+        SignInAs("ann", "Ann", false);
+
+        // Act: render the layout
+        var layout = Render<MainLayout>();
+
+        // Assert: the Inbox tab links to the inbox and carries the count, with the exact number as accessible text
+        Assert.Equal("/inbox", layout.Find("[data-testid='inbox-link']").GetAttribute("href"));
+        var badge = layout.Find("[data-testid='nav-inbox-count']");
+        Assert.Equal(reviews.ToString(System.Globalization.CultureInfo.InvariantCulture), badge.TextContent);
+        Assert.Equal(label, badge.GetAttribute("aria-label"));
+        Assert.Equal("inbox-link", badge.ParentElement?.GetAttribute("data-testid"));
+    }
+
+    /// <summary>
+    ///     Test that the badge is hidden while nothing needs the user's action, but the tab stays.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Render_NoActionItems_ShowsInboxTabWithoutBadge()
+    {
+        // Arrange: ann is a member and nothing waits for her
+        UseCountingUsers();
+        await ArrangeProjectAsync();
+        SignInAs("ann", "Ann", false);
+
+        // Act: render the layout
+        var layout = Render<MainLayout>();
+
+        // Assert: the tab is there without a badge
+        Assert.Equal("/inbox", layout.Find("[data-testid='inbox-link']").GetAttribute("href"));
+        Assert.Empty(layout.FindAll("[data-testid='nav-inbox-count']"));
+    }
+
+    /// <summary>
+    ///     Test that a count above ninety-nine is shown as 99+ while the accessible label keeps the exact number.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Render_ManyActionItems_CapsBadgeAt99Plus()
+    {
+        // Arrange: ann must sign a hundred reviews
+        UseCountingUsers();
+        await ArrangeActionItemsAsync(100);
+        SignInAs("ann", "Ann", false);
+
+        // Act: render the layout
+        var layout = Render<MainLayout>();
+
+        // Assert: the badge is capped, the label is exact
+        var badge = layout.Find("[data-testid='nav-inbox-count']");
+        Assert.Equal("99+", badge.TextContent);
+        Assert.Equal("100 reviews need your action", badge.GetAttribute("aria-label"));
+    }
+
+    /// <summary>
+    ///     Test that nobody gets an Inbox tab, and the inbox is not even asked for a count, while nobody is signed in
+    ///     or the password is still temporary.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Render_NobodyOrTemporaryPassword_ShowsNoInboxTabAndReadsNoCount()
+    {
+        // Arrange: ann has a review that needs her action, but nobody is signed in
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+        SignOut();
+
+        // Act: render the layout for nobody, then for ann with a temporary password
+        var anonymous = Render<MainLayout>();
+        SignInAsTemporaryPassword("ann", "Ann");
+        var flagged = Render<MainLayout>();
+
+        // Assert: no tab, no badge and no lookup of the inbox in either case
+        Assert.Empty(anonymous.FindAll("[data-testid='inbox-link']"));
+        Assert.Empty(anonymous.FindAll("[data-testid='nav-inbox-count']"));
+        Assert.Empty(flagged.FindAll("[data-testid='inbox-link']"));
+        Assert.Empty(flagged.FindAll("[data-testid='nav-inbox-count']"));
+        Assert.Equal(0, users.Lookups);
+    }
+
+    /// <summary>
+    ///     Test that the count is read once per user in thirty seconds however often the layout is rendered, and read
+    ///     again once the clock has moved past that, so that the badge may be up to thirty seconds behind.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Render_WithinThirtySeconds_ReadsCountOnceThenAgainAfterwards()
+    {
+        // Arrange: ann must sign one review
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+        SignInAs("ann", "Ann", false);
+
+        // Act: render twice, add a review, render at 29 seconds, then at 31 seconds
+        var first = Render<MainLayout>();
+        var second = Render<MainLayout>();
+        await CreateInboxReviewAsync("later");
+        await AddSlotAsync("later", "ann");
+        Time.Advance(TimeSpan.FromSeconds(29));
+        var third = Render<MainLayout>();
+        var lookupsInside = users.Lookups;
+        Time.Advance(TimeSpan.FromSeconds(2));
+        var fourth = Render<MainLayout>();
+
+        // Assert: one read for the first three renders, which still show the old number, and a new read afterwards
+        Assert.Equal("1", first.Find("[data-testid='nav-inbox-count']").TextContent);
+        Assert.Equal("1", second.Find("[data-testid='nav-inbox-count']").TextContent);
+        Assert.Equal("1", third.Find("[data-testid='nav-inbox-count']").TextContent);
+        Assert.Equal(1, lookupsInside);
+        Assert.Equal(2, users.Lookups);
+        Assert.Equal("2", fourth.Find("[data-testid='nav-inbox-count']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that two users never share a cached count.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Render_TwoUsers_KeepsTheirCountsApart()
+    {
+        // Arrange: ann must sign a review, bob has nothing
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+
+        // Act: render for ann, then for bob right after
+        SignInAs("ann", "Ann", false);
+        var ann = Render<MainLayout>();
+        SignInAs("bob", "Bob", false);
+        var bob = Render<MainLayout>();
+
+        // Assert: each user got a read of their own
+        Assert.Equal("1", ann.Find("[data-testid='nav-inbox-count']").TextContent);
+        Assert.Empty(bob.FindAll("[data-testid='nav-inbox-count']"));
+        Assert.Equal(2, users.Lookups);
+    }
+
+    /// <summary>
+    ///     Test that a navigation refreshes the badge once the cached count has expired, that a navigation inside the
+    ///     thirty seconds does not read again, and that a layout that was disposed no longer reads.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Navigate_ChangedCount_RefreshesBadgeAndStopsAfterDispose()
+    {
+        // Arrange: ann must sign one review and the layout shows it
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+        SignInAs("ann", "Ann", false);
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/help");
+        var layout = Render<MainLayout>();
+        Assert.Equal("1", layout.Find("[data-testid='nav-inbox-count']").TextContent);
+
+        // Act: another review needs ann, and she navigates within thirty seconds
+        await CreateInboxReviewAsync("later");
+        await AddSlotAsync("later", "ann");
+        navigation.NavigateTo("/projects");
+
+        // Assert: the cached count is still used
+        Assert.Equal(1, users.Lookups);
+        Assert.Equal("1", layout.Find("[data-testid='nav-inbox-count']").TextContent);
+
+        // Act: the cache expires and she navigates again
+        Time.Advance(TimeSpan.FromSeconds(31));
+        navigation.NavigateTo("/inbox");
+
+        // Assert: the badge shows the new number
+        await layout.WaitForAssertionAsync(
+            () => Assert.Equal("2", layout.Find("[data-testid='nav-inbox-count']").TextContent));
+        Assert.Equal(2, users.Lookups);
+
+        // Act: the layout is disposed, the cache expires again and she navigates
+        layout.Instance.Dispose();
+        Time.Advance(TimeSpan.FromSeconds(31));
+        navigation.NavigateTo("/projects");
+
+        // Assert: nothing reads the count any more
+        Assert.Equal(2, users.Lookups);
+    }
+
+    /// <summary>
+    ///     Test that a count that cannot be read hides the badge without breaking the page, is not cached as a
+    ///     failure, and shows again once the inbox works.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage()
+    {
+        // Arrange: ann must sign a review but reading the inbox fails
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+        SignInAs("ann", "Ann", false);
+        users.Fail = true;
+
+        // Act: render the layout
+        var broken = Render<MainLayout>();
+
+        // Assert: the rest of the frame is there and only the badge is missing
+        Assert.Equal("Ann", broken.Find("[data-testid='current-user']").TextContent);
+        Assert.NotNull(broken.Find("[data-testid='inbox-link']"));
+        Assert.NotNull(broken.Find("[data-testid='footer']"));
+        Assert.Empty(broken.FindAll("[data-testid='nav-inbox-count']"));
+
+        // Act: the inbox works again within thirty seconds
+        users.Fail = false;
+        var recovered = Render<MainLayout>();
+
+        // Assert: the failure was not cached, so the badge is back
+        Assert.Equal("1", recovered.Find("[data-testid='nav-inbox-count']").TextContent);
+    }
+
+    /// <summary>
+    ///     Replaces the inbox service by one whose user lookups, the first step of every count, are counted and can be
+    ///     made to fail; call it before the first render.
+    /// </summary>
+    /// <returns>The counting store.</returns>
+    private CountingUserStore UseCountingUsers()
+    {
+        var users = new CountingUserStore(UserStore);
+        Services.RemoveAll<InboxService>();
+        Services.AddSingleton(new InboxService(InboxStore, Store, Access, users, Time));
+        return users;
+    }
+
+    /// <summary>
+    ///     Creates the project and a number of reviews in which <c>ann</c> has to sign.
+    /// </summary>
+    /// <param name="reviews">The number of reviews.</param>
+    /// <returns>A task that completes when the reviews exist.</returns>
+    private async Task ArrangeActionItemsAsync(int reviews)
+    {
+        await ArrangeProjectAsync();
+        for (var i = 0; i < reviews; i++)
+        {
+            var id = "r" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await CreateInboxReviewAsync(id);
+            await AddSlotAsync(id, "ann");
+        }
     }
 
     /// <summary>
@@ -615,5 +863,70 @@ public class AppTests : PageTestBase
         // Assert: the session-ended message is shown instead of the page
         Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']"));
         Assert.Empty(cut.FindAll($"[data-testid='{rootTestId}']"));
+    }
+
+    /// <summary>
+    ///     A user store that counts the look-ups by user name, which the inbox service makes first on every count, and
+    ///     that can be made to fail.
+    /// </summary>
+    /// <param name="inner">The store the calls are passed on to.</param>
+    private sealed class CountingUserStore(IUserStore inner) : IUserStore
+    {
+        /// <summary>
+        ///     Gets the number of look-ups by user name so far.
+        /// </summary>
+        public int Lookups { get; private set; }
+
+        /// <summary>
+        ///     Gets or sets a value indicating whether a look-up by user name throws.
+        /// </summary>
+        public bool Fail { get; set; }
+
+        /// <inheritdoc />
+        public Task<User> AddAsync(User user, Func<User, AuditDraft> audit, CancellationToken cancellationToken = default)
+        {
+            return inner.AddAsync(user, audit, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<User> AddToProjectAsync(
+            User user,
+            int projectId,
+            ProjectRole role,
+            Func<User, AuditDraft> audit,
+            CancellationToken cancellationToken = default)
+        {
+            return inner.AddToProjectAsync(user, projectId, role, audit, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
+        {
+            Lookups++;
+            if (Fail)
+            {
+                throw new InvalidOperationException("The user store is not available.");
+            }
+
+            return inner.GetByUsernameAsync(username, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<User?> GetByExternalAsync(string issuer, string subject, CancellationToken cancellationToken = default)
+        {
+            return inner.GetByExternalAsync(issuer, subject, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken = default)
+        {
+            return inner.ListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task UpdateAsync(User user, AuditDraft? audit, CancellationToken cancellationToken = default)
+        {
+            return inner.UpdateAsync(user, audit, cancellationToken);
+        }
     }
 }

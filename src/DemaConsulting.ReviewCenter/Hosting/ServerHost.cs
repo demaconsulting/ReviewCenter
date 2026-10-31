@@ -119,6 +119,9 @@ internal static class ServerHost
         // Blazor Server: server-side Razor components rendered over an interactive circuit
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+        // The in-process cache behind the count on the Inbox tab (the layout caches it per user for 30 seconds)
+        builder.Services.AddMemoryCache();
+
         // Makes the signed-in user available to AuthorizeRouteView and the layout
         builder.Services.AddCascadingAuthenticationState();
 
