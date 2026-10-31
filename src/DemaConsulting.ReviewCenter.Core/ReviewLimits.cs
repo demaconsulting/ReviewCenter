@@ -159,6 +159,12 @@ public static class ReviewLimits
     public const int MaxCommentLength = 4000;
 
     /// <summary>
+    ///     The longest accepted review conclusion text (the free text the reviewers write as the conclusion of a
+    ///     review's record, not the approved or rejected conclusion), in characters; it is the length of the stored column.
+    /// </summary>
+    public const int MaxConclusionTextLength = 4000;
+
+    /// <summary>
     ///     The longest accepted reason for reopening an approved review, in characters; it is half of
     ///     <see cref="AuditText.MaxDetailLength"/> so the reason and the previous digest fit in one audit entry.
     /// </summary>

@@ -92,7 +92,7 @@ public abstract class PageTestBase : BunitContext
         var allowAll = new AllowAllProjectAccess(store);
         Projects = new ProjectService(store, userStore, allowAll, new FakePasswordHasher(), clock, Audit);
         Threads = new ThreadService(store, allowAll, userStore, clock);
-        Checklists = new ChecklistService(store, allowAll, clock);
+        Checklists = new ChecklistService(store, allowAll, userStore, clock);
         Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), allowAll, clock);
         Reviews = new ReviewService(store, allowAll, clock, Repositories, Git);
         Signing = new SigningService(store, Users, allowAll, clock, Proofs, Totp);
@@ -108,7 +108,7 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(pageProjects);
         Services.AddSingleton(pageReviews);
         Services.AddSingleton(new ThreadService(store, Access, userStore, clock));
-        Services.AddSingleton(new ChecklistService(store, Access, clock));
+        Services.AddSingleton(new ChecklistService(store, Access, userStore, clock));
         Services.AddSingleton(Users);
         Services.AddSingleton(new UserImpactService(store, userStore, Access));
         Services.AddSingleton(pageRepositories);

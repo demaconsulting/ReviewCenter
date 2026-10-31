@@ -45,7 +45,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     indexes of the reviewer slots and of the creator of reviews (and for the case-insensitive collation of the
 ///     creator column) and of the audit trail (the project, actor and action indexes and the fixed-width UTC text
 ///     form of the entry timestamp) and for the <c>LastSignInUtc</c> column of users, and for the <c>IncludeInReport</c>
-///     and <c>Kind</c> columns of comments: a database from before them
+///     and <c>Kind</c> columns of comments and for the <c>ReviewConclusionText</c> column of reviews: a database from
+///     before them
 ///     must be deleted and recreated. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
@@ -268,6 +269,10 @@ internal sealed class ReviewCenterDbContext : DbContext
 
             // The optional due date: a calendar day (UTC), stored as text by the SQLite provider; null when none is set
             review.Property(r => r.DueDate);
+
+            // The review conclusion text: the free text of the record (not the approved or rejected conclusion); plain
+            // text, null when there is none, so rows from before it read back as no text
+            review.Property(r => r.ReviewConclusionText).HasMaxLength(ReviewLimits.MaxConclusionTextLength);
 
             // Source of a repository review (all null for an upload): the repository identity is a plain number,
             // not a foreign key, so the review keeps its reference whatever happens to the registration

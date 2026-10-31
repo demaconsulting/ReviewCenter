@@ -5,7 +5,8 @@
 #### Purpose
 
 `ChecklistService` owns the rules for the review checklist: it reads the checklist of a review with its answers,
-records whether a section applies to the review, and records the answer to a check. It is also the home of the
+records whether a section applies to the review, records the answer to a check, and holds the free-text review
+conclusion text of the record. It is also the home of the
 checklist types (`ChecklistDefinition`, `ChecklistSection`, `ChecklistItem`, `DefaultChecklist`, `ReviewChecklist`,
 `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`) and of `ChecklistState` and `ChecklistProgress`,
 which derive what is left to do.
@@ -175,15 +176,52 @@ records `checklist.answered`. The draft is passed to the store and saved in the 
 answer names the item and the outcome and, when there is a justification, only a short hash of it, not the text. See
 the `AuditService` unit for the detail formats.
 
+**Review conclusion text**: the free-text conclusion of the record, `Review.ReviewConclusionText` (plain text, at most
+`ReviewLimits.MaxConclusionTextLength` = 4000 characters). It is never the enumerated review conclusion (approved or
+rejected) of a ballot, which is a decision of its own; the word "conclusion" alone is not used for the text. The text
+has no web page or API yet: it is written through the two methods below and shown read-only later.
+
+- `CanSetReviewConclusionTextAsync(Actor? actor, int projectId, string reviewId, ...)` answers, without throwing,
+  whether a person may write the text: a signed-in person (not an API token) who may contribute to the project and is
+  the primary or alternate reviewer of any slot of the review, or its lead (the creator who can still contribute, or an
+  administrator of the project; see `ReviewActorRoles`). It is `false` for no actor, an API token, an auditor, a
+  member who is neither, a person outside the project and a review that does not exist. It says nothing about the lock.
+- `SetReviewConclusionTextAsync(int projectId, string reviewId, string? conclusionText, Actor actor, ct,
+  acknowledgedSlotIds)` returns `Task<bool>`: `true` when the text changed, `false` when the review already had this
+  text (nothing is stored, recorded or acknowledged). The checks are made in this order and the first violation is
+  reported: the actor may contribute (`ProjectNotFound` for a person outside the project, `ActorNotAllowed` for an
+  auditor); the actor is not an API token (`ActorNotAllowed`); the review exists (`ReviewNotFound`); the actor is a
+  reviewer of a slot or the lead (`ActorNotAllowed`); the text is valid (`ConclusionTextInvalid`); the review is not
+  concluded (`ReviewLocked`; `ReviewLock.IsConcluded` on the snapshot that was read); no current signature would become
+  out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`, naming each slot and signer, computed with
+  `SignatureImpact.RequireAcknowledged` on the record with the new text). Then the store applies the change as a
+  compare-and-set on the text that was read; when someone changed it meanwhile the service throws `RecordChanged` and
+  nothing is stored.
+- *Normalization*: `\r\n` becomes `\n`, leading and trailing white space is removed, and a blank text means no text.
+  After that the text has at most 4000 characters, and a control character other than a line feed or a tab (a lone
+  carriage return included) is refused with `ConclusionTextInvalid`. The stored text, its length and the digest are
+  therefore the same whatever the browser sent.
+- *Digest*: the text is part of the record digest (the line `conclusion-text`; see `RecordDigest`), so a change while a
+  signature is current needs the acknowledgement, and a concluded review is locked against it. It is not carried over
+  to a follow-up (see `ReviewService`).
+- *Planned*: the rule that a rejected review needs a conclusion text before it can be signed, and the web pages and the
+  attestation that show the text, are separate, later changes and are not part of this unit yet.
+
+**Audit of the review conclusion text**: a change records `review.conclusion-changed` (the constant
+`ReviewConclusionTextChangedAction`), saved with the change in the same transaction. The detail is
+`length {old} -> {new}` (no text counts as 0) and never contains the text.
+
 #### Error Handling
 
-Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store, project access, or clock at
-construction, or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
+Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store, project access, user store, or
+clock at construction, or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
 
 #### Dependencies
 
 - **IReviewStore** — reads the frozen checklist, section states and answers, and saves the changes (injected).
 - **IProjectAccess** — requires that the actor may work in the project (injected).
+- **IUserStore** — resolves the user name of a person to the identity that holds a reviewer slot, for the review
+  conclusion text (injected).
 - **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
   approved, and refuse one that would make a current signature out of date without acknowledgement.
 - **TimeProvider** — supplies the answer times (injected).

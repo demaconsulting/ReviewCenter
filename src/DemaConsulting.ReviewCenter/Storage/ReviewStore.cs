@@ -509,6 +509,35 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
+    public async Task<bool> UpdateReviewConclusionTextAsync(
+        int projectId,
+        string reviewId,
+        string? expected,
+        string? reviewConclusionText,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // A concluded review is locked; the check shares the transaction with the change
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+
+                // The comparison is part of the update statement, so it is atomic with the change (null needs IS NULL)
+                var rows = await context.Reviews
+                    .Where(r => r.ProjectId == projectId && r.Id == reviewId && r.ReviewConclusionText == expected)
+                    .ExecuteUpdateAsync(
+                        r => r.SetProperty(x => x.ReviewConclusionText, reviewConclusionText),
+                        cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<Review?> GetReviewAsync(
         int projectId,
         string reviewId,
@@ -1468,7 +1497,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             var ids = chunk.ToList();
             var headers = await context.Reviews.AsNoTracking()
                 .Where(r => r.ProjectId == projectId && ids.Contains(r.Id))
-                .Select(r => new { r.Id, r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId, r.FollowsReviewId })
+                .Select(r => new { r.Id, r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId, r.FollowsReviewId, r.ReviewConclusionText })
                 .ToListAsync(cancellationToken);
             if (headers.Count == 0)
             {
@@ -1533,7 +1562,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     threads[header.Id].ToList(),
                     source,
                     reopens.GetValueOrDefault(header.Id),
-                    header.FollowsReviewId);
+                    header.FollowsReviewId,
+                    header.ReviewConclusionText);
             }
         }
 

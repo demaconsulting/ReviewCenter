@@ -576,6 +576,69 @@ internal sealed class FakeReviewStore : IReviewStore
             Selection = current.Selection,
             ReviewSetId = current.ReviewSetId,
             FollowsReviewId = current.FollowsReviewId,
+            ReviewConclusionText = current.ReviewConclusionText,
+            CarriedAnswerCount = current.CarriedAnswerCount,
+            CarriedThreadCount = current.CarriedThreadCount,
+            Files = current.Files,
+            Checklist = current.Checklist
+        };
+        Audits.Add(audit);
+        return true;
+    }
+
+    /// <summary>
+    ///     Gets or sets an action that runs just before a review conclusion text change is compared and applied, so a
+    ///     test can simulate someone else changing the text at that moment.
+    /// </summary>
+    public Func<Task>? BeforeReviewConclusionTextUpdate { get; set; }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateReviewConclusionTextAsync(
+        int projectId,
+        string reviewId,
+        string? expected,
+        string? reviewConclusionText,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        if (BeforeReviewConclusionTextUpdate is { } before)
+        {
+            await before();
+        }
+
+        // Like the real store: a concluded review refuses the change, and the text must still be the one expected
+        var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (snapshot is not null && ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        {
+            throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
+        }
+
+        var index = _reviews.FindIndex(r => r.ProjectId == projectId && r.Id == reviewId);
+        if (index < 0 || _reviews[index].ReviewConclusionText != expected)
+        {
+            return false;
+        }
+
+        var current = _reviews[index];
+        _reviews[index] = new Review
+        {
+            ProjectId = current.ProjectId,
+            Id = current.Id,
+            Title = current.Title,
+            State = current.State,
+            Created = current.Created,
+            CreatedBy = current.CreatedBy,
+            CreatedViaApi = current.CreatedViaApi,
+            DueDate = current.DueDate,
+            ContentFingerprint = current.ContentFingerprint,
+            RepositoryId = current.RepositoryId,
+            RepositoryName = current.RepositoryName,
+            BaselineSha = current.BaselineSha,
+            HeadSha = current.HeadSha,
+            Selection = current.Selection,
+            ReviewSetId = current.ReviewSetId,
+            FollowsReviewId = current.FollowsReviewId,
+            ReviewConclusionText = reviewConclusionText,
             CarriedAnswerCount = current.CarriedAnswerCount,
             CarriedThreadCount = current.CarriedThreadCount,
             Files = current.Files,
@@ -933,7 +996,8 @@ internal sealed class FakeReviewStore : IReviewStore
                     review.ReviewSetId)
                 : ReviewSource.Upload,
             _reopens.Count(r => r.ProjectId == projectId && r.ReviewId == reviewId),
-            review.FollowsReviewId);
+            review.FollowsReviewId,
+            review.ReviewConclusionText);
         return Task.FromResult<ReviewRecord?>(record);
     }
 
@@ -1265,6 +1329,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Selection = review.Selection,
             ReviewSetId = review.ReviewSetId,
             FollowsReviewId = review.FollowsReviewId,
+            ReviewConclusionText = review.ReviewConclusionText,
             CarriedAnswerCount = review.CarriedAnswerCount,
             CarriedThreadCount = review.CarriedThreadCount,
             Files = review.Files

@@ -33,7 +33,9 @@ repository registry is the one exception, see `Repositories`).
   most 32; `ContentFingerprint` is required, at most 64; `Created`; `CreatedBy` (the user name of the creator, at most
   the user name limit, null for a review stored before the column existed) and `CreatedViaApi` (default false, true
   for a review created with a personal access token) and `DueDate` (the optional due date, a calendar day stored as
-  text in the form `yyyy-MM-dd`, null for a review without one; it is not part of the record digest). `CreatedBy` has
+  text in the form `yyyy-MM-dd`, null for a review without one; it is not part of the record digest) and
+  `ReviewConclusionText` (the optional free-text conclusion of the review, at most 4000 characters, null for none; it
+  is part of the record digest and is not the approved or rejected conclusion). `CreatedBy` has
   the case-insensitive collation `NOCASE` and an index, so the inbox finds the reviews of a creator without regard to
   case and without a scan. A review from
   a repository also has
@@ -195,7 +197,8 @@ deleted and created again (there are no migrations; the development database is 
 the `PersonalAccessTokens` table and the creator columns of a review (`CreatedBy`, `CreatedViaApi`): a database created
 before the personal-access-token slice does not have them and must be deleted and created again. The same holds for the
 `DueDate` column of a review: there is no migration for it either, `EnsureCreated` does not add a column to an existing
-table, and development databases are recreated. The same holds for the follow-up columns (`FollowsReviewId`,
+table, and development databases are recreated. The same holds for the `ReviewConclusionText` column of a review. The
+same holds for the follow-up columns (`FollowsReviewId`,
 `CarriedAnswerCount`, `CarriedThreadCount` of a review, `CarriedFromReviewId` of an answer, a section state and a
 thread, `CarriedFromThreadId` of a thread) and the index on `ProjectId` and `FollowsReviewId`. The same holds for the
 `IncludeInReport` and `Kind` columns of a comment. The same holds for the `ProjectMemberships` table, the

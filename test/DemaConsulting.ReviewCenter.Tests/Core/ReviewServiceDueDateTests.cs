@@ -136,7 +136,7 @@ public class ReviewServiceDueDateTests
             store,
             new ReviewService(store, access, clock),
             new SigningService(store, users, access, clock),
-            new ChecklistService(store, access, clock),
+            new ChecklistService(store, access, userStore, clock),
             project.Id,
             ids);
     }

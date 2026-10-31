@@ -94,6 +94,20 @@ public sealed class Review
     public string? FollowsReviewId { get; init; }
 
     /// <summary>
+    ///     Gets the review conclusion text: the free text, in plain text, that the reviewers wrote as the conclusion
+    ///     of the review's record, or <c>null</c> when there is none; at most
+    ///     <see cref="ReviewLimits.MaxConclusionTextLength"/> characters.
+    /// </summary>
+    /// <remarks>
+    ///     Not the review conclusion (none, approved or rejected, the enum <c>ReviewConclusion</c>): that is
+    ///     a decision, this is words. The text is part of the record digest (the <c>conclusion-text</c> line, see
+    ///     <see cref="RecordDigest"/>), so changing it while a signature is current needs the acknowledgement of the
+    ///     affected reviewers, and it is written only while the review is not concluded. It is never carried over to a
+    ///     follow-up: a follow-up starts without one. The audit entry that records a change names lengths, never the text.
+    /// </remarks>
+    public string? ReviewConclusionText { get; init; }
+
+    /// <summary>
     ///     Gets how many checklist answers were carried over from <see cref="FollowsReviewId"/> when the review was
     ///     created; zero for a review that is not a follow-up. A display and audit value; the carried answers themselves
     ///     are marked on the answers (<see cref="ChecklistAnswer.CarriedFromReviewId"/>).

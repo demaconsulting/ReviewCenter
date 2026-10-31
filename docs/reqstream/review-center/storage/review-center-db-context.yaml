@@ -151,6 +151,20 @@ sections:
         tests:
           - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
 
+      - id: ReviewCenter-DbContext-ReviewConclusionText
+        title: >-
+          The ReviewCenterDbContext class shall map the optional review conclusion text of a review (the free text, not
+          the approved or rejected conclusion) to one nullable text column of the review table that is limited to
+          4000 characters, so that a review that was not given a text reads back with none and a text reads back
+          unchanged. The schema is created from the model without a migration, so a development database that was
+          created before the column existed has to be recreated.
+        justification: |
+          The text belongs to exactly one review and is read with it, so it is a column of the review. The limit keeps
+          the signed record small and the same everywhere. The schema is created from the model and not migrated
+          while the product is not released, so development databases are recreated.
+        tests:
+          - ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional
+
       - id: ReviewCenter-DbContext-FollowUp
         title: >-
           The ReviewCenterDbContext class shall map the review that a review follows, with the numbers of answers and

@@ -26,7 +26,8 @@ commits (see the `AuditStore` unit).
 `AddThreadAsync`, `AddCommentAsync`,
 `ReopenThreadAsync`, `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
 `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
-`RemoveSlotAsync`, `UpdateDueDateAsync`, `AddSignatureAsync`, and `ReopenReviewAsync` take the audit draft of the
+`RemoveSlotAsync`, `UpdateDueDateAsync`, `UpdateReviewConclusionTextAsync`, `AddSignatureAsync`, and
+`ReopenReviewAsync` take the audit draft of the
 change (or a function that builds it from the stored entity, when the draft names an identity that the database
 assigns). The change and
 its audit entry are
@@ -37,8 +38,8 @@ are of the change itself.
 
 **Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `ReopenThreadAsync`,
 `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
-`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`, and
-`UpdateDueDateAsync` call
+`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`,
+`UpdateDueDateAsync`, and `UpdateReviewConclusionTextAsync` call
 the private `EnsureNotLockedAsync` first, inside the same serialized transaction as the change. It loads the slots, the
 record (with its reopen count), and the signatures with the same code as `AddSignatureAsync`, and asks the Core
 `ReviewLock.IsConcluded`, the one definition of "concluded" (every slot signed for the current record and no thread
@@ -150,6 +151,26 @@ whose condition repeats the expected date (`WHERE ProjectId = p AND Id = r AND D
 `IS NULL`), so two people who save at the same time cannot both succeed: the second affects no row, gets `false`, and
 leaves no change and no entry. Only the column of that review is written, and the date is not part of the record
 digest. `ReviewService` turns the `false` into `RecordChanged`.
+
+**UpdateReviewConclusionTextAsync**: Changes the optional review conclusion text of one review (the free text of the
+record; not the approved or rejected conclusion) if it still equals the text the caller started from (compare-and-set).
+
+- *Parameters*: the project identity, the review identifier, the expected text (`string?`, null for none), the new text
+  (null to clear it), and the audit draft of the change.
+- *Returns*: `Task<bool>` — `true` when the text was changed; `false` when the review does not exist or the stored text
+  is no longer the expected one.
+- *Preconditions*: the audit draft is not null (`ArgumentNullException` otherwise).
+- *Postconditions*: Either the new text and the audit entry (`review.conclusion-changed`, carrying the project and the
+  review, with lengths only) are stored in the same serialized transaction, so the hash chain stays intact, or nothing
+  is.
+
+The change first runs the approval check of the transaction (`EnsureNotLockedAsync`), so a review that is concluded at
+that moment is refused with `ReviewLocked` and nothing is stored. It then writes with one `ExecuteUpdate` statement
+whose condition repeats the expected text (`WHERE ProjectId = p AND Id = r AND ReviewConclusionText = expected`; a null
+compares as `IS NULL`), so two people who save at the same time cannot both succeed: the second affects no row, gets
+`false`, and leaves no change and no entry. Only the column of that review is written. Unlike the due date, the text is
+part of the record digest, so `LoadRecordsAsync` (shared by `GetSnapshotAsync`, `GetRecordAsync` and the batch read)
+selects the column and puts it into the `ReviewRecord`. `ChecklistService` turns the `false` into `RecordChanged`.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 

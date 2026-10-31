@@ -480,6 +480,30 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
+    ///     Test that the review conclusion text of the earlier review is not carried over to a follow-up: the new
+    ///     review starts without text, and the earlier review keeps its own.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFollowUpAsync_ReviewConclusionText_NotCarried()
+    {
+        // Arrange: the earlier review has a review conclusion text
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1");
+        await w.Checklists.SetReviewConclusionTextAsync(
+            w.ProjectId, "rev-1", "Looks good.", TestActors.Ann, cancellationToken);
+
+        // Act
+        var review = await UploadAsync(w, "rev-2", follows: "rev-1");
+
+        // Assert: the follow-up has no text, in the review and in the record the digest is built from
+        Assert.Null(review.ReviewConclusionText);
+        Assert.Null((await w.Reviews.GetAsync(w.ProjectId, "rev-2", cancellationToken))!.ReviewConclusionText);
+        Assert.Null((await RecordAsync(w, "rev-2")).ReviewConclusionText);
+        Assert.Equal("Looks good.", (await RecordAsync(w, "rev-1")).ReviewConclusionText);
+    }
+
+    /// <summary>
     ///     Test that an ordinary review has no follow-up text in the audit and no carried data.
     /// </summary>
     [Fact]

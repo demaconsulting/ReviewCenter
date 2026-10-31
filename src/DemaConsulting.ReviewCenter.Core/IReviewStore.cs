@@ -38,7 +38,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <see cref="SetCommentReportAsync"/>, <see cref="SetChecklistSectionStateAsync"/>,
 ///     <see cref="SetChecklistAnswerAsync"/>,
 ///     <see cref="AddSlotAsync"/>, <see cref="UpdateSlotAsync"/>, <see cref="RemoveSlotAsync"/> and, for the same reason of
-///     "concluded means nothing changes", <see cref="UpdateDueDateAsync"/>) must also refuse with
+///     "concluded means nothing changes", <see cref="UpdateDueDateAsync"/> and <see cref="UpdateReviewConclusionTextAsync"/>) must also refuse with
 ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded (see <see cref="ReviewLock"/>), checked inside
 ///     the same transaction as the change, so a signature that completes the conclusion at the same moment cannot be
 ///     overtaken by a change; nothing is stored then.
@@ -335,6 +335,36 @@ public interface IReviewStore
         string reviewId,
         DateOnly? expected,
         DateOnly? dueDate,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Changes the review conclusion text of a review, if it still holds the text the caller based its change on.
+    /// </summary>
+    /// <remarks>
+    ///     The free text of the record (not the approved or rejected conclusion). The comparison and the update are one
+    ///     atomic step (compare-and-set) inside the transaction that also stores the audit entry, like
+    ///     <see cref="UpdateDueDateAsync"/>, so two people who write at the same time cannot silently overwrite each
+    ///     other and the audit entry always describes the text that was really replaced. The method refuses with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded, checked inside the same transaction
+    ///     (see <see cref="ReviewLock"/>). The text is part of the record digest.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="expected">The text the caller read and based its change on; <c>null</c> for none.</param>
+    /// <param name="reviewConclusionText">The new text, already validated and normalized; <c>null</c> clears it.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the text was changed; <c>false</c> (and nothing recorded) when the review does not exist or
+    ///     its text is no longer <paramref name="expected"/>.
+    /// </returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded.</exception>
+    Task<bool> UpdateReviewConclusionTextAsync(
+        int projectId,
+        string reviewId,
+        string? expected,
+        string? reviewConclusionText,
         AuditDraft audit,
         CancellationToken cancellationToken = default);
 

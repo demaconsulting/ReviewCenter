@@ -318,7 +318,14 @@ public enum DomainRule
     ///     The report flag of the comment cannot be toggled on its own: it is the starting comment of the thread
     ///     (promote or demote the thread instead) or a resolution note (it follows the thread).
     /// </summary>
-    CommentNotTogglable
+    CommentNotTogglable,
+
+    /// <summary>
+    ///     The review conclusion text (the free text of the record, not the approved or rejected conclusion) is not
+    ///     acceptable: it is longer than <see cref="ReviewLimits.MaxConclusionTextLength"/> characters or contains
+    ///     control characters other than line breaks and tabs.
+    /// </summary>
+    ConclusionTextInvalid
 }
 
 /// <summary>

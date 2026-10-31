@@ -26,6 +26,8 @@ sections:
           - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
           - RecordDigest_Canonicalize_EmptyReport_MatchesDocumentedFormatAndKnownValue
           - RecordDigest_Canonicalize_Header_IsV2
+          - RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue
+          - RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue
 
       - id: ReviewCenter-RecordDigest-NullRecord
         title: >-
@@ -44,12 +46,16 @@ sections:
           included comment or its file, side, start line, end line (a whole-file thread being different from one with
           lines), or an included comment's kind, author display name, author user name, text, time, or order, or a new
           included comment, changes, and shall give the same digest when only chat, the state of a thread, or the
-          creation time or identity of a thread changes.
+          creation time or identity of a thread changes. It shall also give a different digest when the review
+          conclusion text (the free text, not the approved or rejected conclusion) is set, changed or cleared, by
+          writing it as the line conclusion-text with its length and text between the sections and the report, and no
+          line when there is none, so that a record without a text keeps its digest.
         justification: |
           A signature approves what the reviewer saw. Anything the reviewer relied on must change the digest, or a
           signature could stay current after the content, the answers, or the report it approved had changed. Chat
           and whether a thread is open are not part of what is signed, so they must not invalidate a signature;
-          an open thread blocks signing by a rule of its own.
+          an open thread blocks signing by a rule of its own. The review conclusion text is what the reviewers
+          concluded in words, so it is signed like the report.
         tests:
           - RecordDigest_Compute_CoveredChange_ChangesDigest
           - RecordDigest_Compute_CommentOrder_ChangesDigest
@@ -58,6 +64,7 @@ sections:
           - RecordDigest_Compute_ChatAddedToFinding_DigestUnchanged
           - RecordDigest_Compute_ThreadState_NotCovered
           - RecordDigest_Compute_ThreadCreatedAndIds_NotCovered
+          - RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-Checklist
         title: >-

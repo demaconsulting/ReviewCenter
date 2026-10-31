@@ -286,6 +286,26 @@ sections:
           - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
 
+      - id: ReviewCenter-ReviewStore-ReviewConclusionText
+        title: >-
+          The ReviewStore class shall store the optional review conclusion text of a review (the free text, not the
+          approved or rejected conclusion) and load it into the record that a signature covers, and change it only
+          through an atomic compare-and-set that applies the new text, or removes it, when the stored one still equals
+          the text the caller started from, changes only that review, stores the audit entry of the change in the same
+          transaction so that the hash chain stays intact, reports, without a change and without an entry, a review
+          that does not exist or a text that is no longer the expected one, and refuses a concluded review with the
+          ReviewLocked rule inside that transaction.
+        justification: |
+          A change must neither be lost nor silently overwrite the change of another person, and a text that is stored
+          without its entry, or an entry without its text, would leave the history untrue. The comparison and the
+          lock check are part of the update, so two people who save at the same time cannot both succeed and a
+          signed record cannot change under a signature.
+        tests:
+          - ReviewStore_UpdateReviewConclusionTextAsync_StoresTextAndAuditAndRecord
+          - ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation
+          - ReviewStore_UpdateReviewConclusionTextAsync_MissingReview_ReturnsFalse
+          - ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked
+
       - id: ReviewCenter-ReviewStore-FollowUp
         title: >-
           The ReviewStore class shall store a follow-up review with the review that it follows, the numbers of

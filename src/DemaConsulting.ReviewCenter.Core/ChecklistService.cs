@@ -36,11 +36,21 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     refused with <see cref="DomainRule.AuthorCannotAnswer"/>. Comment threads are not part of that rule.
 ///     A change that would make a current signature out of date is refused with
 ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> unless the caller acknowledges the affected slots.
+///     The service also owns the review conclusion text: the free text, in plain text, in which the reviewers write the
+///     conclusion of the record (see <see cref="Review.ReviewConclusionText"/>; not the approved or rejected conclusion
+///     of the ballot). It lives here because it is written to the same record as the answers and follows the same
+///     rules: it is part of the digest, so a change needs the same acknowledgement, and it is refused while the review
+///     is concluded.
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
 /// </remarks>
 public sealed class ChecklistService
 {
+    /// <summary>
+    ///     The audit action recorded when the review conclusion text changes; its detail names lengths, never the text.
+    /// </summary>
+    public const string ReviewConclusionTextChangedAction = "review.conclusion-changed";
+
     /// <summary>
     ///     The store that persists checklists.
     /// </summary>
@@ -52,6 +62,11 @@ public sealed class ChecklistService
     private readonly IProjectAccess _access;
 
     /// <summary>
+    ///     Resolves a user name to a user, so the reviewers of the slots of a review can be recognized.
+    /// </summary>
+    private readonly IUserStore _users;
+
+    /// <summary>
     ///     The clock that supplies answer times.
     /// </summary>
     private readonly TimeProvider _timeProvider;
@@ -61,15 +76,18 @@ public sealed class ChecklistService
     /// </summary>
     /// <param name="store">The store that persists checklists. Must not be null.</param>
     /// <param name="access">The access rules. Must not be null.</param>
+    /// <param name="users">The user store used to recognize slot owners for the review conclusion text. Must not be null.</param>
     /// <param name="timeProvider">The clock used for answer times; injected so tests control time. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public ChecklistService(IReviewStore store, IProjectAccess access, TimeProvider timeProvider)
+    public ChecklistService(IReviewStore store, IProjectAccess access, IUserStore users, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(access);
+        ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
         _access = access;
+        _users = users;
         _timeProvider = timeProvider;
     }
 
@@ -298,6 +316,223 @@ public sealed class ChecklistService
                 projectId,
                 reviewId),
             cancellationToken);
+    }
+
+    /// <summary>
+    ///     Tells whether an actor may write the review conclusion text of a review.
+    /// </summary>
+    /// <remarks>
+    ///     The text is written by the people who stand behind the record: the primary or the alternate reviewer of any
+    ///     slot of the review, or the lead of the review (the person who created it and can still contribute, or an
+    ///     administrator of the project). A read-only member (an auditor), a person outside the project and an API token
+    ///     may not. The answer is about the person only: whether the review is concluded (and therefore locked) is a
+    ///     separate matter, so a page shows its edit control only when both allow it.
+    ///     <see cref="SetReviewConclusionTextAsync"/> checks the same rule again, so the pages are never the only guard.
+    /// </remarks>
+    /// <param name="actor">The signed-in user; may be null, which is not allowed.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the actor is a person who may write the text; <c>false</c> otherwise, also when the review does not exist.</returns>
+    public async Task<bool> CanSetReviewConclusionTextAsync(
+        Actor? actor,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        if (actor is null || actor.ViaApiToken || !await _access.CanContributeAsync(actor, projectId, cancellationToken))
+        {
+            return false;
+        }
+
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        return review is not null
+               && snapshot is not null
+               && await IsConclusionTextWriterAsync(actor, review, snapshot, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Sets, changes or clears the review conclusion text of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="conclusionText">
+    ///     The new review conclusion text, in plain text. Line breaks are normalized to <c>\n</c>, leading and trailing
+    ///     white space is removed, and a blank text clears it. At most <see cref="ReviewLimits.MaxConclusionTextLength"/>
+    ///     characters after that; control characters other than line breaks and tabs are refused.
+    /// </param>
+    /// <param name="actor">
+    ///     The signed-in user; must be the primary or the alternate reviewer of a slot of the review, or its lead (see
+    ///     <see cref="CanSetReviewConclusionTextAsync"/>). An API token is refused. Must not be null.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. Needed when the change alters the digest while a signature is current.
+    /// </param>
+    /// <returns><c>true</c> when the text was changed; <c>false</c> when the review already had this text and nothing was recorded.</returns>
+    /// <remarks>
+    ///     The text is the free-text conclusion of the record; it is not the review conclusion of the ballot (approved or
+    ///     rejected), which is a decision. It is part of the digest (the <c>conclusion-text</c> line), so changing it
+    ///     while a signature is current needs the acknowledgement of the affected reviewers. It is audited as
+    ///     <c>review.conclusion-changed</c> with the old and the new length only, never the text. The change is a
+    ///     compare-and-set on the text this method read, stored with its audit entry in one transaction, so two people who
+    ///     write at the same moment cannot silently overwrite each other. A concluded review is locked and refuses the
+    ///     change; after a reopen the text can be changed again. The text is not carried over to a follow-up.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project,
+    ///     <see cref="DomainRule.ReviewNotFound"/> when the review does not exist,
+    ///     <see cref="DomainRule.ActorNotAllowed"/> for a read-only member, an API token or a member who is neither a
+    ///     reviewer of the review nor its lead, <see cref="DomainRule.ConclusionTextInvalid"/> for a text that is too long
+    ///     or has control characters, <see cref="DomainRule.ReviewLocked"/> when the review is concluded,
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged, and
+    ///     <see cref="DomainRule.RecordChanged"/> when someone else changed the text at the same moment; nothing is
+    ///     stored then.
+    /// </exception>
+    public async Task<bool> SetReviewConclusionTextAsync(
+        int projectId,
+        string reviewId,
+        string? conclusionText,
+        Actor actor,
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        // Whoever may not see the project learns nothing about it; a read-only member (an auditor) never writes
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
+        if (actor.ViaApiToken)
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "The review conclusion text cannot be written with an API token; sign in to the web pages.");
+        }
+
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (review is null || snapshot is null)
+        {
+            throw new DomainRuleException(DomainRule.ReviewNotFound, "The review does not exist.");
+        }
+
+        // Who may write it: a reviewer of any slot, or the lead of the review
+        if (!await IsConclusionTextWriterAsync(actor, review, snapshot, cancellationToken))
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "Only a reviewer of the review or its lead can write the review conclusion text.");
+        }
+
+        var normalized = NormalizeConclusionText(conclusionText);
+
+        // A concluded review is locked: the text is part of what the signatures cover
+        if (ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        {
+            throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
+        }
+
+        // The same text again changes nothing: no acknowledgement, no audit entry
+        var previous = snapshot.Record.ReviewConclusionText;
+        if (string.Equals(previous, normalized, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date
+        SignatureImpact.RequireAcknowledged(
+            snapshot,
+            snapshot.Record with { ReviewConclusionText = normalized },
+            acknowledgedSlotIds);
+
+        // The audit entry names lengths only: the text itself stays out of the audit trail
+        var stored = await _store.UpdateReviewConclusionTextAsync(
+            projectId,
+            reviewId,
+            previous,
+            normalized,
+            AuditDraft.By(
+                actor,
+                ReviewConclusionTextChangedAction,
+                $"length {LengthOf(previous)} -> {LengthOf(normalized)}",
+                projectId,
+                reviewId),
+            cancellationToken);
+        if (!stored)
+        {
+            throw new DomainRuleException(
+                DomainRule.RecordChanged,
+                "The review conclusion text was changed by someone else. The current text is shown; check it and save again.");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Tells whether a person who may contribute is a reviewer of the review or its lead.
+    /// </summary>
+    /// <param name="actor">The signed-in person.</param>
+    /// <param name="review">The review.</param>
+    /// <param name="snapshot">The snapshot whose slots decide who is a reviewer.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the person holds a slot (primary or alternate) of the review or leads it.</returns>
+    private async Task<bool> IsConclusionTextWriterAsync(
+        Actor actor,
+        Review review,
+        ReviewSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        return await ReviewActorRoles.IsSlotOwnerAsync(_users, actor, snapshot.Slots, cancellationToken)
+               || await ReviewActorRoles.IsLeadAsync(_access, actor, review, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Checks and normalizes a review conclusion text.
+    /// </summary>
+    /// <param name="text">The candidate text, or <c>null</c>.</param>
+    /// <returns>The text with <c>\n</c> line breaks and without leading and trailing white space, or <c>null</c> when it is blank.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ConclusionTextInvalid"/> when the normalized text is longer than
+    ///     <see cref="ReviewLimits.MaxConclusionTextLength"/> characters or contains a control character other than a
+    ///     line feed or a tab.
+    /// </exception>
+    private static string? NormalizeConclusionText(string? text)
+    {
+        // Browsers send CRLF; one form keeps the stored text, its length and the digest independent of the sender
+        var normalized = (text ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
+        if (normalized.Length == 0)
+        {
+            return null;
+        }
+
+        if (normalized.Length > ReviewLimits.MaxConclusionTextLength)
+        {
+            throw new DomainRuleException(
+                DomainRule.ConclusionTextInvalid,
+                $"The review conclusion text must not be longer than {ReviewLimits.MaxConclusionTextLength} characters.");
+        }
+
+        // Plain text only: line breaks and tabs are fine, other control characters (a lone carriage return included) are not
+        if (normalized.Any(c => char.IsControl(c) && c != '\n' && c != '\t'))
+        {
+            throw new DomainRuleException(
+                DomainRule.ConclusionTextInvalid,
+                "The review conclusion text must be plain text without control characters.");
+        }
+
+        return normalized;
+    }
+
+    /// <summary>
+    ///     Gets the length of a review conclusion text for the audit detail.
+    /// </summary>
+    /// <param name="text">The text, or <c>null</c> for none.</param>
+    /// <returns>The length in characters; zero for none.</returns>
+    private static int LengthOf(string? text)
+    {
+        return text?.Length ?? 0;
     }
 
     /// <summary>
