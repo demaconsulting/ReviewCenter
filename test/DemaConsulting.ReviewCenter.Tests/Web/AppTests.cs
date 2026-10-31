@@ -22,6 +22,7 @@ using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -495,6 +496,94 @@ public class AppTests : InboxWebTestBase
     }
 
     /// <summary>
+    ///     Test that a slow count is reused for thirty seconds from the moment it finished, not from the moment it
+    ///     started.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead()
+    {
+        // Arrange: ann must sign one review and the read takes 20 seconds of the test clock
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+        SignInAs("ann", "Ann", false);
+        users.OnLookup = () => Time.Advance(TimeSpan.FromSeconds(20));
+        var first = Render<MainLayout>();
+        users.OnLookup = null;
+
+        // Act: 15 seconds after the read finished (35 seconds after it started) the layout is rendered again
+        Time.Advance(TimeSpan.FromSeconds(15));
+        var second = Render<MainLayout>();
+
+        // Assert: the number of the first read is still reused
+        Assert.Equal("1", first.Find("[data-testid='nav-inbox-count']").TextContent);
+        Assert.Equal("1", second.Find("[data-testid='nav-inbox-count']").TextContent);
+        Assert.Equal(1, users.Lookups);
+    }
+
+    /// <summary>
+    ///     Test that a navigation that still reaches a layout that was disposed does nothing.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Navigate_DisposedLayout_DoesNothing()
+    {
+        // Arrange: a rendered layout for a user with a review to sign, disposed afterwards, and an expired cache
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+        SignInAs("ann", "Ann", false);
+        var layout = Render<MainLayout>();
+        layout.Instance.Dispose();
+        Time.Advance(TimeSpan.FromSeconds(31));
+        var handler = typeof(MainLayout).GetMethod(
+            "OnLocationChanged",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+
+        // Act: the navigation event is raised on the disposed layout anyway
+        handler.Invoke(layout.Instance, [null, new LocationChangedEventArgs("http://localhost/projects", false)]);
+
+        // Assert: nothing was read
+        Assert.Equal(1, users.Lookups);
+    }
+
+    /// <summary>
+    ///     Test that a refresh that was queued by a navigation before the layout was disposed, and that runs after the
+    ///     disposal, reads nothing.
+    /// </summary>
+    [Fact]
+    public async Task MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose()
+    {
+        // Arrange: a rendered layout for a user with a review to sign, and an expired cache
+        var users = UseCountingUsers();
+        await ArrangeActionItemsAsync(1);
+        SignInAs("ann", "Ann", false);
+        var layout = Render<MainLayout>();
+        Time.Advance(TimeSpan.FromSeconds(31));
+        var handler = typeof(MainLayout).GetMethod(
+            "OnLocationChanged",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+
+        // Act: the renderer is busy while the navigation arrives, so the refresh is queued; the layout is disposed before
+        // the queue runs
+        using var started = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var busy = Task.Run(
+            () => layout.InvokeAsync(() =>
+            {
+                started.Set();
+                release.Wait(TestContext.Current.CancellationToken);
+            }),
+            TestContext.Current.CancellationToken);
+        started.Wait(TestContext.Current.CancellationToken);
+        handler.Invoke(layout.Instance, [null, new LocationChangedEventArgs("http://localhost/projects", false)]);
+        layout.Instance.Dispose();
+        release.Set();
+        await busy;
+        await layout.InvokeAsync(() => { });
+
+        // Assert: the queued refresh did not read the count
+        Assert.Equal(1, users.Lookups);
+    }
+
+    /// <summary>
     ///     Test that a count that cannot be read hides the badge without breaking the page, is not cached as a
     ///     failure, and shows again once the inbox works.
     /// </summary>
@@ -882,6 +971,12 @@ public class AppTests : InboxWebTestBase
         /// </summary>
         public bool Fail { get; set; }
 
+        /// <summary>
+        ///     Gets or sets an action run during every look-up by user name, for example to move the test clock while
+        ///     a count is being read.
+        /// </summary>
+        public Action? OnLookup { get; set; }
+
         /// <inheritdoc />
         public Task<User> AddAsync(User user, Func<User, AuditDraft> audit, CancellationToken cancellationToken = default)
         {
@@ -903,6 +998,7 @@ public class AppTests : InboxWebTestBase
         public Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
         {
             Lookups++;
+            OnLookup?.Invoke();
             if (Fail)
             {
                 throw new InvalidOperationException("The user store is not available.");

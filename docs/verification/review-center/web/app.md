@@ -47,9 +47,10 @@ N/A - standard test environment.
   ninety-nine, and the tab itself stays.
 - Nobody signed in and a user with a temporary password see no Inbox tab and no badge, and the inbox service is not
   asked for a count (the user look-up that starts every count is not made).
-- The count is read once per user in 30 seconds however many times the layout is rendered (the badge may be that much
-  behind), again once the injected clock has moved past 30 seconds, separately for each user, and again on a
-  navigation after it has expired but not on one inside the 30 seconds; a layout that was disposed no longer reads it.
+- The count is normally read once per user in 30 seconds however many times the layout is rendered (the badge may be
+  that much behind), again once the injected clock has moved past 30 seconds, separately for each user, and again on
+  a navigation after it has expired but not on one inside the 30 seconds; the age is counted from the moment the read
+  finished; a layout that was disposed no longer reads it, also when a navigation reaches it.
 - A failure to read the count hides the badge, keeps the rest of the page (name, tab, footer), and is not cached.
 - The page frame component `SessionGate` shows its content while somebody is signed in, shows the "Session ended"
   message with a link to the login page that returns to the page, and none of the content, when nobody is, and
@@ -185,6 +186,19 @@ by `MainLayout_Render_TwoUsers_KeepsTheirCountsApart`.
 the user navigates within 30 seconds (no new look-up, still 1); after the clock moves 31 seconds a navigation makes the
 badge show 2 with one more look-up; after the layout is disposed and the clock has moved again, a navigation makes no
 look-up. This scenario is tested by `MainLayout_Navigate_ChangedCount_RefreshesBadgeAndStopsAfterDispose`.
+
+**MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead**: The look-up moves the test clock by 20 seconds while the
+count is read; 15 seconds after the read finished (35 after it started) the layout is rendered again and shows the same
+number with no second look-up. This scenario is tested by `MainLayout_Render_SlowCount_IsReusedFromTheEndOfTheRead`.
+
+**MainLayout_Navigate_DisposedLayout_DoesNothing**: A layout is rendered and disposed, the cache is expired, and the
+navigation handler is invoked on it anyway; no look-up is made. This scenario is tested by
+`MainLayout_Navigate_DisposedLayout_DoesNothing`.
+
+**MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose**: The cache is expired and the renderer is
+kept busy on another thread, so the refresh that a navigation starts is queued and not yet run; the layout is disposed
+and the renderer released. The queued refresh runs after the disposal and makes no look-up. This scenario is tested by
+`MainLayout_Navigate_RefreshQueuedBeforeDispose_ReadsNothingAfterDispose`.
 
 **MainLayout_Render_CountFails_HidesBadgeAndStillRendersPage**: The user store throws on the look-up; the layout shows
 the name, the Inbox tab, and the footer and no badge; when the store works again within 30 seconds the next render shows

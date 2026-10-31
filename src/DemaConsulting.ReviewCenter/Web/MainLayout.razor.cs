@@ -41,7 +41,8 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     The count on the Inbox tab comes from <see cref="InboxService.CountAsync"/>, which costs one snapshot per
 ///     review the user is involved in, so it is kept per user in the shared <see cref="IMemoryCache"/> for
 ///     <see cref="CountLifetime"/>: it is read when the layout starts and again on each navigation (no timer), which
-///     is at most one count per user in that time however often the user clicks. The age of an entry is checked
+///     is normally one count per user in that time however often the user clicks (tabs that read at the same moment
+///     may each read once). The age of an entry is checked
 ///     against the injected <see cref="TimeProvider"/> so a test controls it. The count is only a hint, so a failure
 ///     to read it hides the badge and never breaks the page, and nothing is asked for anybody who is signed out or
 ///     still has to change a temporary password. The cache lives in this layer because the Core project does not
@@ -236,6 +237,12 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
     /// <param name="e">The new location.</param>
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
+        // The layout may be disposed while the circuit still raises a navigation; it then does nothing
+        if (_disposed)
+        {
+            return;
+        }
+
         if (MustChangePassword)
         {
             RedirectUnlessOpenDuringPasswordChange(e.Location);
@@ -245,6 +252,12 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
         // The cache keeps this cheap; the refresh never throws, so nothing needs to observe the task
         _ = InvokeAsync(async () =>
         {
+            // The callback may run after the layout was disposed: it then reads nothing and renders nothing
+            if (_disposed)
+            {
+                return;
+            }
+
             await RefreshActionCountAsync();
             if (!_disposed)
             {
@@ -268,8 +281,7 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
         try
         {
             var key = CountKeyPrefix + Actor.Username.ToUpperInvariant();
-            var now = Time.GetUtcNow();
-            if (Cache.TryGetValue(key, out CachedCount? hit) && hit is not null && IsFresh(hit, now))
+            if (Cache.TryGetValue(key, out CachedCount? hit) && hit is not null && IsFresh(hit, Time.GetUtcNow()))
             {
                 ActionCount = hit.Count;
                 return;
@@ -278,12 +290,15 @@ public partial class MainLayout : LayoutComponentBase, IDisposable
             var count = await Inbox.CountAsync(Actor);
             ActionCount = count;
 
-            // The cache evicts by its own clock; the stamp is what the freshness check above uses
-            Cache.Set(key, new CachedCount(count, now), CountLifetime);
+            // The entry is stamped when the number became available, not when the read started, so a slow read does
+            // not shorten the time the number is reused. The cache evicts by its own clock; the stamp is what the
+            // freshness check above uses
+            Cache.Set(key, new CachedCount(count, Time.GetUtcNow()), CountLifetime);
         }
         catch (Exception ex)
         {
-            // The badge is a convenience: hide it rather than break the page, and log no more than the user name
+            // The badge is a convenience: hide it rather than break the page; the operator log carries the user name
+            // and the exception, and the page shows neither
             ActionCount = 0;
             Logger.LogWarning(ex, "The inbox count of {Username} could not be read; the badge is hidden", Actor.Username);
         }

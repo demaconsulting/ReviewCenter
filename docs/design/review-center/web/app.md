@@ -107,16 +107,20 @@ password is temporary, and the tab is not shown to those users either.
 - *Cache*: Counting costs one snapshot for each review the user is involved in (see `InboxService`), and the layout
   would otherwise add that to every render, so the number is kept per user (key: the user name in upper case) in the
   `IMemoryCache` of the server for **30 seconds** (`MainLayout.CountLifetime`). The entry holds the number and the time
-  it was read; the age is checked against the injected `TimeProvider`, not the clock of the cache, so tests control it
-  without waiting (the cache also drops the entry by its own clock after the same time). The number can therefore be up
+  it became available (stamped after the read); the age is checked against the injected `TimeProvider`, not the clock
+  of the cache, so tests control it without waiting (the cache also drops the entry by its own clock after the same
+  time). The number can therefore be up
   to 30 seconds behind: work the user has just done (a signature, a reply) shows in the badge after at most that
   time, while the inbox page and the home card always read the current figures.
 - *Refresh*: The number is read when the layout starts and again on every `LocationChanged` for any signed-in user
   (so the handler is subscribed for every signed-in user and removed by `Dispose`), through `InvokeAsync` and
-  `StateHasChanged`. There is no timer and no polling; with the cache that is at most one count per user in 30 seconds
-  however often the user clicks.
+  `StateHasChanged`. There is no timer and no polling; with the cache that is normally one count per user in 30
+  seconds however often the user clicks (the read-through is not atomic, so tabs that read at the same moment may each
+  read once; that is accepted for a hint). A navigation that reaches a disposed layout does nothing, and a refresh that
+  was queued before the disposal checks again when it starts and reads nothing.
 - *Failure*: The badge is a hint. A failure of the count (any exception) leaves `ActionCount` at
-  zero, which hides the badge, and is logged as a warning with the user name only; it is not cached, so the next
+  zero, which hides the badge, and is logged as a warning with the user name and the exception (for the operator; the
+  page shows neither); it is not cached, so the next
   navigation tries again, and the page is never broken by it.
 - *Where it lives*: The cache is in the layout code-behind and not in a new class or in `InboxService`, because the
   `Core` project does not reference the caching package and keeps no state of its own, and a new class would be a new
@@ -191,8 +195,9 @@ home page are open to everyone and do not use it.
 - *Returns*: A task that completes when the count is set; it never faults.
 - *Preconditions*: None; it does nothing when nobody is signed in or the password is temporary.
 - *Postconditions*: `ActionCount` is the cached number when an entry of the user is younger than 30 seconds by the
-  injected clock; otherwise it is read from `InboxService.CountAsync` and cached with the time it was read; when the
-  read fails it is zero, nothing is cached, and a warning with the user name is logged.
+  injected clock; otherwise it is read from `InboxService.CountAsync` and cached with the time the number became
+  available (after the read, so a slow read does not shorten the reuse); when the
+  read fails it is zero, nothing is cached, and a warning with the user name and the exception is logged.
 
 **ShortVersion (MainLayout)**: Shortens the version for the footer.
 
