@@ -188,7 +188,8 @@ sections:
           slots, with the SignaturesWouldBecomeOutOfDate rule that names each affected slot number and signer, before
           anything is stored, shall let a change that does not alter the record, or a review without a current
           signature, pass without acknowledgement, shall refuse again only for the slots that remain
-          unacknowledged, and shall report a locked review with the ReviewLocked rule first.
+          unacknowledged, and shall report a locked review with the ReviewLocked rule first. The exception shall keep
+          its own copy of the affected slots.
         justification: |
           The answers are part of what a signature approves. A change after the signing silently withdraws the
           signature, so the service tells the caller which signatures would be lost and refuses until the caller
@@ -201,6 +202,7 @@ sections:
           - ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate
           - ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement
           - ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact
+          - ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource
 
       - id: ReviewCenter-ChecklistService-CarriedMarking
         title: >-

@@ -159,6 +159,10 @@ on a signed review; it is refused until the slots are acknowledged, and then it 
 `ReviewLocked`, not the signature impact. This scenario is tested by
 `ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact`.
 
+**ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource**: The exception copies the list of
+affected slots it is given, so a later change to the caller's list does not change it, and an exception without slots
+has an empty list. This scenario is tested by `ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource`.
+
 **ChecklistService_Constructor_NullArguments_Throws**: The service is created with a missing store, project access, or
 clock; the constructor throws, so the service cannot exist without the check that the actor may see the project. This
 scenario is tested by `ChecklistService_Constructor_NullArguments_Throws`.

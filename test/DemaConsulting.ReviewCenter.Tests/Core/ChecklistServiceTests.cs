@@ -263,6 +263,25 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that the exception keeps its own copy of the affected slots.
+    /// </summary>
+    [Fact]
+    public void ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource()
+    {
+        // Arrange: a list of one affected signature
+        var source = new List<AffectedSignature> { new(10, 1, "Riley Reviewer", 7) };
+
+        // Act: build the exception, then change the source list
+        var ex = new DomainRuleException(DomainRule.SignaturesWouldBecomeOutOfDate, "Out of date.", source);
+        source.Add(new AffectedSignature(11, 2, "Joan Alternate", 8));
+        source.RemoveAt(0);
+
+        // Assert: the exception still lists the one original signature
+        Assert.Equal(new AffectedSignature(10, 1, "Riley Reviewer", 7), Assert.Single(ex.AffectedSlots));
+        Assert.Empty(new DomainRuleException(DomainRule.ReviewLocked, "Locked.").AffectedSlots);
+    }
+
+    /// <summary>
     ///     Test that the default checklist has the 14 sections of the template with the known number of checks.
     /// </summary>
     [Fact]

@@ -89,7 +89,7 @@ read and no trial write:
    applicable that has no row) is not a change. The answer time is not part of the digest; the person who answered is.
 3. Otherwise every current signature whose slot identity is not in `acknowledged` is affected. When there is one,
    `DomainRuleException` is thrown with `SignaturesWouldBecomeOutOfDate`, the message "This change makes signatures
-   out of date: slot 1 (Rita), slot 3 (Tess). Acknowledge them to continue.", and `AffectedSlots`, a list of
+   out of date: slot 1 (Rita), slot 3 (Tess). Acknowledge them to continue.", and `AffectedSlots`, a copy of the list of
    `AffectedSignature` (slot identity, slot number, signer display name, signer identity). The signer is the person who
    actually signed, which is the alternate when the alternate signed.
 

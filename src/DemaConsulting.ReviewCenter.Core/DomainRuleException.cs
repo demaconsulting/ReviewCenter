@@ -295,7 +295,8 @@ public sealed class DomainRuleException : Exception
     /// <param name="message">An operator-readable explanation of the violation.</param>
     /// <param name="affectedSlots">
     ///     The signatures the change would make out of date, for <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/>;
-    ///     <c>null</c> (the default) for every other rule.
+    ///     <c>null</c> (the default) for every other rule. The list is copied, so a later change to the caller's list does
+    ///     not change the exception.
     /// </param>
     public DomainRuleException(
         DomainRule rule,
@@ -304,7 +305,7 @@ public sealed class DomainRuleException : Exception
         : base(message)
     {
         Rule = rule;
-        AffectedSlots = affectedSlots ?? [];
+        AffectedSlots = affectedSlots is null ? [] : [.. affectedSlots];
     }
 
     /// <summary>
