@@ -17,7 +17,8 @@ The unit also owns the settings of the `DataProtection` section (`KeyRingSetting
 
 #### Data Model
 
-All types are `internal`; the static class has no state and is thread-safe.
+All types are `internal`; the static class has no state and is thread-safe. The decorator `KeyFileRestrictingXmlRepository`
+is a small type of the unit that lives in the same file, like the settings and the plan.
 
 **KeyRingSettings** (section `DataProtection`): `KeysPath` — the folder of the ring; `Protection` — `Auto` (the
 default), `Dpapi`, `Certificate`, or `PermissionsOnly`, in any case; `DpapiScope` — `CurrentUser` (the default) or
@@ -80,7 +81,27 @@ mode.
   is unreadable. That was found when the unit was designed, and it is why this check must run before the probe round
   trip of `ServerHost`, which creates a key.
 
-**RestrictKeyFiles**: On Unix, sets the mode of every key file to 0600 (owner read and write). Nothing on Windows.
+**RestrictKeyFiles**: On Unix, sets the mode of every key file (`*.xml`) in the folder to 0600 (owner read and write).
+Nothing on Windows. The platform and the call that sets the mode are parameters of an overload, so that a test can
+supply a recording call on any machine. `ServerHost` calls it at start-up for the files that exist then.
+
+**RestrictKeyFolder**: On Windows, for the `PermissionsOnly` protection only, creates the key folder if it is missing
+and replaces its access rules: inheritance from the parent is disabled (the inherited rules are not copied), and
+full control is allowed for the account of the server and for the system (`LocalSystemSid`), with container and object
+inheritance so that the files created later, such as the key that the ring rolls to, inherit the rules. It is the
+equivalent of the 0700 mode of the folder on Unix, is idempotent, and does nothing for `Dpapi` and `Certificate` (which
+encrypt the key files) or on another operating system. A failure is an `InvalidOperationException` that names the folder
+and `DataProtection:KeysPath`.
+
+**KeyFileRestrictingXmlRepository**: An `IXmlRepository` decorator over the `FileSystemXmlRepository` of the key
+folder (the repository that `ServerHost.AddServices` configures). `GetAllElements` delegates. `StoreElement` delegates
+and then runs the `RestrictKeyFiles` pass over the folder, so that a key file that Data Protection creates while the
+server runs (the ring rolls every 90 days) is restricted to 0600 as it is created, not at the next start. The pass
+covers the folder because the file name comes from a friendly name that may be empty. The file has the default mode
+for the moment between its creation and the change; the folder (0700) keeps others out meanwhile. The platform and the
+call that sets the mode are constructor parameters (defaulting to the real ones). It does nothing on Windows, where
+`RestrictKeyFolder` is the protection. A failure to set the mode is not swallowed: it surfaces from the call that stored
+the key, as the `InvalidOperationException` of `RestrictKeyFiles`.
 
 **LogProtection**: Logs the protection in force at every start: information for DPAPI (with the scope) and for a
 certificate (with the thumbprint), and a warning for `PermissionsOnly` that the ring is not encrypted at rest and how
@@ -100,7 +121,8 @@ reported the same way.
 
 Known limitations, documented for the administrator: with no secret from the operator there is no facility of the
 operating system that binds the keys to a Linux or macOS machine, so `PermissionsOnly` is protection by file
-permissions only and says so at every start; a key that was written in plain text stays in plain text until Data
+permissions only (on Windows, by the access rules of the folder) and says so at every start; a key that was written in
+plain text stays in plain text until Data
 Protection rolls to a new key (every 90 days); previous certificates use the password of the current certificate, or
 none; and the plan is made when the services are registered, so a `DataProtection` setting that is added afterwards
 (by a test, with `ConfigureBuilder`) is not seen by the encryption.
@@ -109,9 +131,11 @@ none; and the plan is made when the services are registered, so a `DataProtectio
 
 - **SecretSource** (Utilities) — resolves the certificate password from the inline setting or the file.
 - **ASP.NET Core Data Protection** (OTS) — the key encryptors for DPAPI and for a certificate, `IKeyManager`.
-- **.NET BCL** — `X509Certificate2`, `X509CertificateLoader`, and file mode APIs.
+- **.NET BCL** — `X509Certificate2`, `X509CertificateLoader`, file mode APIs, and the access control APIs of the file
+  system (`DirectorySecurity`, `FileSystemAclExtensions`), which are part of the shared framework.
 
 #### Callers
 
-- **ServerHost** — `AddServices` calls `Prepare` and `Apply`; `ValidateDataProtection` calls `CheckRing`,
+- **ServerHost** — `AddServices` calls `Prepare` and `Apply` and wraps the `FileSystemXmlRepository` of the key folder
+  in a `KeyFileRestrictingXmlRepository`; `ValidateDataProtection` calls `RestrictKeyFolder`, `CheckRing`,
   `RestrictKeyFiles`, and `LogProtection`.

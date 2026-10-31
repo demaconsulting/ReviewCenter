@@ -323,9 +323,13 @@ internal static class ServerHost
         services.AddOptions<KeyManagementOptions>()
             .Configure<IOptions<KeyRingSettings>, IOptions<DatabaseOptions>, ILoggerFactory>(
                 (keys, settings, database, loggerFactory) =>
-                    keys.XmlRepository = new FileSystemXmlRepository(
-                        new DirectoryInfo(ResolveKeysPath(settings.Value, database.Value)),
-                        loggerFactory));
+                {
+                    // The decorator restricts the key files that Data Protection creates while the server runs
+                    var keysPath = ResolveKeysPath(settings.Value, database.Value);
+                    keys.XmlRepository = new KeyFileRestrictingXmlRepository(
+                        new FileSystemXmlRepository(new DirectoryInfo(keysPath), loggerFactory),
+                        keysPath);
+                });
         services.AddSingleton<ICredentialProtector, CredentialProtector>();
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
         services.AddSingleton<RepositoryService>();
@@ -696,6 +700,9 @@ internal static class ServerHost
                 // The keys decrypt the stored tokens: only the server account may read them
                 File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             }
+
+            // On Windows without encryption (PermissionsOnly) the access rules of the folder are the protection
+            KeyRingProtection.RestrictKeyFolder(plan, folder);
 
             var probe = Path.Combine(folder, $".probe-{Guid.NewGuid():N}.tmp");
             File.WriteAllText(probe, "probe");

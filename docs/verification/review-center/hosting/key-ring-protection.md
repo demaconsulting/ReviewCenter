@@ -13,9 +13,11 @@ calling it, except in the one Windows-only test that makes a real round trip.
 #### Test Environment
 
 The tests run on every platform. The tests of the file modes (0700 and 0600) run only on Linux and macOS and are
-skipped on Windows, which has no such modes; the real DPAPI test runs only on Windows and is skipped elsewhere. The
-requirements name them with the `ubuntu@` and `windows@` source filters, so that each platform requires the tests it
-can run.
+skipped on Windows, which has no such modes; the tests of the access rules of the key folder and the real DPAPI test
+run only on Windows and are skipped elsewhere. The requirements name them with the `ubuntu@` and `windows@` source
+filters, so that each platform requires the tests it can run. The decorator that restricts the key files as they are
+stored is also tested with a recording call in place of the change of the mode, which runs on every platform and
+proves the decision (restrict on Unix, do nothing on Windows) without touching the permissions of a file.
 
 #### Acceptance Criteria
 
@@ -33,7 +35,10 @@ can run.
 - The guard refuses a ring that the certificate cannot open, without creating a second key, refuses an encrypted ring
   with no certificate, passes an empty ring, and reports an older unreadable key as an error without stopping.
 - `RequireEncryptedKeys` refuses `PermissionsOnly` and a plain key file.
-- On Linux and macOS the key files are restricted to the owner. The warning of `PermissionsOnly` is logged.
+- On Linux and macOS the key files are restricted to the owner, also when Data Protection stores a new key file while
+  the server runs. The warning of `PermissionsOnly` is logged.
+- On Windows the `PermissionsOnly` protection restricts the key folder to the current account and the system, without
+  inheritance, and the files created in it inherit that; the other protections leave the rules of the folder alone.
 - On Windows a ring protected with DPAPI holds an encrypted secret and is read again after a restart.
 
 #### Test Scenarios
@@ -109,6 +114,27 @@ mode logs a warning. This scenario is tested by the test of the same name.
 
 **KeyRingProtection_RestrictKeyFiles_UnixKeyFiles_AreOwnerReadWriteOnly**: On Linux and macOS only, key files that were
 created with wider modes are restricted to 0600. This scenario is tested by the test of the same name.
+
+**KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnUnix_RestrictsTheStoredFile** and
+**KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnWindows_DoesNotChangeModes**: A key is stored through the
+decorator over a real file repository in a temporary folder, with a recording call in place of the change of the mode.
+For a Unix platform the new key file is restricted to 0600 and the key is read back through the decorator; for a
+Windows platform the key is stored and no mode is set. These scenarios run on every platform and are tested by the
+tests of the same names.
+
+**KeyRingProtection_KeyFileRestrictingRepository_UnixStoredKeyFile_IsOwnerReadWriteOnly**: On Linux and macOS only, a key
+stored through the decorator with the real call ends up with mode 0600, as the key file of a ring that rolls while the
+server runs. This scenario is tested by the test of the same name.
+
+**KeyRingProtection_RestrictKeyFolder_WindowsPermissionsOnly_AdmitsOnlyOwnerAndSystem**: On Windows only, in a temporary
+folder that does not exist yet, the folder is restricted twice (the second call changes nothing). It does not inherit
+from its parent, it holds allow rules for the current account and the system and no others, and a file created in it
+afterwards inherits exactly those rules. The current account keeps full control, so that the temporary folder can be
+deleted. This scenario is tested by the test of the same name.
+
+**KeyRingProtection_RestrictKeyFolder_WindowsDpapi_LeavesTheInheritedRules**: On Windows only, the DPAPI protection, which
+encrypts the key files, leaves the folder inheriting the rules of its parent. This scenario is tested by the test of the
+same name.
 
 **KeyRingProtection_DpapiRing_WindowsKeyFileIsEncryptedAndRestartReadsIt**: On Windows only, a real ring is protected
 with DPAPI in a temporary folder and read again by a new provider; the key file holds an encrypted secret. This

@@ -68,15 +68,25 @@ sections:
       - id: ReviewCenter-KeyRingProtection-PermissionsOnly
         title: >-
           The KeyRingProtection class shall, for DataProtection:Protection PermissionsOnly, which Auto chooses on
-          Linux and macOS without a certificate, restrict the key files to the owner (mode 0600) in addition to the
-          key folder (mode 0700), and shall log a warning at every start that the key ring is not encrypted at rest
-          and name DataProtection:CertificatePath and DataProtection:RequireEncryptedKeys as the remedies.
+          Linux and macOS without a certificate, restrict the key folder to its owner (mode 0700 on Linux and macOS;
+          on Windows, access rules without inheritance that admit only the account of the server and the system) and
+          the key files to the owner (mode 0600 on Linux and macOS), including the key files that Data Protection
+          creates while the server runs, and shall log a warning at every start that the key ring is not encrypted at
+          rest and name DataProtection:CertificatePath and DataProtection:RequireEncryptedKeys as the remedies.
         justification: |
           Without a secret from the operator there is no operating system facility that binds the keys to the
-          machine, so the permissions of the files are the only protection, and the operator must be told every time
-          that it is not encryption; a warning that appeared once would be forgotten.
+          machine, so the permissions of the folder and the files are the only protection. A folder inherits the
+          access rules of its parent on Windows and a key file is created with the default mode on Linux and macOS,
+          so both must be restricted explicitly, and the files that the ring creates when it rolls must be restricted
+          as they are created rather than at the next start. The operator must be told every time that it is not
+          encryption; a warning that appeared once would be forgotten.
         tests:
           - ubuntu@KeyRingProtection_RestrictKeyFiles_UnixKeyFiles_AreOwnerReadWriteOnly
+          - ubuntu@KeyRingProtection_KeyFileRestrictingRepository_UnixStoredKeyFile_IsOwnerReadWriteOnly
+          - KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnUnix_RestrictsTheStoredFile
+          - KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnWindows_DoesNotChangeModes
+          - windows@KeyRingProtection_RestrictKeyFolder_WindowsPermissionsOnly_AdmitsOnlyOwnerAndSystem
+          - windows@KeyRingProtection_RestrictKeyFolder_WindowsDpapi_LeavesTheInheritedRules
           - ubuntu@ServerHost_CreateApplication_PermissionsOnlyOnUnix_RestrictsFolderAndFiles
           - ServerHost_CreateApplication_PermissionsOnly_WarnsAtEveryStart
           - KeyRingProtection_LogProtection_EachMode_LogsTheProtectionInForce

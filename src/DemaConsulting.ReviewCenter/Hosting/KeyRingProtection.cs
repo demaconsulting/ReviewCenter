@@ -18,12 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Principal;
 using System.Xml;
+using System.Xml.Linq;
 using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.DataProtection.XmlEncryption;
 using Microsoft.Extensions.Options;
 
@@ -548,14 +553,30 @@ internal static class KeyRingProtection
     /// <remarks>
     ///     Data Protection creates a key file with the default permissions of the process, which are usually readable
     ///     by the group and everybody. The folder is already restricted to its owner, which keeps others out; the
-    ///     files are restricted as well, so that a copy of the folder or a looser folder does not expose them. Key
-    ///     files that Data Protection creates while the server runs (the ring rolls every 90 days) are restricted at
-    ///     the next start; the folder protects them until then. Does nothing on Windows.
+    ///     files are restricted as well, so that a copy of the folder or a looser folder does not expose them. This
+    ///     pass covers the files that exist at start-up; the files that Data Protection creates while the server runs
+    ///     (the ring rolls every 90 days) are restricted as they are created by
+    ///     <see cref="KeyFileRestrictingXmlRepository"/>. Does nothing on Windows.
     /// </remarks>
-    internal static void RestrictKeyFiles(string folder)
+    internal static void RestrictKeyFiles(string folder) =>
+        RestrictKeyFiles(folder, KeyProtectionPlatform.Current, SetUnixFileMode);
+
+    /// <summary>
+    ///     Makes the key files readable and writable by their owner only, with the operating system and the call that
+    ///     sets the mode supplied by the caller.
+    /// </summary>
+    /// <param name="folder">The folder of the key ring. Must not be null.</param>
+    /// <param name="platform">The platform; nothing is done unless it has Unix permissions.</param>
+    /// <param name="setMode">The call that sets the mode of a file; a test supplies a recording one. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="folder"/> or <paramref name="setMode"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when a permission cannot be set; the message names the folder and <c>DataProtection:KeysPath</c>.
+    /// </exception>
+    internal static void RestrictKeyFiles(string folder, KeyProtectionPlatform platform, Action<string, UnixFileMode> setMode)
     {
         ArgumentNullException.ThrowIfNull(folder);
-        if (OperatingSystem.IsWindows())
+        ArgumentNullException.ThrowIfNull(setMode);
+        if (!platform.IsUnix)
         {
             return;
         }
@@ -564,7 +585,7 @@ internal static class KeyRingProtection
         {
             foreach (var file in Directory.EnumerateFiles(folder, "*.xml"))
             {
-                File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                setMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -573,6 +594,91 @@ internal static class KeyRingProtection
                 $"The permissions of the key files in '{folder}' cannot be restricted to the server account: {ex.Message} " +
                 "Set DataProtection:KeysPath to a folder that the server account owns.",
                 ex);
+        }
+    }
+
+    /// <summary>
+    ///     Makes the key folder accessible to its owner and the system only, on Windows, for the
+    ///     <c>PermissionsOnly</c> protection.
+    /// </summary>
+    /// <param name="plan">The plan. Must not be null.</param>
+    /// <param name="folder">The folder of the key ring; it is created when it does not exist. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the access rules cannot be set; the message names the folder and <c>DataProtection:KeysPath</c>.
+    /// </exception>
+    /// <remarks>
+    ///     Without a secret to encrypt the key files, the access rules of the folder are all that protects them, and a
+    ///     folder inherits the rules of its parent, which usually admit other users. The folder therefore stops
+    ///     inheriting and admits only the account of the server and the system (the equivalent of mode 0700 on Unix),
+    ///     with rules that the files created later (a new key when the ring rolls) inherit. The call is idempotent.
+    ///     Does nothing on another operating system (the permissions there are set by <see cref="RestrictKeyFiles(string)"/>)
+    ///     and for the DPAPI and certificate protections, which encrypt the key files themselves.
+    /// </remarks>
+    internal static void RestrictKeyFolder(KeyRingPlan plan, string folder)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(folder);
+        if (!OperatingSystem.IsWindows() || plan.Mode != KeyRingProtectionMode.PermissionsOnly)
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(folder);
+            ApplyOwnerOnlyAccess(folder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            throw new InvalidOperationException(
+                $"The access rules of the key folder '{folder}' cannot be restricted to the server account: {ex.Message} " +
+                "Set DataProtection:KeysPath to a folder that the server account owns.",
+                ex);
+        }
+    }
+
+    /// <summary>
+    ///     Replaces the access rules of a folder by full control for the current account and the system, without
+    ///     inheritance from the parent and inherited by what is created in the folder.
+    /// </summary>
+    /// <param name="folder">The existing folder.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the account of the process has no identity.</exception>
+    [SupportedOSPlatform("windows")]
+    private static void ApplyOwnerOnlyAccess(string folder)
+    {
+        var account = WindowsIdentity.GetCurrent().User
+                      ?? throw new InvalidOperationException("The account of the server has no security identifier.");
+        var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+
+        // Stop inheriting without copying the inherited rules, then allow the two accounts for the folder and for
+        // everything created in it
+        var security = new DirectorySecurity();
+        security.SetAccessRuleProtection(true, false);
+        foreach (var sid in new[] { account, system })
+        {
+            security.AddAccessRule(new FileSystemAccessRule(
+                sid,
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Allow));
+        }
+
+        new DirectoryInfo(folder).SetAccessControl(security);
+    }
+
+    /// <summary>
+    ///     Sets the mode of a file; the default call of <see cref="RestrictKeyFiles(string)"/>.
+    /// </summary>
+    /// <param name="path">The file.</param>
+    /// <param name="mode">The mode.</param>
+    internal static void SetUnixFileMode(string path, UnixFileMode mode)
+    {
+        // Only called on a platform with Unix permissions; the check is for the platform analyzer
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path, mode);
         }
     }
 
@@ -897,5 +1003,94 @@ internal static class KeyRingProtection
         ///     The key files can be read by every account of the machine.
         /// </summary>
         LocalMachine
+    }
+}
+
+/// <summary>
+///     A key repository that restricts each key file to its owner as soon as Data Protection has stored it, on a
+///     platform with Unix permissions.
+/// </summary>
+/// <remarks>
+///     Data Protection creates a key file with the default permissions of the process, and rolls to a new key every
+///     90 days while the server runs. <see cref="KeyRingProtection.RestrictKeyFiles(string)"/> restricts the files that
+///     exist at start-up; this decorator does the same for those that are created later, so that no key file keeps
+///     the default mode until the next start. The file that the inner repository wrote is not known by name (the
+///     name comes from the friendly name, which may be empty), so the pass covers the XML files of the folder. The
+///     folder itself is restricted to its owner, which keeps others out for the moment between the creation of the
+///     file and the change of its mode. Nothing is done on Windows, where <see cref="KeyRingProtection.RestrictKeyFolder"/>
+///     sets the access rules of the folder. A failure to set the mode is not swallowed: it surfaces from the call that
+///     stored the key, as an <see cref="InvalidOperationException"/> that names <c>DataProtection:KeysPath</c>. The
+///     class holds no state of its own and is as thread-safe as the repository that it decorates.
+/// </remarks>
+internal sealed class KeyFileRestrictingXmlRepository : IXmlRepository
+{
+    /// <summary>
+    ///     The repository that reads and writes the key files.
+    /// </summary>
+    private readonly IXmlRepository _inner;
+
+    /// <summary>
+    ///     The folder of the key files.
+    /// </summary>
+    private readonly string _folder;
+
+    /// <summary>
+    ///     The operating system.
+    /// </summary>
+    private readonly KeyProtectionPlatform _platform;
+
+    /// <summary>
+    ///     The call that sets the mode of a file.
+    /// </summary>
+    private readonly Action<string, UnixFileMode> _setMode;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="KeyFileRestrictingXmlRepository"/> class for the platform the
+    ///     process runs on.
+    /// </summary>
+    /// <param name="inner">The repository to decorate. Must not be null.</param>
+    /// <param name="folder">The folder that the repository writes to. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    public KeyFileRestrictingXmlRepository(IXmlRepository inner, string folder)
+        : this(inner, folder, KeyProtectionPlatform.Current, KeyRingProtection.SetUnixFileMode)
+    {
+    }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="KeyFileRestrictingXmlRepository"/> class.
+    /// </summary>
+    /// <param name="inner">The repository to decorate. Must not be null.</param>
+    /// <param name="folder">The folder that the repository writes to. Must not be null.</param>
+    /// <param name="platform">The platform; the files are only restricted when it has Unix permissions.</param>
+    /// <param name="setMode">The call that sets the mode of a file; a test supplies a recording one. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a reference argument is null.</exception>
+    internal KeyFileRestrictingXmlRepository(
+        IXmlRepository inner,
+        string folder,
+        KeyProtectionPlatform platform,
+        Action<string, UnixFileMode> setMode)
+    {
+        ArgumentNullException.ThrowIfNull(inner);
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(setMode);
+        _inner = inner;
+        _folder = folder;
+        _platform = platform;
+        _setMode = setMode;
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<XElement> GetAllElements() => _inner.GetAllElements();
+
+    /// <inheritdoc />
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the mode of a key file cannot be set; the message names the folder and
+    ///     <c>DataProtection:KeysPath</c>.
+    /// </exception>
+    public void StoreElement(XElement element, string friendlyName)
+    {
+        // Let the repository write the file, then restrict what is in the folder, which includes the new file
+        _inner.StoreElement(element, friendlyName);
+        KeyRingProtection.RestrictKeyFiles(_folder, _platform, _setMode);
     }
 }

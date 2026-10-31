@@ -251,10 +251,12 @@ The key ring of the Data Protection system is persisted in a folder, because the
 encrypted with it: with the default in-memory or profile-bound key ring, a restart or a move to another account could
 leave every token unreadable. The folder is `DataProtection:KeysPath`, or a `keys` folder beside the database. The
 key files in the folder are protected at rest as the `KeyRingProtection` unit decides (see its design): with Windows
-DPAPI, with a certificate that the operator supplies, or, on Linux and macOS without a certificate, by the permissions
-of the folder (0700) and the files (0600) alone, with a warning at every start. `AddServices` reads the
+DPAPI, with a certificate that the operator supplies, or, without a certificate, by the permissions
+of the folder and the files alone (0700 and 0600 on Linux and macOS, restricted as the files are created; on Windows
+with `PermissionsOnly` an owner-only access rule of the folder), with a warning at every start. `AddServices` reads the
 `DataProtection` section once (`KeyRingProtection.Prepare`), applies the protection to the Data Protection builder, and
-keeps the manual `XmlRepository` for the folder. Like the
+keeps the manual `XmlRepository` for the folder, wrapped so that new key files are restricted as they are created. Like
+the
 database, the folder is checked once at start-up (`ValidateDataProtection`): a plan with a problem or a ring that the
 certificate does not open (`KeyRingProtection.CheckRing`, which must run before anything can create a key) stops the
 start-up with one message that names the setting; then the folder is checked by writing and deleting a probe file and

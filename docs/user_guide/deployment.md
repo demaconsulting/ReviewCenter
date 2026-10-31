@@ -101,7 +101,10 @@ The key files of the ring are encrypted at rest when the platform or you provide
 in the Administration chapter). **A key ring that Windows DPAPI protects can be read only by the same account on the
 same machine (with `DpapiScope` `LocalMachine`, by any account on the same machine).** A copy of the `keys` folder
 restored on another machine or under another account is unreadable and the stored tokens are lost, so use a
-certificate (`DataProtection:CertificatePath`) for a ring that must move or be restored elsewhere.
+certificate (`DataProtection:CertificatePath`) for a ring that must move or be restored elsewhere. Without encryption
+(`PermissionsOnly`) the server restricts the `keys` folder and every key file in it to its own account, as the files are
+created (mode 0700 and 0600 on Linux and macOS; on Windows an access rule that admits only the account and the system,
+set at every start), so a backup account needs its own way to read it.
 
 ## Configuration
 
@@ -478,7 +481,9 @@ because no release has been published yet.
 - Run the server under an account of its own that can write only to the data folder, and let only that account read the
   database, the `keys` folder, and the attestation pfx file. On Windows the key ring is encrypted with DPAPI by
   default; on Linux and macOS it is not encrypted unless you set `DataProtection:CertificatePath` (the server warns at
-  every start), and the attestation pfx file is never encrypted.
+  every start), and the attestation pfx file is never encrypted. Without encryption the server restricts the `keys`
+  folder and the key files to its own account (also the files that it creates when the ring rolls; on Windows,
+  `PermissionsOnly` sets an owner-only access rule on the folder).
 - Set `DataProtection:RequireEncryptedKeys` to true where the key ring must be encrypted: the server then refuses to
   start with a ring that is not encrypted at rest. Protect the disk or volume with disk encryption as well, because
   encrypted keys do not protect the database, the logs, or a running process.

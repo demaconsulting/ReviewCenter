@@ -951,6 +951,148 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that a key file that Data Protection stores while the server runs is restricted as it is stored, and
+    ///     that the repository still returns what was stored. A recording call stands in for the change of the mode, so
+    ///     the test runs on every platform.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnUnix_RestrictsTheStoredFile()
+    {
+        // Arrange: a decorator over a real file repository, for a Unix platform, with a recording mode call
+        using var folder = new TemporaryDirectory();
+        var recorded = new List<(string File, UnixFileMode Mode)>();
+        var inner = new Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository(
+            new DirectoryInfo(folder.DirectoryPath),
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        var repository = new KeyFileRestrictingXmlRepository(
+            inner,
+            folder.DirectoryPath,
+            UnixPlatform,
+            (file, mode) => recorded.Add((file, mode)));
+
+        // Act: the ring rolls and stores a new key
+        repository.StoreElement(new XElement("key"), "key-new");
+
+        // Assert: the new file was restricted to its owner, and it is read back through the decorator
+        var restricted = Assert.Single(recorded);
+        Assert.Equal("key-new.xml", Path.GetFileName(restricted.File));
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, restricted.Mode);
+        Assert.Single(repository.GetAllElements());
+    }
+
+    /// <summary>
+    ///     Test that the key file repository leaves the mode alone when the platform has no Unix permissions, while it
+    ///     still stores the key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_KeyFileRestrictingRepository_StoreElementOnWindows_DoesNotChangeModes()
+    {
+        // Arrange: the same decorator for a Windows platform
+        using var folder = new TemporaryDirectory();
+        var recorded = new List<string>();
+        var inner = new Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository(
+            new DirectoryInfo(folder.DirectoryPath),
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        var repository = new KeyFileRestrictingXmlRepository(
+            inner,
+            folder.DirectoryPath,
+            WindowsPlatform,
+            (file, _) => recorded.Add(file));
+
+        // Act
+        repository.StoreElement(new XElement("key"), "key-new");
+
+        // Assert: stored, and no mode was set
+        Assert.Empty(recorded);
+        Assert.Single(repository.GetAllElements());
+    }
+
+    /// <summary>
+    ///     Test that a key file stored through the repository really ends up readable and writable by its owner only
+    ///     on Unix, with the real call that sets the mode.
+    /// </summary>
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void KeyRingProtection_KeyFileRestrictingRepository_UnixStoredKeyFile_IsOwnerReadWriteOnly()
+    {
+        // Arrange: a decorator over a real file repository with the real mode call
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file permissions are only enforced on Linux and macOS.");
+        using var folder = new TemporaryDirectory();
+        var inner = new Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository(
+            new DirectoryInfo(folder.DirectoryPath),
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        var repository = new KeyFileRestrictingXmlRepository(inner, folder.DirectoryPath);
+
+        // Act
+        repository.StoreElement(new XElement("key"), "key-new");
+
+        // Assert
+        var file = Path.Combine(folder.DirectoryPath, "key-new.xml");
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+    }
+
+    /// <summary>
+    ///     Test that the permissions-only protection on Windows makes the key folder accessible to the current account
+    ///     and the system only, without inheritance, and that a file created in the folder afterwards inherits that.
+    /// </summary>
+    [Fact]
+    [SupportedOSPlatform("windows")]
+    public void KeyRingProtection_RestrictKeyFolder_WindowsPermissionsOnly_AdmitsOnlyOwnerAndSystem()
+    {
+        // Arrange: a folder that does not exist yet and a permissions-only plan
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Access rules are only enforced on Windows.");
+        using var folder = new TemporaryDirectory();
+        var keys = folder.GetFilePath("keys");
+        using var plan = KeyRingProtection.Prepare(new KeyRingSettings { Protection = "PermissionsOnly" }, KeyProtectionPlatform.Current);
+        var account = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
+        var system = new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.LocalSystemSid, null);
+
+        // Act: restrict twice (the second call must change nothing), then create a key file as the ring rolls
+        KeyRingProtection.RestrictKeyFolder(plan, keys);
+        KeyRingProtection.RestrictKeyFolder(plan, keys);
+        var file = Path.Combine(keys, "key-new.xml");
+        File.WriteAllText(file, "<key />");
+
+        // Assert: the folder does not inherit and admits two accounts; the file inherits exactly those
+        var folderSecurity = new DirectoryInfo(keys).GetAccessControl();
+        Assert.True(folderSecurity.AreAccessRulesProtected);
+        var folderRules = folderSecurity.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<System.Security.AccessControl.FileSystemAccessRule>()
+            .ToList();
+        Assert.Equal(2, folderRules.Count);
+        var expected = new[] { account.Value, system.Value }.Order().ToArray();
+        Assert.Equal(expected, folderRules.Select(rule => rule.IdentityReference.Value).Order().ToArray());
+        Assert.All(folderRules, rule => Assert.Equal(System.Security.AccessControl.AccessControlType.Allow, rule.AccessControlType));
+        var fileSecurity = new FileInfo(file).GetAccessControl();
+        var fileRules = fileSecurity.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<System.Security.AccessControl.FileSystemAccessRule>()
+            .ToList();
+        Assert.All(fileRules, rule => Assert.True(rule.IsInherited));
+        Assert.Equal(expected, fileRules.Select(rule => rule.IdentityReference.Value).Distinct().Order().ToArray());
+    }
+
+    /// <summary>
+    ///     Test that the access rules of the key folder are left alone for the protections that encrypt the key files.
+    /// </summary>
+    [Fact]
+    [SupportedOSPlatform("windows")]
+    public void KeyRingProtection_RestrictKeyFolder_WindowsDpapi_LeavesTheInheritedRules()
+    {
+        // Arrange: an existing folder and a DPAPI plan
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Access rules are only enforced on Windows.");
+        using var folder = new TemporaryDirectory();
+        var keys = folder.GetFilePath("keys");
+        Directory.CreateDirectory(keys);
+        using var plan = KeyRingProtection.Prepare(new KeyRingSettings { Protection = "Dpapi" }, WindowsPlatform);
+
+        // Act
+        KeyRingProtection.RestrictKeyFolder(plan, keys);
+
+        // Assert: the folder still inherits from its parent
+        Assert.False(new DirectoryInfo(keys).GetAccessControl().AreAccessRulesProtected);
+    }
+
+    /// <summary>
     ///     Test that Windows DPAPI protects a real key ring: the key file holds no clear key and a restart reads what
     ///     was protected before. This is the one test that calls DPAPI; it runs only on Windows, in a temporary
     ///     folder, with the account of the test.

@@ -584,9 +584,9 @@ encoded forms are removed from every error message and log line. Git never asks 
   encrypted with a certificate, also back up the certificate and its password (see Key Ring Protection below).
 - **The keys are encrypted at rest only when the platform or you provide a protection.** On Windows they are encrypted
   with DPAPI by default; with a certificate (`DataProtection:CertificatePath`) on any system; and otherwise (Linux and
-  macOS without a certificate) only the permissions of the folder (owner only) and of the key files protect them, and
-  the server logs a warning at every start. Anyone who can read both the key folder and the database can then read
-  the tokens.
+  macOS without a certificate, or `PermissionsOnly` chosen explicitly) only the permissions of the folder (owner only)
+  and of the key files protect them, and the server logs a warning at every start. Anyone who can read both the key
+  folder and the database can then read the tokens.
 - **The first start of this version signs every user out once**, because the cookie keys now persist in the key folder.
 - The server checks at start that the key folder can be written; if it cannot, it refuses to start and names the
   folder.
@@ -607,7 +607,7 @@ chooses how (the names are not case sensitive):
 | `Auto` (default)  | The certificate if `CertificatePath` is set; else DPAPI on Windows, permissions elsewhere   |
 | `Dpapi`           | Windows DPAPI for the account (`CurrentUser`) or the machine (`LocalMachine`); Windows only |
 | `Certificate`     | The key files are encrypted with the public key of an RSA certificate that you supply       |
-| `PermissionsOnly` | No encryption: folder mode 0700 and key files mode 0600 (owner only)                        |
+| `PermissionsOnly` | No encryption: owner-only permissions on the folder and the key files (see below)           |
 
 | Setting                                   | Meaning                                                            |
 | ----------------------------------------- | ------------------------------------------------------------------ |
@@ -626,8 +626,14 @@ Certificates are read from files only; the certificate store is not used. A wron
 missing file, and a certificate without an RSA private key each stop the start with a message that names the setting.
 The password is never logged.
 
-**The honest limit on Linux and macOS.** Without a secret that you supply there is no facility of the operating system
-that binds the keys to the machine, so `PermissionsOnly` is only owner-only permissions on the folder and the files.
+**The honest limit of `PermissionsOnly`.** Without a secret that you supply there is no facility of the operating system
+that binds the keys to the machine, so `PermissionsOnly` is only owner-only permissions. On Linux and macOS the folder
+gets mode 0700 and every key file mode 0600, including a key file that the server creates later when the key ring rolls
+to a new key (about every 90 days): it is restricted as it is created, not at the next start. On Windows, which uses
+`PermissionsOnly` when you choose it explicitly, the server replaces the access rules of the key folder: the folder no
+longer inherits the rules of its parent, and only the account of the server and the system have access, so the key
+files that are created later in it have the same access. Another account, for example one that makes backups, has no
+access, and the server sets the rules again at every start.
 The server says so with a warning at every start ("The key ring is not encrypted at rest ..."). Set
 `DataProtection:CertificatePath` to encrypt the key files, and `DataProtection:RequireEncryptedKeys` to refuse to start
 without it. The certificate and its password must be kept where the service account can read them and an intruder who

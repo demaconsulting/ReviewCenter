@@ -210,9 +210,11 @@ fails earlier, while the configuration is bound, with a message that names the k
 - *Parameters*: `WebApplication app` — supplies the settings and the Data Protection provider.
 - *Returns*: `void`.
 - *Postconditions*: The key ring plan has no problem; the folder exists (on a system other than Windows with the Unix
-  mode that only the owner can use), a probe file can be written and deleted in it, the ring passes
+  mode that only the owner can use; on Windows with `PermissionsOnly`, with access rules that admit only the account
+  of the server and the system), a probe file can be written and deleted in it, the ring passes
   `KeyRingProtection.CheckRing` (before any key can be created), a test value can be protected and unprotected, and the
-  key files are restricted to the owner on Unix; otherwise the application is disposed and an
+  key files are restricted to the owner on Unix (those that exist now; later ones as Data Protection creates them);
+  otherwise the application is disposed and an
   `InvalidOperationException` is thrown. A plan with a problem or a failed check throws a message that names the
   setting at fault ("Invalid key ring settings: ..." and the messages of `KeyRingProtection`); a folder that cannot be
   used throws a message that names the folder and says "Set DataProtection:KeysPath to a folder the server can write to
