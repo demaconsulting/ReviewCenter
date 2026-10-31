@@ -65,6 +65,7 @@ flowchart TD
         ProjectService
         EvidenceSettingsService
         ProjectChecklistService
+        ReviewProgressService
         ReviewService
         ThreadService
         ChecklistService
@@ -143,6 +144,7 @@ flowchart TD
     ServerHost --> ProjectService
     ServerHost --> EvidenceSettingsService
     ServerHost --> ProjectChecklistService
+    ServerHost --> ReviewProgressService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
     ServerHost --> InboxStore
@@ -226,12 +228,14 @@ flowchart TD
     UsersPage --> TotpService
     ProjectsPage --> ProjectService
     ProjectPage --> ProjectService
-    ProjectPage --> ReviewService
-    ProjectPage --> SigningService
+    ProjectPage --> ReviewProgressService
     PlanPage --> ProjectService
     PlanPage --> RepositoryService
     PlanPage --> ReviewPlanner
     ReviewPlanner --> ReviewService
+    ReviewProgressService --> ReviewService
+    ReviewProgressService --> SigningService
+    ReviewProgressService --> AuditStore
     ReviewPlanner --> RepositoryService
     ReviewPlanner --> SigningService
     ReviewPage --> ReviewService
@@ -306,6 +310,7 @@ flowchart TD
     ApiTokenAuthentication --> AuditService
     ApiEndpoints --> ProjectService
     ApiEndpoints --> ReviewService
+    ApiEndpoints --> ReviewProgressService
     ApiEndpoints --> SigningService
     ApiEndpoints --> ThreadService
     ApiEndpoints --> ChecklistService

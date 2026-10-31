@@ -115,4 +115,24 @@ internal sealed class AuditStore(IDbContextFactory<ReviewCenterDbContext> factor
             .Take(count)
             .ToListAsync(cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, DateTimeOffset>> LastActivityAsync(
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // The newest entry of a review is the one with the highest sequence (the index of project, review and
+        // sequence serves the grouping); the time is read from those entries, so no time value is aggregated
+        var latest = context.AuditEntries.AsNoTracking()
+            .Where(a => a.ProjectId == projectId && a.ReviewId != null)
+            .GroupBy(a => a.ReviewId)
+            .Select(g => g.Max(a => a.Sequence));
+        var rows = await context.AuditEntries.AsNoTracking()
+            .Where(a => latest.Contains(a.Sequence))
+            .Select(a => new { a.ReviewId, a.TimestampUtc })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(row => row.ReviewId!, row => row.TimestampUtc);
+    }
 }

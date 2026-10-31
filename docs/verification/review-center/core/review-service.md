@@ -350,11 +350,6 @@ verifies. This scenario is tested by `ReviewService_SetDueDateAsync_AfterSignatu
 that is not approved is overdue; no date, today, a future date, and an approved review are not. This scenario is tested
 by `ReviewService_IsOverdue_PastDateAndNotApproved_IsTheOnlyOverdueCase`.
 
-**ReviewService_ListApprovedWithPastDueDateAsync_OnlyPastDatedReviews_ReturnsTheApprovedOnes**: One approved and one
-unsigned review dated today and one review without a date; asked on the day itself the answer is empty, because no date
-has passed, and three days later it names only the approved dated review. This scenario is tested by
-`ReviewService_ListApprovedWithPastDueDateAsync_OnlyPastDatedReviews_ReturnsTheApprovedOnes`.
-
 **ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses**: Missing, null, and blank text is no date; `yyyy-MM-dd`
 is read; any other text raises `DueDateInvalid`. This scenario is tested by
 `ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses`.

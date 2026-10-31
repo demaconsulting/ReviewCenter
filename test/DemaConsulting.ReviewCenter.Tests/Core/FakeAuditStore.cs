@@ -183,6 +183,19 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
         }
     }
 
+    /// <inheritdoc />
+    public Task<IReadOnlyDictionary<string, DateTimeOffset>> LastActivityAsync(
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        // Like the real store: the newest (highest sequence) entry of each review of the project
+        IReadOnlyDictionary<string, DateTimeOffset> result = Entries
+            .Where(e => e.ProjectId == projectId && e.ReviewId is not null)
+            .GroupBy(e => e.ReviewId!)
+            .ToDictionary(group => group.Key, group => group.MaxBy(e => e.Sequence)!.TimestampUtc);
+        return Task.FromResult(result);
+    }
+
     /// <summary>
     ///     Replaces the detail of a stored entry without updating its hash, as an attacker editing the database would.
     /// </summary>

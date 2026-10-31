@@ -121,10 +121,11 @@ The page instances are created per browser connection, so their state is per use
 **Loaded**, **Project**: whether loading finished and the project (`null` when it does not exist or the user may not
 see it), on both pages.
 
-**Reviews** (`ProjectPage`): the reviews of the project.
-
-**ApprovedReviews** (`ProjectPage`): the identifiers of the reviews that are approved (at least one reviewer slot,
-and every slot has a current signature), filled while loading.
+**Progress**, **Matching**, **PageRows** (`ProjectPage`): the `ReviewProgress` of every review of the project (one call
+of `ReviewProgressService`), the reviews that match the filters in the chosen order, and the 25 of the page shown.
+**StageQuery**, **OverdueQuery**, **BlockedQuery**, **SortQuery**, **DirectionQuery**, **SearchQuery**, and
+**PageQuery** are the query-string parameters (`SupplyParameterFromQuery`) that hold the whole state of the view.
+**CanContribute** (`ProjectPage`): whether the user may create and plan reviews; false for a read-only auditor.
 
 **Repositories**: the enabled repositories of this project (`RepositorySummary` values from
 `RepositoryService.ListEnabledAsync(actor, projectId)`, which carry no location and no token, and none of another
@@ -272,13 +273,46 @@ selection (a text area with one pattern per line, `!` to exclude).
 
 **OnParametersSetAsync** (`ProjectPage`): Loads the project for the actor with `ProjectService.GetAsync(actor, id)`.
 When the project does not exist or the user may not see it, `Project` is null, nothing else is loaded, and the page
-shows the same message for both. Otherwise it loads the reviews, the enabled repositories of the project, and whether
-the user administers the project, and, only for an administrator, the members, then asks
-`SigningService.GetApprovalAsync` once for each review to learn whether it is approved (N+1 lookups, accepted because
-the list of reviews of a project is short). Each review row shows a badge that reads "Approved" when
-the review is in
-`ApprovedReviews` and "In review" otherwise; a review without slots is therefore In review. The stored state of the
-review (`Draft` is its only value) is not shown on the row.
+shows the same message for both. Otherwise it reads the progress of all reviews with one call of
+`ReviewProgressService.GetProgressAsync` (a constant number of reads however many reviews the project has; this replaces
+the former ask of the approval status of each review), applies the filters, the sort order, and the paging of the query
+string (`ApplyView`), and loads whether the user may contribute and whether the user administers the project. The
+enabled repositories are read only for a user who may contribute, because a read-only member (an auditor) neither plans
+nor creates reviews and the repository registry refuses such a read; for an administrator the members are loaded too.
+The stored state of the review (`Draft` is its only value) is not shown on the row.
+
+**Overview** (`ProjectPage`): Above the reviews a summary strip counts the reviews of the project in each stage and the
+overdue ones (`project-summary-setup`, `project-summary-in-review`, `project-summary-approved`,
+`project-summary-overdue`), counted over all reviews and not changed by the filters. A filter form (`review-filter`)
+holds the stage (`filter-stage`), "overdue only" (`filter-overdue`), "blocked only" (`filter-blocked`), a text search of
+the identifier and title (`filter-search`), and Apply (`filter-apply`) and Clear (`filter-clear`) controls; it is a form
+with the GET method, so that the view is always the address. The state of the view lives in the query string only:
+`stage` (`setup`, `in-review`, or `approved`), `overdue=1`, `blocked=1`, `sort` (`id`, `stage`, `activity`, `due`, or
+`signatures`), `dir` (`asc` or `desc`), `q`, and `page`. A value that is not understood is ignored (a `page` that is
+not a whole number is page 1), and a page out of range is brought into range. The text of `q` is shown encoded, never
+as markup.
+Values that equal the default are left out of the addresses the page builds. The filter form carries the sort state of
+the view as hidden `sort` and `dir` inputs whenever the view is not the default (id ascending), also for a descending
+order of the identifier (`sort=id`, `dir=desc`), so that applying a filter does not lose the order; the links of the
+headers and of the paging keep it in `dir`. A project without reviews shows `reviews-empty`: an invitation to use
+"+ New review" for a user who may contribute, and only "This project has no reviews yet." for a member who may only read,
+who has no such button. The column headers (`sort-id`,
+`sort-stage`, `sort-signatures`, `sort-activity`, `sort-due`) are links to the same view with that sort, and flip the
+direction when the column is the current one; the last activity sorts newest first by default, every other column
+ascending, a review without a due date comes last in either direction, and ties are broken by the review identifier.
+The table shows 25 reviews to a page (`reviews-paging` with `reviews-range`, `reviews-prev`, and `reviews-next`, which
+keep the filters), and `reviews-no-match` says so when the filters match nothing. Each row (`review-row-{id}`) shows the
+review (link `review-link-{id}` and title), its stage badge (`review-approval-{id}`: Setup, In review, or Approved, and
+a "Reopened" mark for a reopened review), the signatures (`review-progress-{id}`: signed of required, and "n out of
+date" when any), what blocks it (`review-blockers-{id}`: "No checklist", open threads, unanswered checks, Fail
+answers), the people it
+waits on (`review-waiting-{id}`), the last activity, and the due date with the Overdue badge
+(`review-overdue-{id}`) of the rule of `ReviewService`. The created, last activity, and due dates, and their `datetime`
+attributes, are written with `CultureInfo.InvariantCulture` (Gregorian digits such as `2026-03-04`), like the review page
+and the API, so the culture of the request, for example the Thai Buddhist calendar, never changes the year. Everything
+is read-only, so the same table is shown to a member, a member who may only read (the Auditor role, which is declared
+but cannot be assigned yet), an administrator, and a system administrator; the "+ New review" button, the "Plan
+reviews" link, and the repository hint are shown only to a user who may contribute.
 
 **RemoveMemberAsync**, **ToggleRoleAsync** (`ProjectPage`): Remove a member (`ProjectService.RemoveMemberAsync`) and
 switch a member between `ProjectRole.User` and `ProjectRole.ProjectAdmin` (`SetMemberRoleAsync`). Each goes through one
@@ -307,7 +341,7 @@ in `review-rules-error` only when the guard, asked again, still passes, and the 
 shows it in the switch.
 
 **GuardMembersAsync** (`ProjectPage`): Asks `ProjectViewGuard.GuardViewAsync` whether the user still sees the project;
-when not, `ShowNoAccess` drops the project, the reviews, the approved set, the repositories, and the member state, and
+when not, `ShowNoAccess` drops the project, the progress, the repositories, and the member state, and
 the page shows the not-found message. Then it asks `ProjectViewGuard.GuardAdministerAsync` whether the user still
 administers the project; when not, `ShowMembersLost` clears `CanAdminister`, the members, and the member messages (and
 with them the Members section and the administration buttons), and the reviews stay, because the user may still be a
@@ -488,8 +522,10 @@ the subsystem.
 - **ProjectService** — reads the project for the actor, lists the members, adds a member by exact user name, creates a
   member account with a temporary password, removes a member, changes a role, and changes the review rules
   (`SetReviewRuleAsync`; `RequireIndependentReviewers` and the two stored-only rules).
-- **ReviewService** — lists reviews (`ProjectPage`, and `NewReviewPage` for the earlier reviews that can be followed),
-  previews a follow-up, and creates reviews (`NewReviewPage`).
+- **ReviewService** — lists the earlier reviews that can be followed, previews a follow-up, and creates reviews
+  (`NewReviewPage`).
+- **ReviewProgressService** (Core) — the progress of every review of the project in one call (`ProjectPage`): stage,
+  signatures, blockers, whom a review waits on, last activity, and overdue state.
 - **RepositoryService** — lists the enabled repositories of the project (names only, never a location or token), for
   the plan link and for the drop-down.
 - **IProjectAccess** (Core) — tells whether the user administers the project (`ProjectPage`, the two member pages, and
@@ -501,7 +537,8 @@ the subsystem.
 - **ProjectChecklistService**, **ChecklistValidator**, and **ChecklistDefinition** (Core) — read, validate, replace, and
   reset the checklist template of the project (`ProjectChecklistPage`, and the summary line of `ProjectPage`); the
   service holds the rules, the audit entry, and the refusal of a stale change.
-- **SigningService** — computes whether each review is approved (`ProjectPage`).
+- **SigningService** — not used by `ProjectPage` any more; the approval status of each review comes from
+  `ReviewProgressService`.
 - **AnonymousRateLimit** (Api) — the request limit named in the exposure warning.
 - **ReviewLimits** (Core) — the upload limits.
 - **JavaScript runtime** — the `reviewCenter.copyText` script that copies the temporary password

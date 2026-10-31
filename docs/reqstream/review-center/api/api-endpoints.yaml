@@ -250,3 +250,19 @@ sections:
           script that holds a token is counted by the throttle of tokens and must not be refused by this limit.
         tests:
           - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
+
+      - id: ReviewCenter-ApiEndpoints-ListProgress
+        title: >-
+          The ApiEndpoints unit shall return for every review in the list of the reviews of a project whether it is
+          approved, the number of its reviewer slots, of valid signatures, and of out-of-date signatures, the time of
+          its last activity, and its due date and overdue flag, taking them from the same service as the project
+          page, and shall add the fields without changing any existing field. The list shall read the reviews of the
+          project once and give that same list to the progress service.
+        justification: |
+          A script that watches a project needs the progress that the project page shows, without opening every
+          review. The fields are added and nothing is renamed, so existing clients keep working. One read of the
+          review list keeps a project with many reviews fast.
+        tests:
+          - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
+          - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
+          - ApiDocument_Get_MatchesCommittedSnapshot

@@ -224,6 +224,20 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyDictionary<string, IReadOnlyList<ReviewReopen>>> ListReopensAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyDictionary<string, IReadOnlyList<ReviewReopen>> grouped = _reopens
+            .Where(r => r.ProjectId == projectId && reviewIds.Contains(r.ReviewId))
+            .OrderBy(r => r.Id)
+            .GroupBy(r => r.ReviewId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<ReviewReopen>)g.ToList());
+        return Task.FromResult(grouped);
+    }
+
+    /// <inheritdoc />
     public Task<bool> UpdateEvidenceSettingsAsync(
         int projectId,
         EvidenceSettings expected,
@@ -558,9 +572,16 @@ internal sealed class FakeReviewStore : IReviewStore
         return Task.FromResult(review is null ? null : WithoutContent(review));
     }
 
+    /// <summary>
+    ///     Gets the number of times the reviews of a project were listed, so a test can show that a caller reads the
+    ///     list once.
+    /// </summary>
+    public int ListReviewsCalls { get; private set; }
+
     /// <inheritdoc />
     public Task<IReadOnlyList<Review>> ListReviewsAsync(int projectId, CancellationToken cancellationToken = default)
     {
+        ListReviewsCalls++;
         IReadOnlyList<Review> list = _reviews
             .Where(review => review.ProjectId == projectId)
             .Select(WithoutContent)
@@ -793,6 +814,7 @@ internal sealed class FakeReviewStore : IReviewStore
         string reviewId,
         CancellationToken cancellationToken = default)
     {
+        SnapshotReads++;
         var record = await GetRecordAsync(projectId, reviewId, cancellationToken);
         if (record is null)
         {
@@ -805,23 +827,38 @@ internal sealed class FakeReviewStore : IReviewStore
             await ListSignaturesAsync(projectId, reviewId, cancellationToken));
     }
 
+    /// <summary>
+    ///     Gets the number of single snapshot reads (<see cref="GetSnapshotAsync"/>) made so far; tests use it to show
+    ///     that a batch read does not read a snapshot per review.
+    /// </summary>
+    public int SnapshotReads { get; private set; }
+
+    /// <summary>
+    ///     Gets the number of batch snapshot reads (<see cref="ListSnapshotsAsync"/>) made so far.
+    /// </summary>
+    public int SnapshotBatchReads { get; private set; }
+
     /// <inheritdoc />
-    public async Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
+    public async Task<IReadOnlyDictionary<string, ReviewSnapshot>> ListSnapshotsAsync(
         int projectId,
         IReadOnlyCollection<string> reviewIds,
         CancellationToken cancellationToken = default)
     {
-        var approved = new HashSet<string>();
-        foreach (var reviewId in reviewIds.Distinct())
+        // In memory, so the batch reads each snapshot the single way without counting it as a single read
+        SnapshotBatchReads++;
+        var snapshots = new Dictionary<string, ReviewSnapshot>();
+        var singleReads = SnapshotReads;
+        foreach (var id in reviewIds.Distinct())
         {
-            var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken);
-            if (snapshot is not null && ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+            var snapshot = await GetSnapshotAsync(projectId, id, cancellationToken);
+            if (snapshot is not null)
             {
-                approved.Add(reviewId);
+                snapshots[id] = snapshot;
             }
         }
 
-        return approved;
+        SnapshotReads = singleReads;
+        return snapshots;
     }
 
     /// <inheritdoc />

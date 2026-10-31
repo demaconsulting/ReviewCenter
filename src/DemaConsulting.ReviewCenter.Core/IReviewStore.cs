@@ -506,21 +506,18 @@ public interface IReviewStore
     Task<ReviewSnapshot?> GetSnapshotAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Tells which of several reviews of a project are approved, without loading a full snapshot for each one.
+    ///     Reads the snapshots (see <see cref="GetSnapshotAsync"/>) of several reviews of a project with a constant
+    ///     number of queries, so a list of reviews costs no read per review.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
-    /// <param name="reviewIds">The review identifiers to check. Must not be null.</param>
+    /// <param name="reviewIds">The review identifiers; duplicates are read once.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>
-    ///     The identifiers among <paramref name="reviewIds"/> that are approved by the definition of
-    ///     <see cref="ReviewLock.IsApproved"/>; a review that does not exist is not in the set.
+    ///     The snapshot of each review that exists, by review identifier, each equal to what
+    ///     <see cref="GetSnapshotAsync"/> returns for it; a review that does not exist is absent. The result is empty,
+    ///     without a database read, when there are no identifiers. All snapshots come from one state of the database.
     /// </returns>
-    /// <remarks>
-    ///     The slots and the signatures of all the reviews are read with one query each, in one read transaction. The
-    ///     record, which the current digest needs, is loaded only for a review whose every slot holds some signature,
-    ///     because no other review can be approved.
-    /// </remarks>
-    Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
+    Task<IReadOnlyDictionary<string, ReviewSnapshot>> ListSnapshotsAsync(
         int projectId,
         IReadOnlyCollection<string> reviewIds,
         CancellationToken cancellationToken = default);
@@ -661,5 +658,22 @@ public interface IReviewStore
     Task<IReadOnlyList<ReviewReopen>> ListReopensAsync(
         int projectId,
         string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the reopens of several reviews of a project with a constant number of queries.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers; duplicates are read once.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The reopens of each review that has any, by review identifier, each list equal to what
+    ///     <see cref="ListReopensAsync(int, string, CancellationToken)"/> returns for it (oldest first); a review
+    ///     without a reopen, or that does not exist, is absent. The result is empty, without a database read, when
+    ///     there are no identifiers.
+    /// </returns>
+    Task<IReadOnlyDictionary<string, IReadOnlyList<ReviewReopen>>> ListReopensAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
         CancellationToken cancellationToken = default);
 }

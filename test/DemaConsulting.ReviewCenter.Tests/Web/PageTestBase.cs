@@ -112,6 +112,7 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Users);
         Services.AddSingleton(pageRepositories);
         Services.AddSingleton(pageSigning);
+        Services.AddSingleton(new ReviewProgressService(pageReviews, pageSigning, AuditStore, Access));
         Services.AddSingleton(new ReviewPlanner(store, pageReviews, pageRepositories, Git, pageSigning, SetParser, Access));
 
         // The inbox page, the home page and the review page enforce the real access rules for the signed-in user;

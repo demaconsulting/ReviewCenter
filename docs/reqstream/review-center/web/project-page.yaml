@@ -151,15 +151,90 @@ sections:
 
       - id: ReviewCenter-ProjectPage-Approval
         title: >-
-          The ProjectPage unit shall show on each listed review a badge that reads Approved when
-          the review has at least one reviewer slot and every slot has a current signature, and In review
+          The ProjectPage unit shall show on each listed review a badge for its stage: Setup while it has no reviewer
+          slot, Approved when it has at least one reviewer slot and every slot has a current signature, and In review
           otherwise.
         justification: |
-          Users scan the project page to see which reviews are finished. The approval status is computed from the
-          current record, so a review whose record changed after signing is shown as In review again.
+          Users scan the project page to see which reviews are finished. The stage is computed from the current
+          record, so a review whose record changed after signing is shown as In review again.
         tests:
           - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval
           - ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview
+
+      - id: ReviewCenter-ProjectPage-Progress
+        title: >-
+          The ProjectPage unit shall show for each listed review, besides its link, title, and stage, the signatures
+          as given of needed with the number that are out of date, what blocks the approval (a missing checklist, open
+          threads, unanswered checks, checks answered Fail), the people it waits on, the time of the last activity,
+          and the due date with the Overdue badge of the rule while the review is overdue, all taken from the
+          progress service in one read for the whole project, and shall write the creation date, the last activity,
+          the due date, and their machine-readable time attributes in the invariant culture, in Gregorian digits,
+          whatever culture the request has.
+        justification: |
+          A lead opens the project page to see who is holding each review up. Showing the reason a review is not
+          approved and the names to ask turns the list into a work list, and reading it in one step keeps the page
+          fast for a project with many reviews. A date in the calendar of the visitor's culture (such as the Buddhist
+          year) would disagree with the review page and the API.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+          - ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked
+          - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+
+      - id: ReviewCenter-ProjectPage-Summary
+        title: >-
+          The ProjectPage unit shall show above the reviews a summary of the number of reviews of the project in each
+          stage and the number that are overdue, counted over all reviews and not only the ones that a filter shows.
+        justification: |
+          The summary is the answer to "how are we doing" at one glance, and it must not change when the lead narrows
+          the table.
+        tests:
+          - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+
+      - id: ReviewCenter-ProjectPage-ProgressFilter
+        title: >-
+          The ProjectPage unit shall let the user narrow the reviews by stage, to the overdue ones, to the blocked
+          ones, and by a text that is part of the review identifier or title, and shall keep the choice in the query
+          string of the page (stage, overdue, blocked, q), so that a link or a reload shows the same table, and shall
+          say so when no review matches. A value of the query string that it does not understand shall be ignored,
+          a page that is not a whole number shall show the first page, a page out of range shall be brought into
+          range, and text taken from the query string or from a review shall be shown encoded, never as markup.
+        justification: |
+          A lead who follows up with the team wants "everything that is overdue" or "everything blocked" as a link
+          that can be shared and bookmarked. The address can be typed or forged by anyone, so it must never break the
+          page or inject markup into it.
+        tests:
+          - ProjectPage_Render_QueryFilters_NarrowTheTable
+          - ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters
+          - ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView
+          - ProjectPage_Render_InvalidPageValues_ShowAValidPage
+          - ProjectPage_Render_HostileMarkup_IsRenderedEncoded
+
+      - id: ReviewCenter-ProjectPage-ProgressSort
+        title: >-
+          The ProjectPage unit shall sort the reviews by identifier, stage, last activity, due date, or signatures,
+          ascending or descending, through headers that are links that toggle the direction, show the reviews 25 to a
+          page, and keep the sort, the direction, the filters, and the page in the query string.
+        justification: |
+          A project can have hundreds of reviews. The lead needs the stalest or the nearest due date first, and the
+          position in the list must survive a reload or a shared link.
+        tests:
+          - ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle
+          - ProjectPage_Render_IdDescending_FilterFormKeepsTheSortState
+          - ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters
+
+      - id: ReviewCenter-ProjectPage-ReadOnly
+        title: >-
+          The ProjectPage unit shall show the same table, summary, and filters to a read-only auditor of the project as
+          to a member, offer the auditor no control that creates or plans a review and no list of repositories, and
+          show a user outside the project the page of a project that does not exist.
+        justification: |
+          An auditor reads everything and changes nothing, so the page must not offer what the rules would refuse, and
+          must not fail on the parts that only contributors may see. A project that the user may not see must read
+          like a missing one.
+        tests:
+          - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
+          - ProjectPage_Render_EmptyProject_InvitesOnlyContributors
 
       - id: ReviewCenter-ProjectPage-Selection
         title: >-

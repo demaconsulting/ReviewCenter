@@ -89,6 +89,7 @@ sections:
         tests:
           - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
           - SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock
+          - SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence
 
       - id: ReviewCenter-SigningService-Sign
         title: >-
@@ -166,6 +167,7 @@ sections:
           - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
           - SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember
           - SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce
+          - SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots
           - SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers
 
       - id: ReviewCenter-SigningService-Audit
@@ -318,3 +320,16 @@ sections:
         tests:
           - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
           - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
+
+      - id: ReviewCenter-SigningService-ProgressCounts
+        title: >-
+          The SigningService class shall return with the approval status of a review, besides the sentences that say
+          what blocks the approval, the number of open threads, of unanswered checks, and of checks answered Fail,
+          calculated in the same step as the sentences so that each count equals the number it states, and shall
+          return for each person of a slot whether the account is enabled.
+        justification: |
+          The project overview and any later list of work need the numbers and not the text. Taking them from the
+          step that writes the sentences means the two cannot disagree, and no second rule for what blocks a review
+          can drift from the first. A slot whose person cannot sign any more has to be recognizable.
+        tests:
+          - SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences

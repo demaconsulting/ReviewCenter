@@ -300,6 +300,7 @@ internal static class ServerHost
         services.AddSingleton<UserService>();
         services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<SigningService>();
+        services.AddSingleton<ReviewProgressService>();
         services.AddSingleton<ReauthProofStore>();
 
         // The repository registry and the git content source. Tokens are encrypted with Data Protection, whose key

@@ -100,6 +100,12 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   factor, the users page shows who has it and lets a system administrator reset it, the sign form of a review asks for
   the code beside the password, and the help topic explains it; the pages are verified at unit level by their
   component tests (see the children of the requirement `ReviewCenter-Web-TotpSecondFactor` in `web.yaml`).
+- The progress table of the project page (stage, signatures, blockers, waiting on, last activity, due date, the summary
+  strip, the filters, the sortable columns, the paging, the query string, and the read-only view of an auditor) needs a
+  live connection, so it is verified at unit level by the component tests of `ProjectPage` in
+  `ProjectPageOverviewTests.cs` (see the children of the requirement `ReviewCenter-Web-Progress` in `web.yaml`); the
+  journey in a browser is verified by the system test
+  `ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState`.
 
 ### Test Scenarios
 
@@ -323,6 +329,18 @@ offered only to an administrator or the creator and never for an approved review
 `NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview`, `PlanPage_Create_DueDates_DefaultAndRowDate`,
 `ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc`, and
 `ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot`.
+
+**Review progress**: The unit tests of `ProjectPage` verify the subsystem requirement for the progress table: the stage,
+the signatures with the out-of-date ones, the blockers, the people waited on, the last activity, and the due date with
+its badge, the summary by stage and overdue, the filters and the sort from the query string, 25 reviews to a page that
+keep the filters, and the same table for a read-only auditor while a stranger sees a missing project. They are tested by
+`ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary`,
+`ProjectPage_Render_QueryFilters_NarrowTheTable`,
+`ProjectPage_Render_QuerySort_OrdersTheTableAndTheHeaderLinksToggle`,
+`ProjectPage_Render_ManyReviews_PagesBy25AndKeepsTheFilters`,
+`ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView`,
+`ProjectPage_Render_InvalidPageValues_ShowAValidPage`, `ProjectPage_Render_HostileMarkup_IsRenderedEncoded`, and
+`ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing`.
 
 **Follow-up review**: The unit tests of `ProjectPage` (the form for a new review), `ChecklistPage`, and `ReviewPage`
 verify the subsystem requirement for the follow-up review: the choice of an earlier review with the preview of what is
