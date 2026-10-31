@@ -755,7 +755,8 @@ internal static class ServerHost
     /// <param name="logger">The logger for the warning and the error.</param>
     /// <exception cref="InvalidOperationException">
     ///     Thrown when the folder holds no key file, the database holds protected secrets and
-    ///     <c>DataProtection:AllowNewKeyRing</c> is not set.
+    ///     <c>DataProtection:AllowNewKeyRing</c> is not set; also when the folder holds no key file and the database
+    ///     cannot be read to tell.
     /// </exception>
     /// <remarks>
     ///     A restored database with a missing key ring would otherwise start with a brand new ring and lose every stored
@@ -763,7 +764,11 @@ internal static class ServerHost
     ///     <c>AllowNewKeyRing</c> the start goes on and a warning with the number of secrets is logged; when the ring
     ///     has keys but some secrets cannot be read (another ring was restored, or a key is gone) an error with the
     ///     counts per kind and the remedy is logged and the start goes on, because the rest of the server works. A
-    ///     database that cannot be read here is left to the start-up that opens it, which reports that problem.
+    ///     database that cannot be read here (for example a lock that is held for a moment) is left to the start-up
+    ///     that opens it, with a warning, when the ring has keys. When the ring is empty the start is refused instead,
+    ///     whatever <c>AllowNewKeyRing</c> says, because the probe would create the first key without anyone knowing
+    ///     whether the database holds secrets; the message names the key folder and
+    ///     <c>Database:ConnectionString</c> and holds no exception text or database location.
     /// </remarks>
     private static void GuardLostRing(
         IServiceProvider services,
@@ -785,6 +790,18 @@ internal static class ServerHost
         }
         catch (SqliteException ex)
         {
+            // Without a key file the probe creates the first key, and a ring that is lost next to a database that
+            // cannot be read is indistinguishable from a new installation: refuse, whatever AllowNewKeyRing says
+            // (that switch accepts the loss of secrets that are known to exist). The message holds no exception text
+            // and no database location.
+            if (KeyRingProtection.InspectKeyFiles(folder).KeyFiles == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Key ring '{folder}' is empty and the database (Database:ConnectionString) could not be read to " +
+                    "check whether it holds protected secrets, so no key was created. Fix the access to the database " +
+                    "and start again; run 'reviewcenter --validate --check-config' for the details.");
+            }
+
 #pragma warning disable CA1848 // One entry per start; a LoggerMessage delegate adds no value here
             logger.LogWarning(
                 ex,

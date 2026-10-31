@@ -31,6 +31,7 @@ using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -1610,6 +1611,70 @@ public class ServerHostKeyRingTests
             entry => entry.Level == LogLevel.Warning && entry.Message.Contains("AllowNewKeyRing", StringComparison.Ordinal));
         Assert.Contains("2 protected secrets", warning.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("tkn-lost-ring", warning.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an empty ring next to a database that cannot be read stops the start without creating a key, even
+    ///     with <c>DataProtection:AllowNewKeyRing</c>, and that the message holds neither the exception text nor the
+    ///     location of the database.
+    /// </summary>
+    /// <param name="allowNewKeyRing"><c>true</c> to set <c>DataProtection:AllowNewKeyRing</c>.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey(bool allowNewKeyRing)
+    {
+        // Arrange: a database file that is not a database, and a ring without keys
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder, ("DataProtection:AllowNewKeyRing", allowNewKeyRing ? "true" : "false"));
+        var databaseFile = new SqliteConnectionStringBuilder(settings["Database:ConnectionString"]).DataSource;
+        File.WriteAllText(databaseFile, new string('x', 4096));
+        var keys = Path.Combine(folder.DirectoryPath, "keys");
+
+        // Act
+        var exception = Assert.Throws<InvalidOperationException>(() => Create(settings, new CapturingLoggerProvider()));
+
+        // Assert: the sanitized message of the guard, and no key was created by the refused start
+        Assert.Equal(
+            $"Key ring '{keys}' is empty and the database (Database:ConnectionString) could not be read to check whether " +
+            "it holds protected secrets, so no key was created. Fix the access to the database and start again; run " +
+            "'reviewcenter --validate --check-config' for the details.",
+            exception.Message);
+        Assert.DoesNotContain(databaseFile, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("not a database", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(exception.InnerException);
+        Assert.Empty(KeyFiles(folder));
+    }
+
+    /// <summary>
+    ///     Test that a ring with keys next to a database that cannot be read still starts, with a warning, as the
+    ///     database is reported by the start-up that opens it.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning()
+    {
+        // Arrange: a ring with a key, and a database file that is then replaced by one that is not a database
+        using var folder = new TemporaryDirectory();
+        var settings = Settings(folder);
+        await using (var first = Create(settings, new CapturingLoggerProvider()))
+        {
+            Assert.Single(KeyFiles(folder));
+        }
+
+        var databaseFile = new SqliteConnectionStringBuilder(settings["Database:ConnectionString"]).DataSource;
+        SqliteConnection.ClearAllPools();
+        await File.WriteAllTextAsync(databaseFile, new string('x', 4096), TestContext.Current.CancellationToken);
+        var logs = new CapturingLoggerProvider();
+
+        // Act
+        await using var app = Create(settings, logs);
+
+        // Assert: started on the same key, with the warning that the database could not be read
+        Assert.Single(KeyFiles(folder));
+        Assert.Single(
+            logs.Entries,
+            entry => entry.Level == LogLevel.Warning &&
+                     entry.Message.Contains("database could not be read", StringComparison.Ordinal));
     }
 
     /// <summary>

@@ -28,6 +28,7 @@ flowchart TD
         ServerHost
         KeyRingProtection
         SecretScan
+        UserCommand
         AuditCommand
     end
     subgraph Identity

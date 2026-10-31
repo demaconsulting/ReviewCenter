@@ -120,8 +120,9 @@ to change that.
 
 - *Parameters*: the folder.
 - *Returns*: the number of `key-*.xml` files, how many of them hold a plain `<masterKey`, and how many an
-  `<encryptedSecret`; all zero for a folder that does not exist. A file that is neither, or that is being written at
-  that moment, counts only in the total.
+  `<encryptedSecret`; all zero for a folder that does not exist. A file that is neither, that is being written at
+  that moment, or that the account may not read (`IOException` or `UnauthorizedAccessException`), counts only in the
+  total. `FindPlaintextKeyFiles` skips such a file in the same way.
 - *Notes*: Read-only; nothing is created and no content of a file is returned. `SecretScan` and the key check of the
   self-validation use it, so that the ring is described without calling Data Protection, which creates a key in an
   empty ring.

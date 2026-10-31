@@ -128,6 +128,14 @@ unencrypted key file, an encrypted one, one that is neither, and a file that is 
 three key files, one unencrypted and one encrypted, counts zero for a folder that does not exist without creating it,
 and the folder is as it was. This scenario is tested by the test of the same name.
 
+**KeyRingProtection_InspectKeyFiles_AccessDeniedKeyFile_CountsOnlyInTheTotal**: A temporary folder holds a key file
+that the current account may not read (a deny rule for reading on Windows, mode 0 on Linux and macOS; skipped for a
+privileged account on Linux and macOS, which can read it anyway), an unencrypted one, and an encrypted one. The
+inspection counts three key files, one unencrypted and one encrypted, and the search for plaintext keys finds only the
+unencrypted readable one; neither throws, so the unreadable file raises `UnauthorizedAccessException` and is treated
+like one that is being written. The rule or mode is removed afterwards. This scenario is tested by the test of the same
+name.
+
 **KeyRingSettings_AllowNewKeyRing_DefaultsToFalse**: The escape hatch of the lost-ring refusal is off unless it is set.
 This scenario is tested by the test of the same name, which lives with the `ServerHost` key ring tests.
 

@@ -236,9 +236,18 @@ before the probe round trip because the round trip creates a key when there is n
   for one start to accept that they become unreadable." is thrown, unless `DataProtection:AllowNewKeyRing` is true, in
   which case a warning with the count is logged and the start goes on. With keys in the ring but some secrets that cannot
   be decrypted, an error is logged with the counts per kind, the ids of the repositories and users, and the remedy
-  (enter the repository tokens again; an administrator resets the two-factor secret), and the start goes on.
+  (enter the repository tokens again; an administrator resets the two-factor secret), and the start goes on. When the
+  scan cannot complete because the database cannot be read (a `SqliteException`, for example a lock or a damaged file)
+  and the folder holds no key file, an `InvalidOperationException` "Key ring '{folder}' is empty and the database
+  (Database:ConnectionString) could not be read to check whether it holds protected secrets, so no key was created. Fix
+  the access to the database and start again; run 'reviewcenter --validate --check-config' for the details." is thrown,
+  whatever `DataProtection:AllowNewKeyRing` says: that setting accepts the loss of secrets that are known to exist, and
+  here it is not known. With keys in the ring the same failure is logged as a warning and the start goes on, as the
+  start-up that opens the database reports the problem.
 - *Notes*: A database with no secrets (a fresh installation) never triggers the guard. The message holds the folder
-  and a count only, never a secret value, ciphertext, or key. It runs for the `serve` verb only, because it is part of
+  and a count only (the unreadable-database message holds the folder and the setting name only, no exception text, no
+  connection string, and no database location), never a secret value, ciphertext, or key. It runs for the `serve`
+  verb only, because it is part of
   `ValidateDataProtection`; `user add` and `audit verify` neither scan nor create a key.
 
 **ValidateAttestation**: Obtains the attestation signing key of a built application once.

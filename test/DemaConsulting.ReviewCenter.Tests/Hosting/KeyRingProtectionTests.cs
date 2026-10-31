@@ -827,6 +827,96 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that a key file that the account may not read is counted as a file only, by the inspection and by the
+    ///     search for plaintext keys, and does not stop either of them.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_InspectKeyFiles_AccessDeniedKeyFile_CountsOnlyInTheTotal()
+    {
+        // Arrange: one key file that is denied to the current account, one unencrypted and one encrypted
+        Assert.SkipWhen(
+            !OperatingSystem.IsWindows() && Environment.IsPrivilegedProcess,
+            "A privileged account can read a file whatever its mode.");
+        using var folder = new TemporaryDirectory();
+        var keys = folder.GetFilePath("keys");
+        Directory.CreateDirectory(keys);
+        var denied = Path.Combine(keys, "key-00000000-0000-0000-0000-000000000001.xml");
+        File.WriteAllText(denied, "<key><masterKey>AAAA</masterKey></key>");
+        File.WriteAllText(Path.Combine(keys, "key-00000000-0000-0000-0000-000000000002.xml"), "<key><masterKey>BBBB</masterKey></key>");
+        File.WriteAllText(Path.Combine(keys, "key-00000000-0000-0000-0000-000000000003.xml"), "<key><encryptedSecret>CCCC</encryptedSecret></key>");
+
+        (int KeyFiles, int Plaintext, int Encrypted) counts;
+        List<string> plaintext;
+        var undo = DenyRead(denied);
+        try
+        {
+            // Act: reading the denied file raises UnauthorizedAccessException
+            counts = KeyRingProtection.InspectKeyFiles(keys);
+            plaintext = KeyRingProtection.FindPlaintextKeyFiles(keys);
+        }
+        finally
+        {
+            undo();
+        }
+
+        // Assert: the denied file is a key file and nothing else
+        Assert.Equal((3, 1, 1), counts);
+        Assert.Equal(["key-00000000-0000-0000-0000-000000000002.xml"], plaintext);
+    }
+
+    /// <summary>
+    ///     Makes a file unreadable for the current account.
+    /// </summary>
+    /// <param name="file">The file.</param>
+    /// <returns>The action that makes the file readable again, so that the temporary folder can be removed.</returns>
+    private static Action DenyRead(string file)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return DenyReadOnWindows(file);
+        }
+
+        return DenyReadOnUnix(file);
+    }
+
+    /// <summary>
+    ///     Removes every mode bit of a file.
+    /// </summary>
+    /// <param name="file">The file.</param>
+    /// <returns>The action that restores the mode.</returns>
+    [UnsupportedOSPlatform("windows")]
+    private static Action DenyReadOnUnix(string file)
+    {
+        var mode = File.GetUnixFileMode(file);
+        File.SetUnixFileMode(file, UnixFileMode.None);
+        return () => File.SetUnixFileMode(file, mode);
+    }
+
+    /// <summary>
+    ///     Adds a deny rule for reading to a file for the current Windows account.
+    /// </summary>
+    /// <param name="file">The file.</param>
+    /// <returns>The action that removes the rule again.</returns>
+    [SupportedOSPlatform("windows")]
+    private static Action DenyReadOnWindows(string file)
+    {
+        var info = new FileInfo(file);
+        var rule = new System.Security.AccessControl.FileSystemAccessRule(
+            System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+            System.Security.AccessControl.FileSystemRights.ReadData,
+            System.Security.AccessControl.AccessControlType.Deny);
+        var security = info.GetAccessControl();
+        security.AddAccessRule(rule);
+        info.SetAccessControl(security);
+        return () =>
+        {
+            var restored = info.GetAccessControl();
+            restored.RemoveAccessRule(rule);
+            info.SetAccessControl(restored);
+        };
+    }
+
+    /// <summary>
     ///     Test that an empty ring, and a folder that does not exist yet, are fine: they are new rings.
     /// </summary>
     [Fact]

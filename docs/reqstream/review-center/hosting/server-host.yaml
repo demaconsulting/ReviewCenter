@@ -215,16 +215,23 @@ sections:
           DataProtection:AllowNewKeyRing set it shall start and log a warning with the number of secrets, and when the
           ring has keys but some secrets cannot be decrypted it shall log an error with the counts per kind and the
           remedy and shall still start. A fresh installation shall start, and the command-line verbs shall neither
-          scan nor create a key.
+          scan nor create a key. When the database cannot be read to tell and the folder holds no key file, it shall
+          fail, whatever DataProtection:AllowNewKeyRing says, with an error that names the key folder and
+          Database:ConnectionString and holds no exception text or database location, without creating a key; when the
+          ring has keys it shall log a warning and start.
         justification: |
           A database restored without the key ring that belongs to it would otherwise start with a brand new ring and
           make every stored repository token and second-factor secret unreadable without a word. The refusal must
           come before the probe because the probe is what creates the new key. The escape hatch lets an operator who
           has accepted the loss start once; secrets that are only partly unreadable do not stop the rest of the server
-          from working, so they are reported loudly instead of refused.
+          from working, so they are reported loudly instead of refused. A database that cannot be read (a lock, a
+          damaged file) leaves it unknown whether secrets exist, and the escape hatch only accepts the loss of
+          secrets that are known to exist, so an empty ring is refused until the database can be read.
         tests:
           - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
           - ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning
+          - ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey
+          - ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning
           - ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint
           - ServerHost_CreateApplication_SomeSecretsUnreadable_LogsErrorAndStarts
           - ServerHost_CreateApplication_FreshInstallation_StartsAndCreatesRing

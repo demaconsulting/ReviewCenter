@@ -58,7 +58,9 @@ are more.
 An unreadable secret is the finding, not an error, so it is counted and the message of the exception is not used. An
 argument that is null raises `ArgumentNullException`; a database configuration that cannot be opened read-only (an
 in-memory database) raises `InvalidOperationException`; a database file that exists but cannot be read raises the
-`SqliteException`, which the callers report without the connection string. Nothing is logged by the unit, and no
+`SqliteException`, which the callers report without the connection string (`ServerHost` refuses an empty ring with a
+message that names `Database:ConnectionString` only, and logs a warning for a ring with keys). Nothing is logged by
+the unit, and no
 plaintext, ciphertext, or key ever leaves it.
 
 Known limitation: SQLite may leave empty `-wal` and `-shm` side files beside a database in write-ahead log mode after

@@ -758,7 +758,7 @@ internal static class KeyRingProtection
     /// <remarks>
     ///     An unencrypted key file holds a <c>masterKey</c> element; an encrypted one hides it inside an
     ///     <c>encryptedSecret</c> element. The text of a key is never returned. A file that cannot be read at this
-    ///     moment (Data Protection is writing it) is skipped.
+    ///     moment (Data Protection is writing it, or the account has no access to it) is skipped.
     /// </remarks>
     internal static List<string> FindPlaintextKeyFiles(string folder)
     {
@@ -777,9 +777,9 @@ internal static class KeyRingProtection
                     found.Add(Path.GetFileName(file));
                 }
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Being written right now: it is checked at the next start
+                // Being written right now (or not readable by this account): it is checked at the next start
             }
         }
 
@@ -793,8 +793,8 @@ internal static class KeyRingProtection
     /// <param name="folder">The folder of the key ring.</param>
     /// <returns>
     ///     The number of <c>key-*.xml</c> files, of those with an unencrypted key, and of those with an encrypted
-    ///     key; all zero when the folder does not exist. A file that is neither (or cannot be read at this moment)
-    ///     is only part of the total.
+    ///     key; all zero when the folder does not exist. A file that is neither (or cannot be read at this moment, or
+    ///     not by this account) is only part of the total.
     /// </returns>
     /// <remarks>
     ///     Read-only: nothing is created, changed or returned of the content of a file. The scan of the stored
@@ -825,9 +825,9 @@ internal static class KeyRingProtection
                     encrypted++;
                 }
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Being written right now: it counts as a file, nothing more is known of it
+                // Being written right now (or not readable by this account): it counts as a file, nothing more is known of it
             }
         }
 

@@ -474,6 +474,12 @@ What happens when the keys are missing at the restore:
   the environment of that start, and remove it afterwards). The server then starts, creates a new key ring, and logs a
   warning with the number of secrets that became unreadable. A fresh installation (no secrets) is not affected and
   needs no setting.
+- **A database that cannot be read, next to an empty key folder, is refused too.** When the server cannot read the
+  database to check whether it holds protected secrets (it is locked, damaged, or not a database) and the key folder
+  holds no key file, it does not start and creates no key, because it cannot tell a lost key ring from a new
+  installation. Fix the access to the database and start again; `DataProtection:AllowNewKeyRing` does not bypass this,
+  because it only accepts the loss of secrets that are known to exist. When the key folder has keys, the server starts
+  and logs a warning, and the start-up that opens the database reports the problem.
 - **A key ring that does not belong to the database is not refused, but reported.** When the folder has keys but some
   secrets cannot be decrypted with them (a key folder of another installation, or an older backup), the server starts,
   because the rest of the data is usable, and logs an error at every start with the counts of unreadable repository
@@ -623,6 +629,12 @@ the project produced on purpose with a wrong setting, and what to do:
   database was restored (or the key folder was lost) without its key ring. Restore the key folder that belongs to the
   database. Only if you accept that the stored repository tokens and second-factor secrets are lost, start once with
   `DataProtection:AllowNewKeyRing` set to `true` (see Back Up and Restore).
+- `Key ring '<folder>' is empty and the database (Database:ConnectionString) could not be read to check whether it
+  holds protected secrets, so no key was created. Fix the access to the database and start again; run 'reviewcenter
+  --validate --check-config' for the details.`: the key folder has no key file and the server could not read the
+  database (it is locked, damaged, or not a database), so it cannot tell whether a key ring was lost. Fix the access to
+  the database (a lock is usually gone after a moment) and start again; `DataProtection:AllowNewKeyRing` does not
+  bypass this.
 - `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned or
   CertificateStore.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
 

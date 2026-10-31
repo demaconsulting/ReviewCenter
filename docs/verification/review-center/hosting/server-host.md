@@ -55,7 +55,10 @@ N/A - standard test environment.
   start with an error that names the folder, the count, and `DataProtection:AllowNewKeyRing`, and no key is created;
   with the setting true the server starts and logs a warning with the count; a restart on the same ring, and a fresh
   installation (no secrets, empty ring), start without complaint; when the ring has keys but some secrets cannot be
-  decrypted, the server logs an error with the counts and starts. `user add` and `audit verify` create no key file.
+  decrypted, the server logs an error with the counts and starts. A database that cannot be read stops the start when
+  the ring has no key file (naming the folder and `Database:ConnectionString`, no exception text or database location,
+  no key created, with or without the setting), and only logs a warning when the ring has keys. `user add` and
+  `audit verify` create no key file.
 - The personal access token service is one shared instance, the routes under `/api` are mapped, the OpenAPI document is
   served without a token, a protected route without a token is answered 401, and an unknown address under `/api` is
   answered with a JSON problem document instead of a page.
@@ -250,6 +253,19 @@ cases). The build fails with the message "Key ring '...' is empty but the databa
 **ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning**: The same lost ring is started with
 `DataProtection:AllowNewKeyRing` true; the build succeeds and a warning that names the setting and the number of
 secrets is logged. This scenario is tested by `ServerHost_CreateApplication_LostRingWithAllowNewKeyRing_StartsWithWarning`.
+
+**ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey**: The database file is
+replaced by a file that is not a database, so the scan fails with a `SqliteException` on every platform, and the key
+folder has no key (a theory without and with `DataProtection:AllowNewKeyRing`). The build fails with the message "Key
+ring '...' is empty and the database (Database:ConnectionString) could not be read to check whether it holds protected
+secrets, so no key was created", which holds neither the location of the database nor the text of the exception and has
+no inner exception, and no key file exists afterwards. This scenario is tested by
+`ServerHost_CreateApplication_EmptyRingAndUnreadableDatabase_RefusesToStartAndCreatesNoKey`.
+
+**ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning**: A server is started once, so that
+the ring has a key, and the database file is then replaced by a file that is not a database. The second build succeeds
+with the same single key and logs a warning that the database could not be read. This scenario is tested by
+`ServerHost_CreateApplication_RingWithKeysAndUnreadableDatabase_StartsWithWarning`.
 
 **ServerHost_CreateApplication_RestartWithSameRing_StartsWithoutComplaint**: A server is started, its secrets are
 stored, and a second start over the same database and ring succeeds without a warning or an error about the secrets.
