@@ -704,6 +704,10 @@ nothing, and with it the review is created. This scenario is tested by
 the message of the refusal as the preview error, and creating refuses with the same message and stores nothing. This
 scenario is tested by `NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal`.
 
+**NewReviewPage_FollowUp_DuplicateFileNames_ShowsRefusalInsteadOfFailing**: Two selected files with the same name show
+the duplicate-path message as the preview error instead of failing, and creating refuses with the same message and
+stores nothing. This scenario is tested by `NewReviewPage_FollowUp_DuplicateFileNames_ShowsRefusalInsteadOfFailing`.
+
 **NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview**: Choosing no follow-up again removes the preview and the
 suggested title, and the review is created without a followed review. This scenario is tested by
 `NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview`.

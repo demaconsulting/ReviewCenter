@@ -399,7 +399,9 @@ sections:
           the number of answers and of not-applicable sections, the number of open threads, the number of resolved
           threads that are not carried, and the files of open threads that the new review does not have, by the same
           rule that the creation applies, refusing an unfit earlier review with the FollowUpInvalid rule, and refusing
-          a user who may not see the project as for a project that does not exist.
+          a user who may not see the project as for a project that does not exist. The files must obey the file rules
+          of the creation (count, paths, sizes, unique paths), so that a set the creation would refuse is refused with
+          the same rule and message instead of failing.
         justification: |
           The person who creates a follow-up should see what it takes over, and what would be dropped, before the
           review exists. Using the rule of the creation keeps the preview from promising what the creation does not
@@ -409,6 +411,7 @@ sections:
           - ReviewService_PreviewFollowUpAsync_CountsWhatCreationCarries
           - ReviewService_PreviewFollowUpAsync_ChangesNothing
           - ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid
+          - ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation
           - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
           - ReviewReads_Auditor_AreAllowed
           - AccessCoverage_PublicActorMethods_AreAllClassified

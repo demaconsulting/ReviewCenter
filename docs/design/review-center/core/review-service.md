@@ -202,6 +202,11 @@ A carried answer counts as an answer (the progress of the checklist and `Signing
 carried thread is an open thread, so it blocks approval until it is resolved. Answering a carried check again, or
 setting a carried section again, stores the new value without the mark (see `ChecklistService`).
 
+**Preview of a follow-up**: `PreviewFollowUpAsync` takes the project, the earlier review, the uploaded files and the
+actor. It needs only the right to view the project, stores and audits nothing, and checks the files with the same rules
+as `CreateDraftAsync` (count, paths, sizes, unique paths) before it applies the fit check and the carry computation of
+the creation. A set of files that the creation would refuse is therefore refused with the same rule and message.
+
 **Audit of a follow-up**: the detail of `review.created` gets `, follows 'X'; carried N answers, M threads` (after the
 files, and on the repository path after the fingerprint; before the set, due date and token text), followed by
 `, R resolved threads not carried` when R is greater than zero and `, open threads on F files dropped` when the creator

@@ -965,4 +965,39 @@ public class ReviewServiceFollowUpTests
             w.ProjectId, "rev-1", [new UploadedFile("z.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken));
         Assert.Contains("no file in common", noCommonFile.Message, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    ///     Test that the preview applies the file rules of creation before it compares paths: a set with a duplicate
+    ///     path, a path that is too long and no file at all are refused with the rule of creation, and the message of
+    ///     the duplicate names the path.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation()
+    {
+        // Arrange
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1");
+
+        // Act
+        var duplicate = await Assert.ThrowsAsync<DomainRuleException>(() => w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId,
+            "rev-1",
+            [new UploadedFile("a.txt", TestContent.A), new UploadedFile("a.txt", TestContent.A)],
+            TestActors.Ann,
+            TestContext.Current.CancellationToken));
+        var tooLong = await Assert.ThrowsAsync<DomainRuleException>(() => w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId,
+            "rev-1",
+            [new UploadedFile(new string('x', ReviewLimits.MaxPathLength + 1), TestContent.A)],
+            TestActors.Ann,
+            TestContext.Current.CancellationToken));
+        var none = await Assert.ThrowsAsync<DomainRuleException>(() => w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId, "rev-1", [], TestActors.Ann, TestContext.Current.CancellationToken));
+
+        // Assert: the rules and the message are those of creation
+        Assert.Equal(DomainRule.DuplicatePath, duplicate.Rule);
+        Assert.Contains("'a.txt' appears more than once", duplicate.Message, StringComparison.Ordinal);
+        Assert.Equal(DomainRule.PathInvalid, tooLong.Rule);
+        Assert.Equal(DomainRule.NoFiles, none.Rule);
+    }
 }

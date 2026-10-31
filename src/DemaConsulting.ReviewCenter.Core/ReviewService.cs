@@ -650,7 +650,8 @@ public sealed class ReviewService
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and with
     ///     <see cref="DomainRule.FollowUpInvalid"/> when no review is named, the review does not exist in the project or
-    ///     does not fit the new files.
+    ///     does not fit the new files, and with the file rules of <see cref="CreateDraftAsync"/> (for example
+    ///     <see cref="DomainRule.DuplicatePath"/>) when the files would be refused at creation.
     /// </exception>
     public async Task<FollowUpPreview> PreviewFollowUpAsync(
         int projectId,
@@ -664,6 +665,10 @@ public sealed class ReviewService
 
         // Whoever may not see the project learns nothing about it, and nothing about its reviews
         await _access.RequireViewAsync(actor, projectId, cancellationToken);
+
+        // The files obey the rules of creation (count, paths, sizes, unique paths): the carry-over compares paths, so
+        // a set that creation would refuse is refused with the same message here
+        ValidateFiles(files);
         var follow = NormalizeFollows(followsReviewId)
                      ?? throw new DomainRuleException(DomainRule.FollowUpInvalid, "Choose the review to follow up.");
 

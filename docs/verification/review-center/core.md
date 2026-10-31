@@ -242,7 +242,8 @@ tests of `FollowUpCarryTests.cs`. The preview of a follow-up (`PreviewFollowUpAs
 creation carries, to change nothing, to refuse an unfit source with `FollowUpInvalid`, and to follow the access rule of
 the other operations of the service, by `ReviewService_PreviewFollowUpAsync_CountsWhatCreationCarries`,
 `ReviewService_PreviewFollowUpAsync_ChangesNothing`,
-`ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid`, and
+`ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid`,
+`ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation`, and
 `ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing`. The rule `FollowUpInvalid` is one row of the
 theory
 `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.

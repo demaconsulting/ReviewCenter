@@ -309,6 +309,34 @@ public class NewReviewPageFollowUpTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that two files with the same name show the duplicate-path refusal of creation instead of failing in
+    ///     the preview, and that creation is refused with the same message.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_FollowUp_DuplicateFileNames_ShowsRefusalInsteadOfFailing()
+    {
+        // Arrange: the earlier review and two selected files with the same name
+        var projectId = await ArrangeSourceAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-2");
+        await SelectFilesAsync(cut, "a.txt", "a.txt");
+
+        // Act: choose the earlier review
+        await cut.Find("[data-testid='follow-source-select']").ChangeAsync("REV-1");
+
+        // Assert: the preview shows the message of the file rule instead of counts, and the page still works
+        Assert.Contains("appears more than once", TextOf(cut, "follow-preview-error"), StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='follow-preview']"));
+
+        // Act: create anyway
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: creation gives the same refusal and stores nothing
+        Assert.Contains("appears more than once", TextOf(cut, "review-error"), StringComparison.Ordinal);
+        Assert.Null(await Reviews.GetAsync(projectId, "REV-2", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that choosing no earlier review again drops the preview and the suggested title, and that the review is
     ///     then created as a plain one.
     /// </summary>

@@ -514,6 +514,11 @@ review that does not exist, a review of another project and an earlier review wi
 with `FollowUpInvalid`; the last message says that there is no file in common. This scenario is tested by
 `ReviewService_PreviewFollowUpAsync_UnfitSource_IsRefusedWithFollowUpInvalid`.
 
+**ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation**: A set of files with a duplicate path, a path
+that is too long, or no file at all is refused with the rule of the creation (`DuplicatePath`, `PathInvalid`,
+`NoFiles`) before any path is compared, and the message of the duplicate names the path. This scenario is tested by
+`ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation`.
+
 **The access to the preview** is verified with the other operations that take an actor, in
 `ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing` (a user who is no member gets the not-found
 refusal of a project that does not exist), `ReviewReads_Auditor_AreAllowed` (an auditor may preview), and

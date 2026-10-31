@@ -305,6 +305,7 @@ sections:
           - NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion
           - NewReviewPage_FollowUp_DroppedThreads_NeedTheAcknowledgement
           - NewReviewPage_FollowUp_UnfitFiles_ShowsServiceRefusal
+          - NewReviewPage_FollowUp_DuplicateFileNames_ShowsRefusalInsteadOfFailing
           - NewReviewPage_FollowUp_ChoiceCleared_CreatesPlainReview
           - NewReviewPage_FollowUp_Repository_PassesChoiceAndAcknowledgement
           - ProjectPage_Render_FollowUpReview_ShowsFollowTag
