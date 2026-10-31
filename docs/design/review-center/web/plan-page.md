@@ -42,6 +42,10 @@ project also clears `Busy` and `Reading`, so the form of the new project is usab
 **Plan**: the `ReviewPlan` shown, or `null`. **Ticked**: the identifiers of the ticked rows. **Results**: the
 `PlanCreateResult` values of the last creation, or `null`.
 
+**DefaultDueText**: the optional due date typed for all the reviews of the plan (`yyyy-MM-dd`, empty for none), and the
+due date text of each row, by review-set identifier (**RowDueText**, set with **SetRowDue**; a row without text has
+none of its own). Both dates are calendar days in UTC, and the page says so.
+
 **ErrorMessage**, **ErrorHint**, **ErrorKind**: the plain-English message of the last failure, what to do about it, and
 its kind (the name of the domain rule, `Input`, or `Unexpected`), which the error box carries as `data-error-kind`.
 
@@ -55,7 +59,8 @@ Test identifiers: `plan-page` (root), `breadcrumb-projects-link`, `plan-breadcru
 `plan-error-message`, `plan-error-hint`, and `plan-error-project-link`; the overview: `plan-overview`, `plan-summary`,
 `plan-facts`, and `plan-next-step`; the sets that need a review: `plan-todo`, `plan-todo-list`, `plan-select-all` and
 `plan-select-none` (for more than three rows), per row `plan-row-{set}`, `plan-row-check-{set}`,
-`plan-row-title-{set}`, `plan-row-note-{set}`, and `plan-row-counts-{set}`, then `plan-create-button` and
+`plan-row-title-{set}`, `plan-row-note-{set}`, `plan-row-counts-{set}`, and `plan-row-due-{set}` (the due date of the
+row), then `plan-default-due-input` (the due date for all the ticked rows), `plan-create-button` and
 `plan-create-hint`; the sets that cannot be planned: `plan-problems`, `plan-problem-list`, `plan-problem-{set}`, and
 `plan-problem-reason-{set}`; the sets already filed: `plan-filed-list`, `plan-filed-toggle`, `plan-filed-{set}`, and
 `plan-filed-link-{set}`; the sets with nothing to review: `plan-empty-list`, `plan-empty-toggle`, and
@@ -91,6 +96,13 @@ already filed one, and the reason for a failed one, with a button to plan again 
 whole batch is refused (for example the repository was disabled after the plan was shown), the message is shown next to
 the create button and the plan and ticks stay, so the user can try again. While the batch is created the form, the ticks,
 and select all and none are disabled.
+
+**Due dates**: the sets that need a review offer an optional due date for all of them and one for each row. When the
+reviews are created, each ticked row is sent with the date of its own row and the date for all is passed as the
+default, which `ReviewPlanner.CreateAsync` applies to every row without a date of its own. The text is read with
+`ReviewService.ParseDueDate`; text that is not a date refuses the whole batch with the message of the rule next to the
+create button (the plan and ticks stay), while a date that the creation rule refuses (in the past, too far ahead)
+fails that review only, with the reason in its result row, and the others are created.
 
 **SetTicked**, **SetAllTicked**: Set or clear the tick of one row, or of all rows. Ticking never reads git again. Select
 all and select none are offered only for more than three rows.

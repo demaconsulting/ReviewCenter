@@ -131,6 +131,9 @@ N/A - standard test environment.
 - The project page shows a project admin and a system administrator a "Review rules" card with the switch "Require
   independent reviewers", on by default; saving a change stores it, confirms it, and records one audit entry
   `project.independent-reviewers-changed`; a plain member sees no card.
+- The form for a new review has an optional due date, a calendar day in UTC: a date from today to two years ahead is
+  stored with the review, a date outside that range is refused with a message about the due date and creates nothing,
+  and an empty field means no date.
 
 #### Test Scenarios
 
@@ -178,6 +181,19 @@ page opened is refused on submit and nothing is created. This scenario is tested
 **NewReviewPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview**: Skipped entries are listed with a link to
 open the created review, and the page does not navigate until the link is followed. This scenario is tested by
 `NewReviewPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview`.
+
+**NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview**: The repository form is filled in and an optional due date
+is typed; the form says the date is in UTC. After submitting, the review carries the date. This scenario is tested by
+`NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview`, defined in `NewReviewPageRepositoryTests.cs`.
+
+**NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing**: Yesterday as the due date shows an error that
+names the due date and creates nothing; with the field emptied the review is created without a date. This scenario is
+tested by `NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing`.
+
+**NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate**: The upload form is filled in with a file
+and yesterday as the due date; the error names the due date and nothing is created. After the date is corrected and
+the form is submitted again, the review is created from the upload with the date. This scenario is tested by
+`NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate`, defined in `ProjectPageTests.cs`.
 
 **ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository**: A project without any repository shows the note and no
 link; after a repository is registered, the link goes to `/projects/{id}/plan` and the note is gone. This scenario is

@@ -35,7 +35,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     take effect (a method that returns <c>null</c> or <c>false</c>) records nothing.
 ///     The methods that change reviewed content (<see cref="AddThreadAsync"/>, <see cref="AddCommentAsync"/>,
 ///     <see cref="SetThreadStateAsync"/>, <see cref="SetChecklistSectionStateAsync"/>, <see cref="SetChecklistAnswerAsync"/>,
-///     <see cref="AddSlotAsync"/>, <see cref="UpdateSlotAsync"/> and <see cref="RemoveSlotAsync"/>) must also refuse with
+///     <see cref="AddSlotAsync"/>, <see cref="UpdateSlotAsync"/>, <see cref="RemoveSlotAsync"/> and, for the same reason of
+///     "approved means nothing changes", <see cref="UpdateDueDateAsync"/>) must also refuse with
 ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved (see <see cref="ReviewLock"/>), checked inside
 ///     the same transaction as the change, so a signature that completes the approval at the same moment cannot be
 ///     overtaken by a change; nothing is stored then.
@@ -287,6 +288,35 @@ public interface IReviewStore
     Task AddReviewAsync(Review review, AuditDraft audit, CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Changes the due date of a review, if it still holds the value the caller based its change on.
+    /// </summary>
+    /// <remarks>
+    ///     The comparison and the update are one atomic step (compare-and-set) inside the transaction that also stores
+    ///     the audit entry, like <see cref="UpdateEvidenceSettingsAsync"/>, so two people who save at the same time
+    ///     cannot silently overwrite each other and the audit entry always names the value that was replaced. The
+    ///     method also refuses with <see cref="DomainRule.ReviewLocked"/> when the review is approved, checked inside
+    ///     the same transaction (see <see cref="ReviewLock"/>). The due date is not part of the record digest.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="expected">The due date the caller read and based its change on; <c>null</c> for none.</param>
+    /// <param name="dueDate">The new due date; <c>null</c> clears it.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the due date was changed; <c>false</c> (and nothing recorded) when the review does not exist
+    ///     or its due date is no longer <paramref name="expected"/>.
+    /// </returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is approved.</exception>
+    Task<bool> UpdateDueDateAsync(
+        int projectId,
+        string reviewId,
+        DateOnly? expected,
+        DateOnly? dueDate,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Reads one review with its file metadata (without file bytes).
     /// </summary>
     /// <param name="projectId">The project identity.</param>
@@ -472,6 +502,26 @@ public interface IReviewStore
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The snapshot, or <c>null</c> when the review does not exist.</returns>
     Task<ReviewSnapshot?> GetSnapshotAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Tells which of several reviews of a project are approved, without loading a full snapshot for each one.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers to check. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The identifiers among <paramref name="reviewIds"/> that are approved by the definition of
+    ///     <see cref="ReviewLock.IsApproved"/>; a review that does not exist is not in the set.
+    /// </returns>
+    /// <remarks>
+    ///     The slots and the signatures of all the reviews are read with one query each, in one read transaction. The
+    ///     record, which the current digest needs, is loaded only for a review whose every slot holds some signature,
+    ///     because no other review can be approved.
+    /// </remarks>
+    Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Lists the reviewer slots of a review.

@@ -32,7 +32,9 @@ repository registry is the one exception, see `Repositories`).
 - **Reviews** (`Review`): key `ProjectId` plus `Id`. `Title` is required, at most 200; `State` is stored as text, at
   most 32; `ContentFingerprint` is required, at most 64; `Created`; `CreatedBy` (the user name of the creator, at most
   the user name limit, null for a review stored before the column existed) and `CreatedViaApi` (default false, true
-  for a review created with a personal access token). A review from a repository also has
+  for a review created with a personal access token) and `DueDate` (the optional due date, a calendar day stored as
+  text in the form `yyyy-MM-dd`, null for a review without one; it is not part of the record digest). A review from
+  a repository also has
   `RepositoryId` (a plain number, not a foreign key, so the review keeps its reference whatever happens to the
   registration), `RepositoryName` (a display copy, at most the repository name limit), `BaselineSha` and `HeadSha` (at
   most 64 characters), `Selection` (at most `ReviewLimits.MaxSelectionLength`), and `ReviewSetId` (the review-set
@@ -168,8 +170,10 @@ and baseline columns on a file): a database created before the review-from-git s
 deleted and created again (there are no migrations; the development database is simply recreated). The same holds for
 the `PersonalAccessTokens` table and the creator columns of a review (`CreatedBy`, `CreatedViaApi`): a database created
 before the personal-access-token slice does not have them and must be deleted and created again. The same holds for the
-`ProjectMemberships` table, the `IsSystemAdmin` column of a user (which replaces the role column), and the `ProjectId`
-of a repository: a database created before the project access slice does not have them and must be deleted and created
+`DueDate` column of a review: there is no migration for it either, `EnsureCreated` does not add a column to an existing
+table, and development databases are recreated. The same holds for the `ProjectMemberships` table, the
+`IsSystemAdmin` column of a user (which replaces the role column), and the `ProjectId` of a repository: a database
+created before the project access slice does not have them and must be deleted and created
 again. The same holds for the `MustChangePassword` column of a user (project members management): the schema is created
 with `EnsureCreated` and has no migrations, so a development database created before that column existed does not have
 it and must be deleted and created again. The same holds for the seven evidence settings columns of a project: there is

@@ -127,7 +127,7 @@
           "ApiEndpoints"
         ],
         "summary": "Lists the reviews of a project.",
-        "description": "Returns the reviews of the project, ordered by their identifier, without their details.",
+        "description": "Returns the reviews of the project, ordered by their identifier, without their details; each with its due date and whether it is overdue.",
         "operationId": "ListReviews",
         "parameters": [
           {
@@ -190,7 +190,7 @@
           "ApiEndpoints"
         ],
         "summary": "Creates a review.",
-        "description": "Creates a draft review from uploaded files (Base64) or from a registered git repository; send exactly one of 'files' and 'repository'. The review is recorded as created with an API token. Reviewer slots and signatures cannot be changed with an API token.",
+        "description": "Creates a draft review from uploaded files (Base64) or from a registered git repository; send exactly one of 'files' and 'repository'. The optional 'dueDate' is a UTC calendar day (yyyy-MM-dd), not before today and not more than two years ahead. The review is recorded as created with an API token. Reviewer slots and signatures cannot be changed with an API token.",
         "operationId": "CreateReview",
         "parameters": [
           {
@@ -688,6 +688,13 @@
                 "$ref": "#/components/schemas/RepositorySourceDto"
               }
             ]
+          },
+          "dueDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The optional due date (UTC calendar day, `yyyy-MM-dd`): not before today, at most two years ahead."
           }
         },
         "description": "The request to create a review: either uploaded files or a repository source, never both."
@@ -1028,6 +1035,8 @@
           "headSha",
           "selection",
           "reviewSetId",
+          "dueDate",
+          "overdue",
           "approved",
           "approvalDigest",
           "slots",
@@ -1108,6 +1117,17 @@
             ],
             "description": "The review-set the review was planned from, or `null`."
           },
+          "dueDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The due date as a UTC calendar day in `yyyy-MM-dd` form, or `null` when there is none."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "`true` when the due date is before today (UTC) and the review is not approved."
+          },
           "approved": {
             "type": "boolean",
             "description": "`true` when every reviewer slot has signed the current record."
@@ -1150,7 +1170,9 @@
           "contentFingerprint",
           "createdBy",
           "createdViaApi",
-          "isFromRepository"
+          "isFromRepository",
+          "dueDate",
+          "overdue"
         ],
         "type": "object",
         "properties": {
@@ -1189,6 +1211,17 @@
           "isFromRepository": {
             "type": "boolean",
             "description": "`true` when the review was created from a git repository, `false` for an upload."
+          },
+          "dueDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The due date as a UTC calendar day in `yyyy-MM-dd` form, or `null` when there is none."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "`true` when the due date is before today (UTC) and the review is not approved."
           }
         },
         "description": "A review in a list, without its details."

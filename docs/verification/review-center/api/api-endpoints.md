@@ -24,6 +24,9 @@ N/A - standard test environment (a temporary database and key folder are created
   the `ApiTokenAuthentication` unit).
 - A review is created from uploaded files or from the changes of a repository, answered with 201, flagged as created
   through the API, and the audit entry names the token.
+- A review can be created with an optional `dueDate` (`yyyy-MM-dd`, UTC); the answer, the list, and the details show
+  `dueDate` and `overdue`, and a date that is not a date, is in the past, or is more than two years ahead is a 400
+  problem that names the due date and creates nothing.
 - An invalid body is a 400 problem that names the field, a body that is not JSON of the right shape is a 400 problem, a
   body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status; the rule
   for the last project administrator is 409, too many attempts 429, a required password change 403, and the rules for a
@@ -89,6 +92,17 @@ repository with a request whose repository source leaves out the selection, and 
 `null`. Both are answered with 201, the review has the two changed files, and its selection is `**/*`. This scenario is
 tested by `ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange`.
 
+**ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag**: A review is created with a `dueDate` a week
+ahead and one without. Both are answered with 201; the answer carries the date and is not overdue, and the audit entry
+names the date. The list and the details show `dueDate` (null for the review without one) and `overdue` false; after an
+administrator moves the date to yesterday, both show `overdue` true. This scenario is tested by
+`ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag`.
+
+**ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing**: A theory sends a `dueDate` that is not a date,
+one in the past, one beyond two years ahead, and one that does not exist on the calendar. Each answer is a 400 problem
+that names the due date, and no review is created. This scenario is tested by
+`ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing`.
+
 **ApiEndpoints_CreateReview_BadRequestBody_Answers400NamingTheField**: Bodies with no source, with two sources, with a
 file that is not Base64, and with no body are sent. Each answer is a 400 problem document that names the field
 (`source`, `files[0].contentBase64`, or `body`), and no review is created. This scenario is tested by
@@ -130,7 +144,8 @@ unknown project are sent. The answers are 409, 400, 400, and 404, each a problem
 This scenario is tested by `ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus`.
 
 **ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus**: The status for each of the rules `LastProjectAdmin`,
-`TooManyAttempts`, and `PasswordChangeRequired` is asked of `ApiProblems`; the answers are 409, 429, and 403. This
+`TooManyAttempts`, `PasswordChangeRequired`, and `DueDateInvalid` is asked of `ApiProblems`; the answers are 409, 429, 403,
+and 400. This
 scenario is tested by `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus`.
 
 **ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409**: The status for each of the rules `ReviewLocked` and

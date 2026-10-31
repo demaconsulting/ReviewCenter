@@ -548,6 +548,83 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test that a review can be given a due date when it is planned and can have the date set, changed and shown
+    ///     as overdue on its page (the date is a UTC calendar day), that every change of the date is audited, and that
+    ///     an approved review keeps its date as history without the Overdue badge and cannot have it edited.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited()
+    {
+        // Arrange: a review that puppet created without a due date, and two dates computed in UTC
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var browser = scenario.Browser;
+        await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var ahead = today.AddDays(7).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var yesterday = today.AddDays(-1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        await scenario.OpenReviewAsync();
+        var noDateAtFirst = await browser.ExistsAsync("review-due-none");
+
+        // Act: plan another review with a due date, and open it
+        var planned = await scenario.PlanNewReviewAsync(ahead);
+        await browser.GotoAsync($"/projects/1/reviews/{planned}", "review-page");
+        var plannedDue = await browser.TextOfAsync("review-due-date");
+        var plannedOverdue = await browser.ExistsAsync("review-overdue");
+
+        // Act: change the date of that review to yesterday, which is allowed on edit and makes it overdue
+        await browser.OkAsync("fill", "review-due-input", yesterday);
+        await browser.OkAsync("click", "review-due-save");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("review-overdue"), "the Overdue badge");
+        var editedDue = await browser.TextOfAsync("review-due-date");
+
+        // Act: clear it again
+        await browser.OkAsync("click", "review-due-clear");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("review-due-none"), "the date to be cleared");
+        var overdueAfterClear = await browser.ExistsAsync("review-overdue");
+
+        // Act: give the first review yesterday as its date, then approve it
+        await scenario.OpenReviewAsync();
+        await browser.OkAsync("fill", "review-due-input", yesterday);
+        await browser.OkAsync("click", "review-due-save");
+        await browser.WaitUntilAsync(() => browser.ExistsAsync("review-overdue"), "the Overdue badge of the first review");
+        var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.OpenReviewAsync(reviewer);
+        await Scenario.SignAsync(reviewer, slot);
+
+        // Act: look at the approved review
+        await scenario.OpenReviewAsync();
+        var lockedDue = await browser.TextOfAsync("review-due-date");
+        var lockedOverdue = await browser.ExistsAsync("review-overdue");
+        var lockedForm = await browser.ExistsAsync("due-date-form");
+        var lockedBadge = await browser.ExistsAsync("review-locked");
+
+        // Act: read the audit trail of the server
+        await browser.GotoAsync("/audit", "audit-page");
+        var trail = await browser.TextOfAsync("audit-page");
+
+        // Assert: the first review had no date, and the planned one had the date it was planned with, not overdue
+        Assert.True(noDateAtFirst);
+        Assert.Contains(ahead, plannedDue, StringComparison.Ordinal);
+        Assert.Contains("UTC", plannedDue, StringComparison.Ordinal);
+        Assert.False(plannedOverdue, "A date in the future must not be overdue.");
+
+        // Assert: a date in the past is accepted on edit and shown as overdue, and clearing removes the badge
+        Assert.Contains(yesterday, editedDue, StringComparison.Ordinal);
+        Assert.False(overdueAfterClear);
+
+        // Assert: an approved review keeps its date, is not overdue and offers no edit
+        Assert.True(lockedBadge);
+        Assert.Contains(yesterday, lockedDue, StringComparison.Ordinal);
+        Assert.False(lockedOverdue, "An approved review is never overdue.");
+        Assert.False(lockedForm, "The due date of an approved review must not be editable.");
+
+        // Assert: the audit trail shows that the dates were changed
+        Assert.Contains("review.due-date-changed", trail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Reads a JSON document from the API.
     /// </summary>
     /// <param name="http">The client, with its credentials.</param>
@@ -937,8 +1014,9 @@ public class ReviewCenterSystemTests
         /// <summary>
         ///     Changes the documentation in the repository and plans a review of it, so that the project has one more review.
         /// </summary>
+        /// <param name="dueDate">The due date to give every planned review (<c>yyyy-MM-dd</c>), or <c>null</c> for none.</param>
         /// <returns>The identifier of the new review.</returns>
-        public async Task<string> PlanNewReviewAsync()
+        public async Task<string> PlanNewReviewAsync(string? dueDate = null)
         {
             await File.AppendAllTextAsync(Path.Combine(Repository, "docs", "guide.md"), "Third line.\n", _cancellationToken);
             await PuppetEndToEndTests.RunGitAsync(Repository, _cancellationToken, "commit", "-a", "-m", "second");
@@ -947,6 +1025,11 @@ public class ReviewCenterSystemTests
             await Browser.OkAsync("fill", "plan-head-input", "main");
             await Browser.OkAsync("click", "plan-load-button");
             await Browser.OkAsync("wait", $"plan-row-{SetId}", "--timeout", "30000");
+            if (dueDate is not null)
+            {
+                await Browser.OkAsync("fill", "plan-default-due-input", dueDate);
+            }
+
             await Browser.OkAsync("click", "plan-create-button");
             await Browser.OkAsync("wait", $"plan-result-link-{SetId}", "--timeout", "30000");
             var link = await Browser.EvalAsync($"document.querySelector('[data-testid=\"plan-result-link-{SetId}\"]').getAttribute('href')");

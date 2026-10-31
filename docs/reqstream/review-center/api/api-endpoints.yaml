@@ -59,6 +59,22 @@ sections:
           - ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges
           - ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange
 
+      - id: ReviewCenter-ApiEndpoints-CreateDueDate
+        title: >-
+          The ApiEndpoints unit shall accept an optional due date (a calendar day in UTC, written like 2030-01-31)
+          in the request that creates a review, with the same rules as the web pages, answer a text that is not such
+          a date, or a date that is before today or more than two years ahead, with status 400 and a problem
+          document, creating no review, and show the due date and whether the review is overdue in the review that
+          it returns, in the detail of a review, and in the list of reviews.
+        justification: |
+          A pipeline that creates a draft for every pull request knows when the change is expected to be reviewed.
+          A date that cannot be read, or that the rules refuse, must be reported to the caller instead of being
+          dropped, and a script that polls the reviews needs the date and the overdue flag without reading a page.
+        tests:
+          - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+          - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
+          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
       - id: ReviewCenter-ApiEndpoints-Validation
         title: >-
           The ApiEndpoints unit shall answer a request body that is not valid, including one that is not JSON or not

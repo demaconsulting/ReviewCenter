@@ -38,6 +38,8 @@ N/A - standard test environment (the integration tests need git, and skip themse
   fault, which is reported with a generic reason; a git access failure is reported with a fixed sentence that carries no
   git text; a cancellation is not turned into a result.
 - Review identifiers are safe, within the limit, and unique, also when taken during the creation.
+- A default due date and a due date of each row reach the created reviews, the row's own date winning; a date that the
+  creation rule refuses fails only its row.
 
 #### Test Scenarios
 
@@ -164,6 +166,12 @@ and an unknown project are refused for the whole batch, and git is never opened.
 **ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits**: A review made from the longest repository name, set
 identifier, and title is created, and its audit detail and title fit their limits. This scenario is tested by
 `ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits`.
+
+**ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow**: A batch of two rows is created with a default due
+date, the first row asking for a date of its own. The first review has its own date and the second the default, both
+named in the audit detail. In a second batch, a default date in the past fails only the row that takes it (the reason
+names the due date, nothing is stored for it), and the row with a valid date of its own is created. This scenario is
+tested by `ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow`.
 
 **ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId**: Unsafe characters, runs, leading and trailing punctuation, empty
 results, and taken identifiers give the expected safe and unique identifiers. This scenario is tested by

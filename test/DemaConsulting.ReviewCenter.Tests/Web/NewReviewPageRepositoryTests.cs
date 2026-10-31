@@ -222,6 +222,58 @@ public class NewReviewPageRepositoryTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a due date typed into the optional field is stored with the new review, and that the form also
+    ///     works without one.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview()
+    {
+        // Arrange: the repository form filled in, with a due date (the page's clock is 2025-03-04)
+        var (projectId, repositoryId) = await ArrangeAsync();
+        var cut = RenderPage(projectId);
+        await FillAsync(cut, repositoryId, "main", "v1");
+        Assert.Contains("UTC", cut.Markup, StringComparison.Ordinal);
+        await cut.Find("[data-testid='due-date-input']").InputAsync("2025-04-01");
+
+        // Act: submit
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the review carries the due date
+        var review = await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.Equal(new DateOnly(2025, 4, 1), review!.DueDate);
+    }
+
+    /// <summary>
+    ///     Test that a due date in the past is refused with a message and creates nothing, and that an empty field
+    ///     means no due date.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing()
+    {
+        // Arrange: the repository form filled in, with yesterday as the due date
+        var (projectId, repositoryId) = await ArrangeAsync();
+        var cut = RenderPage(projectId);
+        await FillAsync(cut, repositoryId, "main", "v1");
+        await cut.Find("[data-testid='due-date-input']").InputAsync("2025-03-03");
+
+        // Act: submit
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the error names the due date and nothing was created
+        Assert.Contains("due date", cut.Find("[data-testid='review-error']").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+
+        // Act: clear the field and submit again
+        await cut.Find("[data-testid='due-date-input']").InputAsync(string.Empty);
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the review is created without a due date
+        var review = await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.NotNull(review);
+        Assert.Null(review.DueDate);
+    }
+
+    /// <summary>
     ///     Test that an empty baseline and the default selection review every file at the head.
     /// </summary>
     [Fact]

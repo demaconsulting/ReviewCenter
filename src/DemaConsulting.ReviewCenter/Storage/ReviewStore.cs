@@ -39,7 +39,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     Every change is made through <see cref="AuditAppender.ExecuteAsync{TResult}"/>: one write transaction, under the
 ///     process-wide audit gate, that stores the change and its audit entry together or not at all. The changes of
 ///     reviewed content and of the reviewer slots re-check inside that transaction that the review is not approved
-///     (locked) and refuse with <see cref="DomainRule.ReviewLocked"/> otherwise.
+///     (locked) and refuse with <see cref="DomainRule.ReviewLocked"/> otherwise; so does the change of the due date,
+///     which also compares the due date the caller read (compare-and-set).
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
 /// <param name="appender">The appender that runs each change together with its audit entry.</param>
@@ -440,6 +441,33 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
+    public async Task<bool> UpdateDueDateAsync(
+        int projectId,
+        string reviewId,
+        DateOnly? expected,
+        DateOnly? dueDate,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // An approved review is locked; the check shares the transaction with the change
+                await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
+
+                // The comparison is part of the update statement, so it is atomic with the change (null needs IS NULL)
+                var rows = await context.Reviews
+                    .Where(r => r.ProjectId == projectId && r.Id == reviewId && r.DueDate == expected)
+                    .ExecuteUpdateAsync(r => r.SetProperty(x => x.DueDate, dueDate), cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<Review?> GetReviewAsync(
         int projectId,
         string reviewId,
@@ -754,6 +782,53 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .OrderBy(s => s.Id)
             .ToListAsync(cancellationToken);
         return new ReviewSnapshot(record, slots, signatures);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviewIds);
+        var approved = new HashSet<string>();
+        if (reviewIds.Count == 0)
+        {
+            return approved;
+        }
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // One read transaction, so the slots, the signatures and the records describe one state
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+        var ids = reviewIds.Distinct().ToList();
+        var slots = await context.ReviewerSlots.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+            .ToListAsync(cancellationToken);
+        var signatures = await context.Signatures.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var group in slots.GroupBy(s => s.ReviewId))
+        {
+            var own = signatures.Where(s => s.ReviewId == group.Key).ToList();
+
+            // A review with an unsigned slot cannot be approved, so its record is never loaded
+            if (!group.All(slot => own.Any(s => s.SlotId == slot.Id)))
+            {
+                continue;
+            }
+
+            var record = await LoadRecordAsync(context, projectId, group.Key, cancellationToken);
+            if (record is not null && ReviewLock.IsApproved(record, group.ToList(), own))
+            {
+                approved.Add(group.Key);
+            }
+        }
+
+        return approved;
     }
 
     /// <inheritdoc />

@@ -114,3 +114,15 @@ sections:
           - ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange
           - ReviewPlanner_CreateAsync_IdTaken_UsesSuffix
           - ReviewPlanner_CreateAsync_IdTakenDuringCreate_RetriesWithNextSuffix
+
+      - id: ReviewCenter-ReviewPlanner-DueDate
+        title: >-
+          The ReviewPlanner shall create each picked review with the due date of its own request or, when the
+          request has none, with the default due date of the batch, through the review service so that the same
+          validation applies, and shall fail only the request whose date is refused, with the reason.
+        justification: |
+          A lead plans many reviews at once and wants one date for all of them, but may need another for one. The
+          same rules as for a review made by hand keep a wrong date from being stored, and a wrong date on one row
+          must not lose the other reviews.
+        tests:
+          - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow

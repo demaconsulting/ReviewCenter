@@ -40,6 +40,8 @@ internal sealed record ProjectDto(int Id, string Name, string Description, DateT
 /// <param name="CreatedBy">The user name of the creator, or <c>null</c> when it was not recorded.</param>
 /// <param name="CreatedViaApi"><c>true</c> when the review was created with an API token.</param>
 /// <param name="IsFromRepository"><c>true</c> when the review was created from a git repository, <c>false</c> for an upload.</param>
+/// <param name="DueDate">The due date as a UTC calendar day in <c>yyyy-MM-dd</c> form, or <c>null</c> when there is none.</param>
+/// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not approved.</param>
 internal sealed record ReviewSummaryDto(
     string Id,
     string Title,
@@ -48,7 +50,9 @@ internal sealed record ReviewSummaryDto(
     string ContentFingerprint,
     string? CreatedBy,
     bool CreatedViaApi,
-    bool IsFromRepository);
+    bool IsFromRepository,
+    string? DueDate,
+    bool Overdue);
 
 /// <summary>
 ///     A reviewer slot of a review.
@@ -102,6 +106,8 @@ internal sealed record ReviewCountsDto(
 /// <param name="HeadSha">The head commit, or <c>null</c> for an upload.</param>
 /// <param name="Selection">The file selection patterns that were used, or <c>null</c> when none.</param>
 /// <param name="ReviewSetId">The review-set the review was planned from, or <c>null</c>.</param>
+/// <param name="DueDate">The due date as a UTC calendar day in <c>yyyy-MM-dd</c> form, or <c>null</c> when there is none.</param>
+/// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not approved.</param>
 /// <param name="Approved"><c>true</c> when every reviewer slot has signed the current record.</param>
 /// <param name="ApprovalDigest">The digest of the review record as it is now.</param>
 /// <param name="Slots">The reviewer slots in creation order.</param>
@@ -122,6 +128,8 @@ internal sealed record ReviewDetailDto(
     string? HeadSha,
     string? Selection,
     string? ReviewSetId,
+    string? DueDate,
+    bool Overdue,
     bool Approved,
     string ApprovalDigest,
     IReadOnlyList<SlotDto> Slots,
@@ -156,11 +164,13 @@ internal sealed record RepositorySourceDto(
 /// <param name="Title">The review title.</param>
 /// <param name="Files">The files to review; set this or <paramref name="Repository"/>.</param>
 /// <param name="Repository">The repository source to review; set this or <paramref name="Files"/>.</param>
+/// <param name="DueDate">The optional due date (UTC calendar day, <c>yyyy-MM-dd</c>): not before today, at most two years ahead.</param>
 internal sealed record CreateReviewRequest(
     string? Id,
     string? Title,
     IReadOnlyList<UploadFileDto>? Files,
-    RepositorySourceDto? Repository);
+    RepositorySourceDto? Repository,
+    string? DueDate = null);
 
 /// <summary>
 ///     A repository entry that was left out of a review.

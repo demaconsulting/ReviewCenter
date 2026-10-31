@@ -59,6 +59,20 @@ sections:
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
 
+      - id: ReviewCenter-Api-DueDate
+        title: >-
+          The Api subsystem shall let a client with a valid token give a review an optional due date, a calendar day
+          in UTC, in the request that creates it, refuse a date that is not valid with a problem document, creating
+          nothing, and show the due date and whether the review is overdue in the reviews that it returns.
+        justification: |
+          A pipeline that creates a draft for every pull request knows when the change is expected to be reviewed,
+          and a script that polls the reviews must see which are late without reading a page.
+        children:
+          - ReviewCenter-ApiEndpoints-CreateDueDate
+        tests:
+          - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
+          - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
+
       - id: ReviewCenter-Api-EvidenceJourney
         title: >-
           The Api subsystem shall let ReviewMark read the evidence index of a project and follow the file address of an

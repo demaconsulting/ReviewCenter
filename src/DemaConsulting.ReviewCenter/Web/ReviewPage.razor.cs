@@ -421,6 +421,40 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private string? ReopenError { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the signed-in user may change the due date of the review (a project
+    ///     or system administrator, or the creator of the review).
+    /// </summary>
+    private bool CanSetDueDate { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the text of the due date input (<c>yyyy-MM-dd</c>); empty for none.
+    /// </summary>
+    private string DueDateInput { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the message shown when the due date could not be saved, or <c>null</c>.
+    /// </summary>
+    private string? DueDateError { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the due date edit form is shown: allowed for the user, and the review is
+    ///     not locked.
+    /// </summary>
+    private bool CanEditDueDate => CanSetDueDate && !IsLocked;
+
+    /// <summary>
+    ///     Gets a value indicating whether the review is overdue: its due date is before today (UTC) and it is not approved.
+    /// </summary>
+    private bool IsOverdue => Review is not null && ReviewService.IsOverdue(Review, IsLocked);
+
+    /// <summary>
+    ///     Writes a due date for display and for the date input.
+    /// </summary>
+    /// <param name="dueDate">The due date.</param>
+    /// <returns>The date as <c>yyyy-MM-dd</c>.</returns>
+    private static string FormatDueDate(DateOnly dueDate) => dueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>
     ///     Gets a value indicating whether the review is approved and therefore locked.
     /// </summary>
     private bool IsLocked => Approval?.IsApproved == true;
@@ -614,6 +648,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         ProjectName = project?.Name;
         RequireIndependent = project?.RequireIndependentReviewers == true;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
+        DueDateInput = Review?.DueDate is { } due ? FormatDueDate(due) : string.Empty;
         await RefreshAsync();
 
         // Open what the address names (a file, a line of it, or a thread); the address stays as it is
@@ -711,6 +746,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
         CanReopen = false;
         ReopenReason = string.Empty;
         ReopenError = null;
+        CanSetDueDate = false;
+        DueDateInput = string.Empty;
+        DueDateError = null;
         NewSlotPrimary = string.Empty;
         NewSlotAlternate = string.Empty;
         NewSlotError = null;
@@ -913,6 +951,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
             Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
             Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
             CanReopen = actor is not null && await Access.CanAdministerAsync(actor, ProjectId);
+            CanSetDueDate = await ReviewService.CanSetDueDateAsync(actor, Review);
             try
             {
                 Candidates = actor is null ? [] : await SigningService.ListCandidatesAsync(actor, ProjectId);
@@ -1746,6 +1785,67 @@ public partial class ReviewPage : ComponentBase, IDisposable
         }
 
         SlotErrors.Remove(slotId);
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Saves the typed due date, or clears it when the input is empty.
+    /// </summary>
+    /// <returns>A task that completes when the date is stored or the problem is shown.</returns>
+    private Task SaveDueDateAsync()
+    {
+        return ChangeDueDateAsync(DueDateInput);
+    }
+
+    /// <summary>
+    ///     Clears the due date of the review.
+    /// </summary>
+    /// <returns>A task that completes when the date is cleared or the problem is shown.</returns>
+    private Task ClearDueDateAsync()
+    {
+        return ChangeDueDateAsync(string.Empty);
+    }
+
+    /// <summary>
+    ///     Stores a due date, as the signed-in user, and reloads the review.
+    /// </summary>
+    /// <param name="text">The text of the date (<c>yyyy-MM-dd</c>); empty clears the date.</param>
+    /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
+    /// <remarks>
+    ///     Only a user who may change the date is offered the form, and the service checks the same again (and refuses a
+    ///     locked review). After a refusal the typed text stays so it can be fixed; after a change by someone else the
+    ///     current date is loaded and shown with the message.
+    /// </remarks>
+    private async Task ChangeDueDateAsync(string text)
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            var dueDate = ReviewService.ParseDueDate(text);
+            await ReviewService.SetDueDateAsync(ProjectId, ReviewId, dueDate, await AuthenticationState.GetActorAsync());
+        }
+        catch (DomainRuleException ex)
+        {
+            DueDateError = ex.Message;
+
+            // Someone else changed the date, or the review got locked: show what is stored now
+            if (ex.Rule is DomainRule.RecordChanged or DomainRule.ReviewLocked)
+            {
+                Review = await ReviewService.GetAsync(ProjectId, ReviewId);
+                DueDateInput = Review?.DueDate is { } current ? FormatDueDate(current) : string.Empty;
+                await RefreshAsync();
+            }
+
+            return;
+        }
+
+        DueDateError = null;
+        Review = await ReviewService.GetAsync(ProjectId, ReviewId);
+        DueDateInput = Review?.DueDate is { } stored ? FormatDueDate(stored) : string.Empty;
         await RefreshAsync();
     }
 

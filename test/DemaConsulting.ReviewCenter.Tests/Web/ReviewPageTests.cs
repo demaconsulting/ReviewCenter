@@ -1791,6 +1791,158 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a review without a due date says so, and that a project administrator can set a date and then
+    ///     clear it again from the page, with the date shown as a UTC calendar day and no Overdue badge.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc()
+    {
+        // Arrange: a review without a due date, viewed by ann, who is a system administrator
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+        Assert.Equal("No due date", cut.Find("[data-testid='review-due-none']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-overdue']"));
+
+        // Act: set a date in the future (the clock is 2025-03-04)
+        await cut.Find("[data-testid='review-due-input']").InputAsync("2025-04-01");
+        await cut.Find("[data-testid='due-date-form']").SubmitAsync();
+
+        // Assert: the date is shown in UTC, is not overdue, and is stored
+        Assert.Equal("Due 2025-04-01 (UTC)", cut.Find("[data-testid='review-due-date']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-overdue']"));
+        Assert.Equal(new DateOnly(2025, 4, 1), (await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.DueDate);
+
+        // Act: clear it
+        await cut.Find("[data-testid='review-due-clear']").ClickAsync();
+
+        // Assert: no date any more
+        Assert.NotNull(cut.Find("[data-testid='review-due-none']"));
+        Assert.Null((await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.DueDate);
+    }
+
+    /// <summary>
+    ///     Test that a date in the past is accepted on edit and shows the Overdue badge, and that a text that is not a
+    ///     date is refused with a message.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused()
+    {
+        // Arrange: a review viewed by ann
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+
+        // Act: type a text that is not a date
+        await cut.Find("[data-testid='review-due-input']").InputAsync("not a date");
+        await cut.Find("[data-testid='due-date-form']").SubmitAsync();
+
+        // Assert: an error and nothing stored
+        Assert.Contains("due date", cut.Find("[data-testid='review-due-error']").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Null((await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.DueDate);
+
+        // Act: type yesterday
+        await cut.Find("[data-testid='review-due-input']").InputAsync("2025-03-03");
+        await cut.Find("[data-testid='due-date-form']").SubmitAsync();
+
+        // Assert: stored, shown, overdue, and the error is gone
+        Assert.Equal("Due 2025-03-03 (UTC)", cut.Find("[data-testid='review-due-date']").TextContent);
+        Assert.Equal("Overdue", cut.Find("[data-testid='review-overdue']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-due-error']"));
+    }
+
+    /// <summary>
+    ///     Test that the creator of a review who is a plain member may edit the due date, and that another plain
+    ///     member sees the date and the badge but no edit form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot()
+    {
+        // Arrange: a review created by ann with a past date, and two members who are not administrators
+        await CreateUsersAsync();
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
+        var projectId = project.Id;
+        await Reviews.CreateDraftAsync(
+            projectId, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        await Reviews.SetDueDateAsync(projectId, "REV-1", new DateOnly(2025, 3, 3), TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Act: ann, the creator, views the page
+        SignInAs("ann", "Ann", false);
+        var creator = RenderPage(projectId);
+
+        // Assert: the creator sees the date, the badge and the edit form
+        Assert.Equal("Overdue", creator.Find("[data-testid='review-overdue']").TextContent);
+        Assert.NotNull(creator.Find("[data-testid='due-date-form']"));
+
+        // Act: bob views the page
+        SignInAs("bob", "Bob", false);
+        var other = RenderPage(projectId);
+
+        // Assert: bob sees the date and the badge but cannot edit
+        Assert.Equal("Due 2025-03-03 (UTC)", other.Find("[data-testid='review-due-date']").TextContent);
+        Assert.Equal("Overdue", other.Find("[data-testid='review-overdue']").TextContent);
+        Assert.Empty(other.FindAll("[data-testid='due-date-form']"));
+        Assert.Empty(other.FindAll("[data-testid='review-due-input']"));
+    }
+
+    /// <summary>
+    ///     Test that an approved review keeps its date as history without the Overdue badge and without an edit form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited()
+    {
+        // Arrange: a signable review with a date in the past, then approved
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        await Reviews.SetDueDateAsync(projectId, "REV-1", new DateOnly(2025, 3, 3), TestActors.Ann, TestContext.Current.CancellationToken);
+        await SignSlotAsync(projectId, slotId);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the date is kept, there is no badge and no edit form
+        Assert.Equal("Approved", cut.Find("[data-testid='review-approval']").TextContent);
+        Assert.Equal("Due 2025-03-03 (UTC)", cut.Find("[data-testid='review-due-date']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-overdue']"));
+        Assert.Empty(cut.FindAll("[data-testid='due-date-form']"));
+    }
+
+    /// <summary>
+    ///     Test the race: the review is approved by someone else while the due date form is open, so saving is refused
+    ///     as locked; the page then hides the form but keeps the refusal message, the current date and the lock notice.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone()
+    {
+        // Arrange: a signable review with a date, viewed while it is still open
+        var ids = await CreateUsersAsync();
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
+        var projectId = project.Id;
+        await Reviews.CreateDraftAsync(
+            projectId, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        await AnswerAllAsync(projectId);
+        var slot = await Signing.AddSlotAsync(
+            TestActors.Ann, projectId, "REV-1", ids["bob"], ids["cyd"], TestContext.Current.CancellationToken);
+        await Reviews.SetDueDateAsync(projectId, "REV-1", new DateOnly(2025, 3, 3), TestActors.Ann, TestContext.Current.CancellationToken);
+        SignInAs("ann", "Ann", false);
+        var cut = RenderPage(projectId);
+        Assert.NotNull(cut.Find("[data-testid='due-date-form']"));
+        await cut.Find("[data-testid='review-due-input']").InputAsync("2025-05-01");
+
+        // Act: someone else (bob, the primary reviewer) approves the review, then the open form is saved
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        await Signing.SignAsync(
+            TestActors.Bob, projectId, "REV-1", slot.Id, approval!.Digest, SigningPassword, TestContext.Current.CancellationToken);
+        await cut.Find("[data-testid='due-date-form']").SubmitAsync();
+
+        // Assert: the form is gone, the message stays, the stored date is shown and unchanged, and the page is locked
+        Assert.Empty(cut.FindAll("[data-testid='due-date-form']"));
+        Assert.NotEmpty(cut.Find("[data-testid='review-due-error']").TextContent);
+        Assert.Equal("Due 2025-03-03 (UTC)", cut.Find("[data-testid='review-due-date']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-locked-banner']"));
+        Assert.Equal(new DateOnly(2025, 3, 3), (await Reviews.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.DueDate);
+    }
+
+    /// <summary>
     ///     Signs the only slot of <c>REV-1</c> as ann with the current record, which completes the review.
     /// </summary>
     /// <param name="projectId">The project identity.</param>

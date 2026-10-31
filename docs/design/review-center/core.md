@@ -114,7 +114,13 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   neither be chosen as a reviewer of it nor sign it. The same administrators can switch two further stored rules
   (`ProjectService.SetReviewRuleAsync`; on by default): the review author may not answer the checklist of the review,
   and the person who reopened a review may not sign it again. These two are stored and audited only; no service applies
-  them yet. `RecordDigest` calculates the digest of a record. Every
+  them yet. A review has an optional due date, a UTC calendar day
+  (`DateOnly`): it can be given when the review is created (`CreateDraftAsync`, `CreateFromRepositoryAsync`, and the
+  planner) and is changed or cleared by `SetDueDateAsync` (a project admin, a system administrator, or the user who
+  created the review; never with an API token; refused with `ReviewLocked` when the review is approved; audited as
+  `review.due-date-changed`). `IsOverdue` tells whether the due date lies before `TodayUtc`, the current UTC day, and
+  the review is not approved, and an invalid due date is refused with `DueDateInvalid`. `RecordDigest` calculates the
+  digest of a record. Every
   operation that changes data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
   and verifies its hash chain. Create a personal access token for the actor (the value is returned once), list the
@@ -146,7 +152,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   of a project by compare-and-set in the same way (`UpdateRequireIndependentReviewersAsync`; `UpdateReviewRuleAsync`
   does the same for any named review rule), and change the checklist
   definition of a project by compare-and-set on the hash of the stored text (`UpdateChecklistDefinitionAsync`: the new
-  text, or none for the built-in default, is stored only if the stored text still has the expected hash). Every operation
+  text, or none for the built-in default, is stored only if the stored text still has the expected hash), and change
+  the due date of a review by compare-and-set (`UpdateDueDateAsync`: the new due date, or none, is stored only if the
+  stored one still equals the expected one). Every operation
   that changes data takes an
   `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
   same transaction.
@@ -158,7 +166,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   still the digest it carries, checked inside one transaction, and fails with a `DomainRuleException` for
   `RecordChanged` otherwise. The operations that change a thread, a comment, a checklist section or answer, or a
   reviewer slot refuse with a `DomainRuleException` for `ReviewLocked` when the review is approved, checked inside the
-  same transaction as the change; nothing is stored then. A user is a member of a project at most once: adding a
+  same transaction as the change; nothing is stored then. `UpdateDueDateAsync` does the same, and its audit entry
+  `review.due-date-changed` is appended in the same transaction. A user is a member of a project at most once: adding a
   second membership fails with a
   `DomainRuleException` for `MembershipExists`, and a change or removal of a membership that does not exist returns
   `false`, which the service reports as `MembershipNotFound`. A change of the evidence settings whose expected settings
@@ -167,6 +176,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   `false` means that the expected settings were changed meanwhile, and it reports that as `RecordChanged`. A change of
   the checklist definition whose expected hash is no longer the hash of the stored text, or of a project that does not
   exist, returns `false` and stores nothing; `ProjectChecklistService` reports it as `RecordChanged` in the same way.
+  A change of the due date whose expected value is no longer stored returns `false` and stores nothing;
+  `ReviewService.SetDueDateAsync` reports it as `RecordChanged`.
 
 **IUserStore**: The store interface the subsystem requires for users.
 
@@ -291,7 +302,9 @@ a registered repository needs.
   review or a change since a baseline, already filed, with nothing to review, or one that cannot be planned, with a
   plain note when
   a fallback was used. Create the picked rows through `ReviewService`, each in its own transaction, and report the
-  outcome of each. Creating takes the `Actor` and records every review in the audit trail like any other review.
+  outcome of each. Creating takes the `Actor` and records every review in the audit trail like any other review. The
+  request (`PlanCreateRequest`) can carry a due date (`DueDate`), which is the default date for every picked row; a
+  default date that `ReviewService` refuses as `DueDateInvalid` makes that row fail.
 - *Constraints*: A missing or invalid configuration file fails with a `DomainRuleException` for
   `ReviewSetConfigMissing` or `ReviewSetConfigInvalid`; a problem with one set affects only its row.
 
@@ -387,7 +400,8 @@ message and keep the entered values, and there is a single, easily tested path f
 | `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
 | `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
 | `RecordChanged` | The record changed after the signer saw it (digest differs), or a setting was changed first |
-| `ReviewLocked` | The review is approved (locked) and content, a reviewer slot, or a signature would change |
+| `ReviewLocked` | The review is approved (locked) and content, a reviewer slot, a due date, or a signature changes |
+| `DueDateInvalid` | A due date for a new review is before today (UTC) or more than 2 years ahead, or is not a date |
 | `ReviewNotLocked` | A reopen is requested for a review that is not approved |
 | `ReopenReasonInvalid` | The reason for a reopen is empty after trimming or longer than 250 characters |
 | `ReviewerNotIndependent` | Independent reviewers are required and the review author would be, or signs as, one |
@@ -439,7 +453,8 @@ system administrator with a reason, stored as a `ReviewReopen`. The number of re
 it is above zero, so legacy digests do not change and the format version is not bumped, and after a reopen every earlier
 signature is kept as history but is out of date. The project rule `RequireIndependentReviewers` (on by default) keeps the
 user who created the review (for an API-token review, the token's owner) out of its slots and away from its signature;
-the authors of git commits are not matched.
+the authors of git commits are not matched. The due date of a review is not part of the record digest, so setting or
+clearing it never makes a signature out of date.
 
 The audit trail is the third kind of record: an append-only, hash-chained list of everything that happens, kept in the
 same database. A change of data and its audit entry are stored in the same transaction by the store, so the services

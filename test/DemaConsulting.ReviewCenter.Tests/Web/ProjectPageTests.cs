@@ -234,6 +234,42 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a due date typed into the form is stored with a review created from uploaded files, and that a
+    ///     due date in the past is refused with a message that names the due date and stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_CreateForm_UploadWithDueDate_StoresDateAndRefusesPastDate()
+    {
+        // Arrange: a project, the upload form filled in and files selected (the page's clock is 2025-03-04)
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(project.Id);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-1");
+        await cut.Find("[data-testid='review-title-input']").InputAsync("With due date");
+        SelectFiles(cut, ("a.txt", TestContent.A));
+        await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("[data-testid='selected-file-0']")));
+        await cut.Find("[data-testid='due-date-input']").InputAsync("2025-03-03");
+
+        // Act: submit with yesterday as the due date
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the refusal names the due date and nothing was created
+        Assert.Contains("due date", cut.Find("[data-testid='review-error']").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(await Reviews.GetAsync(project.Id, "REV-1", TestContext.Current.CancellationToken));
+
+        // Act: correct the date and submit again
+        await cut.Find("[data-testid='due-date-input']").InputAsync("2025-04-01");
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the review was created from the upload with the due date
+        var review = await Reviews.GetAsync(project.Id, "REV-1", TestContext.Current.CancellationToken);
+        Assert.NotNull(review);
+        Assert.Equal(new DateOnly(2025, 4, 1), review.DueDate);
+        Assert.Equal(Fingerprint.Compute(new[] { TestContent.A }), review.ContentFingerprint);
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        Assert.EndsWith($"/projects/{project.Id}/reviews/REV-1", navigation.Uri, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a review submitted after the session ended, but before the page learned of it, stores nothing
     ///     and leaves the not-found page (the access check finds no user).
     /// </summary>

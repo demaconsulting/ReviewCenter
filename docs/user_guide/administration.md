@@ -443,6 +443,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Project   | `project.independent-reviewers-changed` (the independence rule was switched)         |
 | Project   | `project.review-rule-changed` (a further review rule was switched)                   |
 | Reopening | `review.reopened` (an administrator reopened an approved review)                     |
+| Due date  | `review.due-date-changed` (the due date of a review was set, changed, or cleared)    |
 | Tokens    | `token.created`, `token.revoked`                                                     |
 | Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
 
@@ -527,7 +528,8 @@ migration: the server creates them only when the database is new, so a developme
 be deleted and created again, like the earlier ones. A new project, and a review that was never reopened, keep their
 record digests (the number of reopens is added to the digest only when it is more than zero). The review rule switches
 add the columns `Projects.RequireNonAuthorChecklistAnswers` and `Projects.RequireNonReopenerSigning`, again with no
-migration: a development database created before them must be deleted and created again.
+migration: a development database created before them must be deleted and created again. The optional due date of a
+review adds the column `Reviews.DueDate`, which the server also creates only when the database is new (no migration).
 
 ## Repositories and Credentials
 

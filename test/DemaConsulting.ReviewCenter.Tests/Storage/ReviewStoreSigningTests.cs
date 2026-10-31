@@ -533,7 +533,9 @@ public class ReviewStoreSigningTests
             ["answer"] = () => db.Store.SetChecklistAnswerAsync(answer, cancellationToken),
             ["add slot"] = () => db.Store.AddSlotAsync(NewSlot(projectId, 3, null), cancellationToken),
             ["update slot"] = () => db.Store.UpdateSlotAsync(projectId, "REV-1", slot.Id, 3, null, cancellationToken),
-            ["remove slot"] = () => db.Store.RemoveSlotAsync(projectId, "REV-1", slot.Id, cancellationToken)
+            ["remove slot"] = () => db.Store.RemoveSlotAsync(projectId, "REV-1", slot.Id, cancellationToken),
+            ["due date"] = () => db.Store.UpdateDueDateAsync(
+                projectId, "REV-1", null, new DateOnly(2030, 1, 1), AuditTestExtensions.Draft(), cancellationToken)
         };
 
         // Act, Assert: each write is refused as locked, and nothing changes
@@ -738,6 +740,58 @@ public class ReviewStoreSigningTests
             new ReviewReopen(0, projectId, reviewId, _time, "root", "Root", reason, RecordDigest.Compute(record!)),
             AuditDraft.By(TestActors.Ann, "review.reopened", reason, projectId, reviewId),
             TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Test that the batch approval query answers for several reviews at once and agrees with the single-review
+    ///     definition: an approved review is in the set, and a review with no slot, an unsigned slot, a slot of two
+    ///     that is unsigned, a signature that a reopening made out of date, and an unknown review are not.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db, "REV-1");
+        foreach (var id in new[] { "REV-2", "REV-3", "REV-4", "REV-5" })
+        {
+            await AddSecondReviewAsync(db, projectId, id);
+        }
+
+        // REV-1 approved; REV-2 has no slot; REV-3 has an unsigned slot; REV-4 has two slots and one is unsigned;
+        // REV-5 was approved and then reopened, so its signature no longer matches
+        var slots = new Dictionary<string, ReviewerSlot>();
+        foreach (var id in new[] { "REV-1", "REV-3", "REV-4", "REV-5" })
+        {
+            slots[id] = await db.Store.AddSlotAsync(
+                new ReviewerSlot { ProjectId = projectId, ReviewId = id, PrimaryUserId = 1, AlternateUserId = 2 },
+                cancellationToken);
+        }
+
+        await db.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = projectId, ReviewId = "REV-4", PrimaryUserId = 2, AlternateUserId = null },
+            cancellationToken);
+        await ApproveReviewAsync(db, projectId, "REV-1", slots["REV-1"].Id);
+        await ApproveReviewAsync(db, projectId, "REV-4", slots["REV-4"].Id);
+        await ReopenReviewAsync(db, projectId, "REV-5", "Again", slots["REV-5"].Id);
+        var ids = new[] { "REV-1", "REV-2", "REV-3", "REV-4", "REV-5", "NOPE", "REV-1" };
+
+        // Act
+        var approved = await db.Store.ListApprovedReviewIdsAsync(projectId, ids, cancellationToken);
+        var none = await db.Store.ListApprovedReviewIdsAsync(projectId, [], cancellationToken);
+
+        // Assert: the set equals what the single-review definition says for each identifier
+        Assert.Equal("REV-1", Assert.Single(approved));
+        foreach (var id in ids.Distinct())
+        {
+            var snapshot = await db.Store.GetSnapshotAsync(projectId, id, cancellationToken);
+            Assert.Equal(
+                snapshot is not null && ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures),
+                approved.Contains(id));
+        }
+
+        Assert.Empty(none);
     }
 
     /// <summary>

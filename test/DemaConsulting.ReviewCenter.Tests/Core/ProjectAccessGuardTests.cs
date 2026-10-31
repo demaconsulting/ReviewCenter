@@ -210,6 +210,7 @@ public class ProjectAccessGuardTests
         "ReviewPlanner.PlanAsync",
         "ReviewService.CreateDraftAsync",
         "ReviewService.CreateFromRepositoryAsync",
+        "ReviewService.SetDueDateAsync",
         "SigningService.AddSlotAsync",
         "SigningService.ListCandidatesAsync",
         "SigningService.RemoveSlotAsync",
@@ -232,6 +233,7 @@ public class ProjectAccessGuardTests
         "ProjectChecklistService.GetAsync",
         "ProjectService.GetAsync",
         "ProjectService.ListAsync",
+        "ReviewService.CanSetDueDateAsync",
         "SigningService.HasReauthProofAsync"
     ];
 
@@ -281,6 +283,8 @@ public class ProjectAccessGuardTests
                 project, "rev-2", "Second", [new UploadedFile("a.txt", [1])], actor, cancellationToken),
             ["ReviewService.CreateFromRepositoryAsync"] = () => world.Reviews.CreateFromRepositoryAsync(
                 project, "rev-3", "Third", new RepositorySource(1, "main", null, "**/*"), actor, cancellationToken),
+            ["ReviewService.SetDueDateAsync"] = () => world.Reviews.SetDueDateAsync(
+                project, "rev-1", null, actor, cancellationToken),
             ["ThreadService.StartThreadAsync"] = () => world.Threads.StartThreadAsync(
                 project, "rev-1", new ThreadAnchor("a.txt"), actor, "hello", cancellationToken),
             ["ThreadService.ReplyAsync"] = () => world.Threads.ReplyAsync(

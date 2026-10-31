@@ -53,6 +53,12 @@
                     <input id="review-title" type="text" maxlength="@ReviewLimits.MaxReviewTitleLength"
                            data-testid="review-title-input" @bind="ReviewTitle" @bind:event="oninput" />
                 </div>
+                <div class="field">
+                    <label for="review-due-date">Due date (optional)</label>
+                    <input id="review-due-date" type="date" data-testid="due-date-input" value="@DueDateText"
+                           @oninput="e => DueDateText = e.Value?.ToString() ?? string.Empty" />
+                    <span class="muted">A calendar day in UTC, from today up to two years ahead.</span>
+                </div>
                 <fieldset class="field source-choice" data-testid="review-source">
                     <legend>Files come from</legend>
                     <div class="option-cards">

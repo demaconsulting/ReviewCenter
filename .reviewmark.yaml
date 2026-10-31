@@ -867,6 +867,7 @@ reviews:
       - "test/**/Core/ReviewServiceTests.cs"
       - "test/**/Core/ReviewServiceRepositoryTests.cs"
       - "test/**/Core/ReviewServiceChecklistTests.cs"
+      - "test/**/Core/ReviewServiceDueDateTests.cs"
       - "test/**/ContentSources/ReviewFromGitTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -1210,6 +1211,7 @@ reviews:
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectChecklistStoreTests.cs"
+      - "test/**/Storage/ReviewDueDateStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-UserStore

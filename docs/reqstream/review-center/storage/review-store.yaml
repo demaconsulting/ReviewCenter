@@ -201,13 +201,44 @@ sections:
           - ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins
 
+      - id: ReviewCenter-ReviewStore-DueDate
+        title: >-
+          The ReviewStore class shall store the optional due date of a review as a calendar day, with no date for a
+          review that was not given one, and change it only through an atomic compare-and-set that applies the new
+          date, or removes it, when the stored one still equals the date the caller started from, changes only that
+          review, stores the audit entry of the change in the same transaction so that the hash chain stays intact,
+          and reports, without a change and without an entry, a review that does not exist or a date that is no
+          longer the expected one, even when two callers change it at the same time.
+        justification: |
+          A change must neither be lost nor silently overwrite the change of another person, and a date that is
+          stored without its entry, or an entry without its date, would leave the history of the due date untrue.
+          The comparison is part of the update, so two people who save at the same time cannot both succeed.
+        tests:
+          - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
+          - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
+          - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
+          - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
+
+      - id: ReviewCenter-ReviewStore-ApprovedReviewIds
+        title: >-
+          The ReviewStore class shall tell which of several reviews of a project are approved, by the same
+          definition of approved as the Core services, reading the slots and the signatures of all the reviews with
+          one query each in one read transaction and loading the record of a review only when every one of its slots
+          holds a signature, and shall leave out a review that does not exist.
+        justification: |
+          A list of reviews has to show which late reviews are approved, and so not overdue. One full snapshot read
+          per review would make the cost of the list grow with the number of late reviews; a review with an unsigned
+          slot can never be approved and so needs no record.
+        tests:
+          - ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes
+
       - id: ReviewCenter-ReviewStore-ApprovalLockInTransaction
         title: >-
           The ReviewStore class shall refuse with the ReviewLocked rule, inside the same transaction that would store
-          the change, to store a thread, a comment, a thread state, a section state, a checklist answer, or the
-          addition, change, or removal of a reviewer slot, when the review is approved at that moment, using the same
-          definition of approved as the Core services, shall store nothing and no audit entry then, and shall not
-          refuse a change to a review that does not exist for this reason.
+          the change, to store a thread, a comment, a thread state, a section state, a checklist answer, a due date,
+          or the addition, change, or removal of a reviewer slot, when the review is approved at that moment, using
+          the same definition of approved as the Core services, shall store nothing and no audit entry then, and
+          shall not refuse a change to a review that does not exist for this reason.
         justification: |
           The Core services check the lock before they write, but a final signature may be stored between that check
           and the change. Repeating the check in the transaction of the change closes that gap, so that no

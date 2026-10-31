@@ -243,6 +243,32 @@ sections:
           - ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins
 
+      - id: ReviewCenter-Storage-DueDate
+        title: >-
+          The Storage subsystem shall keep the optional due date of each review with the review in the database file,
+          so that it is still there, unchanged, when the database is opened again, change it only by an atomic
+          compare-and-set against the date the caller started from, refuse the change of an approved review inside
+          the transaction, store each change together with its audit entry in one transaction, and change nothing and
+          record nothing for a review that does not exist or a date that was changed meanwhile. The schema is created
+          without a migration, so a development database that was created before the column existed has to be
+          recreated.
+        justification: |
+          The date is a commitment that must survive a restart and must not be lost when two people save at the same
+          time. The history of a change must stay true, so the entry is stored with the change or not at all. A list
+          that shows which dated reviews are overdue asks which of them are approved in one batch, so its cost does
+          not grow with a full read of every late review.
+        children:
+          - ReviewCenter-ReviewStore-DueDate
+          - ReviewCenter-ReviewStore-ApprovedReviewIds
+          - ReviewCenter-DbContext-DueDate
+        tests:
+          - ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes
+          - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
+          - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
+          - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
+          - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
+          - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
+
       - id: ReviewCenter-Storage-ReviewIntegrity
         title: >-
           The Storage subsystem shall keep the reopenings of a review, with the reason and the digest of the approved

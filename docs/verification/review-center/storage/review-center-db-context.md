@@ -42,6 +42,8 @@ be loadable on the test platform.
   project reads back with the defaults, and a changed setting is stored and read back from its own column.
 - The `ChecklistDefinition` column of a project is created as nullable text with no length limit: a new project reads
   back with none, and a definition of the full size limit is stored and read back unchanged.
+- The `DueDate` column of a review is created as nullable text holding the calendar day: a review without a date reads
+  back with none and a date reads back as the same day.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
@@ -190,6 +192,10 @@ definition reads it back unchanged, which is tested by
 non-ASCII characters is stored in the unbounded column and read back unchanged by the read and by the listing, which is
 tested by `ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn`. Both tests are defined in
 `ProjectChecklistStoreTests.cs` and described with the `ReviewStore` unit.
+
+**Due date column**: A review added with a due date reads it back as the same calendar day, and one added without reads
+back with none, which is tested by `ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay`, defined in
+`ReviewDueDateStoreTests.cs` and described with the `ReviewStore` unit.
 
 **Second factor tables**: The `UserTotps` and `TotpRecoveryCodes` tables are exercised by the tests of `TotpStore` in
 `TotpStoreTests.cs` over a real database file. The unique index on the user and the recovery code hash refuses a

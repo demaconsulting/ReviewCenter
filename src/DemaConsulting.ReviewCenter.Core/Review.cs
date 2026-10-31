@@ -73,6 +73,16 @@ public sealed class Review
     public bool CreatedViaApi { get; init; }
 
     /// <summary>
+    ///     Gets the optional due date of the review: a calendar day that is interpreted in UTC, or <c>null</c> when
+    ///     none is set.
+    /// </summary>
+    /// <remarks>
+    ///     A planning attribute, not reviewed content: it is not part of the record digest, so changing it can never
+    ///     invalidate a signature. A review is overdue when the day is before today (UTC) and the review is not approved.
+    /// </remarks>
+    public DateOnly? DueDate { get; init; }
+
+    /// <summary>
     ///     Gets the content fingerprint of the file set, as computed by <see cref="Fingerprint"/>.
     /// </summary>
     public string ContentFingerprint { get; init; } = string.Empty;

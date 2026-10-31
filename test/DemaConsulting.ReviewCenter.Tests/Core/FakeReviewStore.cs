@@ -456,6 +456,61 @@ internal sealed class FakeReviewStore : IReviewStore
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    ///     Gets or sets an action that runs just before a due date change is compared and applied, so a test can
+    ///     simulate someone else changing the date at that moment.
+    /// </summary>
+    public Action? BeforeDueDateUpdate { get; set; }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateDueDateAsync(
+        int projectId,
+        string reviewId,
+        DateOnly? expected,
+        DateOnly? dueDate,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        BeforeDueDateUpdate?.Invoke();
+
+        // Like the real store: an approved review refuses the change, and the date must still be the one expected
+        var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (snapshot is not null && ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        {
+            throw new DomainRuleException(DomainRule.ReviewLocked, ReviewLock.LockedMessage);
+        }
+
+        var index = _reviews.FindIndex(r => r.ProjectId == projectId && r.Id == reviewId);
+        if (index < 0 || _reviews[index].DueDate != expected)
+        {
+            return false;
+        }
+
+        var current = _reviews[index];
+        _reviews[index] = new Review
+        {
+            ProjectId = current.ProjectId,
+            Id = current.Id,
+            Title = current.Title,
+            State = current.State,
+            Created = current.Created,
+            CreatedBy = current.CreatedBy,
+            CreatedViaApi = current.CreatedViaApi,
+            DueDate = dueDate,
+            ContentFingerprint = current.ContentFingerprint,
+            RepositoryId = current.RepositoryId,
+            RepositoryName = current.RepositoryName,
+            BaselineSha = current.BaselineSha,
+            HeadSha = current.HeadSha,
+            Selection = current.Selection,
+            ReviewSetId = current.ReviewSetId,
+            Files = current.Files,
+            Checklist = current.Checklist
+        };
+        Audits.Add(audit);
+        return true;
+    }
+
     /// <inheritdoc />
     public Task<Review?> GetReviewAsync(int projectId, string reviewId, CancellationToken cancellationToken = default)
     {
@@ -708,6 +763,25 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlySet<string>> ListApprovedReviewIdsAsync(
+        int projectId,
+        IReadOnlyCollection<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        var approved = new HashSet<string>();
+        foreach (var reviewId in reviewIds.Distinct())
+        {
+            var snapshot = await GetSnapshotAsync(projectId, reviewId, cancellationToken);
+            if (snapshot is not null && ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+            {
+                approved.Add(reviewId);
+            }
+        }
+
+        return approved;
+    }
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
         int projectId,
         string reviewId,
@@ -882,6 +956,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Created = review.Created,
             CreatedBy = review.CreatedBy,
             CreatedViaApi = review.CreatedViaApi,
+            DueDate = review.DueDate,
             ContentFingerprint = review.ContentFingerprint,
             RepositoryId = review.RepositoryId,
             RepositoryName = review.RepositoryName,

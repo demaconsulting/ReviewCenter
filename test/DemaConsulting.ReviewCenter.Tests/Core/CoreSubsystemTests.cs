@@ -751,6 +751,8 @@ public class CoreSubsystemTests
                 "root", "wrong password!", ValidPassword, cancellationToken),
             DomainRule.UserNotFound => users.SetEnabledAsync("nobody", false, cancellationToken),
             DomainRule.ChecklistDefinitionInvalid => Task.Run(() => ChecklistValidator.ParseOrThrow("{ not json"), cancellationToken),
+            DomainRule.DueDateInvalid => reviews.CreateDraftAsync(
+                projectId, "rev-2", "T", oneFile, TestActors.Ann, cancellationToken, dueDate: DateOnly.MinValue),
             DomainRule.LastAdmin => users.SetEnabledAsync("root", false, cancellationToken),
             _ => throw new NotSupportedException($"No violation is defined for the rule '{rule}'.")
         };

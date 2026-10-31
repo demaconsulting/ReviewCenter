@@ -20,11 +20,14 @@ the Core types so that the shape of the API does not change when a Core class do
 from a broken rule to a status and the helpers that build a problem description and the actor of a call.
 
 The answers carry only what a program needs: a summary has no file count and no details; the details of a review hold
-the title, state, fingerprint, creator and the flag that the review was created through the API, the source of a review
+the title, state, fingerprint, creator and the flag that the review was created through the API, the optional due date
+(`dueDate`, the text `yyyy-MM-dd`, or null) and whether the review is overdue (`overdue`: the date is before today in
+UTC and the review is not approved), the source of a review
 from a repository, the approval state and record digest, the slots (the primary and alternate reviewer are user names,
 and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the
 next
-step.
+step. A summary carries `dueDate` and `overdue` as well; the list computes `overdue` only for reviews whose date is
+already past, asking `SigningService` for their approval, so a project without due dates costs nothing extra.
 
 #### Key Methods
 
@@ -90,6 +93,10 @@ step.
     `**/*`). Every other rule (the number and
     size of files, the identifier, the title, the repository state) belongs to the service and arrives as a rule
     exception.
+  - The optional `dueDate` of the request is read with `ReviewService.ParseDueDate` (the text `yyyy-MM-dd`, a calendar
+    day in UTC; missing, `null`, or blank is no date) and passed to either creation call; text that is not such a date,
+    or a date before today or more than two years ahead, is the rule `DueDateInvalid`, which `ApiProblems` maps to a
+    400 problem, and nothing is created. The API cannot change a due date afterwards: that needs a signed-in user.
   - The actor is built from the claims of the token principal, so the review records the user and that the API was used.
   - The answer is 201 with the review and the files that the repository selection skipped.
 

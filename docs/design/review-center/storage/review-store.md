@@ -25,8 +25,9 @@ commits (see the `AuditStore` unit).
 `UpdateReviewRuleAsync`, `AddReviewAsync`,
 `AddThreadAsync`, `AddCommentAsync`,
 `SetThreadStateAsync`, `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
-`RemoveSlotAsync`, `AddSignatureAsync`, and `ReopenReviewAsync` take the audit draft of the change (or a function
-that builds it from the stored entity, when the draft names an identity that the database assigns). The change and
+`RemoveSlotAsync`, `UpdateDueDateAsync`, `AddSignatureAsync`, and `ReopenReviewAsync` take the audit draft of the
+change (or a function that builds it from the stored entity, when the draft names an identity that the database
+assigns). The change and
 its audit entry are
 stored in the same transaction, so both exist or neither does. A change that did not take effect (a thread, slot, or
 review that is not found) returns its null or false result and stores no entry. A failure of any kind, including a
@@ -34,7 +35,8 @@ duplicate review identifier or a refused signature, rolls back the change and th
 are of the change itself.
 
 **Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `SetThreadStateAsync`,
-`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, and `RemoveSlotAsync` call
+`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`, and
+`UpdateDueDateAsync` call
 the private `EnsureNotLockedAsync` first, inside the same serialized transaction as the change. It loads the slots, the
 record (with its reopen count), and the signatures with the same code as `AddSignatureAsync`, and asks the Core
 `ReviewLock.IsApproved`, the one definition of "approved", so the store and the services cannot disagree. When the review
@@ -126,6 +128,36 @@ transaction takes the write lock when it begins and the gate is process-wide, so
 time cannot both succeed: the second finds a different text, gets `false`, and leaves no change and no entry. Only the
 column of that project is written. `ProjectChecklistService` turns the `false` into `RecordChanged`; a project that does
 not exist is refused earlier by the access check and never reaches the store.
+
+**UpdateDueDateAsync**: Changes the optional due date of one review if it still equals the date the caller started from
+(compare-and-set).
+
+- *Parameters*: the project identity, the review identifier, the expected date (`DateOnly?`, null for none), the new
+  date (null to clear it), and the audit draft of the change.
+- *Returns*: `Task<bool>` — `true` when the date was changed; `false` when the review does not exist or the stored date
+  is no longer the expected one.
+- *Preconditions*: the audit draft is not null (`ArgumentNullException` otherwise).
+- *Postconditions*: Either the new date and the audit entry (`review.due-date-changed`, carrying the project and the
+  review) are stored in the same serialized transaction, so the hash chain stays intact, or nothing is.
+
+The change first runs the approval check of the transaction (`EnsureNotLockedAsync`), so a review that is approved at
+that moment is refused with `ReviewLocked` and nothing is stored. It then writes with one `ExecuteUpdate` statement
+whose condition repeats the expected date (`WHERE ProjectId = p AND Id = r AND DueDate = expected`; a null compares as
+`IS NULL`), so two people who save at the same time cannot both succeed: the second affects no row, gets `false`, and
+leaves no change and no entry. Only the column of that review is written, and the date is not part of the record
+digest. `ReviewService` turns the `false` into `RecordChanged`.
+
+**ListApprovedReviewIdsAsync**: Tells which of several reviews of a project are approved, in one read transaction.
+
+- *Parameters*: the project identity and the review identifiers (not null, duplicates allowed).
+- *Returns*: `Task<IReadOnlySet<string>>` — the identifiers that are approved by the one definition of
+  `ReviewLock.IsApproved`; a review that does not exist is absent; an empty input gives an empty set.
+- *Postconditions*: Nothing is changed.
+
+The slots and the signatures of all the reviews are read with one query each. A review can only be approved when it has
+a slot and every slot holds some signature, so the record, which the current digest needs, is loaded only for the
+reviews that pass that test; the others cost nothing more. This lets a list show the overdue state of many reviews
+without a full snapshot read for each one.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 

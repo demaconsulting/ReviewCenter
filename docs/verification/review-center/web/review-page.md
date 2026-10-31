@@ -153,6 +153,11 @@ N/A - standard test environment.
   missing, wrong, recovery, or already used code shows the one message that names the password and the code, signs
   nothing, and empties both fields; a code used within its step is refused until the next code.
 
+- A review that has no due date says so; a review with one shows the date as a UTC calendar day, with an Overdue badge
+  when the date has passed and the review is not approved. An administrator or the creator can set (also to a date in
+  the past) and clear the date, a text that is not a date is refused with a message and stores nothing, another member
+  sees no edit form, and an approved review keeps its date without a badge and without a form.
+
 #### Test Scenarios
 
 **Reviews from a repository** are verified in `ReviewPageRepositoryTests.cs` over a review stored with a source,
@@ -355,6 +360,27 @@ is tested by `ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard`.
 slots or threads is rendered; the summary strip contains the checklist progress and a link to the checklist page of
 the review, the text "No reviewer slots yet", and the thread counts "0 open" and "0 resolved". This scenario is
 tested by `ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads`.
+
+**ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc**: A review without a due date says "No due date" and
+shows no Overdue badge. A system administrator types a date in the future and saves it; the header shows "Due
+2025-04-01 (UTC)" without a badge and the date is stored. Clear removes it again. This scenario is tested by
+`ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc`.
+
+**ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused**: Text that is not a date is refused with a message
+about the due date and nothing is stored; yesterday is accepted on edit, is shown with the Overdue badge, and the
+message is gone. This scenario is tested by `ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused`.
+
+**ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot**: A review with a past due date is viewed by its creator, a
+member who is not an administrator, and by another member. Both see the date and the Overdue badge; only the creator
+sees the edit form. This scenario is tested by `ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot`.
+
+**ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited**: An approved review with a past due date keeps
+the date as history, shows no Overdue badge, and offers no edit form. This scenario is tested by
+`ReviewPage_DueDate_ApprovedReview_IsNeverOverdueAndCannotBeEdited`.
+
+**ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone**: The review is approved by someone
+else while the form is open; saving is refused as locked. The form is gone, but the refusal message, the stored date and
+the lock notice stay. This scenario is tested by `ReviewPage_DueDate_ApprovedMeanwhile_KeepsTheRefusalMessageAfterTheFormIsGone`.
 
 **ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity**: With no threads the index
 says there are no open threads; with an open thread (with a reply) and a resolved thread, the default shows only

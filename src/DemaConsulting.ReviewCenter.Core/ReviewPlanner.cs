@@ -276,6 +276,10 @@ public sealed class ReviewPlanner
     /// </param>
     /// <param name="actor">The signed-in user creating the reviews; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="defaultDueDate">
+    ///     The due date given to every review whose request carries none of its own (<see cref="PlanCreateRequest.DueDate"/>);
+    ///     <c>null</c> for no default. Checked per review with the creation rule of <see cref="ReviewService"/>.
+    /// </param>
     /// <returns>One result per request, in the same order.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="requests"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when there are more than <see cref="ReviewLimits.MaxReviewSets"/> requests.</exception>
@@ -289,7 +293,8 @@ public sealed class ReviewPlanner
         string headSha,
         IReadOnlyList<PlanCreateRequest> requests,
         Actor actor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? defaultDueDate = null)
     {
         ArgumentNullException.ThrowIfNull(requests);
         ArgumentNullException.ThrowIfNull(actor);
@@ -308,7 +313,7 @@ public sealed class ReviewPlanner
         await using var session = await _git.OpenAsync(access, cancellationToken);
         foreach (var request in requests)
         {
-            results.Add(await CreateOneAsync(session, access, projectId, headSha, request, actor, cancellationToken));
+            results.Add(await CreateOneAsync(session, access, projectId, headSha, request, defaultDueDate, actor, cancellationToken));
         }
 
         return results;
@@ -747,6 +752,7 @@ public sealed class ReviewPlanner
     /// <param name="projectId">The project identity.</param>
     /// <param name="headSha">The head commit.</param>
     /// <param name="request">The request.</param>
+    /// <param name="defaultDueDate">The due date used when the request has none of its own, or <c>null</c>.</param>
     /// <param name="actor">The acting user.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>
@@ -759,11 +765,16 @@ public sealed class ReviewPlanner
         int projectId,
         string headSha,
         PlanCreateRequest request,
+        DateOnly? defaultDueDate,
         Actor actor,
         CancellationToken cancellationToken)
     {
         try
         {
+            // The row's own date wins over the default for the whole batch; the creation rule is applied by the service
+            var dueDate = request.DueDate ?? defaultDueDate;
+            _reviews.ValidateNewDueDate(dueDate);
+
             // Everything is validated again: the request may come from a page, and a plan can be stale
             if (request.BaselineSha is not null)
             {
@@ -808,7 +819,8 @@ public sealed class ReviewPlanner
                             selectionText,
                             request.SetId,
                             Short(headSha),
-                            request.BaselineSha is null ? null : Short(request.BaselineSha)),
+                            request.BaselineSha is null ? null : Short(request.BaselineSha),
+                            dueDate),
                         actor,
                         cancellationToken);
                     return new PlanCreateResult(request.SetId, PlanCreateOutcome.Created, created.Review.Id, $"Review '{created.Review.Id}' was created.");

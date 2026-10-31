@@ -84,7 +84,12 @@ internal static class ApiEndpoints
     /// <param name="Signing">The signing service.</param>
     /// <param name="Threads">The thread service.</param>
     /// <param name="Checklists">The checklist service.</param>
-    private sealed record DetailServices(SigningService Signing, ThreadService Threads, ChecklistService Checklists);
+    /// <param name="Reviews">The review service, which owns the rule of when a review is overdue.</param>
+    private sealed record DetailServices(
+        SigningService Signing,
+        ThreadService Threads,
+        ChecklistService Checklists,
+        ReviewService Reviews);
 
     /// <summary>
     ///     The longest Base64 text accepted for one uploaded file: four characters for every three bytes of
@@ -153,7 +158,7 @@ internal static class ApiEndpoints
         group.MapGet("/projects/{projectId:int}/reviews", ListReviewsAsync)
             .WithName("ListReviews")
             .WithSummary("Lists the reviews of a project.")
-            .WithDescription("Returns the reviews of the project, ordered by their identifier, without their details.")
+            .WithDescription("Returns the reviews of the project, ordered by their identifier, without their details; each with its due date and whether it is overdue.")
             .Produces<ReviewSummaryDto[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -171,8 +176,9 @@ internal static class ApiEndpoints
             .WithSummary("Creates a review.")
             .WithDescription(
                 "Creates a draft review from uploaded files (Base64) or from a registered git repository; send exactly one "
-                + "of 'files' and 'repository'. The review is recorded as created with an API token. Reviewer slots and "
-                + "signatures cannot be changed with an API token.")
+                + "of 'files' and 'repository'. The optional 'dueDate' is a UTC calendar day (yyyy-MM-dd), not before "
+                + "today and not more than two years ahead. The review is recorded as created with an API token. "
+                + "Reviewer slots and signatures cannot be changed with an API token.")
             .WithMetadata(new BodySizeLimit())
             .Accepts<CreateReviewRequest>(isOptional: false, "application/json")
             .Produces<CreatedReviewDto>(StatusCodes.Status201Created)
@@ -364,7 +370,12 @@ internal static class ApiEndpoints
         }
 
         var list = await reviews.ListAsync(projectId, cancellationToken);
-        return TypedResults.Ok(list.Select(ToSummary).ToList());
+
+        // Only a review with a date in the past can be overdue; one batch query says which of those are approved
+        var approved = await reviews.ListApprovedWithPastDueDateAsync(projectId, list, cancellationToken);
+        return TypedResults.Ok(list
+            .Select(r => ToSummary(r, reviews, approved.Contains(r.Id)))
+            .ToList());
     }
 
     /// <summary>
@@ -454,9 +465,11 @@ internal static class ApiEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        // The optional due date is checked here for its shape only; the rules about its range belong to the service
+        var dueDate = ReviewService.ParseDueDate(request!.DueDate);
         Review review;
         IReadOnlyList<SkippedFileDto> skipped = [];
-        if (request!.Files is not null)
+        if (request.Files is not null)
         {
             var files = DecodeFiles(request.Files, out var decodeErrors);
             if (decodeErrors is not null)
@@ -465,7 +478,8 @@ internal static class ApiEndpoints
                 return Results.ValidationProblem(decodeErrors, detail: decodeErrors.Values.First()[0]);
             }
 
-            review = await reviews.CreateDraftAsync(projectId, request.Id, request.Title, files, actor, cancellationToken);
+            review = await reviews.CreateDraftAsync(
+                projectId, request.Id, request.Title, files, actor, cancellationToken, dueDate: dueDate);
         }
         else
         {
@@ -476,7 +490,8 @@ internal static class ApiEndpoints
                 request.Title,
                 new RepositorySource(source.RepositoryId, source.HeadRevision, source.BaselineRevision, source.Selection),
                 actor,
-                cancellationToken);
+                cancellationToken,
+                dueDate: dueDate);
             review = result.Review;
             skipped = result.Skipped.Select(s => new SkippedFileDto(s.Path, s.Reason)).ToList();
         }
@@ -655,8 +670,10 @@ internal static class ApiEndpoints
     ///     Maps a review to its list entry.
     /// </summary>
     /// <param name="review">The review.</param>
+    /// <param name="reviews">The review service, which says whether the review is overdue.</param>
+    /// <param name="isApproved"><c>true</c> when the review is approved, so never overdue.</param>
     /// <returns>The list entry.</returns>
-    private static ReviewSummaryDto ToSummary(Review review)
+    private static ReviewSummaryDto ToSummary(Review review, ReviewService reviews, bool isApproved)
     {
         return new ReviewSummaryDto(
             review.Id,
@@ -666,7 +683,19 @@ internal static class ApiEndpoints
             review.ContentFingerprint,
             review.CreatedBy,
             review.CreatedViaApi,
-            review.IsFromRepository);
+            review.IsFromRepository,
+            DueDateText(review.DueDate),
+            reviews.IsOverdue(review, isApproved));
+    }
+
+    /// <summary>
+    ///     Writes a due date the way the API shows it.
+    /// </summary>
+    /// <param name="dueDate">The due date, or <c>null</c>.</param>
+    /// <returns>The date as <c>yyyy-MM-dd</c>, or <c>null</c> when there is none.</returns>
+    private static string? DueDateText(DateOnly? dueDate)
+    {
+        return dueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -728,6 +757,8 @@ internal static class ApiEndpoints
             review.HeadSha,
             review.Selection,
             review.ReviewSetId,
+            DueDateText(review.DueDate),
+            services.Reviews.IsOverdue(review, approval?.IsApproved ?? false),
             approval?.IsApproved ?? false,
             approval?.Digest ?? string.Empty,
             slots,
