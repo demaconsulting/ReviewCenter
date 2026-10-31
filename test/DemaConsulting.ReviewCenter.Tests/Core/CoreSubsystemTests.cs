@@ -753,6 +753,8 @@ public class CoreSubsystemTests
             DomainRule.ChecklistDefinitionInvalid => Task.Run(() => ChecklistValidator.ParseOrThrow("{ not json"), cancellationToken),
             DomainRule.DueDateInvalid => reviews.CreateDraftAsync(
                 projectId, "rev-2", "T", oneFile, TestActors.Ann, cancellationToken, dueDate: DateOnly.MinValue),
+            DomainRule.FollowUpInvalid => reviews.CreateDraftAsync(
+                projectId, "rev-2", "T", oneFile, TestActors.Ann, cancellationToken, followsReviewId: "no-such-review"),
             DomainRule.LastAdmin => users.SetEnabledAsync("root", false, cancellationToken),
             _ => throw new NotSupportedException($"No violation is defined for the rule '{rule}'.")
         };

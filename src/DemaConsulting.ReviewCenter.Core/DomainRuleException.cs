@@ -261,7 +261,15 @@ public enum DomainRule
     ///     A review due date is not valid: it is not an ISO calendar date, a new review's date is before today (UTC) or
     ///     more than two years ahead.
     /// </summary>
-    DueDateInvalid
+    DueDateInvalid,
+
+    /// <summary>
+    ///     A follow-up review cannot be created from the chosen earlier review: the earlier review does not exist in the
+    ///     project, it does not fit the new review (another review-set, another repository, an upload against a
+    ///     repository, or no file in common), or open threads of the earlier review would be dropped because their file
+    ///     is not in the new review and the creator did not acknowledge that.
+    /// </summary>
+    FollowUpInvalid
 }
 
 /// <summary>

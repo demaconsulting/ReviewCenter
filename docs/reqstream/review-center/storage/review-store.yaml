@@ -219,6 +219,25 @@ sections:
           - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
 
+      - id: ReviewCenter-ReviewStore-FollowUp
+        title: >-
+          The ReviewStore class shall store a follow-up review with the review that it follows, the numbers of
+          answers and threads it took over, and the rows it carries (answers, not-applicable sections, and threads
+          with copies of their comments, each with the review it came from and, for a thread, its number there), all
+          in the one transaction that stores the review and its audit entry, so that a carry that fails stores no
+          review, no row, and no entry, shall give the threads new numbers of their own, shall load the follow-up
+          and the carried marks into the record that a signature covers, and shall store an answer or a section that
+          replaces a carried one without the carried mark.
+        justification: |
+          A follow-up that exists without the answers it says it carried, or carried rows without the review, would
+          make the record untrue, so everything is stored together or not at all. A thread of the new review is its own
+          thread, so it needs its own number. The mark is part of what a signature covers, so the record must load it,
+          and an answer that a person gave again must not keep a mark that says it was taken over.
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+          - ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing
+          - ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker
+
       - id: ReviewCenter-ReviewStore-ApprovedReviewIds
         title: >-
           The ReviewStore class shall tell which of several reviews of a project are approved, by the same

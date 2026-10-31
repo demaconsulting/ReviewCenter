@@ -303,3 +303,18 @@ sections:
           - SigningService_UpdateSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent
           - SigningService_AddSlotAsync_AuthorAndIndependenceOff_Succeeds
           - SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent
+
+      - id: ReviewCenter-SigningService-CarriedRecord
+        title: >-
+          The SigningService class shall treat the answers that a follow-up review carried from an earlier review as
+          answered checks, so that they do not block approval, and the open threads that it carried as open threads,
+          so that they block approval with the same message as any open thread, and shall still treat the user who
+          created the follow-up as its author for the rule of independent reviewers, whoever answered the carried
+          checks.
+        justification: |
+          A carried answer was given by a reviewer, so it is a real answer, but an open thread is an unresolved
+          finding and must be resolved before approval wherever it was started. The rule of independence concerns the
+          creation of the review, and carrying work over does not change who created it.
+        tests:
+          - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
+          - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence

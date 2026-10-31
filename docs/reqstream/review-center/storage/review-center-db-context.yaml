@@ -145,6 +145,25 @@ sections:
         tests:
           - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
 
+      - id: ReviewCenter-DbContext-FollowUp
+        title: >-
+          The ReviewCenterDbContext class shall map the review that a review follows, with the numbers of answers and
+          threads it took over, to columns of the review table, with an index on the project and the followed review,
+          and without a foreign key because the followed review is a reference by identifier within the project, shall
+          map the review that a carried answer, a carried section and a carried thread came from, and the number of a
+          carried thread in the earlier review, to nullable columns, and shall not map the carried rows that a review
+          holds only until it is stored, so that a review that follows nothing reads back with none of them. The schema
+          is created from the model without a migration, so a development database that was created before the columns
+          existed has to be recreated.
+        justification: |
+          The followed review belongs to exactly one review and is read with it, so it is a column. A review that has
+          been followed must not be blocked from being kept or removed by a reference, and the lookup of the reviews
+          that follow a review needs the index. The schema is created from the model and not migrated while the product
+          is not released, so development databases are recreated.
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+          - ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview
+
       - id: ReviewCenter-DbContext-Signatures
         title: >-
           The ReviewCenterDbContext class shall map reviewer slots and signatures to tables in which a slot and

@@ -40,7 +40,11 @@ repository registry is the one exception, see `Repositories`).
   most 64 characters), `Selection` (at most `ReviewLimits.MaxSelectionLength`), and `ReviewSetId` (the review-set
   that a planned review was made for, at most `ReviewLimits.MaxReviewSetIdLength`, 100 characters); all six are null
   for an uploaded review, and `ReviewSetId` is also null for a review made by hand. An index on `ProjectId`,
-  `RepositoryId`, and `ReviewSetId` serves the planner's search for the last review of a set. A review belongs to a
+  `RepositoryId`, and `ReviewSetId` serves the planner's search for the last review of a set. A review that was
+  created as a follow-up also has `FollowsReviewId` (the earlier review it follows, at most the review identifier
+  limit, 100; a plain column, not a foreign key, and null otherwise), `CarriedAnswerCount` and `CarriedThreadCount`
+  (numbers, 0 otherwise); an index on `ProjectId` and `FollowsReviewId` serves the search for the reviews that follow
+  a review. `Review.CarryOver` (the rows to write with a new review) is not mapped. A review belongs to a
   project and is deleted with it.
 - **ReviewFiles** (`ReviewFile`): key `ProjectId`, `ReviewId`, and `Path`. `Content` is required and stored as a
   binary column (empty for a deleted file); `Sha256` is required, at most 64; `Size`. `ChangeKind` is stored as text,
@@ -50,7 +54,9 @@ repository registry is the one exception, see `Repositories`).
   the file the thread is about and form a relationship to that file, so the database refuses a thread for a file
   that does not exist, and a thread is deleted with its file. `Side` is stored as text (`Head` or `Baseline`), at most
   32, with `Head` as the default, so a row written without a side reads as a head thread. `StartLine` and `EndLine`
-  are null for a thread on the whole file. `State` is stored as text, at most 32; `Created`.
+  are null for a thread on the whole file. `State` is stored as text, at most 32; `Created`. A thread carried into a
+  follow-up review also has `CarriedFromReviewId` (at most 100) and `CarriedFromThreadId` (a number), plain columns
+  without a relationship, null for any other thread.
 - **Comments** (`ReviewComment`): key `Id`, assigned by the database, so it grows with the posting order.
   `ThreadId` relates the comment to its thread, and a comment is deleted with its thread. `Author` (the display name
   at the time) is required, at most 100 characters; `AuthorUsername` (the user name) is required, at most 50;
@@ -60,11 +66,13 @@ repository registry is the one exception, see `Repositories`).
   review (a one-to-one relationship, so the snapshot is saved with the review) and is deleted with it.
 - **ChecklistSectionStates** (`ChecklistSectionState`): key `ProjectId`, `ReviewId`, and `SectionId` (at most 32),
   so a review has at most one state per section. `Applicable`; `Reason` at most 2000; `SetBy` (the display name) is
-  required, at most 100; `SetByUsername` is required, at most 50; `SetAt`. It belongs to a review and is deleted
+  required, at most 100; `SetByUsername` is required, at most 50; `SetAt`; `CarriedFromReviewId` (at most 100, null
+  unless the state was carried into a follow-up review). It belongs to a review and is deleted
   with it.
 - **ChecklistAnswers** (`ChecklistAnswer`): key `ProjectId`, `ReviewId`, and `ItemId` (at most 32), so a check has at
   most one answer. `Outcome` is stored as text, at most 32; `Justification` at most 2000; `AnsweredBy` (the display
-  name) is required, at most 100; `AnsweredByUsername` is required, at most 50; `AnsweredAt`. It belongs to a review
+  name) is required, at most 100; `AnsweredByUsername` is required, at most 50; `AnsweredAt`; `CarriedFromReviewId`
+  (at most 100, null unless the answer was carried into a follow-up review). It belongs to a review
   and is deleted with it.
 - **Users** (`User`): key `Id`, assigned by the database. `Username` is required, at most 50, with the
   case-insensitive collation of SQLite and a unique index, so a user name is unique without regard to case and a
@@ -171,7 +179,10 @@ deleted and created again (there are no migrations; the development database is 
 the `PersonalAccessTokens` table and the creator columns of a review (`CreatedBy`, `CreatedViaApi`): a database created
 before the personal-access-token slice does not have them and must be deleted and created again. The same holds for the
 `DueDate` column of a review: there is no migration for it either, `EnsureCreated` does not add a column to an existing
-table, and development databases are recreated. The same holds for the `ProjectMemberships` table, the
+table, and development databases are recreated. The same holds for the follow-up columns (`FollowsReviewId`,
+`CarriedAnswerCount`, `CarriedThreadCount` of a review, `CarriedFromReviewId` of an answer, a section state and a
+thread, `CarriedFromThreadId` of a thread) and the index on `ProjectId` and `FollowsReviewId`. The same holds for the
+`ProjectMemberships` table, the
 `IsSystemAdmin` column of a user (which replaces the role column), and the `ProjectId` of a repository: a database
 created before the project access slice does not have them and must be deleted and created
 again. The same holds for the `MustChangePassword` column of a user (project members management): the schema is created

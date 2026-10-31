@@ -89,6 +89,11 @@ comment {S:author} {S:username} {S:text} {ticks}           then one line per com
 reopens {count}                                            only when the review was reopened (count above zero)
 ```
 
+A follow-up review (see `ReviewService`) adds text that is written only when it applies, like `reopens`: a line
+`follows {S:reviewId}` straight after the source block (after the change lines of a review from a repository, before
+the `checklist` line), and the suffix `carried {S:reviewId}`, after a space, at the end of an `answer` line, a
+`not-applicable` line, and a `thread` line of a row that was carried over from that review.
+
 Notation and rules:
 
 - `{S:x}` is a string written length-prefixed as `{length}:{text}`, where the length is the number of UTF-16 code
@@ -129,6 +134,15 @@ Notation and rules:
   reason), and the vectors below are unchanged. After a reopen the line (or a higher count) makes the digest differ from
   every earlier one, whatever the content, so a signature given before the reopen stays in the record as history but
   can never be current again, not even when the content is changed back to what was signed.
+- **The follow-up lines**: `ReviewRecord.FollowsReviewId` (the review the record follows, null for an ordinary review)
+  and the `CarriedFromReviewId` of an answer, a section state, and a thread are written as described above, only when
+  they are not null. A review that follows nothing has no such text, so its digest is exactly what it was before
+  follow-ups existed: the version is **not** bumped, the vectors below are unchanged, and a test pins this with a fixed
+  vector. The identity of the carried row (`CarriedFromThreadId`) is not covered (it is a number of another review's
+  row and tells nothing the carried comments do not), but the marker is: a carried answer and an answer given again
+  with the same words never share a digest, and a signature of a follow-up therefore binds to which review it
+  follows and to what it took over. Answering a carried check again removes the marker and so changes the digest, as
+  any change of an answer does.
 
 **Known-answer vectors**: for an uploaded review with the fingerprint `abc`, no checklist, no answers, no sections
 that do not apply, and no threads, the canonical text is the seven lines

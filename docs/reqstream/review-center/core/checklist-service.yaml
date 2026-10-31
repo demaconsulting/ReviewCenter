@@ -180,3 +180,18 @@ sections:
           describe a record that no longer exists, so the service refuses until an administrator reopens the review.
         tests:
           - ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked
+
+      - id: ReviewCenter-ChecklistService-CarriedMarking
+        title: >-
+          The ChecklistService class shall store an answer, and the applicability of a section, that a person gives or
+          changes in a review that carries answers from an earlier review without the mark of the earlier review, so
+          that an answer carried over and then answered again, or a not-applicable section carried over and then set
+          again, belongs to the review and to the person who gave it, and shall count a carried answer as answered
+          for the progress of the checklist.
+        justification: |
+          The mark says that nobody in this review has looked at the answer yet. Once a person answers again, the
+          answer is theirs, and keeping the mark would claim that it was taken over. A carried answer was given by a
+          reviewer and is a real answer, so the checklist is complete when all checks are carried or answered.
+        tests:
+          - ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker
+          - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered

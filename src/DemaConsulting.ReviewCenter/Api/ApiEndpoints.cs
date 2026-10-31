@@ -177,7 +177,11 @@ internal static class ApiEndpoints
             .WithDescription(
                 "Creates a draft review from uploaded files (Base64) or from a registered git repository; send exactly one "
                 + "of 'files' and 'repository'. The optional 'dueDate' is a UTC calendar day (yyyy-MM-dd), not before "
-                + "today and not more than two years ahead. The review is recorded as created with an API token. "
+                + "today and not more than two years ahead. The optional 'followsReviewId' names an earlier review of the "
+                + "project to follow up: its Pass and not-applicable answers, not-applicable sections and open threads "
+                + "are carried over, and 'acknowledgeDroppedThreads' confirms that open threads on files that are not in "
+                + "the new review are not carried (an unfit review or an unacknowledged drop is a 400 problem). The review "
+                + "is recorded as created with an API token. "
                 + "Reviewer slots and signatures cannot be changed with an API token.")
             .WithMetadata(new BodySizeLimit())
             .Accepts<CreateReviewRequest>(isOptional: false, "application/json")
@@ -479,7 +483,8 @@ internal static class ApiEndpoints
             }
 
             review = await reviews.CreateDraftAsync(
-                projectId, request.Id, request.Title, files, actor, cancellationToken, dueDate: dueDate);
+                projectId, request.Id, request.Title, files, actor, cancellationToken, dueDate: dueDate,
+                followsReviewId: request.FollowsReviewId, acknowledgeDroppedThreads: request.AcknowledgeDroppedThreads);
         }
         else
         {
@@ -491,7 +496,9 @@ internal static class ApiEndpoints
                 new RepositorySource(source.RepositoryId, source.HeadRevision, source.BaselineRevision, source.Selection),
                 actor,
                 cancellationToken,
-                dueDate: dueDate);
+                dueDate: dueDate,
+                followsReviewId: request.FollowsReviewId,
+                acknowledgeDroppedThreads: request.AcknowledgeDroppedThreads);
             review = result.Review;
             skipped = result.Skipped.Select(s => new SkippedFileDto(s.Path, s.Reason)).ToList();
         }
@@ -685,7 +692,8 @@ internal static class ApiEndpoints
             review.CreatedViaApi,
             review.IsFromRepository,
             DueDateText(review.DueDate),
-            reviews.IsOverdue(review, isApproved));
+            reviews.IsOverdue(review, isApproved),
+            review.FollowsReviewId);
     }
 
     /// <summary>
@@ -764,6 +772,9 @@ internal static class ApiEndpoints
             slots,
             counts,
             approval?.Blockers ?? [],
-            approval?.NextStep ?? string.Empty);
+            approval?.NextStep ?? string.Empty,
+            review.FollowsReviewId,
+            review.CarriedAnswerCount,
+            review.CarriedThreadCount);
     }
 }

@@ -140,3 +140,16 @@ sections:
           - AttestationRenderer_Render_ManyFiles_BreaksIntoSeveralPages
           - AttestationRenderer_Render_UnicodeNames_AreReplacedByQuestionMarks
           - AttestationRenderer_Render_NullDocument_Throws
+
+      - id: ReviewCenter-AttestationRenderer-FollowUp
+        title: >-
+          The AttestationRenderer class shall state in the Review section of the document, only for a follow-up review,
+          the review it follows and how many answers and threads it carried, and shall mark with the review they came
+          from the checklist items, the not-applicable sections and the threads that were carried, and print nothing of
+          the kind for a review that does not follow another.
+        justification: |
+          The document is what a reader outside the tool sees. Telling carried answers from fresh ones shows how much of
+          the approval rests on work done in an earlier review, and leaving the lines out of other reviews keeps their
+          documents as they were.
+        tests:
+          - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks

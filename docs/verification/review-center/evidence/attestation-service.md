@@ -173,3 +173,8 @@ display name appear nowhere in the PDF, which names a participant label instead.
 **AttestationService_GenerateAsync_LockedReview_StillRenders**: An approved (locked) review is asked for. The status is
 `Ok` with a signed PDF, so the lock does not stop the attestation. This scenario is tested by
 `AttestationService_GenerateAsync_LockedReview_StillRenders`.
+
+**AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers**: An approved review and an
+approved follow-up that carried every Pass answer are asked for. The follow-up's attestation names the followed review
+and the carried counts, and the original's names neither the row nor the marks. This scenario is tested by
+`AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers`.

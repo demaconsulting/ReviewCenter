@@ -189,6 +189,15 @@ is one transaction.
   for `ReviewIdDuplicate`. A review for a project that does not exist is not stored; the relationship constraint
   of the database refuses it.
 
+A follow-up review arrives with `Review.CarryOver` (the carried answers, section states and threads with their
+comments). The store adds those rows to the same context before the one save, so they are part of the same
+transaction as the review and its audit entry: a failure anywhere (for example a carried thread whose file is not a
+file of the review, which the relationship constraint refuses) stores nothing. Carried threads are copied with fresh
+entities, as for `AddThreadAsync`, so the database assigns their identities and comments; the carried markers
+(`CarriedFromReviewId`, `CarriedFromThreadId`), the original authors, texts and times are kept as given.
+`FollowsReviewId`, `CarriedAnswerCount` and `CarriedThreadCount` are stored with the review and read back by
+`GetReviewAsync` and `ListReviewsAsync`.
+
 **GetReviewAsync**: Reads one review with its source columns and the metadata of its files (path, size, hash, change
 kind, baseline size and hash) ordered by path, and without file bytes (neither head nor baseline), so that showing a
 review with large files does not load them; null when absent.
@@ -231,15 +240,18 @@ answers of a review, with display names, user names, and UTC times as saved.
 a check, including the display name and the user name of the person who made the change. Each first tries to
 overwrite the existing row with one update statement and adds a row only when there
 was none; if two requests add the same row at the same moment, the loser of the race overwrites instead, so
-there is always exactly one row and neither request fails.
+there is always exactly one row and neither request fails. The row that is written never carries a follow-up marker:
+the update and the new row both set `CarriedFromReviewId` to the value of the incoming entity, which the services
+always leave null, so answering a carried check again, or setting a carried section again, replaces the marker.
 
 **GetRecordAsync**: Reads the record that a signature covers (`ReviewRecord`): the content fingerprint, the checklist
 snapshot, the section states, the answers, the threads with their comments, and the source (`ReviewSource`: `Upload`,
 or for a repository review the repository identity, both commits, the selection, the review-set identifier (null when
 the review was not planned), and every change with its path,
 kind, and baseline and head hashes read from the stored columns without loading any bytes), and `Reopens`, the number of
-stored reopens of the review; null when the review does not
-exist.
+stored reopens of the review, and `FollowsReviewId` with the carried markers of the answers, section states and
+threads (the review a row was carried from; the carried thread number is not part of the record); null when the review
+does not exist.
 The work is done by a private loader that takes the context, so the same code serves this method and
 `AddSignatureAsync`. Threads and comments are ordered by identity, as for `ListThreadsAsync`. `GetRecordAsync` reads
 inside one read transaction, so the parts come from one state of the database.

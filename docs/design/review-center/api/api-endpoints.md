@@ -27,7 +27,8 @@ from a repository, the approval state and record digest, the slots (the primary 
 and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the
 next
 step. A summary carries `dueDate` and `overdue` as well; the list computes `overdue` only for reviews whose date is
-already past, asking `SigningService` for their approval, so a project without due dates costs nothing extra.
+already past, asking `SigningService` for their approval, so a project without due dates costs nothing extra. The
+details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over.
 
 #### Key Methods
 
@@ -97,6 +98,12 @@ already past, asking `SigningService` for their approval, so a project without d
     day in UTC; missing, `null`, or blank is no date) and passed to either creation call; text that is not such a date,
     or a date before today or more than two years ahead, is the rule `DueDateInvalid`, which `ApiProblems` maps to a
     400 problem, and nothing is created. The API cannot change a due date afterwards: that needs a signed-in user.
+  - The optional `followsReviewId` of the request (text; missing, `null`, or blank means none) and the optional
+    `acknowledgeDroppedThreads` (a boolean, default false) are passed to either creation call. The review then carries
+    over what `ReviewService` says (see there); a review that does not exist in the project, does not fit, or would drop
+    open threads without the acknowledgement is the rule `FollowUpInvalid`, which `ApiProblems` maps to a 400 problem
+    (the message never reveals another project), and nothing is created. The details of a review show `followsReviewId`
+    (null for an ordinary review), `carriedAnswerCount` and `carriedThreadCount`; the summary shows `followsReviewId`.
   - The actor is built from the claims of the token principal, so the review records the user and that the API was used.
   - The answer is 201 with the review and the files that the repository selection skipped.
 

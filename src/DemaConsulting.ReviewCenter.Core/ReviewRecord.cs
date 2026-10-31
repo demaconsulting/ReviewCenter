@@ -83,6 +83,10 @@ public sealed record ReviewSource(
 ///     reopened. It is part of the digest only when it is above zero (see <see cref="RecordDigest"/>), so a reopened
 ///     review can never be approved again by old signatures.
 /// </param>
+/// <param name="FollowsReviewId">
+///     The identifier of the review this one follows up, or <c>null</c> when it is not a follow-up. It is part of the
+///     digest only when it is set (see <see cref="RecordDigest"/>), so the digest of every other review is unchanged.
+/// </param>
 public sealed record ReviewRecord(
     string ContentFingerprint,
     ReviewChecklist? Checklist,
@@ -90,7 +94,8 @@ public sealed record ReviewRecord(
     IReadOnlyList<ChecklistAnswer> Answers,
     IReadOnlyList<ReviewThread> Threads,
     ReviewSource Source,
-    int Reopens = 0);
+    int Reopens = 0,
+    string? FollowsReviewId = null);
 
 /// <summary>
 ///     One consistent read of a review for the approval status: the record a signature covers, together with the

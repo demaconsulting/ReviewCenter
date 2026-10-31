@@ -53,6 +53,15 @@ reopen history only appears when the review was reopened at least once.
   - *Reviewer names* off: nothing is hidden by the renderer, because the labels are already in the input; the switch is
     only reported in the content scope.
 
+**Follow-up review**: A review that was created as a follow-up has one more row in the review section, "Follows review",
+with the text `X (N answers and M threads carried)` (the followed review and the numbers of carried answers and open
+threads at creation), and a review that follows nothing has no such row, so its document is unchanged. In the checklist
+a not-applicable section, and a check whose answer was carried over, gets a small italic line "Carried from review X"
+below it, and a listed thread that was carried gets the same line, so the document always says which statements were
+given in this review and which were taken over (the answerer shown is the person who gave the answer originally). Open
+threads are only counted; a thread is listed only when it is resolved, and a carried open thread that was resolved in
+the follow-up is listed with the same "Carried from review X" line.
+
 **Reopen history**: A review that was reopened by an administrator after an approval has a section "Reopen history"
 after the sign-offs and before the audit anchor, and a review that never was has none, so its document is unchanged.
 The section says in an italic sentence that the review was approved earlier and reopened by an administrator, and that

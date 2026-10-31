@@ -128,6 +128,33 @@ sections:
           - ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
 
+      - id: ReviewCenter-System-FollowUpReview
+        title: >-
+          The tool shall let a review be created as a follow-up of an earlier review of the same project, by hand or
+          through the API, so that the Pass and N/A answers of unchanged checks, the not-applicable sections and the
+          open threads of the earlier review are carried over and marked with the review they came from, without the
+          Fail answers, the resolved threads, the reviewer slots or the signatures, refuse a review that does not fit
+          and a silent drop of open threads, count carried answers as answered and carried open threads as open for
+          approval, keep a signature bound to exactly what was carried, show the follow-up in the attestation PDF, and
+          keep the digest of every review that is not a follow-up unchanged.
+        tags: [system]
+        justification: |
+          A review that fails is followed by a review of the corrected content. The reviewers should not repeat the
+          checks that passed, and the record, and the document that goes to auditors, must still say which answers
+          were carried and which were given in this review (21 CFR Part 11 section 11.10(e), records that are not
+          obscured by later changes, and 11.10(a), a record that is accurate and complete). Leaving the new lines out
+          of every other review keeps the signatures that already exist valid.
+        children:
+          - ReviewCenter-Core-FollowUp
+          - ReviewCenter-Storage-FollowUp
+          - ReviewCenter-Api-FollowUp
+          - ReviewCenter-Evidence-FollowUp
+        tests:
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+          - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
+          - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
+
       # ----------------------------------------------------------------------------------------------
       # Review activity: the discussion and the checklist
       # ----------------------------------------------------------------------------------------------

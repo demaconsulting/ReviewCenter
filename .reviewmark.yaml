@@ -879,10 +879,14 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/FileDiff.cs"
       - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
       - "src/DemaConsulting.ReviewCenter.Core/RepositoryReviewResult.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/FollowUpCarry.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewCarryOver.cs"
       - "test/**/Core/ReviewServiceTests.cs"
       - "test/**/Core/ReviewServiceRepositoryTests.cs"
       - "test/**/Core/ReviewServiceChecklistTests.cs"
       - "test/**/Core/ReviewServiceDueDateTests.cs"
+      - "test/**/Core/ReviewServiceFollowUpTests.cs"
+      - "test/**/Core/FollowUpCarryTests.cs"
       - "test/**/ContentSources/ReviewFromGitTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -969,6 +973,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/RecordDigest.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewRecord.cs"
       - "test/**/Core/RecordDigestTests.cs"
+      - "test/**/Core/RecordDigestFollowUpTests.cs"
 
   - id: ReviewCenter-Core-SigningService
     title: Review of ReviewCenter SigningService unit implementation
@@ -1227,6 +1232,7 @@ reviews:
       - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectChecklistStoreTests.cs"
       - "test/**/Storage/ReviewDueDateStoreTests.cs"
+      - "test/**/Storage/ReviewFollowUpStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-UserStore

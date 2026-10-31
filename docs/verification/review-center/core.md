@@ -225,6 +225,22 @@ stays valid after a change. They are tested by `ReviewService_CreateDraftAsync_D
 `ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature`, and
 `ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow`.
 
+**Follow-up review**: The unit tests of `ReviewService`, `FollowUpCarry`, `RecordDigest`, `ChecklistService`, and
+`SigningService` verify the subsystem requirement for the follow-up review: the Pass and not-applicable answers, the
+not-applicable sections, and the open threads that are carried with their original authors and times, the fail answers
+and the resolved threads that are not, the anchor that moves to the whole file with a note when the file changed, the
+refusals with `FollowUpInvalid` (another project or unknown source, another review set, another repository, no file in
+common, dropped threads that were not acknowledged), the marker that a new answer clears, the digest that binds the
+follow-up, the independence rule, and the signing blockers. They are tested by
+`ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections`,
+`ReviewService_CreateDraftAsync_UnknownOrForeignSource_IsRefusedWithoutRevealing`,
+`ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker`,
+`ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`,
+`ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`,
+`RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest`, `RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest`, and the
+tests of `FollowUpCarryTests.cs`. The rule `FollowUpInvalid` is one row of the theory
+`CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
+
 **Audit trail of the services**: The unit tests of `AuditService` and `UserService` verify the subsystem requirement
 for the audit trail. A draft recorded through `AuditService` is stored and the chain verifies, which is tested by
 `AuditService_RecordAsync_Draft_StoresEntryThatVerifies`, and the administration events of `UserService` (creation,

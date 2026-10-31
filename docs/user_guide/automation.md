@@ -154,6 +154,19 @@ An optional `dueDate` (text `yyyy-MM-dd`, a calendar day in UTC; omitted, `null`
 a due date. It must not be before today (UTC) or more than two years ahead; otherwise the answer is a **400** that names
 the due date and nothing is created. A token cannot change the date later: that is done on the review page by an
 administrator or the creator (see Due Dates in the Reviewing chapter).
+
+An optional `followsReviewId` makes the review a **follow-up** of an earlier review of the same project: the answers
+that passed or were not applicable, the sections that were not applicable, and the open threads of the earlier review
+are carried into the new one, and answers that failed and threads that are resolved are not. Omitted, `null`, or blank
+means that the review follows nothing. The earlier review must be in the same project and must have at least one file
+path in common with the new one; both must come from the same review-set when both have one, otherwise from the same
+repository (or both be uploads). The earlier review may be in review or approved. The answer is a **400** that names
+`FollowUpInvalid` and nothing is created when the earlier review does not exist in the project (the answer does not say
+whether it exists in another project) or does not fit, or when an open thread of the earlier review is on a file that
+the new review does not have. In the last case, repeat the request with `"acknowledgeDroppedThreads": true` to confirm
+that those threads are dropped. A carried answer keeps its author and time, and a carried thread keeps its comments; a
+thread whose file has other content in the new review is moved to the whole file, with a note that names the original
+lines. The author of the new review is still the creator, so the independence rule applies to the creator as usual.
 The same rules as on the web pages apply: the identifier and title rules, the upload limits, and the repository rules
 (see Projects and Reviews and Reviews from a Repository in the Reviewing chapter). The API refuses more than 200 `files`,
 or a `contentBase64` longer than the Base64 text of 2 MiB, with a **400** that names `files` or `files[i].contentBase64`,
@@ -182,6 +195,11 @@ review is locked) to find out whether a review is approved.
 **`dueDate` and `overdue`.** The review data of the list and of one review has `dueDate` (`yyyy-MM-dd`, or `null` when
 the review has none) and `overdue` (`true` when the date is before today in UTC and the review is not approved; an
 approved review is never overdue, and keeps its date).
+
+**`followsReviewId`.** The review data of the list has `followsReviewId` (the review that this review follows, or `null`
+when it follows none). The review data of one review has also `followsReviewId`, `carriedAnswerCount`, and
+`carriedThreadCount`, the numbers of answers and threads that were carried when the review was created (0 when it
+follows none).
 
 ## Errors, Refusals, and the Throttle
 

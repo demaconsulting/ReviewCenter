@@ -71,4 +71,15 @@ public sealed class ChecklistAnswer
     ///     Gets the moment the check was answered (UTC).
     /// </summary>
     public DateTimeOffset AnsweredAt { get; init; }
+
+    /// <summary>
+    ///     Gets the identifier of the earlier review this answer was carried over from when the review was created as a
+    ///     follow-up, or <c>null</c> for an answer given in this review.
+    /// </summary>
+    /// <remarks>
+    ///     The answerer and the time are those of the original answer; carrying never makes the creator the answerer.
+    ///     Answering the check again (even with the same value) stores an answer without the marker. The marker is part
+    ///     of the record digest.
+    /// </remarks>
+    public string? CarriedFromReviewId { get; init; }
 }

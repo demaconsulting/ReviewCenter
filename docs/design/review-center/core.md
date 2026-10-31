@@ -119,7 +119,13 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   planner) and is changed or cleared by `SetDueDateAsync` (a project admin, a system administrator, or the user who
   created the review; never with an API token; refused with `ReviewLocked` when the review is approved; audited as
   `review.due-date-changed`). `IsOverdue` tells whether the due date lies before `TodayUtc`, the current UTC day, and
-  the review is not approved, and an invalid due date is refused with `DueDateInvalid`. `RecordDigest` calculates the
+  the review is not approved, and an invalid due date is refused with `DueDateInvalid`. A review can be created as a
+  follow-up of an earlier review of the same project (the optional `followsReviewId` of `CreateDraftAsync` and
+  `CreateFromRepositoryAsync`): the Pass and N/A answers of checks that are unchanged, the not-applicable sections
+  with the same title, and the open threads whose file is in the new review are carried over (`FollowUpCarry`, written
+  with the review in one transaction), marked with the review they came from, while Fail answers, resolved threads,
+  reviewer slots, signatures and reopenings are not; a review that does not fit, and open threads that would be dropped
+  without an acknowledgement, are refused with `FollowUpInvalid`. `RecordDigest` calculates the
   digest of a record. Every
   operation that changes data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
@@ -158,7 +164,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   that changes data takes an
   `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
   same transaction.
-- *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
+- *Constraints*: A review is added with all its files, and its checklist snapshot, and (for a follow-up) the carried
+  answers, section states and threads with their comments (`Review.CarryOver`), in one operation, and an attempt
   to add a review whose
   identifier already exists in the project fails with a `DomainRuleException` for `ReviewIdDuplicate`. A thread is
   added with its first comment in one operation. Setting a section state or an answer replaces the earlier one.
@@ -402,6 +409,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `RecordChanged` | The record changed after the signer saw it (digest differs), or a setting was changed first |
 | `ReviewLocked` | The review is approved (locked) and content, a reviewer slot, a due date, or a signature changes |
 | `DueDateInvalid` | A due date for a new review is before today (UTC) or more than 2 years ahead, or is not a date |
+| `FollowUpInvalid` | A follow-up names a review that is not in the project, does not fit it, or drops threads |
 | `ReviewNotLocked` | A reopen is requested for a review that is not approved |
 | `ReopenReasonInvalid` | The reason for a reopen is empty after trimming or longer than 250 characters |
 | `ReviewerNotIndependent` | Independent reviewers are required and the review author would be, or signs as, one |

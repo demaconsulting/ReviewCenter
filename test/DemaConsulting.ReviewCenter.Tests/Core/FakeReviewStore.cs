@@ -452,6 +452,43 @@ internal sealed class FakeReviewStore : IReviewStore
         }
 
         _reviews.Add(review);
+
+        // The rows carried over from the followed review are stored with it, like the real store does in one transaction;
+        // a thread of a file that is not in the review fails like the real foreign key
+        if (review.CarryOver is { } carry)
+        {
+            foreach (var thread in carry.Threads)
+            {
+                if (review.Files.All(f => f.Path != thread.FilePath))
+                {
+                    _reviews.Remove(review);
+                    throw new InvalidOperationException($"The carried thread names the file '{thread.FilePath}', which is not in the review.");
+                }
+            }
+
+            _answers.AddRange(carry.Answers);
+            _sectionStates.AddRange(carry.SectionStates);
+            foreach (var thread in carry.Threads)
+            {
+                var id = _threads.Count + 1;
+                _threads.Add(new ReviewThread
+                {
+                    Id = id,
+                    ProjectId = thread.ProjectId,
+                    ReviewId = thread.ReviewId,
+                    FilePath = thread.FilePath,
+                    Side = thread.Side,
+                    StartLine = thread.StartLine,
+                    EndLine = thread.EndLine,
+                    State = thread.State,
+                    Created = thread.Created,
+                    CarriedFromReviewId = thread.CarriedFromReviewId,
+                    CarriedFromThreadId = thread.CarriedFromThreadId,
+                    Comments = thread.Comments.Select(comment => Copy(comment, id)).ToList()
+                });
+            }
+        }
+
         Audits.Add(audit);
         return Task.CompletedTask;
     }
@@ -504,6 +541,9 @@ internal sealed class FakeReviewStore : IReviewStore
             HeadSha = current.HeadSha,
             Selection = current.Selection,
             ReviewSetId = current.ReviewSetId,
+            FollowsReviewId = current.FollowsReviewId,
+            CarriedAnswerCount = current.CarriedAnswerCount,
+            CarriedThreadCount = current.CarriedThreadCount,
             Files = current.Files,
             Checklist = current.Checklist
         };
@@ -631,6 +671,8 @@ internal sealed class FakeReviewStore : IReviewStore
             EndLine = old.EndLine,
             State = state,
             Created = old.Created,
+            CarriedFromReviewId = old.CarriedFromReviewId,
+            CarriedFromThreadId = old.CarriedFromThreadId,
             Comments = old.Comments
         };
         return Task.FromResult(true);
@@ -740,7 +782,8 @@ internal sealed class FakeReviewStore : IReviewStore
                         .ToList(),
                     review.ReviewSetId)
                 : ReviewSource.Upload,
-            _reopens.Count(r => r.ProjectId == projectId && r.ReviewId == reviewId));
+            _reopens.Count(r => r.ProjectId == projectId && r.ReviewId == reviewId),
+            review.FollowsReviewId);
         return Task.FromResult<ReviewRecord?>(record);
     }
 
@@ -964,6 +1007,9 @@ internal sealed class FakeReviewStore : IReviewStore
             HeadSha = review.HeadSha,
             Selection = review.Selection,
             ReviewSetId = review.ReviewSetId,
+            FollowsReviewId = review.FollowsReviewId,
+            CarriedAnswerCount = review.CarriedAnswerCount,
+            CarriedThreadCount = review.CarriedThreadCount,
             Files = review.Files
                 .Select(file => new ReviewFile
                 {

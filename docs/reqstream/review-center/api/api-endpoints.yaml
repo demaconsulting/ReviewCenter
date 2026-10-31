@@ -75,6 +75,21 @@ sections:
           - ApiEndpoints_CreateReview_InvalidDueDate_Answers400AndCreatesNothing
           - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
 
+      - id: ReviewCenter-ApiEndpoints-CreateFollowUp
+        title: >-
+          The ApiEndpoints unit shall accept an optional followsReviewId, and an optional acknowledgeDroppedThreads,
+          in the request that creates a review, with the same rules as the creation by hand, answer a review that
+          cannot be followed, or open threads that would be dropped without the acknowledgement, with status 400 and a
+          problem document, creating no review, and show the followed review (null when there is none) and the
+          numbers of carried answers and threads in the detail of a review, and the followed review in the list.
+        justification: |
+          A pipeline that creates the next draft after a review failed should not make the reviewers answer again what
+          they have answered. A script must be told why a follow-up was refused instead of getting a review without
+          the carry, and must see which reviews are follow-ups without reading a page.
+        tests:
+          - ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid
+          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
+
       - id: ReviewCenter-ApiEndpoints-Validation
         title: >-
           The ApiEndpoints unit shall answer a request body that is not valid, including one that is not JSON or not

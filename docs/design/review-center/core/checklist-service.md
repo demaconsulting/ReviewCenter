@@ -51,11 +51,13 @@ the strict rules apply only where a definition enters the system or is taken for
 
 **ChecklistSectionState**: whether a section applies to a review: `ProjectId`, `ReviewId`, `SectionId`,
 `Applicable`, `Reason`, `SetBy` (the display name of the person at that time), `SetByUsername` (the user name), and
-`SetAt` (UTC). A section without a row applies.
+`SetAt` (UTC), and `CarriedFromReviewId` (the identifier of the earlier review the state was carried over from when the
+review was created as a follow-up, otherwise null; see `ReviewService`). A section without a row applies.
 
 **ChecklistAnswer**: the answer to one check: `ProjectId`, `ReviewId`, `ItemId`, `Outcome`, `Justification`,
-`AnsweredBy` (the display name of the person at that time), `AnsweredByUsername` (the user name), and `AnsweredAt`
-(UTC). A check has at most one answer; answering again replaces it.
+`AnsweredBy` (the display name of the person at that time), `AnsweredByUsername` (the user name), `AnsweredAt`
+(UTC), and `CarriedFromReviewId` (the earlier review the answer was carried over from, otherwise null; a carried
+answer keeps the original answerer and time). A check has at most one answer; answering again replaces it.
 
 **ChecklistOutcome**: a closed enumeration with the values `Pass`, `Fail`, and `NotApplicable` (shown as N/A). It
 is stored as text.
@@ -136,6 +138,14 @@ The rules are checked in this order, and the first violation is reported: that t
 (`ChecklistItemNotFound`); the justification or reason (`ChecklistJustificationInvalid`); and that the review is not
 locked (`ReviewLocked`). An outcome that is not
 a defined value is a programming error and throws `ArgumentOutOfRangeException` before any rule is checked.
+
+**Carried answers and sections**: a review that was created as a follow-up starts with answers and not-applicable
+section states that were carried over (written by the store with the review, not through these methods). They count as
+answers and decisions for `ChecklistState` (progress, `IsComplete`) exactly like answers given in the review, so the
+checklist needs no other change. Both write methods store a row with `CarriedFromReviewId` null: whoever answers a
+carried check again, or sets a carried section again, makes the row an answer of this review (new answerer, new time,
+no marker), even when the outcome and the justification are the same, and the store's write must not keep the old
+marker. The audit entries are those of any answer.
 
 **Audit**: Changing the applicability of a section records `checklist.applicability-changed`, and answering a check
 records `checklist.answered`. The draft is passed to the store and saved in the same transaction. The detail of an

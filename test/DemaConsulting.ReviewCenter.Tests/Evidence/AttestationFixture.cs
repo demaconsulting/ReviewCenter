@@ -111,6 +111,32 @@ internal sealed class AttestationFixture
     public int CydUserId { get; private set; }
 
     /// <summary>
+    ///     Gets the identity of the user ann.
+    /// </summary>
+    private int AnnUserId { get; set; }
+
+    /// <summary>
+    ///     Gets the identity of the user bob.
+    /// </summary>
+    private int BobUserId { get; set; }
+
+    /// <summary>
+    ///     Creates a follow-up review of the fixture's review (which carries every answer, as all are Pass), adds one
+    ///     slot and signs it as ann, so the follow-up is approved.
+    /// </summary>
+    /// <param name="reviewId">The identifier of the follow-up review.</param>
+    /// <returns>A task that completes when the follow-up is signed.</returns>
+    public async Task CreateSignedFollowUpAsync(string reviewId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await TestServices.Reviews(Store, Clock).CreateDraftAsync(
+            ProjectId, reviewId, "Follow-up", [new("a.txt", TestContent.A)], new Actor("cyd", "Cyd"), cancellationToken, followsReviewId: ReviewId);
+        var slot = await Signing.AddSlotAsync(new Actor("cyd", "Cyd"), ProjectId, reviewId, AnnUserId, BobUserId, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(ProjectId, reviewId, cancellationToken);
+        await Signing.SignAsync(TestActors.Ann, ProjectId, reviewId, slot.Id, approval!.Digest, Password, cancellationToken);
+    }
+
+    /// <summary>
     ///     Creates the fixture.
     /// </summary>
     /// <param name="signed">Whether the slot is signed, which completes the review.</param>
@@ -126,6 +152,8 @@ internal sealed class AttestationFixture
         }
 
         fixture.CydUserId = ids["cyd"];
+        fixture.AnnUserId = ids["ann"];
+        fixture.BobUserId = ids["bob"];
         var project = await TestServices.Projects(fixture.Store, fixture.Clock).CreateAsync("Apollo", null, cancellationToken);
         fixture.ProjectId = project.Id;
         foreach (var id in ids.Values)

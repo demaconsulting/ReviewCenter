@@ -338,6 +338,18 @@ where the same production pipeline can be exercised with real databases more pre
 process: creating a review needs a live browser connection for the file upload, which the in-memory component
 tests provide. The following scenarios belong to the system verification through the subsystem tests.
 
+**Follow-up review**: A review is created that follows an earlier review of the same files through the domain services
+over the fake store, so the answers that passed and the open threads are carried with their original authors and times,
+the digest binds the follow-up, and the creator stays the author for the independence rule; through the API over the
+real pipeline, the review is created with `followsReviewId`, shows it in the details and the list, and a source that
+cannot be followed is a 400 problem that creates nothing; with the real database the carry is stored in the one
+transaction of the review; and the attestation names the followed review. These scenarios are tested by
+`ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections`,
+`ApiEndpoints_CreateReview_FollowsReviewId_IsCreatedShownAndRefusedWhenInvalid`,
+`ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`, and
+`AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers`. The page for choosing the
+earlier review and the carried badges belong to a later change.
+
 **Review creation and display**: A project and a review are created through the domain services over a real
 database, and the review and project pages are requested over HTTP; the pages show the fingerprint, the files,
 and the project. This scenario is tested by `WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages`.

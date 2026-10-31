@@ -60,6 +60,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               and the version header is not bumped; after a reopen the digest differs from every earlier one,
 ///               whatever the content, so a signature given before a reopen can never be current again.</item>
 ///     </list>
+///     A follow-up review (one created from an earlier review, see <see cref="ReviewService"/>) adds two kinds of
+///     conditional text, in the same way as <c>reopens</c>: a <c>follows {id}</c> line straight after the source block,
+///     and a <c>carried {id}</c> suffix at the end of an answer line, a not-applicable line and a thread line whose row
+///     was carried over from that review. They are written only when present, so the digest of a review that is not a
+///     follow-up is byte-for-byte what it was and the version header is not bumped; a signature of a follow-up
+///     therefore also binds to which review it follows and to which rows were carried rather than given in it.
 ///     Strings are written as <c>{length}:{text}</c> (length in UTF-16 code units) and absent values as
 ///     <c>-</c>, so no text can imitate a delimiter; numbers use the invariant culture and times are written as
 ///     UTC ticks. All sorting is ordinal. The class is stateless and thread-safe.
@@ -100,23 +106,30 @@ public static class RecordDigest
         // The source comes straight after the fingerprint so a signature binds to where the files came from
         AddSource(lines, record.Source);
 
+        // A follow-up names the review it follows; the line is absent otherwise, so no other digest changes
+        if (record.FollowsReviewId is not null)
+        {
+            lines.Add("follows " + Text(record.FollowsReviewId));
+        }
+
         // The questions come before the answers so a signature binds to what was asked, not only to the replies
         AddChecklist(lines, record.Checklist);
 
-        // Answers, in check id order, with who answered; only the time is left out on purpose
+        // Answers, in check id order, with who answered; only the time is left out on purpose. A carried answer ends
+        // with the review it came from, so carried and given answers never share a digest
         lines.Add("answers");
         foreach (var answer in record.Answers.OrderBy(a => a.ItemId, StringComparer.Ordinal))
         {
             lines.Add(
                 $"answer {Text(answer.ItemId)} {Text(answer.Outcome.ToString())} {Text(answer.Justification)} " +
-                $"{Text(answer.AnsweredBy)} {Text(answer.AnsweredByUsername)}");
+                $"{Text(answer.AnsweredBy)} {Text(answer.AnsweredByUsername)}{Carried(answer.CarriedFromReviewId)}");
         }
 
         // Only the sections that do not apply matter; "applies" is the default and carries no reason
         lines.Add("sections");
         foreach (var section in record.SectionStates.Where(s => !s.Applicable).OrderBy(s => s.SectionId, StringComparer.Ordinal))
         {
-            lines.Add($"not-applicable {Text(section.SectionId)} {Text(section.Reason)}");
+            lines.Add($"not-applicable {Text(section.SectionId)} {Text(section.Reason)}{Carried(section.CarriedFromReviewId)}");
         }
 
         // Each thread becomes one block; sorting the blocks removes any dependence on row order or identity
@@ -217,7 +230,8 @@ public static class RecordDigest
         var lines = new List<string>
         {
             $"thread {Text(thread.FilePath)} {Text(thread.Side.ToString())} {Number(thread.StartLine)} {Number(thread.EndLine)} " +
-            $"{Text(thread.State.ToString())} {thread.Created.UtcTicks.ToString(CultureInfo.InvariantCulture)}"
+            $"{Text(thread.State.ToString())} {thread.Created.UtcTicks.ToString(CultureInfo.InvariantCulture)}" +
+            Carried(thread.CarriedFromReviewId)
         };
 
         // Comment order is meaningful, so it is kept exactly as stored (the store orders by identity)
@@ -225,6 +239,16 @@ public static class RecordDigest
             $"comment {Text(comment.Author)} {Text(comment.AuthorUsername)} {Text(comment.Text)} " +
             comment.Created.UtcTicks.ToString(CultureInfo.InvariantCulture)));
         return string.Join('\n', lines);
+    }
+
+    /// <summary>
+    ///     Writes the optional suffix of a carried row.
+    /// </summary>
+    /// <param name="carriedFrom">The review the row was carried from, or <c>null</c> for a row of this review.</param>
+    /// <returns>The empty string for no marker, otherwise a space, <c>carried</c>, a space and the length-prefixed id.</returns>
+    private static string Carried(string? carriedFrom)
+    {
+        return carriedFrom is null ? string.Empty : " carried " + Text(carriedFrom);
     }
 
     /// <summary>

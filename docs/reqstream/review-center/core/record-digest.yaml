@@ -179,3 +179,23 @@ sections:
           - RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest
           - RecordDigest_Compute_ReopensChangeDigest
           - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-FollowUp
+        title: >-
+          The RecordDigest class shall cover the review that a follow-up review follows, as a line that is written
+          only for a follow-up, and the review that a carried answer, a carried not-applicable section and a carried
+          thread came from, as a suffix that is written only on a carried line, shall give a different digest when
+          either changes, shall not cover the number that the carried thread had in the earlier review, and shall give
+          for a review that is not a follow-up, and has nothing carried, the same digest as before follow-up reviews
+          existed, without a new format version.
+        justification: |
+          What a signature approves includes whether the reviewers answered a check themselves or took the answer over
+          from an earlier review, so a change of that is a change of the record. Leaving the lines out when they do
+          not apply keeps every existing signature and the evidence index valid. The number of the thread in the
+          earlier review is a database number that adds nothing a reader could check, so it is not covered.
+        tests:
+          - RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest
+          - RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat
+          - RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest
+          - RecordDigest_Compute_CarriedFromThreadId_NotCovered
+          - ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange

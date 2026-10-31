@@ -70,4 +70,12 @@ public sealed class ChecklistSectionState
     ///     Gets the moment the applicability was set (UTC).
     /// </summary>
     public DateTimeOffset SetAt { get; init; }
+
+    /// <summary>
+    ///     Gets the identifier of the earlier review this applicability was carried over from when the review was
+    ///     created as a follow-up (a section that did not apply, with its reason), or <c>null</c> when it was set in
+    ///     this review. Setting the applicability again stores a state without the marker. The marker is part of the
+    ///     record digest.
+    /// </summary>
+    public string? CarriedFromReviewId { get; init; }
 }

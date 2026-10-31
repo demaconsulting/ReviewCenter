@@ -275,7 +275,9 @@ public interface IReviewStore
     Task<bool> ReviewExistsAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Stores a new review together with its files and, when it has one, its frozen checklist.
+    ///     Stores a new review together with its files and, when it has one, its frozen checklist and the rows carried over
+    ///     from the review it follows (<see cref="Review.CarryOver"/>: answers, section states, and threads with copies of their
+    ///     comments, written in the same transaction; a row that cannot be stored fails the whole call and nothing is stored).
     /// </summary>
     /// <param name="review">The review to store, with its files and their bytes. Must not be null.</param>
     /// <param name="audit">The audit draft of the change.</param>

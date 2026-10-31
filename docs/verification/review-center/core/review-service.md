@@ -4,7 +4,8 @@
 
 `ReviewService` is verified with unit tests defined in `ReviewServiceTests.cs`, the freezing of the checklist of the
 project in `ReviewServiceChecklistTests.cs` (which sets the checklist through the real `ProjectChecklistService`), and
-the due date in `ReviewServiceDueDateTests.cs`. The
+the due date in `ReviewServiceDueDateTests.cs`, and the follow-up review in `FollowUpCarryTests.cs` and
+`ReviewServiceFollowUpTests.cs`. The
 tests use the real service and the real `Fingerprint` with a fake in-memory store (`FakeReviewStore`), the
 project-access double
 `AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit), and a fixed clock, so every rule
@@ -51,6 +52,12 @@ N/A - standard test environment.
   audited at creation, and changed or cleared with one entry `review.due-date-changed` by a project administrator, a
   system administrator, or the creator, never through a token, never for an approved review (`ReviewLocked`); a review
   is overdue only when the date has passed and it is not approved.
+- A review can be created as a follow-up of an earlier review of the same project: the Pass and N/A answers of checks
+  with unchanged wording, the not-applicable sections with the same title, and the open threads on files of the new
+  review are carried, marked with the earlier review, and stored with it in one step; Fail answers, resolved threads,
+  slots, signatures and reopenings are not; a line anchor is kept only for identical content; an unknown or foreign
+  review, a review that does not fit, and dropped open threads without an acknowledgement are refused with
+  `FollowUpInvalid`; the audit entry names the carry; a review that follows nothing is unchanged.
 
 #### Test Scenarios
 
@@ -348,3 +355,143 @@ has passed, and three days later it names only the approved dated review. This s
 **ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses**: Missing, null, and blank text is no date; `yyyy-MM-dd`
 is read; any other text raises `DueDateInvalid`. This scenario is tested by
 `ReviewService_ParseDueDate_IsoTextOnly_ReadsDateOrRefuses`.
+
+**The follow-up review** is verified in `FollowUpCarryTests.cs` (the pure helper by itself, with records built in
+memory and no store) and `ReviewServiceFollowUpTests.cs` (the real service, `FakeReviewStore`, and a fixed clock; the
+repository paths use a fake git provider and the real `RepositoryService`).
+
+**FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer**: Pass and N/A answers of checks
+that are in the new checklist with the same wording are carried with their outcome, justification, answerer and time,
+marked with the earlier review. This scenario is tested by
+`FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer`.
+
+**FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried**: A Fail answer, a check whose wording changed, and a
+check that is not in the new checklist are not carried. This scenario is tested by
+`FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried`.
+
+**FollowUpCarry_Compute_SourceWithoutChecklist_CarriesNoChecklistRows**: An earlier review without a checklist carries
+no answer and no section state. This scenario is tested by
+`FollowUpCarry_Compute_SourceWithoutChecklist_CarriesNoChecklistRows`.
+
+**FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame**: A not-applicable section with the
+same title is carried with its reason; one with another title, one that is gone, and a section that applies are not.
+This scenario is tested by `FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame`.
+
+**FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim**: An open thread on a file of the new review is
+carried open with every comment (author, user name, text, time) unchanged, its original time, and the marks of the
+review and the thread it came from. This scenario is tested by
+`FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim`.
+
+**FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed**: A resolved thread is counted and not carried;
+an open thread on a file that the new review does not have is listed (sorted, once per file) and not carried. This
+scenario is tested by `FollowUpCarry_Compute_ResolvedAndDroppedThreads_AreCountedAndListed`.
+
+**FollowUpCarry_Compute_LineAnchor_IsKeptOnlyForIdenticalContent**: A theory over the head and the baseline side: a
+line anchor is kept when the hash of its own side is the same in both reviews, and otherwise the thread becomes a
+whole-file thread with a last comment by `ReviewCenter` that names the old lines and side. This scenario is tested by
+`FollowUpCarry_Compute_LineAnchor_IsKeptOnlyForIdenticalContent`.
+
+**FollowUpCarry_Compute_SingleLineWholeFileAndUnknownHash_AreHandled**: A single-line anchor is named as "line N" in the
+note, a whole-file thread keeps its anchor and gets no note, and an empty or unknown hash never counts as the same
+content. This scenario is tested by `FollowUpCarry_Compute_SingleLineWholeFileAndUnknownHash_AreHandled`.
+
+**FollowUpCarry_CheckFit_Matrix**: A theory over the review-set, the repository, and the file paths: equal sets fit,
+different sets do not; without sets the same repository fits, another repository or an upload against a repository does
+not; two uploads fit; reviews without a common file do not. This scenario is tested by `FollowUpCarry_CheckFit_Matrix`.
+
+**FollowUpCarry_DroppedMessage_ListsFilesAndTheRest**: The message names up to ten files and then says how many more,
+and uses the singular for one file. This scenario is tested by `FollowUpCarry_DroppedMessage_ListsFilesAndTheRest`.
+
+**FollowUpCarry_NullArguments_Throw**: A null argument of `Compute`, `CheckFit` or `DroppedMessage` raises
+`ArgumentNullException`. This scenario is tested by `FollowUpCarry_NullArguments_Throw`.
+
+**ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections**: A review created with `followsReviewId` stores
+the carried answers and not-applicable sections, marked with the earlier review, with the original answerer, and
+`FollowsReviewId` and the counts. This scenario is tested by
+`ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections`.
+
+**ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered**: A checklist whose checks are all carried is
+complete and has no unanswered check. This scenario is tested by
+`ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered`.
+
+**ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried**: After the checklist of the project
+changed the wording of a check, the answer to that check is not carried and the check is unanswered. This scenario is
+tested by `ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried`.
+
+**ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts**: Open threads are carried; the entry
+`review.created` ends the review text with `, follows 'X'; carried N answers, M threads` (`X` is the whole identifier) and
+names the resolved threads
+that were not carried. This scenario is tested by
+`ReviewService_CreateDraftAsync_FollowUp_CarriesOpenThreadsAndAuditsCounts`.
+
+**ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId**: Four earlier reviews have 100-character identifiers
+that share their first 57 characters; a follow-up of each, two per create path, names the whole identifier in the
+`review.created` detail, so the entries of two follow-ups differ, and no detail exceeds 500 characters. This scenario is
+tested by `ReviewService_CreateReview_FollowUp_AuditNamesTheWholeSourceId`.
+
+**ReviewService_CreateDraftAsync_NoFollowUp_HasNoCarriedData**: A review without `followsReviewId` follows nothing,
+carries nothing, and its audit detail has no follow-up text. This scenario is tested by
+`ReviewService_CreateDraftAsync_NoFollowUp_HasNoCarriedData`.
+
+**ReviewService_CreateDraftAsync_UnknownOrForeignSource_IsRefusedWithoutRevealing**: A review that does not exist, and a
+review of another project, are refused with `FollowUpInvalid` and the same message, which does not name the other
+project, and nothing is stored. This scenario is tested by
+`ReviewService_CreateDraftAsync_UnknownOrForeignSource_IsRefusedWithoutRevealing`.
+
+**ReviewService_CreateDraftAsync_UploadFollowUp_NeedsACommonFile**: Two uploads with a file in common fit; without a
+common file the follow-up is refused with `FollowUpInvalid`. This scenario is tested by
+`ReviewService_CreateDraftAsync_UploadFollowUp_NeedsACommonFile`.
+
+**ReviewService_CreateFollowUp_UploadRepositoryAndOtherRepository_AreRefused**: An upload cannot follow a repository
+review and the reverse, and a review from one repository cannot follow one from another; each is `FollowUpInvalid`.
+This scenario is tested by `ReviewService_CreateFollowUp_UploadRepositoryAndOtherRepository_AreRefused`.
+
+**ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors**: A repository follow-up keeps the line anchor of
+a thread whose file is unchanged and moves the thread of a changed file to the whole file with the note. This scenario
+is tested by `ReviewService_CreateFromRepositoryAsync_FollowUp_KeepsOrMovesAnchors`.
+
+**ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor**: When the file has the same content
+in both reviews, the line anchor and the comments are kept without a note. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_FollowUp_SameContent_KeepsTheLineAnchor`.
+
+**ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement**: Open threads on a file that is not in the new
+review refuse the creation with `FollowUpInvalid` and a message that lists the file; with
+`acknowledgeDroppedThreads` the review is created without them and the audit detail says how many files were dropped.
+This scenario is tested by `ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement`.
+
+**ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless**: The acknowledgement changes nothing
+when no thread is dropped. This scenario is tested by
+`ReviewService_CreateDraftAsync_AcknowledgementWithoutDroppedThreads_IsHarmless`.
+
+**ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource**: An approved earlier review can be
+followed, and a follow-up of a follow-up points to the one before it, and what it carries is marked with that review.
+This scenario is tested by `ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource`.
+
+**ReviewService_CreateFromSessionAsync_ReviewSet_MustMatch**: Reviews planned from the same review-set fit, and from
+different sets are refused with `FollowUpInvalid`. This scenario is tested by
+`ReviewService_CreateFromSessionAsync_ReviewSet_MustMatch`.
+
+**ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker**: Answering a carried check again, and
+setting a carried section again, stores a row with no carried mark and with the new person. This scenario is tested by
+`ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker`.
+
+**ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange**: The record digest of a follow-up
+differs from that of the same record without the follow-up, and a later change of the checklist of the project does
+not change it. This scenario is tested by
+`ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange`.
+
+**ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence**: The creator of a follow-up that carried another
+person's answers still cannot be seated as a reviewer while independent reviewers are required (`ReviewerNotIndependent`),
+while the person who gave the carried answers can be. This
+scenario is tested by `ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`.
+
+**ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot**: With only carried answers the review has
+no blocker for the checklist; a carried open thread blocks with "1 thread is open", until it is resolved. This scenario
+is tested by `ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`.
+
+**ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened**: A follow-up that is approved is locked like any review and
+can be reopened. This scenario is tested by `ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened`.
+
+**ReviewService_FollowUp_DuplicateId_IsRefusedAndNothingChanges**: A follow-up with an identifier that exists is refused
+with `ReviewIdDuplicate` and stores nothing. This scenario is tested by
+`ReviewService_FollowUp_DuplicateId_IsRefusedAndNothingChanges`.

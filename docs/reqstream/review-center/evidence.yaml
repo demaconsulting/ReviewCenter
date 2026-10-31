@@ -179,3 +179,18 @@ sections:
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
           - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
           - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      - id: ReviewCenter-Evidence-FollowUp
+        title: >-
+          The Evidence subsystem shall show in the attestation PDF of a follow-up review which earlier review it
+          follows, how much it carried from it, and which checklist answers, sections and threads were carried, and
+          show nothing of the kind for a review that follows none.
+        justification: |
+          The signature approves the carried answers together with the others, so the document that is shown to
+          people outside the tool has to say which are which.
+        children:
+          - ReviewCenter-AttestationService-FollowUp
+          - ReviewCenter-AttestationRenderer-FollowUp
+        tests:
+          - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
+          - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks

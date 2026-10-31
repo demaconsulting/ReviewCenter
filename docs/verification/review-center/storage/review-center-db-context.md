@@ -204,3 +204,11 @@ by `TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack`; t
 which is tested by `TotpStore_ConfirmAsync_SameHashForDifferentUsers_IsAllowed`. Deleting a user removes the enrollment
 and the codes by cascade, which is tested by `TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes`. Both tests are
 described with the `TotpStore` unit.
+
+**The follow-up columns** are verified through the real store in `ReviewFollowUpStoreTests.cs`.
+
+**ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview**: The model has an index on the project and the
+followed review of a review, and the carried rows that a review holds only while it is created are not mapped. This
+scenario is tested by `ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview`. The columns themselves are
+verified by `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`, which is described with the `ReviewStore`
+unit.

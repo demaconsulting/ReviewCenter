@@ -204,6 +204,14 @@ approved ones and agrees with the single-review definition; it is tested by
 `ReviewStore_ListApprovedReviewIdsAsync_SeveralReviews_ReturnsExactlyTheApprovedOnes`, defined in
 `ReviewStoreSigningTests.cs`.
 
+**Follow-up review**: A follow-up review is stored with its followed review and carried counts and with the carried
+answers, sections, and threads in the one transaction of the review, so that a carry that fails halfway creates nothing,
+a new answer or section state replaces a carried row without its marker, and the index on the project and the followed
+review exists. They are tested by `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`,
+`ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing`,
+`ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`, and
+`ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview`, all defined in `ReviewFollowUpStoreTests.cs`.
+
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by
 `AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain`. The public surface of the audit store has no

@@ -525,6 +525,38 @@ sections:
           - ReviewService_SetDueDateAsync_AfterSignature_KeepsDigestAndSignature
           - ReviewPlanner_CreateAsync_DueDates_DefaultOwnAndInvalidPerRow
 
+      - id: ReviewCenter-Core-FollowUp
+        title: >-
+          The Core subsystem shall let a review be created as a follow-up of an earlier review of the same project, by
+          hand or through a script, that fits it (the same review-set, or the same repository or both uploads, with a
+          file in common), carry over from the earlier review the Pass and N/A answers of unchanged checks, the
+          not-applicable sections of the same title, and the open threads of files that the new review has, with their
+          anchors kept only for identical content and moved to the whole file otherwise, never the Fail answers, the
+          resolved threads, the reviewer slots, the signatures or the reopenings, mark everything carried with the
+          review it came from until it is answered again, store it with the review in one step, count the carried
+          answers as answered and the carried open threads as open for approval, keep the creator the author for the
+          rule of independent reviewers, cover the follow-up and the marks in the record digest without changing the
+          digest of any other review, refuse an unfit earlier review and a silent drop of open threads with the
+          FollowUpInvalid rule, and name the carry in the audit entry of the creation.
+        justification: |
+          After a review failed, the work that was fine should carry over to the review of the corrected content, so
+          the reviewers spend their time on what changed. The rules keep the carry to a real continuation, the marks
+          keep the record honest about who answered what, and nothing may be lost without the creator confirming it.
+          Covering the marks in the digest makes a signature approve exactly what was carried, while leaving them out
+          for other reviews keeps every existing signature valid.
+        children:
+          - ReviewCenter-ReviewService-FollowUp
+          - ReviewCenter-ReviewService-FollowUpCarry
+          - ReviewCenter-ChecklistService-CarriedMarking
+          - ReviewCenter-SigningService-CarriedRecord
+          - ReviewCenter-RecordDigest-FollowUp
+        tests:
+          - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
+          - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
+          - ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker
+          - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
+          - RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest
+
       - id: ReviewCenter-Core-AccessTokens
         title: >-
           The Core subsystem shall let a user create personal access tokens with a name and an expiry, up to a limit,

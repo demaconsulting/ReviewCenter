@@ -144,6 +144,15 @@ internal sealed class AttestationRenderer : IAttestationRenderer
             writer.Row("Review set", document.ReviewSetId);
         }
 
+        // A follow-up says which review it follows and how much it took over from it
+        if (document.FollowsReviewId is not null)
+        {
+            writer.Row(
+                "Follows review",
+                $"{document.FollowsReviewId} ({document.CarriedAnswerCount.ToString(CultureInfo.InvariantCulture)} answers and " +
+                $"{document.CarriedThreadCount.ToString(CultureInfo.InvariantCulture)} threads carried)");
+        }
+
         writer.Row("Content fingerprint", document.ContentFingerprint, PdfFont.Courier);
         writer.Row("Record digest", $"{document.RecordDigest}\n({document.DigestVersion})", PdfFont.Courier);
         writer.Row("Generated", $"{Time(document.GeneratedAt)} by {document.GeneratedBy}");
@@ -260,6 +269,11 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         if (!section.IsApplicable)
         {
             writer.Paragraph($"Not applicable: {section.Reason}", PdfFont.HelveticaOblique, 9, 12);
+            if (section.CarriedFrom is not null)
+            {
+                writer.Paragraph($"Carried from review {section.CarriedFrom}", PdfFont.HelveticaOblique, 8, 12, 1);
+            }
+
             return;
         }
 
@@ -296,6 +310,11 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         {
             writer.Paragraph($"Answered by {item.AnsweredBy}", PdfFont.HelveticaOblique, 8, 122, 1);
         }
+
+        if (item.CarriedFrom is not null)
+        {
+            writer.Paragraph($"Carried from review {item.CarriedFrom}", PdfFont.HelveticaOblique, 8, 122, 1);
+        }
     }
 
     /// <summary>
@@ -322,6 +341,10 @@ internal sealed class AttestationRenderer : IAttestationRenderer
                 12,
                 4);
             writer.Paragraph(thread.Summary, PdfFont.Helvetica, 9, 24, 1);
+            if (thread.CarriedFrom is not null)
+            {
+                writer.Paragraph($"Carried from review {thread.CarriedFrom}", PdfFont.HelveticaOblique, 8, 24, 1);
+            }
         }
 
         var omitted = document.ResolvedThreads.Count - MaxListedResolvedThreads;

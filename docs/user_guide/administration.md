@@ -530,6 +530,10 @@ record digests (the number of reopens is added to the digest only when it is mor
 add the columns `Projects.RequireNonAuthorChecklistAnswers` and `Projects.RequireNonReopenerSigning`, again with no
 migration: a development database created before them must be deleted and created again. The optional due date of a
 review adds the column `Reviews.DueDate`, which the server also creates only when the database is new (no migration).
+The follow-up review adds the columns `Reviews.FollowsReviewId`, `Reviews.CarriedAnswerCount`, and
+`Reviews.CarriedThreadCount`, and the carried-from columns of the checklist answers, the section states, and the
+threads, again with no migration. A review that follows nothing keeps its record digest, because the lines for a
+followed review and for carried rows are added to the digest only when they exist.
 
 ## Repositories and Credentials
 

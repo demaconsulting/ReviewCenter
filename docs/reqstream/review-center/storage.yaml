@@ -269,6 +269,26 @@ sections:
           - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
           - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
 
+      - id: ReviewCenter-Storage-FollowUp
+        title: >-
+          The Storage subsystem shall keep the review that a follow-up review follows, the numbers of answers and
+          threads it carried, and the answers, sections and threads it carried with the review they came from, in the
+          database file, so that they are still there, unchanged, when the database is opened again, store them in the
+          one transaction that stores the review, so that a carry that fails stores nothing, load them into the record
+          that a signature covers, and store an answer that replaces a carried one without the mark. The schema is
+          created without a migration, so a development database that was created before the columns existed has to be
+          recreated.
+        justification: |
+          The follow-up and the carried answers are part of what the reviewers approve, so they must survive a restart
+          and exist together with the review or not at all. The schema is created from the model and not migrated
+          while the product is not released, so development databases are recreated.
+        children:
+          - ReviewCenter-ReviewStore-FollowUp
+          - ReviewCenter-DbContext-FollowUp
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+          - ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing
+
       - id: ReviewCenter-Storage-ReviewIntegrity
         title: >-
           The Storage subsystem shall keep the reopenings of a review, with the reason and the digest of the approved

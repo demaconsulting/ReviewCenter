@@ -37,6 +37,9 @@ N/A - standard test environment.
   section are found.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
+- Answers and not-applicable sections that a follow-up review carried count like the others (a review whose checks are
+  all carried is complete); answering a carried check again, or setting a carried section again, stores a row without
+  the carried mark and with the new person.
 
 #### Test Scenarios
 
@@ -230,3 +233,15 @@ are. This scenario is tested by `ChecklistValidator_ParseOrThrow_Invalid_ThrowsW
 
 **ChecklistValidationError_ToString_IsPathAndMessage**: An error is written as its path, a colon, and its message. This
 scenario is tested by `ChecklistValidationError_ToString_IsPathAndMessage`.
+
+**Carried answers and sections** are verified in `ReviewServiceFollowUpTests.cs`, which runs the real `ChecklistService`
+over the fake store after a follow-up was created.
+
+**ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker**: A carried check is answered again by
+another person and a carried section is set again; the stored rows have the new person and no carried mark, while a
+carried answer that was not touched keeps its mark. This scenario is tested by
+`ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker`.
+
+**ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered**: A review whose checks are all carried has a
+complete checklist with no unanswered check. This scenario is tested by
+`ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered`.
