@@ -684,11 +684,10 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public Task<bool> SetThreadStateAsync(
+    public Task<bool> ReopenThreadAsync(
         int projectId,
         string reviewId,
         int threadId,
-        ReviewThreadState state,
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
@@ -700,19 +699,31 @@ internal sealed class FakeReviewStore : IReviewStore
 
         Audits.Add(audit);
         // The state is init-only, so the stored thread is replaced by a copy with the new state
-        ReplaceThread(index, state, _threads[index].Comments);
+        ReplaceThread(index, ReviewThreadState.Open, _threads[index].Comments);
         return Task.FromResult(true);
     }
+
+    /// <summary>
+    ///     Gets or sets an action that runs just before a thread is resolved, so a test can simulate someone else
+    ///     promoting or demoting the thread between the service's check and the store's write.
+    /// </summary>
+    public Func<Task>? BeforeResolveThread { get; set; }
 
     /// <inheritdoc />
     public async Task<bool> ResolveThreadAsync(
         int projectId,
         string reviewId,
         int threadId,
+        ThreadKind expectedKind,
         ReviewComment? resolution,
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
+        if (BeforeResolveThread is { } before)
+        {
+            await before();
+        }
+
         await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
         var index = _threads.FindIndex(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId);
         if (index < 0 || _threads[index].State == ReviewThreadState.Resolved)
@@ -720,8 +731,15 @@ internal sealed class FakeReviewStore : IReviewStore
             return false;
         }
 
-        // The kind is read again, as the real store does inside its transaction
+        // The kind is read again and compared with the expected one, as the real store does inside its transaction
         var isFinding = _threads[index].Kind == ThreadKind.Finding;
+        if (_threads[index].Kind != expectedKind)
+        {
+            throw new DomainRuleException(
+                DomainRule.RecordChanged,
+                "The thread was promoted or demoted while you were resolving it. Review it and try again.");
+        }
+
         if (isFinding && resolution is null)
         {
             throw new DomainRuleException(

@@ -654,11 +654,10 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
-    public async Task<bool> SetThreadStateAsync(
+    public async Task<bool> ReopenThreadAsync(
         int projectId,
         string reviewId,
         int threadId,
-        ReviewThreadState state,
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
@@ -671,7 +670,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 await EnsureNotLockedAsync(context, projectId, reviewId, cancellationToken);
                 var rows = await context.Threads
                     .Where(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, state), cancellationToken);
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, ReviewThreadState.Open), cancellationToken);
                 return rows > 0 ? (true, audit) : (false, null);
             },
             cancellationToken);
@@ -682,6 +681,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         int projectId,
         string reviewId,
         int threadId,
+        ThreadKind expectedKind,
         ReviewComment? resolution,
         AuditDraft audit,
         CancellationToken cancellationToken = default)
@@ -705,9 +705,16 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     return (false, null);
                 }
 
-                // The kind is read again inside the transaction: a Finding cannot be resolved without a note, whatever
-                // the caller saw earlier
+                // The kind is read again inside the transaction. The caller decided the note, the acknowledgement of
+                // the signatures and the report flag for the expected kind, so another kind is refused, not accepted
                 var isFinding = thread.Kind == ThreadKind.Finding;
+                if (thread.Kind != expectedKind)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.RecordChanged,
+                        "The thread was promoted or demoted while you were resolving it. Review it and try again.");
+                }
+
                 if (isFinding && resolution is null)
                 {
                     throw new DomainRuleException(

@@ -168,7 +168,10 @@ after the cancellation token; see "Signature impact" above for when it is needed
 optional `resolutionNote`. The note is trimmed and a blank note counts as none; it has the same length limit as a
 comment (`CommentTextInvalid`). Resolving a Finding without a note is refused with `ResolutionNoteRequired`; a
 Question needs none. A note is stored in the same transaction as a comment of the kind `Resolution`, which is included
-in the report when the thread is a Finding.
+in the report when the thread is a Finding. The service passes the kind it saw to the store, which reads the kind again
+inside its transaction; when a promote or demote landed in between, the resolution is refused with `RecordChanged`
+(nothing is stored or audited), because the note, the acknowledgement and the report flag were decided for the other
+kind. `ReopenAsync` calls the reopen-only method of the store, which cannot resolve.
 
 **PromoteAsync** and **DemoteAsync**: Turn a Question into a Finding, or a Finding into a Question, by setting the
 report flag of the starting comment and of the Resolution comments of the thread (the replies keep their own flag).

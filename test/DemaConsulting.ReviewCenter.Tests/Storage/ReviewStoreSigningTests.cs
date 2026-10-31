@@ -327,7 +327,7 @@ public class ReviewStoreSigningTests
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
         var thread = await AddThreadAsync(db, projectId, "First");
-        await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
+        await db.Store.ResolveThreadAsync(projectId, "REV-1", thread.Id, ThreadKind.Finding, TestContext.Current.CancellationToken);
         var slot = await db.Store.AddSlotAsync(NewSlot(projectId), TestContext.Current.CancellationToken);
         var digest = await DigestAsync(db, projectId);
         await db.Store.AddSignatureAsync(NewSignature(projectId, slot.Id, digest), TestContext.Current.CancellationToken);
@@ -499,8 +499,9 @@ public class ReviewStoreSigningTests
     private static async Task<(ReviewThread Thread, ReviewerSlot Slot, string Digest)> ApproveAsync(TestStore db, int projectId)
     {
         var thread = await AddThreadAsync(db, projectId, "Looks odd");
-        await db.Store.SetThreadStateAsync(
-            projectId, "REV-1", thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
+        // The thread is a Finding, so it is resolved with a note
+        await db.Store.ResolveThreadAsync(
+            projectId, "REV-1", thread.Id, ThreadKind.Finding, TestContext.Current.CancellationToken);
         var slot = await db.Store.AddSlotAsync(NewSlot(projectId), TestContext.Current.CancellationToken);
         var digest = await DigestAsync(db, projectId);
         await db.Store.AddSignatureAsync(NewSignature(projectId, slot.Id, digest), TestContext.Current.CancellationToken);
@@ -547,7 +548,7 @@ public class ReviewStoreSigningTests
             ["thread"] = () => AddThreadAsync(db, projectId, "Another"),
             ["comment"] = () => db.Store.AddCommentAsync(
                 projectId, "REV-1", thread.Id, new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "More", Created = _time }, cancellationToken),
-            ["state"] = () => db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id, ReviewThreadState.Open, cancellationToken),
+            ["state"] = () => db.Store.ReopenThreadAsync(projectId, "REV-1", thread.Id, cancellationToken),
             ["section"] = () => db.Store.SetChecklistSectionStateAsync(section, cancellationToken),
             ["answer"] = () => db.Store.SetChecklistAnswerAsync(answer, cancellationToken),
             ["add slot"] = () => db.Store.AddSlotAsync(NewSlot(projectId, 3, null), cancellationToken),
@@ -564,15 +565,17 @@ public class ReviewStoreSigningTests
             Assert.True(ex.Rule == DomainRule.ReviewLocked, $"{name} gave {ex.Rule}");
         }
 
-        // Assert: the record is exactly as approved: same digest, the one slot and the one thread with its one
-        // comment and state, no answer and no section state, and no audit entry was written by the refused writes
+        // Assert: the record is exactly as approved: same digest, the one slot and the one thread with its comment and
+        // the resolution note that approved it, and state, no answer and no section state, and no audit entry was
+        // written by the refused writes
         Assert.Equal(digest, await DigestAsync(db, projectId));
         var storedSlot = Assert.Single(await db.Store.ListSlotsAsync(projectId, "REV-1", cancellationToken));
         Assert.Equal((slot.Id, 1, (int?)2), (storedSlot.Id, storedSlot.PrimaryUserId, storedSlot.AlternateUserId));
         var storedThread = Assert.Single(await db.Store.ListThreadsAsync(projectId, "REV-1", cancellationToken));
         Assert.Equal(thread.Id, storedThread.Id);
         Assert.Equal(ReviewThreadState.Resolved, storedThread.State);
-        Assert.Equal("Looks odd", Assert.Single(storedThread.Comments).Text);
+        Assert.Equal(2, storedThread.Comments.Count);
+        Assert.Equal("Looks odd", storedThread.Comments[0].Text);
         Assert.Empty(await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", cancellationToken));
         Assert.Empty(await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-1", cancellationToken));
         Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
@@ -1012,7 +1015,7 @@ public class ReviewStoreSigningTests
                 cancellationToken),
             ["comment"] = () => db.Store.AddCommentAsync(
                 projectId, "NOPE", 1, new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "More", Created = _time }, cancellationToken),
-            ["state"] = () => db.Store.SetThreadStateAsync(projectId, "NOPE", 1, ReviewThreadState.Resolved, cancellationToken),
+            ["state"] = () => db.Store.ReopenThreadAsync(projectId, "NOPE", 1, cancellationToken),
             ["section"] = () => db.Store.SetChecklistSectionStateAsync(
                 new ChecklistSectionState
                 {

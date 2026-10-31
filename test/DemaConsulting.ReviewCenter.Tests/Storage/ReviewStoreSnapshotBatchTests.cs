@@ -510,8 +510,8 @@ public class ReviewStoreSnapshotBatchTests
                 var thread = await AddThreadAsync(db, projectId, id, "Comment");
 
                 // An open thread would refuse the signature
-                await db.Store.SetThreadStateAsync(
-                    projectId, id, thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
+                await db.Store.ResolveThreadAsync(
+                    projectId, id, thread.Id, ThreadKind.Question, TestContext.Current.CancellationToken);
                 await SignAsync(db, projectId, id, await AddSlotAsync(db, projectId, id));
             }
         }

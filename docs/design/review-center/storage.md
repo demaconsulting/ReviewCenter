@@ -73,7 +73,8 @@ application; the rest of the system sees only the Core store interfaces.
   audit entry, after the same transaction re-checked that the review is concluded (`ReviewNotLocked` otherwise); the
   number of reopens is part of the record that is read for the digest. A comment is stored with its report flag
   (`IncludeInReport`) and its kind (`Comment` or `Resolution`); resolving a thread stores the optional resolution
-  comment in the same transaction and re-reads the kind of the thread there, setting the flag of the comment from it;
+  comment in the same transaction and compares the kind of the thread read there with the kind the caller expected
+  (`RecordChanged` when they differ), setting the flag of the comment from it;
   promoting or demoting a thread sets the flag of its starting comment and its resolution comments in one transaction,
   and setting the flag of one reply does the same for that comment, each with its audit entry and only when the stored
   value changes. A signature is refused with `SigningNotAllowed` when any thread of the review is open, checked in the

@@ -638,30 +638,33 @@ public class ReviewStoreTests
     }
 
     /// <summary>
-    ///     Test that the state of a thread can be changed back and forth, and that an unknown thread reports false.
+    ///     Test that a resolved thread can be reopened, that reopening an open thread still reports true, and that an
+    ///     unknown thread and a thread through another review report false.
     /// </summary>
     [Fact]
-    public async Task ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse()
+    public async Task ReviewStore_ReopenThreadAsync_ExistingAndUnknown_ReopensOrReturnsFalse()
     {
-        // Arrange: a thread
+        // Arrange: a resolved thread (a Question, so it needs no note)
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
         var thread = await db.Store.AddThreadAsync(
             NewThread(projectId, "REV-1", "a.txt", null, null, "First"), TestContext.Current.CancellationToken);
-
-        // Act: resolve, read, reopen, read, and change an unknown thread and a thread through another review
-        var resolved = await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
+        var resolved = await db.Store.ResolveThreadAsync(projectId, "REV-1", thread.Id, ThreadKind.Question, TestContext.Current.CancellationToken);
         var afterResolve = (await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().State;
-        var reopened = await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id, ReviewThreadState.Open, TestContext.Current.CancellationToken);
-        var afterReopen = (await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().State;
-        var unknown = await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id + 100, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
-        var otherReview = await db.Store.SetThreadStateAsync(projectId, "REV-2", thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
 
-        // Assert: the states changed, and unknown threads report false
+        // Act: reopen, read, reopen again, and reopen an unknown thread and a thread through another review
+        var reopened = await db.Store.ReopenThreadAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
+        var afterReopen = (await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().State;
+        var again = await db.Store.ReopenThreadAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
+        var unknown = await db.Store.ReopenThreadAsync(projectId, "REV-1", thread.Id + 100, TestContext.Current.CancellationToken);
+        var otherReview = await db.Store.ReopenThreadAsync(projectId, "REV-2", thread.Id, TestContext.Current.CancellationToken);
+
+        // Assert: the state changed, and unknown threads report false
         Assert.True(resolved);
         Assert.Equal(ReviewThreadState.Resolved, afterResolve);
         Assert.True(reopened);
         Assert.Equal(ReviewThreadState.Open, afterReopen);
+        Assert.True(again);
         Assert.False(unknown);
         Assert.False(otherReview);
     }

@@ -93,7 +93,7 @@ sections:
           - ReviewStore_AddThreadAsync_Side_IsStoredAsText
           - ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder
           - ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull
-          - ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse
+          - ReviewStore_ReopenThreadAsync_ExistingAndUnknown_ReopensOrReturnsFalse
           - ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder
           - ReviewStore_AddThreadAsync_IncludedComment_PersistsFlagAndKind
           - ReviewStore_AddCommentAsync_IncludedReply_PersistsFlag
@@ -102,20 +102,25 @@ sections:
       - id: ReviewCenter-ReviewStore-ThreadReport
         title: >-
           The ReviewStore class shall resolve a thread in one transaction together with the Resolution comment that
-          carries the note, re-reading the kind of the thread inside that transaction and refusing a Finding without
-          a note with the ResolutionNoteRequired rule, shall treat resolving a thread that is already resolved as
+          carries the note, comparing the kind of the thread read inside that transaction with the kind the caller
+          expected (refusing a changed kind with the RecordChanged rule) and refusing a Finding without
+          a note with the ResolutionNoteRequired rule, shall have no other way to resolve a thread than that
+          method (the reopen method cannot resolve), shall treat resolving a thread that is already resolved as
           nothing done, shall promote or demote a thread by setting the flag of its starting comment and of all its
           Resolution comments in one transaction, shall change the flag of a reply and refuse the starting comment
           and a Resolution comment, each change with its audit entry in the same transaction, and shall refuse
-          every one of these writes, and the change of the state of a thread, on a concluded review with the
+          every one of these writes, and the reopening of a thread, on a concluded review with the
           ReviewLocked rule.
         justification: |
           The check of the service is made before the transaction, so another request can change the thread in
-          between. Deciding again inside the transaction keeps a resolution from being stored against a kind that no
-          longer holds, and writing the state, the note, and the audit entry together keeps them from disagreeing.
+          between. The note, the acknowledgement of the signatures and the report flag were decided for the kind the
+          service saw, so a changed kind must be refused and not accepted silently, and the resolution-note rule must
+          hold for every resolution, so the store offers no other way to set a thread to resolved. Writing the state,
+          the note, and the audit entry together keeps them from disagreeing.
         tests:
           - ReviewStore_ResolveThreadAsync_FindingWithoutResolution_ThrowsResolutionNoteRequired
-          - ReviewStore_ResolveThreadAsync_ConcurrentDemote_RechecksFlagInTransaction
+          - ReviewStore_ResolveThreadAsync_KindChangedSinceRead_ThrowsRecordChangedAndStoresNothing
+          - ReviewStore_ThreadStateMethods_CannotResolveWithoutNote_ReopenStillWorks
           - ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits
           - ReviewStore_ResolveThreadAsync_AlreadyResolved_ReturnsFalseAndAddsNothing
           - ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments

@@ -24,7 +24,7 @@ commits (see the `AuditStore` unit).
 `SetMembershipRoleAsync`, `UpdateEvidenceSettingsAsync`, `UpdateRequireIndependentReviewersAsync`,
 `UpdateReviewRuleAsync`, `AddReviewAsync`,
 `AddThreadAsync`, `AddCommentAsync`,
-`SetThreadStateAsync`, `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
+`ReopenThreadAsync`, `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
 `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
 `RemoveSlotAsync`, `UpdateDueDateAsync`, `AddSignatureAsync`, and `ReopenReviewAsync` take the audit draft of the
 change (or a function that builds it from the stored entity, when the draft names an identity that the database
@@ -35,7 +35,7 @@ review that is not found) returns its null or false result and stores no entry. 
 duplicate review identifier or a refused signature, rolls back the change and the entry together. The descriptions below
 are of the change itself.
 
-**Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `SetThreadStateAsync`,
+**Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `ReopenThreadAsync`,
 `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
 `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`, and
 `UpdateDueDateAsync` call
@@ -222,15 +222,19 @@ flag. It first
 checks that the thread belongs to the stated project
 and review and returns null when it does not, so a thread identity from another review cannot be commented on.
 
-**SetThreadStateAsync**: Sets the state of a thread of the stated review with a single update statement and
-returns whether a thread was found. `ThreadService` uses it to reopen a thread.
+**ReopenThreadAsync**: Sets a thread of the stated review to open with a single update statement and returns whether a
+thread was found. `ThreadService` uses it to reopen a thread. It takes no state: it cannot resolve, so every resolution
+of a thread goes through `ResolveThreadAsync` and its resolution-note rule, and the store has no other way to change
+the state of a thread.
 
 **ResolveThreadAsync**: Resolves an open thread and, when a resolution comment is given, stores it in the same
-transaction. It reads the thread and its starting comment inside the transaction, so the kind (Finding or Question) is
-the one stored at that moment: the comment is stored with the kind `Resolution` and its flag set to whether the thread
-is a Finding, and a Finding without a comment raises `ResolutionNoteRequired`, even when the service saw a Question a
-moment before. A thread that does not exist or is already resolved returns `false` and stores nothing, no comment and
-no audit entry.
+transaction. The caller passes the kind of the thread that it based the note, the acknowledgement of the signatures
+and the report flag on. The store reads the thread and its starting comment inside the transaction and compares the
+kind it finds there with the expected kind: a difference (a promote or demote landed in between) raises
+`RecordChanged` and stores nothing, no state, no comment and no audit entry. When the kinds agree, the comment is
+stored with the kind `Resolution` and its flag set to whether the thread is a Finding, and a Finding without a
+comment raises `ResolutionNoteRequired`. A thread that does not exist or is already resolved returns `false` and
+stores nothing, no comment and no audit entry.
 
 **SetThreadKindAsync**: Promotes or demotes a thread by setting the report flag of its starting comment and of its
 resolution comments (replies keep theirs) with `ExecuteUpdateAsync`, and returns `true` only when the thread had the

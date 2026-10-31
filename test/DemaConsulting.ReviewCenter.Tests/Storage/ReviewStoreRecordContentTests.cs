@@ -272,7 +272,7 @@ public class ReviewStoreRecordContentTests
 
         // Act
         var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ResolveThreadAsync(
-            projectId, "REV-1", thread.Id, null, Draft(projectId, "thread.resolved"), cancellationToken));
+            projectId, "REV-1", thread.Id, ThreadKind.Finding, null, Draft(projectId, "thread.resolved"), cancellationToken));
 
         // Assert
         Assert.Equal(DomainRule.ResolutionNoteRequired, exception.Rule);
@@ -283,39 +283,101 @@ public class ReviewStoreRecordContentTests
     }
 
     /// <summary>
-    ///     Test that the flag is read again inside the transaction: after a concurrent demote the thread is a Question,
-    ///     so a resolve without a note is allowed and a note that comes with it is not included in the report.
+    ///     Test that the kind is read again inside the transaction and compared with the kind the caller expected: a
+    ///     promote or a demote that lands between the caller's read and the write is refused with
+    ///     <see cref="DomainRule.RecordChanged"/>, and nothing is stored and no audit entry is written; the thread
+    ///     stays open and can be resolved by a caller who expects the kind it has now.
     /// </summary>
     [Fact]
-    public async Task ReviewStore_ResolveThreadAsync_ConcurrentDemote_RechecksFlagInTransaction()
+    public async Task ReviewStore_ResolveThreadAsync_KindChangedSinceRead_ThrowsRecordChangedAndStoresNothing()
     {
-        // Arrange: two Findings that another actor demotes after the service looked at them
+        // Arrange: a Finding that another actor demotes and a Question that another actor promotes after the
+        // caller looked at them
         var cancellationToken = TestContext.Current.CancellationToken;
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
-        var withoutNote = await AddThreadAsync(db, projectId, true);
-        var withNote = await AddThreadAsync(db, projectId, true);
+        var demoted = await AddThreadAsync(db, projectId, true);
+        var promoted = await AddThreadAsync(db, projectId, false);
         await db.Store.SetThreadKindAsync(
-            projectId, "REV-1", withoutNote.Id, ThreadKind.Question, Draft(projectId, "thread.kind-changed"), cancellationToken);
+            projectId, "REV-1", demoted.Id, ThreadKind.Question, Draft(projectId, "thread.kind-changed"), cancellationToken);
         await db.Store.SetThreadKindAsync(
-            projectId, "REV-1", withNote.Id, ThreadKind.Question, Draft(projectId, "thread.kind-changed"), cancellationToken);
+            projectId, "REV-1", promoted.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
 
-        // Act: resolve both as the service would after it saw a Finding: one with no note, one with a note
+        // Act: resolve both as a caller would that still expects the kind it read, one with and one without a note
+        var demotedFailure = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ResolveThreadAsync(
+            projectId, "REV-1", demoted.Id, ThreadKind.Finding, Comment("Done", true), Draft(projectId, "thread.resolved"), cancellationToken));
+        var promotedFailure = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ResolveThreadAsync(
+            projectId, "REV-1", promoted.Id, ThreadKind.Question, null, Draft(projectId, "thread.resolved"), cancellationToken));
+
+        // Assert: refused as a changed record, with nothing stored and nothing audited
+        Assert.Equal(DomainRule.RecordChanged, demotedFailure.Rule);
+        Assert.Equal(DomainRule.RecordChanged, promotedFailure.Rule);
+        foreach (var id in new[] { demoted.Id, promoted.Id })
+        {
+            var stored = await ReadThreadAsync(db, projectId, id);
+            Assert.Equal(ReviewThreadState.Open, stored.State);
+            Assert.Single(stored.Comments);
+        }
+
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+
+        // And a caller who expects the kind the threads have now resolves them; the note of the Question is not included
         var plain = await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", withoutNote.Id, null, Draft(projectId, "thread.resolved"), cancellationToken);
+            projectId, "REV-1", demoted.Id, ThreadKind.Question, Comment("Done", true), Draft(projectId, "thread.resolved"), cancellationToken);
         var noted = await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", withNote.Id, Comment("Done", true), Draft(projectId, "thread.resolved"), cancellationToken);
-
-        // Assert: both resolved; the note is a Resolution comment that is not included, as the thread is a Question
+            projectId, "REV-1", promoted.Id, ThreadKind.Finding, Comment("Fixed"), Draft(projectId, "thread.resolved"), cancellationToken);
         Assert.True(plain);
         Assert.True(noted);
-        var storedPlain = await ReadThreadAsync(db, projectId, withoutNote.Id);
-        Assert.Equal(ReviewThreadState.Resolved, storedPlain.State);
-        Assert.Single(storedPlain.Comments);
-        var storedNoted = await ReadThreadAsync(db, projectId, withNote.Id);
-        var note = storedNoted.Comments[1];
-        Assert.Equal(ReviewCommentKind.Resolution, note.Kind);
-        Assert.False(note.IncludeInReport);
+        Assert.False((await ReadThreadAsync(db, projectId, demoted.Id)).Comments[1].IncludeInReport);
+        Assert.True((await ReadThreadAsync(db, projectId, promoted.Id)).Comments[1].IncludeInReport);
+    }
+
+    /// <summary>
+    ///     Test that no store method can resolve a thread without the resolution-note rule: a Finding cannot be
+    ///     resolved without a note, the reopen method does not resolve, the store interface has no method that takes a
+    ///     thread state (so <c>ResolveThreadAsync</c> is the only way to resolve), and reopening still works.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ThreadStateMethods_CannotResolveWithoutNote_ReopenStillWorks()
+    {
+        // Arrange: an open Finding
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var finding = await AddThreadAsync(db, projectId, true);
+
+        // Act: the reopen method on the open Finding, which must not resolve it, and the resolve method without a note
+        var reopened = await db.Store.ReopenThreadAsync(
+            projectId, "REV-1", finding.Id, Draft(projectId, "thread.reopened"), cancellationToken);
+        var afterReopen = await ReadThreadAsync(db, projectId, finding.Id);
+        var refusal = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ResolveThreadAsync(
+            projectId, "REV-1", finding.Id, ThreadKind.Finding, null, Draft(projectId, "thread.resolved"), cancellationToken));
+        var afterRefusal = await ReadThreadAsync(db, projectId, finding.Id);
+
+        // Assert: the thread was never resolved without a note
+        Assert.True(reopened);
+        Assert.Equal(ReviewThreadState.Open, afterReopen.State);
+        Assert.Equal(DomainRule.ResolutionNoteRequired, refusal.Rule);
+        Assert.Equal(ReviewThreadState.Open, afterRefusal.State);
+
+        // Assert: the interface has no method that takes a thread state, so only the resolve method can resolve
+        var stateMethods = typeof(IReviewStore).GetMethods()
+            .Where(m => m.GetParameters().Any(p => p.ParameterType == typeof(ReviewThreadState)))
+            .ToList();
+        Assert.Empty(stateMethods);
+
+        // Act: resolve with a note, reopen, and the thread is open again with the history kept
+        await db.Store.ResolveThreadAsync(
+            projectId, "REV-1", finding.Id, ThreadKind.Finding, Comment("Fixed it"), Draft(projectId, "thread.resolved"), cancellationToken);
+        var reopenedAgain = await db.Store.ReopenThreadAsync(
+            projectId, "REV-1", finding.Id, Draft(projectId, "thread.reopened"), cancellationToken);
+        var final = await ReadThreadAsync(db, projectId, finding.Id);
+
+        // Assert
+        Assert.True(reopenedAgain);
+        Assert.Equal(ReviewThreadState.Open, final.State);
+        Assert.Equal(2, final.Comments.Count);
     }
 
     /// <summary>
@@ -334,7 +396,7 @@ public class ReviewStoreRecordContentTests
 
         // Act
         var resolved = await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", thread.Id, Comment("Fixed it"), Draft(projectId, "thread.resolved"), cancellationToken);
+            projectId, "REV-1", thread.Id, ThreadKind.Finding, Comment("Fixed it"), Draft(projectId, "thread.resolved"), cancellationToken);
 
         // Assert: resolved, the note is an included Resolution comment, and one audit entry was added
         Assert.True(resolved);
@@ -363,14 +425,14 @@ public class ReviewStoreRecordContentTests
         var projectId = await AddReviewAsync(db);
         var thread = await AddThreadAsync(db, projectId, true);
         await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", thread.Id, Comment("Fixed it"), Draft(projectId, "thread.resolved"), cancellationToken);
+            projectId, "REV-1", thread.Id, ThreadKind.Finding, Comment("Fixed it"), Draft(projectId, "thread.resolved"), cancellationToken);
         var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
 
         // Act
         var again = await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", thread.Id, Comment("Again"), Draft(projectId, "thread.resolved"), cancellationToken);
+            projectId, "REV-1", thread.Id, ThreadKind.Finding, Comment("Again"), Draft(projectId, "thread.resolved"), cancellationToken);
         var unknown = await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", 9999, Comment("Nothing"), Draft(projectId, "thread.resolved"), cancellationToken);
+            projectId, "REV-1", 9999, ThreadKind.Finding, Comment("Nothing"), Draft(projectId, "thread.resolved"), cancellationToken);
 
         // Assert
         Assert.False(again);
@@ -393,7 +455,7 @@ public class ReviewStoreRecordContentTests
         var thread = await AddThreadAsync(db, projectId, false);
         await AddReplyAsync(db, projectId, thread.Id, true);
         await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", thread.Id, Comment("Answered"), Draft(projectId, "thread.resolved"), cancellationToken);
+            projectId, "REV-1", thread.Id, ThreadKind.Question, Comment("Answered"), Draft(projectId, "thread.resolved"), cancellationToken);
 
         // Act: promote, promote again, demote, demote again, and an unknown thread
         var promoted = await db.Store.SetThreadKindAsync(
@@ -436,7 +498,7 @@ public class ReviewStoreRecordContentTests
         var thread = await AddThreadAsync(db, projectId, false);
         var reply = await AddReplyAsync(db, projectId, thread.Id, false);
         await db.Store.ResolveThreadAsync(
-            projectId, "REV-1", thread.Id, Comment("Answered"), Draft(projectId, "thread.resolved"), cancellationToken);
+            projectId, "REV-1", thread.Id, ThreadKind.Question, Comment("Answered"), Draft(projectId, "thread.resolved"), cancellationToken);
         var stored = await ReadThreadAsync(db, projectId, thread.Id);
         var startingId = stored.Comments[0].Id;
         var noteId = stored.Comments[2].Id;
@@ -484,18 +546,18 @@ public class ReviewStoreRecordContentTests
         var projectId = await AddReviewAsync(db);
         var thread = await AddThreadAsync(db, projectId, false);
         var reply = await AddReplyAsync(db, projectId, thread.Id, false);
-        await db.Store.SetThreadStateAsync(
-            projectId, "REV-1", thread.Id, ReviewThreadState.Resolved, cancellationToken);
+        await db.Store.ResolveThreadAsync(
+            projectId, "REV-1", thread.Id, ThreadKind.Question, cancellationToken);
         var slot = await db.Store.AddSlotAsync(NewSlot(projectId, 1), cancellationToken);
         var digest = await DigestAsync(db, projectId);
         await db.Store.AddSignatureAsync(NewSignature(projectId, slot.Id, digest), cancellationToken);
         var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
         Func<Task> action = write switch
         {
-            "state" => () => db.Store.SetThreadStateAsync(
-                projectId, "REV-1", thread.Id, ReviewThreadState.Open, cancellationToken),
+            "state" => () => db.Store.ReopenThreadAsync(
+                projectId, "REV-1", thread.Id, cancellationToken),
             "resolve" => () => db.Store.ResolveThreadAsync(
-                projectId, "REV-1", thread.Id, Comment("Note"), Draft(projectId, "thread.resolved"), cancellationToken),
+                projectId, "REV-1", thread.Id, ThreadKind.Question, Comment("Note"), Draft(projectId, "thread.resolved"), cancellationToken),
             "kind" => () => db.Store.SetThreadKindAsync(
                 projectId, "REV-1", thread.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken),
             _ => () => db.Store.SetCommentReportAsync(
@@ -589,11 +651,11 @@ public class ReviewStoreRecordContentTests
         // Act: with the thread open, a thread write is allowed; resolving it concludes the review
         var concludedOpen = await IsConcludedAsync(db, projectId);
         var reply = await AddReplyAsync(db, projectId, thread.Id, false);
-        await db.Store.SetThreadStateAsync(
-            projectId, "REV-1", thread.Id, ReviewThreadState.Resolved, cancellationToken);
+        await db.Store.ResolveThreadAsync(
+            projectId, "REV-1", thread.Id, ThreadKind.Question, cancellationToken);
         var concludedResolved = await IsConcludedAsync(db, projectId);
-        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.SetThreadStateAsync(
-            projectId, "REV-1", thread.Id, ReviewThreadState.Open, cancellationToken));
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ReopenThreadAsync(
+            projectId, "REV-1", thread.Id, cancellationToken));
 
         // Assert: the rule says open: not concluded, and resolved: concluded, and the store agrees
         Assert.False(concludedOpen);

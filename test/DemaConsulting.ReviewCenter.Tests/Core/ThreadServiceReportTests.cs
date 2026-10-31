@@ -362,6 +362,51 @@ public class ThreadServiceReportTests
     }
 
     /// <summary>
+    ///     Test that a promote or a demote that lands between the snapshot of the service and the write of the store
+    ///     is not accepted silently: the note, the acknowledgement and the report flag were decided for the other
+    ///     kind, so the resolve fails with <see cref="DomainRule.RecordChanged"/> and stores and audits nothing.
+    /// </summary>
+    /// <param name="promote">
+    ///     <c>true</c> when a Question is promoted meanwhile; <c>false</c> when a Finding is demoted meanwhile.
+    /// </param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing(bool promote)
+    {
+        // Arrange: a Question resolved without a note (promoted meanwhile) or a Finding resolved with one (demoted)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        var id = await StartAsync(world, include: !promote);
+        world.Store.BeforeResolveThread = async () =>
+        {
+            world.Store.BeforeResolveThread = null;
+            await world.Store.SetThreadKindAsync(
+                world.Project,
+                ReviewId,
+                id,
+                promote ? ThreadKind.Finding : ThreadKind.Question,
+                AuditDraft.By(Who("root"), "thread.kind-changed", $"thread {id}", world.Project, ReviewId),
+                cancellationToken);
+        };
+        var audits = world.Store.Audits.Count;
+        var comments = (await GetAsync(world, id)).Comments.Count;
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Threads.ResolveAsync(
+            world.Project, ReviewId, id, Who("usr"), cancellationToken, null, promote ? null : "Fixed it"));
+
+        // Assert: the thread is still open with its comments, and only the kind change was audited
+        Assert.Equal(DomainRule.RecordChanged, ex.Rule);
+        var thread = await GetAsync(world, id);
+        Assert.Equal(ReviewThreadState.Open, thread.State);
+        Assert.Equal(promote ? ThreadKind.Finding : ThreadKind.Question, thread.Kind);
+        Assert.Equal(comments, thread.Comments.Count);
+        Assert.Equal(audits + 1, world.Store.Audits.Count);
+        Assert.DoesNotContain(world.Store.Audits, draft => draft.Action == "thread.resolved");
+    }
+
+    /// <summary>
     ///     Test that resolving a resolved thread does nothing: no note, no entry in the audit trail.
     /// </summary>
     [Fact]

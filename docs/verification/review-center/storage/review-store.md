@@ -33,12 +33,14 @@ be loadable on the test platform.
 - A duplicate review key is reported as a duplicate review identifier.
 - A thread is stored with its anchor (whole file or line range), first comment, and state, and identities are
   assigned by the database; comments are appended and read in posting order; each comment keeps the display name and
-  the user name of its author, its kind (a comment or a resolution), and whether it is included in the report; the
-  state can be changed back and forth; and an unknown thread, or a thread of another review, is reported as not found.
+  the user name of its author, its kind (a comment or a resolution), and whether it is included in the report; a
+  resolved thread can be reopened; the store has no method that resolves a thread except the one that applies the
+  resolution-note rule; and an unknown thread, or a thread of another review, is reported as not found.
   A comment written without a kind or a flag is a comment that is not included, and the kind of a thread follows from
   its starting comment (a Finding when it is included, otherwise a Question).
 - A Finding is resolved in one transaction together with a Resolution comment that carries the note, and without a note
-  the store refuses with `ResolutionNoteRequired` and stores nothing; the kind is read again inside the transaction;
+  the store refuses with `ResolutionNoteRequired` and stores nothing; the kind is read again inside the transaction and
+  compared with the kind the caller expected, and a difference is refused with `RecordChanged` with nothing stored;
   resolving a resolved thread stores nothing; promoting and demoting set the flag of the starting comment and of the
   Resolution comments together; the flag of a reply can be changed, while the starting comment and a Resolution comment
   are refused; each change is stored with its audit entry.
@@ -285,9 +287,10 @@ comment has an identity and the three comments are listed in posting order. This
 thread through another review, returns null and adds nothing. This scenario is tested by
 `ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull`.
 
-**ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse**: A thread is resolved and
-reopened; the listed state follows each change; an unknown thread and a thread of another review report false. This
-scenario is tested by `ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse`.
+**ReviewStore_ReopenThreadAsync_ExistingAndUnknown_ReopensOrReturnsFalse**: A thread is resolved through the resolve
+method and reopened; the listed state follows each change; reopening an open thread reports true; an unknown thread and
+a thread of another review report false. This scenario is tested by
+`ReviewStore_ReopenThreadAsync_ExistingAndUnknown_ReopensOrReturnsFalse`.
 
 **ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder**: Threads are added to two reviews in an
 interleaved order; each review lists only its own threads in creation order, and an unknown review lists none. This
@@ -320,10 +323,16 @@ scenario is tested by `ReviewStore_GetRecordAsync_ThreadKind_DerivedFromStarting
 a Resolution comment is refused with `ResolutionNoteRequired`, the thread stays open, and no entry is stored. This
 scenario is tested by `ReviewStore_ResolveThreadAsync_FindingWithoutResolution_ThrowsResolutionNoteRequired`.
 
-**ReviewStore_ResolveThreadAsync_ConcurrentDemote_RechecksFlagInTransaction**: A thread is demoted after the service
-looked at it and before the store resolves it; the store reads the kind again and resolves the Question without
-needing the note. This scenario is tested by
-`ReviewStore_ResolveThreadAsync_ConcurrentDemote_RechecksFlagInTransaction`.
+**ReviewStore_ResolveThreadAsync_KindChangedSinceRead_ThrowsRecordChangedAndStoresNothing**: A Finding is demoted and a
+Question is promoted after the caller read them; resolving them with the kind the caller expected is refused with
+`RecordChanged`, the threads stay open with their comments, and no entry is stored; a caller that expects the kind they
+have now resolves them, and the note of the Question is not included. This scenario is tested by
+`ReviewStore_ResolveThreadAsync_KindChangedSinceRead_ThrowsRecordChangedAndStoresNothing`.
+
+**ReviewStore_ThreadStateMethods_CannotResolveWithoutNote_ReopenStillWorks**: The reopen method leaves an open Finding
+open, resolving a Finding without a note is refused, the store interface has no method that takes a thread state, and a
+Finding resolved with a note can be reopened with its history kept. This scenario is tested by
+`ReviewStore_ThreadStateMethods_CannotResolveWithoutNote_ReopenStillWorks`.
 
 **ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits**: Resolving a Finding with a note
 stores the state, an included Resolution comment, and the entry `thread.resolved` in one transaction. This scenario is

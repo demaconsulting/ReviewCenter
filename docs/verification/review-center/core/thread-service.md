@@ -316,6 +316,11 @@ tested by `ThreadService_ResolveAsync_BlankNoteOnQuestion_IsNoNote`.
 note, stores nothing and records no audit entry. This scenario is tested by
 `ThreadService_ResolveAsync_AlreadyResolved_IsNoOpWithoutNoteOrAudit`.
 
+**ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing**: A Question is promoted,
+or a Finding is demoted, after the service read the thread and before the store writes the resolution; the resolve is
+refused with `RecordChanged`, the thread stays open with its comments, and only the kind change is audited. This
+scenario is tested by `ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing`.
+
 **ThreadService_ReopenThenResolveFinding_AddsSecondResolutionComment**: A Finding that is resolved, reopened, and
 resolved again has two Resolution comments. This scenario is tested by
 `ThreadService_ReopenThenResolveFinding_AddsSecondResolutionComment`.

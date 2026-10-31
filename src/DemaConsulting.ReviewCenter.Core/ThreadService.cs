@@ -364,7 +364,10 @@ public sealed class ThreadService
     ///     Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist in the review,
     ///     <see cref="DomainRule.ResolutionNoteRequired"/> when a Finding has no note,
     ///     <see cref="DomainRule.CommentTextInvalid"/> when the note is too long,
-    ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded, or with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded,
+    ///     <see cref="DomainRule.RecordChanged"/> when the thread was promoted or demoted between the check of this
+    ///     method and the write (the note and the acknowledgement were decided for the other kind; nothing is stored,
+    ///     nothing is audited), or with
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when the change alters the digest and a current
     ///     signature is not acknowledged.
     /// </exception>
@@ -426,10 +429,11 @@ public sealed class ThreadService
                     resolution is null ? thread.Comments : [.. thread.Comments, resolution])),
             acknowledgedSlotIds);
 
-        // The store re-reads the kind inside its transaction and saves the entry only when it resolved the thread
+        // The store re-reads the kind inside its transaction, refuses with RecordChanged when it is no longer the one the
+        // note, the acknowledgement and the flag above were decided for, and saves the entry only when it resolved the thread
         var detail = note is null ? $"thread {threadId}" : $"thread {threadId}; note sha256 {AuditText.ShortHash(note)}";
         var audit = AuditDraft.By(actor, "thread.resolved", detail, projectId, reviewId);
-        await _store.ResolveThreadAsync(projectId, reviewId, threadId, resolution, audit, cancellationToken);
+        await _store.ResolveThreadAsync(projectId, reviewId, threadId, thread.Kind, resolution, audit, cancellationToken);
     }
 
     /// <summary>
@@ -482,7 +486,7 @@ public sealed class ThreadService
 
         // The store saves the entry only when the thread exists, so a refused call leaves no trace
         var audit = AuditDraft.By(actor, "thread.reopened", $"thread {threadId}", projectId, reviewId);
-        if (!await _store.SetThreadStateAsync(projectId, reviewId, threadId, ReviewThreadState.Open, audit, cancellationToken))
+        if (!await _store.ReopenThreadAsync(projectId, reviewId, threadId, audit, cancellationToken))
         {
             throw ThreadNotFound(threadId);
         }

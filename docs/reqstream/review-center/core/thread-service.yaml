@@ -253,13 +253,17 @@ sections:
           Resolution comment in the same transaction as the new state (included in the report when the thread is a
           Finding), shall treat resolving a thread that is already resolved as harmless without a note, an audit entry
           or an acknowledgement, and shall keep the earlier Resolution comments when a thread is reopened and resolved
-          again.
+          again, and shall refuse a resolution with the RecordChanged rule, storing nothing, when the thread was
+          promoted or demoted between its check and the write.
         justification: |
           Closing a Finding is a statement in the record, so the record must say how it was closed. A Question is
           chat, so its resolution needs no explanation. Storing the note with the state change keeps the two from
-          ever disagreeing, and keeping the earlier notes keeps the history of the thread.
+          ever disagreeing, and keeping the earlier notes keeps the history of the thread. The note, the
+          acknowledgement and the report flag are decided for the kind that the service saw, so a kind that changed
+          meanwhile must be refused and not accepted silently.
         tests:
           - ThreadService_ResolveAsync_FindingWithoutNote_ThrowsResolutionNoteRequiredAndStoresNothing
+          - ThreadService_ResolveAsync_KindChangedBeforeStoreWrite_ThrowsRecordChangedAndStoresNothing
           - ThreadService_ResolveAsync_FindingWithNote_StoresIncludedResolutionComment
           - ThreadService_ResolveAsync_QuestionWithNote_StoresExcludedResolutionComment
           - ThreadService_ResolveAsync_QuestionWithoutNote_Resolves
