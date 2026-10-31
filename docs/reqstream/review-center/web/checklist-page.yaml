@@ -39,6 +39,16 @@ sections:
           - ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData
           - ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData
 
+      - id: ReviewCenter-ChecklistPage-ReadOnly
+        title: >-
+          The ChecklistPage unit shall show a member whose role is auditor the checklist with a read-only notice and
+          with every control that answers a check or changes a section disabled, so that nothing can be changed.
+        justification: |
+          An auditor reads the answers and the justifications but must not be offered to change them, and the notice
+          says why the controls are disabled.
+        tests:
+          - ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl
+
       - id: ReviewCenter-ChecklistPage-Answer
         title: >-
           The ChecklistPage unit shall offer Pass, Fail, and N/A buttons for each check of the open section, store

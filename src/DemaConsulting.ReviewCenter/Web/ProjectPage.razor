@@ -60,10 +60,13 @@
         <div class="page-heading">
             <h1 data-testid="project-name">@Project.Name</h1>
             <div class="heading-actions">
-                @if (CanAdminister)
+                @if (CanAudit)
                 {
                     <a class="action outline" href="/projects/@ProjectId/audit"
                        data-testid="project-audit-link">Audit trail</a>
+                }
+                @if (CanAdminister)
+                {
                     <a class="action outline" href="/projects/@ProjectId/repositories" data-testid="repositories-link">Repositories</a>
                     <a class="action outline" href="/projects/@ProjectId/evidence-settings"
                        data-testid="evidence-settings-link">Evidence settings</a>
@@ -80,6 +83,12 @@
                 }
             </div>
         </div>
+        @if (!CanContribute)
+        {
+            <p class="notice" role="status" data-testid="readonly-notice">
+                Your access to this project is read-only: you can read its reviews but not change them.
+            </p>
+        }
         @if (Project.Description.Length > 0)
         {
             <p class="page-lead" data-testid="project-description">@Project.Description</p>
@@ -327,7 +336,7 @@
                                 <strong class="row-title" data-testid="member-name-@current.Username">@current.Username</strong>
                                 <p class="muted">@current.DisplayName</p>
                                 <p class="row-badges">
-                                    <span class="badge" data-testid="member-role-@current.Username">@(current.Role == ProjectRole.ProjectAdmin ? "Project admin" : "Member")</span>
+                                    <span class="badge" data-testid="member-role-@current.Username">@RoleLabel(current.Role)</span>
                                     @if (!current.Enabled)
                                     {
                                         <span class="badge">Disabled</span>
@@ -335,8 +344,21 @@
                                 </p>
                             </div>
                             <div class="row-actions">
-                                <button type="button" class="outline small" data-testid="member-toggle-role-@current.Username"
-                                        @onclick="() => ToggleRoleAsync(current)">@(current.Role == ProjectRole.ProjectAdmin ? "Make member" : "Make project admin")</button>
+                                @if (current.Role == ProjectRole.Auditor)
+                                {
+                                    @* An auditor is never promoted by a toggle: each change names its target role *@
+                                    <button type="button" class="outline small" data-testid="member-set-role-@current.Username-user"
+                                            @onclick="() => SetRoleAsync(current, ProjectRole.User)">Make member</button>
+                                    <button type="button" class="outline small" data-testid="member-set-role-@current.Username-projectadmin"
+                                            @onclick="() => SetRoleAsync(current, ProjectRole.ProjectAdmin)">Make project admin</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="outline small" data-testid="member-toggle-role-@current.Username"
+                                            @onclick="() => ToggleRoleAsync(current)">@(current.Role == ProjectRole.ProjectAdmin ? "Make member" : "Make project admin")</button>
+                                    <button type="button" class="outline small" data-testid="member-set-role-@current.Username-auditor"
+                                            @onclick="() => SetRoleAsync(current, ProjectRole.Auditor)">Make auditor</button>
+                                }
                                 <button type="button" class="outline small" data-testid="member-remove-@current.Username"
                                         @onclick="() => RemoveMemberAsync(current)">Remove</button>
                             </div>

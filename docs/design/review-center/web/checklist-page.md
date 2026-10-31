@@ -19,7 +19,9 @@ reads and writes the checklist only through `ChecklistService`, so every checkli
 a signed-in user, and every answer and section decision is saved on behalf of that user. When the review is approved,
 and so locked, the page shows a banner (`checklist-locked`) that says the checklist is read-only and that a project
 administrator can reopen the review, and disables the section applicability switch, the reason field and its Save, the
-Pass, Fail, and N/A buttons, and the justification field and its Save. The answers stay visible.
+Pass, Fail, and N/A buttons, and the justification field and its Save. The answers stay visible. For a member who may
+only read (the Auditor role) the page shows a `readonly-notice` and treats the checklist as locked in the same way
+(`IsLocked` is true when the review is approved or the viewer is read-only), so every control is disabled.
 
 #### Data Model
 

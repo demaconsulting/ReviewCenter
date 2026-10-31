@@ -136,6 +136,9 @@ the events of Gemini are shown and the events of Apollo are not. This scenario i
 missing project each give the not-found message, no table, and no event or project name. This scenario is tested by
 `ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries`.
 
+**ProjectAuditPage_Render_Auditor_ShowsTheTrailOfOwnProjectOnly**: An Auditor of the project opens the audit page and
+sees the entries of that project only. This scenario is tested by `ProjectAuditPage_Render_Auditor_ShowsTheTrailOfOwnProjectOnly`.
+
 **ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst**: More than 50 events are recorded for the project; the
 first page shows 50 rows with the newest on top and a link to the older page, and no link to a newer one; the older
 page, opened at the address of that link, shows the remaining rows, none of the first page, and the Newer link. This

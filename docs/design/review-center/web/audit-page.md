@@ -11,8 +11,8 @@ chain with the *Verify chain* button and read the
 result, including the head hash. It requires the `SystemAdmin` role: a signed-in user without it is shown the
 access denied message of the router instead of the page, and an anonymous visitor is sent to the login page. It
 changes nothing. `ProjectAuditPage` is the page at `/projects/{id}/audit`: it shows the audit entries of one project,
-newest first, to the project administrators and the system administrators (and to Auditors once that role can be
-given; the page asks the audit-read access of `ProjectViewGuard`, `GuardAuditAsync`, and not the administer right),
+newest first, to the project administrators, the system administrators, and the Auditors of the project (the page asks
+the audit-read access of `ProjectViewGuard`, `GuardAuditAsync`, and not the administer right),
 with the same filter form (without the project selector) and paging, and it has no verification (the chain verifies as
 a whole on `/audit`; the project view is a filtered
 read of the same chain). The entries of a project are those that name the project, among them the member changes and
@@ -113,8 +113,8 @@ administrator only.
 may read the audit trail of the project only.
 
 - *Postconditions*: The project and the page are cleared before the first await. `ProjectViewGuard.GuardAuditAsync`
-  (the audit-read access of `IProjectAccess`: a project administrator or a system administrator, and an Auditor once
-  that role can be given) decides whether to load at all; when it refuses, `ShowNoAccess` leaves no project and no
+  (the audit-read access of `IProjectAccess`: a project administrator, a system administrator, or an Auditor)
+  decides whether to load at all; when it refuses, `ShowNoAccess` leaves no project and no
   entries, and the page shows the not-found message. Otherwise the project is read with `ProjectService.GetAsync` and
   the entries with `AuditService.ListAsync(filter, before, after, size)`, where the filter always carries the project
   of the route whatever the address says, so the page returns only the entries that carry the project (never those of

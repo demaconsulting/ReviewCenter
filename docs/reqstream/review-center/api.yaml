@@ -88,6 +88,20 @@ sections:
           - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
           - ApiDocument_Get_MatchesCommittedSnapshot
 
+      - id: ReviewCenter-Api-ReadOnlyRole
+        title: >-
+          The Api subsystem shall let a token of a member whose role is Auditor read what the member may see and refuse
+          every change by it with a problem document, and shall answer a token of a user who is no member of the project
+          as for a project that does not exist.
+        justification: |
+          A script that acts for an auditor must be as read-only as the auditor, and must not reveal which projects
+          exist.
+        children:
+          - ReviewCenter-ApiEndpoints-ReadOnlyRole
+        tests:
+          - ApiAuditor_Reads_Token_ServeTheProject
+          - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
+
       - id: ReviewCenter-Api-FollowUp
         title: >-
           The Api subsystem shall let a client with a valid token create a review as a follow-up of an earlier review

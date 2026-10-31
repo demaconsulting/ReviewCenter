@@ -41,6 +41,17 @@ sections:
           - ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing
           - ReviewPage_DiffView_RevealRun_MembershipRevoked_RevealsNothingAndShowsNotFound
 
+      - id: ReviewCenter-ReviewPage-ReadOnly
+        title: >-
+          The ReviewPage unit shall show a member whose role is auditor the whole review with a read-only notice and
+          without any control that changes it, that is the reopening and due date forms, the slot forms and the signing
+          form, the new comment form, the reply box, the resolve toggle, and the line comment controls.
+        justification: |
+          An auditor reads everything and changes nothing, so the page must not offer what the rules would refuse, and
+          the notice says why the controls are missing.
+        tests:
+          - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
+
       - id: ReviewCenter-ReviewPage-Layout
         title: >-
           The ReviewPage unit shall present the next-step line, the files, the thread index and the content of

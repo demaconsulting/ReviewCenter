@@ -175,6 +175,10 @@ project. The not-found text equals the text for a project that does not exist (a
 status, progress, check text, project name or review title is shown. This scenario is tested by
 `ChecklistPage_Render_NonMember_LooksLikeAMissingReview`.
 
+**ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl**: An Auditor opens the checklist; the answers
+are visible, the `readonly-notice` is shown, and every answer, applicability, and justification control is disabled.
+This scenario is tested by `ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl`.
+
 **ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the checklist open and the membership is
 removed; passing a check shows the not-found message, nothing of the checklist remains in the markup, and no answer is
 stored. This scenario is tested by `ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData`.

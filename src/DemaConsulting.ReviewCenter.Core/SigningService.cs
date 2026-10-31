@@ -195,11 +195,11 @@ public sealed class SigningService
 
         // The same rules as signing, in the same order, minus everything that needs the record
         var user = await EnsureActorAsync(actor, projectId, cancellationToken);
-        if (!user.IsExternal || !await _access.IsMemberAsync(user.Id, projectId, cancellationToken))
+        if (!user.IsExternal || !await IsReviewerMemberAsync(user.Id, projectId, cancellationToken))
         {
             throw new DomainRuleException(
                 DomainRule.ActorNotAllowed,
-                "Only a member of the project who signs in with an identity provider can confirm this way.");
+                "Only a member of the project who can work in it and signs in with an identity provider can confirm this way.");
         }
 
         var slot = (await _store.ListSlotsAsync(projectId, reviewId, cancellationToken))
@@ -377,7 +377,8 @@ public sealed class SigningService
     }
 
     /// <summary>
-    ///     Lists the users that can be chosen for a slot of a project: its enabled members.
+    ///     Lists the users that can be chosen for a slot of a project: its enabled members who can work in it (a
+    ///     read-only auditor is never offered).
     /// </summary>
     /// <param name="actor">The signed-in user who asks; must be able to work in the project. Must not be null.</param>
     /// <param name="projectId">The project identity.</param>
@@ -395,9 +396,7 @@ public sealed class SigningService
     {
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
-        var memberIds = (await _store.ListMembershipsAsync(projectId, cancellationToken))
-            .Select(membership => membership.UserId)
-            .ToHashSet();
+        var memberIds = await ReviewerMemberIdsAsync(projectId, cancellationToken);
         return (await _users.ListAsync(cancellationToken))
             .Where(user => user.Enabled && memberIds.Contains(user.Id))
             .OrderBy(user => user.DisplayName, StringComparer.OrdinalIgnoreCase)
@@ -832,11 +831,11 @@ public sealed class SigningService
         int slotId,
         CancellationToken cancellationToken)
     {
-        if (!await _access.IsMemberAsync(user.Id, projectId, cancellationToken))
+        if (!await IsReviewerMemberAsync(user.Id, projectId, cancellationToken))
         {
             throw new DomainRuleException(
                 DomainRule.ActorNotAllowed,
-                "Only a member of the project can sign its reviews.");
+                "Only a member of the project who can work in it (not a read-only auditor) can sign its reviews.");
         }
 
         var record = await _store.GetRecordAsync(projectId, reviewId, cancellationToken)
@@ -1132,6 +1131,34 @@ public sealed class SigningService
     }
 
     /// <summary>
+    ///     Lists the users who may be a reviewer or sign: the members of the project whose role is user or project
+    ///     administrator. A read-only auditor is a member but never a reviewer.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The identities of those users.</returns>
+    private async Task<HashSet<int>> ReviewerMemberIdsAsync(int projectId, CancellationToken cancellationToken)
+    {
+        return (await _store.ListMembershipsAsync(projectId, cancellationToken))
+            .Where(membership => membership.Role is ProjectRole.User or ProjectRole.ProjectAdmin)
+            .Select(membership => membership.UserId)
+            .ToHashSet();
+    }
+
+    /// <summary>
+    ///     Reports whether a user is a member of the project who may be a reviewer or sign (not an auditor).
+    /// </summary>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the user is a member whose role is user or project administrator.</returns>
+    private async Task<bool> IsReviewerMemberAsync(int userId, int projectId, CancellationToken cancellationToken)
+    {
+        return await _store.GetMembershipAsync(userId, projectId, cancellationToken)
+            is { Role: ProjectRole.User or ProjectRole.ProjectAdmin };
+    }
+
+    /// <summary>
     ///     Checks that a review exists.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
@@ -1203,9 +1230,7 @@ public sealed class SigningService
         int? alternateUserId,
         CancellationToken cancellationToken)
     {
-        var memberIds = (await _store.ListMembershipsAsync(projectId, cancellationToken))
-            .Select(membership => membership.UserId)
-            .ToHashSet();
+        var memberIds = await ReviewerMemberIdsAsync(projectId, cancellationToken);
         var enabled = (await _users.ListAsync(cancellationToken))
             .Where(user => user.Enabled && memberIds.Contains(user.Id))
             .ToDictionary(user => user.Id);

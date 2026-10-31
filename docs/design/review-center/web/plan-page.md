@@ -11,7 +11,8 @@ see at once what matters and what to do next: one plain summary sentence, then t
 default), then the rest in groups that are shown only when they are not empty, with the sets that have nothing to
 review collapsed behind a count. It contains no planning rule: the baseline choice, the classification of the sets, the
 identifiers, and the creation are in `ReviewPlanner`. It requires a signed-in user, and a project the user may not see
-looks like a project that does not exist (the not-found message, no form, no repository). It is a Razor component
+looks like a project that does not exist (the not-found message, no form, no repository). A member who may only read
+(the Auditor role) sees a `readonly-notice` instead of the form and no repository is read for them. It is a Razor component
 split into
 presentation (`PlanPage.razor`) and behavior (`PlanPage.razor.cs`).
 

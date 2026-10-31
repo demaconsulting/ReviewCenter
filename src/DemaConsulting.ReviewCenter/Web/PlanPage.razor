@@ -58,7 +58,13 @@
         <h1 data-testid="plan-heading">Plan reviews</h1>
         <p class="muted" data-testid="plan-help">Pick a repository and a revision to see which review-sets of its .reviewmark.yaml need a review.</p>
 
-        @if (Repositories.Count == 0)
+        @if (!CanContribute)
+        {
+            <p class="notice" role="status" data-testid="readonly-notice">
+                Your access to this project is read-only, so you cannot plan or create reviews.
+            </p>
+        }
+        else if (Repositories.Count == 0)
         {
             <p class="notice" role="status" data-testid="plan-no-repository">This project has no repository; ask a project administrator to add one.</p>
         }

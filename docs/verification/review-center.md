@@ -98,6 +98,11 @@ loopback TCP ports.
   waits on, its last activity, and its due date, with a summary by stage and overdue, filters, sorting, and paging that
   live in the address; a read-only auditor sees the same, and the API list carries the progress fields
   (`ReviewCenter-System-Oversight`).
+- A project administrator or system administrator can make a member an Auditor, who reads everything of the project,
+  including its audit trail and export, and changes nothing: the pages show a read-only notice without controls, the
+  Auditor is not offered as a reviewer, cannot sign, and an API token of an Auditor is refused every write with 403
+  while a non-member gets 404 (`ReviewCenter-System-Auditor`; the system test
+  `ReviewCenter_Auditor_CanReadEverythingAndChangeNothing`).
 - A review can be created in the browser or through the API as a follow-up of an earlier review of the project: the form
   previews what is carried over, the checklist marks every carried answer and shows the earlier Fail of an open check,
   the review page names the followed review and marks carried threads, the follow-up is approved on its own while the

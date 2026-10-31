@@ -43,7 +43,7 @@ a project checklist, and sign the review with their credentials. Every action is
   action, review, and date, with CSV and JSON export that reports the chain status
 - 📄 **Signed PDF Attestation** - Approved reviews download as verifiable PDFs
 - ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access
-- 🛡️ **Access Control** - Project roles, local accounts, and sign-in lockout
+- 🛡️ **Access Control** - Project roles (including a read-only Auditor), local accounts, and sign-in lockout
 - 🪪 **OpenID Connect Sign-in** - Single sign-on with any provider
 - 🔐 **Two-Factor Sign-in** - Optional authenticator-app codes for local accounts
 - 🔑 **API Tokens** - Personal tokens for REST API and ReviewMark

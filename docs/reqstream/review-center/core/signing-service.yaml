@@ -77,6 +77,20 @@ sections:
           - SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed
           - SigningService_SignAsync_NotAMember_IsRefused
 
+      - id: ReviewCenter-SigningService-AuditorNotReviewer
+        title: >-
+          The SigningService class shall not offer a member whose role is Auditor as a candidate for a reviewer slot,
+          shall refuse to name an Auditor as the primary or the alternate reviewer of a slot with the slot-user-invalid
+          rule, and shall refuse to let an Auditor sign, even when a slot still names the Auditor, with the
+          actor-not-allowed rule, and shall store nothing in each case.
+        justification: |
+          An auditor reads and changes nothing. Naming an auditor in a slot would make a review wait for somebody who
+          may not sign, and a signature of an auditor would break the rule that only those who work in a project
+          approve what it reviews.
+        tests:
+          - SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable
+          - SigningService_SignAsync_AuditorStillNamedInASlot_IsRefused
+
       - id: ReviewCenter-SigningService-Blockers
         title: >-
           The SigningService class shall refuse to sign a review while a check in a section that applies is

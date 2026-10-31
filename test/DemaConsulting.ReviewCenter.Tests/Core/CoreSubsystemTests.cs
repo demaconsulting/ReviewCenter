@@ -251,7 +251,7 @@ public class CoreSubsystemTests
         }
 
         if (rule is DomainRule.MembershipExists or DomainRule.MembershipNotFound or DomainRule.LastProjectAdmin
-            or DomainRule.TooManyAttempts or DomainRule.PasswordChangeRequired)
+            or DomainRule.TooManyAttempts or DomainRule.PasswordChangeRequired or DomainRule.MemberHasOpenReviewWork)
         {
             return ViolateMembershipAsync(rule, store, projectId);
         }
@@ -299,6 +299,17 @@ public class CoreSubsystemTests
         if (rule == DomainRule.MembershipNotFound)
         {
             await service.RemoveMemberAsync(actor, projectId, "mem", cancellationToken);
+            return;
+        }
+
+        if (rule == DomainRule.MemberHasOpenReviewWork)
+        {
+            // "mem" is a member who holds an unsigned slot, so the change to the auditor role is refused
+            var mem = (await userStore.GetByUsernameAsync("mem", cancellationToken))!;
+            await store.AddMembershipAsync(mem.Id, projectId, cancellationToken);
+            var signing = TestServices.Signing(store, userService, clock);
+            await signing.AddSlotAsync(new Actor("first", "First"), projectId, "rev-1", mem.Id, null, cancellationToken);
+            await service.SetMemberRoleAsync(actor, projectId, "mem", ProjectRole.Auditor, cancellationToken);
             return;
         }
 

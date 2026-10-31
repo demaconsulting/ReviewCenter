@@ -140,7 +140,19 @@ public partial class ChecklistPage : ComponentBase
     ///     Gets a value indicating whether the review is approved and therefore locked: the checklist is read-only until
     ///     an administrator reopens the review.
     /// </summary>
-    private bool IsLocked { get; set; }
+    private bool IsApproved { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the user may only read this project (an auditor); every control that
+    ///     changes the checklist is then disabled and a read-only notice is shown.
+    /// </summary>
+    private bool ReadOnly { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the controls that change the checklist are disabled: the review is approved
+    ///     and locked, or the user may only read.
+    /// </summary>
+    private bool IsLocked => IsApproved || ReadOnly;
 
     /// <summary>
     ///     Gets the value rendered into the <c>data-locked</c> attribute of a disabled control: <c>true</c> when the
@@ -220,8 +232,13 @@ public partial class ChecklistPage : ComponentBase
         FollowedState = Review?.FollowsReviewId is { } followed && State is not null
             ? await ChecklistService.GetAsync(ProjectId, followed)
             : null;
-        IsLocked = project is not null && State is not null
+        IsApproved = project is not null && State is not null
             && (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsApproved == true;
+
+        // A member who may only read (an auditor) sees the checklist with every control disabled
+        ReadOnly = project is not null && State is not null
+            && !await Access.CanContributeAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+
         // Start where the work is: the first section with unanswered checks
         OpenSectionId = State?.FirstIncompleteSectionId();
         Loaded = true;
@@ -269,7 +286,8 @@ public partial class ChecklistPage : ComponentBase
         Review = null;
         State = null;
         FollowedState = null;
-        IsLocked = false;
+        IsApproved = false;
+        ReadOnly = false;
         ProjectName = null;
         OpenSectionId = null;
         PendingOutcomes.Clear();
@@ -496,7 +514,7 @@ public partial class ChecklistPage : ComponentBase
         catch (DomainRuleException ex)
         {
             // Somebody signed the last slot while the page was open: show the page as locked from now on
-            IsLocked |= ex.Rule == DomainRule.ReviewLocked;
+            IsApproved |= ex.Rule == DomainRule.ReviewLocked;
             Warning = null;
             ItemErrors[itemId] = ex.Message;
             return;
@@ -548,7 +566,7 @@ public partial class ChecklistPage : ComponentBase
         }
         catch (DomainRuleException ex)
         {
-            IsLocked |= ex.Rule == DomainRule.ReviewLocked;
+            IsApproved |= ex.Rule == DomainRule.ReviewLocked;
             Warning = null;
             SectionErrors[sectionId] = ex.Message;
             return;

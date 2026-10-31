@@ -445,6 +445,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private bool CanReopen { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the signed-in user may only read this project (an auditor): every
+    ///     control that changes something (comments, replies, resolving, reviewers, signing) is then left out.
+    /// </summary>
+    private bool ReadOnly { get; set; }
+
+    /// <summary>
     ///     Gets or sets the reason typed in the reopen form.
     /// </summary>
     private string ReopenReason { get; set; } = string.Empty;
@@ -830,6 +836,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         ClearNewThreadForm();
         RequireIndependent = false;
         CanReopen = false;
+        ReadOnly = false;
         ReopenReason = string.Empty;
         ReopenError = null;
         CanSetDueDate = false;
@@ -1046,6 +1053,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
             }
 
             CanReopen = actor is not null && await Access.CanAdministerAsync(actor, ProjectId);
+            ReadOnly = actor is not null && !await Access.CanContributeAsync(actor, ProjectId);
             CanSetDueDate = await ReviewService.CanSetDueDateAsync(actor, Review);
             try
             {

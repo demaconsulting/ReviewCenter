@@ -32,7 +32,7 @@ longer an enabled system administrator, the page shows an error for every action
 
 ## Access and Visibility
 
-ReviewCenter controls access by project. There are three roles:
+ReviewCenter controls access by project. There are four roles:
 
 - **System administrator**: a flag on a user account. A system administrator creates projects, manages users and
   project membership, reads the audit trail, and can see and manage every project.
@@ -40,6 +40,11 @@ ReviewCenter controls access by project. There are three roles:
   evidence settings, and the review rules of that project, and who can reopen an approved review of it.
 - **Member**: a user who belongs to a project (a project member, role "Member" on the project page). A member works on
   the reviews of that project.
+- **Auditor**: a member of one project who may read everything of it and change nothing. An Auditor sees the
+  project, its reviews, progress, checklists, comments, history, evidence, and the audit trail of the project, and can
+  export that trail. An Auditor cannot create or plan reviews, comment, answer checklists, be named as a reviewer, or
+  sign, and the pages show a read-only notice instead of the controls. An Auditor does not see the Members section, the
+  repositories, or the Users page.
 
 A user who is neither a member of a project nor a system administrator has no access to it. A new project has no
 members; a project administrator or a system administrator adds them (see
@@ -49,21 +54,21 @@ sign-in and finds it again by the issuer and the subject that the provider gives
 roles and project membership in ReviewCenter like any other account (see Sign In with an OpenID Connect Provider in
 the Users and Sign-in chapter).
 
-| Action                                               | Member | Project admin | System admin |
-| ---------------------------------------------------- | ------ | ------------- | ------------ |
-| See the project, its reviews, history, and evidence  | yes    | yes           | yes          |
-| Create reviews, comment, edit checklists             | yes    | yes           | yes          |
-| Edit unsigned reviewer slots (not on a locked review)| yes    | yes           | yes          |
-| Sign a review as the assigned reviewer               | yes    | yes           | if a member  |
-| Download the attestation PDF of an approved review   | yes    | yes           | yes          |
-| Manage the repositories and credentials of a project | no     | yes           | yes          |
-| Add and remove members, change member roles          | no     | yes           | yes          |
-| Create projects                                      | no     | no            | yes          |
-| Manage users; read the audit page                    | no     | no            | yes          |
-| Read the audit trail of the project                  | no     | yes           | yes          |
-| Change evidence settings of a project                | no     | yes           | yes          |
-| Change the review rules of a project                 | no     | yes           | yes          |
-| Reopen an approved (locked) review                   | no     | yes           | yes          |
+| Action                                               | Member | Auditor | Project admin | System admin |
+| ---------------------------------------------------- | ------ | ------- | ------------- | ------------ |
+| See the project, its reviews, history, and evidence  | yes    | yes     | yes           | yes          |
+| Create reviews, comment, edit checklists             | yes    | no      | yes           | yes          |
+| Edit unsigned reviewer slots (not on a locked review)| yes    | no      | yes           | yes          |
+| Sign a review as the assigned reviewer               | yes    | no      | yes           | if a member  |
+| Download the attestation PDF of an approved review   | yes    | yes     | yes           | yes          |
+| Manage the repositories and credentials of a project | no     | no      | yes           | yes          |
+| Add and remove members, change member roles          | no     | no      | yes           | yes          |
+| Create projects                                      | no     | no      | no            | yes          |
+| Manage users; read the audit page                    | no     | no      | no            | yes          |
+| Read and export the audit trail of the project       | no     | yes     | yes           | yes          |
+| Change evidence settings of a project                | no     | no      | yes           | yes          |
+| Change the review rules of a project                 | no     | no      | yes           | yes          |
+| Reopen an approved (locked) review                   | no     | no      | yes           | yes          |
 
 **Hidden means missing.** A project you cannot see looks exactly like a project that does not exist. The project
 pages say "Project N does not exist.", and the API and the PDF routes answer **404**, never 403, so a refused request
@@ -79,7 +84,8 @@ cannot be one of its reviewers and cannot sign it.
 
 **Tokens.** A personal access token acts as its owner and carries the owner's memberships, so it reads and creates
 reviews only in the projects the owner can see, and the API lists only those projects (see
-the Automation and API Tokens chapter). A token never signs, so a token user can never sign a
+the Automation and API Tokens chapter). The token of an Auditor is read-only: every write is refused with **403**, and
+a project the owner is no member of answers 404. A token never signs, so a token user can never sign a
 review. A token cannot reopen a review or change the review rules either. A review created with a token has the
 owner of the token as its author.
 
@@ -94,13 +100,16 @@ This release lets a project administrator manage the members of that project (se
 ### Managing Project Members
 
 A project administrator or a system administrator manages the members on the project page, in the **Members**
-section. It lists each member with a role badge (**Member** or **Project admin**), a role button (**Make project
-admin** or **Make member**), and a **Remove** button. Ordinary members do not see the section.
+section. It lists each member with a role badge (**Member**, **Auditor**, or **Project admin**) and role buttons
+(**Make project admin** or **Make member** next to **Make auditor**; an Auditor row offers **Make member** and **Make
+project admin**, so an Auditor is never promoted by accident), and a **Remove** button. Ordinary members and Auditors do
+not see the section.
 
 ![A project page with its reviews and Members section, as a project administrator sees it.](images/project-members.png)
 
 **Add someone who has an account.** Press **+ Add member**, which opens `/projects/{id}/members/new`. Type the exact
-user name, tick **Project admin** if the person is to manage the members and repositories of the project, and press
+user name, tick **Project admin** if the person is to manage the members and repositories of the project, or tick
+**Auditor** if the person is only to read (not both), and press
 **Add member** (or **Cancel**). There is no list of users to choose from, so nobody can browse the accounts of other
 projects: ask the person for the user name. If the name cannot be added you get one message, whatever the reason (a
 misspelled name, an account that does not exist, or a disabled account). Every such failure is recorded in the audit
@@ -110,7 +119,7 @@ Each attempt is counted when it starts, so many attempts made at the same time c
 
 **Create an account for someone new.** On the same page, **Create a new account** opens
 `/projects/{id}/members/account`. Enter a user name (3 to 50 letters, digits, `.`, `_`, or `-`) and a display name,
-choose whether the person is a project admin,
+choose whether the person is a project admin or an auditor,
 and press **Create account**. The account exists only together with its membership in this project (recorded as
 `project.account-created`). ReviewCenter generates a **temporary password** and shows it **once**, with a **Copy**
 button; nobody types or chooses it, and it is never written to the audit trail or a log. Give it to the person right
@@ -123,10 +132,22 @@ and cannot create, list, or use API tokens (an existing token of that user is re
 password must differ from the temporary one. After the change the person signs in again with the new password.
 Accounts made by a system administrator on the Users page do not have this rule.
 
-**Change a role or remove a member.** Use **Make project admin**, **Make member**, or **Remove** on a member. A
-project always keeps at least one project administrator: a project administrator cannot remove or demote the last
-one, not even themselves, and the page explains why. A system administrator can. The rule holds even when two people
+**Change a role or remove a member.** Use **Make project admin**, **Make member**, **Make auditor**, or **Remove** on a
+member. A project always keeps at least one project administrator: a project administrator cannot remove or demote
+the last one, not even themselves, and the page explains why. A system administrator can. The rule holds even when two people
 act at the same moment.
+
+**The Auditor role.** Only a project administrator or a system administrator can assign it, when a member is added, an
+account is created, or a role is changed; each change is recorded as `project.member-added`, `project.account-created`,
+or `project.member-role-changed` with the role name. An Auditor is a read-only member (see the table in
+[Access and Visibility](#access-and-visibility)), is not offered as a reviewer, and cannot sign. A member who still
+owes work cannot be made an Auditor: while the member is the primary or alternate reviewer of a slot that is not signed
+or whose signature is out of date, on a review that is not approved, the change is refused and the message lists the
+reviews. To resolve it, reassign or remove the slot (a member who can work in the project, on the review page), or
+let the member
+sign, and then change the role again. A new member or a new account never has such a slot. An Auditor can be made a
+member or a project administrator at any time. There is a small gap: a slot that is assigned in the same moment as the
+role change is not noticed; such an Auditor simply cannot sign, and the slot stays waiting until it is reassigned.
 
 **Reviewers who are removed.** A reviewer slot keeps its reviewer when the person is removed from the project. The
 review page marks the reviewer as **No longer a project member**, and that reviewer cannot sign until added again.
@@ -394,8 +415,8 @@ settings, review rules, and account creations, and nothing of other projects, si
 list is newest first, with **Older** and **Newer** buttons, and has the same filter as the audit page, except for the
 project. It has no **Verify chain** button; verification covers the whole trail
 and stays with the system administrator. Ordinary members do not get the button, and the page looks like a missing
-project to them. Who may read it is decided by the audit-read access of a project: today that is the project
-administrators and the system administrators, and Auditors will have it too once that role can be assigned.
+project to them. Who may read it is decided by the audit-read access of a project: the project administrators, the
+system administrators, and the Auditors of the project, who may also export it.
 
 ### Filtering and Paging the Audit Trail
 
@@ -431,7 +452,7 @@ entry first); the page size and the position of the page do not matter. It is a 
 `audit-project-3-20250101T120000Z-chain-intact.csv`.
 
 - **Who may export**: the audit page of a project can export the entries of that project for everyone who may open the
-  page (project administrators and system administrators today). Someone who may see the project but not read its
+  page (project administrators, system administrators, and Auditors). Someone who may see the project but not read its
   audit trail is refused with 403, and someone who cannot see the project gets 404. The export of the whole trail
   (`/audit/export`) is for system administrators only; everyone else is refused with 403, and a request without a
   session is sent to the sign-in page.

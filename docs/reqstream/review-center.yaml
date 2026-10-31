@@ -150,6 +150,28 @@ sections:
           - ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState
           - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
 
+      - id: ReviewCenter-System-Auditor
+        title: >-
+          The tool shall let a project administrator or a system administrator give a member of a project the read-only
+          Auditor role, so that the auditor can read everything of the project that members read, including its audit
+          trail and its export, but can change nothing, is not offered as a reviewer and cannot sign, finds every
+          control that changes something missing or disabled with a notice that says so, and is refused every change
+          through the API with 403, while a user who is no member finds no project; and shall refuse to make a member an
+          auditor while the member holds an unsigned or out-of-date reviewer slot on a review that is not approved.
+        tags: [system]
+        justification: |
+          A project that is audited, for example by quality assurance or a customer, must let the auditor see how the
+          reviews were done without giving the auditor the means to change the record, which is what makes the record
+          trustworthy (21 CFR Part 11 section 11.10(d), limiting access to authorized individuals). Refusing the role
+          while the member still owes a signature keeps a review from waiting for somebody who may no longer sign.
+        children:
+          - ReviewCenter-Core-ProjectAccess
+          - ReviewCenter-Web-ProjectAccess
+          - ReviewCenter-Api-ReadOnlyRole
+        tests:
+          - ReviewCenter_Auditor_CanReadEverythingAndChangeNothing
+          - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
+
       - id: ReviewCenter-System-FollowUpReview
         title: >-
           The tool shall let a review be created as a follow-up of an earlier review of the same project, by hand or

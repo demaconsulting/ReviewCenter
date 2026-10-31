@@ -35,7 +35,9 @@ N/A - standard test environment.
   entries that carry the project; a plain member is refused with `ActorNotAllowed` and an actor who cannot see the
   project gets `ProjectNotFound`; a project administrator lists the members of the own project only.
 - A repeated add, an unknown membership, an unknown user, and an unknown project are refused with the matching rule.
-- The `Auditor` role is declared but cannot be assigned: it is refused like an undefined role until it is offered.
+- Adding or changing a member to the `Auditor` role is accepted and audited with the role name. Changing a member to
+  `Auditor` is refused with `MemberHasOpenReviewWork` while the member holds an unsigned or out-of-date slot on a review
+  that is not approved; adding a new member as `Auditor` is not.
 - A member is added only by the exact user name; an unknown name and a disabled user give one rule and one message,
   and an unknown name and a non-member give one rule and one message for a removal or role change.
 - After ten failed attempts within ten minutes an actor who is no system administrator is refused with
@@ -195,10 +197,32 @@ adding to an unknown project gives `ProjectNotFound`; adding a member twice give
 who is no member gives `MembershipNotFound`; an undefined role is rejected with an `ArgumentOutOfRangeException`. This
 scenario is tested by `ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules`.
 
-**ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered**: Adding a member, creating a member account, and
-changing the role of a member with the declared but not yet offered `Auditor` role are refused with an
-`ArgumentOutOfRangeException`, and nothing is stored. This scenario is tested by
-`ProjectService_Members_AuditorRole_IsRefusedUntilItIsOffered`.
+**ProjectService_Members_AuditorRole_IsAssignedAndAudited**: Adding a member, creating a member account, and changing
+the role of a member with `Auditor` are accepted, store the role, and are audited with the role name in the detail. This
+scenario is tested by `ProjectService_Members_AuditorRole_IsAssignedAndAudited`.
+
+**ProjectService_SetMemberRoleAsync_UnsignedSlot_RefusesAuditorAndNamesTheReview**: A member who is the primary or the
+alternate of a slot that is not signed, on a review that is not approved, is refused the `Auditor` role with
+`MemberHasOpenReviewWork`; the message names the review and the role stays. This scenario is tested by
+`ProjectService_SetMemberRoleAsync_UnsignedSlot_RefusesAuditorAndNamesTheReview`.
+
+**ProjectService_SetMemberRoleAsync_OutOfDateSlot_RefusesAuditor**: A slot that was signed but is out of date because
+the record changed counts as open work and refuses the role. This scenario is tested by
+`ProjectService_SetMemberRoleAsync_OutOfDateSlot_RefusesAuditor`.
+
+**ProjectService_SetMemberRoleAsync_NoOpenWork_AllowsAuditor**: A member whose slots are signed and current, or whose
+review is approved, is made an `Auditor`, and the change is audited with the role name. This scenario is tested by
+`ProjectService_SetMemberRoleAsync_NoOpenWork_AllowsAuditor`.
+
+**ProjectService_SetMemberRoleAsync_LastProjectAdminToAuditor_IsRefused**: The last project administrator cannot be
+made an `Auditor`, as for any other role that is no administrator. This scenario is tested by
+`ProjectService_SetMemberRoleAsync_LastProjectAdminToAuditor_IsRefused`.
+
+**ProjectService_AddMemberAsync_Auditor_IsAllowedForANewMember**: A new member can be added as `Auditor`, because a new
+member holds no slot. This scenario is tested by `ProjectService_AddMemberAsync_Auditor_IsAllowedForANewMember`.
+
+**ProjectService_MemberManagement_Auditor_IsRefused**: An `Auditor` who tries to add, change, remove, or list members is
+refused with `ActorNotAllowed`. This scenario is tested by `ProjectService_MemberManagement_Auditor_IsRefused`.
 
 **ProjectService_GetAsync_HiddenProject_ReadsAsMissing**: A member reads the own project; the same member reading
 another project, a non-member reading the project, and a system administrator reading a project that does not exist

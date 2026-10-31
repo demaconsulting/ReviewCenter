@@ -695,6 +695,10 @@ text for a project that does not exist (apart from the project number), and none
 file names, file content, comment, reviewer name or checklist progress is in the markup. This scenario is tested by
 `ReviewPage_Render_NonMember_LooksLikeAMissingReview`.
 
+**ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls**: An Auditor opens a review; the page shows the
+`readonly-notice`, the comments and the status, and none of the slot, sign, comment, reply, and resolve controls and no
+reopen form. This scenario is tested by `ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls`.
+
 **ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the review open, and the membership is
 removed in the store; choosing a file shows the not-found message, and nothing that the page had loaded (names, file
 content, comments, reviewer name, checklist progress) remains in the markup. This scenario is tested by

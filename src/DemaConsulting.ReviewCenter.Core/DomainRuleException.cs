@@ -206,6 +206,12 @@ public enum DomainRule
     /// <summary>The change would leave the project without an enabled project administrator.</summary>
     LastProjectAdmin,
 
+    /// <summary>
+    ///     The member holds an unsigned or out-of-date reviewer slot on a review that is not approved, so the member
+    ///     cannot be made a read-only auditor until the slot is signed, reassigned or the review is approved.
+    /// </summary>
+    MemberHasOpenReviewWork,
+
     /// <summary>Too many failed attempts to add or create a member in a short time; try again later.</summary>
     TooManyAttempts,
 
