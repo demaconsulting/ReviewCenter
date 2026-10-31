@@ -487,7 +487,8 @@ disabled afterwards is rendered; each change list has an extra, labeled option f
 selected one, so the select is not blank. This scenario is tested by
 `ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists`.
 
-**ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption**: A slot of enabled members has no `unavailable` option.
+**ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption**: A slot of enabled members has no `unavailable` option in
+either list, and each current reviewer is a regular option of its list.
 This scenario is tested by `ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption`.
 
 **ReviewPage_EditSlot_AuthorHoldingSlotUnderIndependence_LabelNamesTheRule**: The review author holds the primary slot

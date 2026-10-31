@@ -1339,13 +1339,20 @@ public partial class ReviewPageTests : PageTestBase
     public async Task ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption()
     {
         // Arrange: a slot of ann and bob, who are both enabled members
-        var (projectId, slotId, _) = await CreateSignableAsync();
+        var (projectId, slotId, ids) = await CreateSignableAsync();
 
         // Act: render the page
         var cut = RenderPage(projectId);
 
-        // Assert: both reviewers are among the regular options
+        // Assert: neither list has an extra option, and each current reviewer is still a regular option
         Assert.Empty(cut.FindAll($"[data-testid='slot-primary-unavailable-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='slot-alternate-unavailable-{slotId}']"));
+        var primaryValues = cut.Find($"[data-testid='slot-primary-select-{slotId}']")
+            .QuerySelectorAll("option").Select(o => o.GetAttribute("value")).ToList();
+        var alternateValues = cut.Find($"[data-testid='slot-alternate-select-{slotId}']")
+            .QuerySelectorAll("option").Select(o => o.GetAttribute("value")).ToList();
+        Assert.Contains(ids["ann"].ToString(), primaryValues);
+        Assert.Contains(ids["bob"].ToString(), alternateValues);
     }
 
     /// <summary>
