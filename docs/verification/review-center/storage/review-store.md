@@ -6,8 +6,9 @@
 checklists), `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures), and
 `ReviewStoreRepositoryTests.cs` (reviews from a repository), `ReviewStoreMembershipTests.cs` (project
 memberships), `ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
-the same time), and `EvidenceSettingsStoreTests.cs` (the evidence settings of a project and their compare-and-set
-change). The tests use the real
+the same time), `EvidenceSettingsStoreTests.cs` (the evidence settings of a project and their compare-and-set
+change), and `ProjectChecklistStoreTests.cs` (the checklist definition of a project, its compare-and-set change by the
+hash of the stored text, and the race of two writers). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
 Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
@@ -81,6 +82,11 @@ be loadable on the test platform.
   the read and by the listing; the setting is changed by a compare-and-set that is stored with one
   audit entry, is read back with the project, and for an expected value that is not stored (or an unknown project)
   reports `false` and changes nothing.
+- A new project has no checklist definition; a definition of the full size limit is stored in its own project only,
+  read back unchanged, and reset to none; the change is a compare-and-set on the hash of the stored text that is stored
+  with one audit entry of the project (the chain verifies), a hash that is not the stored one or an unknown project
+  reports `false` and changes nothing and writes no entry, and of two writers that start from the same hash exactly one
+  succeeds.
 
 #### Test Scenarios
 
@@ -371,6 +377,34 @@ The setting is switched off with the expected value `true`; the call reports `tr
 audit entry is stored. A second call that still names `true` as the expected value, and a call for a project that does
 not exist, report `false` and change nothing. This scenario is defined in `ReviewStoreSigningTests.cs` and is tested
 by `ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet`.
+
+**ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven**: A project added without a
+checklist definition reads back with none; a project added with one reads back with it unchanged. This scenario is
+defined in `ProjectChecklistStoreTests.cs` and is tested by
+`ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven`.
+
+**ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn**: A definition text of the full size
+limit, with non-ASCII characters, is stored and read back unchanged by the read and by the listing. This scenario is
+defined in `ProjectChecklistStoreTests.cs` and is tested by
+`ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn`.
+
+**ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited**: The definition of one project is
+replaced with the expected hash of the default and then reset with the hash of the replacement; both calls report
+`true`, the other project is untouched, two entries `project.checklist-changed` of the project exist, and the chain
+verifies. This scenario is defined in `ProjectChecklistStoreTests.cs` and is tested by
+`ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited`.
+
+**ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing**: A change that names a hash that is no longer
+the stored one, one that names a made-up hash, and one for an unknown project report `false`, leave the stored
+definition as it was, write no entry, and leave the chain intact. This scenario is defined in
+`ProjectChecklistStoreTests.cs` and is tested by
+`ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing`.
+
+**ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins**: Two writers that start from the same
+hash with different definitions are released together, once calling the store and once calling the service; exactly one
+wins, the stored definition is the winner's, one entry exists, and the chain verifies. This scenario is defined in
+`ProjectChecklistStoreTests.cs` and is tested by
+`ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

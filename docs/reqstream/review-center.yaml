@@ -150,7 +150,9 @@ sections:
         children:
           - ReviewCenter-Web-Checklist
           - ReviewCenter-Core-Checklist
+          - ReviewCenter-Core-ProjectChecklist
           - ReviewCenter-Storage-Checklist
+          - ReviewCenter-Storage-ProjectChecklist
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
@@ -318,7 +320,9 @@ sections:
           - ReviewCenter-Core-RepositoryReviews
           - ReviewCenter-Storage-RepositoryReviews
           - ReviewCenter-Core-Checklist
+          - ReviewCenter-Core-ProjectChecklist
           - ReviewCenter-Storage-Checklist
+          - ReviewCenter-Storage-ProjectChecklist
           - ReviewCenter-Core-Threads
           - ReviewCenter-Storage-Threads
           - ReviewCenter-Core-Signatures

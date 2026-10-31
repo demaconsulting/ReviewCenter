@@ -32,6 +32,16 @@ internal static class TestServices
     }
 
     /// <summary>
+    ///     Builds a project checklist service.
+    /// </summary>
+    /// <param name="store">The review store.</param>
+    /// <returns>The service.</returns>
+    public static ProjectChecklistService ProjectChecklists(IReviewStore store)
+    {
+        return new ProjectChecklistService(store, new AllowAllProjectAccess(store));
+    }
+
+    /// <summary>
     ///     Builds a review service.
     /// </summary>
     /// <param name="store">The review store.</param>

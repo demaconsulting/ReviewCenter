@@ -53,6 +53,10 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - The evidence settings of a project are stored with the project (the defaults for a new project), are changed only
   when the stored settings still equal the expected ones, and are stored with their audit entry or not at all; this is
   verified in the unit tests of `ReviewStore` on the real database.
+- The checklist definition of a project is stored with the project (none for a new project, which stands for the
+  default), is changed only when the hash of the stored text still equals the expected one, is stored with its audit
+  entry or not at all, and of two simultaneous changes from the same hash exactly one succeeds; this is verified in the
+  unit tests of `ReviewStore` on the real database.
 - The approval lock and the reopen history survive a restart: a review that was approved, reopened by an administrator,
   and signed again is read back after the database is closed and opened again with its reopen (who, why, and the
   previous digest), its old and new signatures, and the approval; the store itself refuses a thread, a checklist
@@ -169,6 +173,16 @@ tested by `ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings`,
 `ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited`, and
 `ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing`, all defined in
 `EvidenceSettingsStoreTests.cs`.
+
+**Project checklist**: A new project has no checklist definition, a definition of the full size limit is stored and read
+back unchanged, a change is stored for its own project only together with its audit entry (the chain verifies), a change
+based on a hash that is no longer the stored one changes nothing, and of two writers from the same hash exactly one
+wins; these are tested by `ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven`,
+`ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn`,
+`ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited`,
+`ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing`, and
+`ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins`, all defined in
+`ProjectChecklistStoreTests.cs`.
 
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by

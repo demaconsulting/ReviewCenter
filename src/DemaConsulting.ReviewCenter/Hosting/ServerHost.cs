@@ -290,6 +290,7 @@ internal static class ServerHost
         services.AddSingleton<IProjectAccess, ProjectAccess>();
         services.AddSingleton<ProjectService>();
         services.AddSingleton<EvidenceSettingsService>();
+        services.AddSingleton<ProjectChecklistService>();
         services.AddSingleton<ReviewService>();
         services.AddSingleton<ThreadService>();
         services.AddSingleton<ChecklistService>();

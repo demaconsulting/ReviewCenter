@@ -59,7 +59,10 @@ application; the rest of the system sees only the Core store interfaces.
   otherwise changes nothing and stores no entry. The schema has no migration: a development database that was created
   before the settings existed is recreated. A review rule of the project, `RequireIndependentReviewers`, is stored in
   a boolean column of the project and changed in the same way (`UpdateRequireIndependentReviewersAsync`, audited as
-  `project.independent-reviewers-changed`). An approved review is locked: the operations that change a thread, a
+  `project.independent-reviewers-changed`). The checklist definition of a project is stored with the project in one
+  nullable, unbounded text column (null stands for the built-in default) and changed by a compare-and-set on the hash of
+  the stored text (`UpdateChecklistDefinitionAsync`, audited as `project.checklist-changed` in the same transaction, so
+  the hash chain stays intact). An approved review is locked: the operations that change a thread, a
   comment, a checklist section or answer, or a reviewer slot re-check inside their own transaction that the review is
   not approved and raise a `DomainRuleException` for `ReviewLocked` otherwise (nothing is stored). A reopen of an
   approved review (`ReopenReviewAsync`) is stored as a row of the append-only `ReviewReopens` table together with its

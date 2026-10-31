@@ -23,7 +23,10 @@ repository registry is the one exception, see `Repositories`).
   `EvidenceSettings.Default`. `RequireIndependentReviewers` is a required boolean column of the same table. No
   database default is declared for it: the value always comes from the entity, whose initializer is `true`, so a
   project that was never given another value requires independent reviewers (this avoids the pitfall where Entity
-  Framework treats the CLR default of a boolean as "not set" and substitutes the database default).
+  Framework treats the CLR default of a boolean as "not set" and substitutes the database default). `ChecklistDefinition`
+  is a nullable text column with no length limit: the JSON of the checklist the project gives to its new reviews (a
+  definition is up to `ReviewLimits.MaxChecklistBytes`, 256 KiB), and `NULL` stands for the built-in default checklist.
+  There is no version column; the version label is part of the JSON.
 - **Reviews** (`Review`): key `ProjectId` plus `Id`. `Title` is required, at most 200; `State` is stored as text, at
   most 32; `ContentFingerprint` is required, at most 64; `Created`; `CreatedBy` (the user name of the creator, at most
   the user name limit, null for a review stored before the column existed) and `CreatedViaApi` (default false, true

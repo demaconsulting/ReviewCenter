@@ -56,7 +56,8 @@ constants are in `ReviewLimits`; see `ProjectService`).
 - *Returns*: `Task<Review>` — the stored review with its fingerprint and the hash and size of each file.
 - *Preconditions*: `files` and `actor` are not null.
 - *Postconditions*: The review is stored in the `Draft` state with the creation time from the clock; the bytes
-  are stored exactly as given, together with a copy of `DefaultChecklist.Current` as the review's checklist, in
+  are stored exactly as given, together with a copy of the checklist of the project (see below) as the review's
+  checklist, in
   the same transaction. Nothing is stored when a rule fails.
 
 The first check is that the actor may see the project (`IProjectAccess.RequireViewAsync`): a project that does not
@@ -109,6 +110,16 @@ record digest (see `RecordDigest`) additionally covers the source, the review-se
 
 Skipped entries (symbolic links, submodules, and paths that cannot be reviewed) are not part of the review; those
 that match the selection are returned in the result and counted in the audit detail.
+
+**Checklist of the project**: both creation paths (`CreateDraftAsync` and `CreateFromSessionAsync`, which also serves
+`CreateFromRepositoryAsync` and `ReviewPlanner`) take the checklist of the review in one place. The service reads the
+project; when it has no definition of its own the copy is made from `DefaultChecklist.Current`, otherwise the stored
+text is parsed and checked with `ChecklistValidator.ParseOrThrow` at that moment. A text that cannot be used fails
+closed: the review is not created, nothing is stored, and the call raises `ChecklistDefinitionInvalid` with a message
+that names the project and the first errors; the service never falls back to the default in that case. A project that
+does not exist raises `ProjectNotFound`. The copy is stored with the review and read from there afterwards (see
+`ChecklistService`), so a later change of the checklist of the project, an approval, or a lock changes neither an
+existing review, nor its checklist wording, nor its record digest.
 
 **GetAsync**: Reads one review with its files' metadata, ordered by path; returns null when it does not exist.
 

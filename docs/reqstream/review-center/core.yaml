@@ -5,7 +5,8 @@
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
-#   ReviewPlanner, LineDiff, ProjectAccess, and EvidenceSettingsService units, with the domain types they share
+#   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, and ProjectChecklistService units, with the
+#   domain types they share
 #   (project, evidence settings, review,
 #   review file, thread, comment, checklist, user, project membership, actor, reviewer slot, signature, upload,
 #   limits, repository, rule exception, and store interfaces)
@@ -102,6 +103,35 @@ sections:
           - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
           - EvidenceSettingsService_SetAsync_ChangedMeanwhile_IsRefusedAsRecordChanged
 
+      - id: ReviewCenter-Core-ProjectChecklist
+        title: >-
+          The Core subsystem shall let every project have a checklist of its own, the built-in default checklist when
+          it has none, that only a system administrator or a project administrator of the project, and never an
+          API token, can read for change, replace, or reset (every other actor gets the answer for a project that does
+          not exist, and a plain member is told it may not), accept a definition only when it passes a strict
+          validation that reports every error with its path and that needs a new version label when the wording
+          changes, change it only from the definition the caller started from, refuse a change that was overtaken by
+          another, and record every change in the audit trail without the wording.
+        justification: |
+          A project decides what its reviews are answered against, and the wording is covered by every signature. The
+          decision belongs to those who administer the project, must be well formed, must not be lost or undone by a
+          simultaneous change, and must be traceable in the history of the project.
+        children:
+          - ReviewCenter-ProjectChecklistService-Read
+          - ReviewCenter-ProjectChecklistService-Validation
+          - ReviewCenter-ProjectChecklistService-Access
+          - ReviewCenter-ProjectChecklistService-Change
+          - ReviewCenter-ProjectChecklistService-VersionLabel
+          - ReviewCenter-ProjectChecklistService-NoChange
+          - ReviewCenter-ProjectChecklistService-Reset
+          - ReviewCenter-ProjectChecklistService-Audit
+          - ReviewCenter-ProjectChecklistService-Conflict
+          - ReviewCenter-ProjectChecklistService-Arguments
+          - ReviewCenter-ChecklistService-Validation
+        tests:
+          - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+          - ProjectChecklistService_SetAndReset_ChangedMeanwhile_AreRefusedAsRecordChanged
       - id: ReviewCenter-Core-Reviews
         title: >-
           The Core subsystem shall create a draft review in a project from a set of uploaded files, keep every
@@ -200,7 +230,8 @@ sections:
       - id: ReviewCenter-Core-Checklist
         title: >-
           The Core subsystem shall give every review a checklist of checks grouped in sections, frozen when the
-          review is created, let each section be marked as not applicable with a reason, let each check be
+          review is created from the checklist of its project or, when the project has none, the built-in default,
+          let each section be marked as not applicable with a reason, let each check be
           answered Pass, Fail, or N/A with a justification where required, and give the progress per section and
           overall and whether the checklist is complete.
         justification: |
@@ -209,6 +240,7 @@ sections:
         children:
           - ReviewCenter-ChecklistService-Default
           - ReviewCenter-ChecklistService-Freeze
+          - ReviewCenter-ReviewService-ProjectChecklist
           - ReviewCenter-ChecklistService-Applicability
           - ReviewCenter-ChecklistService-Answer
           - ReviewCenter-ChecklistService-AnsweredBy
@@ -348,6 +380,7 @@ sections:
           - ReviewCenter-ProjectService-Audit
           - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-EvidenceSettingsService-Audit
+          - ReviewCenter-ProjectChecklistService-Audit
           - ReviewCenter-ReviewService-Audit
           - ReviewCenter-ThreadService-Audit
           - ReviewCenter-ChecklistService-Audit

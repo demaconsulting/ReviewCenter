@@ -132,6 +132,9 @@ public sealed class ReviewService
         // with a uniqueness constraint, which covers two requests racing past this check
         await EnsureFreeIdAsync(projectId, id!, cancellationToken);
 
+        // The checklist the review is frozen with: the project's own definition, else the built-in default
+        var checklistDefinition = await ResolveChecklistDefinitionAsync(projectId, cancellationToken);
+
         // Keep the bytes verbatim and record the size and hash of each file alongside them
         var reviewFiles = files
             .Select(file => new ReviewFile
@@ -158,8 +161,9 @@ public sealed class ReviewService
             ContentFingerprint = Fingerprint.Compute(reviewFiles.Select(file => file.Sha256)),
             Files = reviewFiles,
 
-            // The checklist is frozen now: later changes of the default never alter this review's checks
-            Checklist = NewChecklist(projectId, id!)
+            // The checklist is frozen now: later changes of the project's definition or of the default never alter
+            // this review's checks
+            Checklist = NewChecklist(projectId, id!, checklistDefinition)
         };
 
         // An API-created review says so in the trail (at the end: the upload detail is short enough to always fit)
@@ -281,6 +285,10 @@ public sealed class ReviewService
                 $"A review-set id must be 1 to {ReviewLimits.MaxReviewSetIdLength} characters.");
         }
 
+        // The checklist the review is frozen with (the project's own definition, else the default); resolved first so
+        // a definition that cannot be used fails the creation before the repository is read
+        var checklistDefinition = await ResolveChecklistDefinitionAsync(projectId, cancellationToken);
+
         // Deleted files are matched by their path like any other
         var changeSet = await session.ListChangesAsync(baselineSha, headSha, cancellationToken);
         var selected = changeSet.Changes
@@ -332,7 +340,7 @@ public sealed class ReviewService
             Selection = selectionText,
             ReviewSetId = reviewSetId,
             Files = files,
-            Checklist = NewChecklist(projectId, id)
+            Checklist = NewChecklist(projectId, id, checklistDefinition)
         };
 
         // The title is shortened so the SHAs and the fingerprint always fit in the audit detail; an API-created review
@@ -510,20 +518,59 @@ public sealed class ReviewService
     }
 
     /// <summary>
-    ///     Builds the frozen copy of the current default checklist for a new review.
+    ///     Builds the frozen copy of a checklist definition for a new review.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
-    /// <returns>The checklist; later changes of the default never alter it.</returns>
-    private static ReviewChecklist NewChecklist(int projectId, string reviewId)
+    /// <param name="definition">The definition to freeze: the project's own, or the built-in default.</param>
+    /// <returns>The checklist; later changes of the project's definition or of the default never alter it.</returns>
+    private static ReviewChecklist NewChecklist(int projectId, string reviewId, ChecklistDefinition definition)
     {
         return new ReviewChecklist
         {
             ProjectId = projectId,
             ReviewId = reviewId,
-            Version = DefaultChecklist.Version,
-            Definition = DefaultChecklist.Current.ToJson()
+            Version = definition.Version,
+            Definition = definition.ToJson()
         };
+    }
+
+    /// <summary>
+    ///     Finds the checklist definition a new review of a project is frozen with.
+    /// </summary>
+    /// <remarks>
+    ///     A project without a definition of its own gets the built-in <see cref="DefaultChecklist"/>. A stored
+    ///     definition is validated again here with <see cref="ChecklistValidator"/>, so even a value that reached the
+    ///     database by other means is never frozen into a review; a definition that does not pass fails the creation
+    ///     (it never falls back silently to the default, which would give reviewers other questions than the
+    ///     administrators configured).
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The definition to freeze.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the project does not exist, and with
+    ///     <see cref="DomainRule.ChecklistDefinitionInvalid"/> when the stored definition is not valid.
+    /// </exception>
+    private async Task<ChecklistDefinition> ResolveChecklistDefinitionAsync(int projectId, CancellationToken cancellationToken)
+    {
+        var project = await _store.GetProjectAsync(projectId, cancellationToken)
+                      ?? throw new DomainRuleException(DomainRule.ProjectNotFound, $"Project {projectId} does not exist.");
+        if (project.ChecklistDefinition is null)
+        {
+            return DefaultChecklist.Current;
+        }
+
+        try
+        {
+            return ChecklistValidator.ParseOrThrow(project.ChecklistDefinition);
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.ChecklistDefinitionInvalid)
+        {
+            throw new DomainRuleException(
+                DomainRule.ChecklistDefinitionInvalid,
+                $"The review was not created because the checklist of project {projectId} cannot be used. {ex.Message}");
+        }
     }
 
     /// <summary>

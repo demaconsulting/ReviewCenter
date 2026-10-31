@@ -52,6 +52,13 @@ N/A - standard test environment.
   administrator of the project read and change them (a plain member is told it may not, and every other actor gets the
   answer for a missing project); a change that was overtaken by another is refused and stores nothing; and every change
   is audited with its changed keys (see the unit tests of `EvidenceSettingsService`).
+- The checklist of a project is the built-in default until an administrator replaces it; only a system administrator
+  and a project administrator of the project (never through an API token) read and change it, a definition that breaks
+  any rule of the strict validation is refused with every error and its path, a replacement with other content needs
+  a new version label, a change that was overtaken by another is refused with `RecordChanged`, and every change is
+  audited without the wording (see the unit tests of `ProjectChecklistService` and `ChecklistService`). A new review
+  freezes the checklist of its project, fails closed when that cannot be used, and is not affected by a later change
+  (see the unit tests of `ReviewService`).
 - A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
   signature makes the review approved, an administrator's reopen makes it out of date and not approved, and the
   slot can be signed again.

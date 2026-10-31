@@ -1,0 +1,154 @@
+---
+# Software Unit Requirements for the ProjectChecklistService Class
+#
+# The ProjectChecklistService class reads and changes the checklist definition that a project gives to its new
+# reviews (the built-in default when the project has none), lets only the administrators of the project change it,
+# refuses a definition that does not pass the strict validation, and records every change in the audit trail. The
+# ProjectChecklist type, which carries the definition with its text and hash, is verified with it. The validation
+# itself is the ChecklistValidator class of the ChecklistService unit, and the copy that a review takes is made by the
+# ReviewService unit; their requirements are in their own files.
+
+sections:
+  - title: ProjectChecklistService Unit Requirements
+    requirements:
+      - id: ReviewCenter-ProjectChecklistService-Read
+        title: >-
+          The ProjectChecklistService class shall return the checklist a project gives to its new reviews as the
+          parsed definition with its version, its text, whether it is the built-in default, and the SHA-256 hash of
+          the text a change must be based on, which for a project without a definition of its own is the hash of
+          the text of the built-in default checklist, and shall reject a stored text that cannot be read as an
+          invalid checklist definition.
+        justification: |
+          A project that nobody configured must use the built-in checklist, so reading it has to give a definition
+          and a hash like any other. Because every change is compared against the hash, the reader and the store must
+          calculate it in the same way, and a stored text that cannot be read must be reported, not replaced by the
+          default without anyone noticing.
+        tests:
+          - ProjectChecklistService_GetAsync_NewProject_IsDefault
+          - ProjectChecklistService_HashOf_IsSha256OfTheTextAndOfTheDefaultForNull
+
+      - id: ReviewCenter-ProjectChecklistService-Validation
+        title: >-
+          The ProjectChecklistService class shall refuse to store a checklist definition that does not pass the
+          strict validation of the ChecklistValidator class, reporting every error with its path in a domain rule
+          exception of the ChecklistDefinitionInvalid rule and storing nothing, including a definition whose stored
+          (normal) form is longer than the size limit although the text that was sent was not, and shall offer the
+          same check as a
+          pure operation that reports every error with its path, or the parsed definition, without storing or
+          recording anything.
+        justification: |
+          The wording of the checklist is frozen into every review and covered by every signature. A definition that
+          is malformed must never be stored, and the person who entered it needs all the errors in one pass, with
+          the place of each, to correct it. A pure check lets a page show the errors and a preview before anything
+          is saved.
+        tests:
+          - ProjectChecklistService_SetAsync_InvalidDefinition_IsRefusedWithAllErrors
+          - ProjectChecklistService_SetAsync_NormalFormOverLimit_IsRefused
+          - ProjectChecklistService_Validate_ReportsAllErrorsAndStoresNothing
+
+      - id: ReviewCenter-ProjectChecklistService-Access
+        title: >-
+          The ProjectChecklistService class shall return the checklist of a project to any actor who may see the
+          project, including an actor that came through an API token, and replace or reset it only for a system
+          administrator or a project administrator of that project, checked again at every call, tell a plain member
+          of the project that it may not, give every other actor, including a user outside the project, an
+          administrator of another project, a disabled user, and no actor at all, the answer for a project that does
+          not exist, refuse every replace and reset that comes through an API token, and change and record nothing
+          when it refuses.
+        justification: |
+          The checklist decides what every later review of the project is answered against, so only the people who
+          administer the project may change it, and only in person: a token that is leaked or scripted must not be
+          able to weaken the standard of a project. Reading is not restricted to administrators or to people: the
+          checklist is shown in every review of the project, so every viewer, a token for tooling included, may read
+          it. A project that the actor may not see must read like a missing
+          one, so that its existence does not leak, and a right that was revoked while a page was open must not
+          get a change through.
+        tests:
+          - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - ProjectChecklistService_SetAndReset_ApiToken_AreRefused
+          - ProjectChecklistService_UnknownProject_IsNotFound
+
+      - id: ReviewCenter-ProjectChecklistService-Change
+        title: >-
+          The ProjectChecklistService class shall store a valid definition for the project it names only, in the
+          normal form of the definition and not in the text the caller sent, leaving the checklist of every other
+          project as it is, and shall report that the definition was changed.
+        justification: |
+          Every project has a checklist of its own. A change that reached another project would alter the standard of
+          a body of work whose administrators did not decide it. Storing the normal form means that the same
+          content always has the same text and so the same hash.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-VersionLabel
+        title: >-
+          The ProjectChecklistService class shall refuse a replacement whose content differs from the current
+          definition, the built-in default included, but whose version label is the same as the current one, with the
+          ChecklistDefinitionInvalid rule and a message that names the label, and storing nothing.
+        justification: |
+          The version names the wording a review was answered against. If two different wordings could carry the same
+          label, the label would prove nothing, so a change of the wording must come with a new label.
+        tests:
+          - ProjectChecklistService_SetAsync_SameVersionOtherContent_IsRefused
+          - ProjectChecklistService_SetAsync_DefaultLabelOtherContent_IsRefused
+
+      - id: ReviewCenter-ProjectChecklistService-NoChange
+        title: >-
+          The ProjectChecklistService class shall, when the new definition has the same content as the current one,
+          or when the project already uses the default and is asked to reset, store nothing, record nothing, and
+          report that nothing was changed.
+        justification: |
+          A change that changes nothing would put an entry in the audit trail that says something happened when it
+          did not.
+        tests:
+          - ProjectChecklistService_SetAsync_SameContent_RecordsNothing
+          - ProjectChecklistService_ResetAsync_AlreadyDefault_RecordsNothing
+
+      - id: ReviewCenter-ProjectChecklistService-Reset
+        title: >-
+          The ProjectChecklistService class shall, on a reset, remove the definition of the project so that its new
+          reviews use the built-in default checklist again, report that it was changed, and leave every existing
+          review with the copy it was created with.
+        justification: |
+          A project that no longer wants a checklist of its own must be able to return to the standard one, and a
+          return must not rewrite what earlier reviews were answered against.
+        tests:
+          - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
+
+      - id: ReviewCenter-ProjectChecklistService-Audit
+        title: >-
+          The ProjectChecklistService class shall record a replacement and a reset as one audit entry each, with the
+          action project.checklist-changed, that carries the project and no review, names the actor, and states
+          the new version, the number of sections and checks, a short SHA-256 of the text, and the previous version,
+          or that the checklist was reset to the default, but never the wording, and within the length limit of an
+          audit detail.
+        justification: |
+          Changing the standard that reviews are answered against is a decision that an auditor must be able to
+          find, date, and attribute. The entry identifies the change and its content without copying the wording into
+          the trail, which must stay short and free of free text.
+        tests:
+          - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+          - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
+
+      - id: ReviewCenter-ProjectChecklistService-Conflict
+        title: >-
+          The ProjectChecklistService class shall change the definition only when the stored one still has the
+          SHA-256 hash the caller started from, refuse a change that was overtaken by another with the RecordChanged
+          rule and a message that says someone else changed the checklist, store and record nothing then, and let
+          exactly one of two changes that start from the same hash succeed.
+        justification: |
+          Two administrators who edit the checklist at the same time must not silently overwrite each other. The
+          comparison is repeated atomically by the store, so the guarantee holds even when two requests overlap.
+        tests:
+          - ProjectChecklistService_SetAndReset_ChangedMeanwhile_AreRefusedAsRecordChanged
+          - ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins
+
+      - id: ReviewCenter-ProjectChecklistService-Arguments
+        title: >-
+          The ProjectChecklistService class shall refuse a null store, a null access rule, and a null actor or
+          expected hash for a change.
+        justification: |
+          A missing collaborator or argument is a programming error that must show at once, not later as a null
+          reference in the middle of a change.
+        tests:
+          - ProjectChecklistService_NullArguments_AreRefused

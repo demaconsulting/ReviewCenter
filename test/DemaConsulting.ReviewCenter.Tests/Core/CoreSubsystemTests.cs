@@ -750,6 +750,7 @@ public class CoreSubsystemTests
             DomainRule.CurrentPasswordIncorrect => users.ChangeOwnPasswordAsync(
                 "root", "wrong password!", ValidPassword, cancellationToken),
             DomainRule.UserNotFound => users.SetEnabledAsync("nobody", false, cancellationToken),
+            DomainRule.ChecklistDefinitionInvalid => Task.Run(() => ChecklistValidator.ParseOrThrow("{ not json"), cancellationToken),
             DomainRule.LastAdmin => users.SetEnabledAsync("root", false, cancellationToken),
             _ => throw new NotSupportedException($"No violation is defined for the rule '{rule}'.")
         };

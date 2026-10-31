@@ -180,6 +180,27 @@ sections:
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
           - ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing
 
+      - id: ReviewCenter-ReviewStore-ProjectChecklist
+        title: >-
+          The ReviewStore class shall store the checklist definition of a project, as unbounded text, with the
+          project, with no definition for a project that was not given one, return it with every project it reads
+          or lists, and change it only through an atomic compare-and-set that applies the new definition, or removes
+          it, when the stored one still equals the definition the caller started from, changes only that project,
+          stores the audit entry of the change in the same transaction so that the hash chain stays intact, and
+          reports, without a change and without an entry, a project that does not exist or a definition that is no
+          longer the expected one, even when two callers change it at the same time.
+        justification: |
+          The definition decides the wording of every review created later, so a change must neither be lost nor
+          silently overwrite the change of another administrator, and a change that is stored without its entry,
+          or an entry without its change, would leave the history of the checklist untrue. The comparison is part
+          of the update, so two administrators who save at the same time cannot both succeed.
+        tests:
+          - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
+          - ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn
+          - ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited
+          - ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing
+          - ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins
+
       - id: ReviewCenter-ReviewStore-ApprovalLockInTransaction
         title: >-
           The ReviewStore class shall refuse with the ReviewLocked rule, inside the same transaction that would store
@@ -253,8 +274,9 @@ sections:
       - id: ReviewCenter-ReviewStore-Audit
         title: >-
           The ReviewStore class shall store every audited change (project, project membership, evidence settings,
-          setting that requires independent reviewers, review, thread, comment, thread state, checklist answer and
-          section state, slot, signature, and reopening) together with its audit entry in one transaction, through the
+          project checklist definition, setting that requires independent reviewers, review, thread, comment,
+          thread state, checklist answer and section state, slot, signature, and reopening) together with its audit
+          entry in one transaction, through the
           process-wide audit gate, shall store neither when either fails, and shall store no entry for a change that
           has no effect.
         justification: |
@@ -268,6 +290,7 @@ sections:
           - ReviewStore_NoOpChanges_RecordNothing
           - ReviewStore_Membership_Changes_AreAuditedWithTheProject
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+          - ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited
           - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
           - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
           - ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen

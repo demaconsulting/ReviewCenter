@@ -59,12 +59,12 @@ internal sealed class ReviewCenterDbContext : DbContext
     /// <summary>
     ///     The width of the column that holds the version label of a checklist.
     /// </summary>
-    private const int ChecklistVersionColumnLength = 64;
+    private const int ChecklistVersionColumnLength = ReviewLimits.MaxChecklistVersionLength;
 
     /// <summary>
     ///     The width of a column that holds a checklist section or check identifier.
     /// </summary>
-    private const int ChecklistIdColumnLength = 32;
+    private const int ChecklistIdColumnLength = ReviewLimits.MaxChecklistIdLength;
 
     /// <summary>
     ///     The width of the column that holds the meaning text of a signature.
@@ -204,6 +204,11 @@ internal sealed class ReviewCenterDbContext : DbContext
             // The review rules: independent reviewers are required unless an administrator switches the rule off. No
             // database default is declared, so the value always comes from the entity (true unless set otherwise)
             project.Property(p => p.RequireIndependentReviewers);
+
+            // The project's own checklist definition (JSON). NULL means the built-in default checklist. The text is
+            // not length-limited by the column: ChecklistValidator bounds it (ReviewLimits.MaxChecklistBytes) before
+            // it is ever stored
+            project.Property(p => p.ChecklistDefinition);
 
             // Evidence settings: seven boolean columns; the defaults match EvidenceSettings.Default. There is no
             // migration: the database is created from this model and recreated while the product is pre-release
