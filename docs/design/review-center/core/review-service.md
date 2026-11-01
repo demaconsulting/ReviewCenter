@@ -160,8 +160,9 @@ with nothing stored:
    in common"). The state of the earlier review does not matter: a review that is in review and one that is approved
    (both are the one stored state `Draft`) can be followed, and so can a follow-up (a chain). The new review always
    points to its immediate source; what it carried from older reviews keeps the mark of the immediate source.
-3. `IReviewStore.GetRecordAsync` reads the record of the earlier review and `FollowUpCarry.Compute` works out what is
-   carried (below).
+3. `IReviewStore.GetRecordAsync` reads the record of the earlier review, `IReviewStore.ListChecklistAnswersAsync` and
+   `ListChecklistSectionStatesAsync` read its review-level baseline rows (slot 0, what the earlier review itself carried),
+   and `FollowUpCarry.Compute` works out what is carried (below).
 4. Open threads of the earlier review whose file is not in the new review are never carried. Unless
    `acknowledgeDroppedThreads` is true they refuse the creation with the message from `FollowUpCarry.DroppedMessage`,
    which lists the files (at most 10, then "and N more"). When it is true they are dropped and counted in the audit
@@ -175,12 +176,20 @@ store saves them in one transaction with the audit entry and a failure creates n
 it is pure, reads no store and no clock, and is tested by itself). `Compute` takes the record of the earlier review,
 its files, the new review's files and checklist, and the creation time, and returns:
 
-- *Answers*: every Pass and N/A answer of the earlier review whose check identifier is in the checklist of the new
-  review with the same text (an ordinal comparison; the earlier review's frozen checklist is used). Outcome,
-  justification, answerer name, user name and time are kept, and the answer is marked `CarriedFromReviewId` with the
-  earlier review. Fail answers are not carried (they are the reason for the follow-up and are answered again). When the
-  earlier review has no checklist nothing is carried.
-- *Section states*: every not-applicable section of the earlier review whose section identifier is in the new
+- *Answers*: every Pass and N/A answer that the submitted ballots of the earlier review agree on (the row of the lowest
+  slot that gave it; a draft ballot, a pending check and a disputed check carry nothing) whose check identifier is in the
+  checklist of the new review with the same text (an ordinal comparison; the earlier review's frozen checklist is
+  used). Outcome, justification, answerer name, user name and time are kept, and the answer is marked
+  `CarriedFromReviewId` with the earlier review. Fail answers are not carried (they are the reason for the follow-up
+  and are answered again). When the earlier review has no checklist nothing is carried. When the earlier review is
+  itself a follow-up, `Compute` also receives its baseline rows (the optional `baselineAnswers` and `baselineSections`
+  arguments, the slot 0 rows that `PrepareFollowUpAsync` reads from the store) and carries them onward by the same
+  rules, so that a follow-up without a submitted ballot (for example one that has no reviewer slot) does not end the
+  chain. A baseline answer is used only for a check that no submitted ballot has an answer for, and a baseline
+  answer in a section that the ballots mark not applicable or dispute, or that the baseline marks not applicable, is not
+  carried: wherever a submitted ballot has a row, the ballots win.
+- *Section states*: every not-applicable section that the submitted ballots of the earlier review agree on, and every
+  not-applicable baseline section that no submitted ballot has a state for, whose section identifier is in the new
   checklist with the same title, with its reason, setter and time, marked in the same way.
 - *Threads*: in the order of the earlier threads. A resolved thread is counted (`ResolvedThreadsNotCarried`) and not
   carried. An open thread whose file is not in the new review goes to `DroppedThreadFiles` (sorted, distinct). Any

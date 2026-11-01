@@ -6,6 +6,8 @@
 build a small checklist and ballots in memory, call `Consolidate` and `IsComplete` directly, and check the standing of
 checks and sections, the counts, and the derived outcome. Separate tests check that only submitted ballots count, that
 wording never creates a dispute, that the order of the ballots does not matter, and that null input is refused.
+`BallotProjection` is verified with tests defined in `BallotProjectionTests.cs`, in the same way: the tests build a
+record with a checklist and ballots in memory and call `Consolidate` and `ForBallot` directly.
 
 #### Test Environment
 
@@ -27,6 +29,13 @@ N/A - standard test environment.
   status.
 - A submitted ballot shows the state submitted and any other ballot shows draft.
 - Null arguments are refused.
+- `BallotProjection.Consolidate` gives no view for a record without a checklist; an agreed check is answered with the
+  row of the lowest slot that answered it, and a disputed or pending check has no answer; drafts never contribute,
+  except the sole draft of a review with one slot when the number of slots is given; a section is not applicable
+  when the submitted ballots agree and disputed otherwise.
+- `BallotProjection.ForBallot` shows the rows of the viewer's own ballot, a draft included, marked as the viewer's own,
+  and an empty state that has not been started when the slot has no ballot.
+- Missing arguments of the projection are refused.
 
 #### Test Scenarios
 
@@ -109,3 +118,33 @@ tested by `BallotConsolidation_IsComplete_MissingAnswer_False`.
 
 **BallotConsolidation_IsComplete_NaSectionSkipsItems_True**: A section that the ballot marks as not applicable needs no
 answers. This scenario is tested by `BallotConsolidation_IsComplete_NaSectionSkipsItems_True`.
+
+**BallotProjection_Consolidate_NoChecklist_ReturnsNull**: A record without a checklist has no consolidated view. This
+scenario is tested by `BallotProjection_Consolidate_NoChecklist_ReturnsNull`.
+
+**BallotProjection_NullArguments_Throw**: A null record for `Consolidate` and a null definition for `ForBallot` are
+refused with an `ArgumentNullException`. This scenario is tested by `BallotProjection_NullArguments_Throw`.
+
+**BallotProjection_Consolidate_RepresentativeRow_IsTheLowestSlot**: Two submitted ballots agree on one check, disagree
+on another, and leave a third unanswered; the agreed check is answered with the row of the lowest slot, and the
+disputed and the pending check have no answer but their consolidation. This scenario is tested by
+`BallotProjection_Consolidate_RepresentativeRow_IsTheLowestSlot`.
+
+**BallotProjection_Consolidate_DraftBallots_AreIgnored**: A draft ballot, however far along, takes no part in the view.
+This scenario is tested by `BallotProjection_Consolidate_DraftBallots_AreIgnored`.
+
+**BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount**: The sole draft of a review with one slot
+gives answers when the number of slots 1 is given, and none when it is not given or when the review has two slots. This
+scenario is tested by `BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount`.
+
+**BallotProjection_Consolidate_Sections_AgreedNotApplicableAndDisputed**: A section that the submitted ballots agree
+is not applicable is not applicable and has the row of the lowest slot, a section on which they disagree is disputed,
+and the author blocked and no slot flags of the call are carried into the state. This scenario is tested by
+`BallotProjection_Consolidate_Sections_AgreedNotApplicableAndDisputed`.
+
+**BallotProjection_ForBallot_ShowsTheOwnDraft**: The state of a draft ballot shows its own answers and section states,
+the slot, and the state draft, and is marked as the viewer's own ballot. This scenario is tested by
+`BallotProjection_ForBallot_ShowsTheOwnDraft`.
+
+**BallotProjection_ForBallot_NoBallot_IsNotStarted**: A slot without a ballot gets an empty state that is not started
+and is marked as the viewer's own. This scenario is tested by `BallotProjection_ForBallot_NoBallot_IsNotStarted`.

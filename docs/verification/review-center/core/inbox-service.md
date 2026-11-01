@@ -143,6 +143,14 @@ unread again when another reviewer signs it after the last seen time. This scena
 unread again when someone else writes a comment after the last seen one. This scenario is tested by
 `InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread`.
 
+**InboxService_Unread_DraftBallotOfOtherSlot_Ignored**: A review to sign that the user has seen stays read when another
+reviewer answers a check in a draft ballot, because a draft is not part of the record. This scenario is tested by
+`InboxService_Unread_DraftBallotOfOtherSlot_Ignored`.
+
+**InboxService_Unread_SubmittedBallotOfOtherSlot_IsUnread**: A review to sign that the user has seen is unread again
+when another reviewer hands in a ballot after the last seen time. This scenario is tested by
+`InboxService_Unread_SubmittedBallotOfOtherSlot_IsUnread`.
+
 **InboxService_CountAsync_EqualsDistinctActionReviews**: The count is the number of distinct reviews that need action,
 not the number of rows and not the information rows. This scenario is tested by
 `InboxService_CountAsync_EqualsDistinctActionReviews`.

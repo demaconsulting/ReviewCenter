@@ -245,14 +245,16 @@ public class ReviewStoreSigningTests
     [Fact]
     public async Task ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments()
     {
-        // Arrange: a review with an answer, a section state and a thread with a comment
+        // Arrange: a review with a slot whose ballot holds an answer and a section state, and a thread with a comment
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
-        await db.Store.SetChecklistAnswerAsync(
+        var slot = await db.Store.AddSlotAsync(NewSlot(projectId), TestContext.Current.CancellationToken);
+        await db.Store.SetBallotAnswerAsync(
             new ChecklistAnswer
             {
                 ProjectId = projectId,
                 ReviewId = "REV-1",
+                SlotId = slot.Id,
                 ItemId = "REQ-01",
                 Outcome = ChecklistOutcome.Fail,
                 Justification = "Bad",
@@ -261,11 +263,12 @@ public class ReviewStoreSigningTests
                 AnsweredAt = _time
             },
             TestContext.Current.CancellationToken);
-        await db.Store.SetChecklistSectionStateAsync(
+        await db.Store.SetBallotSectionStateAsync(
             new ChecklistSectionState
             {
                 ProjectId = projectId,
                 ReviewId = "REV-1",
+                SlotId = slot.Id,
                 SectionId = "DES",
                 Applicable = false,
                 Reason = "None",
@@ -297,8 +300,9 @@ public class ReviewStoreSigningTests
         // Assert: the record has every covered part, and the digest follows the comment
         Assert.NotNull(record);
         Assert.Equal(TestContent.FingerprintA, record.ContentFingerprint);
-        Assert.Equal("REQ-01", record.Answers.Single().ItemId);
-        Assert.False(record.SectionStates.Single().Applicable);
+        var ballot = Assert.Single(record.Ballots);
+        Assert.Equal("REQ-01", ballot.Answers.Single().ItemId);
+        Assert.False(ballot.SectionStates.Single().Applicable);
         Assert.Equal(["First"], record.Threads.Single().Comments.Select(c => c.Text));
         Assert.NotEqual(before, after);
     }
@@ -526,6 +530,7 @@ public class ReviewStoreSigningTests
         {
             ProjectId = projectId,
             ReviewId = "REV-1",
+            SlotId = slot.Id,
             ItemId = "REQ-01",
             Outcome = ChecklistOutcome.Pass,
             AnsweredBy = "Ann",
@@ -536,6 +541,7 @@ public class ReviewStoreSigningTests
         {
             ProjectId = projectId,
             ReviewId = "REV-1",
+            SlotId = slot.Id,
             SectionId = "REQ",
             Applicable = false,
             Reason = "Not relevant",
@@ -549,8 +555,8 @@ public class ReviewStoreSigningTests
             ["comment"] = () => db.Store.AddCommentAsync(
                 projectId, "REV-1", thread.Id, new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "More", Created = _time }, cancellationToken),
             ["state"] = () => db.Store.ReopenThreadAsync(projectId, "REV-1", thread.Id, cancellationToken),
-            ["section"] = () => db.Store.SetChecklistSectionStateAsync(section, cancellationToken),
-            ["answer"] = () => db.Store.SetChecklistAnswerAsync(answer, cancellationToken),
+            ["section"] = () => db.Store.SetBallotSectionStateAsync(section, cancellationToken),
+            ["answer"] = () => db.Store.SetBallotAnswerAsync(answer, cancellationToken),
             ["add slot"] = () => db.Store.AddSlotAsync(NewSlot(projectId, 3, null), cancellationToken),
             ["update slot"] = () => db.Store.UpdateSlotAsync(projectId, "REV-1", slot.Id, 3, null, cancellationToken),
             ["remove slot"] = () => db.Store.RemoveSlotAsync(projectId, "REV-1", slot.Id, cancellationToken),
@@ -576,8 +582,7 @@ public class ReviewStoreSigningTests
         Assert.Equal(ReviewThreadState.Resolved, storedThread.State);
         Assert.Equal(2, storedThread.Comments.Count);
         Assert.Equal("Looks odd", storedThread.Comments[0].Text);
-        Assert.Empty(await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", cancellationToken));
-        Assert.Empty(await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-1", cancellationToken));
+        Assert.Empty(await db.Store.ListBallotsAsync(projectId, "REV-1", cancellationToken));
         Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
 
         // Act: reopen, then write again
@@ -587,10 +592,10 @@ public class ReviewStoreSigningTests
             new ReviewReopen(0, projectId, "REV-1", _time, "root", "Root", "Again", digest),
             AuditTestExtensions.Draft(),
             cancellationToken);
-        await db.Store.SetChecklistAnswerAsync(answer, cancellationToken);
+        await db.Store.SetBallotAnswerAsync(answer, cancellationToken);
 
         // Assert: the answer is stored now
-        Assert.Single(await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", cancellationToken));
+        Assert.Single(Assert.Single(await db.Store.ListBallotsAsync(projectId, "REV-1", cancellationToken)).Answers);
     }
 
     /// <summary>
@@ -1016,11 +1021,12 @@ public class ReviewStoreSigningTests
             ["comment"] = () => db.Store.AddCommentAsync(
                 projectId, "NOPE", 1, new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "More", Created = _time }, cancellationToken),
             ["state"] = () => db.Store.ReopenThreadAsync(projectId, "NOPE", 1, cancellationToken),
-            ["section"] = () => db.Store.SetChecklistSectionStateAsync(
+            ["section"] = () => db.Store.SetBallotSectionStateAsync(
                 new ChecklistSectionState
                 {
                     ProjectId = projectId,
                     ReviewId = "NOPE",
+                    SlotId = 1,
                     SectionId = "REQ",
                     Applicable = false,
                     Reason = "Not relevant",
@@ -1029,11 +1035,12 @@ public class ReviewStoreSigningTests
                     SetAt = _time
                 },
                 cancellationToken),
-            ["answer"] = () => db.Store.SetChecklistAnswerAsync(
+            ["answer"] = () => db.Store.SetBallotAnswerAsync(
                 new ChecklistAnswer
                 {
                     ProjectId = projectId,
                     ReviewId = "NOPE",
+                    SlotId = 1,
                     ItemId = "REQ-01",
                     Outcome = ChecklistOutcome.Pass,
                     AnsweredBy = "Ann",

@@ -35,18 +35,18 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     take effect (a method that returns <c>null</c> or <c>false</c>) records nothing.
 ///     The methods that change reviewed content (<see cref="AddThreadAsync"/>, <see cref="AddCommentAsync"/>,
 ///     <see cref="ReopenThreadAsync"/>, <see cref="ResolveThreadAsync"/>, <see cref="SetThreadKindAsync"/>,
-///     <see cref="SetCommentReportAsync"/>, <see cref="SetChecklistSectionStateAsync"/>,
-///     <see cref="SetChecklistAnswerAsync"/>, <see cref="SetBallotAnswerAsync"/>, <see cref="SetBallotSectionStateAsync"/>,
+///     <see cref="SetCommentReportAsync"/>, <see cref="SetBallotAnswerAsync"/>, <see cref="SetBallotSectionStateAsync"/>,
 ///     <see cref="SubmitBallotAsync"/>,
 ///     <see cref="AddSlotAsync"/>, <see cref="UpdateSlotAsync"/>, <see cref="RemoveSlotAsync"/> and, for the same reason of
 ///     "concluded means nothing changes", <see cref="UpdateDueDateAsync"/> and <see cref="UpdateReviewConclusionTextAsync"/>) must also refuse with
 ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded (see <see cref="ReviewLock"/>), checked inside
 ///     the same transaction as the change, so a signature that completes the conclusion at the same moment cannot be
 ///     overtaken by a change; nothing is stored then.
-///     The checklist answers and section states are held per reviewer slot: the legacy list and set methods
-///     (<see cref="ListChecklistAnswersAsync"/>, <see cref="ListChecklistSectionStatesAsync"/>,
-///     <see cref="SetChecklistAnswerAsync"/>, <see cref="SetChecklistSectionStateAsync"/>) and the record see only the
-///     review-level rows (<see cref="ChecklistAnswer.BaselineSlotId"/>), while the ballot methods
+///     The checklist answers and section states are held per reviewer slot: the list methods
+///     (<see cref="ListChecklistAnswersAsync"/>, <see cref="ListChecklistSectionStatesAsync"/>) see only the
+///     review-level rows (<see cref="ChecklistAnswer.BaselineSlotId"/>, the baseline a follow-up review carries, which
+///     belongs to no ballot and is no part of the record), while the
+///     record carries the ballots and the ballot methods
 ///     (<see cref="ListBallotsAsync"/>, <see cref="GetBallotAsync"/>, <see cref="SetBallotAnswerAsync"/>,
 ///     <see cref="SetBallotSectionStateAsync"/>, <see cref="SubmitBallotAsync"/>) work on the rows of one slot and
 ///     never touch the review-level rows.
@@ -623,42 +623,6 @@ public interface IReviewStore
     Task<IReadOnlyList<ChecklistAnswer>> ListChecklistAnswersAsync(
         int projectId,
         string reviewId,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    ///     Stores the review-level applicability of a checklist section, replacing an earlier one.
-    /// </summary>
-    /// <param name="state">
-    ///     The state to store. Must not be null; the review must exist; its <see cref="ChecklistSectionState.SlotId"/>
-    ///     must be <see cref="ChecklistAnswer.BaselineSlotId"/>.
-    /// </param>
-    /// <param name="audit">The audit draft of the change.</param>
-    /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the state is stored.</returns>
-    /// <exception cref="ArgumentException">
-    ///     Thrown when the state belongs to a slot; ballot rows are written with <see cref="SetBallotSectionStateAsync"/>.
-    /// </exception>
-    Task SetChecklistSectionStateAsync(
-        ChecklistSectionState state,
-        AuditDraft audit,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    ///     Stores the review-level answer to a checklist check, replacing an earlier answer.
-    /// </summary>
-    /// <param name="answer">
-    ///     The answer to store. Must not be null; the review must exist; its <see cref="ChecklistAnswer.SlotId"/> must be
-    ///     <see cref="ChecklistAnswer.BaselineSlotId"/>.
-    /// </param>
-    /// <param name="audit">The audit draft of the change.</param>
-    /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the answer is stored.</returns>
-    /// <exception cref="ArgumentException">
-    ///     Thrown when the answer belongs to a slot; ballot rows are written with <see cref="SetBallotAnswerAsync"/>.
-    /// </exception>
-    Task SetChecklistAnswerAsync(
-        ChecklistAnswer answer,
-        AuditDraft audit,
         CancellationToken cancellationToken = default);
 
     /// <summary>

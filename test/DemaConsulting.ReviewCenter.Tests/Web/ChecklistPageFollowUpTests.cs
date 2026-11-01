@@ -44,12 +44,22 @@ public class ChecklistPageFollowUpTests : PageTestBase
         var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         await Reviews.CreateDraftAsync(
             project.Id, "REV-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
-        await Checklists.SetAnswerAsync(
-            project.Id, "REV-1", "REQ-01", ChecklistOutcome.Fail, "Missing trace", TestActors.Bob, cancellationToken);
-        await Checklists.SetAnswerAsync(
-            project.Id, "REV-1", "REQ-02", ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
+        await SeatAsync(project.Id, "REV-1", "bob");
         await Checklists.SetSectionApplicabilityAsync(
             project.Id, "REV-1", "DES", false, "No design", TestActors.Bob, cancellationToken);
+        foreach (var item in DefaultChecklist.Current.Sections.Where(s => s.Id != "DES").SelectMany(s => s.Items))
+        {
+            var fails = item.Id == "REQ-01";
+            await Checklists.SetAnswerAsync(
+                project.Id,
+                "REV-1",
+                item.Id,
+                fails ? ChecklistOutcome.Fail : ChecklistOutcome.Pass,
+                fails ? "Missing trace" : null,
+                TestActors.Bob,
+                cancellationToken);
+        }
+
         await Reviews.CreateDraftAsync(
             project.Id,
             "REV-2",
@@ -83,8 +93,10 @@ public class ChecklistPageFollowUpTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail()
     {
-        // Arrange: REV-2 follows REV-1
+        // Arrange: REV-2 follows REV-1; bob holds the slot, so his draft ballot starts with the carried rows
         var projectId = await CreateFollowUpAsync();
+        await SeatAsync(projectId, "REV-2", "bob");
+        SignInAs("bob", "Bob", false);
 
         // Act
         var cut = RenderPage(projectId, "REV-2");
@@ -115,14 +127,19 @@ public class ChecklistPageFollowUpTests : PageTestBase
     {
         // Arrange: REV-2 follows REV-1 and the check is answered Pass there
         var projectId = await CreateFollowUpAsync();
+        await SeatAsync(projectId, "REV-2", "cyd");
+        var cyd = new Actor("cyd", "Cyd");
         await Checklists.SetAnswerAsync(
-            projectId, "REV-2", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Cy, TestContext.Current.CancellationToken);
+            projectId, "REV-2", "REQ-01", ChecklistOutcome.Pass, null, cyd, TestContext.Current.CancellationToken);
+        SignInAs("cyd", "Cyd", false);
 
         // Act
         var follow = RenderPage(projectId, "REV-2");
         var earlier = RenderPage(projectId, "REV-1");
 
-        // Assert: the new answer is the follow-up's own, so there is no mark and no earlier Fail
+        // Assert: the new answer is the follow-up's own, so there is no mark and no earlier Fail (the finished checklist
+        // shows no open section, so the section is opened first)
+        await follow.Find("[data-testid='section-req-toggle']").ClickAsync();
         Assert.Empty(follow.FindAll("[data-testid='check-earlier-fail-req-01']"));
         Assert.Empty(follow.FindAll("[data-testid='check-carried-req-01']"));
         Assert.NotEmpty(follow.FindAll("[data-testid='check-carried-req-02']"));
@@ -146,6 +163,7 @@ public class ChecklistPageFollowUpTests : PageTestBase
         await SetChecklistAsync(project.Id, Definition("custom-1", "Is it right?"));
         await Reviews.CreateDraftAsync(
             project.Id, "REV-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
+        await SeatAsync(project.Id, "REV-1", "bob");
         foreach (var item in new[] { "ck-01", "ck-02" })
         {
             await Checklists.SetAnswerAsync(

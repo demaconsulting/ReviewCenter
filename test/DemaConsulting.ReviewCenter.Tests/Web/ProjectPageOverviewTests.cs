@@ -97,14 +97,15 @@ public class ProjectPageOverviewTests : PageTestBase
             await Reviews.CreateDraftAsync(project.Id, id, title, [new("a.txt", TestContent.A)], token);
         }
 
-        await AnswerAllAsync(project.Id, "REV-A");
         var slotA = await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-A", ann.Id, null, token);
+        await AnswerAllAsync(project.Id, "REV-A");
         var approvalA = await Signing.GetApprovalAsync(project.Id, "REV-A", token);
         await Signing.SignAsync(TestActors.Ann, project.Id, "REV-A", slotA.Id, approvalA!.Digest, Password, token);
 
-        await AnswerAllAsync(project.Id, "REV-B");
         var slotB = await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-B", ann.Id, null, token);
         await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-B", bob.Id, null, token);
+        await AnswerAllAsync(project.Id, "REV-B");
+        await Checklists.SubmitBallotAsync(project.Id, "REV-B", TestActors.Ann, token);
         var approvalB = await Signing.GetApprovalAsync(project.Id, "REV-B", token);
         await Signing.SignAsync(TestActors.Ann, project.Id, "REV-B", slotB.Id, approvalB!.Digest, Password, token);
 
@@ -112,6 +113,7 @@ public class ProjectPageOverviewTests : PageTestBase
         var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
         await Checklists.SetAnswerAsync(
             project.Id, "REV-B", first.Id, ChecklistOutcome.Fail, "Wrong", TestActors.Ann, token, [slotB.Id]);
+        await Checklists.SubmitBallotAsync(project.Id, "REV-B", TestActors.Ann, token, [slotB.Id]);
         await Threads.StartThreadAsync(project.Id, "REV-B", new ThreadAnchor("a.txt"), TestActors.Bob, "Look", token);
         await Reviews.SetDueDateAsync(project.Id, "REV-B", new DateOnly(2025, 3, 3), TestActors.Ann, token);
 
@@ -231,8 +233,8 @@ public class ProjectPageOverviewTests : PageTestBase
             new Review { ProjectId = project.Id, Id = "REV-NONE", Title = "No checklist", Created = DateTimeOffset.UtcNow },
             token);
         await Reviews.CreateDraftAsync(project.Id, "REV-OK", "Complete", [new("a.txt", TestContent.A)], token);
-        await AnswerAllAsync(project.Id, "REV-OK");
         await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-OK", ann.Id, null, token);
+        await AnswerAllAsync(project.Id, "REV-OK");
 
         // Act: render all rows, and the blocked rows
         var cut = RenderAt(project.Id);

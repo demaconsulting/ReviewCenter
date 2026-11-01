@@ -65,7 +65,8 @@ internal static class SignatureTestExtensions
 /// </summary>
 /// <remarks>
 ///     Slot 1 has the primary <c>rita</c> and the alternate <c>alex</c>, slot 2 has <c>sam</c> and slot 3 has
-///     <c>tess</c>. Nobody has signed when the world is created. The world is not thread-safe.
+///     <c>tess</c>. The owner of every slot (<c>rita</c>, <c>sam</c> and <c>tess</c>) has answered every check Pass and
+///     handed the ballot in. Nobody has signed when the world is created. The world is not thread-safe.
 /// </remarks>
 internal sealed class SignedReviewWorld
 {
@@ -154,7 +155,8 @@ internal sealed class SignedReviewWorld
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         var store = new FakeReviewStore();
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
         await TestServices.Reviews(store, clock).CreateDraftAsync(
             project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], cancellationToken);
@@ -166,13 +168,8 @@ internal sealed class SignedReviewWorld
             ids.Add(user.Id);
         }
 
-        var checklists = TestServices.Checklists(store, clock);
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await checklists.SetAnswerAsync(
-                project.Id, ReviewId, item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
-        }
-
+        // The slots come first: a person answers into the ballot of the own slot
+        var checklists = TestServices.Checklists(store, clock, userStore);
         var signing = TestServices.Signing(store, users, clock);
         var slots = new List<ReviewerSlot>
         {
@@ -180,6 +177,15 @@ internal sealed class SignedReviewWorld
             await signing.AddSlotAsync(ActorOf("rita"), project.Id, ReviewId, ids[2], null, cancellationToken),
             await signing.AddSlotAsync(ActorOf("rita"), project.Id, ReviewId, ids[3], null, cancellationToken)
         };
+
+        // The owner of every slot answers every check Pass and hands the ballot in, so the review is fully answered and
+        // every ballot counts
+        foreach (var owner in new[] { "rita", "sam", "tess" })
+        {
+            await AuditTestExtensions.AnswerAllAsync(checklists, project.Id, ReviewId, ActorOf(owner), cancellationToken);
+            await checklists.SubmitBallotAsync(project.Id, ReviewId, ActorOf(owner), cancellationToken);
+        }
+
         return new SignedReviewWorld(store, checklists, TestServices.Threads(store, clock), signing, project.Id, slots);
     }
 
@@ -197,6 +203,32 @@ internal sealed class SignedReviewWorld
         var digest = (await Signing.GetApprovalAsync(ProjectId, ReviewId, cancellationToken))!.Digest;
         await Signing.SignAsync(
             ActorOf(name), ProjectId, ReviewId, Slots[slotNumber - 1].Id, digest, Password, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Stores a signature of the primary of a slot for the record as it is now, straight into the store, so the
+    ///     rules of the signing service (a handed-in ballot, no dispute) do not apply.
+    /// </summary>
+    /// <param name="slotNumber">The number of the slot, 1 to 3.</param>
+    /// <returns>A task that completes when the signature is stored.</returns>
+    public async Task StoreSignatureAsync(int slotNumber)
+    {
+        var slot = Slots[slotNumber - 1];
+        var digest = (await Signing.GetApprovalAsync(ProjectId, ReviewId, TestContext.Current.CancellationToken))!.Digest;
+        await Store.AddSignatureAsync(
+            new ReviewSignature
+            {
+                ProjectId = ProjectId,
+                ReviewId = ReviewId,
+                SlotId = slot.Id,
+                UserId = slot.PrimaryUserId,
+                DisplayName = _names[slotNumber == 1 ? 0 : slotNumber],
+                Role = SlotRole.Primary,
+                SignedAt = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero),
+                RecordDigest = digest,
+                Meaning = "Reviewed and approved"
+            },
+            TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -222,7 +254,7 @@ internal sealed class SignedReviewWorld
     /// </summary>
     /// <param name="name">The user name, one of the names of the world.</param>
     /// <returns>The actor; the display name is the user name with a capital first letter.</returns>
-    private static Actor ActorOf(string name)
+    public static Actor ActorOf(string name)
     {
         return new Actor(name, char.ToUpperInvariant(name[0]) + name[1..]);
     }

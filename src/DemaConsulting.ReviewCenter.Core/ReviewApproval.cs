@@ -112,6 +112,16 @@ public sealed record SlotStatus(
 ///     <c>true</c> when the review has no checklist; the structured form of the "This review has no checklist."
 ///     blocker, so it is <c>true</c> exactly when that sentence is among <paramref name="Blockers"/>.
 /// </param>
+/// <param name="DisputedChecks">
+///     The number of checks and sections on which the submitted ballots disagree; the count behind the "reviewers
+///     disagree" blocker. Zero for a review without a checklist.
+/// </param>
+/// <param name="UnsubmittedBallots">
+///     The number of slots whose ballot has not been handed in (a draft, or none yet); zero for a review without a
+///     checklist. Every such slot counts, whatever the state of the answers. A single-slot review hands the ballot in
+///     with the last answer, but a complete single-slot draft that needs no answer (for example because all checks
+///     were carried over) is not handed in automatically, so it still counts one until it is submitted.
+/// </param>
 public sealed record ReviewApproval(
     bool IsApproved,
     string Digest,
@@ -122,4 +132,6 @@ public sealed record ReviewApproval(
     int OpenThreads = 0,
     int UnansweredChecks = 0,
     int FailedChecks = 0,
-    bool MissingChecklist = false);
+    bool MissingChecklist = false,
+    int DisputedChecks = 0,
+    int UnsubmittedBallots = 0);

@@ -53,7 +53,9 @@ N/A - standard test environment.
   system administrator, or the creator, never through a token, never for an approved review (`ReviewLocked`); a review
   is overdue only when the date has passed and it is not approved.
 - A review can be created as a follow-up of an earlier review of the same project: the Pass and N/A answers of checks
-  with unchanged wording, the not-applicable sections with the same title, and the open threads on files of the new
+  with unchanged wording that the submitted ballots of the earlier review agree on (and, for checks no submitted
+  ballot answered, those that the earlier review itself carried), the not-applicable sections with the same title
+  (taken in the same way), and the open threads on files of the new
   review are carried, marked with the earlier review, and stored with it in one step, each thread with its comments
   keeping their kinds and report flags (a Finding stays a Finding, chat stays chat, and the note about a moved anchor
   is a comment that is not included); Fail answers, resolved threads,
@@ -360,8 +362,9 @@ is read; any other text raises `DueDateInvalid`. This scenario is tested by
 memory and no store) and `ReviewServiceFollowUpTests.cs` (the real service, `FakeReviewStore`, and a fixed clock; the
 repository paths use a fake git provider and the real `RepositoryService`).
 
-**FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer**: Pass and N/A answers of checks
-that are in the new checklist with the same wording are carried with their outcome, justification, answerer and time,
+**FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer**: Pass and N/A answers that the
+submitted ballots agree on, of checks that are in the new checklist with the same wording, are carried with their
+outcome, justification, answerer and time,
 marked with the earlier review. This scenario is tested by
 `FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer`.
 
@@ -376,6 +379,18 @@ no answer and no section state. This scenario is tested by
 **FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame**: A not-applicable section with the
 same title is carried with its reason; one with another title, one that is gone, and a section that applies are not.
 This scenario is tested by `FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame`.
+
+**FollowUpCarry_Compute_SourceWithOnlyBaselineRows_CarriesTheBaselineOnward**: An earlier review that has no submitted
+ballot but holds baseline rows (the slot 0 rows that it carried itself, given to `Compute`) carries its Pass and N/A
+baseline answers and its not-applicable baseline section onward, with the original answerer and time and marked with the
+earlier review, but not the answer of a check inside the not-applicable section. This scenario is tested by
+`FollowUpCarry_Compute_SourceWithOnlyBaselineRows_CarriesTheBaselineOnward`.
+
+**FollowUpCarry_Compute_SubmittedBallotWinsOverBaseline**: Where a submitted ballot has an answer or a section state
+(here a Fail against a baseline Pass, a Pass against a baseline N/A, and an applicable section against a not-applicable
+baseline section), the ballot wins and the baseline row is not used; a check or section that no submitted ballot has a
+row for is filled in from the baseline. This scenario is tested by
+`FollowUpCarry_Compute_SubmittedBallotWinsOverBaseline`.
 
 **FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim**: An open thread on a file of the new review is
 carried open with every comment (author, user name, text, time) unchanged, its original time, and the marks of the
@@ -481,6 +496,11 @@ when no thread is dropped. This scenario is tested by
 **ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource**: An approved earlier review can be
 followed, and a follow-up of a follow-up points to the one before it, and what it carries is marked with that review.
 This scenario is tested by `ReviewService_CreateDraftAsync_ApprovedSourceAndChain_PointToTheImmediateSource`.
+
+**ReviewService_FollowUp_ChainThroughReviewWithoutSlot_CarriesOnward**: A follow-up that has no reviewer slot (and so no
+submitted ballot) is followed by a third review, which carries the answers and the not-applicable section that the
+second one carried, still naming the original answerer and marked with the second review. This scenario is tested by
+`ReviewService_FollowUp_ChainThroughReviewWithoutSlot_CarriesOnward`.
 
 **ReviewService_CreateFromSessionAsync_ReviewSet_MustMatch**: Reviews planned from the same review-set fit, and from
 different sets are refused with `FollowUpInvalid`. This scenario is tested by

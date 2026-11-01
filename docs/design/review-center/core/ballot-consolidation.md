@@ -10,6 +10,12 @@ everything it has to. It is a pure, static unit with no state, no file system, d
 thread-safe. The record of a review, and so what a signature binds to, must depend only on what the reviewers have
 handed in and agree on, which is why only submitted ballots take part.
 
+The unit also holds `BallotProjection`, a second static class that projects the ballots of a `ReviewRecord` into the
+views that the rest of the application reads: the consolidated standing of the review (`ConsolidatedView`) and the
+checklist state of one ballot. Progress, blockers, the inbox, the attestation, and the carry-over of a follow-up read
+the checklist through it, and `RecordDigest` consolidates the same submitted ballots, so each of them sees the same
+agreed standing.
+
 #### Data Model
 
 **Ballot** (record): the answers of one reviewer slot.
@@ -37,6 +43,14 @@ handed in and agree on, which is why only submitted ballots take part.
 - **Agreed**, **Disputed**, **Pending**, **Failed**: `int` — the counts of checks (a disputed section counts as one
   dispute, so that the first three add up to the listed checks plus the disputed sections).
 - **BallotsSubmitted**, **BallotsTotal**: `int`.
+
+**ConsolidatedView** (record): the consolidated standing of a record together with the checklist state that reads
+from it.
+
+- **State**: `ChecklistState` — the checklist state of the agreed standing: an agreed check is answered with the row of
+  the lowest slot that answered it, an agreed not-applicable section has the row of the lowest slot that marked it, and
+  a pending or disputed check has no answer. It carries the consolidation (`ChecklistState.Consolidation`).
+- **Result**: `BallotConsolidationResult` — the consolidation that the state was built from.
 
 #### Key Methods
 
@@ -74,18 +88,59 @@ disagrees turns an agreed check into a disputed one.
 - *Algorithm*: For each section that the ballot does not mark as not applicable, look for an answer for each item. The
   status of the ballot is not looked at, so that a draft can be asked whether it is ready to be submitted.
 
+**BallotProjection.Consolidate**: Consolidates the ballots of a record and builds the checklist state that reads from
+the agreed standing.
+
+- *Signature*: `ConsolidatedView? Consolidate(ReviewRecord record, int? slotCount = null, bool authorBlocked = false,
+  bool noSlot = false)`.
+- *Parameters*: `record` — the record, whose `Ballots` hold all ballots, drafts included; `slotCount` — the number of
+  slots of the review when the sole ballot of a single-slot review is to count as submitted for progress and blockers,
+  and `null` (the default) to read the submitted ballots only, as the digest does; `authorBlocked` and `noSlot` — the
+  values of `ChecklistState.AuthorBlocked` and `ChecklistState.NoSlot` for the state.
+- *Returns*: `ConsolidatedView?` — `null` when the review has no checklist.
+- *Preconditions*: `record` is not null.
+- *Algorithm*:
+  - Parse the frozen checklist of the record. When `slotCount` is 1 and the record holds exactly one ballot that is a
+    draft, read that ballot as submitted. A review with one slot has no second reviewer to agree with and no separate
+    hand-in step, so its partly answered checklist shows its true progress; the digest never does this.
+  - Call `BallotConsolidation.Consolidate` for the checklist and the ballots.
+  - For every agreed check take the answer row of the lowest slot that answered it, and for every agreed
+    not-applicable section the section row of the lowest submitted slot that marked it. Drafts never contribute, and a
+    pending or disputed check has no row.
+  - Build the `ChecklistState` from the sections and the answers, with the consolidation, `AuthorBlocked`, and
+    `NoSlot`.
+
+**BallotProjection.ForBallot**: Builds the checklist state of one ballot, a draft included.
+
+- *Signature*: `ChecklistState ForBallot(ChecklistDefinition definition, int slotId, Ballot? ballot,
+  bool authorBlocked = false)`.
+- *Parameters*: `definition` — the frozen checklist; `slotId` — the slot that the ballot belongs to; `ballot` — the
+  ballot, or `null` when the slot has none yet; `authorBlocked` — the value of `ChecklistState.AuthorBlocked`.
+- *Returns*: `ChecklistState` — the rows of the ballot (an empty state for no ballot), marked as the viewer's own
+  ballot (`IsOwnBallot`), with the slot, and the ballot state: `Draft` or `Submitted`, or `NotStarted` for no ballot.
+- *Preconditions*: `definition` is not null.
+- *Postconditions*: No consolidation is attached to the state, and it never holds the rows of another slot.
+
 #### Error Handling
 
 `Consolidate` and `IsComplete` raise `ArgumentNullException` for a null argument, and `Consolidate` raises
 `ArgumentException` for a ballot list that holds a null element or two ballots of one slot. No other error arises: any
 other combination of ballots has a defined standing. Should a ballot repeat the answer to a check or the state of a
-section, the last entry wins.
+section, the last entry wins. `BallotProjection.Consolidate` raises `ArgumentNullException` for a null record and
+`BallotProjection.ForBallot` for a null definition; the projection otherwise adds the errors of `Consolidate`, and
+`IsComplete` as they are.
 
 #### Dependencies
 
 - **ChecklistDefinition**, **ChecklistAnswer**, **ChecklistSectionState**, **ChecklistOutcome** — Core.
+- **ReviewRecord**, **ReviewChecklist**, and **ChecklistState** — Core; read by `BallotProjection`.
 
 #### Callers
 
-- **Ballot storage and the review pages** (a later slice) — consolidate the ballots that are stored for a review and
-  test a ballot before it is submitted.
+- **RecordDigest** — consolidates the submitted ballots of a record to write the standing of the checks, the sections,
+  and the outcome.
+- **BallotProjection** — read by `ChecklistService`, `SigningService`, `InboxRules`, `FollowUpCarry`, and
+  `AttestationService`, which build their view of the checklist from the consolidation of the submitted ballots, and
+  shows a reviewer the reviewer's own ballot.
+- **Ballot storage and the review pages** — consolidate the ballots that are stored for a review and test a ballot
+  before it is submitted (`IsComplete`), through `ChecklistService`.

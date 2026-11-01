@@ -34,44 +34,17 @@ public class RecordDigestFollowUpTests
     private static readonly DateTimeOffset _time = new(2025, 3, 4, 5, 6, 7, TimeSpan.Zero);
 
     /// <summary>
-    ///     Builds a record with one answer, one section that does not apply and one thread, each optionally marked as
-    ///     carried from a review.
+    ///     Builds a record with one thread, optionally marked as carried from a review, and optionally following one.
     /// </summary>
+    /// <remarks>
+    ///     The carried answers and section states of a follow-up are baseline rows that belong to no ballot, so they are
+    ///     not part of the record the digest covers; only the thread marker is.
+    /// </remarks>
     /// <param name="follows">The review the record follows, or <c>null</c>.</param>
-    /// <param name="answerFrom">The review the answer was carried from, or <c>null</c>.</param>
-    /// <param name="sectionFrom">The review the section state was carried from, or <c>null</c>.</param>
     /// <param name="threadFrom">The review the thread was carried from, or <c>null</c>.</param>
     /// <returns>The record.</returns>
-    private static ReviewRecord Record(
-        string? follows = null,
-        string? answerFrom = null,
-        string? sectionFrom = null,
-        string? threadFrom = null)
+    private static ReviewRecord Record(string? follows = null, string? threadFrom = null)
     {
-        var answer = new ChecklistAnswer
-        {
-            ProjectId = 1,
-            ReviewId = "rev-1",
-            ItemId = "REQ-01",
-            Outcome = ChecklistOutcome.Pass,
-            Justification = "ok",
-            AnsweredBy = "Ann",
-            AnsweredByUsername = "ann",
-            AnsweredAt = _time,
-            CarriedFromReviewId = answerFrom
-        };
-        var section = new ChecklistSectionState
-        {
-            ProjectId = 1,
-            ReviewId = "rev-1",
-            SectionId = "DES",
-            Applicable = false,
-            Reason = "none",
-            SetBy = "Ann",
-            SetByUsername = "ann",
-            SetAt = _time,
-            CarriedFromReviewId = sectionFrom
-        };
         var thread = new ReviewThread
         {
             Id = 1,
@@ -98,7 +71,7 @@ public class RecordDigestFollowUpTests
                 }
             ]
         };
-        return new ReviewRecord("abc", null, [section], [answer], [thread], ReviewSource.Upload, 0, follows);
+        return new ReviewRecord("abc", null, [], [thread], ReviewSource.Upload, 0, follows);
     }
 
     /// <summary>
@@ -110,7 +83,7 @@ public class RecordDigestFollowUpTests
     public void RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest()
     {
         // Arrange: the smallest known record with and without the explicit null, and a full record without markers
-        var legacy = new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload);
+        var legacy = new ReviewRecord("abc", null, [], [], ReviewSource.Upload);
         var explicitNone = legacy with { FollowsReviewId = null };
         var full = Record();
 
@@ -118,7 +91,7 @@ public class RecordDigestFollowUpTests
         var canonical = RecordDigest.Canonicalize(full);
 
         // Assert: the digest is the pinned v2 value, and neither text mentions a follow-up
-        Assert.Equal("eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3", RecordDigest.Compute(legacy));
+        Assert.Equal("4c93e63f9251787ecc5a267ee3d3f28922757b299294add1709bf8a401fad5cd", RecordDigest.Compute(legacy));
         Assert.Equal(RecordDigest.Compute(legacy), RecordDigest.Compute(explicitNone));
         Assert.StartsWith("ReviewCenter record v2\n", canonical, StringComparison.Ordinal);
         Assert.DoesNotContain("follows", canonical, StringComparison.Ordinal);
@@ -127,13 +100,13 @@ public class RecordDigestFollowUpTests
 
     /// <summary>
     ///     Test that the follow-up lines have exactly the documented shape: the <c>follows</c> line straight after the
-    ///     source block and the <c>carried</c> suffix at the end of the answer, section and thread lines.
+    ///     source block and the <c>carried</c> suffix at the end of the thread line.
     /// </summary>
     [Fact]
     public void RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat()
     {
-        // Arrange: a record that follows rev-0 and carries all three kinds of row
-        var record = Record("rev-0", "rev-0", "rev-0", "rev-0");
+        // Arrange: a record that follows rev-0 and carries its thread
+        var record = Record("rev-0", "rev-0");
         var ticks = _time.UtcTicks;
 
         // Act
@@ -147,10 +120,9 @@ public class RecordDigestFollowUpTests
             "source upload",
             "follows 5:rev-0",
             "checklist -",
-            "answers",
-            "answer 6:REQ-01 4:Pass 2:ok 3:Ann 3:ann carried 5:rev-0",
+            "checks",
             "sections",
-            "not-applicable 3:DES 4:none carried 5:rev-0",
+            "outcome none",
             "report",
             "thread file 5:a.txt 4:Head 1 2 carried 5:rev-0",
             $"claim 3:Ann 3:ann 10:Please fix {ticks}");
@@ -158,26 +130,18 @@ public class RecordDigestFollowUpTests
     }
 
     /// <summary>
-    ///     Test that each marker changes the digest: the followed review, and for each kind of row the review it was
-    ///     carried from, so a carried row and a row given in the review never share a digest.
+    ///     Test that each marker changes the digest: the followed review and the review a thread was carried from, so a
+    ///     carried thread and a thread started in the review never share a digest.
     /// </summary>
     /// <param name="change">Which marker differs from the baseline.</param>
     [Theory]
     [InlineData("follows")]
-    [InlineData("answer")]
-    [InlineData("section")]
     [InlineData("thread")]
     public void RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest(string change)
     {
         // Arrange: a baseline that follows rev-0 and the same record with one marker different or absent
-        var baseline = Record("rev-0", "rev-0", "rev-0", "rev-0");
-        var changed = change switch
-        {
-            "follows" => Record("rev-9", "rev-0", "rev-0", "rev-0"),
-            "answer" => Record("rev-0", null, "rev-0", "rev-0"),
-            "section" => Record("rev-0", "rev-0", "rev-9", "rev-0"),
-            _ => Record("rev-0", "rev-0", "rev-0", null)
-        };
+        var baseline = Record("rev-0", "rev-0");
+        var changed = change == "follows" ? Record("rev-9", "rev-0") : Record("rev-0", null);
 
         // Act, Assert: the digests differ, and a record that follows nothing differs from the baseline too
         Assert.NotEqual(RecordDigest.Compute(baseline), RecordDigest.Compute(changed));
@@ -192,7 +156,7 @@ public class RecordDigestFollowUpTests
     public void RecordDigest_Compute_CarriedFromThreadId_NotCovered()
     {
         // Arrange: two records whose carried thread came from different thread identities
-        var one = Record("rev-0", threadFrom: "rev-0");
+        var one = Record("rev-0", "rev-0");
         var other = one with
         {
             Threads = [new ReviewThread

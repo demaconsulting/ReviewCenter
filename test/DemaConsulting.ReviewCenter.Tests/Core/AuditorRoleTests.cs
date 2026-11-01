@@ -343,6 +343,17 @@ public class AuditorRoleTests
     private static async Task SignDirectlyAsync(World world, int slotId, int userId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+
+        // The store signs only a handed-in ballot; an empty one is enough for these tests of the role rules
+        await world.Store.SubmitBallotAsync(
+            world.Own,
+            "rev-1",
+            slotId,
+            _now,
+            "root",
+            AuditDraft.By(new Actor("root", "root"), "ballot.submitted", "test", world.Own, "rev-1"),
+            _ => true,
+            cancellationToken);
         var record = (await world.Store.GetRecordAsync(world.Own, "rev-1", cancellationToken))!;
         await world.Store.AddSignatureAsync(
             new ReviewSignature

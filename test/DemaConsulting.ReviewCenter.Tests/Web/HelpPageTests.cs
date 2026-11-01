@@ -133,7 +133,8 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("no changes allowed", text, StringComparison.Ordinal);
         Assert.Contains("code signing only is used, not refused for that reason", text, StringComparison.Ordinal);
         Assert.Contains("does not check the certificate chain or revocation", text, StringComparison.Ordinal);
-        Assert.Contains("who answered it and when", text, StringComparison.Ordinal);
+        Assert.Contains("consolidated agreed answer of the submitted ballots", text, StringComparison.Ordinal);
+        Assert.Contains("shows as <em>Not answered</em>", text, StringComparison.Ordinal);
     }
 
     /// <summary>

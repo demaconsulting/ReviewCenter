@@ -159,7 +159,7 @@ public class ReviewPlannerGitTests
             origin,
             planner,
             signing,
-            TestServices.Checklists(db.Store, clock),
+            TestServices.Checklists(db.Store, clock, db.Users),
             db.Store,
             project.Id,
             repository.Id,
@@ -199,7 +199,7 @@ public class ReviewPlannerGitTests
     }
 
     /// <summary>
-    ///     Signs a review: answers the whole checklist, adds a slot for ann and lets ann sign it.
+    ///     Signs a review: adds a slot for ann, lets ann answer the whole checklist in it and sign.
     /// </summary>
     /// <param name="s">The scenario.</param>
     /// <param name="reviewId">The review to sign.</param>
@@ -207,13 +207,13 @@ public class ReviewPlannerGitTests
     private static async Task SignAsync(Scenario s, string reviewId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var slot = await s.Signing.AddSlotAsync(TestActors.Ann, s.ProjectId, reviewId, s.AnnId, null, cancellationToken);
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await s.Checklists.SetAnswerAsync(
                 s.ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
         }
 
-        var slot = await s.Signing.AddSlotAsync(TestActors.Ann, s.ProjectId, reviewId, s.AnnId, null, cancellationToken);
         var digest = (await s.Signing.GetApprovalAsync(s.ProjectId, reviewId, cancellationToken))!.Digest;
         await s.Signing.SignAsync(TestActors.Ann, s.ProjectId, reviewId, slot.Id, digest, Password, cancellationToken);
     }

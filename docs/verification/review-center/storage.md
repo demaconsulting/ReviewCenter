@@ -213,13 +213,15 @@ answers, sections, and threads in the one transaction of the review, so that a c
 a new answer or section state replaces a carried row without its marker, and the index on the project and the followed
 review exists. They are tested by `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`,
 `ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing`,
-`ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`, and
+`ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`, and
 `ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview`, all defined in `ReviewFollowUpStoreTests.cs`.
 
 **Ballots**: The answers and section states of a reviewer slot are stored as the ballot of that slot with a status row,
-apart from the review-level rows that the record uses; a hand-in is a compare-and-set that refuses an incomplete ballot;
+apart from the review-level rows that a follow-up review carries as its baseline; the record carries all ballots, drafts
+included; a hand-in is a compare-and-set that refuses an incomplete ballot;
 and the slot methods seed, reassign, and remove the ballot rows in their own transactions with one audit entry for each
 transition. They are tested by `ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot`,
+`ReviewStore_GetRecordAsync_BallotRows_AreInTheRecordAsBallots`,
 `ReviewStore_SubmitBallotAsync_CompleteDraft_SubmitsWithAudit`,
 `ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft`,
 `ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows`, and

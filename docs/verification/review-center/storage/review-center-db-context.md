@@ -115,13 +115,13 @@ that names none of the new columns; it reads back as chat with the kind Comment,
 column is the text "Comment". This scenario is tested by
 `ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment`.
 
-**ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem**: A check is answered twice and another check once; the
-database holds one row per check, the first with the latest answer. This scenario is tested by
-`ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem`.
+**ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem**: A check is answered twice in the ballot of a slot and another
+check once; the database holds one row per check for the slot, the first with the latest answer. This scenario is
+tested by `ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem`.
 
-**ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection**: A section state is set twice; the database
-holds one row for the section with the latest state. This scenario is tested by
-`ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection`.
+**ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection**: A section state is set twice in the ballot of a slot;
+the database holds one row for the section and the slot with the latest state. This scenario is tested by
+`ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection`.
 
 **UserStore_AddAsync_User_RoundTripsEveryField**: A user is stored with every field set and a supplied identity;
 the database assigns its own identity and every value is read back, which verifies the users table. This scenario is

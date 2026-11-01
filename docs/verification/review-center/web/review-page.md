@@ -596,6 +596,18 @@ is tested by `ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing`.
 alternate dropped, and Save shows the change ("None" for the alternate); Remove then removes the slot and the empty
 message returns. This scenario is tested by `ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves`.
 
+**ReviewPage_EditSlot_ChangeAltersSignedRecord_WarnsAndStoresOnlyOnConfirm**: The alternate of the first slot has
+handed in a ballot that disagrees, and the second slot holds a signature of that record. Dropping the alternate would
+take his answers out of the record, so Save shows the signature warning naming "Slot 2 (Cyd)" and stores nothing;
+Cancel removes the warning and still stores nothing; Save and Confirm store the change ("None" for the alternate) and
+the signature of the second slot is then out of date. This scenario is tested by
+`ReviewPage_EditSlot_ChangeAltersSignedRecord_WarnsAndStoresOnlyOnConfirm`.
+
+**ReviewPage_RemoveSlot_RemovalAltersSignedRecord_WarnsAndRemovesOnlyOnConfirm**: In the same review, Remove on the
+first slot shows the signature warning naming "Slot 2 (Cyd)" and removes nothing; Cancel removes the warning and the
+slot stays; Remove and Confirm remove the slot and the signature of the second slot is then out of date. This
+scenario is tested by `ReviewPage_RemoveSlot_RemovalAltersSignedRecord_WarnsAndRemovesOnlyOnConfirm`.
+
 **ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem**: A slot has ann as primary and bob as
 alternate, and the page is rendered while both are members: no marker is shown. After bob left the project only the
 alternate carries "No longer a project member"; after ann left too, both do, and the hint of the slot is shown. This

@@ -384,6 +384,63 @@ public abstract class PageTestBase : BunitContext
     }
 
     /// <summary>
+    ///     Seats a user as the primary reviewer of a new reviewer slot of a review, without the rules of the signing
+    ///     service (membership, independence), and creates the user when the store does not know the user yet.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review id.</param>
+    /// <param name="username">The user name of the reviewer; the display name is the capitalized user name.</param>
+    /// <param name="alternate">The user name of the alternate reviewer, or <c>null</c> for none.</param>
+    /// <returns>The identity of the slot.</returns>
+    protected async Task<int> SeatAsync(int projectId, string reviewId, string username, string? alternate = null)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var primaryId = await EnsureUserAsync(username);
+        int? alternateId = alternate is null ? null : await EnsureUserAsync(alternate);
+        foreach (var userId in new[] { primaryId, alternateId ?? primaryId }.Distinct())
+        {
+            if (await Store.GetMembershipAsync(userId, projectId, cancellationToken) is null)
+            {
+                await Store.AddMembershipAsync(userId, projectId, cancellationToken);
+            }
+        }
+        var slot = await Store.AddSlotAsync(
+            new ReviewerSlot
+            {
+                ProjectId = projectId,
+                ReviewId = reviewId,
+                PrimaryUserId = primaryId,
+                AlternateUserId = alternateId
+            },
+            cancellationToken);
+        return slot.Id;
+    }
+
+    /// <summary>
+    ///     Finds a user by user name, or creates the user.
+    /// </summary>
+    /// <param name="username">The user name; the display name is the capitalized user name.</param>
+    /// <returns>The identity of the user.</returns>
+    private async Task<int> EnsureUserAsync(string username)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var existing = await UserStore.GetByUsernameAsync(username, cancellationToken);
+        if (existing is not null)
+        {
+            return existing.Id;
+        }
+
+        // The ambient user of the page tests (ann) is a system administrator, as in the page authentication state
+        var created = await Users.CreateAsync(
+            username,
+            char.ToUpperInvariant(username[0]) + username[1..],
+            username == "ann",
+            "correct horse battery",
+            cancellationToken);
+        return created.Id;
+    }
+
+    /// <summary>
     ///     Removes the membership of a user in a project, as an administrator would while the user still has a page open.
     /// </summary>
     /// <param name="projectId">The project identity.</param>

@@ -59,9 +59,14 @@ internal sealed class InboxTestWorld
         Inbox = new InboxService(InboxStore, Store, Access, UserStore, Clock);
         Reviews = TestServices.Reviews(Store, Clock);
         Threads = TestServices.Threads(Store, Clock);
-        Checklists = TestServices.Checklists(Store, Clock);
+        Checklists = TestServices.Checklists(Store, Clock, UserStore);
         Signing = TestServices.Signing(Store, Users, Clock);
     }
+
+    /// <summary>
+    ///     The reviews that <see cref="AnswerAllAsync"/> marked as answered by every reviewer seated.
+    /// </summary>
+    private readonly HashSet<string> _answeredReviews = [];
 
     /// <summary>
     ///     Gets the review store.
@@ -189,21 +194,24 @@ internal sealed class InboxTestWorld
     }
 
     /// <summary>
-    ///     Answers every check of the review as Pass.
+    ///     Marks the review as answered: every reviewer seated in a slot of it (now or later) answers every check Pass
+    ///     and hands the ballot in. A person answers into the ballot of the own slot, so the answers are written as
+    ///     the slots are seated.
     /// </summary>
     /// <param name="reviewId">The review identifier.</param>
-    /// <returns>A task that completes when all checks are answered.</returns>
+    /// <returns>A task that completes when the seated reviewers have answered.</returns>
     public async Task AnswerAllAsync(string reviewId)
     {
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        _answeredReviews.Add(reviewId);
+        foreach (var slot in await Store.ListSlotsAsync(ProjectId, reviewId, TestContext.Current.CancellationToken))
         {
-            await Checklists.SetAnswerAsync(
-                ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, ActorOf("eve"), TestContext.Current.CancellationToken);
+            await AnswerAsSlotOwnerAsync(reviewId, slot);
         }
     }
 
     /// <summary>
-    ///     Answers one check of the review as Fail.
+    ///     Answers one check of the review as Fail in the ballot of a user, who is seated in a slot of the review
+    ///     when the user holds none.
     /// </summary>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="by">The user name of the user who answers.</param>
@@ -211,9 +219,16 @@ internal sealed class InboxTestWorld
     /// <returns>A task that completes when the answer is stored.</returns>
     public async Task FailCheckAsync(string reviewId, string by, int itemIndex = 0)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var item = DefaultChecklist.Current.Sections[0].Items[itemIndex];
+        var slots = await Store.ListSlotsAsync(ProjectId, reviewId, cancellationToken);
+        if (!slots.Any(s => s.PrimaryUserId == Ids[by] || s.AlternateUserId == Ids[by]))
+        {
+            await Signing.AddSlotAsync(ActorOf("author"), ProjectId, reviewId, Ids[by], null, cancellationToken);
+        }
 
         // The change may make a signature out of date; the signed slots are acknowledged
+        var acknowledged = await Store.CurrentlySignedSlotIdsAsync(ProjectId, reviewId);
         await Checklists.SetAnswerAsync(
             ProjectId,
             reviewId,
@@ -221,26 +236,57 @@ internal sealed class InboxTestWorld
             ChecklistOutcome.Fail,
             "It is wrong",
             ActorOf(by),
-            TestContext.Current.CancellationToken,
-            await Store.CurrentlySignedSlotIdsAsync(ProjectId, reviewId));
+            cancellationToken,
+            acknowledged);
+
+        // A complete ballot is handed in again, so that the answer counts in the record; an incomplete one stays a draft
+        try
+        {
+            await Checklists.SubmitBallotAsync(ProjectId, reviewId, ActorOf(by), cancellationToken, acknowledged);
+        }
+        catch (DomainRuleException exception) when (exception.Rule == DomainRule.BallotIncomplete)
+        {
+            // The ballot has other checks to answer
+        }
     }
 
     /// <summary>
-    ///     Adds a reviewer slot.
+    ///     Adds a reviewer slot; when the review is marked answered by <see cref="AnswerAllAsync"/>, the primary
+    ///     reviewer of the slot answers every check Pass and hands the ballot in.
     /// </summary>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="primary">The user name of the primary reviewer.</param>
     /// <param name="alternate">The user name of the alternate reviewer, or <c>null</c> for none.</param>
     /// <returns>The slot.</returns>
-    public Task<ReviewerSlot> AddSlotAsync(string reviewId, string primary, string? alternate = null)
+    public async Task<ReviewerSlot> AddSlotAsync(string reviewId, string primary, string? alternate = null)
     {
-        return Signing.AddSlotAsync(
+        var slot = await Signing.AddSlotAsync(
             ActorOf("author"),
             ProjectId,
             reviewId,
             Ids[primary],
             alternate is null ? null : Ids[alternate],
             TestContext.Current.CancellationToken);
+        if (_answeredReviews.Contains(reviewId))
+        {
+            await AnswerAsSlotOwnerAsync(reviewId, slot);
+        }
+
+        return slot;
+    }
+
+    /// <summary>
+    ///     Lets the primary reviewer of a slot answer every check Pass and hand the ballot in.
+    /// </summary>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slot">The slot.</param>
+    /// <returns>A task that completes when the ballot is handed in.</returns>
+    private async Task AnswerAsSlotOwnerAsync(string reviewId, ReviewerSlot slot)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var owner = ActorOf(Ids.First(pair => pair.Value == slot.PrimaryUserId).Key);
+        await AuditTestExtensions.AnswerAllAsync(Checklists, ProjectId, reviewId, owner, cancellationToken);
+        await Checklists.SubmitBallotAsync(ProjectId, reviewId, owner, cancellationToken);
     }
 
     /// <summary>

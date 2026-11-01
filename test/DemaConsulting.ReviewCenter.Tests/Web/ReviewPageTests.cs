@@ -890,6 +890,7 @@ public partial class ReviewPageTests : PageTestBase
     {
         // Arrange: a review with one answered check and a not-applicable section of 5 checks
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        await SeatAsync(projectId, "REV-1", "ann");
         await Checklists.SetAnswerAsync(
             projectId, "REV-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
         await Checklists.SetSectionApplicabilityAsync(
@@ -909,9 +910,9 @@ public partial class ReviewPageTests : PageTestBase
             projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Done", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
 
-        // Act, Assert: one sentence says that only the reviewer slot is missing
+        // Act, Assert: one sentence says that the review is ready for signatures
         Assert.Equal(
-            "Add a reviewer slot.",
+            "Ready for signatures.",
             RenderPage(projectId).Find("[data-testid='next-step']").TextContent);
     }
 
@@ -923,6 +924,7 @@ public partial class ReviewPageTests : PageTestBase
     {
         // Arrange: a review with two answered checks
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        await SeatAsync(projectId, "REV-1", "ann");
         foreach (var id in new[] { "REQ-01", "REQ-02" })
         {
             await Checklists.SetAnswerAsync(
@@ -1153,17 +1155,21 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Answers every check of <c>REV-1</c> as Pass, as Cyd (an author may not answer the checklist of their own review).
+    ///     Answers every check of <c>REV-1</c> as Pass, as Ann, the primary reviewer of the slot, and hands in the ballot.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
+    /// <param name="answerer">The slot owner who answers; Ann when <c>null</c>.</param>
     /// <returns>A task that completes when every check is answered.</returns>
-    private async Task AnswerAllAsync(int projectId)
+    private async Task AnswerAllAsync(int projectId, Actor? answerer = null)
     {
+        var actor = answerer ?? TestActors.Ann;
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await Checklists.SetAnswerAsync(
-                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, new Actor("cyd", "Cyd"), TestContext.Current.CancellationToken);
+                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, actor, TestContext.Current.CancellationToken);
         }
+
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", actor, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -1174,9 +1180,9 @@ public partial class ReviewPageTests : PageTestBase
     {
         var ids = await CreateUsersAsync();
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
-        await AnswerAllAsync(projectId);
         var slot = await Signing.AddSlotAsync(
             TestActors.Ann, projectId, "REV-1", ids["ann"], ids["bob"], TestContext.Current.CancellationToken);
+        await AnswerAllAsync(projectId);
         return (projectId, slot.Id, ids);
     }
 
@@ -1300,6 +1306,125 @@ public partial class ReviewPageTests : PageTestBase
         // Assert: it is gone
         Assert.Empty(cut.FindAll($"[data-testid='slot-{slotId}']"));
         Assert.NotNull(cut.Find("[data-testid='slots-empty']"));
+    }
+
+    /// <summary>
+    ///     Creates a review with two slots whose record a change of the first slot alters: the
+    ///     alternate of the first slot (bob) has handed in a ballot that disagrees on the first check, and the second
+    ///     slot (cyd) holds a signature of that record, which is stored directly because the signing service refuses a
+    ///     disputed record, as if it had been given before the dispute arose.
+    /// </summary>
+    /// <returns>The project identity, the identities of the first and the second slot, and the user identities.</returns>
+    private async Task<(int ProjectId, int SlotId, int SecondSlotId, Dictionary<string, int> Ids)> CreateSlotWithDissentAndSignedSecondSlotAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (projectId, slotId, secondSlotId, ids) = await CreateTwoSlotsAsync();
+        var cyd = new Actor("cyd", "Cyd");
+        await AnswerAllAsync(projectId, cyd);
+        await Checklists.SetAnswerAsync(
+            projectId,
+            "REV-1",
+            DefaultChecklist.Current.Sections[0].Items[0].Id,
+            ChecklistOutcome.Fail,
+            "Wrong.",
+            TestActors.Bob,
+            cancellationToken);
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", TestActors.Bob, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        await Store.AddSignatureAsync(
+            new ReviewSignature
+            {
+                ProjectId = projectId,
+                ReviewId = "REV-1",
+                SlotId = secondSlotId,
+                UserId = ids["cyd"],
+                DisplayName = "Cyd",
+                Role = SlotRole.Primary,
+                SignedAt = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero),
+                RecordDigest = approval!.Digest,
+                Meaning = "Reviewed and approved"
+            },
+            cancellationToken);
+        return (projectId, slotId, secondSlotId, ids);
+    }
+
+    /// <summary>
+    ///     Test that a change of a slot that alters the record names the signatures it makes out of date and waits: the
+    ///     change is stored only when the person confirms, and nothing is stored when the person cancels.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_EditSlot_ChangeAltersSignedRecord_WarnsAndStoresOnlyOnConfirm()
+    {
+        // Arrange: bob, the alternate of the first slot, disagrees, and the second slot is signed at that record
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (projectId, slotId, secondSlotId, _) = await CreateSlotWithDissentAndSignedSecondSlotAsync();
+        var cut = RenderPage(projectId);
+
+        // Act: drop the alternate, whose answers leave the record with him, and save
+        await cut.Find($"[data-testid='slot-alternate-select-{slotId}']").ChangeAsync(string.Empty);
+        await cut.Find($"[data-testid='slot-save-{slotId}']").ClickAsync();
+
+        // Assert: the warning names the affected signer, and nothing is stored yet
+        Assert.Equal("Slot 2 (Cyd)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
+        Assert.NotNull((await Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!.Slots[0].AlternateUserId);
+        Assert.Equal(SlotSignatureState.Signed, (await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken))!.Slots.Single(s => s.SlotId == secondSlotId).State);
+
+        // Act: cancel
+        await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
+
+        // Assert: the warning is gone and the slot is as it was
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.NotNull((await Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!.Slots[0].AlternateUserId);
+        Assert.Equal(SlotSignatureState.Signed, (await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken))!.Slots.Single(s => s.SlotId == secondSlotId).State);
+
+        // Act: save again and confirm
+        await cut.Find($"[data-testid='slot-save-{slotId}']").ClickAsync();
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: the change is stored, the warning is gone and the signature of the second slot is out of date
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Null((await Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!.Slots[0].AlternateUserId);
+        Assert.Equal("None", cut.Find($"[data-testid='slot-alternate-{slotId}']").TextContent);
+        Assert.Equal(SlotSignatureState.OutOfDate, (await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken))!.Slots.Single(s => s.SlotId == secondSlotId).State);
+    }
+
+    /// <summary>
+    ///     Test that removing a slot that alters the record names the signatures it makes out of date and waits: the
+    ///     slot is removed only when the person confirms, and stays when the person cancels.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_RemoveSlot_RemovalAltersSignedRecord_WarnsAndRemovesOnlyOnConfirm()
+    {
+        // Arrange: bob, the alternate of the first slot, disagrees, and the second slot is signed at that record
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (projectId, slotId, secondSlotId, _) = await CreateSlotWithDissentAndSignedSecondSlotAsync();
+        var cut = RenderPage(projectId);
+
+        // Act: remove the first slot
+        await cut.Find($"[data-testid='slot-remove-{slotId}']").ClickAsync();
+
+        // Assert: the warning names the affected signer, and both slots are still there
+        Assert.Equal("Slot 2 (Cyd)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
+        Assert.Equal(2, (await Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!.Slots.Count);
+        Assert.NotEmpty(cut.FindAll($"[data-testid='slot-{slotId}']"));
+
+        // Act: cancel
+        await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
+
+        // Assert: the warning is gone and nothing is removed
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Equal(2, (await Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!.Slots.Count);
+        Assert.NotEmpty(cut.FindAll($"[data-testid='slot-{slotId}']"));
+
+        // Act: remove again and confirm
+        await cut.Find($"[data-testid='slot-remove-{slotId}']").ClickAsync();
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: the slot is gone, the warning is gone and the signature of the second slot is out of date
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Empty(cut.FindAll($"[data-testid='slot-{slotId}']"));
+        Assert.Equal(secondSlotId, Assert.Single((await Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!.Slots).Id);
+        Assert.Equal(SlotSignatureState.OutOfDate, (await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken))!.Slots.Single(s => s.SlotId == secondSlotId).State);
     }
 
     /// <summary>
@@ -1931,9 +2056,9 @@ public partial class ReviewPageTests : PageTestBase
         var projectId = project.Id;
         await Reviews.CreateDraftAsync(
             projectId, "REV-1", "First review", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
-        await AnswerAllAsync(projectId);
         var slot = await Signing.AddSlotAsync(
             TestActors.Ann, projectId, "REV-1", ids["bob"], ids["cyd"], TestContext.Current.CancellationToken);
+        await AnswerAllAsync(projectId, TestActors.Bob);
         await Reviews.SetDueDateAsync(projectId, "REV-1", new DateOnly(2025, 3, 3), TestActors.Ann, TestContext.Current.CancellationToken);
         SignInAs("ann", "Ann", false);
         var cut = RenderPage(projectId);
@@ -2272,7 +2397,8 @@ public partial class ReviewPageTests : PageTestBase
             projectId, "REV-1", new ThreadAnchor("b.txt", 1, 1), TestActors.Ann, "confidential-thread-comment", cancellationToken);
         await AddReviewerSlotAsync(projectId, member.Id);
         var item = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
-        await Checklists.SetAnswerAsync(projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        await Checklists.SetAnswerAsync(
+            projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, new Actor(RevokedUser, "Zelda Quill"), cancellationToken);
         return (projectId, thread.Id);
     }
 

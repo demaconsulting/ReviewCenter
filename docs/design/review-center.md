@@ -489,7 +489,8 @@ version), and gives every file, line and thread a stable link (the address bar a
 for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
-and a review is Approved only while every slot has a current signature. A review without a slot is In review. An
+and a review is Approved only while every slot has handed in its ballot, the ballots agree, and every slot has a
+current signature. A review without a slot is In review. An
 Approved review is locked: its comments, checklist, and reviewer slots can no longer change, and only a project
 administrator or a system administrator can reopen it, with a recorded reason; the earlier signatures then stay as
 history, are out of date, and the review needs new signatures. While the project rule "Require independent reviewers"

@@ -106,6 +106,9 @@ sections:
         children:
           - ReviewCenter-ReviewStore-Checklist
           - ReviewCenter-ReviewStore-Ballots
+          - ReviewCenter-ReviewStore-RecordBallots
+          - ReviewCenter-ReviewStore-LegacyBaseline
+          - ReviewCenter-ReviewStore-SignOwnBallot
           - ReviewCenter-ReviewStore-BallotSubmit
           - ReviewCenter-ReviewStore-BallotSlotLifecycle
           - ReviewCenter-DbContext-Checklist

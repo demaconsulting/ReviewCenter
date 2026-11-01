@@ -121,17 +121,22 @@ sections:
           the last comment the user has seen, compare the user names without regard to case, treat every comment of
           somebody else as unread when the user has never seen the review, never treat a comment of the user as unread,
           and mark an item of the inbox as unread when it holds an unread comment or a change after the time the user
-          last saw the review, also an item to sign of a review the user has seen before.
+          last saw the review, also an item to sign of a review the user has seen before. A change is a signature, a
+          reopen, a comment, or an answer of another reviewer in a submitted ballot (the draft of another slot is not
+          news, because it is not part of the record).
         justification: |
           The user wants to see what is new, and the own words are never news. Comment identities grow with time, so
           one number per review is enough to tell what has been seen. A review that waits for a signature must show
-          what happened to it after the last visit, not only before the first one.
+          what happened to it after the last visit, not only before the first one. A reviewer who is still working on
+          a draft has not said anything yet.
         tests:
           - InboxService_GetInboxAsync_NoStateRow_AllCommentsByOthersAreUnread
           - InboxService_GetInboxAsync_OwnComments_AreNeverUnread
           - InboxService_GetInboxAsync_CommentsAfterLastSeen_AreUnread
           - InboxService_GetInboxAsync_ToSign_OtherSignsAfterLastSeen_IsUnread
           - InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread
+          - InboxService_Unread_DraftBallotOfOtherSlot_Ignored
+          - InboxService_Unread_SubmittedBallotOfOtherSlot_IsUnread
           - InboxRules_MaxCommentId_WithCutoff_IgnoresLaterComments
           - InboxRules_SameUser_IgnoresCase
           - InboxRules_IsUnread_OtherAndNewer_IsTheOnlyUnread

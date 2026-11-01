@@ -103,7 +103,8 @@ public class ReviewPlannerTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = new MovableTimeProvider(_now);
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
         await users.CreateAsync("adm", "Adm", UserRole.Admin, Password, cancellationToken);
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
         var store = new FakeReviewStore();
@@ -171,7 +172,7 @@ public class ReviewPlannerTests
             clock,
             reviews,
             signing,
-            TestServices.Checklists(store, clock),
+            TestServices.Checklists(store, clock, userStore),
             repositories,
             git,
             parser,
@@ -228,7 +229,8 @@ public class ReviewPlannerTests
     private static void MoveMain(Fixture f, string sha) => f.Git.Revisions["main"] = sha;
 
     /// <summary>
-    ///     Signs a review: answers the whole checklist, adds a slot for ann and lets ann sign it.
+    ///     Signs a review: adds a slot for ann, lets ann answer the whole checklist in the ballot of the slot (the only
+    ///     ballot, so it is handed in as it is complete) and sign it.
     /// </summary>
     /// <param name="f">The fixture.</param>
     /// <param name="reviewId">The review to sign.</param>
@@ -236,13 +238,12 @@ public class ReviewPlannerTests
     private static async Task SignAsync(Fixture f, string reviewId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var slot = await f.Signing.AddSlotAsync(TestActors.Ann, f.ProjectId, reviewId, f.AnnId, null, cancellationToken);
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await f.Checklists.SetAnswerAsync(
                 f.ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
         }
-
-        var slot = await f.Signing.AddSlotAsync(TestActors.Ann, f.ProjectId, reviewId, f.AnnId, null, cancellationToken);
         var digest = (await f.Signing.GetApprovalAsync(f.ProjectId, reviewId, cancellationToken))!.Digest;
         await f.Signing.SignAsync(TestActors.Ann, f.ProjectId, reviewId, slot.Id, digest, Password, cancellationToken);
     }

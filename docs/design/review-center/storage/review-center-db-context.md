@@ -71,9 +71,10 @@ repository registry is the one exception, see `Repositories`).
   `Version` is required, at most 64; `Definition` is required text (the JSON of the checklist). It belongs to its
   review (a one-to-one relationship, so the snapshot is saved with the review) and is deleted with it.
 - **ChecklistSectionStates** (`ChecklistSectionState`): key `ProjectId`, `ReviewId`, `SlotId`, and `SectionId` (at most
-  32), so a review has at most one state per section and slot. `SlotId` is 0 (`ChecklistAnswer.BaselineSlotId`) for the
-  review-level rows that the record is built from, and the identity of a reviewer slot for the rows of its ballot; it
-  is a plain column without a foreign key, so the store deletes the rows of a removed slot itself. `Applicable`;
+  32), so a review has at most one state per section and slot. `SlotId` is the identity of a reviewer slot for the rows
+  of its ballot (the record is built from `ReviewRecord.Ballots`), or 0 (`ChecklistAnswer.BaselineSlotId`) for the
+  baseline that a follow-up review carries: such a row belongs to no ballot and is no part of the record or the
+  digest. It is a plain column without a foreign key, so the store deletes the rows of a removed slot itself. `Applicable`;
   `Reason` at most 2000; `SetBy` (the display name) is
   required, at most 100; `SetByUsername` is required, at most 50; `SetAt`; `CarriedFromReviewId` (at most 100, null
   unless the state was carried into a follow-up review). It belongs to a review and is deleted

@@ -191,9 +191,10 @@ public class ReviewFollowUpStoreTests
         Assert.Equal("Bob", comment.Author);
         Assert.Equal("Check this", comment.Text);
 
-        // Assert: the record holds the markers, so the signature covers them, and the chain is intact
+        // Assert: the record holds the thread marker, so the signature covers it, the carried rows belong to no ballot
+        // yet, and the chain is intact
         Assert.Equal("REV-1", record!.FollowsReviewId);
-        Assert.Equal("REV-1", Assert.Single(record.Answers).CarriedFromReviewId);
+        Assert.Empty(record.Ballots);
         Assert.Equal("REV-1", Assert.Single(record.Threads).CarriedFromReviewId);
         Assert.True(AuditChain.Verify(await db.Audit.ReadAfterAsync(0, 100, cancellationToken)).IsIntact);
     }
@@ -228,25 +229,29 @@ public class ReviewFollowUpStoreTests
     }
 
     /// <summary>
-    ///     Test that answering a carried check again, and setting a carried section again, store the new values
-    ///     without the carried marker, while an answer that is not replaced keeps its marker.
+    ///     Test that answering a carried check again, and setting a carried section again, in the ballot of a slot store
+    ///     the new values without the carried marker, while an answer that is not replaced keeps its marker, and that
+    ///     the review-level carried rows stay as they were.
     /// </summary>
     [Fact]
-    public async Task ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker()
+    public async Task ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker()
     {
-        // Arrange: a follow-up that carried an answer and a section
+        // Arrange: a follow-up that carried an answer and a section, and a slot that started from them
         var cancellationToken = TestContext.Current.CancellationToken;
         using var db = new TestStore();
         var projectId = await AddFirstAsync(db);
         await db.Store.AddReviewAsync(NewReview(projectId, "REV-2", "REV-1", NewCarry(projectId)), cancellationToken);
+        var slot = await db.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = projectId, ReviewId = "REV-2", PrimaryUserId = 1 }, cancellationToken);
         var draft = AuditDraft.By(TestActors.Bob, "checklist.answered", "x", projectId, "REV-2");
 
         // Act: the answer and the section are set again by another person, without a marker
-        await db.Store.SetChecklistAnswerAsync(
+        await db.Store.SetBallotAnswerAsync(
             new ChecklistAnswer
             {
                 ProjectId = projectId,
                 ReviewId = "REV-2",
+                SlotId = slot.Id,
                 ItemId = "REQ-01",
                 Outcome = ChecklistOutcome.Fail,
                 Justification = "Wrong",
@@ -255,12 +260,14 @@ public class ReviewFollowUpStoreTests
                 AnsweredAt = _created.AddHours(1)
             },
             draft,
+            null,
             cancellationToken);
-        await db.Store.SetChecklistSectionStateAsync(
+        await db.Store.SetBallotSectionStateAsync(
             new ChecklistSectionState
             {
                 ProjectId = projectId,
                 ReviewId = "REV-2",
+                SlotId = slot.Id,
                 SectionId = "docs",
                 Applicable = false,
                 Reason = "Still none",
@@ -269,16 +276,20 @@ public class ReviewFollowUpStoreTests
                 SetAt = _created.AddHours(1)
             },
             draft,
+            null,
             cancellationToken);
 
-        // Assert: the new values are stored, the markers are gone, and no second row exists
-        var answer = Assert.Single(await db.Store.ListChecklistAnswersAsync(projectId, "REV-2", cancellationToken));
+        // Assert: the ballot holds the new values without markers and no second row; the baseline rows are unchanged
+        var ballot = (await db.Store.GetBallotAsync(projectId, "REV-2", slot.Id, cancellationToken))!;
+        var answer = Assert.Single(ballot.Answers);
         Assert.Null(answer.CarriedFromReviewId);
         Assert.Equal(ChecklistOutcome.Fail, answer.Outcome);
         Assert.Equal("bob", answer.AnsweredByUsername);
-        var section = Assert.Single(await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-2", cancellationToken));
+        var section = Assert.Single(ballot.SectionStates);
         Assert.Null(section.CarriedFromReviewId);
         Assert.Equal("Still none", section.Reason);
+        Assert.Equal("REV-1", Assert.Single(await db.Store.ListChecklistAnswersAsync(projectId, "REV-2", cancellationToken)).CarriedFromReviewId);
+        Assert.Equal("REV-1", Assert.Single(await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-2", cancellationToken)).CarriedFromReviewId);
         Assert.Equal("REV-1", Assert.Single(await db.Store.ListThreadsAsync(projectId, "REV-2", cancellationToken)).CarriedFromReviewId);
     }
 

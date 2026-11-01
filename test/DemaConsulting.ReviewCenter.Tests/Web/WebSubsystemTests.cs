@@ -172,6 +172,7 @@ public partial class WebSubsystemTests
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Ann, TestContext.Current.CancellationToken);
+        await SeatAsync(app, project.Id, "rev-1", "bob");
         var route = $"/projects/{project.Id}/reviews/rev-1/checklist";
 
         // Act: request the checklist page as the author and as another user
@@ -202,6 +203,7 @@ public partial class WebSubsystemTests
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Bob, TestContext.Current.CancellationToken);
+        await SeatAsync(app, project.Id, "rev-1", "ann");
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         await checklists.SetAnswerAsync(
             project.Id, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
@@ -252,15 +254,15 @@ public partial class WebSubsystemTests
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Bob, TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slot = await signing.AddSlotAsync(
+            TestActors.Ann, project.Id, "rev-1", ann.Id, null, TestContext.Current.CancellationToken);
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await checklists.SetAnswerAsync(
                 project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
         }
 
-        var signing = app.Services.GetRequiredService<SigningService>();
-        var slot = await signing.AddSlotAsync(
-            TestActors.Ann, project.Id, "rev-1", ann.Id, null, TestContext.Current.CancellationToken);
         var route = $"/projects/{project.Id}/reviews/rev-1";
 
         // Ann is the only reviewer and reopens the review below; the rule that would refuse that is off here
@@ -321,15 +323,15 @@ public partial class WebSubsystemTests
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestActors.Bob, TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await checklists.SetAnswerAsync(
-                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
-        }
-
         var signing = app.Services.GetRequiredService<SigningService>();
         var slot = await signing.AddSlotAsync(
             TestActors.Ann, project.Id, "rev-1", cyd.Id, null, TestContext.Current.CancellationToken);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, new Actor("cyd", "Cyd"), TestContext.Current.CancellationToken);
+        }
+
         var approval = (await signing.GetApprovalAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!;
         await signing.SignAsync(
             new Actor("cyd", "Cyd"), project.Id, "rev-1", slot.Id, approval.Digest, TestBrowser.Password, TestContext.Current.CancellationToken);
@@ -682,6 +684,24 @@ public partial class WebSubsystemTests
         return await File.ReadAllTextAsync(
             Path.Combine(directory.FullName, "src", "DemaConsulting.ReviewCenter", "wwwroot", "app.css"),
             TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Seats an existing user as the primary reviewer of a new slot of a review, without the rules of the signing
+    ///     service, so that the user can answer the checklist.
+    /// </summary>
+    /// <param name="app">The running application.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review id.</param>
+    /// <param name="username">The user name of the reviewer; the user must exist.</param>
+    /// <returns>The identity of the slot.</returns>
+    private static async Task<int> SeatAsync(Microsoft.AspNetCore.Builder.WebApplication app, int projectId, string reviewId, string username)
+    {
+        var user = (await app.Services.GetRequiredService<UserService>().GetAsync(username, TestContext.Current.CancellationToken))!;
+        var slot = await app.Services.GetRequiredService<IReviewStore>().AddSlotAsync(
+            new ReviewerSlot { ProjectId = projectId, ReviewId = reviewId, PrimaryUserId = user.Id },
+            TestContext.Current.CancellationToken);
+        return slot.Id;
     }
 
     /// <summary>

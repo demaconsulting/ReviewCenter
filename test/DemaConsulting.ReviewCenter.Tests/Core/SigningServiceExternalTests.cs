@@ -77,8 +77,9 @@ public class SigningServiceExternalTests
         var store = new FakeReviewStore();
         var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         var trail = new FakeAuditStore(clock);
+        var userStore = new FakeUserStore();
         var users = new UserService(
-            new FakeUserStore(), new FakePasswordHasher(), clock, new AuditService(trail, null, clock));
+            userStore, new FakePasswordHasher(), clock, new AuditService(trail, null, clock));
         var boss = await users.CreateAsync("boss", "Boss", UserRole.Reviewer, "correct horse battery", cancellationToken);
         var external = await users.SignInExternalAsync("https://idp.example/", "sub-1", "olive", "Olive", cancellationToken);
         var olive = external.User!;
@@ -87,17 +88,19 @@ public class SigningServiceExternalTests
         await store.AddMembershipAsync(olive.Id, project.Id, cancellationToken);
         await TestServices.Reviews(store, clock).CreateDraftAsync(
             project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], cancellationToken);
-        var checklists = TestServices.Checklists(store, clock);
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await checklists.SetAnswerAsync(
-                project.Id, ReviewId, item.Id, ChecklistOutcome.Pass, null, Boss, cancellationToken);
-        }
-
         var proofs = new ReauthProofStore(clock);
         var signing = new SigningService(
             store, users, new AllowAllProjectAccess(store), clock, withProofs ? proofs : null);
         var slot = await signing.AddSlotAsync(Boss, project.Id, ReviewId, olive.Id, null, cancellationToken);
+
+        // The primary reviewer answers the checklist; the only ballot is submitted when it is complete
+        var checklists = TestServices.Checklists(store, clock, userStore);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                project.Id, ReviewId, item.Id, ChecklistOutcome.Pass, null, new Actor("olive", "Olive"), cancellationToken);
+        }
+
         return new World(signing, proofs, clock, users, project.Id, slot.Id, olive.Id, store, trail);
     }
 

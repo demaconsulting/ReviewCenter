@@ -130,7 +130,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   entered again, or, for a user of an identity provider, with a single-use proof of a fresh confirmation at the
   provider (members only), tell whether such a proof exists without spending it, read the
   approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
-  project, who can be chosen for a slot. A concluded review (every slot signed for the current record and no thread
+  project, who can be chosen for a slot. A concluded review (every slot has handed in its ballot, the ballots agree and
+  approve, every slot signed for the current record, and no thread
   open) is locked: every change of its threads, checklist answers,
   section applicability, or reviewer slots, and any further signature, is refused with `ReviewLocked`, until a project
   admin or system administrator reopens it with a reason (`ReopenReviewAsync`; never with an API token), which keeps the
@@ -537,7 +538,8 @@ different meaning: a signed slot cannot be changed or removed, a signature is ne
 status of a review (Approved or In review) is computed from the record and the signatures each time and never stored.
 
 An approved review is also locked, and that too is computed, not stored: `ReviewLock.IsConcluded` is the one definition
-(at least one slot, every slot holds a signature of the current digest, and no thread is open), used by the approval
+(at least one slot, every slot has a submitted ballot, the ballots agree on every check with the approved outcome, every
+slot holds a signature of the current digest, and no thread is open), used by the approval
 status, by the
 `ReviewLocked` check that `ThreadService`, `ChecklistService`, and `SigningService` make before every change, and by the
 `Storage` subsystem inside its write transactions. Reopening is the only way out: an audited action of a project or

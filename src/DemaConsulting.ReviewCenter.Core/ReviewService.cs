@@ -482,7 +482,13 @@ public sealed class ReviewService
         }
 
         var record = await _store.GetRecordAsync(projectId, follow, cancellationToken) ?? throw missing;
-        var carry = FollowUpCarry.Compute(follow, record, source.Files, projectId, reviewId, newFiles, definition, now);
+
+        // The review-level rows (slot 0) are what the earlier review itself carried; they are carried onward for the checks
+        // and sections no submitted ballot covers, so a follow-up without a submitted ballot does not end the chain
+        var baselineAnswers = await _store.ListChecklistAnswersAsync(projectId, follow, cancellationToken);
+        var baselineSections = await _store.ListChecklistSectionStatesAsync(projectId, follow, cancellationToken);
+        var carry = FollowUpCarry.Compute(
+            follow, record, source.Files, projectId, reviewId, newFiles, definition, now, baselineAnswers, baselineSections);
         if (carry.DroppedThreadFiles.Count > 0 && !acknowledge)
         {
             throw new DomainRuleException(DomainRule.FollowUpInvalid, FollowUpCarry.DroppedMessage(carry.DroppedThreadFiles));

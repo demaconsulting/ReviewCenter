@@ -25,7 +25,7 @@ commits (see the `AuditStore` unit).
 `UpdateReviewRuleAsync`, `AddReviewAsync`,
 `AddThreadAsync`, `AddCommentAsync`,
 `ReopenThreadAsync`, `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
-`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `SetBallotAnswerAsync`, `SetBallotSectionStateAsync`,
+`SetBallotAnswerAsync`, `SetBallotSectionStateAsync`,
 `SubmitBallotAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
 `RemoveSlotAsync`, `UpdateDueDateAsync`, `UpdateReviewConclusionTextAsync`, `AddSignatureAsync`, and
 `ReopenReviewAsync` take the audit draft of the
@@ -39,12 +39,13 @@ are of the change itself.
 
 **Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `ReopenThreadAsync`,
 `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
-`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `SetBallotAnswerAsync`, `SetBallotSectionStateAsync`,
+`SetBallotAnswerAsync`, `SetBallotSectionStateAsync`,
 `SubmitBallotAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`,
 `UpdateDueDateAsync`, and `UpdateReviewConclusionTextAsync` call
 the private `EnsureNotLockedAsync` first, inside the same serialized transaction as the change. It loads the slots, the
 record (with its reopen count), and the signatures with the same code as `AddSignatureAsync`, and asks the Core
-`ReviewLock.IsConcluded`, the one definition of "concluded" (every slot signed for the current record and no thread
+`ReviewLock.IsConcluded`, the one definition of "concluded" (every slot has a submitted ballot, the ballots agree with
+the approved outcome, every slot signed for the current record, and no thread
 open), so the store and the services cannot disagree. When the review
 is concluded it raises `DomainRuleException` with `ReviewLocked` (the message of `ReviewLock.LockedMessage`), and the
 transaction rolls back: nothing is stored and no audit entry is written. A review without slots is never concluded, and
@@ -52,7 +53,8 @@ the check returns early without loading the record. This is defense in depth beh
 race with a concurrent final signature: because the write transaction holds the database write lock, a signature
 cannot commit between the check and the change. `AddSignatureAsync` compares the digest inside its own transaction and,
 after the digest check, refuses with `SigningNotAllowed` when any thread of the review is open (a thread that was
-started or reopened after the signer loaded the page); reads are not affected.
+started or reopened after the signer loaded the page), and refuses with `BallotNotSubmitted` when the ballot of the
+slot being signed is not submitted (see **Signature rule of the own ballot** below); reads are not affected.
 
 **AddProjectAsync**: Stores a project and returns it with the identity assigned by the database. The unit copies the
 name, description, and creation time into a new entity, so an identity supplied by the caller is ignored and can
@@ -278,40 +280,37 @@ returns or zero bytes.
 
 **GetChecklistAsync**: Reads the checklist snapshot of a review; null when the review has none.
 
-**ListChecklistSectionStatesAsync** and **ListChecklistAnswersAsync**: List the stored section states and the
-answers of a review, with display names, user names, and UTC times as saved.
-
-**SetChecklistSectionStateAsync** and **SetChecklistAnswerAsync**: Replace the state of a section or the answer to
-a check, including the display name and the user name of the person who made the change. These two methods keep the
-review-level rows only (slot identity 0, `ChecklistAnswer.BaselineSlotId`), the rows that the record and its digest are
-built from; an entity with another slot identity is refused with an `ArgumentException`. The review-level listings and
-`GetRecordAsync` read slot 0 only. Each first tries to
-overwrite the existing row with one update statement and adds a row only when there
-was none; if two requests add the same row at the same moment, the loser of the race overwrites instead, so
-there is always exactly one row and neither request fails. The row that is written never carries a follow-up marker:
-the update and the new row both set `CarriedFromReviewId` to the value of the incoming entity, which the services
-always leave null, so answering a carried check again, or setting a carried section again, replaces the marker.
+**ListChecklistSectionStatesAsync** and **ListChecklistAnswersAsync**: List the stored review-level section states and
+answers of a review (slot identity 0, `ChecklistAnswer.BaselineSlotId`), with display names, user names, and UTC times
+as saved. They are the legacy baseline: the rows a follow-up review carries from the review it follows. The rows of a
+ballot are not listed. The store has no method that writes these rows other than the creation of a follow-up review
+(`AddReviewAsync` with its carry): every answer and section state of a reviewer is written with the ballot methods
+below, and answering a carried check again, or setting a carried section again, in a ballot replaces the carried
+marker, because the row of the ballot is written from the incoming entity, which the services leave without one.
 
 **Ballots**: A ballot is the set of answers and section states that one reviewer slot gave, with a status row
 (`ChecklistBallot`: draft or submitted, and for a submitted one the time and the user name of the hand-in). Slot
-identity 0 is the baseline, the review-level rows that the legacy methods above read and write; it is never a ballot, and
-no status row exists for it. The ballot methods are dormant in this change: no service calls them yet, and the record,
-the digest, the attestation, the inbox and the evidence keep reading the review-level rows.
+identity 0 is the baseline, the review-level rows that the legacy readers above list; it is never a ballot, and
+no status row exists for it. The record, the digest and the services read the ballots, not the baseline.
 
 - **ListBallotsAsync** and **GetBallotAsync** read the ballots of a review (ordered by slot identity) or of one slot inside
   one read transaction, with the rows of each slot only; a slot without a status row has no ballot (null).
 - **SetBallotAnswerAsync** and **SetBallotSectionStateAsync** refuse the identity 0 (`ArgumentOutOfRangeException`), then
   in one transaction check the approval lock (`ReviewLocked`), check that the slot belongs to the review
-  (`SlotNotFound`), replace the row of the slot, make the ballot a draft (a submitted ballot is reopened by the edit),
+  (`SlotNotFound`), replace the row of the slot, so that there is one row for each slot and check or section, make the
+  ballot a draft (a submitted ballot is reopened by the edit),
   and, when the review has exactly one slot and the caller's completeness test accepts the rows of the transaction, hand
   the ballot in at once with the time and user name of the edit. The audit draft of the edit is stored first; when the
   status changed in the net, a second entry follows: `ballot.reopened` or `ballot.submitted`. The second entry is saved
-  before the transaction ends and the last entry is the audit of the transaction, so the chain stays intact.
+  before the transaction ends and the last entry is the audit of the transaction, so the chain stays intact. Each first
+  tries to overwrite the existing row with one update statement and adds a row only when there was none; if two
+  requests add the same row at the same moment, the loser of the race overwrites instead, so there is always exactly
+  one row and neither request fails.
 - **SubmitBallotAsync** is a compare-and-set from draft to submitted: a ballot that is already submitted is returned
   as it is, with no write and no entry; otherwise the completeness test is asked about the rows of the same
   transaction, an
   incomplete ballot raises `BallotIncomplete` and stores nothing, and a complete one is stored with the time and user
-  name and the audit draft of the caller. A slot without any row counts as an empty ballot.
+  name, the audit draft of the caller (`ballot.submitted`). A slot without any row counts as an empty ballot.
 - **AddSlotAsync** copies the carried review-level rows (those with `CarriedFromReviewId`) of a follow-up review into rows
   of the new slot and stores a draft ballot for it; a review without carried rows gets no ballot. A carried answer never
   submits the ballot, and no extra entry is written.
@@ -323,14 +322,26 @@ the digest, the attestation, the inbox and the evidence keep reading the review-
   identity without a foreign key, and the status row by cascade; a signed slot is still refused by the database, which
   rolls the deletes back.
 
+**Signature rule of the own ballot**: `AddSignatureAsync` loads the record inside its write transaction, with the same
+loader as `GetRecordAsync`, and, for a review that has a checklist, refuses a signature with `BallotNotSubmitted` and
+stores nothing when the ballot of the slot being signed is not submitted (it has no status row or is a draft). The
+digest covers only the submitted ballots, so a draft of the signer changes nothing in it and the digest comparison
+cannot see it; the service checks the same rule before the transaction, and this recheck closes the gap to an edit that
+lands in between. The ballots of the other slots do not matter. A review without a checklist has no ballots and keeps
+the earlier rule.
+
 **GetRecordAsync**: Reads the record that a signature covers (`ReviewRecord`): the content fingerprint, the checklist
-snapshot, the section states, the answers, the threads with their comments, and the source (`ReviewSource`: `Upload`,
+snapshot, the ballots of its slots (every slot's status row with its answers and section states, drafts included, in
+slot order; the baseline rows are not part of them), the threads with their comments, and the source
+(`ReviewSource`: `Upload`,
 or for a repository review the repository identity, both commits, the selection, the review-set identifier (null when
 the review was not planned), and every change with its path,
 kind, and baseline and head hashes read from the stored columns without loading any bytes), and `Reopens`, the number of
-stored reopens of the review, and `FollowsReviewId` with the carried markers of the answers, section states and
-threads (the review a row was carried from; the carried thread number is not part of the record); null when the review
+stored reopens of the review, and `FollowsReviewId`; null when the review
 does not exist.
+The record carries the drafts so that the services can show a reviewer the ballot of their own slot, but the digest
+computed from the record (`RecordDigest`) covers the consolidation of the submitted ballots only, so an edit of a draft
+changes no digest.
 The work is done by a private loader that takes the context, so the same code serves this method and
 `AddSignatureAsync`. Threads and comments are ordered by identity, as for `ListThreadsAsync`. `GetRecordAsync` reads
 inside one read transaction, so the parts come from one state of the database.
@@ -353,8 +364,10 @@ its own transaction.
 The method opens one read transaction (the same plain read transaction as `GetSnapshotAsync`) and reads the records of
 all the reviews through the shared loader `LoadRecordsAsync`, which `GetSnapshotAsync` and `GetRecordAsync` use too (as
 the batch of one review), so a batch entry cannot differ from the single read. The loader reads the headers, the files,
-the checklists, the section states, the answers, the threads with their comments, and the number of reopens of all the
-reviews with one query each, filtered by project and by the identifier list, and assembles one record per review. The
+the checklists, the status rows of the ballots, the section states and answers of the ballots (the rows of the slots,
+not the baseline), the threads with their comments, and the number of reopens of all the
+reviews with one query each, filtered by project and by the identifier list, and assembles one record per review with
+all its ballots, drafts included. The
 slots and the signatures follow with one query each, ordered by identity. The identifiers are processed in chunks of
 500, so no statement exceeds the parameter limit of SQLite; the number of queries grows with the number of chunks and
 not with the number of reviews. `SigningService.GetApprovalsAsync` uses it, so the progress overview of a project reads

@@ -286,16 +286,15 @@ public partial class IntegrationTests
         await store.AddMembershipAsync(cyd.Id, project.Id, cancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", Core.TestContent.A)], Core.TestActors.Bob, cancellationToken);
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slot = await signing.AddSlotAsync(Core.TestActors.Ann, project.Id, "rev-1", cyd.Id, null, cancellationToken);
+        var reviewer = new Actor("cyd", "Cyd");
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await checklists.SetAnswerAsync(
-                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, Core.TestActors.Ann, cancellationToken);
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, reviewer, cancellationToken);
         }
-
-        var signing = app.Services.GetRequiredService<SigningService>();
-        var slot = await signing.AddSlotAsync(Core.TestActors.Ann, project.Id, "rev-1", cyd.Id, null, cancellationToken);
-        var reviewer = new Actor("cyd", "Cyd");
 
         // Act: the separate reviewer signs; then a change is tried, and the attestation is read while locked
         var first = (await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken))!;

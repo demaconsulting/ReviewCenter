@@ -4,7 +4,8 @@
 # The BallotConsolidation class turns the ballots that the reviewer slots of a review hand in into one agreed standing
 # of every check and section of the checklist, the outcome that standing leads to, and a test of whether one ballot
 # answers everything it has to. It also covers the Ballot record, the stored and displayed ballot states, and the
-# outcome types that a later signature attests.
+# outcome types that a later signature attests, and the BallotProjection class, which projects the ballots of a record
+# into the views that the services, the pages, and the follow-up carry-over read.
 
 sections:
   - title: BallotConsolidation Unit Requirements
@@ -124,3 +125,28 @@ sections:
           an empty review, and a repeated slot would let one outcome overwrite another and hide a dispute.
         tests:
           - BallotConsolidation_NullArguments_Throws
+
+      - id: ReviewCenter-BallotConsolidation-Projection
+        title: >-
+          The BallotProjection class shall give the rest of the application one view of the consolidated standing of a
+          record, built from its submitted ballots only, in which an agreed check is answered with the row of the lowest
+          slot that answered it, an agreed not-applicable section has the row of the lowest slot that marked it, and a
+          pending or disputed check has no answer, shall read the sole ballot of a review with exactly one slot as
+          submitted, for progress and blockers only, when the caller gives the number of slots, shall give no view for a
+          record without a checklist, shall show a viewer the state of the viewer's own ballot, a draft included (not
+          started when there is none), and shall refuse a missing record or definition.
+        justification: |
+          Progress, blockers, the attestation, and the carry-over of a follow-up must all see the same agreed standing
+          that the digest covers, so one projection builds it from the submitted ballots by the rule of the
+          consolidation. A review with one slot has nobody to agree with and no separate hand-in step, so its sole draft
+          shows its true progress, while the digest never counts a draft. A reviewer needs to see and edit own
+          draft, and the page must never show a draft of another slot.
+        tests:
+          - BallotProjection_Consolidate_NoChecklist_ReturnsNull
+          - BallotProjection_NullArguments_Throw
+          - BallotProjection_Consolidate_RepresentativeRow_IsTheLowestSlot
+          - BallotProjection_Consolidate_DraftBallots_AreIgnored
+          - BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount
+          - BallotProjection_Consolidate_Sections_AgreedNotApplicableAndDisputed
+          - BallotProjection_ForBallot_ShowsTheOwnDraft
+          - BallotProjection_ForBallot_NoBallot_IsNotStarted

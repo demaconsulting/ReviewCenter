@@ -361,7 +361,11 @@ public sealed class SigningService
         }
 
         var isApproved = ReviewLock.IsConcluded(record, slots, signatures);
-        var (checklist, blockers, failed) = Assess(record);
+        var (checklist, blockers, failed) = Assess(record, slots.Count);
+        var unsubmitted = record.Checklist is null
+            ? 0
+            : slots.Count(slot => record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State != BallotState.Submitted);
+        var disputed = checklist?.Consolidation?.Disputed ?? 0;
         return new ReviewApproval(
             isApproved,
             digest,
@@ -371,10 +375,12 @@ public sealed class SigningService
             reopens,
             // The structured counts behind the blocker sentences of Assess, so a list can show them without parsing
             record.Threads.Count(thread => thread.State == ReviewThreadState.Open),
-            checklist?.Overall.Unanswered ?? 0,
+            checklist?.Consolidation?.Pending ?? 0,
             failed,
             // Assess returns no checklist state exactly when it adds the "no checklist" blocker
-            checklist is null);
+            checklist is null,
+            disputed,
+            unsubmitted);
     }
 
     /// <summary>
@@ -480,13 +486,19 @@ public sealed class SigningService
     /// <param name="primaryUserId">The new primary reviewer.</param>
     /// <param name="alternateUserId">The new alternate reviewer, or <c>null</c> for none.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or <c>null</c> for
+    ///     none. Needed when a reviewer leaves the slot and the slot has a ballot: the ballot reverts to a draft without
+    ///     the rows of the departed reviewer, which changes what the signatures of the other slots cover.
+    /// </param>
     /// <returns>A task that completes when the slot is stored.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.SlotNotFound"/>,
     ///     <see cref="DomainRule.SlotSigned"/> (the slot has any signature, current or out of date) or
     ///     <see cref="DomainRule.SlotUserInvalid"/> when a rule is violated; nothing is stored then. Also thrown with
-    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved and with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved,
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged and with
     ///     <see cref="DomainRule.ReviewerNotIndependent"/> as <see cref="AddSlotAsync"/> does.
     /// </exception>
     public async Task UpdateSlotAsync(
@@ -496,7 +508,8 @@ public sealed class SigningService
         int slotId,
         int primaryUserId,
         int? alternateUserId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
         ArgumentNullException.ThrowIfNull(actor);
         RejectApiToken(actor);
@@ -504,11 +517,31 @@ public sealed class SigningService
         try
         {
             await EnsureActorAsync(actor, projectId, cancellationToken);
-            await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+            var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
             await ValidateMembersAsync(
                 projectId, reviewId, slots, slotId, primaryUserId, alternateUserId, cancellationToken);
             var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
+
+            // A reviewer who leaves takes the own rows out of the ballot, which reverts to a draft: that may change what
+            // the signatures of the other slots cover
+            var old = slots.First(s => s.Id == slotId);
+            var ballot = snapshot?.Record.Ballots.FirstOrDefault(b => b.SlotId == slotId);
+            var departing = new[] { old.PrimaryUserId, old.AlternateUserId ?? 0 }
+                .Where(id => id != 0 && id != primaryUserId && id != alternateUserId)
+                .Distinct()
+                .ToList();
+            if (snapshot is not null && ballot is not null && departing.Count > 0)
+            {
+                var names = (await _users.ListAsync(cancellationToken))
+                    .Where(user => departing.Contains(user.Id))
+                    .Select(user => user.Username)
+                    .ToList();
+                SignatureImpact.RequireAcknowledged(
+                    snapshot,
+                    BallotEdits.WithBallot(snapshot.Record, BallotEdits.Reassign(ballot, names)),
+                    acknowledgedSlotIds);
+            }
 
             var audit = AuditDraft.By(
                 actor, "slot.updated", $"slot {SlotNumberOf(slots, slotId)}: {members}", projectId, reviewId);
@@ -531,19 +564,25 @@ public sealed class SigningService
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="slotId">The slot identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or <c>null</c> for
+    ///     none. Needed when the slot has a submitted ballot: removing the slot removes its ballot from the record.
+    /// </param>
     /// <returns>A task that completes when the slot is removed.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.SlotNotFound"/> or
     ///     <see cref="DomainRule.SlotSigned"/> when a rule is violated; nothing is removed then. Also thrown with
-    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved.
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved and with
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged.
     /// </exception>
     public async Task RemoveSlotAsync(
         Actor actor,
         int projectId,
         string reviewId,
         int slotId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
     {
         ArgumentNullException.ThrowIfNull(actor);
         RejectApiToken(actor);
@@ -551,8 +590,17 @@ public sealed class SigningService
         try
         {
             await EnsureActorAsync(actor, projectId, cancellationToken);
-            await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+            var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
+
+            // The ballot of the slot leaves the record with it: that may change what the other signatures cover
+            if (snapshot is not null)
+            {
+                SignatureImpact.RequireAcknowledged(
+                    snapshot,
+                    BallotEdits.WithoutBallot(snapshot.Record, slotId),
+                    acknowledgedSlotIds);
+            }
 
             // The entry describes the slot as it was before it goes, including the number it had on the page
             var slot = slots.First(s => s.Id == slotId);
@@ -918,7 +966,22 @@ public sealed class SigningService
                 "This slot already has a signature of the current record.");
         }
 
-        var (_, blockers, _) = Assess(record);
+        var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
+        var (_, blockers, _) = Assess(record, slots.Count);
+
+        // The signer's own ballot must be handed in: the digest covers only the submitted ballots, so it cannot say so.
+        // A review with one slot hands the ballot in with the last answer, so there the open checks are the better
+        // message and come first.
+        var ownNotSubmitted = record.Checklist is not null
+                              && record.Ballots.FirstOrDefault(b => b.SlotId == slotId)?.State != BallotState.Submitted;
+        if (ownNotSubmitted && !(slots.Count == 1 && blockers.Count > 0))
+        {
+            throw new DomainRuleException(
+                DomainRule.BallotNotSubmitted,
+                "Hand in your ballot before you sign: the signature covers the consolidated ballots, and yours is " +
+                "not among them yet.");
+        }
+
         if (blockers.Count > 0)
         {
             throw new DomainRuleException(
@@ -1014,28 +1077,35 @@ public sealed class SigningService
     ///     Computes what blocks signing from a record.
     /// </summary>
     /// <param name="record">The record.</param>
+    /// <param name="slotCount">The number of reviewer slots of the review.</param>
     /// <returns>
-    ///     The checklist state (or <c>null</c> without a checklist), the blockers as plain sentences (empty when the
-    ///     review can be signed) and the number of checks answered Fail in sections that apply.
+    ///     The consolidated checklist state (or <c>null</c> without a checklist), the blockers as plain sentences (empty
+    ///     when the review can be signed) and the number of checks the submitted ballots agree on as Fail in sections
+    ///     that apply.
     /// </returns>
-    private static (ChecklistState? Checklist, IReadOnlyList<string> Blockers, int Failed) Assess(ReviewRecord record)
+    /// <remarks>
+    ///     A review with one slot counts the partial draft of that slot in the progress and the blockers (never in the
+    ///     digest), so the single reviewer sees what is left to answer.
+    /// </remarks>
+    private static (ChecklistState? Checklist, IReadOnlyList<string> Blockers, int Failed) Assess(
+        ReviewRecord record,
+        int slotCount)
     {
         var blockers = new List<string>();
 
         // A review needs a checklist to be signed
-        if (record.Checklist is null)
+        var view = BallotProjection.Consolidate(record, slotCount);
+        if (view is null)
         {
             blockers.Add("This review has no checklist.");
         }
 
-        ChecklistState? checklist = null;
-        var failed = 0;
-        if (record.Checklist is not null)
+        var checklist = view?.State;
+        var failed = view?.Result.Failed ?? 0;
+        if (view is not null)
         {
-            checklist = new ChecklistState(record.Checklist.Parse(), record.SectionStates, record.Answers);
-
             // Every check of an applicable section must be answered, and none may be a Fail
-            var unanswered = checklist.Overall.Unanswered;
+            var unanswered = view.Result.Pending;
             if (unanswered > 0)
             {
                 blockers.Add(unanswered == 1
@@ -1043,10 +1113,15 @@ public sealed class SigningService
                     : $"{unanswered} checklist checks are unanswered");
             }
 
-            failed = checklist.Definition.Sections
-                .Where(section => checklist.IsApplicable(section.Id))
-                .SelectMany(section => section.Items)
-                .Count(item => checklist.AnswerFor(item.Id)?.Outcome == ChecklistOutcome.Fail);
+            // Ballots that disagree must be settled before anybody signs
+            var disputed = view.Result.Disputed;
+            if (disputed > 0)
+            {
+                blockers.Add(disputed == 1
+                    ? "1 checklist check is disputed between the ballots"
+                    : $"{disputed} checklist checks are disputed between the ballots");
+            }
+
             if (failed > 0)
             {
                 blockers.Add(failed == 1 ? "1 check is answered Fail" : $"{failed} checks are answered Fail");

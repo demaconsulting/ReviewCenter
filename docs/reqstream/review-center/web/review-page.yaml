@@ -386,7 +386,9 @@ sections:
           with the primary reviewer, the alternate reviewer ("None" when there is none), and the signature status
           ("Not signed", "Signed by {name} on {UTC time}", or "Signature out of date"); let a signed-in user add a
           slot by choosing enabled users as primary and alternate, and change or remove a slot that has no
-          signature, showing the reason next to the control when a change is refused; offer no change or removal
+          signature, showing the reason next to the control when a change is refused, and naming the signers of
+          other slots whose signature the change would make out of date and storing the change only after the user
+          confirms; offer no change or removal
           for a slot that has a signature; show the display names as plain text; mark an assignee who is no longer a
           member of the project with the badge "No longer a project member" and, for the slot, the hint that such a
           reviewer cannot sign until added again, and no such marker for assignees who are members; keep a primary or
@@ -403,6 +405,8 @@ sections:
           - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
           - ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing
           - ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves
+          - ReviewPage_EditSlot_ChangeAltersSignedRecord_WarnsAndStoresOnlyOnConfirm
+          - ReviewPage_RemoveSlot_RemovalAltersSignedRecord_WarnsAndRemovesOnlyOnConfirm
           - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
           - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
           - ReviewPage_Render_SlotDisplayName_IsShownAsPlainText

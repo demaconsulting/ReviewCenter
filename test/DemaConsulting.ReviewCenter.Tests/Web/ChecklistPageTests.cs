@@ -42,14 +42,21 @@ public partial class ChecklistPageTests : PageTestBase
     private static partial Regex KebabCaseTestId();
 
     /// <summary>
-    ///     Creates a project with the review <c>REV-1</c>, which gets the default checklist.
+    ///     Creates a project with the review <c>REV-1</c>, which gets the default checklist, and seats ann as the one
+    ///     reviewer of it, so a person who answers as ann answers into the ballot of the slot.
     /// </summary>
+    /// <param name="seatAnn"><c>false</c> to leave the review without a reviewer slot.</param>
     /// <returns>The project id.</returns>
-    private async Task<int> CreateReviewAsync()
+    private async Task<int> CreateReviewAsync(bool seatAnn = true)
     {
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await Reviews.CreateDraftAsync(
             project.Id, "REV-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        if (seatAnn)
+        {
+            await SeatAsync(project.Id, "REV-1", "ann");
+        }
+
         return project.Id;
     }
 
@@ -221,7 +228,7 @@ public partial class ChecklistPageTests : PageTestBase
     public async Task ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls()
     {
         // Arrange: an approved review
-        var projectId = await CreateReviewAsync();
+        var projectId = await CreateReviewAsync(seatAnn: false);
         await AuditTestExtensions.ApproveReviewAsync(Store, Time, projectId, "REV-1", cancellationToken: TestContext.Current.CancellationToken);
 
         // Act: render the page
@@ -246,36 +253,105 @@ public partial class ChecklistPageTests : PageTestBase
     private const string SigningPassword = "correct horse battery";
 
     /// <summary>
-    ///     Creates a fully answered review whose first slot (rita) is signed, with a second slot (sam) and optionally a
-    ///     third slot (tom) that nobody has signed, so that the review is not approved.
+    ///     Creates a review with a ballot of every reviewer handed in, whose first slot (rita) is signed, with a second
+    ///     slot (sam) and optionally a third slot (tom) that nobody has signed, so that the review is not approved. The
+    ///     person who edits is the owner of the last slot and is signed in.
     /// </summary>
-    /// <param name="beforeSigning">Changes the record before the first slot is signed; <c>null</c> for none.</param>
+    /// <remarks>
+    ///     Every ballot passes every check, except that the owner of the last slot can differ: <paramref name="dissent"/>
+    ///     fails the first check and <paramref name="designOff"/> marks the design section as not applicable. The
+    ///     signing service refuses a disputed record, so for those two the signature of the first slot is stored
+    ///     directly, which models a signature given before the dispute arose. Taking the dissent back, or handing a
+    ///     changed ballot in, changes the record the signature is for.
+    /// </remarks>
+    /// <param name="dissent"><c>true</c> when the last reviewer fails the first check.</param>
+    /// <param name="designOff"><c>true</c> when the last reviewer marks the design section as not applicable.</param>
     /// <param name="thirdSlot"><c>true</c> to add the third slot.</param>
     /// <returns>The project identity and the identities of the first and the second slot.</returns>
     private async Task<(int ProjectId, int FirstSlotId, int SecondSlotId)> CreateSignedFirstSlotAsync(
-        Func<int, Task>? beforeSigning = null, bool thirdSlot = false)
+        bool dissent = false, bool designOff = false, bool thirdSlot = false)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var projectId = await CreateReviewAsync();
-        await PassSectionsAsync(projectId, [.. DefaultChecklist.Current.Sections.Select(s => s.Id)]);
-        if (beforeSigning is not null)
-        {
-            await beforeSigning(projectId);
-        }
-
+        var projectId = await CreateReviewAsync(seatAnn: false);
         var rita = new Actor("rita", "Rita");
-        var slots = new List<int>();
         var names = thirdSlot ? new[] { ("rita", "Rita"), ("sam", "Sam"), ("tom", "Tom") } : [("rita", "Rita"), ("sam", "Sam")];
+        var slots = new List<int>();
+        var userIds = new List<int>();
         foreach (var (username, name) in names)
         {
             var user = await Users.CreateAsync(username, name, UserRole.Reviewer, SigningPassword, cancellationToken);
+            userIds.Add(user.Id);
             await Store.AddMembershipAsync(user.Id, projectId, cancellationToken);
             slots.Add((await Signing.AddSlotAsync(rita, projectId, "REV-1", user.Id, null, cancellationToken)).Id);
         }
 
+        foreach (var (username, name) in names)
+        {
+            var actor = new Actor(username, name);
+            var isEditor = username == names[^1].Item1;
+            foreach (var section in DefaultChecklist.Current.Sections)
+            {
+                if (isEditor && designOff && section.Id == "DES")
+                {
+                    await Checklists.SetSectionApplicabilityAsync(projectId, "REV-1", "DES", false, "No design files", actor, cancellationToken);
+                    continue;
+                }
+
+                foreach (var item in section.Items)
+                {
+                    var fails = isEditor && dissent && item.Id == "REQ-01";
+                    await Checklists.SetAnswerAsync(
+                        projectId,
+                        "REV-1",
+                        item.Id,
+                        fails ? ChecklistOutcome.Fail : ChecklistOutcome.Pass,
+                        fails ? "Before" : null,
+                        actor,
+                        cancellationToken);
+                }
+            }
+
+            await Checklists.SubmitBallotAsync(projectId, "REV-1", actor, cancellationToken);
+        }
+
         var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
-        await Signing.SignAsync(rita, projectId, "REV-1", slots[0], approval!.Digest, SigningPassword, cancellationToken);
+        if (dissent || designOff)
+        {
+            // The signing service refuses to sign a disputed record, so the signature is put in the store directly, as
+            // if it had been given before the dispute: the state a warning guards against
+            await Store.AddSignatureAsync(
+                new ReviewSignature
+                {
+                    ProjectId = projectId,
+                    ReviewId = "REV-1",
+                    SlotId = slots[0],
+                    UserId = userIds[0],
+                    DisplayName = "Rita",
+                    Role = SlotRole.Primary,
+                    SignedAt = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero),
+                    RecordDigest = approval!.Digest,
+                    Meaning = "Reviewed and approved"
+                },
+                cancellationToken);
+        }
+        else
+        {
+            await Signing.SignAsync(rita, projectId, "REV-1", slots[0], approval!.Digest, SigningPassword, cancellationToken);
+        }
+
+        SignInAs(names[^1].Item1, names[^1].Item2, false);
         return (projectId, slots[0], slots[1]);
+    }
+
+    /// <summary>
+    ///     Gets the ballot of a reviewer as that person sees it, with the drafts.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="username">The user name of the owner of the slot.</param>
+    /// <returns>The checklist state of the reviewer.</returns>
+    private async Task<ChecklistState> OwnStateAsync(int projectId, string username)
+    {
+        return (await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken, username))!;
     }
 
     /// <summary>
@@ -305,15 +381,14 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that an answer that changes a review with a current signature is not stored at once: the page names
-    ///     the signature in a warning and keeps the unsaved Fail, cancelling stores nothing, and confirming stores the
-    ///     answer and makes the signature out of date.
+    ///     Test that an answer that changes a review with a current signature is stored as a draft, that handing the
+    ///     ballot in waits for confirmation because it changes what the signature is for, that cancelling stores
+    ///     nothing, and that confirming hands the ballot in and makes the signature out of date.
     /// </summary>
     [Fact]
     public async Task ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate()
     {
-        // Arrange: a fully answered review whose first of two slots is signed, so it is not yet approved
-        var cancellationToken = TestContext.Current.CancellationToken;
+        // Arrange: a review whose first of two slots is signed; sam, owner of the second, has handed in a ballot
         var (projectId, slotId, _) = await CreateSignedFirstSlotAsync();
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
@@ -323,42 +398,48 @@ public partial class ChecklistPageTests : PageTestBase
         await cut.Find("[data-testid='check-justification-req-01']").InputAsync("Not good enough");
         await cut.Find("[data-testid='check-save-req-01']").ClickAsync();
 
-        // Assert: the warning names slot and signer, and the old answer and signature are untouched
+        // Assert: the answer is only a draft of sam, so nothing is warned about and the signature is current
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        var draft = await OwnStateAsync(projectId, "sam");
+        Assert.Equal((ChecklistOutcome.Fail, BallotState.Draft), (draft.AnswerFor("REQ-01")!.Outcome, draft.BallotState));
+        Assert.Equal(SlotSignatureState.Signed, await SlotStateAsync(projectId, slotId));
+
+        // Act: hand the ballot in
+        await cut.Find("[data-testid='submit-ballot']").ClickAsync();
+
+        // Assert: the warning names slot and signer, and the ballot is still a draft
         Assert.Equal("Slot 1 (Rita)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
-        Assert.Equal(ChecklistOutcome.Pass, (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.AnswerFor("REQ-01")!.Outcome);
+        Assert.Equal(BallotState.Draft, (await OwnStateAsync(projectId, "sam")).BallotState);
         Assert.Equal(SlotSignatureState.Signed, await SlotStateAsync(projectId, slotId));
 
         // Act: cancel
         await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
 
-        // Assert: no warning, nothing stored, and the Fail with its text is still waiting to be saved
+        // Assert: no warning, still a draft, and the signature is current
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
-        Assert.Equal(ChecklistOutcome.Pass, (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.AnswerFor("REQ-01")!.Outcome);
-        Assert.Equal("true", cut.Find("[data-testid='check-fail-req-01']").GetAttribute("aria-pressed"));
-        Assert.Equal("Not good enough", cut.Find("[data-testid='check-justification-req-01']").GetAttribute("value"));
+        Assert.Equal(BallotState.Draft, (await OwnStateAsync(projectId, "sam")).BallotState);
+        Assert.Equal(SlotSignatureState.Signed, await SlotStateAsync(projectId, slotId));
 
-        // Act: save again and confirm
-        await cut.Find("[data-testid='check-save-req-01']").ClickAsync();
+        // Act: hand in again and confirm
+        await cut.Find("[data-testid='submit-ballot']").ClickAsync();
         await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
 
-        // Assert: the answer is stored, the warning is gone and the first slot's signature is out of date
+        // Assert: the ballot counts, the warning is gone and the first slot's signature is out of date
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
-        var answer = (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.AnswerFor("REQ-01")!;
-        Assert.Equal((ChecklistOutcome.Fail, "Not good enough"), (answer.Outcome, answer.Justification));
+        var submitted = await OwnStateAsync(projectId, "sam");
+        Assert.Equal((ChecklistOutcome.Fail, BallotState.Submitted), (submitted.AnswerFor("REQ-01")!.Outcome, submitted.BallotState));
         Assert.Equal(SlotSignatureState.OutOfDate, await SlotStateAsync(projectId, slotId));
     }
 
     /// <summary>
-    ///     Test that a Pass that changes a signed review waits for confirmation next to the check, and that the check
-    ///     keeps its stored answer until the person confirms.
+    ///     Test that taking back a dissent, which changes a signed review, waits for confirmation next to the check,
+    ///     and that the check keeps its stored answer until the person confirms.
     /// </summary>
     [Fact]
     public async Task ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores()
     {
-        // Arrange: the first check was passed with a justification before the first slot was signed
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var (projectId, slotId, _) = await CreateSignedFirstSlotAsync(id =>
-            Checklists.SetAnswerAsync(id, "REV-1", "REQ-01", ChecklistOutcome.Pass, "Before", TestActors.Ann, cancellationToken));
+        // Arrange: sam failed the first check with a justification before the first slot was signed
+        var (projectId, slotId, _) = await CreateSignedFirstSlotAsync(dissent: true);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
 
@@ -367,7 +448,7 @@ public partial class ChecklistPageTests : PageTestBase
 
         // Assert: the warning is inside the check, and the stored answer still has its justification
         Assert.Equal("Slot 1 (Rita)", cut.Find("[data-testid='check-req-01'] [data-testid='signature-warning-slots']").TextContent);
-        Assert.Equal("Before", (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.AnswerFor("REQ-01")!.Justification);
+        Assert.Equal("Before", (await OwnStateAsync(projectId, "sam")).AnswerFor("REQ-01")!.Justification);
 
         // Act: confirm
         await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
@@ -375,7 +456,7 @@ public partial class ChecklistPageTests : PageTestBase
         // Assert: passed without the justification, and the signature is out of date
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
         Assert.Equal("true", cut.Find("[data-testid='check-pass-req-01']").GetAttribute("aria-pressed"));
-        Assert.NotEqual("Before", (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.AnswerFor("REQ-01")!.Justification);
+        Assert.NotEqual("Before", (await OwnStateAsync(projectId, "sam")).AnswerFor("REQ-01")!.Justification);
         Assert.Equal(SlotSignatureState.OutOfDate, await SlotStateAsync(projectId, slotId));
     }
 
@@ -386,72 +467,78 @@ public partial class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring()
     {
-        // Arrange: three slots with the first signed, and a pass that waits for confirmation
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var (projectId, _, secondSlotId) = await CreateSignedFirstSlotAsync(
-            id => Checklists.SetAnswerAsync(id, "REV-1", "REQ-01", ChecklistOutcome.Pass, "Before", TestActors.Ann, cancellationToken),
-            thirdSlot: true);
+        // Arrange: three slots with the first signed; tom saves a fail as a draft and hands the ballot in
+        var (projectId, _, secondSlotId) = await CreateSignedFirstSlotAsync(thirdSlot: true);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
-        await cut.Find("[data-testid='check-pass-req-01']").ClickAsync();
+        await cut.Find("[data-testid='check-fail-req-01']").ClickAsync();
+        await cut.Find("[data-testid='check-justification-req-01']").InputAsync("Changed my mind");
+        await cut.Find("[data-testid='check-save-req-01']").ClickAsync();
+        await cut.Find("[data-testid='submit-ballot']").ClickAsync();
         Assert.Equal("Slot 1 (Rita)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
 
         // Act: sam signs the second slot, then the person confirms what was shown
         await SignAsSamAsync(projectId, secondSlotId);
         await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
 
-        // Assert: nothing is stored, and the warning now names both signatures
-        Assert.Equal("Before", (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.AnswerFor("REQ-01")!.Justification);
+        // Assert: the ballot is still a draft, and the warning now names both signatures
+        Assert.Equal(BallotState.Draft, (await OwnStateAsync(projectId, "tom")).BallotState);
         Assert.Equal("Slot 1 (Rita), Slot 2 (Sam)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
 
         // Act: confirm again
         await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
 
-        // Assert: stored
+        // Assert: handed in
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
-        Assert.NotEqual("Before", (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.AnswerFor("REQ-01")!.Justification);
+        Assert.Equal(BallotState.Submitted, (await OwnStateAsync(projectId, "tom")).BallotState);
     }
 
     /// <summary>
-    ///     Test that saving the reason that makes a section not applicable waits for confirmation on a signed review,
-    ///     that cancelling keeps the unsaved switch and reason, and that confirming stores the section as not
-    ///     applicable.
+    ///     Test that saving the reason that makes a section not applicable is stored as a draft on a signed review,
+    ///     that handing the ballot in waits for confirmation, that cancelling keeps the switch and reason, and that
+    ///     confirming makes the section not applicable in the record.
     /// </summary>
     [Fact]
     public async Task ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores()
     {
         // Arrange: a signed first slot and the design section switched off with its reason, not yet saved
-        var cancellationToken = TestContext.Current.CancellationToken;
         var (projectId, slotId, _) = await CreateSignedFirstSlotAsync();
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
         await cut.Find("[data-testid='section-des-applicable']").ChangeAsync(new ChangeEventArgs { Value = false });
         await cut.Find("[data-testid='section-des-reason']").InputAsync("No design files");
 
-        // Act: save the reason
+        // Act: save the reason, then hand the ballot in
         await cut.Find("[data-testid='section-des-save']").ClickAsync();
 
-        // Assert: the warning names the signature and nothing is stored
+        // Assert: saved as a draft without a warning, and the signature is current
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.False((await OwnStateAsync(projectId, "sam")).IsApplicable("DES"));
+        Assert.Equal(SlotSignatureState.Signed, await SlotStateAsync(projectId, slotId));
+        await cut.Find("[data-testid='submit-ballot']").ClickAsync();
+
+        // Assert: the warning names the signature and the ballot is still a draft
         Assert.Equal("Slot 1 (Rita)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
-        Assert.True((await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.IsApplicable("DES"));
+        Assert.Equal(BallotState.Draft, (await OwnStateAsync(projectId, "sam")).BallotState);
 
         // Act: cancel
         await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
 
-        // Assert: the switch is still off with the typed reason, and nothing is stored
+        // Assert: the switch is still off with the typed reason, and the ballot is still a draft
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
         Assert.False(cut.Find("[data-testid='section-des-applicable']").HasAttribute("checked"));
         Assert.Equal("No design files", cut.Find("[data-testid='section-des-reason']").GetAttribute("value"));
-        Assert.True((await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.IsApplicable("DES"));
+        Assert.Equal(BallotState.Draft, (await OwnStateAsync(projectId, "sam")).BallotState);
 
-        // Act: save again and confirm
-        await cut.Find("[data-testid='section-des-save']").ClickAsync();
+        // Act: hand in again and confirm
+        await cut.Find("[data-testid='submit-ballot']").ClickAsync();
         await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
 
         // Assert: not applicable now, and the signature is out of date
         Assert.Equal("Not applicable", cut.Find("[data-testid='section-des-progress']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='section-des-unsaved-hint']"));
-        Assert.Equal("No design files", (await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.ReasonFor("DES"));
+        var own = await OwnStateAsync(projectId, "sam");
+        Assert.Equal(("No design files", BallotState.Submitted), (own.ReasonFor("DES"), own.BallotState));
         Assert.Equal(SlotSignatureState.OutOfDate, await SlotStateAsync(projectId, slotId));
     }
 
@@ -462,10 +549,8 @@ public partial class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores()
     {
-        // Arrange: the design section was marked not applicable before the first slot was signed
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var (projectId, slotId, _) = await CreateSignedFirstSlotAsync(id =>
-            Checklists.SetSectionApplicabilityAsync(id, "REV-1", "DES", false, "No design files", TestActors.Ann, cancellationToken));
+        // Arrange: sam marked the design section not applicable, which rita did not, before rita signed
+        var (projectId, slotId, _) = await CreateSignedFirstSlotAsync(designOff: true);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
 
@@ -475,7 +560,7 @@ public partial class ChecklistPageTests : PageTestBase
         // Assert: the warning is shown, the switch is on while the person decides, and nothing is stored
         Assert.Equal("Slot 1 (Rita)", cut.Find("[data-testid='signature-warning-slots']").TextContent);
         Assert.True(cut.Find("[data-testid='section-des-applicable']").HasAttribute("checked"));
-        Assert.False((await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.IsApplicable("DES"));
+        Assert.False((await OwnStateAsync(projectId, "sam")).IsApplicable("DES"));
 
         // Act: cancel
         await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
@@ -483,7 +568,7 @@ public partial class ChecklistPageTests : PageTestBase
         // Assert: the switch is back off and nothing is stored
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
         Assert.False(cut.Find("[data-testid='section-des-applicable']").HasAttribute("checked"));
-        Assert.False((await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.IsApplicable("DES"));
+        Assert.False((await OwnStateAsync(projectId, "sam")).IsApplicable("DES"));
 
         // Act: switch on again and confirm
         await cut.Find("[data-testid='section-des-applicable']").ChangeAsync(new ChangeEventArgs { Value = true });
@@ -491,7 +576,7 @@ public partial class ChecklistPageTests : PageTestBase
 
         // Assert: the section applies again, and the signature is out of date
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
-        Assert.True((await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.IsApplicable("DES"));
+        Assert.True((await OwnStateAsync(projectId, "sam")).IsApplicable("DES"));
         Assert.Equal(5, cut.FindAll("[data-testid^='check-des-']").Count);
         Assert.Equal(SlotSignatureState.OutOfDate, await SlotStateAsync(projectId, slotId));
     }
@@ -502,10 +587,8 @@ public partial class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning()
     {
-        // Arrange: a not applicable section on a signed review, with the switch-on warning open
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var (projectId, _, _) = await CreateSignedFirstSlotAsync(id =>
-            Checklists.SetSectionApplicabilityAsync(id, "REV-1", "DES", false, "No design files", TestActors.Ann, cancellationToken));
+        // Arrange: a not applicable section of sam on a signed review, with the switch-on warning open
+        var (projectId, _, _) = await CreateSignedFirstSlotAsync(designOff: true);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
         await cut.Find("[data-testid='section-des-applicable']").ChangeAsync(new ChangeEventArgs { Value = true });
@@ -517,7 +600,7 @@ public partial class ChecklistPageTests : PageTestBase
         // Assert: the warning is gone, the switch is off, and nothing is stored
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
         Assert.False(cut.Find("[data-testid='section-des-applicable']").HasAttribute("checked"));
-        Assert.False((await Checklists.GetAsync(projectId, "REV-1", cancellationToken))!.IsApplicable("DES"));
+        Assert.False((await OwnStateAsync(projectId, "sam")).IsApplicable("DES"));
     }
 
     /// <summary>
@@ -528,9 +611,7 @@ public partial class ChecklistPageTests : PageTestBase
     public async Task ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId()
     {
         // Arrange: a pass that waits for confirmation next to its check
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var (projectId, _, _) = await CreateSignedFirstSlotAsync(id =>
-            Checklists.SetAnswerAsync(id, "REV-1", "REQ-01", ChecklistOutcome.Pass, "Before", TestActors.Ann, cancellationToken));
+        var (projectId, _, _) = await CreateSignedFirstSlotAsync(dissent: true);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
         await cut.Find("[data-testid='check-pass-req-01']").ClickAsync();
@@ -631,7 +712,8 @@ public partial class ChecklistPageTests : PageTestBase
     {
         // Arrange: a new review, with the reviewer signed in as Bea
         SignInAs("bea", "Bea");
-        var projectId = await CreateReviewAsync();
+        var projectId = await CreateReviewAsync(seatAnn: false);
+        await SeatAsync(projectId, "REV-1", "bea");
         var cut = RenderPage(projectId);
 
         // Act: pass the first check
@@ -655,6 +737,8 @@ public partial class ChecklistPageTests : PageTestBase
         // Arrange: a review created by the user "author", viewed by the author, by Bea, and by the author again with
         // the rule off
         var projectId = await CreateReviewAsync();
+        await SeatAsync(projectId, "REV-1", "bea");
+        await SeatAsync(projectId, "REV-1", "author");
         SignInAs("author", "Author");
 
         // Act
@@ -683,7 +767,7 @@ public partial class ChecklistPageTests : PageTestBase
     public async Task ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice()
     {
         // Arrange: an approved review, viewed by its author
-        var projectId = await CreateReviewAsync();
+        var projectId = await CreateReviewAsync(seatAnn: false);
         await AuditTestExtensions.ApproveReviewAsync(Store, Time, projectId, "REV-1", cancellationToken: TestContext.Current.CancellationToken);
         SignInAs("author", "Author");
 
@@ -704,6 +788,7 @@ public partial class ChecklistPageTests : PageTestBase
     {
         // Arrange: the rule is off while the author loads the page, and then switched on
         var projectId = await CreateReviewAsync();
+        await SeatAsync(projectId, "REV-1", "author");
         await Projects.SetReviewRuleOffAsync(projectId, ReviewRule.NonAuthorChecklistAnswers, TestContext.Current.CancellationToken);
         SignInAs("author", "Author");
         var cut = RenderPage(projectId);
@@ -1013,6 +1098,7 @@ public partial class ChecklistPageTests : PageTestBase
         var projectId = await CreateReviewAsync();
         var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
         await Store.AddMembershipAsync(member.Id, projectId, TestContext.Current.CancellationToken);
+        await SeatAsync(projectId, "REV-1", "mem");
         SignInAs("mem", "Mem", UserRole.Reviewer);
         var cut = RenderPage(projectId);
         Assert.NotEmpty(cut.FindAll("[data-testid='checklist-status']"));

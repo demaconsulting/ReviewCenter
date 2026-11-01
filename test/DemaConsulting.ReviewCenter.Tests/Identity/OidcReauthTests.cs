@@ -699,10 +699,10 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         await world.AddMemberAsync("olive");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, ReviewId, "First review", [new("a.txt", TestContent.A)], world.Boss, cancellationToken);
-        await EvidenceTestSupport.AnswerAllPassAsync(
-            app.Services.GetRequiredService<ChecklistService>(), project.Id, ReviewId);
         var olive = await OidcTestApp.UserAsync(app, "olive");
         var slot = await world.Signing.AddSlotAsync(world.Boss, project.Id, ReviewId, olive.Id, null, cancellationToken);
+        await EvidenceTestSupport.AnswerAllPassAsync(
+            app.Services.GetRequiredService<ChecklistService>(), project.Id, ReviewId, world.Actor);
         world.SlotId = slot.Id;
         Assert.NotEqual(0, admin.Id);
         return world;

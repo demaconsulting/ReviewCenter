@@ -32,8 +32,9 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     Each operation uses its own short-lived context from the factory, so the store is safe for
 ///     concurrent use by all browser sessions. Read operations are untracked, and listing a review
 ///     never loads file bytes. The checklist snapshot is stored in the same transaction as its review.
-///     Answers and section states are replaced in place (one row per check or section and slot; the rows without a slot are
-///     the review-level rows the record is built from, the rows of a slot make its ballot). Ballot changes run in one
+///     Answers and section states are replaced in place (one row per check or section and slot; the rows of a slot make
+///     its ballot, which the record carries; the rows without a slot are only the baseline that a follow-up review carries,
+///     belong to no ballot and are no part of the record). Ballot changes run in one
 ///     transaction with the status row of the ballot and up to two audit entries (the change, then a status change of the
 ///     ballot). Slots are plain rows.
 ///     Signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness
@@ -933,61 +934,6 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
-    public async Task SetChecklistSectionStateAsync(
-        ChecklistSectionState state,
-        AuditDraft audit,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        ArgumentNullException.ThrowIfNull(audit);
-
-        // A ballot row must go through the ballot rules (status, audit), so it cannot enter by this door
-        if (state.SlotId != ChecklistAnswer.BaselineSlotId)
-        {
-            throw new ArgumentException("A section state of a ballot is stored with SetBallotSectionStateAsync.", nameof(state));
-        }
-
-        // Replace the row when there is one; otherwise insert it. The write lock is held for the whole
-        // transaction, so no other request can insert the row between the update and the insert
-        await appender.ExecuteAsync<bool>(
-            factory,
-            async context =>
-            {
-                await EnsureNotLockedAsync(context, state.ProjectId, state.ReviewId, cancellationToken);
-                await UpsertSectionStateAsync(context, state, cancellationToken);
-                return (true, audit);
-            },
-            cancellationToken);
-    }
-
-    /// <inheritdoc />
-    public async Task SetChecklistAnswerAsync(
-        ChecklistAnswer answer,
-        AuditDraft audit,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(answer);
-        ArgumentNullException.ThrowIfNull(audit);
-
-        // A ballot row must go through the ballot rules (status, audit), so it cannot enter by this door
-        if (answer.SlotId != ChecklistAnswer.BaselineSlotId)
-        {
-            throw new ArgumentException("An answer of a ballot is stored with SetBallotAnswerAsync.", nameof(answer));
-        }
-
-        // Same replace-or-insert approach as for the section state
-        await appender.ExecuteAsync<bool>(
-            factory,
-            async context =>
-            {
-                await EnsureNotLockedAsync(context, answer.ProjectId, answer.ReviewId, cancellationToken);
-                await UpsertAnswerAsync(context, answer, cancellationToken);
-                return (true, audit);
-            },
-            cancellationToken);
-    }
-
-    /// <inheritdoc />
     public async Task<IReadOnlyList<Ballot>> ListBallotsAsync(
         int projectId,
         string reviewId,
@@ -1477,6 +1423,17 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                         "A thread is open; resolve it before signing.");
                 }
 
+                // The own ballot must be handed in: the digest covers only submitted ballots, so a draft of the signer
+                // changes nothing in it and the digest check above cannot see it. A review without a checklist has no
+                // ballots and keeps the earlier rule
+                if (record.Checklist is not null
+                    && !record.Ballots.Any(b => b.SlotId == signature.SlotId && b.Status == BallotStatus.Submitted))
+                {
+                    throw new DomainRuleException(
+                        DomainRule.BallotNotSubmitted,
+                        "Your ballot has not been handed in; submit it before signing.");
+                }
+
                 // Insert a fresh entity so that the database always assigns the identity
                 var entity = new ReviewSignature
                 {
@@ -1742,15 +1699,23 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     .Where(c => c.ProjectId == projectId && ids.Contains(c.ReviewId))
                     .ToListAsync(cancellationToken))
                 .ToLookup(c => c.ReviewId);
-            // The record holds the review-level rows only; the rows of a slot belong to its ballot (see ListBallotsAsync)
+            // The record holds the ballots: the status row of each slot with its own rows. The review-level rows
+            // (SlotId 0) are only the baseline a follow-up carries and seed the ballot of a new slot
+            var ballotRows = (await context.ChecklistBallots.AsNoTracking()
+                    .Where(b => b.ProjectId == projectId && ids.Contains(b.ReviewId))
+                    .OrderBy(b => b.SlotId)
+                    .ToListAsync(cancellationToken))
+                .ToLookup(b => b.ReviewId);
             var sections = (await context.ChecklistSectionStates.AsNoTracking()
-                    .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId) && s.SlotId == ChecklistAnswer.BaselineSlotId)
+                    .Where(s => s.ProjectId == projectId && ids.Contains(s.ReviewId) && s.SlotId > ChecklistAnswer.BaselineSlotId)
+                    .OrderBy(s => s.SectionId)
                     .ToListAsync(cancellationToken))
-                .ToLookup(s => s.ReviewId);
+                .ToLookup(s => (s.ReviewId, s.SlotId));
             var answers = (await context.ChecklistAnswers.AsNoTracking()
-                    .Where(a => a.ProjectId == projectId && ids.Contains(a.ReviewId) && a.SlotId == ChecklistAnswer.BaselineSlotId)
+                    .Where(a => a.ProjectId == projectId && ids.Contains(a.ReviewId) && a.SlotId > ChecklistAnswer.BaselineSlotId)
+                    .OrderBy(a => a.ItemId)
                     .ToListAsync(cancellationToken))
-                .ToLookup(a => a.ReviewId);
+                .ToLookup(a => (a.ReviewId, a.SlotId));
             var threads = (await context.Threads.AsNoTracking()
                     .Where(t => t.ProjectId == projectId && ids.Contains(t.ReviewId))
                     .Include(t => t.Comments.OrderBy(c => c.Id))
@@ -1785,8 +1750,12 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 records[header.Id] = new ReviewRecord(
                     header.ContentFingerprint,
                     checklists[header.Id].FirstOrDefault(),
-                    sections[header.Id].ToList(),
-                    answers[header.Id].ToList(),
+                    ballotRows[header.Id]
+                        .Select(row => ToBallot(
+                            row,
+                            answers[(header.Id, row.SlotId)].ToList(),
+                            sections[(header.Id, row.SlotId)].ToList()))
+                        .ToList(),
                     threads[header.Id].ToList(),
                     source,
                     reopens.GetValueOrDefault(header.Id),
@@ -2201,8 +2170,9 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     ///     The <c>ballot.reassigned</c> draft when a row was removed or the status changed; otherwise <c>null</c>.
     /// </returns>
     /// <remarks>
-    ///     Rows carried from an earlier review stay, because their author is a third party, not the departing reviewer.
-    ///     The entry names the slot number and counts only.
+    ///     Rows carried from an earlier review stay: they keep the user name of the earlier author, so a departing reviewer
+    ///     may still be named on one although the reviewer did not give it in this review; <c>BallotEdits.Reassign</c> applies
+    ///     the same exemption. The entry names the slot number and counts only.
     /// </remarks>
     private static async Task<AuditDraft?> ReassignBallotAsync(
         ReviewCenterDbContext context,
@@ -2219,7 +2189,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .Select(u => u.Username)
             .ToListAsync(cancellationToken);
 
-        // Only rows the departing reviewers gave themselves go; carried rows are not theirs
+        // Only rows the departing reviewers gave themselves in this review go; a carried row is kept even when it still
+        // names a departing reviewer, because it keeps the user name of its earlier author
         var answerIds = (await context.ChecklistAnswers.AsNoTracking()
                 .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == slotId && a.CarriedFromReviewId == null)
                 .ToListAsync(cancellationToken))

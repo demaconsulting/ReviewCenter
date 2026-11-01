@@ -40,18 +40,21 @@ who resolves it, and how it is worded.
 While the project requires it (the default), the person who created the review in ReviewCenter cannot answer its
 checks or change which sections apply; another member of the project has to. The checklist page tells the author so and
 disables the controls. The author can still start, answer, and resolve comment threads, because the discussion is
-where the author explains the change. Plan for it: create the review, then ask a second member to go through the
+where the author explains the change. Only a reviewer of a slot of the review can answer, so add the slots first. Plan
+for it: create the review, then ask a second member to go through the
 checklist, or let a reviewer do it. A project where one person has to do everything switches the rule off on the
 project page; every change of the rule is audited.
 
 ## What Makes a Signature Out of Date
 
 A signature stays current only while the record is the one that was signed. These changes alter the record, so each one
-makes the current signatures out of date: a changed checklist answer (also the justification, or who gave the answer),
-switching a checklist section to not applicable or back, and a change to the report, which is the set of comments that
+makes the current signatures out of date: a change of the agreed standing of the submitted ballots (a check or a section
+on which the ballots agreed that becomes disputed or changes its agreed answer, or a check that becomes agreed or open),
+and a change to the report, which is the set of comments that
 are included in it (an included comment, a reply that is included, including or removing a comment, promoting or
-demoting a thread, and resolving a Finding with its note). A save that changes nothing, such as the same person saving
-the same answer again, does not.
+demoting a thread, and resolving a Finding with its note). A draft ballot, a justification, the name of the person who
+answered, and a save that changes nothing, such as a second reviewer submitting the answer that the ballots already
+agree on, do not.
 
 Ordinary discussion does not alter the record. A comment is **chat** unless it is included in the report, and chat,
 replies to it, and the state of a thread (resolved or open) are not part of what a signature covers. This version of
@@ -73,7 +76,8 @@ the signers are done, or agree with them first (see *Sign Last* below).
 ## Answering the Checklist
 
 - **Pass** when you looked at the files of the review and the check is met. A Pass needs no text and is saved at once,
-  so do not use it to move on quickly; an answer is recorded under your name and goes into the signed record.
+  so do not use it to move on quickly; an answer is recorded under your name in your ballot, and the agreed answers
+  go into the signed record.
 - **Fail** when the check is not met. A justification is required. State what is wrong and where, and point to the
   thread that holds the details, because checklist answers are not linked to threads by the product.
 - **N/A** when the check cannot apply to the files of this review. A justification is required as well. Say why in a
@@ -90,12 +94,14 @@ record that the signatures bind to.
 
 ## Sign Last
 
-Any change to the record, including a checklist answer of another reviewer (even an identical one) or a change to the
-report, makes the signatures given so far out of date. So agree who is still to answer, let them
+Any change to the agreed standing of the submitted ballots (such as a reviewer disagreeing with an agreed check) or a
+change to the
+report makes the signatures given so far out of date. So agree who is still to answer, let them
 finish, close the open threads (an open thread blocks the signature), and only then sign; the signature of the last
 reviewer is the one that approves the review. If a late change
 is needed, the page warns you which signatures it voids; after you confirm, the reviewers who already signed sign the
-new record again.
+new record again. A reviewer may sign as soon as the own ballot is submitted, but then a later disagreement of another
+reviewer makes that signature out of date.
 
 ## When a Check Fails
 

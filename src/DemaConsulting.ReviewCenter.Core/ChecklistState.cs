@@ -78,6 +78,65 @@ public sealed class ChecklistState
     public bool AuthorBlocked { get; init; }
 
     /// <summary>
+    ///     Gets the identity of the slot whose ballot this state shows, or <c>null</c> for the consolidated view.
+    /// </summary>
+    public int? SlotId { get; init; }
+
+    /// <summary>
+    ///     Gets the state of the ballot this state shows; <see cref="BallotState.NotStarted"/> when the viewer's slot has
+    ///     no answer yet, and for the consolidated view (which is no ballot).
+    /// </summary>
+    public BallotState BallotState { get; init; } = BallotState.NotStarted;
+
+    /// <summary>
+    ///     Gets a value indicating whether the state shows the viewer's own ballot (drafts included) rather than the
+    ///     consolidated standing of the submitted ballots.
+    /// </summary>
+    public bool IsOwnBallot { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the review has no reviewer slot the viewer could answer for, so the viewer sees
+    ///     the consolidated standing and cannot answer; set by <see cref="ChecklistService.GetAsync"/> for a viewer
+    ///     without a slot.
+    /// </summary>
+    public bool NoSlot { get; init; }
+
+    /// <summary>
+    ///     Gets the consolidation this state was built from, or <c>null</c> for the state of one ballot.
+    /// </summary>
+    public BallotConsolidationResult? Consolidation { get; init; }
+
+    /// <summary>
+    ///     Gets the standing of a check in the consolidation.
+    /// </summary>
+    /// <param name="itemId">The item identifier.</param>
+    /// <returns>The standing, or <c>null</c> when the state is no consolidation or the check is not listed.</returns>
+    public CheckConsolidation? ConsolidationFor(string itemId)
+    {
+        return Consolidation?.Checks.FirstOrDefault(check => check.ItemId == itemId);
+    }
+
+    /// <summary>
+    ///     Reports whether the submitted ballots disagree on whether a section applies.
+    /// </summary>
+    /// <param name="sectionId">The section identifier.</param>
+    /// <returns><c>true</c> only for a consolidation in which the section is disputed.</returns>
+    public bool IsSectionDisputed(string sectionId)
+    {
+        return Consolidation?.Sections.Any(s => s.SectionId == sectionId && s.Consensus == SectionConsensus.Disputed) == true;
+    }
+
+    /// <summary>
+    ///     Gets the stored state of a section.
+    /// </summary>
+    /// <param name="sectionId">The section identifier.</param>
+    /// <returns>The state (the representative row in a consolidation), or <c>null</c> when none was stored.</returns>
+    public ChecklistSectionState? SectionStateFor(string sectionId)
+    {
+        return _sections.GetValueOrDefault(sectionId);
+    }
+
+    /// <summary>
     ///     Gets the progress over all sections that apply.
     /// </summary>
     public ChecklistProgress Overall

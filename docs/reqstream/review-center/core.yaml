@@ -75,6 +75,7 @@ sections:
           - ReviewCenter-RepositoryService-Ownership
           - ReviewCenter-ThreadService-Access
           - ReviewCenter-ChecklistService-Access
+          - ReviewCenter-ChecklistService-BallotAccess
         tests:
           - ProjectAccess_Matrix_ActorKinds_GetTheirRights
           - ProjectAccess_Revocation_TakesEffectOnTheNextCall
@@ -260,6 +261,10 @@ sections:
           - ReviewCenter-ChecklistService-Progress
           - ReviewCenter-ChecklistService-ReviewConclusionText
           - ReviewCenter-ChecklistService-ReviewConclusionTextAudit
+          - ReviewCenter-ChecklistService-BallotSlot
+          - ReviewCenter-ChecklistService-BallotSubmit
+          - ReviewCenter-ChecklistService-SingleSlotAutoSubmit
+          - ReviewCenter-ChecklistService-OwnBallotView
         tests:
           - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
 
@@ -321,6 +326,10 @@ sections:
           - ReviewCenter-RecordDigest-Independence
           - ReviewCenter-RecordDigest-Unambiguous
           - ReviewCenter-RecordDigest-Report
+          - ReviewCenter-RecordDigest-ConsolidatedChecks
+          - ReviewCenter-RecordDigest-DraftIgnored
+          - ReviewCenter-RecordDigest-NoBallotContent
+          - ReviewCenter-RecordDigest-Outcome
           - ReviewCenter-SigningService-Slots
           - ReviewCenter-SigningService-SlotUsers
           - ReviewCenter-SigningService-SlotEdit
@@ -332,6 +341,11 @@ sections:
           - ReviewCenter-SigningService-Status
           - ReviewCenter-SigningService-SignatureImpact
           - ReviewCenter-ChecklistService-SignatureImpact
+          - ReviewCenter-ChecklistService-BallotImpact
+          - ReviewCenter-SigningService-OwnBallotSubmitted
+          - ReviewCenter-SigningService-EarlySigning
+          - ReviewCenter-SigningService-DisputedBlocker
+          - ReviewCenter-SigningService-SlotBallotImpact
           - ReviewCenter-ThreadService-SignatureImpact
         tests:
           - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
@@ -353,6 +367,7 @@ sections:
           project, keeps the record that was signed the record that exists, and keeps the history of approvals complete.
         children:
           - ReviewCenter-SigningService-ApprovalLock
+          - ReviewCenter-SigningService-Concluded
           - ReviewCenter-SigningService-Reopen
           - ReviewCenter-ThreadService-ApprovalLock
           - ReviewCenter-ThreadService-ConcludedRefusal
@@ -406,7 +421,8 @@ sections:
           The Core subsystem shall enforce the two further review rules of a project through its services, whatever
           the caller: while a project requires that authors do not answer the checklist, the author of a review cannot
           answer a check or change the applicability of a section of it; while it requires that the person who
-          reopened a review does not sign it again, that person cannot sign it and an administrator cannot reopen a
+          reopened a review does not sign it again, that person cannot sign it, but can still answer the checklist and
+          hand in a ballot of a slot, and an administrator cannot reopen a
           review in a way that leaves a slot without a person who may sign; and a project that switched a rule off is
           not restricted by it.
         justification: |
@@ -416,6 +432,7 @@ sections:
         children:
           - ReviewCenter-ChecklistService-AuthorRule
           - ReviewCenter-SigningService-ReopenerRule
+          - ReviewCenter-ChecklistService-ReopenerBallot
           - ReviewCenter-SigningService-StrandedSlot
         tests:
           - CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff
@@ -646,6 +663,7 @@ sections:
           - ReviewCenter-BallotConsolidation-Complete
           - ReviewCenter-BallotConsolidation-BallotState
           - ReviewCenter-BallotConsolidation-Arguments
+          - ReviewCenter-BallotConsolidation-Projection
         tests:
           - BallotConsolidation_Consolidate_SubmittedEqual_Agreed
           - BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts

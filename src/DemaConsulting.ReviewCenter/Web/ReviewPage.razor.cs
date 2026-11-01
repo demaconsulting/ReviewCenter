@@ -1065,7 +1065,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         if (Review is not null)
         {
             Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
-            Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
+            Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: actor?.Username);
             Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
             if (IsLocked)
             {
@@ -1982,8 +1982,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     Saves the primary and alternate chosen for an unsigned slot.
     /// </summary>
     /// <param name="slot">The slot as shown.</param>
-    /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
-    private async Task SaveSlotAsync(SlotStatus slot)
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the change is stored or the warning or problem is shown.</returns>
+    private async Task SaveSlotAsync(SlotStatus slot, IReadOnlyList<AffectedSignature>? confirmed = null)
     {
         if (!await GuardAsync())
         {
@@ -1998,14 +1999,30 @@ public partial class ReviewPage : ComponentBase, IDisposable
             }
 
             await SigningService.UpdateSlotAsync(
-                await AuthenticationState.GetActorAsync(), ProjectId, ReviewId, slot.SlotId, primary, ParseUserId(AlternateChoice(slot)));
+                await AuthenticationState.GetActorAsync(),
+                ProjectId,
+                ReviewId,
+                slot.SlotId,
+                primary,
+                ParseUserId(AlternateChoice(slot)),
+                acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            // A reviewer who leaves takes the own answers out of the ballot, which may change the record
+            SlotErrors.Remove(slot.SlotId);
+            Warning = PendingSignatureWarning.Create(
+                SlotWarningKey(slot.SlotId), confirmed, ex, slots => SaveSlotAsync(slot, slots));
+            return;
         }
         catch (DomainRuleException ex)
         {
+            Warning = null;
             SlotErrors[slot.SlotId] = ex.Message;
             return;
         }
 
+        Warning = null;
         SlotErrors.Remove(slot.SlotId);
         SlotPrimaryChoices.Remove(slot.SlotId);
         SlotAlternateChoices.Remove(slot.SlotId);
@@ -2013,11 +2030,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
     }
 
     /// <summary>
-    ///     Removes an unsigned slot.
+    ///     Removes an unsigned slot, or asks for confirmation when that would make signatures out of date.
     /// </summary>
     /// <param name="slotId">The identity of the slot.</param>
-    /// <returns>A task that completes when the slot is removed or the problem is shown.</returns>
-    private async Task RemoveSlotAsync(int slotId)
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the slot is removed or the warning or problem is shown.</returns>
+    private async Task RemoveSlotAsync(int slotId, IReadOnlyList<AffectedSignature>? confirmed = null)
     {
         if (!await GuardAsync())
         {
@@ -2026,16 +2044,41 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         try
         {
-            await SigningService.RemoveSlotAsync(await AuthenticationState.GetActorAsync(), ProjectId, ReviewId, slotId);
+            await SigningService.RemoveSlotAsync(
+                await AuthenticationState.GetActorAsync(),
+                ProjectId,
+                ReviewId,
+                slotId,
+                acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            // The ballot of the slot leaves the record with it, which may change what the other signatures cover
+            SlotErrors.Remove(slotId);
+            Warning = PendingSignatureWarning.Create(
+                SlotWarningKey(slotId), confirmed, ex, slots => RemoveSlotAsync(slotId, slots));
+            return;
         }
         catch (DomainRuleException ex)
         {
+            Warning = null;
             SlotErrors[slotId] = ex.Message;
             return;
         }
 
+        Warning = null;
         SlotErrors.Remove(slotId);
         await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for a change of a slot.
+    /// </summary>
+    /// <param name="slotId">The identity of the slot.</param>
+    /// <returns>The key.</returns>
+    private static string SlotWarningKey(int slotId)
+    {
+        return $"slot-{slotId}";
     }
 
     /// <summary>

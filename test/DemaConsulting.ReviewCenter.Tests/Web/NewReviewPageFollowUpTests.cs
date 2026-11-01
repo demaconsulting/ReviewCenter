@@ -66,14 +66,12 @@ public class NewReviewPageFollowUpTests : PageTestBase
             [new("a.txt", TestContent.A), new("b.txt", TestContent.B)],
             TestActors.Ann,
             cancellationToken);
-        await Checklists.SetAnswerAsync(
-            project.Id,
-            "REV-1",
-            DefaultChecklist.Current.Sections[0].Items[0].Id,
-            ChecklistOutcome.Pass,
-            null,
-            TestActors.Bob,
-            cancellationToken);
+        await SeatAsync(project.Id, "REV-1", "bob");
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                project.Id, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
+        }
         await Threads.StartThreadAsync(project.Id, "REV-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Bob, "Look at a", cancellationToken);
         await Threads.StartThreadAsync(project.Id, "REV-1", new ThreadAnchor("b.txt", 1, 1), TestActors.Bob, "Look at b", cancellationToken);
         var done = await Threads.StartThreadAsync(project.Id, "REV-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Bob, "Done", cancellationToken);
@@ -204,8 +202,9 @@ public class NewReviewPageFollowUpTests : PageTestBase
 
         // Assert: the preview counts the Pass answer, the two open threads and the resolved one that is not carried;
         // every file is in the new review, so nothing is dropped and no acknowledgement is asked for
+        var answers = DefaultChecklist.Current.Sections.Sum(s => s.Items.Count);
         var preview = TextOf(cut, "follow-preview");
-        Assert.Contains("1 Pass or N/A answer,", preview, StringComparison.Ordinal);
+        Assert.Contains($"{answers} Pass or N/A answers,", preview, StringComparison.Ordinal);
         Assert.Contains("0 N/A sections", preview, StringComparison.Ordinal);
         Assert.Contains("2 open threads", preview, StringComparison.Ordinal);
         Assert.Contains("1 resolved thread is not carried", preview, StringComparison.Ordinal);
@@ -220,7 +219,7 @@ public class NewReviewPageFollowUpTests : PageTestBase
         Assert.NotNull(review);
         Assert.Equal("REV-1", review.FollowsReviewId);
         Assert.Equal("Follow-up to REV-1", review.Title);
-        Assert.Equal(1, review.CarriedAnswerCount);
+        Assert.Equal(answers, review.CarriedAnswerCount);
         Assert.Equal(2, review.CarriedThreadCount);
     }
 
