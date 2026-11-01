@@ -243,13 +243,18 @@ public class ProjectAccessGuardTests
     private static readonly string[] _reads =
     [
         "ChecklistService.CanSetReviewConclusionTextAsync",
+        "ChecklistService.GetBallotViewAsync",
         "ProjectChecklistService.GetAsync",
         "ProjectService.GetAsync",
         "ProjectService.ListAsync",
         "ReviewProgressService.GetProgressAsync",
         "ReviewService.CanSetDueDateAsync",
         "ReviewService.PreviewFollowUpAsync",
-        "SigningService.HasReauthProofAsync"
+        "SigningService.GetApprovalAsync",
+        "SigningService.GetApprovalsAsync",
+        "SigningService.HasReauthProofAsync",
+        "ThreadService.GetCapabilitiesAsync",
+        "ThreadService.ListAsync"
     ];
 
     /// <summary>
