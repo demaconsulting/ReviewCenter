@@ -259,6 +259,52 @@
             {
                 <p class="error" role="alert" data-testid="review-conclusion-error">@ConclusionError</p>
             }
+            @if (Approval?.IsMasked != true)
+            {
+                var reportFindings = Threads.Where(t => t.Kind == ThreadKind.Finding).ToList();
+                @if (Approval is { IsConcluded: true } concluded)
+                {
+                    <p data-testid="review-conclusion-outcome-row">
+                        <span class="conclusion-outcome @(concluded.IsApproved ? "approved" : "rejected")" data-testid="review-conclusion-outcome">
+                            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="@(concluded.IsApproved ? OutcomeApprovedPath : OutcomeRejectedPath)" /></svg>
+                            <span>@(concluded.IsApproved ? "Approved" : "Rejected")</span>
+                        </span>
+                    </p>
+                }
+                @if (reportFindings.Count > 0)
+                {
+                    <h3 data-testid="review-conclusion-findings-heading">Findings in the report</h3>
+                    <ul class="report-findings" data-testid="review-conclusion-findings">
+                        @foreach (var finding in reportFindings)
+                        {
+                            var note = finding.Comments.LastOrDefault(c => c.Kind == ReviewCommentKind.Resolution);
+                            <li data-testid="review-conclusion-finding-@finding.Id">
+                                <ThreadKindBadge Kind="ThreadKind.Finding" ShowInReport="false" TestId="@($"review-conclusion-finding-kind-{finding.Id}")" />
+                                <span class="path" data-testid="review-conclusion-finding-anchor-@finding.Id">@IndexPathLabel(finding), @AnchorLabel(finding)</span>:
+                                <span data-testid="review-conclusion-finding-text-@finding.Id">@finding.Comments[0].Text</span>
+                                @if (finding.State == ReviewThreadState.Resolved)
+                                {
+                                    <span class="badge resolved" data-testid="review-conclusion-finding-state-@finding.Id">Resolved</span>
+                                    @if (note is not null)
+                                    {
+                                        <span class="resolution-note" data-testid="review-conclusion-finding-note-@finding.Id">@note.Text</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="badge" data-testid="review-conclusion-finding-state-@finding.Id">Open</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                @if (Approval is { IsConcluded: true } signed && signed.Slots.Any(s => s.State == SlotSignatureState.Signed))
+                {
+                    <p class="conclusion-signers muted" data-testid="review-conclusion-signers">
+                        @string.Join("; ", signed.Slots.Where(s => s.State == SlotSignatureState.Signed).Select(s => $"Signed by {s.SignerName} on {FormatTime(s.SignedAt!.Value)}"))
+                    </p>
+                }
+            }
         </section>
 
         @if (UnreadCount > 0)
@@ -292,7 +338,10 @@
             }
             <div class="summary-cell" data-testid="summary-threads">
                 <span class="summary-label">Threads</span>
-                <span class="summary-value">@Threads.Count(t => t.State == ReviewThreadState.Open) open &middot; @Threads.Count(t => t.State == ReviewThreadState.Resolved) resolved</span>
+                @{
+                    var summaryCounts = ThreadCounts.From(Threads);
+                }
+                <span class="summary-value"><span data-testid="summary-open-questions">@ThreadCounts.OpenQuestionsPhrase(summaryCounts.OpenQuestions)</span> &middot; <span data-testid="summary-open-findings">@ThreadCounts.OpenFindingsPhrase(summaryCounts.OpenFindings)</span> &middot; <span data-testid="summary-resolved">@summaryCounts.Resolved resolved</span></span>
             </div>
         </section>
 
@@ -550,16 +599,24 @@
 
         <section class="card" data-testid="thread-index">
             <h2>Threads</h2>
-            <div class="index-filters" role="group" aria-label="Filter threads" data-testid="thread-summary">
+            <div class="index-filters" role="group" aria-label="Filter threads by state" data-testid="thread-summary">
                 <button type="button" class="secondary" aria-pressed="@(IndexFilter is null ? "true" : "false")"
-                        data-testid="index-filter-all" @onclick="() => GuardedAsync(() => SetFilter(null))">All (<span data-testid="threads-all-count">@Threads.Count</span>)</button>
+                        data-testid="index-filter-all" @onclick="() => GuardedAsync(() => SetFilter(null))">All (<span data-testid="threads-all-count">@CountByState(null)</span>)</button>
                 <button type="button" class="secondary" aria-pressed="@(IndexFilter == ReviewThreadState.Open ? "true" : "false")"
-                        data-testid="index-filter-open" @onclick="() => GuardedAsync(() => SetFilter(ReviewThreadState.Open))">Open (<span data-testid="threads-open-count">@Threads.Count(t => t.State == ReviewThreadState.Open)</span>)</button>
+                        data-testid="index-filter-open" @onclick="() => GuardedAsync(() => SetFilter(ReviewThreadState.Open))">Open (<span data-testid="threads-open-count">@CountByState(ReviewThreadState.Open)</span>)</button>
                 <button type="button" class="secondary" aria-pressed="@(IndexFilter == ReviewThreadState.Resolved ? "true" : "false")"
-                        data-testid="index-filter-resolved" @onclick="() => GuardedAsync(() => SetFilter(ReviewThreadState.Resolved))">Resolved (<span data-testid="threads-resolved-count">@Threads.Count(t => t.State == ReviewThreadState.Resolved)</span>)</button>
+                        data-testid="index-filter-resolved" @onclick="() => GuardedAsync(() => SetFilter(ReviewThreadState.Resolved))">Resolved (<span data-testid="threads-resolved-count">@CountByState(ReviewThreadState.Resolved)</span>)</button>
+            </div>
+            <div class="index-filters" role="group" aria-label="Filter threads by kind" data-testid="thread-kind-filters">
+                <button type="button" class="secondary" aria-pressed="@(IndexKind is null ? "true" : "false")"
+                        data-testid="index-kind-all" @onclick="() => GuardedAsync(() => SetKindFilter(null))">Both kinds (<span data-testid="threads-kind-all-count">@CountByKind(null)</span>)</button>
+                <button type="button" class="secondary" aria-pressed="@(IndexKind == ThreadKind.Question ? "true" : "false")"
+                        data-testid="index-kind-question" @onclick="() => GuardedAsync(() => SetKindFilter(ThreadKind.Question))">Questions (<span data-testid="threads-questions-count">@CountByKind(ThreadKind.Question)</span>)</button>
+                <button type="button" class="secondary" aria-pressed="@(IndexKind == ThreadKind.Finding ? "true" : "false")"
+                        data-testid="index-kind-finding" @onclick="() => GuardedAsync(() => SetKindFilter(ThreadKind.Finding))">Findings (<span data-testid="threads-findings-count">@CountByKind(ThreadKind.Finding)</span>)</button>
             </div>
             @{
-                var indexRows = ThreadService.BuildIndex(Threads, IndexFilter);
+                var indexRows = IndexRows();
             }
             @if (indexRows.Count == 0)
             {
@@ -575,6 +632,7 @@
                             <button type="button" class="index-row" data-testid="index-row-@row.Id"
                                     aria-label="@IndexRowLabel(row)"
                                     @onclick="() => ViewThreadAsync(rowThread)">
+                                <ThreadKindBadge Kind="row.Kind" ShowInReport="false" TestId="@($"index-kind-{row.Id}")" />
                                 <span class="path" data-testid="index-file-@row.Id">@IndexPathLabel(row)</span>
                                 <span data-testid="index-anchor-@row.Id">@AnchorLabel(row)</span>
                                 <span class="badge @(row.State == ReviewThreadState.Resolved ? "resolved" : null)" data-testid="index-state-@row.Id">@row.State</span>
@@ -592,88 +650,9 @@
             }
         </section>
 
-        // One thread: its header, comments, reply box and resolve control; used in the diff, in the list of a
-        // file and in the card of the check discussions
-        RenderFragment<ReviewThread> threadCard = item => @<li class="thread @(item.Id == FocusedThreadId ? "focused" : null)" data-testid="thread-@item.Id">
-                @{
-                    var threadId = item.Id;
-                    var resolved = item.State == ReviewThreadState.Resolved;
-                    var expanded = !resolved || ExpandedThreads.Contains(threadId);
-                }
-                <div class="thread-head">
-                    <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(item)</span>
-                    <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@item.State</span>
-                    @if (ThreadHasUnread(item))
-                    {
-                        <span class="badge unread" data-testid="thread-unread-@threadId">New</span>
-                    }
-                    @if (item.CarriedFromReviewId is { } carriedFrom)
-                    {
-                        <span class="muted" data-testid="thread-carried-@threadId">carried from <a href="@ReviewLinks.ForReview(ProjectId, carriedFrom)" data-testid="thread-carried-link-@threadId">@carriedFrom</a></span>
-                    }
-                    <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(item)</span>
-                    <a class="thread-link action outline small" href="@ReviewLinks.ForThread(ProjectId, ReviewId, threadId)"
-                       aria-label="Link to thread @threadId" data-testid="thread-link-@threadId">Link</a>
-                    <button type="button" class="secondary" data-testid="thread-copy-link-@threadId"
-                            aria-label="Copy link to thread @threadId"
-                            @onclick="() => CopyThreadLinkAsync(threadId)">Copy link</button>
-                    <span class="muted" role="status" data-testid="thread-copy-status-@threadId">@CopyStatusFor(threadId)</span>
-                    @if (resolved)
-                    {
-                        <button type="button" class="secondary" data-testid="thread-expand-@threadId"
-                                aria-expanded="@(expanded ? "true" : "false")"
-                                aria-label="@(expanded ? "Collapse" : "Expand") thread @threadId"
-                                @onclick="() => GuardedAsync(() => ToggleThreadExpanded(threadId))">@(expanded ? "Collapse" : "Expand")</button>
-                    }
-                    @if (expanded && !ReadOnly)
-                    {
-                        <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
-                                disabled="@IsLocked" data-locked="@LockedMarker"
-                                aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
-                                @onclick="() => ToggleThreadAsync(item)">@(resolved ? "Reopen" : "Resolve")</button>
-                    }
-                </div>
-                @if (Warning?.Key == ToggleWarningKey(threadId))
-                {
-                    <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
-                }
-                @if (expanded)
-                {
-                    @for (var n = 1; n <= item.Comments.Count; n++)
-                    {
-                        var comment = item.Comments[n - 1];
-                        <div class="comment" data-testid="comment-@threadId-@n">
-                            <div class="comment-meta">
-                                <strong data-testid="comment-author-@threadId-@n">@comment.Author</strong>
-                                <time class="muted" datetime="@comment.Created.UtcDateTime.ToString("O")" data-testid="comment-time-@threadId-@n">@FormatTime(comment.Created)</time>
-                            </div>
-                            <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
-                        </div>
-                    }
-                    @if (!IsLocked && !ReadOnly)
-                    {
-                        <div class="reply">
-                            <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
-                                      aria-label="Reply to thread @threadId" placeholder="Reply"
-                                      data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
-                                      data-ctrl-enter-submits="reply-button-@threadId"
-                                      @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
-                            @if (ReplyErrors.TryGetValue(threadId, out var replyError))
-                            {
-                                <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
-                            }
-                            @if (Warning?.Key == ReplyWarningKey(threadId))
-                            {
-                                <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
-                            }
-                            <button type="button" class="secondary" data-testid="reply-button-@threadId"
-                                    aria-label="Post reply to thread @threadId"
-                                    @onclick="() => ReplyAsync(threadId)">Reply</button>
-                            <span class="muted hint" data-testid="reply-submit-hint-@threadId">Ctrl+Enter to submit</span>
-                        </div>
-                    }
-                }
-            </li>;
+        // One thread: the card with its kind, header, comments, reply box and actions; used in the diff, in the list of
+        // a file and in the card of the check discussions
+        RenderFragment<ReviewThread> threadCard = item => ThreadCardFor(item);
 
         @if (CheckThreads().Count > 0)
         {
@@ -708,71 +687,70 @@
             // Lines inside the range of a head thread are highlighted in the head view; the first line of a range
             // carries a count marker. Threads on the baseline side belong to the diff and the baseline view.
             var anchoredLines = new HashSet<int>();
-            var startCounts = new Dictionary<int, int>();
+            var startCounts = new Dictionary<int, ThreadCounts>();
             foreach (var thread in fileThreads.Where(t => t.StartLine is not null && t.Side == ThreadSide.Head))
             {
                 for (var line = thread.StartLine!.Value; line <= thread.EndLine!.Value; line++)
                 {
                     anchoredLines.Add(line);
                 }
+            }
 
-                startCounts[thread.StartLine!.Value] = startCounts.GetValueOrDefault(thread.StartLine!.Value) + 1;
+            foreach (var group in fileThreads.Where(t => t.StartLine is not null && t.Side == ThreadSide.Head)
+                         .GroupBy(t => t.StartLine!.Value))
+            {
+                startCounts[group.Key] = ThreadCounts.From(group);
             }
 
             // The new-thread form; in the diff it is drawn under the selected line, otherwise in its own card
-            RenderFragment newThreadForm = @<form data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
-                @if (CurrentView == FileView.Baseline && SelectedKind == ChangeKind.Deleted)
-                {
-                    <p class="muted hint" data-testid="deleted-comment-note">This file was deleted. A comment here applies to the whole file; use the Diff view to comment on a line.</p>
-                }
-                else if (CurrentView == FileView.Head)
-                {
-                    <div class="line-fields">
-                        <div class="field">
-                            <label for="thread-start-line">Start line (optional)</label>
-                            <input id="thread-start-line" type="number" min="1"
-                                   data-testid="thread-start-line-input" @bind="NewStartLine" @bind:event="oninput" />
+            RenderFragment newThreadForm = @<ThreadComposer Text="@NewText" TextChanged="@(text => NewText = text)"
+                                                            IncludeInReport="NewIncludeInReport"
+                                                            IncludeInReportChanged="@(report => NewIncludeInReport = report)"
+                                                            Error="@NewThreadError" OnSubmit="StartThreadAsync">
+                <Fields>
+                    @if (CurrentView == FileView.Baseline && SelectedKind == ChangeKind.Deleted)
+                    {
+                        <p class="muted hint" data-testid="deleted-comment-note">This file was deleted. A comment here applies to the whole file; use the Diff view to comment on a line.</p>
+                    }
+                    else if (CurrentView == FileView.Head)
+                    {
+                        <div class="line-fields">
+                            <div class="field">
+                                <label for="thread-start-line">Start line (optional)</label>
+                                <input id="thread-start-line" type="number" min="1"
+                                       data-testid="thread-start-line-input" @bind="NewStartLine" @bind:event="oninput" />
+                            </div>
+                            <div class="field">
+                                <label for="thread-end-line">End line (optional)</label>
+                                <input id="thread-end-line" type="number" min="1"
+                                       data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
+                            </div>
                         </div>
-                        <div class="field">
-                            <label for="thread-end-line">End line (optional)</label>
+                    }
+                    else if (inlineComposer)
+                    {
+                        <div class="field through-field">
+                            <label for="thread-end-line">Through line (optional)</label>
                             <input id="thread-end-line" type="number" min="1"
                                    data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
                         </div>
-                    </div>
-                }
-                else if (inlineComposer)
-                {
-                    <div class="field through-field">
-                        <label for="thread-end-line">Through line (optional)</label>
-                        <input id="thread-end-line" type="number" min="1"
-                               data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
-                    </div>
-                }
-                <p class="muted hint" data-testid="thread-target">@NewThreadTarget().</p>
-                <div class="field">
-                    <label for="thread-text">Comment</label>
-                    <textarea id="thread-text" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
-                              data-ctrl-enter-submits="start-thread-button"
-                              data-testid="thread-text-input" @bind="NewText" @bind:event="oninput"></textarea>
-                </div>
-                @if (NewThreadError is not null)
-                {
-                    <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
-                }
-                @if (Warning?.Key == NewThreadWarningKey)
-                {
-                    <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
-                }
-                <div class="form-actions">
-                    <button type="submit" data-testid="start-thread-button">Start thread</button>
-                    <span class="muted hint" data-testid="thread-submit-hint">Ctrl+Enter to submit</span>
+                    }
+                    <p class="muted hint" data-testid="thread-target">@NewThreadTarget().</p>
+                </Fields>
+                <Notices>
+                    @if (Warning?.Key == NewThreadWarningKey)
+                    {
+                        <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
+                    }
+                </Notices>
+                <Actions>
                     @if (inlineComposer)
                     {
                         <button type="button" class="secondary" data-testid="thread-cancel-button" @onclick="CancelComment">Cancel</button>
                         <button type="button" class="secondary" data-testid="thread-whole-file-button" @onclick="() => GuardedAsync(CommentOnWholeFile)">Comment on the whole file instead</button>
                     }
-                </div>
-            </form>;
+                </Actions>
+            </ThreadComposer>;
 
             <section class="card">
                 <h2>File content</h2>
@@ -890,9 +868,18 @@
                                             @onclick="() => GuardedAsync(() => CommentOnLine(lineNumber))">+</button>
                                     <span class="line-no" data-testid="line-no-@number">@number</span>
                                     <span class="line-marker">
-                                        @if (startCounts.TryGetValue(number, out var markerCount))
+                                        @if (startCounts.TryGetValue(number, out var marker))
                                         {
-                                            <span class="thread-marker" data-testid="line-marker-@number" title="@markerCount thread(s) start here">@markerCount</span>
+                                            <span class="kind-markers" data-testid="line-marker-@number">
+                                                @if (marker.Findings > 0)
+                                                {
+                                                    <ThreadKindBadge Kind="ThreadKind.Finding" Compact="true" Count="marker.Findings" TestId="@($"line-marker-finding-{number}")" />
+                                                }
+                                                @if (marker.Questions > 0)
+                                                {
+                                                    <ThreadKindBadge Kind="ThreadKind.Question" Compact="true" Count="marker.Questions" TestId="@($"line-marker-question-{number}")" />
+                                                }
+                                            </span>
                                         }
                                     </span>
                                 </span>

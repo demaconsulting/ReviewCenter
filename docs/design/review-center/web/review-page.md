@@ -55,6 +55,41 @@ the review (now or earlier) sees, in place of the sign form of that slot, the no
 ("You reopened this review; another reviewer must sign."). The page holds none of these
 rules; Core decides, and the page only shows the result.
 
+#### Questions, Findings, and the report
+
+Every thread is a Question (conversation) or a Finding (goes in the report). The page draws the difference with four
+small components, none of which holds a rule:
+
+- `ThreadKindBadge` draws the kind as an inline SVG icon (`aria-hidden`) and the visible words "Question" (a neutral
+  speech bubble, class `kind-question`) or "Finding" (an amber flag, class `kind-finding`, with an "In report" badge).
+  Its compact form is the gutter marker: icon, count, a `title`, and an `aria-label` such as "2 questions" or
+  "1 finding", so that neither the icon nor the color carries the meaning alone. The colors are the CSS variables
+  `--kind-question-*` and `--kind-finding-*` of the light and the dark theme.
+- `ThreadComposer` is the one form that starts a thread (line, diff row, whole file, and the discussion about a check
+  on the checklist page) and the reply box. It offers the radio choice "Question" (the default) or "Finding (goes in
+  the report)", sends with Ctrl+Enter, and in the reply box offers an "Add to report" check box. A review with one
+  slot offers the same choice.
+- `ThreadCard` is one thread: the kind badge, the anchor, the comments (a chat bubble, or an "In report" mark for a
+  comment that is part of the report), the buttons, the reply box, and the notices. Which buttons exist is decided
+  only by the `ThreadActions` that `ThreadService.GetCapabilitiesAsync` computed with the rules the service itself
+  enforces: "Make this a Finding" and "Make this a Question" (promote and demote), "Add to report" and "Remove from
+  report" for a reply, and Resolve or Reopen. An auditor and a concluded review get no button.
+- `ResolveNoteDialog` asks for a short resolution note when a thread is resolved ("fixed in abc123", "ticket #123",
+  "not an issue"). The note is required for a Finding and optional for a Question, and the person may cancel.
+
+A change that alters the digest (promote, demote, an added or removed reply, or a resolution) goes through the same
+confirmation as a reply: the page tries the change, and when Core refuses it with the signatures it would make out
+of date, the page shows `SignatureWarning` (also naming the signers when a Finding is demoted), stores nothing on
+cancel, and repeats the change with the confirmed slots. Core audits the change once it is stored.
+
+`DiffView` marks the lines with threads with one marker per kind, so a row with both kinds shows a bubble and a flag,
+each with its count. The thread index filters by kind (All, Questions, Findings) and by state (All, Open, Resolved),
+with the count of each choice, and every row shows the kind badge. The summary strip shows the number of open
+questions and of open findings from `ThreadCounts`. The conclusion card of a concluded review shows the outcome as an
+icon and text, the conclusion text, the findings that are in the report with their resolution notes, and the signers
+with the time; it shows the empty state while no conclusion is written and only the notice to a viewer who may not see
+the other ballots.
+
 #### Data Model
 
 The page instance is created per browser connection, so its state is per user.
@@ -368,23 +403,38 @@ threads.
 **ReplyAsync**: Adds the typed reply to a thread on behalf of the signed-in user. A violated rule is shown inside that
 thread.
 
-**ToggleThreadAsync**: Resolves an open thread or reopens a resolved one, then reloads the threads. Resolving also
-collapses the thread. A thread that no longer exists is reported inside the thread.
+The actions of a thread card all go through one shared method, **ChangeThreadAsync**, which runs the sign-in check,
+calls the service for the signed-in actor, and on success clears the message and reloads the threads. It takes the
+call to make, the call that repeats it with a confirmation, and an optional step that runs after the change was
+stored. A violated rule other than the signature impact is shown inside that thread, and the signature impact starts
+the warning flow below. The methods that use it are:
 
-**Signature warning**: `StartThreadAsync`, `ReplyAsync`, and `ToggleThreadAsync` call the service without an
-acknowledgement. The page posts chat only (the comment is not included in the report) and resolving or reopening a
-Question or reopening a Finding changes nothing the digest covers, so in this version the service does not refuse these
-calls and the banner stays hidden; the handling below is kept for the actions that later pages add (included comments,
-promote, demote, and resolving a Finding). When the service refuses with `SignaturesWouldBecomeOutOfDate`, the page
+- **ResolveThreadAsync**: Resolves an open thread with the note from the resolve dialog (`null` when none was typed;
+  a Finding needs one). Resolving also collapses the thread.
+- **ReopenThreadAsync**: Opens a resolved thread again.
+- **PromoteThreadAsync** and **DemoteThreadAsync**: Make a Question a Finding or a Finding a Question (the report
+  flag of the starting comment and of the resolution notes).
+- **ToggleReplyReportAsync**: Adds a reply to the report or takes it out again.
+
+A thread that no longer exists is reported inside the thread.
+
+**Signature warning**: `StartThreadAsync`, `ReplyAsync`, `ResolveThreadAsync`, `ReopenThreadAsync`,
+`PromoteThreadAsync`, `DemoteThreadAsync`, and `ToggleReplyReportAsync` call the service first without an
+acknowledgement. What is chat (a Question, a reply that is not in the report) changes nothing the digest covers and is
+stored at once; what is part of the report (a new Finding, an included reply, promote, demote, resolving a Finding) is
+refused by the service when a signature is current. When the service refuses
+with `SignaturesWouldBecomeOutOfDate`, the page
 keeps the request and shows the
 `SignatureWarning` component (`signature-warning`) where the action was taken: under the new-thread form, in the thread
-of the reply, or in the head of the toggled thread. The banner names every affected slot and its signer
+of the reply, or in the head of the changed thread. The banner names every affected slot and its signer
 (`signature-warning-slots`, for example "Slot 1 (Ann)"). Nothing is stored and everything typed stays. **Confirm
 change**
 (`signature-warning-confirm`) repeats the call with the identities of the affected slots as the acknowledgement. When
 another signature appeared meanwhile, the service refuses again and the page shows the banner again with the slots of
 both refusals merged, so a person confirms only what they have been shown. **Cancel** (`signature-warning-cancel`) only
-removes the banner; the typed text and an unsaved choice stay. The page holds one banner at a time, so the test
+removes the banner; the typed text and an unsaved choice stay, and so does the resolve dialog with the note typed in it
+(`ThreadCard` closes that dialog only when the thread has become resolved, not when the note is handed to the page), so
+the person can resolve again without typing the note again. The page holds one banner at a time, so the test
 identifiers stay unique; a new refusal replaces the earlier banner, and a reload of a locked review removes it. Confirm
 runs the session check of the page again, so an expired session is handled like any other action. A refusal for any
 other rule is shown as before and no banner is shown. The reopen of a whole review (`ReopenReviewAsync`) is not part of

@@ -470,7 +470,12 @@ public sealed class InboxService
                 if (waiting.Count > 0)
                 {
                     var unread = InboxRules.CountUnread(waiting, username, lastSeenCommentId) > 0;
-                    items.Add(Row(InboxSection.RepliesWaiting, $"{waiting.Count} waiting", unread));
+                    var counts = ThreadCounts.From(waiting);
+                    items.Add(Row(
+                        InboxSection.RepliesWaiting,
+                        $"{waiting.Count} waiting",
+                        unread,
+                        $"Waiting for your reply: {counts.OpenText}."));
                 }
             }
 

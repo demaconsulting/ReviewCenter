@@ -794,7 +794,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 {
                     throw new DomainRuleException(
                         DomainRule.ResolutionNoteRequired,
-                        "A finding can only be resolved with a note that says what was done.");
+                        "A finding needs a short note on what was done before it can be resolved.");
                 }
 
                 await context.Threads
@@ -904,8 +904,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 {
                     throw new DomainRuleException(
                         DomainRule.CommentNotTogglable,
-                        "Only a reply can be included on its own; promote or demote the thread to change its starting " +
-                        "comment and its resolution notes.");
+                        "Only a reply can be added to the report or taken out of it on its own. Make the whole thread " +
+                        "a finding or a question to change its first comment.");
                 }
 
                 if (comment.IncludeInReport == include)

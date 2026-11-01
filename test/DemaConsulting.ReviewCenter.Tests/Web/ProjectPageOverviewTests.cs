@@ -158,7 +158,7 @@ public class ProjectPageOverviewTests : PageTestBase
         Assert.Equal("0/2", cut.Find("[data-testid='review-progress-REV-B']").TextContent);
         Assert.Equal("1 out of date", cut.Find("[data-testid='review-outofdate-REV-B']").TextContent);
         Assert.Equal("Ann, Bob", cut.Find("[data-testid='review-waiting-REV-B']").TextContent);
-        Assert.Equal("1 open thread, conclusion needed", cut.Find("[data-testid='review-blockers-REV-B']").TextContent);
+        Assert.Equal("1 open question, conclusion needed", cut.Find("[data-testid='review-blockers-REV-B']").TextContent);
         Assert.Equal("2025-03-03", cut.Find("[data-testid='review-due-REV-B']").TextContent);
         Assert.Equal("Overdue", cut.Find("[data-testid='review-overdue-REV-B']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='review-overdue-REV-A']"));

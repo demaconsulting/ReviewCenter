@@ -113,7 +113,7 @@ Diff view shows "x added, y removed",
 then the changed lines side by side: the earlier version (baseline) on the left and the new version (head) on the
 right, each with its own line numbers. Removed lines are red with a `-` and added lines green with a `+`; a run of
 removed lines sits next to the run of added lines that replaces it, and a cell with nothing opposite is left empty
-and grey. Unchanged lines show on both sides. Unchanged lines far from a change are collapsed behind a **Show N
+and gray. Unchanged lines show on both sides. Unchanged lines far from a change are collapsed behind a **Show N
 unchanged lines** button, and the page scrolls to the first change when you open the file. On a narrow screen, such as
 a phone, each row stacks: the baseline cell above the head cell, with the empty cells hidden. To comment on a line,
 point at the line (or tab to it) and click the **+** that appears at the start of its cell (on a touch screen it is
@@ -298,26 +298,46 @@ top of the page says what is left to do: start a discussion, how many open threa
 are resolved (it also counts the unanswered checks of the [Review Checklist](#review-checklist)). The file list shows
 the number of open threads of each file.
 
-The thread index lists the threads of all files with the file (a thread about a check shows "Check discussion"), the
-lines, the state, the number of comments, the
+The thread index lists the threads of all files with the kind (Question or Finding), the file (a thread about a check
+shows "Check discussion"), the lines, the state, the number of comments, the
 author of the first comment, and the time of the last activity, newest first. Use the All, Open, and Resolved
-buttons (which show the totals) to filter it; it starts with Open. Press a row to show that thread: its file is
-selected, its lines are highlighted, and the page scrolls to them.
+buttons and the All, Questions, and Findings buttons (which show the totals) to filter it; it starts with Open. Press a
+row to show that thread: its file is selected, its lines are highlighted, and the page scrolls to them. The summary line
+above shows the number of open questions and open findings.
 
 ![A side-by-side diff of a review file with one open and one resolved thread.](images/review-diff-thread.png)
 
+Every thread is one of two kinds. A **Question** is a conversation: it is chat, it is not part of the signed record, and
+it is marked with a speech-bubble icon and the word Question. A **Finding** is something that goes into the report: its
+first comment is part of the signed record, and it is marked with an amber flag, the word Finding, and an In report
+badge. The kind is never shown by color alone. In the margin of the diff a gray bubble marks a line with questions and
+an amber flag a line with findings, each with its number; a line with both shows both.
+
 1. To start a thread, either press the Comment button of a line, which fills in that line, or type a first and a last
    line number yourself (a first line without a last line means that one line), or leave both line fields empty to
-   comment on the whole file. The form shows where the comment will go. Enter the comment text (1 to 4000
+   comment on the whole file. The form shows where the comment will go. Choose **Question** (the default) or **Finding
+   (goes in the report)**, enter the comment text (1 to 4000
    characters) and press the start button, or press Ctrl+Enter in the text field. When you open the form with a line
    button, the text field is focused, so you can type at once. The author of the comment is you, the signed-in user.
+   A review with a single reviewer slot offers the same choice.
 2. A thread is listed below the file's code with the lines it covers (the whole file, a line, or a range of lines)
    and its comments in the order they were posted; the form to start a new thread follows it. Lines that have a
-   thread are marked.
-3. Any member of the project can reply to a thread (Ctrl+Enter in the reply field sends it as well). Press the
+   thread are marked. A comment of a Question is shown as a chat bubble; a comment that is part of the report carries an
+   In report mark.
+3. Any member of the project can reply to a thread (Ctrl+Enter in the reply field sends it as well). A reply is chat
+   unless you tick **Add to report** before you send it. Press the
    resolve button to mark a thread resolved, and the reopen
-   button to open it again. A resolved thread is shown as one line (lines, state, and number of comments); press its
+   button to open it again. Resolving a Finding asks for a short note ("fixed in abc123", "ticket #123", "not an
+   issue"), which is printed in the report with the Finding; for a Question the note is optional. A resolved thread is
+   shown as one line (lines, state, and number of comments); press its
    expand button to read it, reply, or reopen it, and the collapse button to fold it again.
+4. **Make this a Finding** (or **Add to report**) turns a Question into a Finding; the person who started the thread,
+   the owner of any reviewer slot of the review, and the lead of the review (the creator, or a project or system
+   administrator) may press it. **Make this a Question** takes a Finding out of the report again; only the person who
+   started the thread and the lead may press it. A reply can be added to the report or removed from it with the button
+   next to it by the person who wrote it and by the lead. A resolved Question can become a Finding only when it was
+   resolved with a note; otherwise reopen it and resolve it again with a note. An auditor sees the kinds but has no
+   buttons, and nobody has them once the review is concluded.
 
 Lines are numbered from 1. Windows (CRLF) and Unix (LF) line endings count the same, a line ending at the very end
 of a file does not add a line, and an empty file has no lines. A binary file, or a file that is not valid UTF-8, and
@@ -325,11 +345,13 @@ an empty file can be commented on as a whole only. A line number must be a whole
 first line must not be after the last line. Leading and trailing spaces of the text are removed. A
 problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
 
-When a review already has a current signature but is not yet concluded, the comments you post here are **chat**: a new
-thread, a reply, a resolve, and a reopen of a thread do not change what the signatures cover, so they never make a
-signature out of date and the page asks for no confirmation. A comment is part of the signed record only when it is
-included in the report, which this version of the pages does not offer; the open threads still block signing and the
-approval (see [Review Signatures](#review-signatures)).
+When a review already has a current signature but is not yet concluded, the comments you post here are **chat** unless
+they are part of the report: a new Question, a reply that is not added to the report, a resolve, and a reopen of a
+Question do not change what the signatures cover, so they never make a signature out of date and the page asks for no
+confirmation. A Finding, a reply added to the report, a promotion or demotion, and the resolution of a Finding with its
+note are part of the signed record: the page then names the signatures that go out of date (demoting a Finding after
+signatures names its signers too) and goes on only when you press **Confirm change**. The open threads of both kinds
+still block signing and the approval (see [Review Signatures](#review-signatures)).
 
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
 changes. While a review is concluded (approved or rejected) it is locked: the comment forms and reply fields are not
@@ -348,7 +370,8 @@ across all reviews.
 
 A thread can be about one check of the checklist instead of a file. Such a thread has no file and no lines: its anchor
 reads `Check {id}`, and the thread index shows "Check discussion" where a file path would be. It is a thread like any
-other (chat by default, a Finding after promotion, with replies, a resolve, and a reopen), and an open one blocks
+other (a Question by default, a Finding after promotion or when you choose Finding in the form, with replies, a resolve,
+and a reopen), and an open one blocks
 signing and the conclusion of the review.
 
 The review page lists the threads about checks in a card named **Check discussions**, which is shown only when the
@@ -402,8 +425,8 @@ taken from the Continuous Compliance review template (14 sections and 58 checks)
 replaces it (see [Checklist Template](administration.md#checklist-template)). The review page shows a Checklist card
 with a summary such as "37 of 58
 checks answered" and a link to the checklist page; the review page's next-step line also counts the unanswered
-checks (for example "12 checklist checks unanswered, 1 open thread to resolve.") and says "Checklist complete and
-all threads resolved." when nothing is left.
+checks (for example "12 checklist checks unanswered, 1 open question to resolve." or "1 open finding to resolve.")
+and says "Checklist complete and all threads resolved." when nothing is left.
 
 The checklist page tells you what to do next at its top: how many checks are unanswered, the overall progress, and
 a "Next unanswered check" button that opens the section of the first unanswered check and brings it into view.

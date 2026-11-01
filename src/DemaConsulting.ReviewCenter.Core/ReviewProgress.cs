@@ -62,7 +62,7 @@ public enum ReviewStage
 ///     person, the alternate of every slot that is not signed or out of date, each once. A person whose account is
 ///     disabled carries the suffix <see cref="ReviewProgressService.DisabledSuffix"/>. Empty for a concluded (approved or rejected) review.
 /// </param>
-/// <param name="OpenThreads">The number of comment threads that are open.</param>
+/// <param name="OpenThreads">The number of comment threads that are open: <paramref name="OpenQuestions"/> plus <paramref name="OpenFindings"/>.</param>
 /// <param name="UnansweredChecks">The number of checks of applicable sections that have no answer.</param>
 /// <param name="FailedChecks">
 ///     The number of checks of applicable sections the ballots agree on as Fail; informational, not a blocker.
@@ -90,6 +90,8 @@ public enum ReviewStage
 /// <param name="DisputedChecks">
 ///     The number of checks of applicable sections on which the submitted ballots disagree; each blocks signing.
 /// </param>
+/// <param name="OpenQuestions">The number of open threads that are Questions (chat).</param>
+/// <param name="OpenFindings">The number of open threads that are Findings (part of the report).</param>
 public sealed record ReviewProgress(
     string ReviewId,
     string Title,
@@ -111,7 +113,9 @@ public sealed record ReviewProgress(
     bool IsBlocked,
     string? FollowsReviewId,
     bool ConclusionRequired = false,
-    int DisputedChecks = 0)
+    int DisputedChecks = 0,
+    int OpenQuestions = 0,
+    int OpenFindings = 0)
 {
     /// <summary>
     ///     Gets a value indicating whether the review is concluded as approved.
@@ -122,4 +126,22 @@ public sealed record ReviewProgress(
     ///     Gets a value indicating whether the review is concluded, as approved or as rejected.
     /// </summary>
     public bool IsConcluded => Conclusion != ReviewConclusion.None;
+
+    /// <summary>
+    ///     Gets the open threads in words, for example "2 open findings, 1 open question"; "no open threads" when
+    ///     none is open.
+    /// </summary>
+    public string OpenThreadsText => OpenQuestions + OpenFindings == 0 && OpenThreads > 0
+        ? Plural(OpenThreads)
+        : ThreadCounts.OpenPhrase(OpenQuestions, OpenFindings);
+
+    /// <summary>
+    ///     Words a number of threads of unknown kind, for a progress that carries no counts by kind.
+    /// </summary>
+    /// <param name="count">The number of open threads.</param>
+    /// <returns>The count and the word.</returns>
+    private static string Plural(int count)
+    {
+        return count == 1 ? "1 open thread" : $"{count} open threads";
+    }
 }

@@ -182,6 +182,15 @@ N/A - standard test environment.
 - A viewer who may not see the answers of the other reviewers sees no checklist standing (a note for a member without
   a slot, the own progress for a slot owner), no discussion about a check and no count of them, and no conclusion text;
   the lead and an administrator see them.
+- A Question shows a speech-bubble icon and the word Question and a Finding an amber flag icon, the word Finding and an
+  In report badge, never by color alone; a gutter marker per kind has a count, a title and an accessible name; a new
+  thread is started as a Question unless Finding is chosen; a reply is chat unless Add to report is ticked.
+- The thread card offers Make this a Finding, Make this a Question, Add to report or Remove from report, and Resolve or
+  Reopen only to the people whom the capabilities of Core allow, and never to an auditor or on a concluded review;
+  resolving a Finding asks for a note; a change that makes a signature out of date asks for the confirmation naming it
+  and stores nothing on Cancel.
+- The index filters by kind and state with counts, the summary strip shows the open questions and open findings, and
+  the conclusion card shows the outcome, the text, the findings in the report with their notes, and the signers.
 
 #### Test Scenarios
 
@@ -376,7 +385,7 @@ identifier, state, fingerprint, and file hashes, while the file list holds no ha
 `ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata`.
 
 **ReviewPage_Render_NextStep_FollowsThreadState**: With no threads the line names the 58 unanswered checks; after a
-thread is started it names the checks and one open thread to resolve in one sentence; after the thread is resolved
+thread is started it names the checks and "1 open question to resolve" in one sentence; after the thread is resolved
 only the checks are named again. This scenario is tested by `ReviewPage_Render_NextStep_FollowsThreadState`.
 
 **ReviewPage_Render_NextStep_IncludesChecklistProgress**: A check is answered and a section is marked not
@@ -985,3 +994,64 @@ review, the baseline of that review is loaded and that review is marked as seen.
 
 **ReviewPage_Render_NoViewAccess_WritesNoState**: A user who may not see the project gets the not-found body and no read
 state is written. This scenario is tested by `ReviewPage_Render_NoViewAccess_WritesNoState`.
+
+**Questions and Findings** are verified in `ThreadKindBadgeTests.cs`, `ThreadComposerTests.cs`, `ThreadCardTests.cs`,
+`ResolveNoteDialogTests.cs`, `DiffViewMarkerTests.cs`, `ReviewPageThreadKindTests.cs`, and
+`ReviewPageConclusionCardTests.cs`, which render the components and the page with bUnit.
+
+**ThreadKindBadge_Question_ShowsIconAndLabel**, **ThreadKindBadge_Finding_ShowsFlagLabelAndInReportBadge**,
+**ThreadKindBadge_Kinds_UseDifferentIcons**, and **ThreadKindBadge_Compact_NamesKindAndCount**: A Question shows a
+hidden icon and the word Question, a Finding a different icon, the word Finding and an In report badge, and the compact
+marker names the kind and the count ("2 questions", "1 finding"). These scenarios are tested by the tests of the same
+names.
+
+**DiffView_Markers_UseDifferentIconPerKind**, **DiffView_Markers_MixedRow_ShowsBothKindsWithCounts**,
+**DiffView_Markers_EveryMarkerHasTextNameAndHiddenIcon**, **DiffView_Markers_NoThreads_NoMarkers**, and
+**ReviewPage_KindMarkers_EveryMarkerHasTextLabel**: The gutter shows a bubble for questions and a flag for findings,
+both on a mixed row, every marker has a text name and a hidden icon, and a row without threads has none. These
+scenarios are tested by the tests of the same names.
+
+**ThreadComposer_DefaultsToQuestion**, **ThreadComposer_FindingChoice_StartsFindingThread**,
+**ThreadComposer_ReplyAddToReport_SetsIncludeInReport**, **ThreadComposer_Error_IsShownAsAlert**,
+**ReviewPage_SingleSlot_KindChoiceStillAvailable**, and **ChecklistPage_DiscussFinding_KindChosenInComposer**: The
+composer defaults to Question, hands over the Finding choice, sets the report flag of a reply only when the check box
+is ticked, shows a refusal as an alert, and is the same in a review with a single slot and in the discussion about a
+check. These scenarios are tested by the tests of the same names.
+
+**ThreadCard_Question_ShowsQuestionBadgeAndChatBubbles**,
+**ThreadCard_Finding_ShowsFindingBadgeAndInReportMarkOnStartingComment**,
+**ThreadCard_PromoteVisibleForSlotOwner_HiddenForAuditor**, **ThreadCard_DemoteHiddenForNonStarterNonLead**,
+**ThreadCard_ReplyReportToggle_OnlyAuthorOrLead**, and **ThreadCard_ResolveFinding_AsksForNoteThenReopens**: The card
+shows the badge and the chat or In report marks, offers the buttons only where the capabilities allow them, and asks for
+the note when a Finding is resolved. These scenarios are tested by the tests of the same names.
+
+**ResolveNoteDialog_Finding_RequiresNote**, **ResolveNoteDialog_Question_NoteOptional**, and
+**ResolveNoteDialog_Cancel_HandsOverNothing**: A Finding cannot be resolved without a note, a Question can, and Cancel
+hands over nothing. These scenarios are tested by the tests of the same names.
+
+**ReviewPage_Promote_AfterSignature_ShowsSignatureImpactAndAudits** and
+**ReviewPage_Demote_AfterSignature_NamesAffectedSigners**: Promoting or demoting after a slot has signed shows the
+confirmation that names the signer, stores nothing on Cancel, and on Confirm changes the kind, makes the signature out
+of date, and is audited as `thread.kind-changed`. These scenarios are tested by the tests of the same names.
+
+**ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote**: Resolving a Finding with a note after a slot has
+signed shows the confirmation, stores nothing and keeps the resolve dialog open when the person cancels, and resolving
+again stores the note typed first. This scenario is tested by `ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote`.
+
+**ReviewPage_ReplyReportToggle_AddsAndRemovesReplyFromReport**, **ReviewPage_Concluded_ThreadActionsAbsent**,
+**ReviewPage_Auditor_SeesKindsButNoThreadActions**, and **ReviewPage_CheckThread_ShowsKindBadgeAndPromote**: The lead
+adds and removes a reply of another person from the report, a concluded review and an auditor get no action buttons
+but still see the kinds, and the discussion about a check shows its kind and can be promoted. These scenarios are
+tested by the tests of the same names.
+
+**ReviewPage_ThreadIndex_FiltersByKindWithCounts** and **ReviewPage_SummaryStrip_ShowsQuestionAndFindingCounts**: The
+index filters by kind and state with counts and kind badges, and the summary strip shows the open questions and open
+findings. These scenarios are tested by the tests of the same names.
+
+**ReviewPage_ConclusionCard_Rejected_ShowsOutcomeTextFindingsAndSigners**,
+**ReviewPage_ConclusionCard_Approved_ShowsApprovedOutcomeWithoutFindings**,
+**ReviewPage_ConclusionCard_InProgress_ShowsEmptyStateAndOpenFindings**, and
+**ReviewPage_ConclusionCard_MaskedViewer_ShowsNoticeOnly**: The conclusion card shows the outcome as icon and text, the
+conclusion text, the findings in the report with their notes, and the signers; shows the empty state while no
+conclusion is written; and shows only the notice to a viewer who may not see the others. These scenarios are tested by
+the tests of the same names.

@@ -65,9 +65,11 @@ answered, and a save that changes nothing, such as a second reviewer submitting 
 agree on, do not.
 
 Ordinary discussion does not alter the record. A comment is **chat** unless it is included in the report, and chat,
-replies to it, and the state of a thread (resolved or open) are not part of what a signature covers. This version of
-the pages posts chat only, so starting a thread, replying, resolving, and reopening never make a signature out of
-date. An open thread still blocks signing, and a review that has an open thread is not concluded even when every slot
+replies to it, and the state of a thread (resolved or open) are not part of what a signature covers. A **Question** and
+its replies are chat; a **Finding** (and any reply you tick **Add to report** for) is in the report. So starting or
+resolving a Question, replying, and reopening a Question never make a signature out of date, while starting a Finding,
+adding a reply to the report, making a Question a Finding or back, and resolving a Finding with its note do. An open
+thread of either kind still blocks signing, and a review that has an open thread is not concluded even when every slot
 is signed. The due date of a review is planning information and is not part of the record, so changing it leaves the
 signatures current.
 
@@ -176,11 +178,12 @@ record of the decision:
 - **Track it elsewhere.** Collect several minor findings in one ticket in your own tracker, reply "Tracked in PROJ-123",
   and resolve the threads. ReviewCenter has no link to a tracker, so the reference is plain text.
 
-Resolution has no text of its own in this version of the pages: the **Resolve** button only changes the state of the
-thread (a Finding, a thread that is included in the report, needs a resolution note, which the pages do not offer yet).
-Write the reason as a
-reply first, then resolve. A reply can also be added to a resolved thread (expand it first), and it does not reopen it.
-Resolving or replying to a thread that is only chat does not make a signature out of date, but close every thread
+Resolving a **Question** needs no text of its own: the **Resolve** button asks for an optional note and changes the
+state of the thread. Resolving a **Finding** needs a short note, such as "fixed in abc123", "ticket #123", or "not an
+issue", which is part of the report. Write
+the reason in the note, or as a reply first, then resolve. A reply can also be added to a resolved thread (expand it
+first), and it does not reopen it.
+Resolving or replying to a Question does not make a signature out of date, but close every thread
 before the last signature anyway: an open thread blocks signing, and once the review is concluded and locked it refuses
 both.
 Say what was done and who decided, for example "Declined by the author after discussion with Alex: ...", because a
@@ -194,9 +197,10 @@ resolved thread is shown collapsed, and the audit trail records who pressed the 
   and keep the other.
 - **State the expected outcome.** Say what would resolve it: "Rename to match X", "Add a test for the empty case", or
   "Explain why this is safe".
-- **Name the severity in words.** The product has no severity flag, so start the first comment with a word that your
-  team agrees on, such as "Blocking:", "Nit:", or "Question:". It tells the author what needs a fix before the review
-  can be signed and what can be answered or tracked.
+- **Choose the kind in words and in the form.** Use **Question** for what can be answered in the chat, and **Finding
+  (goes in the report)** for what must be fixed or recorded; the form has the choice and a Question can be made a
+  Finding later. The product has no severity flag, so a word such as "Blocking:" or "Nit:" at the start of the first
+  comment still tells the author what needs a fix before the review can be signed.
 
 Posted comments cannot be edited or deleted. Think before you post, and correct yourself with a reply.
 

@@ -1,0 +1,27 @@
+@* ThreadKindBadge: the kind of a thread, as an icon and a word (a helper of the ReviewPage and ChecklistPage units).
+
+   A Question (chat) shows a neutral speech bubble and the word "Question"; a Finding (part of the report) shows an
+   amber flag, the word "Finding" and, unless asked not to, an "In report" badge. In its compact form (the gutter marker
+   of a line) it shows the icon and the number of threads, and names the kind and the number in its title and
+   aria-label, for example "2 questions". The icons are inline SVG hidden from assistive technology next to a text
+   label, so the kind never rests on color alone. The semantic classes kind-question and kind-finding carry the colors
+   of both themes (see app.css). Presentation only; the words are built in ThreadKindBadge.razor.cs. Every key value
+   carries a stable kebab-case data-testid. *@
+@if (Compact)
+{
+    <span class="kind-marker @KindClass" data-testid="@TestId" data-thread-kind="@KindClass" title="@MarkerLabel" aria-label="@MarkerLabel" role="img">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="@IconPath" /></svg>
+        <span aria-hidden="true" data-testid="@(TestId)-count">@Count</span>
+    </span>
+}
+else
+{
+    <span class="kind-badge @KindClass" data-testid="@TestId" data-thread-kind="@KindClass">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="@IconPath" /></svg>
+        <span data-testid="@(TestId)-label">@Label</span>
+    </span>
+    @if (ShowsInReport)
+    {
+        <span class="badge in-report" data-testid="@(TestId)-in-report">In report</span>
+    }
+}

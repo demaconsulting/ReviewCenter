@@ -536,6 +536,8 @@ public sealed class SigningService
             ? 0
             : slots.Count(slot => record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State != BallotState.Submitted);
         var disputed = checklist?.Consolidation?.Disputed ?? 0;
+        var openCounts = ThreadCounts.From(record.Threads);
+        var openCheckCounts = ThreadCounts.From(record.Threads, thread => thread.IsCheckThread);
         return new ReviewApproval(
             conclusion,
             digest,
@@ -553,7 +555,12 @@ public sealed class SigningService
             unsubmitted,
             assessment.Outcome,
             assessment.ConclusionRequired,
-            record.Threads.Count(thread => thread.State == ReviewThreadState.Open && thread.IsCheckThread));
+            record.Threads.Count(thread => thread.State == ReviewThreadState.Open && thread.IsCheckThread),
+            IsMasked: false,
+            OpenQuestions: openCounts.OpenQuestions,
+            OpenFindings: openCounts.OpenFindings,
+            OpenCheckQuestions: openCheckCounts.OpenQuestions,
+            OpenCheckFindings: openCheckCounts.OpenFindings);
     }
 
     /// <summary>
@@ -1318,10 +1325,10 @@ public sealed class SigningService
         }
 
         // Every thread must be resolved
-        var open = record.Threads.Count(thread => thread.State == ReviewThreadState.Open);
-        if (open > 0)
+        var open = ThreadCounts.From(record.Threads);
+        if (open.Open > 0)
         {
-            blockers.Add(open == 1 ? "1 thread is open" : $"{open} threads are open");
+            blockers.Add($"{open.OpenText} to resolve");
         }
 
         if (conclusionRequired)

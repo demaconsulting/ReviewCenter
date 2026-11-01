@@ -539,4 +539,43 @@ public class BallotMaskingServiceTests
         Assert.Equal(ThreadCapabilities.None, outsider);
         Assert.Equal(ThreadCapabilities.None, nobody);
     }
+
+    /// <summary>
+    ///     Test that a viewer who has not handed in never gets a count, a blocker or a per-thread action for a
+    ///     discussion about a check (a Finding here), while the lead and a reviewer who handed in do.
+    /// </summary>
+    [Fact]
+    public async Task ThreadCounts_MaskedViewer_NeverCountsCheckThreads()
+    {
+        // Arrange: the lead starts a discussion about a check and promotes it; bob has not handed in
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync(bobSubmitted: false);
+        var check = await world.StartCheckThreadAsync("lead");
+        await world.Threads.PromoteAsync(world.ProjectId, BallotMaskingWorld.ReviewId, check.Id, BallotMaskingWorld.ActorOf("lead"), Token);
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, BallotMaskingWorld.ReviewId, new ThreadAnchor("a.txt"), BallotMaskingWorld.ActorOf("lead"), "General", Token);
+
+        // Act
+        var bobProgress = (await world.Progress.GetProgressAsync(BallotMaskingWorld.ActorOf("bob"), world.ProjectId, Token)).Single();
+        var annProgress = (await world.Progress.GetProgressAsync(BallotMaskingWorld.ActorOf("ann"), world.ProjectId, Token)).Single();
+        var bobApproval = (await world.Signing.GetApprovalAsync(
+            BallotMaskingWorld.ActorOf("bob"), world.ProjectId, BallotMaskingWorld.ReviewId, Token))!;
+        var bobCapabilities = await world.Threads.GetCapabilitiesAsync(
+            BallotMaskingWorld.ActorOf("bob"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var annCapabilities = await world.Threads.GetCapabilitiesAsync(
+            BallotMaskingWorld.ActorOf("ann"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        Assert.Equal(1, bobProgress.OpenQuestions);
+        Assert.Equal(0, bobProgress.OpenFindings);
+        Assert.Equal(1, bobApproval.OpenQuestions);
+        Assert.Equal(0, bobApproval.OpenFindings);
+        Assert.Contains("1 open question to resolve", bobApproval.Blockers);
+        Assert.DoesNotContain(bobApproval.Blockers, text => text.Contains("finding", StringComparison.Ordinal));
+        Assert.Single(bobCapabilities.Threads);
+        Assert.False(bobCapabilities.CanDemote(check.Id));
+        Assert.Equal(1, annProgress.OpenQuestions);
+        Assert.Equal(1, annProgress.OpenFindings);
+        Assert.Equal(2, annCapabilities.Threads.Count);
+    }
 }

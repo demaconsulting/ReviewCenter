@@ -24,6 +24,7 @@ using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 
@@ -113,6 +114,18 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     The key of the confirmation for the new-thread form.
     /// </summary>
     private const string NewThreadWarningKey = "new-thread";
+
+    /// <summary>
+    ///     The outline of the check mark in the outcome badge of an approved review, in a 16 by 16 box.
+    /// </summary>
+    private const string OutcomeApprovedPath =
+        "M6.2 11.3 3.1 8.2l-1.1 1.1 4.2 4.2 7.8-7.8-1.1-1.1z";
+
+    /// <summary>
+    ///     The outline of the cross in the outcome badge of a rejected review, in a 16 by 16 box.
+    /// </summary>
+    private const string OutcomeRejectedPath =
+        "M3.2 2.1 2.1 3.2 6.9 8l-4.8 4.8 1.1 1.1L8 9.1l4.8 4.8 1.1-1.1L9.1 8l4.8-4.8-1.1-1.1L8 6.9z";
 
     /// <summary>
     ///     Where the element of <see cref="_scrollTarget"/> lands in the window: <c>start</c> or <c>center</c>.
@@ -728,6 +741,22 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private ReviewThreadState? IndexFilter { get; set; } = ReviewThreadState.Open;
 
     /// <summary>
+    ///     Gets the kind the thread index is filtered to, or <c>null</c> for both kinds.
+    /// </summary>
+    private ThreadKind? IndexKind { get; set; }
+
+    /// <summary>
+    ///     Gets or sets what the viewer may do with each thread (promote, demote, resolve, add a reply to the report).
+    /// </summary>
+    private ThreadCapabilities Capabilities { get; set; } = ThreadCapabilities.None;
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the new thread is a Finding (goes in the report) rather than a
+    ///     Question.
+    /// </summary>
+    private bool NewIncludeInReport { get; set; }
+
+    /// <summary>
     ///     Gets the identities of the resolved threads the reader has expanded.
     /// </summary>
     private HashSet<int> ExpandedThreads { get; } = [];
@@ -757,6 +786,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     Gets the reply text typed for each thread, by thread identity.
     /// </summary>
     private Dictionary<int, string> ReplyTexts { get; } = [];
+
+    /// <summary>
+    ///     Gets whether the reply typed for each thread is ticked "Add to report", by thread identity.
+    /// </summary>
+    private Dictionary<int, bool> ReplyReports { get; } = [];
 
     /// <summary>
     ///     Gets the message of the last failed reply or state change for each thread, by thread identity.
@@ -934,9 +968,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
         SignTotpCodes.Clear();
         SignErrors.Clear();
         ReplyTexts.Clear();
+        ReplyReports.Clear();
         ReplyErrors.Clear();
         Warning = null;
         IndexFilter = ReviewThreadState.Open;
+        IndexKind = null;
+        Capabilities = ThreadCapabilities.None;
+        NewIncludeInReport = false;
         ExpandedThreads.Clear();
         FocusedThreadId = null;
         HighlightLine = null;
@@ -1126,6 +1164,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
         if (Review is not null)
         {
             Threads = await ThreadService.ListAsync(actor, ProjectId, ReviewId);
+            Capabilities = actor is null
+                ? ThreadCapabilities.None
+                : await ThreadService.GetCapabilitiesAsync(actor, ProjectId, ReviewId);
             Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: actor?.Username);
             Approval = await SigningService.GetApprovalAsync(actor, ProjectId, ReviewId);
             if (IsLocked)
@@ -1494,6 +1535,46 @@ public partial class ReviewPage : ComponentBase, IDisposable
     }
 
     /// <summary>
+    ///     Filters the thread index to one kind, or to both.
+    /// </summary>
+    /// <param name="kind">The kind to show, or <c>null</c> for both.</param>
+    private void SetKindFilter(ThreadKind? kind)
+    {
+        IndexKind = kind;
+    }
+
+    /// <summary>
+    ///     Gets the rows of the thread index for the chosen state and kind.
+    /// </summary>
+    /// <returns>The threads, in the order of the index.</returns>
+    private IReadOnlyList<ReviewThread> IndexRows()
+    {
+        return ThreadService.BuildIndex(Threads, IndexFilter)
+            .Where(t => IndexKind is null || t.Kind == IndexKind)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Counts the threads of one state under the chosen kind, for the state filter buttons.
+    /// </summary>
+    /// <param name="state">The state to count, or <c>null</c> for all.</param>
+    /// <returns>The number of threads.</returns>
+    private int CountByState(ReviewThreadState? state)
+    {
+        return Threads.Count(t => (state is null || t.State == state) && (IndexKind is null || t.Kind == IndexKind));
+    }
+
+    /// <summary>
+    ///     Counts the threads of one kind under the chosen state, for the kind filter buttons.
+    /// </summary>
+    /// <param name="kind">The kind to count, or <c>null</c> for both.</param>
+    /// <returns>The number of threads.</returns>
+    private int CountByKind(ThreadKind? kind)
+    {
+        return Threads.Count(t => (kind is null || t.Kind == kind) && (IndexFilter is null || t.State == IndexFilter));
+    }
+
+    /// <summary>
     ///     Expands a collapsed resolved thread, or collapses an expanded one.
     /// </summary>
     /// <param name="threadId">The identity of the thread.</param>
@@ -1827,7 +1908,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         }
 
         var anchor = new ThreadAnchor(SelectedPath, start, end ?? start, start is null ? ThreadSide.Head : NewSide);
-        await SubmitThreadAsync(anchor, NewText, null);
+        await SubmitThreadAsync(anchor, NewText, NewIncludeInReport, null);
     }
 
     /// <summary>
@@ -1835,22 +1916,24 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </summary>
     /// <param name="anchor">Where the thread is placed, as it was when the person submitted the form.</param>
     /// <param name="text">The comment text, as it was when the person submitted the form.</param>
+    /// <param name="includeInReport"><c>true</c> to start a Finding, <c>false</c> to start a Question.</param>
     /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
     /// <returns>A task that completes when the thread is stored or the warning or problem is shown.</returns>
     private async Task SubmitThreadAsync(
-        ThreadAnchor anchor, string text, IReadOnlyList<AffectedSignature>? confirmed)
+        ThreadAnchor anchor, string text, bool includeInReport, IReadOnlyList<AffectedSignature>? confirmed)
     {
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
             await ThreadService.StartThreadAsync(
-                ProjectId, ReviewId, anchor, actor, text, acknowledgedSlotIds: SlotIds(confirmed));
+                ProjectId, ReviewId, anchor, actor, text, acknowledgedSlotIds: SlotIds(confirmed),
+                includeInReport: includeInReport);
         }
         catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
         {
             NewThreadError = null;
             Warning = PendingSignatureWarning.Create(
-                NewThreadWarningKey, confirmed, ex, slots => SubmitThreadAsync(anchor, text, slots));
+                NewThreadWarningKey, confirmed, ex, slots => SubmitThreadAsync(anchor, text, includeInReport, slots));
             return;
         }
         catch (DomainRuleException ex)
@@ -1863,6 +1946,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         Warning = null;
         NewThreadError = null;
         NewText = string.Empty;
+        NewIncludeInReport = false;
         ClearAnchor();
         await RefreshAsync();
     }
@@ -1875,9 +1959,16 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <param name="confirmedText">
     ///     The text to send, as it was at the first attempt; <c>null</c> to take the text typed for the thread.
     /// </param>
+    /// <param name="confirmedReport">
+    ///     Whether the reply goes in the report, as it was at the first attempt; <c>null</c> to take the tick typed
+    ///     for the thread.
+    /// </param>
     /// <returns>A task that completes when the reply is stored or the warning or problem is shown.</returns>
     private async Task ReplyAsync(
-        int threadId, IReadOnlyList<AffectedSignature>? confirmed = null, string? confirmedText = null)
+        int threadId,
+        IReadOnlyList<AffectedSignature>? confirmed = null,
+        string? confirmedText = null,
+        bool? confirmedReport = null)
     {
         if (!await GuardAsync())
         {
@@ -1885,17 +1976,19 @@ public partial class ReviewPage : ComponentBase, IDisposable
         }
 
         var text = confirmedText ?? ReplyTexts.GetValueOrDefault(threadId) ?? string.Empty;
+        var report = confirmedReport ?? ReplyReports.GetValueOrDefault(threadId);
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
             await ThreadService.ReplyAsync(
-                ProjectId, ReviewId, threadId, actor, text, acknowledgedSlotIds: SlotIds(confirmed));
+                ProjectId, ReviewId, threadId, actor, text, acknowledgedSlotIds: SlotIds(confirmed),
+                includeInReport: report);
         }
         catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
         {
             ReplyErrors.Remove(threadId);
             Warning = PendingSignatureWarning.Create(
-                ReplyWarningKey(threadId), confirmed, ex, slots => ReplyAsync(threadId, slots, text));
+                ReplyWarningKey(threadId), confirmed, ex, slots => ReplyAsync(threadId, slots, text, report));
             return;
         }
         catch (DomainRuleException ex)
@@ -1908,21 +2001,129 @@ public partial class ReviewPage : ComponentBase, IDisposable
         Warning = null;
         ReplyErrors.Remove(threadId);
         ReplyTexts.Remove(threadId);
+        ReplyReports.Remove(threadId);
         await RefreshAsync();
     }
 
     /// <summary>
-    ///     Resolves an open thread or reopens a resolved one, or asks for confirmation when that would make
-    ///     signatures out of date.
+    ///     Resolves an open thread, or asks for confirmation when that would make signatures out of date.
+    /// </summary>
+    /// <param name="thread">The thread as shown.</param>
+    /// <param name="note">The resolution note, or <c>null</c> when none was written (a Finding needs one).</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the state is stored or the warning or problem is shown.</returns>
+    /// <remarks>
+    ///     Refused, with a message, when the sign-in state of the page has already ended. Resolving changes the
+    ///     approval state, so it must not run for a user who is no longer signed in.
+    /// </remarks>
+    private Task ResolveThreadAsync(ReviewThread thread, string? note, IReadOnlyList<AffectedSignature>? confirmed = null)
+    {
+        return ChangeThreadAsync(
+            thread,
+            ToggleWarningKey(thread.Id),
+            confirmed,
+            (actor, slots) => ThreadService.ResolveAsync(
+                ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: slots, resolutionNote: note),
+            slots => ResolveThreadAsync(thread, note, slots),
+            () => ExpandedThreads.Remove(thread.Id));
+    }
+
+    /// <summary>
+    ///     Opens a resolved thread again, or asks for confirmation when that would make signatures out of date.
     /// </summary>
     /// <param name="thread">The thread as shown.</param>
     /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
     /// <returns>A task that completes when the state is stored or the warning or problem is shown.</returns>
-    /// <remarks>
-    ///     Refused, with a message, when the sign-in state of the page has already ended. Resolving or reopening
-    ///     changes the approval state, so it must not run for a user who is no longer signed in.
-    /// </remarks>
-    private async Task ToggleThreadAsync(ReviewThread thread, IReadOnlyList<AffectedSignature>? confirmed = null)
+    private Task ReopenThreadAsync(ReviewThread thread, IReadOnlyList<AffectedSignature>? confirmed = null)
+    {
+        return ChangeThreadAsync(
+            thread,
+            ToggleWarningKey(thread.Id),
+            confirmed,
+            (actor, slots) => ThreadService.ReopenAsync(
+                ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: slots),
+            slots => ReopenThreadAsync(thread, slots),
+            null);
+    }
+
+    /// <summary>
+    ///     Makes a Question a Finding (it goes in the report), or asks for confirmation when that would make
+    ///     signatures out of date.
+    /// </summary>
+    /// <param name="thread">The thread as shown.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the kind is stored or the warning or problem is shown.</returns>
+    private Task PromoteThreadAsync(ReviewThread thread, IReadOnlyList<AffectedSignature>? confirmed = null)
+    {
+        return ChangeThreadAsync(
+            thread,
+            KindWarningKey(thread.Id),
+            confirmed,
+            (actor, slots) => ThreadService.PromoteAsync(
+                ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: slots),
+            slots => PromoteThreadAsync(thread, slots),
+            null);
+    }
+
+    /// <summary>
+    ///     Makes a Finding a Question (it leaves the report), or asks for confirmation when that would make
+    ///     signatures out of date; the warning names the signers who must sign again.
+    /// </summary>
+    /// <param name="thread">The thread as shown.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the kind is stored or the warning or problem is shown.</returns>
+    private Task DemoteThreadAsync(ReviewThread thread, IReadOnlyList<AffectedSignature>? confirmed = null)
+    {
+        return ChangeThreadAsync(
+            thread,
+            KindWarningKey(thread.Id),
+            confirmed,
+            (actor, slots) => ThreadService.DemoteAsync(
+                ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: slots),
+            slots => DemoteThreadAsync(thread, slots),
+            null);
+    }
+
+    /// <summary>
+    ///     Adds a reply to the report or takes it out, or asks for confirmation when that would make signatures out of
+    ///     date.
+    /// </summary>
+    /// <param name="thread">The thread as shown.</param>
+    /// <param name="comment">The reply as shown.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the flag is stored or the warning or problem is shown.</returns>
+    private Task ToggleReplyReportAsync(
+        ReviewThread thread, ReviewComment comment, IReadOnlyList<AffectedSignature>? confirmed = null)
+    {
+        var include = !comment.IncludeInReport;
+        return ChangeThreadAsync(
+            thread,
+            ReportWarningKey(thread.Id),
+            confirmed,
+            (actor, slots) => ThreadService.SetCommentIncludedAsync(
+                ProjectId, ReviewId, thread.Id, comment.Id, include, actor, acknowledgedSlotIds: slots),
+            slots => ToggleReplyReportAsync(thread, comment, slots),
+            null);
+    }
+
+    /// <summary>
+    ///     Runs one change to a thread with the shared handling of the page: the sign-in check, the warning that asks
+    ///     for confirmation when signatures would become out of date, the message of a refused change and the reload.
+    /// </summary>
+    /// <param name="thread">The thread as shown.</param>
+    /// <param name="warningKey">The key of the confirmation for this kind of change.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <param name="change">Stores the change for an actor, acknowledging the given slot identities.</param>
+    /// <param name="retry">Repeats the change with the confirmed signatures.</param>
+    /// <param name="onStored">Runs after the change was stored, or <c>null</c>.</param>
+    /// <returns>A task that completes when the change is stored or the warning or problem is shown.</returns>
+    private async Task ChangeThreadAsync(
+        ReviewThread thread,
+        string warningKey,
+        IReadOnlyList<AffectedSignature>? confirmed,
+        Func<Actor, int[]?, Task> change,
+        Func<IReadOnlyList<AffectedSignature>, Task> retry,
+        Action? onStored)
     {
         if (!await GuardAsync())
         {
@@ -1933,23 +2134,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
         {
             // The actor is audited; asking for it also refuses an ended sign-in state
             var actor = await AuthenticationState.GetActorAsync();
-            if (thread.State == ReviewThreadState.Open)
-            {
-                await ThreadService.ResolveAsync(
-                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: SlotIds(confirmed));
-                ExpandedThreads.Remove(thread.Id);
-            }
-            else
-            {
-                await ThreadService.ReopenAsync(
-                    ProjectId, ReviewId, thread.Id, actor, acknowledgedSlotIds: SlotIds(confirmed));
-            }
+            await change(actor, SlotIds(confirmed));
+            onStored?.Invoke();
         }
         catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
         {
             ReplyErrors.Remove(thread.Id);
-            Warning = PendingSignatureWarning.Create(
-                ToggleWarningKey(thread.Id), confirmed, ex, slots => ToggleThreadAsync(thread, slots));
+            Warning = PendingSignatureWarning.Create(warningKey, confirmed, ex, retry);
             return;
         }
         catch (DomainRuleException ex)
@@ -2019,6 +2210,114 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private static string ToggleWarningKey(int threadId)
     {
         return $"toggle-{threadId}";
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for promoting or demoting a thread.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>The key.</returns>
+    private static string KindWarningKey(int threadId)
+    {
+        return $"kind-{threadId}";
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for adding a reply of a thread to the report or taking it out.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>The key.</returns>
+    private static string ReportWarningKey(int threadId)
+    {
+        return $"report-{threadId}";
+    }
+
+    /// <summary>
+    ///     Gets what the viewer may do with a thread.
+    /// </summary>
+    /// <param name="thread">The thread.</param>
+    /// <returns>The actions; nothing when the review is read-only for the viewer or concluded.</returns>
+    private ThreadActions ActionsFor(ReviewThread thread)
+    {
+        return ReadOnly || IsLocked ? ThreadActions.None : Capabilities.ForThread(thread.Id);
+    }
+
+    /// <summary>
+    ///     Tells whether a signature confirmation of a change to the thread itself (not of a reply) is waiting.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns><c>true</c> when the waiting change resolves, reopens, promotes or demotes the thread or changes the
+    /// report flag of one of its replies.</returns>
+    private bool HeadWarningWaits(int threadId)
+    {
+        return Warning?.Key == ToggleWarningKey(threadId)
+               || Warning?.Key == KindWarningKey(threadId)
+               || Warning?.Key == ReportWarningKey(threadId);
+    }
+
+    /// <summary>
+    ///     Renders the card of a thread with what the page knows about it.
+    /// </summary>
+    /// <param name="thread">The thread.</param>
+    /// <returns>The markup of the card.</returns>
+    private RenderFragment ThreadCardFor(ReviewThread thread) => builder =>
+    {
+        var threadId = thread.Id;
+        var resolved = thread.State == ReviewThreadState.Resolved;
+        builder.OpenComponent<ThreadCard>(0);
+        builder.SetKey(threadId);
+        builder.AddComponentParameter(1, nameof(ThreadCard.Thread), thread);
+        builder.AddComponentParameter(2, nameof(ThreadCard.Actions), ActionsFor(thread));
+        builder.AddComponentParameter(3, nameof(ThreadCard.AnchorText), AnchorLabel(thread));
+        builder.AddComponentParameter(4, nameof(ThreadCard.CountText), CommentCountLabel(thread));
+        builder.AddComponentParameter(5, nameof(ThreadCard.Focused), thread.Id == FocusedThreadId);
+        builder.AddComponentParameter(6, nameof(ThreadCard.HasUnread), ThreadHasUnread(thread));
+        builder.AddComponentParameter(7, nameof(ThreadCard.Expanded), !resolved || ExpandedThreads.Contains(threadId));
+        builder.AddComponentParameter(8, nameof(ThreadCard.CanReply), !IsLocked && !ReadOnly);
+        builder.AddComponentParameter(9, nameof(ThreadCard.CopyStatus), CopyStatusFor(threadId));
+        builder.AddComponentParameter(10, nameof(ThreadCard.Error), ReplyErrors.GetValueOrDefault(threadId));
+        builder.AddComponentParameter(11, nameof(ThreadCard.ReplyText), ReplyTexts.GetValueOrDefault(threadId) ?? string.Empty);
+        builder.AddComponentParameter(12, nameof(ThreadCard.ReplyTextChanged), EventCallback.Factory.Create<string>(this, text => ReplyTexts[threadId] = text));
+        builder.AddComponentParameter(13, nameof(ThreadCard.ReplyIncludeInReport), ReplyReports.GetValueOrDefault(threadId));
+        builder.AddComponentParameter(14, nameof(ThreadCard.ReplyIncludeInReportChanged), EventCallback.Factory.Create<bool>(this, report => ReplyReports[threadId] = report));
+        builder.AddComponentParameter(15, nameof(ThreadCard.OnCopyLink), EventCallback.Factory.Create(this, () => CopyThreadLinkAsync(threadId)));
+        builder.AddComponentParameter(16, nameof(ThreadCard.OnToggleExpanded), EventCallback.Factory.Create(this, () => GuardedAsync(() => ToggleThreadExpanded(threadId))));
+        builder.AddComponentParameter(17, nameof(ThreadCard.OnReply), EventCallback.Factory.Create(this, () => ReplyAsync(threadId)));
+        builder.AddComponentParameter(18, nameof(ThreadCard.OnResolve), EventCallback.Factory.Create<string?>(this, note => ResolveThreadAsync(thread, note)));
+        builder.AddComponentParameter(19, nameof(ThreadCard.OnReopen), EventCallback.Factory.Create(this, () => ReopenThreadAsync(thread)));
+        builder.AddComponentParameter(20, nameof(ThreadCard.OnPromote), EventCallback.Factory.Create(this, () => PromoteThreadAsync(thread)));
+        builder.AddComponentParameter(21, nameof(ThreadCard.OnDemote), EventCallback.Factory.Create(this, () => DemoteThreadAsync(thread)));
+        builder.AddComponentParameter(22, nameof(ThreadCard.OnToggleReport), EventCallback.Factory.Create<ReviewComment>(this, comment => ToggleReplyReportAsync(thread, comment)));
+        // Always pass both notices (null when nothing waits): an omitted parameter would keep its old value.
+        builder.AddComponentParameter(100, nameof(ThreadCard.HeadNotice), HeadWarningWaits(threadId) ? WarningFragment() : null);
+        builder.AddComponentParameter(101, nameof(ThreadCard.ReplyNotice), Warning?.Key == ReplyWarningKey(threadId) ? WarningFragment() : null);
+
+        builder.CloseComponent();
+    };
+
+    /// <summary>
+    ///     Renders the signature warning of the change that waits.
+    /// </summary>
+    /// <returns>The markup of the banner with the page's confirm and cancel actions.</returns>
+    private RenderFragment WarningFragment()
+    {
+        // Capture the slots now: the fragment may render after the warning was confirmed or cancelled.
+        var slots = Warning!.Slots;
+        return builder => RenderWarning(builder, slots);
+    }
+
+    /// <summary>
+    ///     Renders the signature warning for the given slots.
+    /// </summary>
+    /// <param name="builder">The render tree builder.</param>
+    /// <param name="slots">The slots whose signatures the change affects.</param>
+    private void RenderWarning(RenderTreeBuilder builder, IReadOnlyList<AffectedSignature> slots)
+    {
+        builder.OpenComponent<SignatureWarning>(0);
+        builder.AddComponentParameter(1, nameof(SignatureWarning.Slots), slots);
+        builder.AddComponentParameter(2, nameof(SignatureWarning.OnConfirm), EventCallback.Factory.Create(this, ConfirmWarningAsync));
+        builder.AddComponentParameter(3, nameof(SignatureWarning.OnCancel), EventCallback.Factory.Create(this, CancelWarning));
+        builder.CloseComponent();
     }
 
     /// <summary>
@@ -2487,11 +2786,17 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>"No threads yet.", "No open threads." or "No resolved threads.".</returns>
     private string IndexEmptyMessage()
     {
+        var word = IndexKind switch
+        {
+            ThreadKind.Question => "questions",
+            ThreadKind.Finding => "findings",
+            _ => "threads"
+        };
         return IndexFilter switch
         {
-            ReviewThreadState.Open => "No open threads.",
-            ReviewThreadState.Resolved => "No resolved threads.",
-            _ => "No threads yet."
+            ReviewThreadState.Open => $"No open {word}.",
+            ReviewThreadState.Resolved => $"No resolved {word}.",
+            _ => $"No {word} yet."
         };
     }
 
@@ -2585,7 +2890,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>For example "Show Line 4 of src/a.cs, Open, 2 comments, first by Ann, last activity 2026-01-02 03:04 UTC".</returns>
     private string IndexRowLabel(ReviewThread thread)
     {
-        return $"Show {AnchorLabel(thread)} of {IndexPathLabel(thread)}, {thread.State}, {CommentCountLabel(thread)}, " +
+        return $"Show {AnchorLabel(thread)} of {IndexPathLabel(thread)}, {thread.Kind}, {thread.State}, {CommentCountLabel(thread)}, " +
                $"first by {thread.Comments.FirstOrDefault()?.Author}, last activity {FormatTime(thread.LastActivity)}";
     }
 
@@ -2625,7 +2930,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>The UTC time as "yyyy-MM-dd HH:mm UTC".</returns>
     private static string FormatTime(DateTimeOffset time)
     {
-        return time.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
+        return ThreadCard.FormatTime(time);
     }
 
     /// <summary>
@@ -2658,6 +2963,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     {
         ClearAnchor();
         NewText = string.Empty;
+        NewIncludeInReport = false;
         NewThreadError = null;
         if (Warning?.Key == NewThreadWarningKey)
         {

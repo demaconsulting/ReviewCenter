@@ -233,6 +233,11 @@ sections:
           - ReviewCenter-ReviewPage-ThreadShow
           - ReviewCenter-ReviewPage-ThreadUpdate
           - ReviewCenter-ReviewPage-CheckThreads
+          - ReviewCenter-ReviewPage-ThreadKinds
+          - ReviewCenter-ReviewPage-ThreadComposer
+          - ReviewCenter-ReviewPage-ThreadActions
+          - ReviewCenter-ReviewPage-ThreadKindIndex
+          - ReviewCenter-ReviewPage-ConclusionFindings
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
 

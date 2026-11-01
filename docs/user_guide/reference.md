@@ -374,6 +374,10 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 - A failed-checks entry reads "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is
   a disagreement to resolve."; the chip of an update is
   "Approved", "Rejected", or "Reopened".
+- A replies-waiting entry names the kinds of the threads that wait, for example "Waiting for your reply: 1 open finding,
+  2 open questions." The counts of the review page and of the progress lists use the same words: a **Question** is
+  conversation (chat), a **Finding** goes into the signed report with its resolution note, and a thread of either kind
+  that is open blocks signing.
 - The count on the home page is the number of distinct reviews in the first three groups, so a review in two groups
   counts once. Updates are never counted. The badge of the Inbox tab in the header shows the same count, read when a
   page is opened and kept for 30 seconds for each user, so it can be up to 30 seconds behind; it is hidden at zero and

@@ -38,6 +38,14 @@
     --radius-small: 0.5rem;
     --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.06), 0 2px 8px rgba(16, 24, 40, 0.05);
     --transition: 0.15s ease;
+    --kind-question-text: #3b4654;
+    --kind-question-background: #eceff4;
+    --kind-question-border: #b9c2cf;
+    --kind-question-icon: #52607a;
+    --kind-finding-text: #7a4b00;
+    --kind-finding-background: #fdf1d8;
+    --kind-finding-border: #d9a441;
+    --kind-finding-icon: #b45309;
 }
 
 /* The dark palette: the same variables, so every rule below works unchanged. The accent family is lightened so
@@ -74,6 +82,14 @@
     --anchored-stripe: #e0b020;
     --focused-background: #5c4700;
     --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --kind-question-text: #d3dae4;
+    --kind-question-background: #2a3340;
+    --kind-question-border: #4a5668;
+    --kind-question-icon: #a9b6c9;
+    --kind-finding-text: #f0c870;
+    --kind-finding-background: #3a2d0e;
+    --kind-finding-border: #8a6a1f;
+    --kind-finding-icon: #f0b429;
 }
 
 *,
@@ -558,16 +574,196 @@ a.action:active {
     padding-right: 0.25rem;
 }
 
-.thread-marker {
-    display: inline-block;
-    min-width: 1.25rem;
-    padding: 0 0.3rem;
+/* The kind of a thread: a Question (chat) is neutral, a Finding (part of the report) is amber. The icon and the visible
+   word always go together, so the kind never rests on color alone */
+.kind-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.05rem 0.6rem 0.05rem 0.45rem;
+    border: 1px solid var(--kind-question-border);
     border-radius: 999px;
-    background: var(--accent);
-    color: var(--accent-text);
+    background: var(--kind-question-background);
+    color: var(--kind-question-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.kind-badge svg,
+.kind-marker svg {
+    flex: none;
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+}
+
+.kind-badge.kind-question svg,
+.kind-marker.kind-question svg {
+    color: var(--kind-question-icon);
+}
+
+.kind-badge.kind-finding {
+    border-color: var(--kind-finding-border);
+    background: var(--kind-finding-background);
+    color: var(--kind-finding-text);
+}
+
+.kind-badge.kind-finding svg,
+.kind-marker.kind-finding svg {
+    color: var(--kind-finding-icon);
+}
+
+.badge.in-report {
+    border-color: var(--kind-finding-border);
+    background: var(--kind-finding-background);
+    color: var(--kind-finding-text);
+}
+
+/* The gutter marker of a line that starts threads: the icon of the kind and the count */
+.kind-marker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    min-width: 1.25rem;
+    padding: 0 0.35rem;
+    border: 1px solid var(--kind-question-border);
+    border-radius: 999px;
+    background: var(--kind-question-background);
+    color: var(--kind-question-text);
     font-size: 0.75rem;
     line-height: 1.25rem;
-    text-align: center;
+}
+
+.kind-marker.kind-finding {
+    border-color: var(--kind-finding-border);
+    background: var(--kind-finding-background);
+    color: var(--kind-finding-text);
+}
+
+.kind-markers {
+    display: inline-flex;
+    gap: 0.2rem;
+}
+
+/* A comment is chat unless it is in the report, which the amber stripe and the word "In report" say */
+.comment.in-report {
+    border-left: 4px solid var(--kind-finding-border);
+}
+
+.comment-report-mark {
+    color: var(--kind-finding-text);
+    font-weight: 600;
+}
+
+.comment-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.25rem 0 0;
+}
+
+.comment-actions button {
+    margin: 0;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.thread-kind-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.resolution-note {
+    margin: 0.25rem 0 0.5rem;
+    padding: 0.4rem 0.75rem;
+    border-left: 4px solid var(--success-border);
+    border-radius: 0.25rem;
+    background: var(--success-background);
+    color: var(--success-text);
+}
+
+/* The new-thread form: a Question or a Finding, then the text */
+.composer-kind {
+    margin: 0 0 0.75rem;
+    padding: 0;
+    border: 0;
+}
+
+.composer-kind legend {
+    padding: 0;
+    font-weight: 600;
+}
+
+.composer-kind .choice {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0.25rem 0 0;
+}
+
+.composer-kind input[type="radio"],
+.composer-report input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.composer-report {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0 0 0.5rem;
+}
+
+.resolve-note-dialog {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--surface);
+}
+
+.resolve-note-dialog textarea {
+    margin: 0 0 0.5rem;
+}
+
+/* The conclusion of a review: the outcome, the reasons, the findings in the report and who signed */
+.conclusion-outcome {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.1rem 0.7rem;
+    border: 1px solid var(--success-border);
+    border-radius: 999px;
+    background: var(--success-background);
+    color: var(--success-text);
+    font-weight: 700;
+}
+
+.conclusion-outcome.rejected {
+    border-color: var(--error-border);
+    background: var(--error-background);
+    color: var(--error-text);
+}
+
+.conclusion-outcome svg {
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+}
+
+.report-findings {
+    margin: 0.5rem 0;
+    padding-left: 1.25rem;
+}
+
+.report-findings li {
+    margin: 0 0 0.35rem;
+}
+
+.conclusion-signers {
+    margin: 0.5rem 0 0;
 }
 
 .line-text {

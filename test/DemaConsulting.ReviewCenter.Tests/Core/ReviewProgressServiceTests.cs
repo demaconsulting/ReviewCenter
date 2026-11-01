@@ -473,7 +473,9 @@ public partial class ReviewProgressServiceTests
 
         // Assert: the counts are what the sentences say, the review is blocked, the approved one is not
         Assert.Equal(2, progress.OpenThreads);
-        Assert.Equal(CountInBlocker(approval, "thread"), progress.OpenThreads);
+        Assert.Equal(CountInBlocker(approval, "question"), progress.OpenThreads);
+        Assert.Equal(2, progress.OpenQuestions);
+        Assert.Equal(0, progress.OpenFindings);
         Assert.Equal(CountInBlocker(approval, "unanswered"), progress.UnansweredChecks);
         Assert.True(progress.UnansweredChecks > 0);
         Assert.Equal(1, progress.FailedChecks);
@@ -484,6 +486,72 @@ public partial class ReviewProgressServiceTests
         Assert.True(progress.IsBlocked);
         Assert.False(approved.IsBlocked);
         Assert.Equal(0, approved.OpenThreads + approved.UnansweredChecks + approved.FailedChecks);
+    }
+
+    /// <summary>
+    ///     Test that the progress counts open questions and open findings apart, keeps <c>OpenThreads</c> as their sum,
+    ///     and words them by kind.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings()
+    {
+        // Arrange: two open findings, one open question and a resolved finding
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AddSlotAsync(world, "rev-1", "member");
+        var anchor = new ThreadAnchor("a.txt");
+        await world.Threads.StartThreadAsync(world.ProjectId, "rev-1", anchor, _member, "Q", cancellationToken);
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "rev-1", anchor, _member, "F1", cancellationToken, includeInReport: true);
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "rev-1", anchor, _member, "F2", cancellationToken, includeInReport: true);
+        var done = await world.Threads.StartThreadAsync(
+            world.ProjectId, "rev-1", anchor, _member, "F3", cancellationToken, includeInReport: true);
+        await world.Threads.ResolveAsync(world.ProjectId, "rev-1", done.Id, _member, cancellationToken, null, "Fixed");
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+        var approval = (await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", cancellationToken))!;
+
+        // Assert
+        Assert.Equal(1, progress.OpenQuestions);
+        Assert.Equal(2, progress.OpenFindings);
+        Assert.Equal(3, progress.OpenThreads);
+        Assert.Equal("2 open findings, 1 open question", progress.OpenThreadsText);
+        Assert.Contains("2 open findings, 1 open question to resolve", approval.Blockers);
+    }
+
+    /// <summary>
+    ///     Test that the progress words a thread count without a split as open threads.
+    /// </summary>
+    [Fact]
+    public void ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads()
+    {
+        // Arrange
+        var progress = new ReviewProgress(
+            "rev-1",
+            "T",
+            ReviewStage.InReview,
+            1,
+            0,
+            0,
+            [],
+            3,
+            0,
+            0,
+            false,
+            _now,
+            _now,
+            null,
+            false,
+            ReviewConclusion.None,
+            false,
+            true,
+            null);
+
+        // Act, Assert
+        Assert.Equal("3 open threads", progress.OpenThreadsText);
     }
 
     /// <summary>

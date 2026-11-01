@@ -113,6 +113,22 @@
                 {
                     <span class="line-no" data-testid="diff-new-no-@row">@line.NewNumber</span>
                 }
+                @{
+                    var counts = MarkerCounts(line, side);
+                }
+                @if (counts.Total > 0)
+                {
+                    <span class="kind-markers" data-testid="diff-markers-@key">
+                        @if (counts.Findings > 0)
+                        {
+                            <ThreadKindBadge Kind="ThreadKind.Finding" Compact="true" Count="counts.Findings" TestId="@($"diff-marker-finding-{key}")" />
+                        }
+                        @if (counts.Questions > 0)
+                        {
+                            <ThreadKindBadge Kind="ThreadKind.Question" Compact="true" Count="counts.Questions" TestId="@($"diff-marker-question-{key}")" />
+                        }
+                    </span>
+                }
             </span>
             <span class="diff-sign" aria-hidden="true">@Sign(line)</span>
             <span class="line-text" data-testid="diff-text-@key">@line.Text</span>

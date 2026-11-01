@@ -75,6 +75,10 @@ N/A - standard test environment.
   only slot (with a draft); an auditor, a plain contributor, and a reviewer of one of several slots with a draft or no
   ballot are refused with `ActorNotAllowed`. A concluded review refuses it with `ReviewLocked`, a start that would
   outdate a signature needs the acknowledgement, and the audit entry names the check and never the text.
+- The capabilities of a viewer equal the rules that the actions enforce (promote: starter, slot owner, lead; demote:
+  starter, lead; toggle: author of the reply, lead), an auditor and a concluded review allow nothing, a token gets what
+  its user gets except the lead's rights, and the threads are counted by kind and state with the open ones worded by
+  kind.
 
 #### Test Scenarios
 
@@ -576,3 +580,39 @@ and the anchor, and the comment text appears only as an eight-character digest p
 nothing, which is tested by `ThreadService_ResolveAsync_MissingThread_RecordsNothing`. Both tests are defined in
 `AuditEventTests.cs`. The new entries `thread.kind-changed` and `thread.comment-report-changed` and the note hash of
 `thread.resolved` are verified by the Audit scenarios of this unit above.
+
+**ThreadCapabilities_Promote_StarterSlotOwnerAndLead**: The starter, the owner of a slot, and the lead may promote a
+Question; a plain contributor may not. This scenario is tested by `ThreadCapabilities_Promote_StarterSlotOwnerAndLead`.
+
+**ThreadCapabilities_Demote_StarterAndLeadOnly**: Only the starter and the lead may demote a Finding, not a slot
+owner. This scenario is tested by `ThreadCapabilities_Demote_StarterAndLeadOnly`.
+
+**ThreadCapabilities_ResolvedQuestion_PromoteNeedsResolutionNote**: A resolved Question without a resolution note
+cannot be promoted, and one with a note can. This scenario is tested by
+`ThreadCapabilities_ResolvedQuestion_PromoteNeedsResolutionNote`.
+
+**ThreadCapabilities_Auditor_NothingAllowed** and **ThreadCapabilities_Concluded_NothingAllowed**: An auditor and every
+viewer of a concluded review are allowed nothing. These scenarios are tested by the tests of the same names.
+
+**ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead**: A token of a slot owner is offered the promote that the
+slot owner is offered, as the service enforces it by user name; a token of the lead is offered neither promote nor
+demote, because a token is never a lead. This scenario is tested by
+`ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead`.
+
+**ThreadCapabilities_ToggleReply_AuthorOrLead**: The author of a reply and the lead may toggle it, other people may
+not, and the starting comment and a resolution note cannot be toggled. This scenario is tested by
+`ThreadCapabilities_ToggleReply_AuthorOrLead`.
+
+**ThreadCapabilities_Resolve_AnyContributor_UnknownThreadNothing**: A contributor may resolve a thread, and a thread
+that does not exist gets no action. This scenario is tested by
+`ThreadCapabilities_Resolve_AnyContributor_UnknownThreadNothing`.
+
+**ThreadCapabilities_Equality_ComparesPerThreadActionsByValue**: Two capabilities with equal per-thread actions are
+equal. This scenario is tested by `ThreadCapabilities_Equality_ComparesPerThreadActionsByValue`.
+
+**ThreadCounts_SplitByKindAndState**, **ThreadCounts_OpenPhrase_NamesTheKinds**,
+**ThreadCounts_KindPhrases_NameZeroOneAndMany**, and
+**ThreadCounts_From_NullThreads_Throws**: The threads are counted by kind and state, the open ones are worded
+("2 open findings, 1 open question"), one kind is worded also for a zero count ("0 open questions"), and a null list
+is refused. These scenarios are tested by the tests of the same
+names, all defined in `ThreadCapabilitiesTests.cs`.

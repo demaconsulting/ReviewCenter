@@ -242,7 +242,7 @@ public class SigningServiceOpenThreadTests
         Assert.All(approval.Slots, slot => Assert.Equal(SlotSignatureState.Signed, slot.State));
         Assert.False(approval.IsApproved);
         Assert.Equal(1, approval.OpenThreads);
-        Assert.Contains("1 thread is open", approval.Blockers);
+        Assert.Contains("1 open question to resolve", approval.Blockers);
     }
 
     /// <summary>
@@ -294,7 +294,7 @@ public class SigningServiceOpenThreadTests
         Assert.Equal(
             [SlotSignatureState.Signed, SlotSignatureState.Signed, SlotSignatureState.NotSigned],
             blocked.Slots.Select(slot => slot.State));
-        Assert.Contains("1 thread is open", blocked.Blockers);
+        Assert.Contains("1 open question to resolve", blocked.Blockers);
         Assert.Empty(resolved.Blockers);
         Assert.Equal(blocked.Digest, resolved.Digest);
         Assert.True(concluded.IsApproved);
@@ -406,7 +406,7 @@ public class SigningServiceOpenThreadTests
         Assert.All(blocked.Slots, slot => Assert.Equal(SlotSignatureState.Signed, slot.State));
         Assert.False(blocked.IsApproved);
         Assert.Equal(1, blocked.OpenThreads);
-        Assert.Contains("1 thread is open", blocked.Blockers);
+        Assert.Contains("1 open question to resolve", blocked.Blockers);
         Assert.True(resolved.IsApproved);
     }
 

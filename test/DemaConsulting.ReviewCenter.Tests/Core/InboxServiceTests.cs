@@ -335,6 +335,38 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that the row of waiting replies names the findings and questions that wait.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_RepliesWaiting_TextNamesFindingsAndQuestions()
+    {
+        // Arrange: ann started a finding and two questions, bob answered each
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        var finding = await world.Threads.StartThreadAsync(
+            world.ProjectId,
+            "r1",
+            new ThreadAnchor("a.txt"),
+            InboxTestWorld.ActorOf("ann"),
+            "Needs a fix",
+            Ct,
+            includeInReport: true);
+        var first = await world.StartThreadAsync("r1", "ann");
+        var second = await world.StartThreadAsync("r1", "ann");
+        await world.ReplyAsync("r1", finding.Id, "bob");
+        await world.ReplyAsync("r1", first.Id, "bob");
+        await world.ReplyAsync("r1", second.Id, "bob");
+
+        // Act
+        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.RepliesWaiting));
+
+        // Assert
+        Assert.Equal("3 waiting", row.Chip);
+        Assert.Equal("Waiting for your reply: 1 open finding, 2 open questions.", row.Detail);
+    }
+
+    /// <summary>
     ///     Test that a thread whose latest comment is the user's own is not waiting.
     /// </summary>
     [Fact]

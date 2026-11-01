@@ -51,8 +51,24 @@ N/A - standard test environment.
   further read of the review list, uses exactly the given list (a subset, in the given order; an empty list gives an
   empty answer without reading the last activity), still checks the access, and refuses a null list.
 - A null collaborator is refused with an argument exception.
+- The open threads are split into open questions and open findings (their sum is the open threads), the progress texts
+  name the kinds, and the discussions about checks are never counted for a viewer who may not see them.
 
 #### Test Scenarios
+
+**ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings**: A review has two open findings, one open
+question, and a resolved finding; the progress reports 1 open question, 2 open findings and 3 open threads, and the
+progress text and the blocker sentence name both kinds ("2 open findings, 1 open question"). This scenario is tested by
+`ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings`.
+
+**ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads**: A progress record built without the kind
+counts words the open threads as threads. This scenario is tested by
+`ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads`.
+
+**ThreadCounts_MaskedViewer_NeverCountsCheckThreads**: A discussion about a check that was promoted to a Finding is
+not counted for a viewer who may not see the other ballots (progress, approval, and capabilities), while the lead's
+progress counts it. This scenario is tested by `ThreadCounts_MaskedViewer_NeverCountsCheckThreads`, defined in
+`BallotMaskingServiceTests.cs`.
 
 **ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage**: Three reviews: one without a slot, one with
 an unsigned slot, and one signed by its only reviewer after the checklist was answered. The list is ordered by identifier

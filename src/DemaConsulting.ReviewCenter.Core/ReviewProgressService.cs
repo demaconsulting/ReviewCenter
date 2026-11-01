@@ -237,7 +237,9 @@ public sealed class ReviewProgressService
             blocked,
             review.FollowsReviewId,
             approval.ConclusionRequired,
-            approval.DisputedChecks);
+            approval.DisputedChecks,
+            approval.OpenQuestions,
+            approval.OpenFindings);
     }
 
     /// <summary>

@@ -829,6 +829,7 @@ public class ReviewPageDiffTests : PageTestBase
         await cut.Find($"[data-testid='reply-button-{open.Id}']").ClickAsync();
         Assert.Equal("A reply", cut.Find($"[data-testid='comment-text-{open.Id}-2']").TextContent);
         await cut.Find($"[data-testid='thread-toggle-{open.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{open.Id}']").ClickAsync();
 
         // Assert: it is resolved and collapsed
         Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{open.Id}']").TextContent);

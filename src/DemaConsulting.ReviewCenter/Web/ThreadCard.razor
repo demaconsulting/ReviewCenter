@@ -1,0 +1,122 @@
+@* ThreadCard: one thread with its header, comments, reply box and the actions the person may take (a helper of the
+   ReviewPage unit; used in the diff, in the list of a file and in the card of the check discussions).
+
+   The header shows the kind of the thread (Question or Finding, as an icon and a word), where it is anchored, its
+   state and the link buttons. A comment is chat unless it is in the report, which carries the stripe and the words
+   "In report"; a resolved thread shows its resolution note as such. The buttons (promote, demote, resolve or reopen,
+   add a reply to or take it out of the report) come only from the actions the parent passes, which are the ones the
+   thread service would accept, so a person never sees a button that is then refused. Resolving asks for a note first
+   (see ResolveNoteDialog). Presentation only; the parent owns every typed text, stores the changes and shows the
+   signature warning through HeadNotice and ReplyNotice. All text is rendered as plain text. Every interactive
+   element and every key value carries a stable kebab-case data-testid. *@
+@{
+    var threadId = Thread.Id;
+    var resolved = Thread.State == ReviewThreadState.Resolved;
+    var isFinding = Thread.Kind == ThreadKind.Finding;
+}
+<li class="thread @(Focused ? "focused" : null) @(isFinding ? "kind-finding" : "kind-question")" data-testid="thread-@threadId">
+    <div class="thread-head">
+        <ThreadKindBadge Kind="Thread.Kind" TestId="@($"thread-kind-{threadId}")" />
+        <span class="path" data-testid="thread-anchor-@threadId">@AnchorText</span>
+        <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@Thread.State</span>
+        @if (HasUnread)
+        {
+            <span class="badge unread" data-testid="thread-unread-@threadId">New</span>
+        }
+        @if (Thread.CarriedFromReviewId is { } carriedFrom)
+        {
+            <span class="muted" data-testid="thread-carried-@threadId">carried from <a href="@ReviewLinks.ForReview(Thread.ProjectId, carriedFrom)" data-testid="thread-carried-link-@threadId">@carriedFrom</a></span>
+        }
+        <span class="muted" data-testid="thread-count-@threadId">@CountText</span>
+        <a class="thread-link action outline small" href="@ReviewLinks.ForThread(Thread.ProjectId, Thread.ReviewId, threadId)"
+           aria-label="Link to thread @threadId" data-testid="thread-link-@threadId">Link</a>
+        <button type="button" class="secondary" data-testid="thread-copy-link-@threadId"
+                aria-label="Copy link to thread @threadId"
+                @onclick="OnCopyLink">Copy link</button>
+        <span class="muted" role="status" data-testid="thread-copy-status-@threadId">@CopyStatus</span>
+        @if (resolved)
+        {
+            <button type="button" class="secondary" data-testid="thread-expand-@threadId"
+                    aria-expanded="@(Expanded ? "true" : "false")"
+                    aria-label="@(Expanded ? "Collapse" : "Expand") thread @threadId"
+                    @onclick="OnToggleExpanded">@(Expanded ? "Collapse" : "Expand")</button>
+        }
+        @if (Expanded)
+        {
+            <span class="thread-kind-actions">
+                @if (Actions.CanPromote)
+                {
+                    <button type="button" class="secondary" data-testid="thread-promote-@threadId"
+                            title="Add to report"
+                            aria-label="Make thread @threadId a Finding, which adds it to the report"
+                            @onclick="OnPromote">Make this a Finding</button>
+                }
+                @if (Actions.CanDemote)
+                {
+                    <button type="button" class="secondary" data-testid="thread-demote-@threadId"
+                            title="Remove from report"
+                            aria-label="Make thread @threadId a Question, which takes it out of the report"
+                            @onclick="OnDemote">Make this a Question</button>
+                }
+                @if (Actions.CanResolve)
+                {
+                    <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
+                            aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
+                            @onclick="ToggleAsync">@(resolved ? "Reopen" : "Resolve")</button>
+                }
+            </span>
+        }
+    </div>
+    @if (_resolving && !resolved)
+    {
+        <ResolveNoteDialog Kind="Thread.Kind" Suffix="@threadId.ToString()" OnConfirm="ConfirmResolveAsync" OnCancel="CancelResolve" />
+    }
+    @HeadNotice
+    @if (Expanded)
+    {
+        @for (var n = 1; n <= Thread.Comments.Count; n++)
+        {
+            var comment = Thread.Comments[n - 1];
+            var isNote = comment.Kind == ReviewCommentKind.Resolution;
+            <div class="comment @(comment.IncludeInReport ? "in-report" : "chat")" data-testid="comment-@threadId-@n"
+                 data-in-report="@(comment.IncludeInReport ? "true" : "false")">
+                <div class="comment-meta">
+                    <strong data-testid="comment-author-@threadId-@n">@comment.Author</strong>
+                    <time class="muted" datetime="@comment.Created.UtcDateTime.ToString("O")" data-testid="comment-time-@threadId-@n">@FormatTime(comment.Created)</time>
+                    @if (isNote)
+                    {
+                        <span class="badge resolved" data-testid="comment-note-@threadId-@n">Resolution note</span>
+                    }
+                    @if (comment.IncludeInReport)
+                    {
+                        <span class="comment-report-mark" data-testid="comment-in-report-@threadId-@n">In report</span>
+                    }
+                </div>
+                <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
+                @if (Actions.ToggleCommentIds.Contains(comment.Id))
+                {
+                    <div class="comment-actions">
+                        <button type="button" class="secondary" data-testid="comment-report-@threadId-@n"
+                                aria-label="@(comment.IncludeInReport ? "Remove" : "Add") reply @n of thread @threadId @(comment.IncludeInReport ? "from" : "to") the report"
+                                @onclick="() => OnToggleReport.InvokeAsync(comment)">@(comment.IncludeInReport ? "Remove from report" : "Add to report")</button>
+                    </div>
+                }
+            </div>
+        }
+        @if (Error is not null)
+        {
+            <p class="error" role="alert" data-testid="reply-error-@threadId">@Error</p>
+        }
+        @if (CanReply)
+        {
+            <ThreadComposer IsReply="true" Text="@ReplyText" TextChanged="ReplyTextChanged"
+                            IncludeInReport="ReplyIncludeInReport" IncludeInReportChanged="ReplyIncludeInReportChanged"
+                            OnSubmit="OnReply" TextLabel="@($"Reply to thread {threadId}")"
+                            SubmitLabel="@($"Post reply to thread {threadId}")"
+                            FormTestId="@($"reply-box-{threadId}")" TextTestId="@($"reply-text-{threadId}")"
+                            SubmitTestId="@($"reply-button-{threadId}")" HintTestId="@($"reply-submit-hint-{threadId}")"
+                            ReportTestId="@($"reply-report-{threadId}")" ErrorTestId="@($"reply-composer-error-{threadId}")"
+                            Notices="ReplyNotice" />
+        }
+    }
+</li>

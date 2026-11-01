@@ -21,7 +21,8 @@ is derived and is never the stored state of the review, which only says whether 
 reopened after it was concluded is open again, so it is `InReview`.
 
 **ReviewProgress**: an immutable record with `ReviewId`, `Title`, `Stage`, `SlotsRequired`, `SlotsSigned`,
-`SlotsOutOfDate`, `WaitingOn` (display names), `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `NoChecklist`,
+`SlotsOutOfDate`, `WaitingOn` (display names), `OpenThreads`, `OpenQuestions`, `OpenFindings`, `UnansweredChecks`,
+`FailedChecks`, `NoChecklist`,
 `Created`, `LastActivity`, `DueDate`, `IsOverdue`, `Conclusion` (a `ReviewConclusion`), `Reopened`, `IsBlocked`,
 `FollowsReviewId`, `ConclusionRequired`, and `DisputedChecks` (the checks on which the submitted ballots disagree, so
 a review blocked only by a dispute can say so). `IsApproved` (conclusion approved) and `IsConcluded` (approved or
@@ -29,7 +30,8 @@ rejected) are derived from `Conclusion`. `FailedChecks` is informational: a Fail
 `IsBlocked` is true for a review that is not concluded and has no checklist, or has any open thread, unanswered or
 disputed check, or a rejected outcome that still needs its conclusion text (`ConclusionRequired`).
 
-**Blocker counts**: the counts and the flags are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`,
+**Blocker counts**: the counts and the flags are fields of `ReviewApproval` (`OpenThreads`, `OpenQuestions`,
+`OpenFindings`, `UnansweredChecks`,
 `FailedChecks`, `DisputedChecks`, `MissingChecklist`, `ConclusionRequired`; the missing-checklist flag is copied to
 `NoChecklist`). The check counts are those
 of the consolidated checklist (see *Ballot Consolidation Design*), which reads only the submitted ballots, so a draft
@@ -43,6 +45,10 @@ step that also writes the blocker sentences (`BuildApproval`), so the numbers, t
 disagree: `MissingChecklist` is true exactly when "This review has no checklist." is a blocker. This unit only copies
 them; it has no second rule for what blocks a review, and the later work list of the lead reuses the same counts.
 `SlotMember.Enabled` carries whether the account of a person in a slot is enabled.
+
+**Kind counts**: `OpenThreads` is the sum of `OpenQuestions` and `OpenFindings`, counted with `ThreadCounts` from the
+threads the viewer may see, so the discussions about checks are left out for a viewer who may not see the other
+ballots. The blocker, next-step, and progress sentences name the kinds ("2 open findings, 1 open question").
 
 **Last activity**: the time of the newest audit entry that names the review, read for the whole project with one call of
 `IAuditStore.LastActivityAsync(projectId)` (a dictionary of review identifier to the time of the entry with the highest

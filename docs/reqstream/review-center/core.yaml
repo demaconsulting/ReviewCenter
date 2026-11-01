@@ -216,6 +216,7 @@ sections:
           - ReviewCenter-ThreadService-CommentToggle
           - ReviewCenter-ThreadService-CheckThreads
           - ReviewCenter-ThreadService-CheckThreadStart
+          - ReviewCenter-ThreadService-Capabilities
           - ReviewCenter-RecordDigest-CheckThread
         tests:
           - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder
@@ -629,6 +630,7 @@ sections:
           - ReviewCenter-ReviewProgressService-ViewerRights
           - ReviewCenter-ReviewProgressService-Performance
           - ReviewCenter-ReviewProgressService-Arguments
+          - ReviewCenter-ReviewProgressService-KindCounts
           - ReviewCenter-SigningService-ProgressCounts
         tests:
           - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
@@ -759,6 +761,7 @@ sections:
           - ReviewCenter-InboxService-Count
           - ReviewCenter-InboxService-Unread
           - ReviewCenter-InboxService-MarkSeen
+          - ReviewCenter-InboxService-KindWording
         tests:
           - CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts
           - InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach

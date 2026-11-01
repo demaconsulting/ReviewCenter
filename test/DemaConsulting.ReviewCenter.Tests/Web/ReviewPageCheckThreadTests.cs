@@ -128,6 +128,7 @@ public class ReviewPageCheckThreadTests : PageTestBase
 
         // Act: resolve
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{thread.Id}']").ClickAsync();
 
         // Assert: resolved, collapsed and counted
         Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);

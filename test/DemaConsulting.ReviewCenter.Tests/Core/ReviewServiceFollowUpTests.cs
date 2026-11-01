@@ -943,7 +943,7 @@ public class ReviewServiceFollowUpTests
         var free = (await w.Signing.GetApprovalAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!;
 
         // Assert
-        Assert.Equal(["1 thread is open"], blocked.Blockers);
+        Assert.Equal(["1 open question to resolve"], blocked.Blockers);
         Assert.Empty(free.Blockers);
     }
 

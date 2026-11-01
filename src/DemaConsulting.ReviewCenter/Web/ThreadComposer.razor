@@ -1,0 +1,68 @@
+@* ThreadComposer: the box that starts a thread or replies to one (a helper of the ReviewPage and ChecklistPage units).
+
+   Starting a thread (the default): a choice between "Question" (chat, the default) and "Finding (goes in the report)",
+   the text, and the submit button; the page may add fields before the text (line numbers) and buttons after it.
+   Replying: the text, an "Add to report" checkbox (a reply is chat unless ticked) and the Reply button. Ctrl+Enter in
+   the text submits (see the script in App.razor). Presentation only; the parent owns the text and the choice, decides
+   what a submit does and shows the messages and the signature warning through Notices. The text is plain text. Every
+   interactive element carries a stable kebab-case data-testid; the parent names them so each use keeps its own. *@
+@if (IsReply)
+{
+    <div class="reply" data-testid="@FormTestId">
+        <textarea id="@(TextTestId)" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
+                  aria-label="@TextLabel" placeholder="Reply"
+                  data-testid="@TextTestId" value="@Text"
+                  data-ctrl-enter-submits="@SubmitTestId"
+                  @oninput="OnTextInput"></textarea>
+        <label class="composer-report" for="@(ReportTestId)-box">
+            <input id="@(ReportTestId)-box" type="checkbox" data-testid="@ReportTestId" checked="@IncludeInReport"
+                   @onchange="OnReportChanged" />
+            <span>Add to report</span>
+        </label>
+        @if (Error is not null)
+        {
+            <p class="error" role="alert" data-testid="@ErrorTestId">@Error</p>
+        }
+        @Notices
+        <button type="button" class="secondary" data-testid="@SubmitTestId" aria-label="@SubmitLabel"
+                @onclick="SubmitAsync">Reply</button>
+        <span class="muted hint" data-testid="@HintTestId">Ctrl+Enter to submit</span>
+    </div>
+}
+else
+{
+    <form data-testid="@FormTestId" novalidate @onsubmit="SubmitAsync">
+        @Fields
+        <fieldset class="composer-kind" data-testid="@(KindTestId)">
+            <legend>What is this?</legend>
+            <label class="choice" for="@(KindTestId)-question">
+                <input id="@(KindTestId)-question" type="radio" name="@(KindTestId)-choice" value="question"
+                       data-testid="@(KindTestId)-question" checked="@(!IncludeInReport)"
+                       @onchange="() => ChooseAsync(false)" />
+                <span><strong>Question</strong> <span class="muted">(a conversation; not in the report)</span></span>
+            </label>
+            <label class="choice" for="@(KindTestId)-finding">
+                <input id="@(KindTestId)-finding" type="radio" name="@(KindTestId)-choice" value="finding"
+                       data-testid="@(KindTestId)-finding" checked="@IncludeInReport"
+                       @onchange="() => ChooseAsync(true)" />
+                <span><strong>Finding (goes in the report)</strong></span>
+            </label>
+        </fieldset>
+        <div class="field">
+            <label for="@TextTestId">@TextLabel</label>
+            <textarea id="@TextTestId" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
+                      data-ctrl-enter-submits="@SubmitTestId"
+                      data-testid="@TextTestId" value="@Text" @oninput="OnTextInput"></textarea>
+        </div>
+        @if (Error is not null)
+        {
+            <p class="error" role="alert" data-testid="@ErrorTestId">@Error</p>
+        }
+        @Notices
+        <div class="form-actions">
+            <button type="submit" data-testid="@SubmitTestId">@SubmitLabel</button>
+            <span class="muted hint" data-testid="@HintTestId">Ctrl+Enter to submit</span>
+            @Actions
+        </div>
+    </form>
+}
