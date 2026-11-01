@@ -638,7 +638,7 @@ rendered. This scenario is tested by `ReviewPage_Render_ApprovedReviewNonAdmin_H
 
 **ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory**: For an administrator the banner holds the
 reopen form. A reason is typed and the button pressed; the badge reads "In review", the Locked badge and banner are
-gone, the controls are enabled again, the old signature shows "Signature out of date", and the reopen history
+gone, the controls are enabled again, the old signature shows "Signed, then the review changed", and the reopen history
 (`reopen-history`) lists the administrator, the time, the reason, and the shortened previous digest. This scenario is
 tested by `ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory`.
 
@@ -719,7 +719,7 @@ stored signature belongs to the user in the primary role. This scenario is teste
 
 **ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview**: A slot is signed, so the review is approved;
 an administrator then reopens it through the service with a reason, which changes the record, and the page is rendered
-again; the slot shows "Signature out of date", the
+again; the slot shows "Signed, then the review changed", the
 badge reads "In review", the slot has no Save or Remove, and the sign form is offered again. This scenario is tested
 by `ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview`.
 
@@ -1055,3 +1055,33 @@ findings. These scenarios are tested by the tests of the same names.
 conclusion text, the findings in the report with their notes, and the signers; shows the empty state while no
 conclusion is written; and shows only the notice to a viewer who may not see the others. These scenarios are tested by
 the tests of the same names.
+
+**Where are we? and what changed** are verified in `ReviewStatusPanelTests.cs` and in `ReviewPageTests.cs`, which
+render the component and the page with bUnit, and in two Puppet scenarios that run the page in a browser.
+
+**ReviewStatusPanel_ShowsReviewerBallotAndSignedStates**, **ReviewStatusPanel_ShowsQuestionAndFindingCounts**,
+**ReviewStatusPanel_ShowsExactlyOneNextActionButton**, and **ReviewStatusPanel_DisputedCheck_DiscussStartsThread**: The
+panel lists each reviewer with the words for the ballot and the signature, shows the open questions and findings as
+icon and text, renders exactly one `next-action` element, and a Discuss button on a disputed check starts the check
+thread. These scenarios are tested by the tests of the same names.
+
+**ReviewStatusPanel_MaskedViewer_HidesDisputes**: A viewer who has not handed in the own ballot sees the notice
+"hidden until you submit your ballot", no disputed check, and no discuss button. This scenario is tested by
+`ReviewStatusPanel_MaskedViewer_HidesDisputes`.
+
+**ReviewPage_SignedThenChanged_ExplainsWhatChanged**: After a slot signed and a Finding then went into the report, the
+slot reads "Signed, then the review changed" and the expandable list names the change, the person and the time, with
+the note that the list explains and does not prove. This scenario is tested by
+`ReviewPage_SignedThenChanged_ExplainsWhatChanged`.
+
+**ReviewPage_NoJargonOutOfDateText** and **SignatureWarning_UsesPlainLanguage**: No text of the page and no warning
+contains "out of date"; the warning says that signed reviewers will need to look again and sign again, because the
+report changes, and names the signers. These scenarios are tested by the tests of the same names.
+
+**ReviewCenter_QuestionFlow_MaskedUntilSubmitThenDiscussAndResolve_ShowsStatusPanelInBothThemes** and
+**ReviewCenter_FindingFlow_PromoteResolveWithNote_ShowsFindingInConclusionCardInBothThemes**: Two users work in a real
+browser. In the first scenario the disputes stay hidden until the second user hands in a ballot, the differing ballots
+make a disputed check, Discuss starts the check thread, the thread is resolved, and the status panel shows the next
+step. In the second scenario a Question is made a Finding and resolved with a note, and the conclusion card shows it.
+Both take screenshots in the light and the dark theme into the `visual-checks` folder of the test output, which is not
+committed. These scenarios are tested by the tests of the same names.

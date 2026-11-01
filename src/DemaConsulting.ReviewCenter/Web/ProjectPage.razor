@@ -1,5 +1,6 @@
 @* ProjectPage: one project with its reviews, at "/projects/{id}". The reviews are the whole page: a progress table
-   (review id with title and creation date, stage, signatures such as 2/3 with a note for out-of-date ones, blockers
+   (review id with title and creation date, stage, signatures such as 2/3 with a note for the signed-then-changed ones,
+   blockers
    (open threads, unanswered checks, disputed checks), who a review is waiting on, last activity and due date with an
    Overdue badge), each row a link to the review. Above the table sit a summary strip (reviews per stage and overdue)
    and a filter bar (stage, overdue only, blocked only, text search); the column headers sort; 25 reviews make a page.
@@ -208,7 +209,7 @@
                                             <span data-testid="review-progress-@review.ReviewId">@review.SlotsSigned/@review.SlotsRequired</span>
                                             @if (review.SlotsOutOfDate > 0)
                                             {
-                                                <span class="muted" data-testid="review-outofdate-@review.ReviewId">@review.SlotsOutOfDate out of date</span>
+                                                <span class="muted" data-testid="review-outofdate-@review.ReviewId">@review.SlotsOutOfDate signed, then the review changed</span>
                                             }
                                         }
                                     </td>

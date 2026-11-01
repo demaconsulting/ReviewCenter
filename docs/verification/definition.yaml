@@ -85,6 +85,7 @@ input-files:
   - docs/verification/review-center/core/user-impact-service.md
   - docs/verification/review-center/core/ballot-consolidation.md
   - docs/verification/review-center/core/ballot-visibility.md
+  - docs/verification/review-center/core/review-status-service.md
   - docs/verification/review-center/storage.md
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md

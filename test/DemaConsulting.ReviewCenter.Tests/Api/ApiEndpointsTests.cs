@@ -133,7 +133,7 @@ public class ApiEndpointsTests
         // Arrange: the refusal of a service
         var exception = new DomainRuleException(
             DomainRule.SignaturesWouldBecomeOutOfDate,
-            "This change makes signatures out of date: slot 1 (Ann). Acknowledge them to continue.",
+            "Signed reviewers will need to look again and sign again, because the report changes: slot 1 (Ann). Acknowledge this to continue.",
             [new AffectedSignature(7, 1, "Ann", 3)]);
 
         // Act

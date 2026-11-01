@@ -34,5 +34,6 @@ package ReviewCenter {
         part userImpactService : UserImpactService;
         part ballotConsolidation : BallotConsolidation;
         part ballotVisibility : BallotVisibility;
+        part reviewStatusService : ReviewStatusService;
     }
 }

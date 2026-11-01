@@ -364,7 +364,7 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 
 | Group | A review is listed when | Needs action |
 | ----- | ----------------------- | ------------ |
-| To sign | You are primary or alternate of a slot that is not signed or out of date; not concluded | Yes |
+| To sign | You are primary or alternate of a slot that is not signed or must be signed again; not concluded | Yes |
 | Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
 | Failed checks | You authored the review, it is not concluded, and the ballots agree a check is Fail | Yes |
 | Updates | Someone else concluded (approved or rejected) or reopened the review after you last saw it | No |

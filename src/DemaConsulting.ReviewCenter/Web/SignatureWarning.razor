@@ -1,4 +1,4 @@
-@* SignatureWarning: the inline banner that asks the person to confirm a change that makes signatures out of date
+@* SignatureWarning: the inline banner that asks the person to confirm a change that makes signed reviewers sign again
    (a helper of the ReviewPage and ChecklistPage units).
 
    The parent shows it only for the change that waits, and decides what Confirm and Cancel do. Presentation only; the
@@ -7,9 +7,8 @@
    can sit inside a form. Every key value carries a stable kebab-case data-testid. *@
 <div class="notice" role="alert" data-testid="signature-warning">
     <p>
-        This change makes these signatures out of date:
+        Signed reviewers will need to look again and sign again, because the report changes:
         <strong data-testid="signature-warning-slots">@SlotsText</strong>.
-        Those reviewers must sign again.
     </p>
     <div class="form-actions">
         <button type="button" data-testid="signature-warning-confirm" @onclick="OnConfirm">Confirm change</button>

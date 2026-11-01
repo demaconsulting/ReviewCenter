@@ -99,8 +99,8 @@ The ReviewCenter system is divided as follows:
   UserService,
   PersonalAccessTokenService,
   SigningService, ReauthProofStore, TotpService, TotpChallengeStore, RepositoryService, SelectionMatcher,
-  RevisionValidator, ReviewPlanner, LineDiff, InboxService, UserImpactService, BallotConsolidation, and
-  BallotVisibility
+  RevisionValidator, ReviewPlanner, LineDiff, InboxService, UserImpactService, BallotConsolidation,
+  BallotVisibility, and ReviewStatusService
   units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
   tokens, second factor enrollments, reviewer slots, signatures, the read state of the inbox, the audit trail, and the

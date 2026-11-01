@@ -376,6 +376,26 @@ sections:
           - CoreSubsystem_ApiTokenReview_AuthorIsTokenUser
           - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
 
+      - id: ReviewCenter-System-WhereAreWe
+        title: >-
+          The tool shall tell every viewer of a review, in plain words and on the review page, where the review stands
+          and what to do next, shall let the reviewers settle a disagreement about a check by a discussion that they
+          start from there, shall show what changed to a reviewer whose signature no longer matches the report, and
+          shall keep what a reviewer answered from the others until they have handed in their own ballot.
+        tags: [system]
+        justification: |
+          A review with several people only finishes when each of them knows what is left and what to do. The system
+          tests drive the pages of a running server with two reviewers: the standing stays hidden until the own ballot
+          is in, a difference in the ballots is discussed and resolved, a Question becomes a Finding that is resolved
+          with a note and listed in the conclusion, and a picture of the pages is taken in the light and the dark
+          theme for a person to look at.
+        children:
+          - ReviewCenter-Core-ReviewStatus
+          - ReviewCenter-Web-WhereAreWe
+        tests:
+          - ReviewCenter_QuestionFlow_MaskedUntilSubmitThenDiscussAndResolve_ShowsStatusPanelInBothThemes
+          - ReviewCenter_FindingFlow_PromoteResolveWithNote_ShowsFindingInConclusionCardInBothThemes
+
       - id: ReviewCenter-System-ReviewRuleSwitches
         title: >-
           The tool shall keep, for each project, a switch for each of two further review rules, one for authors

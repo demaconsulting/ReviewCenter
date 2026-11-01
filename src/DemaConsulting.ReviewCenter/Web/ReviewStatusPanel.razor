@@ -1,0 +1,144 @@
+@* ReviewStatusPanel: the "Where are we?" panel at the top of the review page (the ReviewStatusPanel unit).
+
+   It answers four questions in plain words: who has done what (a table with the ballot of each reviewer, Not
+   started, Draft or Handed in, and whether the reviewer has signed), which checks the reviewers answered
+   differently (each with a Discuss button), how many questions and findings are open (icon and word, like the thread
+   kind badge), and what to do next: exactly one button, or one line when nothing is left to do. For a reviewer who has
+   signed before the review changed, an expandable list tells what changed since then. A viewer who may not see the
+   answers of the others yet sees that they are hidden until they hand in their own ballot; no dispute and no check
+   discussion is counted for them.
+
+   Presentation only. The status is computed by ReviewStatusService and handed in; the Discuss form and the handling of
+   the signature warning belong to the page, which passes the form for a check as a fragment. Every interactive
+   element and every key value carries a stable kebab-case data-testid. *@
+@if (Status is not null)
+{
+    <section class="card status-panel" id="status-panel" aria-labelledby="status-panel-heading" data-testid="status-panel">
+        <h2 id="status-panel-heading">Where are we?</h2>
+
+        @if (Status.Reviewers.Count == 0)
+        {
+            <p class="muted" data-testid="status-no-reviewers">Nobody is asked to review yet.</p>
+        }
+        else
+        {
+            <table class="status-reviewers" data-testid="status-reviewers">
+                <thead>
+                    <tr>
+                        <th scope="col">Reviewer</th>
+                        @if (Status.HasChecklist)
+                        {
+                            <th scope="col">Ballot</th>
+                        }
+                        <th scope="col">Signature</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var reviewer in Status.Reviewers)
+                    {
+                        <tr data-testid="status-reviewer-@reviewer.SlotId">
+                            <td data-testid="status-reviewer-name-@reviewer.SlotId">
+                                @reviewer.Name@if (reviewer.IsYou)
+                                {
+                                    <span class="muted"> (you)</span>
+                                }
+                            </td>
+                            @if (Status.HasChecklist)
+                            {
+                                <td>
+                                    <span class="status-chip @BallotClass(reviewer)" data-testid="status-ballot-@reviewer.SlotId">@BallotText(reviewer)</span>
+                                </td>
+                            }
+                            <td>
+                                <span class="status-chip @SignatureClass(reviewer)" data-testid="status-signature-@reviewer.SlotId">@SignatureText(reviewer)</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (Status.IsMasked)
+        {
+            <p class="notice masked-note" role="status" data-testid="status-hidden">
+                The checks the reviewers answered differently and the talk about them stay hidden until you submit your ballot.
+            </p>
+        }
+        else if (Status.DisputedChecks.Count > 0)
+        {
+            <div class="status-disputes" id="disputed-checks" data-testid="status-disputed">
+                <h3>Checks answered differently</h3>
+                <ul class="status-dispute-list">
+                    @foreach (var check in Status.DisputedChecks)
+                    {
+                        var itemId = check.ItemId;
+                        var iid = TestId(itemId);
+                        <li data-testid="status-disputed-@iid">
+                            <span class="badge" data-testid="status-disputed-badge-@iid"><span aria-hidden="true">&#9888; </span>Different answers</span>
+                            <span data-testid="status-disputed-text-@iid">@check.Text</span>
+                            @if (check.CanDiscuss && !ReadOnly)
+                            {
+                                <button type="button" class="secondary" data-testid="status-discuss-@iid"
+                                        @onclick="() => OnDiscuss.InvokeAsync(itemId)">Discuss</button>
+                            }
+                            @DiscussForm?.Invoke(check)
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <p class="status-counts" data-testid="status-open-threads">
+            <span class="status-count" data-testid="status-open-questions">
+                <ThreadKindBadge Kind="ThreadKind.Question" TestId="status-questions-kind" />
+                <span data-testid="status-open-questions-text">@Status.OpenQuestions open</span>
+            </span>
+            <span class="status-count" data-testid="status-open-findings">
+                <ThreadKindBadge Kind="ThreadKind.Finding" ShowInReport="false" TestId="status-findings-kind" />
+                <span data-testid="status-open-findings-text">@Status.OpenFindings open</span>
+            </span>
+        </p>
+
+        @foreach (var signed in Status.ChangesSinceSigning)
+        {
+            <details class="status-changes" data-testid="status-changes-@signed.SlotId">
+                <summary data-testid="status-changes-summary-@signed.SlotId">What changed since @signed.SignerName signed</summary>
+                <p class="muted" data-testid="status-changes-note-@signed.SlotId">
+                    Signed @FormatTime(signed.SignedAt). The review changed after that, so @signed.SignerName needs to look
+                    again and sign again. These are the changes that can alter the report:
+                </p>
+                @if (signed.Changes.Count == 0)
+                {
+                    <p class="muted" data-testid="status-changes-empty-@signed.SlotId">
+                        The history shows no single change that explains it, for example because the files or the
+                        reviewers themselves changed.
+                    </p>
+                }
+                else
+                {
+                    <ul data-testid="status-changes-list-@signed.SlotId">
+                        @for (var index = 0; index < signed.Changes.Count; index++)
+                        {
+                            var change = signed.Changes[index];
+                            <li data-testid="status-change-@signed.SlotId-@index">
+                                <span class="muted">@FormatTime(change.At)</span>
+                                <span>@change.By: @change.Reason</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </details>
+        }
+
+        @if (Status.NextAction.IsActionable)
+        {
+            <p class="status-next">
+                <a class="action" href="@NextActionHref" data-testid="next-action">@Status.NextAction.Label</a>
+            </p>
+        }
+        else
+        {
+            <p class="status-next idle" data-testid="next-action">@Status.NextAction.Label</p>
+        }
+    </section>
+}

@@ -142,7 +142,7 @@ administrator." or "'{user}' is no longer a system administrator.", "Password of
 at the next sign-in." (for the own row: "Password of '{user}' set; it is not temporary."), and "Unlocked '{user}'." A
 change that would remove the last enabled
 system administrator is refused by Core and shown as a message. The impact list words the state of a slot as "Not
-signed" or "Out of date".
+signed" or "Signed, then the review changed".
 
 **ResetTotpAsync**: Removes the second factor of the user of a row through `TotpService.ResetAsync` (for a user who lost
 the phone and the recovery codes), through the same `RunAsync` step as the other actions, after the second click. The

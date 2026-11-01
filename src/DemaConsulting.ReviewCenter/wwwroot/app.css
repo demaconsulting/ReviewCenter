@@ -762,6 +762,11 @@ a.action:active {
     margin: 0 0 0.35rem;
 }
 
+.report-findings li .badge:not(:first-child),
+.report-findings li .resolution-note {
+    margin-left: 0.5rem;
+}
+
 .conclusion-signers {
     margin: 0.5rem 0 0;
 }
@@ -1285,6 +1290,117 @@ a.action:active {
     margin: 0.5rem 0;
 }
 
+/* The "Where are we?" panel at the top of the review page. Every color comes from a theme token, so the light and the
+   dark theme both work; a state is always a word, the color only backs it up */
+.status-panel h3 {
+    margin: 0.75rem 0 0.35rem;
+    font-size: 1rem;
+}
+
+.status-reviewers {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.status-reviewers th,
+.status-reviewers td {
+    padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.status-reviewers th {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-chip {
+    display: inline-block;
+    padding: 0.05rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--code-background);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.status-chip.done {
+    border-color: var(--success-border);
+    background: var(--success-background);
+    color: var(--success-text);
+}
+
+.status-chip.partial,
+.status-chip.changed {
+    border-color: var(--warning-border);
+    background: var(--warning-background);
+    color: var(--warning-text);
+}
+
+.status-chip.waiting {
+    color: var(--muted);
+}
+
+.status-dispute-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.status-dispute-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.35rem 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--warning-border);
+    border-left-width: 4px;
+    border-radius: 0.25rem;
+    background: var(--warning-background);
+    color: var(--warning-text);
+}
+
+.status-dispute-list li > :not(.badge):not(button):not(span) {
+    flex: 1 1 100%;
+    color: var(--text);
+}
+
+.status-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin: 0.75rem 0;
+}
+
+.status-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.status-changes {
+    margin: 0.5rem 0;
+}
+
+.status-changes summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.status-next {
+    margin: 0.75rem 0 0;
+}
+
+.status-next.idle {
+    color: var(--muted);
+    font-weight: 600;
+}
+
 .sign-confirm {
     margin: 0.5rem 0;
 }
@@ -1792,8 +1908,12 @@ button:disabled {
 
     .item-list button.index-row {
         display: grid;
-        grid-template-columns: minmax(0, 1.4fr) 6.5rem 4.5rem 5.5rem minmax(0, 1fr) 11.5rem;
+        grid-template-columns: 8rem minmax(0, 1.4fr) 7.5rem 5.5rem minmax(0, 1fr) 11.5rem;
         gap: 0 0.75rem;
+    }
+
+    .item-list button.index-row .path {
+        overflow-wrap: anywhere;
     }
 
     .item-list button.index-row .badge {

@@ -305,6 +305,7 @@ internal static class ServerHost
         services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<SigningService>();
         services.AddSingleton<ReviewProgressService>();
+        services.AddSingleton<ReviewStatusService>();
         services.AddSingleton<UserImpactService>();
         services.AddSingleton<ReauthProofStore>();
 

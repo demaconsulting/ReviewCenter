@@ -161,3 +161,8 @@ the setting `Identity:Totp:Enabled` with the warning about the password alone. T
 topic. Its page is rendered; the text names the four groups (To sign, Replies waiting, Failed checks, and Updates), the
 New marker, and Mark all as read, and it links to `/inbox`. This scenario is tested by
 `HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead`.
+
+**HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe**: The topics on signing, comments and the inbox
+are rendered. The signing topic explains the "Where are we?" panel and the words "Signed, then the review changed",
+and says that reviewers look again and sign again; none of the three topics contains the words "out of date" or
+"out-of-date". This scenario is tested by `HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe`.

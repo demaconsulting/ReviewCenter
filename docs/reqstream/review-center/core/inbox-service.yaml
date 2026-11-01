@@ -13,10 +13,10 @@ sections:
         title: >-
           The InboxService class shall list as to sign every review that is not concluded and in which the user is the
           primary or the alternate reviewer of a slot that has no current signature, with the chip Not signed when
-          nothing was signed and the chip Out of date, sign again when the signature no longer covers the record, shall
-          list nothing for a slot that is signed, shall keep a review whose slots are all signed but that still has an
-          open thread out of the concluded reviews, and shall give the item the due date, and the Overdue mark when the
-          date is past, while the review is not concluded.
+          nothing was signed and the chip The review changed, sign again when the signature no longer covers the
+          record, shall list nothing for a slot that is signed, shall keep a review whose slots are all signed but that
+          still has an open thread out of the concluded reviews, and shall give the item the due date, and the Overdue
+          mark when the date is past, while the review is not concluded.
         justification: |
           A reviewer must find the signatures that are theirs to give, and a signature that went out of date because
           the review changed is as much work as one that was never given. The state of a slot is decided as the

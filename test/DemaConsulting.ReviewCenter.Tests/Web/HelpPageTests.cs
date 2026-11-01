@@ -420,6 +420,31 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the signing, comments and inbox topics describe the "Where are we?" panel and the reviewers who
+    ///     must look again and sign again in plain words, without the words "out of date".
+    /// </summary>
+    [Fact]
+    public void HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe()
+    {
+        // Act: render the three topics
+        var signing = Render<HelpSigningPage>().Markup;
+        var comments = Render<HelpCommentsPage>().Markup;
+        var inbox = Render<HelpInboxPage>().Markup;
+
+        // Assert: the panel and the plain wording
+        Assert.Contains("<strong>Where are we?</strong>", signing, StringComparison.Ordinal);
+        Assert.Contains("<strong>Signed, then the review changed</strong>", signing, StringComparison.Ordinal);
+        Assert.Contains("look again and sign again", signing, StringComparison.Ordinal);
+
+        // Assert: none of them uses the old wording
+        foreach (var text in new[] { signing, comments, inbox })
+        {
+            Assert.DoesNotContain("out of date", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("out-of-date", text, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
     ///     Test that an unknown help address shows a friendly message and a link back to the index.
     /// </summary>
     [Fact]

@@ -90,7 +90,29 @@ icon and text, the conclusion text, the findings that are in the report with the
 with the time; it shows the empty state while no conclusion is written and only the notice to a viewer who may not see
 the other ballots.
 
-#### Data Model
+#### Where are we? (the status panel)
+
+`ReviewStatusPanel` is the first card under the title. It holds no rule: the page reads one `ReviewStatus` from
+`ReviewStatusService.GetStatusAsync` (see its design) and the component only draws it, so the panel and the next-step
+button always agree with Core.
+
+- **Reviewers table** (`status-reviewers`): one row for each slot with the ballot state (Not started, Draft, Handed in)
+  and the signature state (Signed, Not signed, or "Signed, then the review changed"). A review with one slot shows one
+  row, so the panel stays coherent there.
+- **Disputed checks** (`status-disputed`): each check the handed-in ballots answered differently, with a Discuss button
+  (`status-discuss-{id}`) that opens the same `ThreadComposer` as the checklist page for the check thread. A viewer who
+  may not see them (`BallotVisibility`) gets the notice "hidden until you submit your ballot" and no count.
+- **Open threads**: the open Questions and Findings from `ThreadCounts`, drawn like `ThreadKindBadge` with icon and text.
+- **Next step** (`next-action`): exactly one primary button; the target is a link to the checklist, a check, a thread,
+  or the signing form, or a plain sentence when the viewer has nothing to do.
+- **What changed since {name} signed** (`status-changes-{id}`): an expandable list for a signature that no longer fits,
+  with a plain-language reason, the person, and the time of each entry. The text says that it explains and does not
+  prove, because the record decides whether a signature is current.
+
+The wording of the whole page is plain: a signature that no longer fits the record reads "Signed, then the review
+changed", and `SignatureWarning` says "Signed reviewers will need to look again and sign again, because the report
+changes: {names}". The words "out of date" are not shown anywhere; the internal names (`SlotSignatureState.OutOfDate`,
+`SignaturesWouldBecomeOutOfDate`, the CSS class `outdated`) keep them.
 
 The page instance is created per browser connection, so its state is per user.
 

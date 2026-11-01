@@ -78,6 +78,7 @@ flowchart TD
         UserImpactService
         BallotConsolidation
         BallotVisibility
+        ReviewStatusService
         ReauthProofStore
         TotpService
         TotpChallengeStore

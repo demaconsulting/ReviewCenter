@@ -1,0 +1,86 @@
+---
+# Software Unit Requirements for the ReviewStatusService Unit
+#
+# The ReviewStatusService unit answers the question "Where are we?" for one viewer of a review: who has handed in a
+# ballot, who has signed, which checks the reviewers answered differently, how many questions and findings are open,
+# the one thing the viewer should do next (ReviewNextAction), and, for a signature that no longer matches the report,
+# what changed since the reviewer signed. It is computed on demand from what the other services give the same viewer,
+# so it never shows more than they do.
+
+sections:
+  - title: ReviewStatusService Unit Requirements
+    requirements:
+      - id: ReviewCenter-ReviewStatusService-NextAction
+        title: >-
+          The ReviewNextAction type shall decide exactly one next action for a viewer from the facts about the viewer
+          and the review: a concluded review is done, a viewer who cannot take part has nothing to do, a reviewer
+          answers the checklist and hands in the ballot first (in one step with the signature when that is offered),
+          then discusses the checks answered differently, resolves open findings, answers open questions, writes the
+          conclusion when one is needed, and signs, a person without a slot adds the reviewers or themselves or helps
+          with the discussions, and everybody else waits, in plain words and with the place where it is done.
+        justification: |
+          A person who opens a review wants to know what to do, not to read a status table. One pure rule that gives a
+          single answer cannot contradict itself or the rest of the page, and the order makes the reviewer's own
+          judgment come before anything that depends on the others.
+        tests:
+          - ReviewNextAction_NoSlot_AssignMe
+          - ReviewNextAction_DraftBallot_Submit
+          - ReviewNextAction_SubmittedWithDispute_Discuss
+          - ReviewNextAction_OpenFindings_Resolve
+          - ReviewNextAction_ReadyToSign_Sign
+          - ReviewNextAction_SignedWaiting_WaitForOthers
+          - ReviewNextAction_Concluded_Done
+          - ReviewNextAction_OneActionPerViewer
+
+      - id: ReviewCenter-ReviewStatusService-Status
+        title: >-
+          The ReviewStatusService class shall give a viewer who may see the project the status of a review that lists,
+          in the order of the slots, the reviewer of each slot with the state of the ballot (not started, draft, or
+          handed in) and of the signature (signed, not signed, or signed and then the review changed) and never the
+          content of a ballot, the checks that the submitted ballots answer differently with whether the viewer may
+          start a discussion about each of them, the number of open questions and of open findings, and the next
+          action, shall give a review with one slot, or with none, a sensible status, shall return nothing for a
+          review that does not exist, and shall refuse a viewer who may not see the project.
+        justification: |
+          The reviewers need one place that says where the review stands. Building it from the services that the pages
+          already use keeps it consistent with them, and leaving out the content of the ballots keeps it a status and
+          never a second way to read them.
+        tests:
+          - ReviewStatus_Reviewers_ShowBallotAndSignatureState
+          - ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen
+          - ReviewStatus_Auditor_SeesDisputesButCannotDiscuss
+          - ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull
+          - ReviewStatus_NoSlots_LeadIsAskedToAddReviewers
+          - ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer
+
+      - id: ReviewCenter-ReviewStatusService-MaskedViewer
+        title: >-
+          The ReviewStatusService class shall, for a viewer who may not see the answers of the other reviewers yet,
+          list no disputed check, count no discussion about a check, give no outcome and no conclusion text, name no
+          answer in the changes since a signature, and shall decide the next action from what that viewer may see, so
+          that the status reveals nothing that the hidden ballots keep back.
+        justification: |
+          The status summarizes the standing, which is where a leak would come through. It asks the same rule as every
+          other reader of the ballots, and a viewer without a ballot is told in the page that the rest stays hidden
+          until the own ballot is handed in.
+        tests:
+          - ReviewStatus_MaskedViewer_NoDisputedChecks
+          - ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer
+
+      - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning
+        title: >-
+          The ReviewStatusService class shall list, for each slot whose signature no longer matches the report, the
+          audit entries after the signature that can change the report (a ballot handed in, reopened or reassigned,
+          the conclusion text, a thread in the report that was started, answered, made a Finding or a Question,
+          added to the report or taken out, and a Finding resolved with a note), each with the time, the person and a
+          reason in plain words, shall leave out every other entry, shall list nothing for a signature that still
+          matches, and shall give the details of an entry only as the audit masking allows the viewer.
+        justification: |
+          A signed reviewer who is told to look again wants to know what happened. The list is derived from the audit
+          trail by a fixed set of actions; it explains and does not prove: the signature check itself compares the
+          digest, and an entry in the list may not have changed the report in the end, for example a reply that was
+          not part of it. Rendering the entries through the audit masking keeps hidden answers hidden.
+        tests:
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
+          - ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches
+          - ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries

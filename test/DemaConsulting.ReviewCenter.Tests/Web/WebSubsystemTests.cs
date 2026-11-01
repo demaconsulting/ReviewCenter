@@ -294,7 +294,7 @@ public partial class WebSubsystemTests
         // Assert: the signature is out of date and the review is In review again
         var changed = await ParseAsync(client, route);
         var changedList = await ParseAsync(client, $"/projects/{project.Id}");
-        Assert.Equal("Signature out of date", changed.QuerySelector($"[data-testid='slot-status-{slot.Id}']")?.TextContent);
+        Assert.Equal("Signed, then the review changed", changed.QuerySelector($"[data-testid='slot-status-{slot.Id}']")?.TextContent);
         Assert.Equal("In review", changed.QuerySelector("[data-testid='review-approval']")?.TextContent);
         Assert.Equal("In review", changedList.QuerySelector("[data-testid='review-approval-rev-1']")?.TextContent);
     }

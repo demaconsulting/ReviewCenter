@@ -107,7 +107,10 @@ refused, and links to the Evidence settings topic. The topic says that a signatu
 them again, with the password (and the code of the second factor, when there is one) or by signing in again at the
 identity provider.
 
-**Review integrity text**: Three topics explain the approval lock and the review rules, in static text. Reviewers and
+**Review integrity text**: Three topics explain the approval lock and the review rules, in static text. The signing, the
+comments and the inbox topics use plain words and never the phrase "out of date": the signing topic explains the
+"Where are we?" panel of the review page, the words "Signed, then the review changed", and what the list "What changed
+since {name} signed" does and does not tell (it explains, and the signature check decides). Reviewers and
 signing (`HelpSigningPage`) has three list items: a concluded review (approved or rejected) is locked (nobody can add
 comments, change answers,
 change the files, or change the reviewers), a project admin or a system administrator can reopen it with a reason, the

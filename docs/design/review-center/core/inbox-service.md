@@ -45,7 +45,7 @@ are assigned in posting order and never reused, so one integer per review tells 
   - *To sign*: the user may contribute and is a member, the review is not concluded, and a slot of the user (primary
     or alternate) is not signed. The row does not wait for the ballot of the slot: it is listed whether or not the
     slot has handed its ballot in, and the review page says what blocks the signature. The chip is "Not signed", or
-    "Out of date, sign again" when every such slot has a
+    "The review changed, sign again" when every such slot has a
     signature that no longer covers the record. The state of a slot is the one the approval of the review uses.
   - *Replies waiting*: the user may contribute, the review is not concluded, and there is an open thread whose last
     comment is by someone else (a comment of the system counts as someone else) in which the user, holding a slot of

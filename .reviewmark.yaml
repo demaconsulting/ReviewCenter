@@ -658,6 +658,8 @@ reviews:
       - "src/**/Web/ThreadCard.razor.cs"
       - "src/**/Web/ResolveNoteDialog.razor"
       - "src/**/Web/ResolveNoteDialog.razor.cs"
+      - "src/**/Web/ReviewStatusPanel.razor"
+      - "src/**/Web/ReviewStatusPanel.razor.cs"
       - "src/**/Web/DiffView.razor"
       - "src/**/Web/DiffView.razor.cs"
       - "src/**/Web/ReviewLinks.cs"
@@ -674,6 +676,7 @@ reviews:
       - "test/**/Web/ThreadComposerTests.cs"
       - "test/**/Web/ThreadCardTests.cs"
       - "test/**/Web/ResolveNoteDialogTests.cs"
+      - "test/**/Web/ReviewStatusPanelTests.cs"
       - "test/**/Web/DiffViewMarkerTests.cs"
       - "test/**/Web/BallotMaskingPageTests.cs"
       - "test/**/Web/BallotPageTestBase.cs"
@@ -1295,6 +1298,25 @@ reviews:
       - "test/**/Core/AuditMaskingTests.cs"
       - "test/**/Core/BallotMaskingServiceTests.cs"
       - "test/**/Core/BallotMaskingWorld.cs"
+
+  - id: ReviewCenter-Core-ReviewStatusService
+    title: Review of ReviewCenter ReviewStatusService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/review-status-service.yaml"
+      - "docs/design/review-center/core/review-status-service.md"
+      - "docs/verification/review-center/core/review-status-service.md"
+      - "docs/sysml2/model/review-center/core/review-status-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewStatusService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewStatus.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewNextAction.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewChangeRules.cs"
+      - "test/**/Core/ReviewNextActionTests.cs"
+      - "test/**/Core/ReviewStatusServiceTests.cs"
 
   - id: ReviewCenter-Core-ReviewPlanner
     title: Review of ReviewCenter ReviewPlanner unit implementation

@@ -4,7 +4,9 @@
    that line or thread, and that the page keeps in the browser's address bar as the reader chooses files and threads.
    A link that names something that does not exist shows a message above the file list instead of an error page.
 
-   Presentation only; state and event handling live in ReviewPage.razor.cs. From the top it shows the title, a
+   Presentation only; state and event handling live in ReviewPage.razor.cs. From the top it shows the title, the
+   "Where are we?" status panel (see ReviewStatusPanel: the ballot and signature of each reviewer, the checks answered
+   differently with a Discuss form, the open questions and findings and the one next action), a
    one-sentence next step (checklist, threads and signatures) under an Approved / In review badge, the checklist
    progress with a link to the checklist page, the Reviewers card (slots with primary, alternate and signature
    status; an occupant of a slot signs there after confirming the password (an account of an identity provider
@@ -218,12 +220,15 @@
             </p>
         }
 
+        <ReviewStatusPanel Status="StatusView" ProjectId="ProjectId" ReviewId="@ReviewId" ReadOnly="ReadOnly || IsLocked"
+                           OnDiscuss="@(id => ToggleDiscuss(id))" DiscussForm="DiscussFormFor" />
+
         <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@Approval?.NextStep</span></p>
 
         @* The review conclusion: the reasons the reviewers state. A rejected review cannot be signed without it. It is
            shown to everyone who can read the review (with an explicit empty state when none is written) and edited only
            by who may write it, while the review is not locked *@
-        <section class="card" data-testid="review-conclusion">
+        <section class="card" id="review-conclusion" data-testid="review-conclusion">
             <h2>Review conclusion</h2>
             @if (Approval?.IsMasked == true)
             {
@@ -350,7 +355,7 @@
         RenderFragment? reviewersCard = null;
         if (approval is not null)
         {
-            reviewersCard = @<section class="card" data-testid="reviewers-card">
+            reviewersCard = @<section class="card" id="reviewers-card" data-testid="reviewers-card">
                 <h2>Reviewers and signing</h2>
                 @if (ShowAuthorHint)
                 {
@@ -597,7 +602,7 @@
             </ul>
         </section>
 
-        <section class="card" data-testid="thread-index">
+        <section class="card" id="thread-index" data-testid="thread-index">
             <h2>Threads</h2>
             <div class="index-filters" role="group" aria-label="Filter threads by state" data-testid="thread-summary">
                 <button type="button" class="secondary" aria-pressed="@(IndexFilter is null ? "true" : "false")"
