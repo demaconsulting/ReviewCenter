@@ -73,8 +73,9 @@ sections:
           answered yet, a draft that does not count until it is submitted, or submitted and counting), shall offer a
           Submit ballot button only while that ballot is a draft that answers every check it requires and the controls
           are not disabled, and shall hand the ballot in when the button is pressed, so that the button is not offered
-          for an incomplete ballot or in a review with a single slot, where the answer that completes the ballot hands
-          it in.
+          for an incomplete ballot or after a hand-in, and, in a review with a single slot, where an answer or an edit
+          that completes the ballot hands it in, only for a complete draft that no such answer produced (a follow-up
+          whose checks are all carried, or a checklist without checks).
         justification: |
           A ballot counts in the record only after the reviewer hands it in, so the reviewer has to see whether the
           answers already count and has to have a visible way to hand them in. Offering the button only when the

@@ -112,8 +112,9 @@ only the submitted ballots of the others (as the consolidated standing). A ballo
 - **Early signing is allowed, with a price.** You may sign as soon as your own ballot is submitted and nothing blocks
   the review, even when other slots have not handed in theirs. If another ballot later disagrees with an agreed
   check, your signature goes out of date and you sign again. A late ballot that agrees changes nothing.
-- **One slot is simple.** In a review with a single slot nothing changes: the answers count at once and the last answer
-  hands the ballot in. The review can be Approved as soon as that slot has signed.
+- **One slot is simple.** In a review with a single slot nothing changes: the answers count at once, and the answer
+  that completes the ballot hands it in (a complete draft that no answer produced, such as a follow-up whose checks are
+  all carried, still shows **Submit ballot**). The review can be Approved as soon as that slot has signed.
 
 ## Sign Last
 

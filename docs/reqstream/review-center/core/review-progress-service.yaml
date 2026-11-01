@@ -63,7 +63,8 @@ sections:
         justification: |
           What blocks a review is a different question from who has not signed. The counts and the sentences are
           produced in one place, so the overview and the review page cannot disagree about why a review is not
-          approved. A draft ballot is not handed in and so changes none of the counts, and a disputed check blocks the
+          approved. A draft ballot is not handed in and so changes none of the counts (the one exception is the sole
+          ballot of a review with a single slot, which counts before its hand-in), and a disputed check blocks the
           review although it is neither unanswered nor a Fail.
         tests:
           - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers

@@ -21,8 +21,10 @@ slot that the user holds (see *ChecklistService Design*). What the page shows de
 slot sees and edits the own ballot, drafts included, and a status line says whether it counts yet ("You have not
 answered yet.", "Your ballot is a draft: it does not count until you submit it.", or "Your ballot is submitted and
 counts in the review."); a **Submit ballot** button hands in a draft that answers every check it requires. In a review
-with a single slot there is no such step: the answer that completes the ballot hands it in, so the page shows the
-ballot as submitted and no button. A user who holds no slot (and is not read-only) sees the consolidated standing of the
+with a single slot an answer or an edit that completes the ballot hands it in at once, so the page then shows the
+ballot as submitted and no button; a complete draft that no such answer produced (a follow-up whose checks are all
+carried, or a checklist without checks) still shows the button. A user who holds no slot (and is not read-only) sees the
+consolidated standing of the
 submitted ballots and the notice `no-slot-notice`, and cannot answer. When the review is approved,
 and so locked, the page shows a banner (`checklist-locked`) that says the checklist is read-only and that a project
 administrator can reopen the review, and disables the section applicability switch, the reason field and its Save, the
@@ -118,8 +120,9 @@ behalf of the signed-in user, who comes from the authentication state (`SignIn.G
 which a name could be typed. The answer goes into the ballot of the slot of that user, as a draft.
 
 **SubmitBallotAsync**: Handles **Submit ballot**, which is offered only while `State.IsOwnBallot`, the ballot is a
-`Draft`, `State.IsComplete` is true, and the controls are not disabled; in a single-slot review the completing answer
-has already handed the ballot in, so the button is never shown there. It calls `ChecklistService.SubmitBallotAsync` on
+`Draft`, `State.IsComplete` is true, and the controls are not disabled (`CanSubmitBallot`); in a single-slot review an
+answer or an edit that completes the ballot has already handed it in, so the button shows there only for a complete
+draft that no such answer produced (carried answers only, or no checks). It calls `ChecklistService.SubmitBallotAsync` on
 behalf of the signed-in user, with the same warning, retry, and error pattern as an answer (a refusal is shown in
 `ballot-error`), and reads the state again, so the status line then says that the ballot is submitted.
 

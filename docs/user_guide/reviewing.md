@@ -392,8 +392,10 @@ and the first section with unanswered checks is open when you arrive.
 review (the primary and the alternate of a slot share its ballot). A project member who has no slot sees the
 consolidated standing of the submitted ballots and the notice "You are not a reviewer of this review, so you see the
 consolidated standing but cannot answer.", and has to add a slot (see [Review Signatures](#review-signatures)) before
-answering. In a review with one slot nothing changes: your answers count at once, and the last answer hands the ballot
-in. In a review with several slots your answers are a draft that only you see; when every check that applies is
+answering. In a review with one slot nothing changes: your answers count at once, and the answer that completes the
+ballot hands it in (a complete draft that no answer produced, such as a follow-up whose checks are all carried, still
+shows **Submit ballot**). In a review with several slots your answers are a draft that only you see; when every check
+that applies is
 answered, the button **Submit ballot** appears, and the ballot counts, for the digest, the progress, and the approval,
 only after you press it. Changing a submitted ballot makes it a draft again until you submit it. Where the submitted
 ballots differ on a check, the check is disputed and blocks signing until the reviewers agree.
@@ -573,7 +575,8 @@ and after that the slot offers **Sign** (see
 Sign In with an OpenID Connect Provider in the Users and Sign-in chapter). A review can be signed only when:
 
 - it has a checklist, and every check of an applicable section is answered;
-- your own ballot is submitted (in a review with one slot the last answer does that; the other reviewers may still be
+- your own ballot is submitted (in a review with one slot the answer that completes it does that, or **Submit ballot**
+  for a complete draft that no answer produced; the other reviewers may still be
   at work, which allows early signing, and a later disagreement then makes your signature out of date);
 - no check of an applicable section is disputed between the submitted ballots;
 - no check of an applicable section is answered Fail (the files of a review never change, so after a Fail the usual

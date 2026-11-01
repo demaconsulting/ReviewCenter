@@ -114,13 +114,12 @@ Example validation report:
     refused; review answered and signed by a separate reviewer in the one slot; author signature refused;
     approved review locked and reopened by an administrator;
     evidence index fingerprint 13e028da0629…, record digest 5ab1c0de42f7…
-✓ ReviewCenter_Fingerprint - Passed (28 ms): 3 files, fingerprint
-13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2 ✓ ReviewCenter_PasswordHash - Passed (219 ms): right
-password accepted, wrong password refused, hashes salted ✓ ReviewCenter_Totp - Passed (12 ms): RFC 6238 SHA-1 vectors,
-window +/-1, replay step returned ✓ ReviewCenter_AuditChain - Passed (1152 ms): 3 entries intact; change of entry 2
-detected ✓ ReviewCenter_AttestationPdf - Passed (343 ms): CMS signature and DocMDP verified; changed byte detected
-(75964 bytes) ✓ ReviewCenter_HostStart - Passed (1590 ms): 127.0.0.1:58493; /login and /_framework/blazor.web.js 200;
-stopped cleanly
+✓ ReviewCenter_Fingerprint - Passed (28 ms): 3 files, fingerprint 13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2
+✓ ReviewCenter_PasswordHash - Passed (219 ms): right password accepted, wrong password refused, hashes salted
+✓ ReviewCenter_Totp - Passed (12 ms): RFC 6238 SHA-1 vectors, window +/-1, replay step returned
+✓ ReviewCenter_AuditChain - Passed (1152 ms): 3 entries intact; change of entry 2 detected
+✓ ReviewCenter_AttestationPdf - Passed (343 ms): CMS signature and DocMDP verified; changed byte detected (75964 bytes)
+✓ ReviewCenter_HostStart - Passed (1590 ms): 127.0.0.1:58493; /login and /_framework/blazor.web.js 200; stopped cleanly
 
 Total Tests: 9
 Passed: 9

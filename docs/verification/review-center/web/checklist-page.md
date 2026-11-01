@@ -29,7 +29,8 @@ N/A - standard test environment.
   progress follows.
 - A reviewer who holds a slot sees the state of the own ballot; a complete draft ballot of a review with several slots
   offers **Submit ballot**, which hands it in and changes the status line; an incomplete ballot and the ballot of a
-  single-slot review (handed in by the completing answer) offer no button; a user without a slot sees the notice
+  single-slot review that the completing answer handed in offer no button (a complete single-slot draft that no answer
+  produced still does); a user without a slot sees the notice
   `no-slot-notice`, no ballot status and no button.
 - Saving answers into a draft shows no signature warning; handing the ballot in, or taking back a dissent that the
   others did not share, while a signature of another slot is current, stores nothing and shows a warning that names the

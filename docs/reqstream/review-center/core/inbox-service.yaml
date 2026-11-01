@@ -55,13 +55,15 @@ sections:
       - id: ReviewCenter-InboxService-FailedChecks
         title: >-
           The InboxService class shall list as failed checks every review that is not approved and was created by the
-          user and has at least one check that the submitted ballots agree is Fail (the consolidated standing) in a
+          user and has at least one check that the ballots agree is Fail (the consolidated standing of the submitted
+          ballots; the sole ballot of a review with a single slot is included before its hand-in) in a
           section that applies, with a chip
           that gives the number of failed checks, and shall ignore a Fail in a section that is marked not applicable.
         justification: |
           The creator of a review answers for it. A failed check is the signal that the content must change, and a
           check of a section that does not apply to the review is not a finding. Only what the reviewers have handed in
-          and agree on is a finding: a draft is unfinished work, and a check on which the ballots disagree is still to
+          and agree on is a finding: a draft ballot is unfinished work (except the sole ballot of a single-slot review,
+          which counts as it is answered), and a check on which the ballots disagree is still to
           be settled, so neither is a failure yet.
         tests:
           - InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount

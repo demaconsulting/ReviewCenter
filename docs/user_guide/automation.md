@@ -193,8 +193,10 @@ Reviewing chapter).
 
 **`state` and `approved`.** The review data has both a `state` and an `approved` field. `state` is the stored
 life-cycle value, and in this release it is always `Draft`, even after the review is signed; it is kept so that clients
-that read it keep working. Use `approved` (`true` while the review is concluded: it has at least one slot, every slot
-has handed in its ballot and has signed the current record, and no thread is open; the review is then locked) to find
+that read it keep working. Use `approved` (`true` while the review is concluded as approved: it has at least one slot,
+every slot has handed in
+its ballot and has signed the current record, the submitted ballots agree on an approved outcome with no check
+pending, disputed or answered Fail, and no thread is open; the review is then locked) to find
 out whether a review is approved.
 
 **`dueDate` and `overdue`.** The review data of the list and of one review has `dueDate` (`yyyy-MM-dd`, or `null` when
