@@ -1434,6 +1434,22 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                         "Your ballot has not been handed in; submit it before signing.");
                 }
 
+                // The signature attests the outcome of the consolidated record. The digest binds the outcome as well, but
+                // the stored outcome is checked here against the record in the same transaction, so that no caller can
+                // store an Approved signature for a Rejected record or the reverse. A review without a checklist has
+                // no ballots and is approved by its signatures alone. While checks are pending or disputed the record
+                // has no outcome yet: the service refuses to sign then (those are blockers), so there is nothing to
+                // compare
+                var recordOutcome = record.Checklist is null
+                    ? ReviewOutcome.Approved
+                    : BallotConsolidation.Consolidate(record.Checklist.Parse(), record.Ballots).Outcome;
+                if (recordOutcome is { } expected && expected != signature.Outcome)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.RecordChanged,
+                        "The outcome of the record changed while you were signing. Review it and try again.");
+                }
+
                 // Insert a fresh entity so that the database always assigns the identity
                 var entity = new ReviewSignature
                 {

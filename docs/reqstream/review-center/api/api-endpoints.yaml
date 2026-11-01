@@ -217,8 +217,9 @@ sections:
           The ApiEndpoints unit shall answer a request that a service refuses because the review is concluded
           (approved or rejected) and
           locked (ReviewLocked), or because it is not locked (ReviewNotLocked), with status 409 and a problem document
-          that carries the message of the rule, and shall keep a locked review readable, with its attestation and its
-          evidence index entry, and offer no route that reopens a review.
+          that carries the message of the rule, and shall keep a locked review readable, whether approved or rejected,
+          and, for an approved review only, with its attestation and its evidence index entry (a rejected review has
+          neither), and offer no route that reopens a review.
         justification: |
           A script that meets the lock must be able to tell it from a mistake in its request, which status 409 does,
           and must be able to keep reading the concluded review and its evidence. Reopening is a decision of a person

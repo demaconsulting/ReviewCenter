@@ -415,6 +415,10 @@ transaction as an immediate write transaction, so the database write lock is tak
 can change the record until the transaction ends. The method reloads the record with the shared loader, recomputes
 the digest with the Core `RecordDigest.Compute` (the same code the service used to compute the digest the signer
 saw), and compares it with the digest of the signature. It then checks that the slot exists in the stated review,
+checks that the `Outcome` of the signature equals the outcome of the record (the agreed outcome of the consolidated
+ballots; Approved for a review without a checklist) and throws `RecordChanged`, storing nothing, when they differ (an
+approval of a rejected record or the reverse; while checks are still pending or disputed the record has no outcome yet,
+the service refuses to sign then, and the store compares nothing),
 inserts a fresh entity copied from the argument (so the database assigns the identity; the copy includes the `Outcome`,
 so a rejected signature is stored as rejected and read back as such, and a signature of an earlier version of the
 record is never reinterpreted), saves, and commits. The test

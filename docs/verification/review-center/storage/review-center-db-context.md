@@ -156,9 +156,9 @@ signing that is not allowed, and one signature remains. This scenario is tested 
 role, its 64-character digest, and its meaning text unchanged, which verifies the signatures table.
 This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
 
-**ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome**: A signature with the rejected outcome and one built
-without an outcome are stored and read back; the first is still a rejection and the second is an approval, which
-verifies the outcome column of the signatures table. This scenario is tested by
+**ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome**: A signature with the rejected outcome, for a record
+whose submitted ballot agrees on a Fail, is stored and read back as a rejection with its meaning text, which verifies
+the outcome column of the signatures table. This scenario is tested by
 `ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome`.
 
 **Repositories table**: The `Repositories` table is exercised by the tests of `RepositoryStore`: a repository round-trips

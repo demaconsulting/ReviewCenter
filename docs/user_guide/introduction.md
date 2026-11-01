@@ -51,8 +51,6 @@ Each chapter of this guide serves a group of readers:
 
 These items are planned but not yet implemented:
 
-- Further review states; today a review is In review, Approved, or Rejected, and an Approved or Rejected review is
-  locked
 - External anchoring, export, and retention of the audit trail
 - Self-service password reset (an administrator can already set a new password), a required second factor (enforced for
   system administrators, or by a policy of a project), a QR code for the setup, and a connection to several identity

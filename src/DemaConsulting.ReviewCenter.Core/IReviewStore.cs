@@ -918,7 +918,8 @@ public interface IReviewStore
     /// </remarks>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.RecordChanged"/> when the digest of the record now differs from
-    ///     <see cref="ReviewSignature.RecordDigest"/>, with <see cref="DomainRule.ReviewNotFound"/> when the
+    ///     <see cref="ReviewSignature.RecordDigest"/> or the <see cref="ReviewSignature.Outcome"/> is not the agreed
+    ///     outcome of the record (a record that has no outcome yet is not compared), with <see cref="DomainRule.ReviewNotFound"/> when the
     ///     review does not exist, with <see cref="DomainRule.SlotNotFound"/> when the slot is not part of the review,
     ///     and with <see cref="DomainRule.SigningNotAllowed"/> when the slot already has a signature of this digest or
     ///     a thread of the review is open.

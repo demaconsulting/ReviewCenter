@@ -623,10 +623,11 @@ sections:
 
       - id: ReviewCenter-ReviewPage-ConclusionCard
         title: >-
-          The ReviewPage unit shall show the review conclusion text in a card, let a primary reviewer or an alternate
-          of a slot write and save it, asking for the confirmation of the signatures that the change would make out of
-          date before it saves, show the text without an editor to everybody else and for a review that is concluded,
-          and show the message of the rule when the service refuses the change.
+          The ReviewPage unit shall show the review conclusion text in a card for everybody who can read the review,
+          with an explicit "No conclusion written." state when it is blank and the viewer cannot write it, let a primary
+          reviewer or an alternate of a slot write and save it, asking for the confirmation of the signatures that the
+          change would make out of date before it saves, show the text without an editor to everybody else and for a
+          review that is concluded, and show the message of the rule when the service refuses the change.
         justification: |
           A rejection needs stated reasons, and the person who signs must be able to write them where the review is
           shown. The text is part of the record that the signatures cover, so a change after a signature is confirmed
@@ -635,6 +636,7 @@ sections:
           - ReviewPage_ConclusionCard_SlotOwnerSavesText_ShowsInCard
           - ReviewPage_ConclusionCard_ChangeAfterSignature_AsksForConfirmation
           - ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor
+          - ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState
           - ReviewPage_Render_ConcludedReview_ConclusionCardIsReadOnly
 
       - id: ReviewCenter-ReviewPage-Reopen

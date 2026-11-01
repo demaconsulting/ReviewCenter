@@ -547,6 +547,10 @@ stores the text. This scenario is tested by `ReviewPage_ConclusionCard_ChangeAft
 conclusion text is shown and there is no editor. This scenario is tested by
 `ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor`.
 
+**ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState**: A project member who owns no slot opens the page of
+a review whose conclusion text is blank; the card is shown with "No conclusion written.", and neither an editor nor a
+text. This scenario is tested by `ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState`.
+
 **ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes**: The sign form of a rejection shows the outcome and
 the rejection meaning text; signing with the right password concludes the review as rejected, and the review is locked
 without an attestation. This scenario is tested by `ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes`.

@@ -221,37 +221,39 @@
         <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@Approval?.NextStep</span></p>
 
         @* The review conclusion: the reasons the reviewers state. A rejected review cannot be signed without it. It is
-           shown to everyone who sees the review and edited only by who may write it, while the review is not locked *@
-        @if (Review.ReviewConclusionText is not null || ShowConclusionEditor)
-        {
-            <section class="card" data-testid="review-conclusion">
-                <h2>Review conclusion</h2>
-                @if (ShowConclusionEditor)
-                {
-                    <form data-testid="review-conclusion-form" novalidate @onsubmit="SaveConclusionAsync">
-                        <div class="field">
-                            <label for="review-conclusion-input">Conclusion (the reasons, in plain text)</label>
-                            <textarea id="review-conclusion-input" rows="4" maxlength="@ReviewLimits.MaxConclusionTextLength"
-                                      data-testid="review-conclusion-input" value="@ConclusionInput"
-                                      @oninput="e => ConclusionInput = e.Value?.ToString() ?? string.Empty"></textarea>
-                        </div>
-                        @if (Warning?.Key == ConclusionWarningKey)
-                        {
-                            <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
-                        }
-                        <button type="submit" data-testid="review-conclusion-save">Save</button>
-                    </form>
-                }
-                else
-                {
-                    <p class="conclusion-text" data-testid="review-conclusion-text">@Review.ReviewConclusionText</p>
-                }
-                @if (ConclusionError is not null)
-                {
-                    <p class="error" role="alert" data-testid="review-conclusion-error">@ConclusionError</p>
-                }
-            </section>
-        }
+           shown to everyone who can read the review (with an explicit empty state when none is written) and edited only
+           by who may write it, while the review is not locked *@
+        <section class="card" data-testid="review-conclusion">
+            <h2>Review conclusion</h2>
+            @if (ShowConclusionEditor)
+            {
+                <form data-testid="review-conclusion-form" novalidate @onsubmit="SaveConclusionAsync">
+                    <div class="field">
+                        <label for="review-conclusion-input">Conclusion (the reasons, in plain text)</label>
+                        <textarea id="review-conclusion-input" rows="4" maxlength="@ReviewLimits.MaxConclusionTextLength"
+                                  data-testid="review-conclusion-input" value="@ConclusionInput"
+                                  @oninput="e => ConclusionInput = e.Value?.ToString() ?? string.Empty"></textarea>
+                    </div>
+                    @if (Warning?.Key == ConclusionWarningKey)
+                    {
+                        <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
+                    }
+                    <button type="submit" data-testid="review-conclusion-save">Save</button>
+                </form>
+            }
+            else if (string.IsNullOrWhiteSpace(Review.ReviewConclusionText))
+            {
+                <p class="muted" data-testid="review-conclusion-empty">No conclusion written.</p>
+            }
+            else
+            {
+                <p class="conclusion-text" data-testid="review-conclusion-text">@Review.ReviewConclusionText</p>
+            }
+            @if (ConclusionError is not null)
+            {
+                <p class="error" role="alert" data-testid="review-conclusion-error">@ConclusionError</p>
+            }
+        </section>
 
         @if (UnreadCount > 0)
         {

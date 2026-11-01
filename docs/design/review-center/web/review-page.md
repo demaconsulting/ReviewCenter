@@ -194,7 +194,8 @@ every thread are not rendered at all (they could never be sent), the `+` and Com
 
 Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-link`, `review-loading`,
 `review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `review-due-section`,
-`review-conclusion`, `review-conclusion-text`, `review-conclusion-form`, `review-conclusion-input`,
+`review-conclusion`, `review-conclusion-text`, `review-conclusion-empty`, `review-conclusion-form`,
+`review-conclusion-input`,
 `review-conclusion-save`, `review-conclusion-error`, `attestation-rejected-note`,
 `review-due-date`, `review-overdue`, `review-due-none`, `due-date-form`, `review-due-input`, `review-due-save`,
 `review-due-clear`, `review-due-error`, `reopen-form`,
@@ -472,12 +473,13 @@ its date, without the badge, as history. The form `due-date-form` (a date input,
 `CanEditDueDate` holds, so never for a user who may not change the date and never for a locked review.
 
 **Review conclusion**: A card `review-conclusion` shows the review conclusion text, the reasons that the reviewers
-state, which a rejected review cannot be signed without. The card is drawn when the review has a conclusion text or the
-editor is shown. A person who may write it (`ShowConclusionEditor`: a slot owner or the lead of the review, who may
+state, which a rejected review cannot be signed without. The card is always drawn, for everyone who can read the
+review. A person who may write it (`ShowConclusionEditor`: a slot owner or the lead of the review, who may
 change the review, while the review is not locked) gets the form `review-conclusion-form` with a text area
 `review-conclusion-input` (at most `ReviewLimits.MaxConclusionTextLength` characters) and the button
 `review-conclusion-save`; everybody else, and everybody once the review is locked, sees the text read-only in
-`review-conclusion-text`. **SaveConclusionAsync** (behind the form) calls `GuardAsync` and then
+`review-conclusion-text`, or, when no text is written, the empty state `review-conclusion-empty` ("No conclusion
+written."). **SaveConclusionAsync** (behind the form) calls `GuardAsync` and then
 `ChecklistService.SetReviewConclusionTextAsync` with the signed-in user and the typed text. A change that would make a
 current signature out of date (the text is part of the record digest) is not stored at once: Core refuses it with
 `SignaturesWouldBecomeOutOfDate`, the page shows the `SignatureWarning` confirmation inside the form with the affected

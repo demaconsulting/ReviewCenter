@@ -228,6 +228,27 @@ public class ReviewPageRejectedTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a member who owns no slot, and so cannot write the conclusion, sees an explicit empty state when no
+    ///     conclusion is written, and neither an editor nor a text.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState()
+    {
+        // Arrange: no conclusion text, viewed by cyd, who is a member but holds no slot
+        var (projectId, _) = await CreateRejectedAsync(withText: false);
+        SignInAs("cyd", "Cyd", isSystemAdmin: false);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.Equal("No conclusion written.", cut.Find("[data-testid='review-conclusion-empty']").TextContent);
+        Assert.NotNull(cut.Find("[data-testid='review-conclusion']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-conclusion-text']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-conclusion-form']"));
+    }
+
+    /// <summary>
     ///     Test that the sign form of a rejection says what is signed, that signing it with the password concludes the
     ///     review as rejected, and that the review is then locked without an attestation.
     /// </summary>

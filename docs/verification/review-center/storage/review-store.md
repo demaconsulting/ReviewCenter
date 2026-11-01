@@ -204,10 +204,19 @@ and reading the 20 reviews one by one sends more than five times as many. This s
 signature is stored with a database-assigned identity and listed with the slot, user, display name, role, time, digest,
 and meaning unchanged. This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
 
-**ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome**: Two slots are signed with the current digest, the
-first with the rejected outcome and the rejection meaning text, the second with a signature built without an outcome.
-The signatures are listed with the first as a rejection with its meaning text unchanged and the second as an approval.
-This scenario is tested by `ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome`.
+**ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome**: A review has a checklist with one check and one slot
+whose submitted ballot answers the check Fail, so the record is rejected. The slot is signed with the rejected outcome
+and the rejection meaning text; the signature is listed as a rejection with its meaning text unchanged. This scenario is
+tested by `ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome`.
+
+**ReviewStore_AddSignatureAsync_OutcomeDiffersFromRecord_ThrowsRecordChangedAndStoresNothing**: The ballots agree on a
+Fail and the signature claims Approved, and the ballots agree on a Pass and the signature claims Rejected; each throws a
+`DomainRuleException` for `RecordChanged` and no signature is listed. This scenario is tested by
+`ReviewStore_AddSignatureAsync_OutcomeDiffersFromRecord_ThrowsRecordChangedAndStoresNothing`.
+
+**ReviewStore_AddSignatureAsync_RejectedSignatureWithoutChecklist_ThrowsRecordChanged**: A review without a checklist is
+approved by its signatures alone, so a signature with the rejected outcome throws `RecordChanged` and nothing is stored.
+This scenario is tested by `ReviewStore_AddSignatureAsync_RejectedSignatureWithoutChecklist_ThrowsRecordChanged`.
 
 **ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing**: A signature is added with a digest
 that was made up, and with a digest that was current until a thread was added; each throws a `DomainRuleException` for
