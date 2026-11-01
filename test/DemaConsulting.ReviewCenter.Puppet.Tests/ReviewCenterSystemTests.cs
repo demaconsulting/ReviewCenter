@@ -121,7 +121,6 @@ public class ReviewCenterSystemTests
         await editor.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
         await Scenario.OpenSectionAsync(editor, "req");
         await editor.OkAsync("check", "section-req-applicable");
-        await editor.OkAsync("click", "section-req-save");
         await editor.WaitUntilAsync(
             async () => !(await editor.TextOfAsync("section-req-progress")).Contains("Not applicable", StringComparison.Ordinal),
             "the section to be applicable again");
