@@ -472,7 +472,7 @@ with the project and the detail `RequireNonAuthorChecklistAnswers on->off` or `R
 `off->on`). The same rules apply as for the first switch: only a project administrator or a system administrator
 changes them, and a personal access token cannot. Over the API, a refusal for one of these rules is a 409 problem.
 
-## Reopening an Approved Review
+## Reopening a Concluded Review
 
 An approved or rejected review is locked: ReviewCenter refuses every change of its threads, checklist, and reviewer
 slots (see

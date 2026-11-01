@@ -13,7 +13,7 @@ A token **never signs**. Signing a review, and adding, changing, or removing a r
 API: there is no route for them, and the service refuses a token even if one existed. A signature always needs a
 person who enters the password again in the browser. For the same reason a token cannot **reopen** a concluded review
 or change the review rules of a project (there is no route, and the service refuses a token); an administrator does
-both in the web pages (see Reopening an Approved Review and Review Rules in the Administration chapter).
+both in the web pages (see Reopening a Concluded Review and Review Rules in the Administration chapter).
 
 ## Create and Revoke a Token
 

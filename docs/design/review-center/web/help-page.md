@@ -123,7 +123,7 @@ signing. Reading a review
 then sign, and the review concludes when every slot has signed the same, current record. It says that on a concluded
 review the + buttons and the
 comment forms are disabled while every file and diff can still be read, tells that a reviewer who holds a slot (and the
-review creator) writes the review conclusion in the "Review conclusion" card, and links to Reviewers and signing.
+review creator, a project admin or a system administrator) writes the review conclusion in the "Review conclusion" card, and links to Reviewers and signing.
 Managing
 project members (`HelpMembersPage`) has a "Review rules" section that says the Review rules card of the project page is
 also only for a project admin or a system administrator, switches on or off whether the person who created a review may

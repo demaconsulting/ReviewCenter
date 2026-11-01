@@ -467,7 +467,8 @@ block signing, but a rejection must state its reasons:
 
 1. Answer the checklist and settle every disagreement between the ballots, so that the ballots agree.
 2. Resolve every open thread.
-3. A reviewer of a slot, or the lead, writes the reasons in the **Review conclusion** card and presses **Save**. Until
+3. A reviewer of a slot, or the lead (the creator, a project administrator, or a system administrator), writes the
+   reasons in the **Review conclusion** card and presses **Save**. Until
    then the slots show "A rejected review needs a conclusion stating the reasons" instead of the sign form, and the
    project page shows "conclusion needed" as the blocker.
 4. Every slot signs. The sign form says "You are signing: REJECTED" and shows the statement "I have reviewed this record

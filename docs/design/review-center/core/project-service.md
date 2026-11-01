@@ -41,7 +41,7 @@ storage agree:
 | `MaxProjectDescriptionLength` | 1000 | longest project description |
 | `MaxReviewIdLength` | 100 | longest review id |
 | `MaxReviewTitleLength` | 200 | longest review title |
-| `MaxReopenReasonLength` | 250 | longest reason for reopening an approved review (fits one audit entry) |
+| `MaxReopenReasonLength` | 250 | longest reason for reopening a concluded review (fits one audit entry) |
 
 **NewMemberAccount**: an immutable record of `Member` (the new `ProjectMember`) and `TemporaryPassword` (`string`, the
 clear-text temporary password). The password exists only in this value: it is stored as a hash only and is never
