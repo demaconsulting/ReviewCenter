@@ -357,13 +357,15 @@ sections:
       - id: ReviewCenter-ReviewService-FollowUpCarry
         title: >-
           The ReviewService class shall, for a follow-up review, work out what it takes over with a pure function and
-          store it together with the review in one call: the Pass and N/A answers of checks that are in the checklist
-          of the new review with the same wording, with their outcome, justification, answerer and time, but not the
-          Fail answers; the not-applicable sections that are in the new checklist with the same title, with their
-          reasons; and the open threads whose file is in the new review, with every comment unchanged, the kind of
-          the thread and the report flag of every comment kept (a carried Finding stays a Finding and carried chat
-          stays chat), and the thread open. A thread keeps its line anchor only when the file has the same content on
-          the side it is anchored to,
+          store it together with the review in one call: from the consolidated standing of the submitted ballots of
+          the earlier review only (never a draft, and nothing when no ballot is submitted), the agreed Pass and N/A
+          answers of checks that are in the checklist of the new review with the same wording, with their outcome,
+          justification, answerer and time, but not the Fail answers and not a check that the submitted ballots
+          dispute or leave open; the not-applicable sections that the submitted ballots agree on and that are in
+          the new checklist with the same title, with their reasons; and the open threads whose file is in the new
+          review, with every comment unchanged, the kind of the thread and the report flag of every comment kept (a
+          carried Finding stays a Finding and carried chat stays chat), and the thread open. A thread keeps its line
+          anchor only when the file has the same content on the side it is anchored to,
           and otherwise refers to the whole file, with a note from the system, added after the comments and not
           included in the report, that gives the
           original anchor. Resolved threads, reviewer slots, signatures and reopenings are not carried, the person who
@@ -371,8 +373,10 @@ sections:
           the review it came from, and shall not carry the review conclusion text (the free text, not the approved or
           rejected conclusion).
         justification: |
-          What a person has already answered and not failed is still true of unchanged wording, and answering it again
-          wastes time and invites mistakes. A Fail is the reason for the follow-up, so it must be answered again. A
+          What the reviewers have handed in, agreed on and not failed is still true of unchanged wording, and answering
+          it again wastes time and invites mistakes. A draft is not an answer of the review yet, and a check on which
+          the ballots disagree has no agreed answer to take over, so neither is carried. A Fail is the reason for the
+          follow-up, so it must be answered again. A
           line number of a file that changed would point at other code, so the thread moves to the whole file and says
           where it was. The original text and author of a comment are evidence, so they are copied unchanged. Slots and
           signatures belong to the record that was signed, and the person who creates the review must not look like
@@ -381,6 +385,10 @@ sections:
           carried either: the follow-up starts without one.
         tests:
           - FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer
+          - FollowUpCarry_Compute_ConsolidatedSource_CarriesAgreedPassOnly
+          - FollowUpCarry_Compute_DisputedNotCarried
+          - FollowUpCarry_Compute_DraftBallot_IsIgnored
+          - FollowUpCarry_Compute_OnlyDraftBallots_CarriesNothing
           - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
           - FollowUpCarry_Compute_SourceWithoutChecklist_CarriesNoChecklistRows
           - FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame

@@ -56,13 +56,15 @@ sections:
       - id: ReviewCenter-ReviewProgressService-Blockers
         title: >-
           The ReviewProgressService class shall report for every review the number of open threads, of unanswered
-          checks, and of checks answered Fail, and whether the review has no checklist, taken from the same blocker
-          counts and flag of the approval status that the blocker sentences of the review page come from, and shall
-          mark an unapproved review with any of them as blocked.
+          checks (the pending checks of the consolidated checklist of the submitted ballots), and of checks that the
+          ballots agree are Fail, and whether the review has no checklist, taken from the same blocker counts and flag
+          of the approval status that the blocker sentences of the review page come from, and shall mark an unapproved
+          review with any of them, or with a check on which the ballots disagree, as blocked.
         justification: |
           What blocks a review is a different question from who has not signed. The counts and the sentences are
           produced in one place, so the overview and the review page cannot disagree about why a review is not
-          approved.
+          approved. A draft ballot is not handed in and so changes none of the counts, and a disputed check blocks the
+          review although it is neither unanswered nor a Fail.
         tests:
           - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
           - ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked

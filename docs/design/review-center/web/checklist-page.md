@@ -16,16 +16,24 @@ action, so the reviewer does not have to scroll back: the same "Next unanswered 
 checklist is complete, a link back to the review. A Fail is shown in a different color than a Pass. It
 is a Razor component split into presentation (`ChecklistPage.razor`) and behavior (`ChecklistPage.razor.cs`). It
 reads and writes the checklist only through `ChecklistService`, so every checklist rule is applied there. It requires
-a signed-in user, and every answer and section decision is saved on behalf of that user. When the review is approved,
+a signed-in user, and every answer and section decision is saved on behalf of that user, in the ballot of the reviewer
+slot that the user holds (see *ChecklistService Design*). What the page shows depends on the viewer: a user who holds a
+slot sees and edits the own ballot, drafts included, and a status line says whether it counts yet ("You have not
+answered yet.", "Your ballot is a draft: it does not count until you submit it.", or "Your ballot is submitted and
+counts in the review."); a **Submit ballot** button hands in a draft that answers every check it requires. In a review
+with a single slot there is no such step: the answer that completes the ballot hands it in, so the page shows the
+ballot as submitted and no button. A user who holds no slot (and is not read-only) sees the consolidated standing of the
+submitted ballots and the notice `no-slot-notice`, and cannot answer. When the review is approved,
 and so locked, the page shows a banner (`checklist-locked`) that says the checklist is read-only and that a project
 administrator can reopen the review, and disables the section applicability switch, the reason field and its Save, the
-Pass, Fail, and N/A buttons, and the justification field and its Save. The answers stay visible. For a member who may
-only read (the Auditor role) the page shows a `readonly-notice` and treats the checklist as locked in the same way
-(`IsLocked` is true when the review is approved or the viewer is read-only), so every control is disabled. When the project
-does not let authors answer the checklist (the default; see `ProjectService`) and the signed-in user is the author of
-the review, the page instead shows the notice `author-answer-blocked` (another project member has to answer; comment
-threads are still available) and disables the same controls, unless the review is locked, which shows only the lock
-banner. Nothing else changes for the author, and every other member sees no notice.
+Pass, Fail, and N/A buttons, and the justification field and its Save (the Submit ballot button is not offered). The
+answers stay visible. For a member who may only read (the Auditor role) the page shows a `readonly-notice` and treats
+the checklist as locked in the same way (`IsLocked` is true when the review is approved or the viewer is read-only), so
+every control is disabled. When the project does not let authors answer the checklist (the default; see
+`ProjectService`) and the signed-in user is the author of the review, the page instead shows the notice
+`author-answer-blocked` (another project member has to answer; comment threads are still available) and disables the
+same controls, unless the review is locked, which shows only the lock banner. Nothing else changes for the author, and
+every other member sees no notice.
 
 #### Data Model
 
@@ -38,19 +46,23 @@ page loads, only for a review that has a checklist, and is also set when a save 
 page that was loaded before the last signature stops offering the controls at its first refused save. **LockedMarker**:
 `true` while locked, written to the `data-locked` attribute of the disabled applicability switch and outcome buttons.
 
-**ControlsDisabled**: `true` while the review is locked or `State.AuthorBlocked` is set. `AuthorBlocked` is computed by
+**ControlsDisabled**: `true` while the review is locked, `State.AuthorBlocked` is set, or the displayed state is not the
+own ballot (`State.IsOwnBallot` is false: the viewer holds no slot). `State` comes from
 `ChecklistService.GetAsync(projectId, reviewId, viewerUsername: ...)` with the user name of the signed-in user, every
-time the page reads the checklist; a page loaded before the project switched the rule on shows the refusal message of
+time the page reads the checklist; for a slot owner it is the own ballot (`IsOwnBallot`, `BallotState`, `SlotId`), for
+every other viewer the consolidated standing (`NoSlot` is true for a viewer without a slot). `AuthorBlocked` is
+computed in the same call; a page loaded before the project switched the rule on shows the refusal message of
 the rule (`AuthorCannotAnswer`) in the error line of the check or section, stores nothing, and shows the notice after
-the next read.
+the next read. A page loaded before the user lost the slot shows the refusal `NoReviewerSlot` in the same way.
 
 **Loaded**, **Review**, **ProjectName**: whether loading finished, the review (`null` when it does not exist or its
 project is not visible to the user), and
 the name of the owning project shown in the breadcrumb.
 
 **State**: the `ChecklistState` of the review (`null` when the review has no checklist); it is read again after each
-change. **FollowedState**: for a follow-up review, the `ChecklistState` of the review it follows (read with
-`ChecklistService.GetAsync`, once when the page loads), so a check that failed there can be shown; `null` otherwise.
+change. **FollowedState**: for a follow-up review, the consolidated `ChecklistState` of the review it follows (read with
+`ChecklistService.GetAsync` and no viewer, once when the page loads), so a check that failed there can be shown;
+`null` otherwise.
 
 **OpenSectionId**: the section whose checks are shown; at most one.
 
@@ -65,7 +77,9 @@ parameters change.
 
 Test identifiers: `checklist-page` (root), `breadcrumb-projects-link`, `project-link`, `review-link`,
 `checklist-loading`, `checklist-not-found`, `checklist-missing`, `checklist-review-title`, `checklist-status`,
-`checklist-progress`, `next-unanswered-button`, `back-to-review-link`, `checklist-locked`, `author-answer-blocked`, and,
+`checklist-progress`, `next-unanswered-button`, `back-to-review-link`, `checklist-locked`, `author-answer-blocked`,
+`no-slot-notice` (a viewer without a slot), `ballot-status` (the state of the own ballot), `submit-ballot` and
+`ballot-error` (the hand-in and its refusal), and,
 per section,
 `section-{id}`, `section-{id}-toggle`, `section-{id}-progress`, `section-{id}-applicable`, `section-{id}-reason`,
 `section-{id}-save`, `section-{id}-error`, `section-{id}-unsaved-hint` (shown while the switch is off and the reason is
@@ -101,11 +115,27 @@ before choosing. Choosing the stored outcome again leaves nothing unsaved.
 
 **SaveAsync**: Stores the outcome and justification shown for a check through `ChecklistService.SetAnswerAsync`, on
 behalf of the signed-in user, who comes from the authentication state (`SignIn.GetActorAsync`); there is no field in
-which a name could be typed.
+which a name could be typed. The answer goes into the ballot of the slot of that user, as a draft.
 
-**Signature warning**: `SaveAsync` and the applicability saves call the service without an acknowledgement. When it
+**SubmitBallotAsync**: Handles **Submit ballot**, which is offered only while `State.IsOwnBallot`, the ballot is a
+`Draft`, `State.IsComplete` is true, and the controls are not disabled; in a single-slot review the completing answer
+has already handed the ballot in, so the button is never shown there. It calls `ChecklistService.SubmitBallotAsync` on
+behalf of the signed-in user, with the same warning, retry, and error pattern as an answer (a refusal is shown in
+`ballot-error`), and reads the state again, so the status line then says that the ballot is submitted.
+
+**Signature warning**: What the page stores does not always change what the signatures cover. An answer or section
+decision saved into a draft ballot is not part of the record yet, so no warning is shown for it. An edit of a ballot
+that was submitted returns it to a draft, which takes it out of the consolidation; that changes the digest only when
+the ballot made a difference (for example, a dissent that the others did not share, or a section it marked not
+applicable). The warning appears
+when the call would change the digest while a signature of another slot is current: at **Submit ballot**, and at an
+answer or section decision that changes the standing in this way (for example, passing a check
+that the reviewer had failed in a submitted ballot, or switching a not-applicable section back to "applies"). The own
+slot's signature never needs an acknowledgement. `SaveAsync`, `SubmitBallotAsync` and the applicability saves call the
+service without an acknowledgement. When it
 refuses with `SignaturesWouldBecomeOutOfDate`, the page keeps the request and shows the `SignatureWarning` component
-(`signature-warning`) next to the control that was used: inside the check (after `check-error`) for an answer, and
+(`signature-warning`) next to the control that was used: inside the check (after `check-error`) for an answer, under the
+ballot status line (after `ballot-error`) for a hand-in, and
 inside
 the section (after the section error) for a reason saved to make a section not applicable or a switch back to
 "applies". The banner names every affected slot and its signer (`signature-warning-slots`, for example "Slot 1 (Rita)").
@@ -114,7 +144,8 @@ as switched until the person decides. **Confirm change** (`signature-warning-con
 identities of the affected slots as the acknowledgement. When another signature appeared meanwhile, the service
 refuses again and the page shows the banner again with the slots of both refusals merged. **Cancel**
 (`signature-warning-cancel`) only removes the banner; the switch of a section to "applies" returns to its stored
-state, and the typed reason and chosen outcome stay. The page holds one banner at a time, and Confirm runs the
+state, and the typed reason and chosen outcome stay (a ballot that was being handed in stays a draft). The page holds
+one banner at a time, and Confirm runs the
 session check of the page again. A refusal for any other rule is shown as before.
 
 **SetApplicableAsync** and **SaveNotApplicableAsync**: Switching a section to "applies" is stored at once; switching
@@ -132,10 +163,12 @@ same wording, shows the earlier Fail and its justification as read-only text, "F
 (`EarlierFailFor`), so the reviewer has to decide it again. Nothing is stored for these marks, the earlier answer is
 not copied, and carrying never makes the creator the answerer: "Answered by" still names the one who answered.
 
-A violated rule is shown in an alert next to the check (`check-error-{item}`) or the section
-(`section-{id}-error`) and everything typed stays. An answered check
-shows "Answered by {display name}, {UTC time}", the display name saved at that time. The status line and the numbers
-come from `ChecklistState`, so the page holds no
+A violated rule is shown in an alert next to the check (`check-error-{item}`), the section
+(`section-{id}-error`) or the ballot (`ballot-error`) and everything typed stays. An answered check
+shows "Answered by {display name}, {UTC time}", the display name saved at that time; in the consolidated view (a viewer
+without a slot) that is the row of the lowest slot whose submitted ballot gave the agreed answer, and a disputed or
+open check shows no answer. The status line and the numbers
+come from `ChecklistState` (the own ballot for a slot owner, the consolidated standing otherwise), so the page holds no
 counting rules of its own. The outcome buttons are a group of toggle buttons (`aria-pressed`), named by the wording of
 the check (`aria-labelledby`), at least 44 pixels
 high on a phone, and an unanswered check has a visible marker, so state does not depend on color alone.
@@ -173,9 +206,11 @@ in" message on this page.
 - **ReviewService** — reads the review.
 - **SignatureWarning** — draws the signature warning banner and holds the pending request (`PendingSignatureWarning`);
   it is a part of this unit.
-- **ChecklistService** — reads the checklist (and tells, for the signed-in user, whether the author rule blocks them,
-  `AuthorBlocked`) and records answers and section decisions; it refuses a change of a locked
-  review with `ReviewLocked` and the change of the author with `AuthorCannotAnswer`.
+- **ChecklistService** — reads the checklist (the own ballot for a slot owner, the consolidated standing for everyone
+  else, and tells, for the signed-in user, whether the author rule blocks them,
+  `AuthorBlocked`) and records answers, section decisions, and the hand-in of the ballot; it refuses a change of a
+  locked review with `ReviewLocked`, the change of the author with `AuthorCannotAnswer`, and an answer or hand-in of a
+  user without a slot with `NoReviewerSlot`, and an incomplete hand-in with `BallotIncomplete`.
 - **SigningService** — tells whether the review is approved (`GetApprovalAsync`), which is what locks the page.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
   name for the breadcrumb.

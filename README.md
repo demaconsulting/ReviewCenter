@@ -32,12 +32,15 @@ a project checklist, and sign the review with their credentials. Every action is
 - 📅 **Due Dates** - Optional UTC due date per review, with an Overdue badge
 - 📊 **Progress Overview** - Project page shows each review's stage, signatures, blockers, and who it waits on, with
   filters and sorting
-- 🔁 **Follow-up Reviews** - A review after a failed one carries over the passed answers and open threads (web and API)
+- 🔁 **Follow-up Reviews** - A review after a failed one carries over the agreed passed answers and open threads (web and
+  API)
 - 💬 **Threaded Comments** - Discuss files or line ranges inline
 - 📥 **Inbox** - What waits for you: signatures to give, replies, failed checks, and unread comments
-- ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own template)
-- 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot
-- ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to reviewed record
+- ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own
+  template), answered per reviewer slot in its own ballot and consolidated into the agreed standing
+- 👥 **Reviewer Slots** - Primary and alternate reviewers share a ballot and sign each slot, early once the ballot is in
+- ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to the agreed record; a change makes it out of
+  date
 - 🔒 **Approval Lock** - Approved reviews lock, admins reopen with a reason, authors cannot self-review
 - 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history, filterable by project, actor,
   action, review, and date, with CSV and JSON export that reports the chain status

@@ -5,7 +5,9 @@
 `ReviewProgressService` is verified with unit tests defined in `ReviewProgressServiceTests.cs`. The tests use the real
 `ReviewProgressService`, `ReviewService`, `SigningService`, `ChecklistService`, `ThreadService`, `UserService`, and
 `ProjectAccess` over the in-memory fakes `FakeReviewStore`, `FakeUserStore`, and `FakeAuditStore`, with a movable clock
-(`MovableTimeProvider`, set to 4 March 2025) so that no database is needed. One arranged world has a project with the
+(`MovableTimeProvider`, set to 4 March 2025) so that no database is needed. The helper `AnswerAllAsync` marks a review as
+answered the way a person does: the primary reviewer of each slot answers every check Pass into the own ballot and hands
+it in. One arranged world has a project with the
 users `root` (a system administrator), `padm` (a project administrator), `creator`, `member`, `reviewer1`, `reviewer2`,
 and `auditor` (a read-only member), and a user `stranger` outside the project. The blocker counts are compared with the
 numbers in the blocker sentences of the approval status read from `SigningService`. The audit store behind the last
@@ -27,8 +29,10 @@ N/A - standard test environment.
   review whose slots are all signed but that has an open thread is `InReview` and blocked.
 - The signature counts equal the slots of the approval status; a comment that is included in the report, added after a
   signature, turns that signature from signed into out of date, while chat does not.
-- The open-thread, unanswered-check, and Fail counts equal the numbers in the blocker sentences; a review with any of
-  them, or without a checklist, that is not approved is blocked, an approved review is not.
+- The open-thread, unanswered-check, and Fail counts equal the numbers in the blocker sentences (the check counts are
+  those of the consolidated checklist of the submitted ballots; a review with a single slot counts its one ballot before
+  the hand-in); a review with any of them, with a disputed check, or without a checklist, that is not approved is
+  blocked, an approved review is not.
 - `WaitingOn` names the primary and a different alternate of every slot that is not signed, each person once, leaves out
   signed slots, shows a disabled person with the suffix, and is empty for an approved review.
 - A review is overdue from the day after its due date and not on it, never without a date, and never when approved.
@@ -53,9 +57,11 @@ review waits on nobody. This scenario is tested by `ReviewProgressService_GetPro
 **ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty**: A project without reviews gives an empty list.
 This scenario is tested by `ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty`.
 
-**ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers**: A review has a Fail answer, unanswered
-checks, and two open threads; the counts are compared with the numbers in the blocker sentences of the approval status
-and with the counts of the status, and the review is blocked. An approved review has no blockers and is not blocked. This
+**ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers**: A review has one slot (the member's)
+whose ballot holds a Fail answer, the other checks unanswered (pending), and two open threads; with a single slot the
+one ballot counts before a hand-in. The counts are compared with the numbers in the blocker sentences of the approval
+status and with the counts of the status, and the review is blocked. An approved review (its slot owner answered every
+check and handed the ballot in, then signed) has no blockers and is not blocked. This
 scenario is tested by `ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers`.
 
 **ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked**: A review is stored without a checklist,

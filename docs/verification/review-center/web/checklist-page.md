@@ -2,13 +2,15 @@
 
 #### Verification Approach
 
-`ChecklistPage` is verified with component tests defined in `ChecklistPageTests.cs` and `ChecklistPageFollowUpTests.cs`
-(the marks of a follow-up review), which use the bUnit test context
+`ChecklistPage` is verified with component tests defined in `ChecklistPageTests.cs`, `ChecklistPageFollowUpTests.cs`
+(the marks of a follow-up review), and `ChecklistPageBallotTests.cs` (the ballot controls), which use the bUnit test
+context
 to render the real component over real Core services and an in-memory fake store holding a review with the default
 checklist. The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display
-name "Ann") unless a test signs in as someone else. Tests locate elements by their `data-testid` attributes (the page
-units share the helper `PageTestBase`), click the buttons, and compare the shown values with the progress counts of
-the default checklist. The browser
+name "Ann") unless a test signs in as someone else; the tests that answer give that user a reviewer slot first, because
+answering needs a slot (see `NoReviewerSlot`), so the ballot of a review with one slot counts as soon as it is complete.
+Tests locate elements by their `data-testid` attributes (the page units share the helper `PageTestBase`), click the
+buttons, and compare the shown values with the progress counts of the default checklist. The browser
 function that scrolls is replaced by bUnit's JavaScript interop mock, which records the call. The real database is
 covered by the `Storage` subsystem and the integration tests of the `Web` subsystem.
 
@@ -23,9 +25,15 @@ N/A - standard test environment.
 - A new review shows the status line "58 checks unanswered.", the overall progress, every section with its
   progress, and only the first section open; a partly answered review opens the first section with unanswered
   checks; opening a section closes the one that was open.
-- A Pass is stored at once with the signed-in user and the time, and the progress follows.
-- A change on a review with a current signature is stored by the page, which acknowledges the affected signatures for
-  now, and the signature is then out of date.
+- A Pass is stored at once with the signed-in user and the time, in the draft ballot of the user's slot, and the
+  progress follows.
+- A reviewer who holds a slot sees the state of the own ballot; a complete draft ballot of a review with several slots
+  offers **Submit ballot**, which hands it in and changes the status line; an incomplete ballot and the ballot of a
+  single-slot review (handed in by the completing answer) offer no button; a user without a slot sees the notice
+  `no-slot-notice`, no ballot status and no button.
+- Saving answers into a draft shows no signature warning; handing the ballot in, or taking back a dissent that the
+  others did not share, while a signature of another slot is current, stores nothing and shows a warning that names the
+  slots; the signature is out of date only after Confirm.
 - A Fail or N/A shows a justification box marked as required; saving it empty shows an error next to the box and
   stores nothing; saving it with text stores the answer and shows who answered it and when.
 - The page has no field for a name; an answer is recorded under the user name and display name of the signed-in
@@ -82,7 +90,8 @@ This scenario is tested by `ChecklistPage_Answer_FailWithJustification_SavesAndS
 
 **ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy**: Another user ("bea") is signed in and Pass is clicked;
 the page has no name field, "Answered by" shows the display name of that user, and the stored answer carries the
-user name and display name of that user. This scenario is tested by `ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy`.
+user name and display name of that user. This scenario is tested by
+`ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy`.
 
 **ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError**: A section is switched to not applicable and
 saved without a reason; an error is shown and the section is still applicable in the store. This scenario is tested
@@ -151,42 +160,64 @@ off, the rule is switched on, and the author clicks Pass; the error line of the 
 the checklist" and nothing is stored. This scenario is tested by
 `ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing`.
 
-**ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate**: A review is
-fully answered, has two slots, and only the first is signed. A check is changed to Fail with a justification; the page
-shows the warning naming "Slot 1 (Rita)", the old answer and the signature stand. Cancel removes the warning and keeps
-the unsaved Fail and its text. Saving again and Confirm store the answer and the first slot's signature is out of date.
+**ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate**: A review has
+two slots; the first (Rita) is signed and the owner of the second (Sam) has handed in a ballot that agrees. Sam changes
+a check to Fail with a justification and saves; the answer is stored as a draft of Sam's ballot, no warning is shown
+(the draft is outside the record) and the signature stays current. **Submit ballot** shows the warning naming
+"Slot 1 (Rita)" and the ballot stays a draft. Cancel removes the warning, the ballot stays a draft and the signature
+stays current. Submit again and Confirm make the ballot submitted and the first slot's signature out of date. The name
+of the test is older than the ballots; what it verifies now is the draft, the hand-in warning and the confirmation.
 This scenario is tested by
 `ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate`.
 
-**ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores**: A check is changed to Pass on a
-signed review; the warning is shown inside that check and the stored answer is unchanged until Confirm, which stores it
-and makes the signature out of date. This scenario is tested by
+**ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores**: Sam had submitted a Fail with a
+justification on the first check (a dissent) before the first slot was signed. Sam passes the check: taking the
+dissent back returns the ballot to a draft and changes the consolidated standing, so the warning is shown at once inside
+that check, and the stored answer keeps its justification until Confirm, which stores the Pass and makes the signature
+out of date. This scenario is tested by
 `ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores`.
 
-**ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring**: With a warning open, another
-reviewer signs a second slot and Confirm is clicked; nothing is stored and the warning names both slots. A second
-Confirm stores the answer. This scenario is tested by
-`ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring`.
+**ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring**: A review has three slots with
+the first signed. The owner of the third (Tom) saves a Fail as a draft and presses Submit ballot; the warning names
+"Slot 1 (Rita)". Another reviewer signs the second slot meanwhile and Confirm is clicked; the ballot is still a draft
+and the warning now names "Slot 1 (Rita), Slot 2 (Sam)". A second Confirm hands the ballot in. This scenario is tested
+by `ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring`.
 
-**ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores**: A section is switched off and
-its reason saved on a signed review; the warning is shown in the section and nothing is stored. Cancel removes the
-warning and keeps the unsaved switch and reason. Saving again and Confirm store the section as not applicable and the
-signature is out of date. This scenario is tested by
+**ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores**: On a signed review a section
+is switched off and its reason saved; the section is stored as not applicable in the draft ballot with no warning and
+the signature stays current. **Submit ballot** shows the warning under the ballot status line and the ballot stays a
+draft; Cancel keeps the switch off with the typed reason. Submit and Confirm make the ballot submitted, with the section
+not applicable and the reason, and the signature out of date. This scenario is tested by
 `ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores`.
 
-**ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores**: A section that is not
-applicable is switched on, on a signed review; the warning is shown. Cancel returns the switch to its stored state;
-switching on again and Confirm store the section as applicable. This scenario is tested by
-`ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores`.
+**ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores**: Sam had submitted a
+ballot that marks a section not applicable, which Rita's signed ballot does not. Switching the section on again takes
+the dissent back and changes the standing, so the warning is shown at once. Cancel returns the switch to its stored
+state; switching on again and Confirm store the section as applicable and make the signature out of date. This scenario
+is tested by `ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores`.
 
 **ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning**: While the switch-on warning is open,
 the section is switched off again; the warning is gone, the switch is off, and nothing is stored. This scenario is
 tested by `ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning`.
 
-**ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId**: With a warning open, every
-link, button, input, and text area of the page, including the two buttons of the warning, has a kebab-case
-`data-testid`. This scenario is tested by
+**ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId**: With the warning of the
+taken-back dissent open inside a check, every link, button, input, and text area of the page, including the two buttons
+of the warning, has a kebab-case `data-testid`. This scenario is tested by
 `ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId`.
+
+**ChecklistPage_SubmitButton_ShownWhenDraftComplete**: A review has two slots (ann and bob) and ann has answered every
+check, so her own ballot is a complete draft. The page for ann shows a ballot status line that says draft and the
+`submit-ballot` button; pressing it hands the ballot in, the status line says submitted, the button is gone, and the
+service reports the ballot as submitted. This scenario is tested by `ChecklistPage_SubmitButton_ShownWhenDraftComplete`.
+
+**ChecklistPage_SubmitButton_HiddenWhenIncompleteOrSingleSlot**: In a review with two slots where ann has answered one
+check only, the page shows no submit button. In a review with one slot (cyd) that cyd answered completely, which hands
+the ballot in, the page shows no submit button and the status line says submitted. This scenario is tested by
+`ChecklistPage_SubmitButton_HiddenWhenIncompleteOrSingleSlot`.
+
+**ChecklistPage_NoSlot_ShowsHint**: ann opens the checklist of a review whose only slot belongs to bob; the notice
+`no-slot-notice` is shown, and there is no submit button and no ballot status line. This scenario is tested by
+`ChecklistPage_NoSlot_ShowsHint`.
 
 **ChecklistPage_Render_NonMember_LooksLikeAMissingReview**: A review is opened by a user who is no member of the
 project. The not-found text equals the text for a project that does not exist (apart from the project number), and no

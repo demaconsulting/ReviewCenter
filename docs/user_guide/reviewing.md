@@ -24,8 +24,8 @@ unchanged, together with a fingerprint of that content.
 3. On the project page, press **+ New review**. On the form at `/projects/{id}/reviews/new`, enter a review
    identifier (1 to 100 letters, digits, `.`, `_`, or `-`, starting with a letter or digit; unique within the
    project; the identifier `new` is reserved and is refused) and a title (up to 200 characters), choose the files to
-   review, and press the create button. The chosen files are listed with their sizes before you submit. You can also enter
-   an optional **Due date** (see [Due Dates](#due-dates)). **Cancel**
+   review, and press the create button. The chosen files are listed with their sizes before you submit. You can also
+   enter an optional **Due date** (see [Due Dates](#due-dates)). **Cancel**
    goes back to the project.
 
    ![The New review form with three chosen files listed before the review is created.](images/new-review-upload.png)
@@ -178,8 +178,8 @@ creates the reviews you tick.
 1. Choose **Show plan**. Nothing is created yet.
 
 The plan starts with one sentence, for example "3 sets need review, 1 already filed, 9 have nothing to review.", a
-muted line with the repository, the head, and the baseline that was used, and a sentence that says what to do next. Below
-that:
+muted line with the repository, the head, and the baseline that was used, and a sentence that says what to do next.
+Below that:
 
 - **To review**: the sets that need a review, each ticked, with its title, a note about the baseline, and how many
   files changed (added, modified, deleted). Clear the tick of the sets you do not want now. For a long list
@@ -195,16 +195,16 @@ that:
 Before you create, you can enter an optional **Due date for all reviews**, and a **Due** date on a row that should have
 its own (the row's date wins). The dates are UTC calendar days; see [Due Dates](#due-dates).
 
-Choose **Create N reviews**. The page then lists one result per set: a link to the new review, or the reason it could not
-be created. The others are still created. When a set fails because the repository could not be read, the reason is the
-fixed sentence "The repository could not be read." A failed set is not created; choose **Plan again** to offer it once
-more, or
+Choose **Create N reviews**. The page then lists one result per set: a link to the new review, or the reason it could
+not be created. The others are still created. When a set fails because the repository could not be read, the reason is
+the fixed sentence "The repository could not be read." A failed set is not created; choose **Plan again** to offer it
+once more, or
 go back to the project. A new review has the files of the plan, the checklist, and the set identifier, which the review
 page shows as **Review set** in the Details. If you change the head revision, the baseline, or the repository, the plan
 is cleared, because it no longer matches.
 
-The creator of the reviews is you, as for any review. The reviews use the commits that the plan showed, so a commit pushed
-while you read the plan does not change them.
+The creator of the reviews is you, as for any review. The reviews use the commits that the plan showed, so a commit
+pushed while you read the plan does not change them.
 
 When the plan cannot be made, the page says why in plain English and what to do:
 
@@ -264,7 +264,7 @@ author of the review. Someone who only wrote a comment in another person's revie
 | ----- | ------------- | ---- |
 | To sign | A slot of yours that is unsigned or out of date | "Not signed", "Out of date, sign again" |
 | Replies waiting | An open thread whose latest comment is by someone else | "N waiting" |
-| Failed checks | Checks of your own review that someone answered Fail | "N failed" |
+| Failed checks | Checks of your own review that the submitted ballots agree to be Fail | "N failed" |
 | Updates | A review that someone else approved or reopened since you last looked | "Approved" or "Reopened" |
 
 Only the first three groups need your action. They also show the due date of the review, marked "Overdue" when it is
@@ -498,8 +498,9 @@ mind, and answer again a check that the fix may affect, because the changes of t
 
 ## Review Signatures
 
-A review is approved when its reviewers have signed it and no comment thread is open. The review page shows an
-**Approved** or **In review** badge
+A review is approved when every reviewer slot has handed in its ballot, the ballots agree, every slot has signed the
+current record, and no comment thread is open (the exact rule is in *Out of date and Approved* below). The review page
+shows an **Approved** or **In review** badge
 next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the stage of each
 review (see [The Project Page Overview](#the-project-page-overview)). An Approved review is also locked (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
@@ -511,7 +512,10 @@ system administrator) can add a slot (open **Add a slot**,
 choose the reviewers and press **Add slot**) and change or remove a slot that is not signed (open **Change
 reviewers**, then **Save** or **Remove**). A user can be in only one slot of
 a review, and the primary and the alternate must be different users. A slot that has been signed can no longer be
-changed or removed, even if its signature is out of date; to change the reviewers, add a new slot. The slots of an
+changed or removed, even if its signature is out of date; to change the reviewers, add a new slot. A reviewer who is
+taken out of a slot that holds a ballot takes the own answers back, and that can change what the signatures of the other
+slots cover; the page then names the affected slots and signers in a warning and asks you to confirm, like for a
+changed answer. The slots of an
 approved review cannot be changed at all (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
 
 **Independent reviewers.** In a project that requires independent reviewers (the default; see Review Rules in the
@@ -532,9 +536,10 @@ the review in ReviewCenter is not excluded. The rule helps to keep the creator o
 it is not proof that the reviewer did not write the code. A project in which one person has to do both can switch the
 rule off.
 
-**Who may answer the checklist.** Only a reviewer of a slot of the review can answer a check or change whether a section
-applies (the service refuses anybody else with "You are not a reviewer of this review"). In a project that does not let
-authors answer the checklist of their own review
+**Who may answer the checklist.** Only a reviewer of a slot of the review can answer a check, change whether a section
+applies, or hand in a ballot. Everybody else, a project administrator or system administrator included, is refused with
+"You are not a reviewer of this review, so you cannot answer its checklist. Add yourself as a reviewer slot first." In a
+project that does not let authors answer the checklist of their own review
 (the default), the person who created the review cannot answer a check or change whether a section applies; the
 service refuses it with a message that starts "You created this review, so you cannot answer its checklist". The
 comment threads are not affected. A review created from the command line has no recorded author.
@@ -700,13 +705,17 @@ project does not exist.
 - **Columns.** *Review* (the identifier, the title, and the creation date; the identifier links to the review, and a
   follow-up names the review it follows), *Stage*, *Signatures*, *Blockers*, *Waiting on*, *Last activity*, and *Due*.
 - **Stage.** **Setup** is a review without a reviewer slot. **In review** has slots that are not all signed, or a
-  signature that went out of date. **Approved** has every slot signed on the current record and nothing that blocks it.
+  signature that went out of date. **Approved** has every slot signed on the current record and nothing that blocks it
+  (every slot has also handed in its ballot).
   A review that an administrator reopened also shows a **Reopened** badge. The stage is worked out from the
   signatures, not stored.
 - **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature became out of date
   (the record changed after it was given), `1 out of date`. A review without slots shows a dash.
 - **Blockers.** What prevents approval: a missing checklist ("No checklist"), the open comment threads, the
-  unanswered checklist checks, and the checks answered Fail. A dash means nothing blocks the review.
+  unanswered checklist checks, the checks that the submitted ballots disagree on (disputed), and the checks that they
+  agree to be Fail. The checks are counted from the consolidated checklist of the submitted ballots; the draft of a
+  reviewer never changes them (in a review with one slot the answers count before the hand-in). A dash means nothing
+  blocks the review.
 - **Waiting on.** The people who still have to sign: the primary reviewer, and a different alternate, of each slot that
   is not signed or is out of date. A disabled account is shown with "(disabled)". An approved review waits on nobody.
 - **Last activity.** The time (UTC) of the newest entry of the audit trail of the review, or its creation time.
@@ -725,8 +734,9 @@ someone.
 When a review is **Approved**, its page shows **Download attestation (PDF)** on a line of its own below the title, with
 a note about the key that signs the file. The PDF is made when you press the button and is not stored. It contains the
 review (project, review, repository and commits, the content fingerprint and the hash of every file), the checklist
-with every answer, who gave it and the UTC time of the answer (to the second), and every justification in full (a
-comment is never shortened), the comment threads, the sign-off of every
+with the consolidated checklist of the submitted ballots (the agreed answer of every check, who gave it, the UTC time of
+the answer to the second, and the justification in full; a check that the ballots leave open or disputed is shown as
+not answered), the comment threads (a comment is never shortened), the sign-off of every
 reviewer slot with the record digest it was bound to, and the state of the audit trail (the number of entries, whether
 the chain is intact, and the head hash). The counts of open and resolved threads are exact. The first 100 resolved
 threads are listed, each with the start of its first comment (at most 300 characters), and a line says how many more
@@ -739,9 +749,9 @@ route, see Evidence Settings in the Administration chapter) a review that is not
 review that does not exist, so that review identifiers cannot be probed; signed-in members still get the 409. If the
 review changes
 while the PDF is being
-prepared (for example an administrator reopens the review), nothing is signed or recorded and the request is also refused
-with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
-Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
+prepared (for example an administrator reopens the review), nothing is signed or recorded and the request is also
+refused with status 409 ("The review changed while the attestation was being prepared; try again."); press the button
+again. Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
 administrators can download the PDF; for anyone else the address answers 404, as for a project that does not exist. The
 one exception is the API route of the PDF in a project whose administrators turned on **Anonymous attestation PDFs**
 (see Evidence Settings in the Administration chapter): anyone can then download it without signing in, and the

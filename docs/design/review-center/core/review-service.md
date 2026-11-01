@@ -175,13 +175,22 @@ store saves them in one transaction with the audit entry and a failure creates n
 it is pure, reads no store and no clock, and is tested by itself). `Compute` takes the record of the earlier review,
 its files, the new review's files and checklist, and the creation time, and returns:
 
-- *Answers*: every Pass and N/A answer of the earlier review whose check identifier is in the checklist of the new
-  review with the same text (an ordinal comparison; the earlier review's frozen checklist is used). Outcome,
-  justification, answerer name, user name and time are kept, and the answer is marked `CarriedFromReviewId` with the
-  earlier review. Fail answers are not carried (they are the reason for the follow-up and are answered again). When the
-  earlier review has no checklist nothing is carried.
-- *Section states*: every not-applicable section of the earlier review whose section identifier is in the new
-  checklist with the same title, with its reason, setter and time, marked in the same way.
+- *Source*: the consolidated state of the submitted ballots of the earlier review (`BallotProjection.Consolidate`,
+  without a slot count, so a lone draft never counts), never a single person's ballot and never a draft. A check that
+  the submitted ballots dispute or that no submitted ballot answered has no consolidated answer, so it is not carried
+  and stays open in the new review; a review whose ballots are all drafts carries no answers and no sections.
+- *Answers*: every agreed Pass and N/A answer of the earlier review whose check identifier is in the checklist of the
+  new review with the same text (an ordinal comparison; the earlier review's frozen checklist is used). The row that
+  is carried is the representative row of the agreed check (the one of the lowest slot that answered it), so outcome,
+  justification, answerer name, user name and time are those of that row, and the answer is marked
+  `CarriedFromReviewId` with the earlier review. Fail answers are not carried (they are the reason for the follow-up
+  and are answered again). When the earlier review has no checklist nothing is carried.
+- *Section states*: every not-applicable section that the submitted ballots agree on, whose section identifier is in
+  the new checklist with the same title, with its reason, setter and time (those of the lowest submitted slot that
+  marked it), marked in the same way.
+- *Storage*: the carried rows are written by the store as review-level baseline rows (slot 0). They seed the draft
+  ballot of each reviewer slot of the new review and never count in the record by themselves, so a carried answer does
+  not hand a ballot in (see `ChecklistService`).
 - *Threads*: in the order of the earlier threads. A resolved thread is counted (`ResolvedThreadsNotCarried`) and not
   carried. An open thread whose file is not in the new review goes to `DroppedThreadFiles` (sorted, distinct). Any
   other open thread is carried open with every comment verbatim (author, user name, text, time, kind, and the report
@@ -202,10 +211,10 @@ its files, the new review's files and checklist, and the creation time, and retu
 - The review conclusion text of the earlier review (the free text of the record) is never carried: a follow-up starts
   without one, because the conclusion belongs to the review it was written for.
 
-A carried answer counts as an answer (the progress of the checklist and `SigningService.Assess` need no change), and a
-carried thread is an open thread, so it blocks signing and the conclusion until it is resolved. Answering a carried
-check again, or
-setting a carried section again, stores the new value without the mark (see `ChecklistService`).
+A carried answer fills the draft ballot of each slot, so it counts toward completeness only once the slot's ballot is
+handed in, and a carried thread is an open thread, so it blocks signing and the conclusion until it is resolved.
+Answering a carried check again, or setting a carried section again, stores the new value in the ballot of the
+reviewer without the mark (see `ChecklistService`).
 
 **Preview of a follow-up**: `PreviewFollowUpAsync` takes the project, the earlier review, the uploaded files and the
 actor. It needs only the right to view the project, stores and audits nothing, and checks the files with the same rules

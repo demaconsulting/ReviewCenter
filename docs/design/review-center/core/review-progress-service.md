@@ -7,7 +7,8 @@
 `ReviewProgressService` answers one question for the project overview and the API list: where does every review of this
 project stand, and who is holding it up? For each review it reports the stage, how many signatures there are of the
 number needed (and how many are out of date), the people the review waits on, what blocks its approval (open threads,
-unanswered checks, checks answered Fail), when it last changed, its due date and whether it is overdue. The unit also
+unanswered checks, checks answered Fail, checks on which the ballots disagree), when it last changed, its due date and
+whether it is overdue. The unit also
 owns the `ReviewStage` and `ReviewProgress` types that carry the answer. It computes everything on demand from what is
 already stored and keeps no state of its own, so the overview cannot disagree with the review page. Who may see a project
 is decided by `ProjectAccess`; this unit only asks.
@@ -22,10 +23,17 @@ reopened after its approval is open again, so it is `InReview`.
 `SlotsOutOfDate`, `WaitingOn` (display names), `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `NoChecklist`,
 `Created`, `LastActivity`, `DueDate`, `IsOverdue`, `IsApproved`, `Reopened`, `IsBlocked`, and `FollowsReviewId`.
 `IsBlocked` is true for a review that is not approved and has no checklist, or has any open thread, unanswered check,
-or Fail answer.
+Fail answer, or disputed check.
 
-**Blocker counts**: the three counts and the flag are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`,
-`FailedChecks`, `MissingChecklist`; the flag is copied to `NoChecklist`). `SigningService` calculates them in the one
+**Blocker counts**: the counts and the flag are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`,
+`FailedChecks`, `DisputedChecks`, `MissingChecklist`; the flag is copied to `NoChecklist`). The check counts are those
+of the consolidated checklist (see *Ballot Consolidation Design*), which reads only the submitted ballots, so a draft
+ballot does not change them (a review with a single slot is the exception: its one ballot counts before the hand-in).
+`UnansweredChecks` is the number of pending checks (a check that not every submitted ballot has answered, which is also
+every check while no ballot is submitted), `FailedChecks` the checks on which the submitted ballots agree on Fail, and
+`DisputedChecks` the checks that the submitted ballots answered differently. The progress record has no field for the
+disputed count: a review with a disputed check is only marked blocked (the blocker sentence on the review page names
+the number). `SigningService` calculates them in the one
 step that also writes the blocker sentences (`BuildApproval`), so the numbers, the flag, and the sentences cannot
 disagree: `MissingChecklist` is true exactly when "This review has no checklist." is a blocker. This unit only copies
 them; it has no second rule for what blocks a review, and the later work list of the lead reuses the same counts.
@@ -77,8 +85,8 @@ that is removed between the first two reads is left out. The page that lists the
 approval of each review on its own; it now uses this one call.
 
 **Stage**: no slot gives `Setup`; otherwise an approved review gives `Approved` and every other `InReview`. A review
-whose slots are all signed but that has an open thread is not approved, so it is `InReview` and its `OpenThreads`
-count blocks it until the thread is resolved.
+whose slots are all signed but that has an open thread, a pending or disputed check, or a ballot that is not handed in is
+not approved, so it is `InReview` (the blockers of the first kind are counted and block it until they are settled).
 
 **WaitingOn**: for an unapproved review, the primary reviewer and, when it is another person, the alternate reviewer of
 every slot that is not signed or whose signature is out of date, each person once, in slot order. A person whose account

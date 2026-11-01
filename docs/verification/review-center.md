@@ -107,7 +107,8 @@ loopback TCP ports.
   previews what is carried over, the checklist marks every carried answer and shows the earlier Fail of an open check,
   the review page names the followed review and marks carried threads, the follow-up is approved on its own while the
   earlier review stays as it was, and the attestation of the follow-up names the earlier review
-  (`ReviewCenter-System-FollowUpReview`; the system test `ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn`).
+  (`ReviewCenter-System-FollowUpReview`; the system test
+  `ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn`).
 - A signature needs the password of the signer again for that signature; a wrong password is refused, signs nothing,
   and is audited without the password (`ReviewCenter-System-SignatureReauthentication`). The lockout count, the second
   factor, and the provider proof are verified at the level of the child requirements.
@@ -278,35 +279,40 @@ person is already in another slot; `third` is then added, giving exactly two slo
 `ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers`.
 
 **ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen**: In the same setting, a review with a slot
-for `second` and an unanswered checklist shows `second` its blockers and offers no form to sign. After every checklist
-section is answered as not applicable with a reason, the form is offered. A wrong password is refused with the generic
+for `second` and an unanswered checklist shows `second` its blockers and offers no form to sign. `second` answers every
+checklist section as not applicable with a reason in the ballot of the own slot (with one slot the finished ballot is
+handed in at once), and the form is offered. A wrong password is refused with the generic
 message,
-the review stays In review, and the slot stays unsigned. The administrator changes a reason of the checklist in another
-browser session while the page of `second` still shows the old record; signing on the old page with the right password
-is refused because the record changed. After the page is drawn again, the right password signs and the review is
+the review stays In review, and the slot stays unsigned. A second session of `second` makes the section of the
+requirements applicable again while the page of the first session still shows the old record; the ballot becomes a
+draft and the record changes, so signing on the old page with the right password
+is refused because the record changed. After the section is marked not applicable again and the page is drawn again,
+the right password signs and the review is
 Approved. The audit page lists the failed proof and the signature but neither password, and its verification reports an
 intact chain. This scenario is tested by `ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen`.
 
 **ReviewCenter_Signing_ChangeAfterSignature_AsksToConfirmAndOnlyThenMakesItOutOfDate**: In the same setting, a review
-has slots for `second` and `third` and every checklist section answered as not applicable; `second` signs, so the
-review is not approved. The administrator changes the reason of a section on the checklist page; the page shows the
+has slots for `second` and `third`; `second` answers every checklist section as not applicable and hands the ballot in,
+then signs, so the review is not approved. `third` answers differently (the requirements apply) and clicks Submit
+ballot; the hand-in changes the record that the signature of `second` covers, so the page shows the
 warning, which names "Slot 1" and "Second Reviewer" and stores nothing. After Cancel the slot of `second` still shows
-"Signed by". The administrator saves the change again and clicks Confirm; the warning goes and the slot shows "Signature
+"Signed by". `third` hands the ballot in again and clicks Confirm; the warning goes and the slot of `second` shows
+"Signature
 out of date". This scenario is tested by
 `ReviewCenter_Signing_ChangeAfterSignature_AsksToConfirmAndOnlyThenMakesItOutOfDate`.
 
 **ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised**: A comment thread is started on the
-review and resolved, every checklist section is answered, and a personal access token of the signer (`second`) is
-created in the browser. Through the API with the token, the review is not approved, the attestation is refused, and
-the evidence index is empty. After the signature in the browser the review is approved with the signer named, the
-attestation is a digitally signed PDF, and the index lists the review-set with the content fingerprint and the result.
-A client without credentials is refused both documents; the token does not open a web page and a request of the token to
-sign or to arrange slots finds no route; the signed slot offers no control to change or remove it. The approved review
-is locked, so the only later change is its reopening by the administrator with a reason: afterwards the review is In
-review, its signature is out of date and kept, its approval digest differs and its content fingerprint is unchanged, the
-attestation is refused and the index is empty again, a posted comment has no control to edit it, and a link to the
-thread leads a signed-out user back to the thread after the sign-in. This scenario is tested by
-`ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised`.
+review and resolved, every checklist section is answered (by `second` in the ballot of the own slot), and a personal
+access token of the signer (`second`) is created in the browser. Through the API with the token, the review is not
+approved, the attestation is refused, and the evidence index is empty. After the signature in the browser the review is
+approved with the signer named, the attestation is a digitally signed PDF, and the index lists the review-set with the
+content fingerprint and the result. A client without credentials is refused both documents; the token does not open a
+web page and a request of the token to sign or to arrange slots finds no route; the signed slot offers no control to
+change or remove it. The approved review is locked, so the only later change is its reopening by the administrator with
+a reason: afterwards the review is In review, its signature is out of date and kept, its approval digest differs and its
+content fingerprint is unchanged, the attestation is refused and the index is empty again, a posted comment has no
+control to edit it, and a link to the thread leads a signed-out user back to the thread after the sign-in. This scenario
+is tested by `ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised`.
 
 **ReviewCenter_ApprovedReview_IsLockedUntilAnAdministratorReopensItWithAReason**: A review that the administrator
 created is approved by the signature of `second`. The administrator's review page shows Approved and Locked, with the
@@ -325,7 +331,8 @@ signature approves and locks the review again. The history page of the review li
 review page of its author (the administrator) does not offer the author in the list of reviewers and tells the author
 that a different member has to review, while the project requires independent reviewers (the default). The
 administrator switches the rule off on the project page and the page confirms it; the author is then offered, the hint
-is gone, and the author is seated in a slot. After every checklist section is answered and the rule is switched on again,
+is gone, and the author is seated in a slot. After every checklist section is answered (by the author in the ballot of
+the own slot) and the rule is switched on again,
 the author's attempt to sign with the right password is refused with the message that the author created the review
 and cannot be a reviewer of it, and the review stays In review. The audit page lists the
 `project.independent-reviewers-changed` entries. This scenario is tested by
@@ -344,11 +351,12 @@ a rule as off after it was changed. These scenarios are tested by
 **CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff** and
 **WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers**: These subsystem scenarios verify the enforcement
 of the two further rules. In the Core scenario the author's answer to a check is refused with `AuthorCannotAnswer`
-and stores nothing, a reopening by the only person who may sign the slot is refused (`ReopenWouldStrandSlot`) and
-leaves the review approved, and with each rule switched off the same call succeeds, so that the administrator reopens
+and stores nothing (with the rule switched off the same call is refused only because the author holds no reviewer slot,
+`NoReviewerSlot`), a reopening by the only person who may sign the slot is refused (`ReopenWouldStrandSlot`) and
+leaves the review approved, and with that rule switched off the same call succeeds, so that the administrator reopens
 the review and signs it again. In the Web scenario the author sees the notice and disabled controls on the
-checklist page and another member answers a check. The refusal of the reopener's signature is verified by the
-SigningService scenarios. These scenarios are tested by
+checklist page and another member, who holds a slot, answers a check. The refusal of the reopener's signature is
+verified by the SigningService scenarios. These scenarios are tested by
 `CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff` and
 `WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers`.
 
@@ -371,14 +379,16 @@ After the reviewer approves the first review, it is listed under the approved st
 Overdue badge, and the summary counts one approved and no overdue review. This scenario is tested by
 `ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState`.
 
-**ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn**: In a browser, one user fails a check of a review,
-passes the rest of its section, marks the other sections as not applicable and starts a thread. A second review is
+**ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn**: In a browser, the reviewer `second` of a review
+fails a check, passes the rest of its section and marks the other sections as not applicable, which hands the ballot of
+the single slot in; another user starts a thread. A second review is
 created through the form of a new review from the same repository, with the first review chosen in the follow-up
 choice and the suggested title kept. The new review names the first one with the carried counts and marks the carried
 thread; its checklist marks the carried Pass and section and shows the earlier Fail with its justification for the check
-that is open again. The check is decided again and the carried thread is resolved, a second user signs, and the review is
-Approved while the first review is still In review and lists the follow-up. The attestation PDF of the follow-up contains
-"Follows review" and the identifier of the first review. This scenario is tested by
+that is open again. The reviewer of the follow-up (`second` again, in the slot that is added to it) decides the check
+again and the carried thread is resolved, the reviewer signs, and the review is
+Approved while the first review is still In review and lists the follow-up. The attestation PDF of the follow-up
+contains "Follows review" and the identifier of the first review. This scenario is tested by
 `ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn`.
 
 **ReviewCenter_AuditTrail_FiltersByActionAndActor**: This scenario verifies the filter of the audit page of the system
@@ -493,7 +503,8 @@ audit trail. This scenario is tested by the system test
 `ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned`. The service, the store, the route, and the
 pages are verified in the `Core`, `Storage`, `Hosting`, and `Web` subsystems.
 
-**Review checklist**: Two checks of a new review are answered through the domain service over the real pipeline, one
+**Review checklist**: Two checks of a new review are answered through the domain service over the real pipeline (in the
+ballot of the reviewer who is seated in its only slot), one
 Pass and one Fail with a justification; the checklist page, requested twice, shows the progress, the pressed Pass
 button, and the justification, and the review page shows the progress summary, the link to the checklist page, and
 the unanswered checks as the next step. This scenario is tested by
@@ -515,7 +526,8 @@ administrator and signed by a separate reviewer; the review is then approved and
 with `ReviewLocked`, and its attestation, downloaded with an API token, has no reopen history. An administrator
 reopens it with a reason; the review returns to In review under a new digest, and the reviewer signs the new digest.
 The review is approved and locked once more, the reopen is recorded with the reason and the previous digest, and the
-attestation now holds the reopen history. This scenario is tested by `IntegrationTests_ApprovalLockReopenResign_EndToEnd`.
+attestation now holds the reopen history. This scenario is tested by
+`IntegrationTests_ApprovalLockReopenResign_EndToEnd`.
 
 **Audit trail chain**: Changes are made at the same moment through the three stores (review, user, and audit), which
 share the process-wide gate; the resulting trail has consecutive sequence numbers and an intact chain, so the changes

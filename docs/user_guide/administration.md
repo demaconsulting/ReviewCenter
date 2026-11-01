@@ -77,8 +77,9 @@ the Users and Sign-in chapter).
 | Action                                               | Member | Auditor | Project admin | System admin |
 | ---------------------------------------------------- | ------ | ------- | ------------- | ------------ |
 | See the project, its reviews, history, and evidence  | yes    | yes     | yes           | yes          |
-| Create reviews, comment, edit checklists             | yes    | no      | yes           | yes          |
+| Create reviews, comment                              | yes    | no      | yes           | yes          |
 | Edit unsigned reviewer slots (not on a locked review)| yes    | no      | yes           | yes          |
+| Answer the checklist as a slot reviewer              | yes    | no      | yes           | if a member  |
 | Sign a review as the assigned reviewer               | yes    | no      | yes           | if a member  |
 | Download the attestation PDF of an approved review   | yes    | yes     | yes           | yes          |
 | Manage the repositories and credentials of a project | no     | no      | yes           | yes          |
@@ -101,6 +102,13 @@ Signing needs two things: you are a member of the project, and you are the assig
 administrator who is not a member of the project cannot sign it; add yourself as a member first, and then be assigned.
 While the project requires independent reviewers (see [Review Rules](#review-rules)), the person who created a review
 cannot be one of its reviewers and cannot sign it.
+
+**Who answers the checklist.** The checklist is answered in the ballot of a reviewer slot, so only the primary or the
+alternate of a slot can answer a check, change whether a section applies, or hand in the ballot. A member who holds no
+slot, a project administrator and a system administrator included, is refused with "You are not a reviewer of this
+review, so you cannot answer its checklist. Add yourself as a reviewer slot first."; every member can add the slot.
+Everyone who may see the project reads the checklist: the reviewer of a slot reads the own ballot, a draft included,
+and everybody else reads the consolidated standing of the submitted ballots (see Reviewing).
 
 **Tokens.** A personal access token acts as its owner and carries the owner's memberships, so it reads and creates
 reviews only in the projects the owner can see, and the API lists only those projects (see
@@ -442,8 +450,10 @@ applies them to every project that has them on, including the projects that exis
 must not be affected switches them off.
 
 - **Authors cannot answer the checklist.** The person who created a review cannot answer its checks or change which
-  sections apply; the service refuses it with the message "You created this review, so you cannot answer its
-  checklist..." and the checklist page shows the author a notice and disabled controls. Reading the checklist and the
+  sections apply, or hand in a ballot; the service refuses it with the message "You created this review, so you cannot
+  answer its checklist..." and the checklist page shows the author a notice and disabled controls. With the switch
+  off the author may answer, but still only as the reviewer of a slot (and with the independence switch on, the author
+  cannot hold a slot). Reading the checklist and the
   comment threads
   (starting, answering, and resolving them) are not affected, and a review created from the command line has no
   recorded author, so nobody is excluded from it.
@@ -470,7 +480,8 @@ Open the review; in the locked notice, enter a **Reason for reopening** (require
 **Reopen review**. Ordinary members do not see the form, and a personal access token cannot reopen a review.
 
 - The review is In review again, and its signatures stay as history but are out of date; they cannot become current
-  again, so the reviewers must sign again.
+  again, so the reviewers must sign again. The ballots stay as they were handed in, so the reviewers need not answer
+  again; a change of an answer makes the ballot of its slot a draft until it is handed in again.
 - The audit trail records `review.reopened` with the administrator as the actor and the detail
   `previous digest <digest>; reason: <reason>`. The review page lists the reopens in its **Reopen history**, and the
   attestation PDF of a review that was reopened and approved again has a **Reopen history** section.
@@ -750,7 +761,10 @@ review adds the column `Reviews.DueDate`, which the server also creates only whe
 The follow-up review adds the columns `Reviews.FollowsReviewId`, `Reviews.CarriedAnswerCount`, and
 `Reviews.CarriedThreadCount`, and the carried-from columns of the checklist answers, the section states, and the
 threads, again with no migration. A review that follows nothing keeps its record digest, because the line for a
-followed review and the marker of a carried thread are added to the digest only when they exist. The time of the
+followed review and the marker of a carried thread are added to the digest only when they exist. The reviewer
+ballots add the table `ChecklistBallots` (the state of the ballot of each slot) and the slot identity to the key of the
+checklist answers and the section states, again with no migration: a development database created before them must be
+deleted and created again. The time of the
 last sign-in adds the
 column `Users.LastSignInUtc`, again with no migration: a development database created before it must be deleted and
 created again. The comments of a thread add the columns `Comments.IncludeInReport` and `Comments.Kind`, again with no

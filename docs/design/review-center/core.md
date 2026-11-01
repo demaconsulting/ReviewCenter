@@ -76,8 +76,9 @@ supporting types, documented with the unit that owns them.
 - *Role*: Provider.
 - *Contract*: Give, for every review of a project, its stage (Setup, In review, or Approved, derived from the approval
   status and not from the stored state), the number of reviewer slots, valid signatures, and out-of-date signatures,
-  the names of the people it waits on (a disabled account is marked), the number of open threads, unanswered checks, and
-  Fail answers (the counts that `SigningService` also states in the blocker sentences, so the two cannot disagree),
+  the names of the people it waits on (a disabled account is marked), the number of open threads, unanswered checks
+  (the pending checks of the consolidated checklist), Fail answers, and checks on which the ballots disagree (the
+  counts that `SigningService` also states in the blocker sentences, so the two cannot disagree),
   the time of its last activity (the newest audit entry of the review, from one grouped read of the audit trail), and
   its due date and overdue state by the rule of `ReviewService`. It reads the project with a constant number of
   queries, and answers every actor who may see the project (and a project that the actor may not see as one that does
@@ -149,10 +150,12 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   `review.due-date-changed`). `IsOverdue` tells whether the due date lies before `TodayUtc`, the current UTC day, and
   the review is not approved, and an invalid due date is refused with `DueDateInvalid`. A review can be created as a
   follow-up of an earlier review of the same project (the optional `followsReviewId` of `CreateDraftAsync` and
-  `CreateFromRepositoryAsync`): the Pass and N/A answers of checks that are unchanged, the not-applicable sections
+  `CreateFromRepositoryAsync`): the Pass and N/A answers of checks that are unchanged (as the submitted ballots of the
+  earlier review agree on them), the not-applicable sections
   with the same title, and the open threads whose file is in the new review are carried over (`FollowUpCarry`, written
   with the review in one transaction), marked with the review they came from, while Fail answers, resolved threads,
-  reviewer slots, signatures and reopenings are not; a review that does not fit, and open threads that would be dropped
+  reviewer slots, signatures and reopenings are not; the carried answers are review-level baseline rows that seed the
+  draft ballot of every reviewer slot; a review that does not fit, and open threads that would be dropped
   without an acknowledgement, are refused with `FollowUpInvalid`. `PreviewFollowUpAsync` tells, for the files of a new
   review, what such a follow-up would carry and drop, without storing or auditing anything. `RecordDigest` calculates the
   digest of a record. Every
