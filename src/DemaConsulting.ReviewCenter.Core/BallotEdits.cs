@@ -94,8 +94,9 @@ public static class BallotEdits
     /// <param name="ballot">The ballot as stored. Must not be null.</param>
     /// <param name="departingUsernames">The user names of the reviewers who leave the slot. Must not be null.</param>
     /// <returns>
-    ///     The reverted ballot. Rows carried from an earlier review stay, because their author is not the departing
-    ///     reviewer; the comparison of user names ignores case.
+    ///     The reverted ballot. Rows carried from an earlier review stay: they keep the user name of the earlier author, so a
+    ///     departing reviewer may still be named on one even though the reviewer did not give it in this review. A carried
+    ///     row is therefore kept whoever it names; the comparison of user names ignores case.
     /// </returns>
     public static Ballot Reassign(Ballot ballot, IReadOnlyCollection<string> departingUsernames)
     {

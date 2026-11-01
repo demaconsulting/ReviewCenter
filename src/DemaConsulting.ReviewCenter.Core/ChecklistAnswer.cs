@@ -24,7 +24,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The recorded answer to one check of a review's checklist.
 /// </summary>
 /// <remarks>
-///     There is at most one answer per check; answering again replaces it. The person who answered comes
+///     There is at most one answer per check in a ballot (or at the review level); answering again replaces it. What a
+///     review shows for a check is the answer its submitted ballots agree on (the row of the lowest slot that gave it); a
+///     pending or disputed check shows as "Not answered". The person who answered comes
 ///     from the signed-in user (see <see cref="Actor"/>). Instances are created by
 ///     <see cref="ChecklistService"/>, which enforces the rules. The type is not thread-safe.
 /// </remarks>

@@ -282,6 +282,121 @@ public class FollowUpCarryTests
     }
 
     /// <summary>
+    ///     Builds a review-level (slot 0) answer of the earlier review, as a follow-up review holds what it carried.
+    /// </summary>
+    /// <param name="item">The check id.</param>
+    /// <param name="outcome">The outcome.</param>
+    /// <returns>The answer, given by Ann in a review before the earlier one.</returns>
+    private static ChecklistAnswer BaselineAnswer(string item, ChecklistOutcome outcome)
+    {
+        return new ChecklistAnswer
+        {
+            ProjectId = 1,
+            ReviewId = "old",
+            SlotId = ChecklistAnswer.BaselineSlotId,
+            ItemId = item,
+            Outcome = outcome,
+            Justification = outcome == ChecklistOutcome.Pass ? null : "Earlier reason",
+            AnsweredBy = "Ann",
+            AnsweredByUsername = "ann",
+            AnsweredAt = _then.AddDays(-1),
+            CarriedFromReviewId = "oldest"
+        };
+    }
+
+    /// <summary>
+    ///     Builds a review-level (slot 0) section state of the earlier review.
+    /// </summary>
+    /// <param name="section">The section id.</param>
+    /// <returns>The not-applicable state, set by Ann in a review before the earlier one.</returns>
+    private static ChecklistSectionState BaselineSection(string section)
+    {
+        return new ChecklistSectionState
+        {
+            ProjectId = 1,
+            ReviewId = "old",
+            SlotId = ChecklistAnswer.BaselineSlotId,
+            SectionId = section,
+            Applicable = false,
+            Reason = "Earlier reason",
+            SetBy = "Ann",
+            SetByUsername = "ann",
+            SetAt = _then.AddDays(-1),
+            CarriedFromReviewId = "oldest"
+        };
+    }
+
+    /// <summary>
+    ///     Test that a follow-up without any submitted ballot (for example one with no reviewer slot) carries what it
+    ///     carried itself onward: the Pass and not-applicable baseline answers and the not-applicable baseline section,
+    ///     with the original answerer and time, marked with the immediate source, but not the answer of a check in that
+    ///     not-applicable section.
+    /// </summary>
+    [Fact]
+    public void FollowUpCarry_Compute_SourceWithOnlyBaselineRows_CarriesTheBaselineOnward()
+    {
+        // Arrange: a source with a checklist, no ballot at all, and baseline rows (one answer inside the section b that
+        // the baseline marks as not applicable)
+        var checklist = new ReviewChecklist { ProjectId = 1, ReviewId = "old", Version = "v", Definition = Definition().ToJson() };
+        var record = new ReviewRecord("fp", checklist, [], [], ReviewSource.Upload);
+        ChecklistAnswer[] answers =
+        [
+            BaselineAnswer("a-01", ChecklistOutcome.Pass),
+            BaselineAnswer("a-02", ChecklistOutcome.NotApplicable),
+            BaselineAnswer("b-01", ChecklistOutcome.Pass)
+        ];
+
+        // Act
+        var carry = FollowUpCarry.Compute(
+            "old", record, [File("a.txt")], 1, "new", [File("a.txt")], Definition(), _now, answers, [BaselineSection("b")]);
+
+        // Assert
+        Assert.Equal(["a-01", "a-02"], carry.Answers.Select(a => a.ItemId));
+        Assert.All(carry.Answers, answer =>
+        {
+            Assert.Equal("old", answer.CarriedFromReviewId);
+            Assert.Equal("new", answer.ReviewId);
+            Assert.Equal("Ann", answer.AnsweredBy);
+            Assert.Equal("ann", answer.AnsweredByUsername);
+            Assert.Equal(_then.AddDays(-1), answer.AnsweredAt);
+        });
+        var state = Assert.Single(carry.SectionStates);
+        Assert.Equal(("b", "Earlier reason", "ann", "old"), (state.SectionId, state.Reason, state.SetByUsername, state.CarriedFromReviewId));
+        Assert.Equal(_then.AddDays(-1), state.SetAt);
+    }
+
+    /// <summary>
+    ///     Test that the baseline rows fill in only the checks and sections that no submitted ballot has a row for:
+    ///     where a submitted ballot answered (agreed, failed, or disputed) its row wins, and the baseline fills the rest.
+    /// </summary>
+    [Fact]
+    public void FollowUpCarry_Compute_SubmittedBallotWinsOverBaseline()
+    {
+        // Arrange: Bob's submitted ballot fails a-01 and passes a-02 and marks section b applicable; the baseline says
+        // Pass for a-01, N/A for a-02 and b-01, and marks section b not applicable
+        var record = Record(
+            [Answer("a-01", ChecklistOutcome.Fail), Answer("a-02", ChecklistOutcome.Pass)],
+            [Section("b", true)]);
+        ChecklistAnswer[] answers =
+        [
+            BaselineAnswer("a-01", ChecklistOutcome.Pass),
+            BaselineAnswer("a-02", ChecklistOutcome.NotApplicable),
+            BaselineAnswer("b-01", ChecklistOutcome.NotApplicable)
+        ];
+
+        // Act
+        var carry = FollowUpCarry.Compute(
+            "old", record, [File("a.txt")], 1, "new", [File("a.txt")], Definition(), _now, answers, [BaselineSection("b")]);
+
+        // Assert: a-01 stays open (the Fail is not carried and the baseline Pass does not override it), a-02 is Bob's Pass,
+        // b-01 comes from the baseline, and the section is not carried because the ballot has a state for it
+        Assert.Equal(["a-02", "b-01"], carry.Answers.Select(a => a.ItemId));
+        Assert.Equal(("bob", ChecklistOutcome.Pass), (carry.Answers[0].AnsweredByUsername, carry.Answers[0].Outcome));
+        Assert.Equal(("ann", ChecklistOutcome.NotApplicable), (carry.Answers[1].AnsweredByUsername, carry.Answers[1].Outcome));
+        Assert.Empty(carry.SectionStates);
+    }
+
+    /// <summary>
     ///     Test that an open thread is carried with all comments verbatim and in order, in the state Open, and that
     ///     the thread and comment identities are left for the store to assign.
     /// </summary>

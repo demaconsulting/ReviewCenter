@@ -35,8 +35,13 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               comparison of the text the answer was given against). Outcome, justification, answerer and time stay
 ///               those of the original answer (the row of the lowest slot that answered it); the answer is marked as carried
 ///               from the immediate source. Fail answers
-///               are never carried: the check stays unanswered so a reviewer decides again.</item>
-///         <item>Not-applicable sections (with their reason) that the submitted ballots agree on, whose section exists in
+///               are never carried: the check stays unanswered so a reviewer decides again. When the earlier review is itself
+///               a follow-up, its review-level baseline rows (slot 0, what it carried) are carried onward under the same
+///               rules for every check no submitted ballot has an answer for, so a follow-up chain loses nothing when the
+///               middle review has no submitted ballot (for example no reviewer slot); wherever a submitted ballot has a row,
+///               the ballots win.</item>
+///         <item>Not-applicable sections (with their reason) that the submitted ballots agree on (or, for a section no
+///               submitted ballot has a state for, that the baseline marks), whose section exists in
 ///               the new checklist with the same title.</item>
 ///         <item>Open threads whose file is in the new review, with all comments verbatim (each keeping whether it is part
 ///               of the report and whether it is a resolution note, so a carried Finding stays a Finding and chat stays
@@ -108,6 +113,15 @@ public static class FollowUpCarry
     /// <param name="newFiles">The files of the new review. Must not be null.</param>
     /// <param name="newDefinition">The checklist the new review is frozen with. Must not be null.</param>
     /// <param name="now">The creation time of the new review, used for the system comment of a moved anchor.</param>
+    /// <param name="baselineAnswers">
+    ///     The review-level (slot 0) answers of the earlier review, or <c>null</c> for none: what the earlier review itself
+    ///     carried and what a follow-up of it may therefore carry onward even when it has no submitted ballot. Used only for
+    ///     checks that no submitted ballot has an answer for.
+    /// </param>
+    /// <param name="baselineSections">
+    ///     The review-level (slot 0) section states of the earlier review, or <c>null</c> for none; used only for sections
+    ///     that no submitted ballot has a state for.
+    /// </param>
     /// <returns>The rows to store with the new review and the counts for the audit text.</returns>
     public static ReviewCarryOver Compute(
         string sourceId,
@@ -117,7 +131,9 @@ public static class FollowUpCarry
         string reviewId,
         IReadOnlyList<ReviewFile> newFiles,
         ChecklistDefinition newDefinition,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        IReadOnlyList<ChecklistAnswer>? baselineAnswers = null,
+        IReadOnlyList<ChecklistSectionState>? baselineSections = null)
     {
         ArgumentNullException.ThrowIfNull(sourceId);
         ArgumentNullException.ThrowIfNull(source);
@@ -126,7 +142,8 @@ public static class FollowUpCarry
         ArgumentNullException.ThrowIfNull(newFiles);
         ArgumentNullException.ThrowIfNull(newDefinition);
 
-        var (answers, sections) = CarryChecklist(sourceId, source, projectId, reviewId, newDefinition);
+        var (answers, sections) = CarryChecklist(
+            sourceId, source, projectId, reviewId, newDefinition, baselineAnswers ?? [], baselineSections ?? []);
         var (threads, resolved, dropped) = CarryThreads(sourceId, source, sourceFiles, projectId, reviewId, newFiles, now);
         return new ReviewCarryOver(answers, sections, threads, resolved, dropped);
     }
@@ -159,13 +176,17 @@ public static class FollowUpCarry
     /// <param name="projectId">The project of both reviews.</param>
     /// <param name="reviewId">The identifier of the new review.</param>
     /// <param name="newDefinition">The checklist of the new review.</param>
+    /// <param name="baselineAnswers">The review-level answers of the earlier review (never null).</param>
+    /// <param name="baselineSections">The review-level section states of the earlier review (never null).</param>
     /// <returns>The carried answers and the carried section states, each sorted by identifier.</returns>
     private static (List<ChecklistAnswer> Answers, List<ChecklistSectionState> Sections) CarryChecklist(
         string sourceId,
         ReviewRecord source,
         int projectId,
         string reviewId,
-        ChecklistDefinition newDefinition)
+        ChecklistDefinition newDefinition,
+        IReadOnlyList<ChecklistAnswer> baselineAnswers,
+        IReadOnlyList<ChecklistSectionState> baselineSections)
     {
         var answers = new List<ChecklistAnswer>();
         var sections = new List<ChecklistSectionState>();
@@ -182,16 +203,40 @@ public static class FollowUpCarry
 
         // Only what the submitted ballots agree on is carried: the consolidated state holds the representative row of
         // every agreed check and not-applicable section, so a disputed or pending check stays open in the new review
-        var consolidated = BallotProjection.Consolidate(source)?.State;
-        if (consolidated is null)
+        var view = BallotProjection.Consolidate(source);
+        if (view is null)
         {
             return (answers, sections);
         }
+
+        var consolidated = view.State;
+
+        // The baseline rows (what the earlier review itself carried and no submitted ballot has taken over) fill in only
+        // the checks and sections that no submitted ballot has a row for; wherever a submitted ballot has a row, the
+        // ballots decide, even when they are pending or disputed. The checks of a section that the ballots mark not
+        // applicable (or dispute) are not carried, as the section is carried as not applicable instead
+        var submittedBallots = source.Ballots.Where(b => b.Status == BallotStatus.Submitted).ToList();
+        var coveredItems = submittedBallots.SelectMany(b => b.Answers).Select(a => a.ItemId).ToHashSet(StringComparer.Ordinal);
+        var coveredSections = submittedBallots.SelectMany(b => b.SectionStates).Select(s => s.SectionId).ToHashSet(StringComparer.Ordinal);
+        var closedSections = view.Result.Sections
+            .Where(s => s.Consensus != SectionConsensus.Applicable)
+            .Select(s => s.SectionId)
+            .Concat(baselineSections
+                .Where(s => s.SlotId == ChecklistAnswer.BaselineSlotId && !s.Applicable && !coveredSections.Contains(s.SectionId))
+                .Select(s => s.SectionId))
+            .ToHashSet(StringComparer.Ordinal);
+        var sectionOfItem = oldDefinition.Sections
+            .SelectMany(section => section.Items.Select(item => (item.Id, SectionId: section.Id)))
+            .ToDictionary(pair => pair.Id, pair => pair.SectionId, StringComparer.Ordinal);
 
         var agreedAnswers = oldDefinition.Sections
             .SelectMany(section => section.Items)
             .Select(item => consolidated.AnswerFor(item.Id))
             .OfType<ChecklistAnswer>()
+            .Concat(baselineAnswers
+                .Where(a => a.SlotId == ChecklistAnswer.BaselineSlotId
+                    && !coveredItems.Contains(a.ItemId)
+                    && !(sectionOfItem.TryGetValue(a.ItemId, out var sectionId) && closedSections.Contains(sectionId))))
             .OrderBy(a => a.ItemId, StringComparer.Ordinal);
         foreach (var answer in agreedAnswers)
         {
@@ -223,6 +268,8 @@ public static class FollowUpCarry
         var agreedStates = oldDefinition.Sections
             .Select(section => consolidated.SectionStateFor(section.Id))
             .OfType<ChecklistSectionState>()
+            .Concat(baselineSections
+                .Where(s => s.SlotId == ChecklistAnswer.BaselineSlotId && !coveredSections.Contains(s.SectionId)))
             .Where(s => !s.Applicable)
             .OrderBy(s => s.SectionId, StringComparer.Ordinal);
         foreach (var state in agreedStates)

@@ -19,8 +19,9 @@ N/A - standard test environment (everything runs in memory).
   far as the evidence settings include them (see the criteria for the Content scope below).
 - A checklist comment is printed in full, however long, and runs over pages without loss; only the list of resolved
   threads is capped (100), with exact counts and a line that says how many are left out.
-- Every checklist answer shows who answered it and the time of the answer, in UTC to the second like the other times of
-  the document; an answer without a time shows no time.
+- Every checklist answer shows who gave the agreed answer and the time of the answer, in UTC to the second like the
+  other times of the document; an answer without a time shows no time, and a check that is pending or disputed shows as
+  "Not answered".
 - A self-signed key gets the notice; an organization key gets its subject and issuer and no notice.
 - The statement of what the signature proves and does not prove is in the document.
 - The result is deterministic, grows over pages, and handles characters beyond WinAnsi and a missing document.

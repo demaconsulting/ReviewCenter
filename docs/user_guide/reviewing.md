@@ -477,7 +477,11 @@ the report flags of its comments, so a Finding stays a Finding. The
 review page also says "Follows X" with the number of answers and threads carried, and the earlier review lists the
 reviews that follow it.
 
-Answers are carried only from the submitted ballots of the earlier review (a draft ballot carries nothing), and an
+Answers are carried from the submitted ballots of the earlier review, and only those the submitted ballots agree on (a
+draft ballot carries nothing). When the earlier review is itself a follow-up, what it carried (shown there as carried
+answers) is carried on for every check that none of its submitted ballots has answered, so a follow-up that nobody has
+started, or that has no reviewer, still passes its carried answers to the next follow-up; where a submitted ballot has
+an answer, that ballot decides. An
 answer inside a section that is marked not applicable is not carried, because the section is carried as not
 applicable instead.
 

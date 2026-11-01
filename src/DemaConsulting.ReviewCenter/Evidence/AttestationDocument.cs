@@ -136,7 +136,7 @@ internal sealed record AttestationSection(
 /// <param name="Text">The text of the check.</param>
 /// <param name="Outcome">The outcome: <c>Pass</c>, <c>Fail</c>, <c>N/A</c> or <c>Not answered</c>.</param>
 /// <param name="Comment">The justification the reviewer gave, or <c>null</c>.</param>
-/// <param name="AnsweredBy">The display name of the user who answered, or <c>null</c>.</param>
+/// <param name="AnsweredBy">The display name of the user who gave the agreed answer shown, or <c>null</c> (a pending or disputed check shows as <c>Not answered</c> and has none).</param>
 /// <param name="CarriedFrom">The review the answer was carried over from, or <c>null</c> for an answer given in this review.</param>
 /// <param name="AnsweredAt">The time the answer was given, or <c>null</c>; it is not part of the record digest.</param>
 internal sealed record AttestationCheck(
