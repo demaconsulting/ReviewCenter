@@ -53,9 +53,9 @@ N/A - standard test environment.
   system administrator, or the creator, never through a token, never for an approved review (`ReviewLocked`); a review
   is overdue only when the date has passed and it is not approved.
 - A review can be created as a follow-up of an earlier review of the same project: the Pass and N/A answers of checks
-  with unchanged wording that the submitted ballots of the earlier review agree on (and, for checks no submitted
-  ballot answered, those that the earlier review itself carried), the not-applicable sections with the same title
-  (taken in the same way), and the open threads on files of the new
+  with unchanged wording that the submitted ballots of the earlier review agree on (never a draft, a disputed check
+  or an open one; and, for checks no submitted ballot answered, those that the earlier review itself carried), the
+  not-applicable sections with the same title (taken in the same way), and the open threads on files of the new
   review are carried, marked with the earlier review, and stored with it in one step, each thread with its comments
   keeping their kinds and report flags (a Finding stays a Finding, chat stays chat, and the note about a moved anchor
   is a comment that is not included); Fail answers, resolved threads,
@@ -364,9 +364,23 @@ repository paths use a fake git provider and the real `RepositoryService`).
 
 **FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer**: Pass and N/A answers that the
 submitted ballots agree on, of checks that are in the new checklist with the same wording, are carried with their
-outcome, justification, answerer and time,
-marked with the earlier review. This scenario is tested by
+outcome, justification, answerer and time, marked with the earlier review. This scenario is tested by
 `FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer`.
+
+**FollowUpCarry_Compute_ConsolidatedSource_CarriesAgreedPassOnly**: Two submitted ballots agree on the first check
+(Pass) and only one of them answers the second; only the agreed check is carried, once, with the row of the lowest
+slot (its answerer). This scenario is tested by `FollowUpCarry_Compute_ConsolidatedSource_CarriesAgreedPassOnly`.
+
+**FollowUpCarry_Compute_DisputedNotCarried**: Two submitted ballots disagree on a check (Pass against N/A, and Pass
+against Fail); nothing is carried, so the checks stay open in the new review. This scenario is tested by
+`FollowUpCarry_Compute_DisputedNotCarried`.
+
+**FollowUpCarry_Compute_DraftBallot_IsIgnored**: A submitted ballot and a draft ballot that answers the same check
+differently and another check as Pass; only the submitted ballot counts, so its Pass is carried and nothing of the
+draft is. This scenario is tested by `FollowUpCarry_Compute_DraftBallot_IsIgnored`.
+
+**FollowUpCarry_Compute_OnlyDraftBallots_CarriesNothing**: The only ballot of the earlier review is a draft; no answer
+and no section state is carried. This scenario is tested by `FollowUpCarry_Compute_OnlyDraftBallots_CarriesNothing`.
 
 **FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried**: A Fail answer, a check whose wording changed, and a
 check that is not in the new checklist are not carried. This scenario is tested by
@@ -436,9 +450,10 @@ the carried answers and not-applicable sections, marked with the earlier review,
 `FollowsReviewId` and the counts. This scenario is tested by
 `ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections`.
 
-**ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered**: A checklist whose checks are all carried is
-complete and has no unanswered check. This scenario is tested by
-`ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered`.
+**ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered**: Every check of the earlier review was
+passed. Once one reviewer takes the only slot of the follow-up, the checklist of that reviewer's own ballot is
+complete and every carried answer keeps its original answerer (the review-level baseline rows). This scenario is tested
+by `ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered`.
 
 **ReviewService_CreateDraftAsync_FollowUp_ChangedChecklistWording_IsNotCarried**: After the checklist of the project
 changed the wording of a check, the answer to that check is not carried and the check is unanswered. This scenario is
@@ -520,9 +535,10 @@ person's answers still cannot be seated as a reviewer while independent reviewer
 while the person who gave the carried answers can be. This
 scenario is tested by `ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence`.
 
-**ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot**: With only carried answers the review has
-no blocker for the checklist; a carried open thread blocks with "1 thread is open", until it is resolved. This scenario
-is tested by `ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`.
+**ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot**: With every answer carried and one
+reviewer in the only slot, the review has no blocker for the checklist; a carried open thread blocks with "1 thread is
+open", until it is resolved. This scenario is tested by
+`ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot`.
 
 **ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened**: A follow-up that is approved is locked like any review and
 can be reopened. This scenario is tested by `ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened`.

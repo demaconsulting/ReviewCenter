@@ -279,8 +279,9 @@ sections:
       - id: ReviewCenter-ChecklistService-SingleSlotAutoSubmit
         title: >-
           The ChecklistService class shall hand in the ballot of the only slot of a review with the answer or the
-          section change that completes it, and shall keep it a draft until then, so that a review with one reviewer
-          needs no separate hand-in step.
+          section change that completes it, and shall keep it a draft until then, so that answering in a review with one
+          reviewer needs no separate hand-in step (a complete ballot that no edit produced, such as a follow-up with
+          every check carried, is handed in with SubmitBallotAsync).
         justification: |
           With one reviewer there is nobody to agree with and nobody to hide a draft from, so answering stays as
           simple as it was before each reviewer had a ballot.

@@ -121,8 +121,8 @@ read and no trial write:
    a Question's resolution note, a save of the same answer by the same person, saving a draft ballot (a draft is not in
    the digest), or marking a section applicable that
    has no row. A change of an included comment, of the kind of a thread, or of the resolution note of a Finding is
-   one, and so is a change that alters the consolidated standing of the ballots. The answer time is not part of the
-   digest; the person who answered is.
+   one, and so is a change that alters the consolidated standing of the ballots. Neither the answer time nor the
+   person who answered is part of the digest.
 3. Otherwise every current signature whose slot identity is not in `acknowledged` is affected. When there is one,
    `DomainRuleException` is thrown with `SignaturesWouldBecomeOutOfDate`, the message "This change makes signatures
    out of date: slot 1 (Rita), slot 3 (Tess). Acknowledge them to continue.", and `AffectedSlots`, a copy of the list of
@@ -357,7 +357,9 @@ not found.
 - *Blocker counts*: `ReviewApproval` also carries `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `DisputedChecks`,
   `UnsubmittedBallots`, and the flag
   `MissingChecklist`. They are counted in the one place that writes the blocker sentences (`BuildApproval`, one additive
-  region), so each number equals the one in its sentence and the flag is true exactly when the "no checklist" sentence
+  region), so each number but one equals the one in its sentence (`UnsubmittedBallots` has no sentence: the ballots of
+  other slots do not block a signature, so a draft is only a wait state before the conclusion) and the flag is true
+  exactly when the "no checklist" sentence
   is present; the sentences are unchanged. `ReviewProgressService` and any later list of work use
   the counts and do not repeat the rule. `SlotMember.Enabled` tells whether the account of a person in a slot is enabled
   (true by default).

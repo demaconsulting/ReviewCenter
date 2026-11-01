@@ -178,16 +178,19 @@ sections:
           through the API, so that the Pass and N/A answers of unchanged checks, the not-applicable sections and the
           open threads of the earlier review are carried over and marked with the review they came from, without the
           Fail answers, the resolved threads, the reviewer slots or the signatures, refuse a review that does not fit
-          and a silent drop of open threads, count carried answers as answered and carried open threads as open for
-          approval, keep a signature bound to exactly what was carried, show the follow-up in the attestation PDF, and
-          keep the digest of every review that is not a follow-up unchanged.
+          and a silent drop of open threads, carry only what the submitted ballots of the earlier review agree on and
+          let a carried answer seed the draft ballot of each reviewer slot (it counts only when a reviewer hands the
+          ballot in), count carried open threads as open for approval, keep a signature bound to the review that is
+          followed and to the carried threads, show the follow-up in the attestation PDF, and keep the digest of every
+          review that is not a follow-up unchanged.
         tags: [system]
         justification: |
           A review that fails is followed by a review of the corrected content. The reviewers should not repeat the
           checks that passed, and the record, and the document that goes to auditors, must still say which answers
           were carried and which were given in this review (21 CFR Part 11 section 11.10(e), records that are not
-          obscured by later changes, and 11.10(a), a record that is accurate and complete). Leaving the new lines out
-          of every other review keeps the signatures that already exist valid.
+          obscured by later changes, and 11.10(a), a record that is accurate and complete). A carried answer is only
+          a starting point: the reviewers still hand in their ballots, so what is approved is what they agreed to.
+          Leaving the new lines out of every other review keeps the signatures that already exist valid.
         children:
           - ReviewCenter-Core-FollowUp
           - ReviewCenter-Storage-FollowUp

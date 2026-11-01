@@ -110,8 +110,9 @@ Example validation report:
 
 ✓ ReviewCenter_GitAvailable - Passed (432 ms): git version 2.51.0.windows.2 (minimum 2.31)
 ✓ ReviewCenter_GitRoundTrip - Passed (4363 ms): 2 commits, 2 changes, file read back unchanged
-✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; author answer refused; review answered and signed by
-    a separate reviewer; author signature refused; approved review locked and reopened by an administrator;
+✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; author answer refused; reviewer without a slot
+    refused; review answered and signed by a separate reviewer in the one slot; author signature refused;
+    approved review locked and reopened by an administrator;
     evidence index fingerprint 13e028da0629…, record digest 5ab1c0de42f7…
 ✓ ReviewCenter_Fingerprint - Passed (28 ms): 3 files, fingerprint 13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2
 ✓ ReviewCenter_PasswordHash - Passed (219 ms): right password accepted, wrong password refused, hashes salted
@@ -143,8 +144,9 @@ JUnit files.
 - **`ReviewCenter_GitRoundTrip`** - a local repository can be committed to, mirrored and read back by the git
   layer of the server.
 - **`ReviewCenter_ReviewWorkflow`** - on an embedded SQLite database, a project with two members is created, and one
-  member creates a review and answers its checklist. The check then shows that the author is refused as a reviewer and
-  as a signer, and that the other member signs after a password re-authentication. It shows that the approved review is
+  member creates a review. The check then shows that the author is refused as a reviewer, as an answerer of the
+  checklist, and as a signer, that a member without a reviewer slot cannot answer, and that the other member, who holds
+  the one slot, answers its checklist and signs after a password re-authentication. It shows that the approved review is
   locked (a change of an answer is refused), that an administrator can reopen it with a reason, and that the evidence
   index shows the fingerprint and the record digest.
 - **`ReviewCenter_Fingerprint`** - the content fingerprint of fixed files equals a pinned value on every platform.
@@ -285,14 +287,19 @@ misconfiguration failures automatically.
 
 ## Review Lock and Independence Reference
 
-This section lists, in one place, the audit actions, messages, and settings of the approval lock and of the
-independent reviewers. The chapters Reviewing and Administration explain how they work.
+This section lists, in one place, the audit actions, messages, and settings of the approval lock, of the ballots of the
+reviewers, and of the independent reviewers. The chapters Reviewing and Administration explain how they work.
 
-| Audit action                            | Detail                                               |
-| --------------------------------------- | ---------------------------------------------------- |
-| `review.reopened`                       | `previous digest <digest>; reason: <reason>`         |
-| `project.independent-reviewers-changed` | `RequireIndependentReviewers on->off` (or `off->on`) |
-| `project.review-rule-changed`           | `<setting> on->off` (or `off->on`)                   |
+| Audit action                            | Detail                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `review.reopened`                       | `previous digest <digest>; reason: <reason>`                              |
+| `checklist.answered`                    | `item <id>: <outcome>`, with a hash of the justification                  |
+| `checklist.applicability-changed`       | `section <id>: applicable` or `not applicable`, with a hash of the reason |
+| `ballot.submitted`                      | `slot <n>: ballot submitted (<a> answers, <s> section states)`            |
+| `ballot.reopened`                       | `slot <n>: ballot reverted to draft by an edit`                           |
+| `ballot.reassigned`                     | `slot <n>: ballot reverted to draft after a reassignment`                 |
+| `project.independent-reviewers-changed` | `RequireIndependentReviewers on->off` (or `off->on`)                      |
+| `project.review-rule-changed`           | `<setting> on->off` (or `off->on`)                                        |
 
 For `project.review-rule-changed` the setting is `RequireNonAuthorChecklistAnswers` or `RequireNonReopenerSigning`.
 
@@ -313,6 +320,12 @@ The messages that the user sees:
   switch off 'The person who reopened a review cannot sign it again'." when the person who reopened a review tries to
   sign it, and "Slot 1 would have no one who may sign; ask another administrator or switch the rule off." (the slot
   numbers are listed) when a reopen would leave a slot without anyone who may sign.
+- "You are not a reviewer of this review, so you cannot answer its checklist. Add yourself as a reviewer slot first."
+  when a user who holds no reviewer slot (an administrator included) answers a check, changes a section, or hands in a
+  ballot.
+- "The ballot cannot be submitted while a check that applies has no answer." when an incomplete ballot is handed in.
+- "Hand in your ballot before you sign: the signature covers the consolidated ballots, and yours is not among them yet."
+  when a reviewer signs while the own ballot is a draft.
 - "The setting was changed by someone else. Reload the page and try again." when the review rules were changed while
   the page was open.
 - "Reviewer slots and signatures cannot be changed with an API token; sign in to the web pages." for a reopen with an
@@ -321,9 +334,9 @@ The messages that the user sees:
 The setting **Require independent reviewers** is a per-project setting on the project page, on by default, that only a
 project administrator or a system administrator changes in the web pages. The author that it compares is the
 ReviewCenter user who created the review (the owner of the token for a review created with an API token). Git commit
-authors are not matched. Two further per-project settings, **Authors cannot answer the checklist of their own review** and
-**The person who reopened a review cannot sign it again**, are on by default and changed in the same way; ReviewCenter
-applies and audits them.
+authors are not matched. Two further per-project settings, **Authors cannot answer the checklist of their own review**
+and **The person who reopened a review cannot sign it again**, are on by default and changed in the same way;
+ReviewCenter applies and audits them.
 
 > **These rules apply to all existing projects.** The rules are on by default and apply to ALL existing projects, also
 > those created before this version (the stored columns default to on). A project that needs one person to do
@@ -347,7 +360,7 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 | ----- | ----------------------- | ------------ |
 | To sign | You are primary or alternate of a slot that is not signed or out of date; not approved | Yes |
 | Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
-| Failed checks | You authored the review, it is not approved, and an applicable check is answered Fail | Yes |
+| Failed checks | You authored the review, it is not approved, and the ballots agree an applicable check is Fail | Yes |
 | Updates | Someone else completed the approval, or reopened the review, after you last saw it | No |
 
 - Only members who may contribute are given To sign and Replies waiting; an auditor gets neither. A user who is
