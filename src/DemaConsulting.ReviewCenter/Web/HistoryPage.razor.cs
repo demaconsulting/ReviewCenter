@@ -92,6 +92,20 @@ public partial class HistoryPage : ComponentBase
     private ProjectService ProjectService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that reads the checklist and what a viewer may see of the ballots, supplied by
+    ///     dependency injection.
+    /// </summary>
+    [Inject]
+    private ChecklistService ChecklistService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the user service, supplied by dependency injection; it finds the account of the viewer so the
+    ///     viewer's own entries are never hidden from them.
+    /// </summary>
+    [Inject]
+    private UserService Users { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -145,9 +159,30 @@ public partial class HistoryPage : ComponentBase
         if (Review is not null)
         {
             Page = await AuditService.ListAsync(new AuditFilter(ProjectId: ProjectId, ReviewId: ReviewId), Before, After);
+            Page = await MaskForViewerAsync(Page);
         }
 
         Loaded = true;
+    }
+
+    /// <summary>
+    ///     Hides what the viewer may not know yet about other reviewers' answers and discussions of checks.
+    /// </summary>
+    /// <param name="page">The page of entries as stored.</param>
+    /// <returns>The page to show; it differs only in the detail of entries the viewer may not read yet.</returns>
+    /// <remarks>
+    ///     This is every viewer's own reading of the history: the stored trail and its exports are not changed. A viewer
+    ///     who has not handed in their own ballot in a review with several reviewers sees who answered and when, but not
+    ///     what; the project's lead, administrators and auditors see everything. The viewer's own entries are never
+    ///     hidden from them.
+    /// </remarks>
+    private async Task<AuditEntryPage> MaskForViewerAsync(AuditEntryPage page)
+    {
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        var ballots = await ChecklistService.GetBallotViewAsync(actor, ProjectId, ReviewId);
+        var masked = ballots?.IsMasked ?? true;
+        var viewerId = actor is null ? null : (await Users.GetAsync(actor.Username))?.Id;
+        return page with { Entries = AuditMasking.ForViewer(page.Entries, canSeeOthers: !masked, viewerId) };
     }
 
     /// <summary>

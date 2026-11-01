@@ -37,8 +37,10 @@ review of a project, for the project overview and the API list;
 `InboxService`, the inbox of a user (the reviews that wait for the user, in four groups, which also serves as the list
 of notifications) and the read state that marks what is new;
 `UserImpactService`, the offboarding impact of a user
-(the reviewer slots that still wait for the user and the projects the user alone administers); and
-`BallotConsolidation`, the agreed standing of the submitted ballots of a review and the outcome it leads to. The
+(the reviewer slots that still wait for the user and the projects the user alone administers);
+`BallotConsolidation`, the agreed standing of the submitted ballots of a review and the outcome it leads to; and
+`BallotVisibility`, who may see the answers of the other reviewers of a review before the own ballot is handed in, with
+the masking of what would reveal them. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
@@ -306,6 +308,21 @@ review pages in a later slice.
   and section, the outcome that the standing leads to, and whether one ballot answers every check it requires. Only
   submitted ballots count, and only the outcome of a check is compared.
 - *Constraints*: Pure: nothing is read, stored, or audited, and the result does not depend on the order of the ballots.
+
+**BallotVisibility**: Who may see the answers of the other reviewers of a review, and the masking of everything that
+would reveal them. It is consumed by the checklist, signing, progress, inbox, and thread services and by the pages that
+show their results.
+
+- *Type*: In-process .NET static classes and records (`BallotVisibility`, `BallotView`, `ThreadCapabilities`,
+  `AuditMasking`).
+- *Role*: Provider.
+- *Contract*: In a review with several reviewer slots, a viewer who has not handed in their own ballot sees who has
+  handed in and signed, and no answer of another reviewer, no count of disputed or failed checks, no provisional
+  outcome or conclusion text, no discussion about a check, and no audit detail that names an answer. The lead, the
+  administrators, and an Auditor see everything, and so does everybody once the review is concluded. A viewer who has
+  handed in sees the differing answers side by side.
+- *Constraints*: Masking applies to what a viewer reads, never to what is stored: the record, the signatures, the audit
+  chain, and its export are untouched, and the signing rules still use the true standing. The unknown viewer is masked.
 
 **IInboxStore**: The store interface the subsystem requires for the read state and for finding the reviews of a user.
 

@@ -23,6 +23,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 
 namespace DemaConsulting.ReviewCenter.Web;
@@ -91,6 +92,32 @@ public partial class ChecklistPage : ComponentBase
     /// </summary>
     [Inject]
     private SigningService SigningService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the service that starts discussions, supplied by dependency injection; used by the Discuss
+    ///     button of a check the reviewers disagree on.
+    /// </summary>
+    [Inject]
+    private ThreadService ThreadService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the user service, supplied by dependency injection; it tells whether the viewer signs in with
+    ///     an identity provider and finds the viewer's account for the "Assign me as reviewer" button.
+    /// </summary>
+    [Inject]
+    private UserService Users { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the service that knows whether a second factor is set up, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private TotpService Totp { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the identity provider settings, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IOptions<OidcOptions> Oidc { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the browser script access used to scroll a check into view, supplied by dependency injection.
@@ -190,6 +217,99 @@ public partial class ChecklistPage : ComponentBase
     private const string BallotWarningKey = "ballot";
 
     /// <summary>
+    ///     Gets what the viewer may see of the other ballots and which ballot actions are open, or <c>null</c> when the
+    ///     page is not loaded.
+    /// </summary>
+    private BallotView? Ballots { get; set; }
+
+    /// <summary>
+    ///     Gets which discussions the viewer may start on this review.
+    /// </summary>
+    private ThreadCapabilities Capabilities { get; set; } = ThreadCapabilities.None;
+
+    /// <summary>
+    ///     Gets a value indicating whether the viewer signs in with an identity provider, so signing needs a fresh
+    ///     confirmation of identity instead of a password.
+    /// </summary>
+    private bool CurrentIsExternal { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the viewer has a second factor, so signing asks for a current code too.
+    /// </summary>
+    private bool CurrentHasTotp { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the ballot was just handed in by "Submit and sign" and the viewer still has to
+    ///     confirm their identity with the identity provider before signing.
+    /// </summary>
+    private bool ReauthPending { get; set; }
+
+    /// <summary>
+    ///     Gets the friendly message about the last "Submit and sign", or <c>null</c>; it says what was done and what is
+    ///     left.
+    /// </summary>
+    private string? SignNotice { get; set; }
+
+    /// <summary>
+    ///     Gets the message of the last failed step of "Submit and sign", or <c>null</c>.
+    /// </summary>
+    private string? SignError { get; set; }
+
+    /// <summary>
+    ///     Gets the message of the last failed "Assign me as reviewer", or <c>null</c>.
+    /// </summary>
+    private string? AssignError { get; set; }
+
+    /// <summary>
+    ///     Gets the checks whose Discuss form is open.
+    /// </summary>
+    private HashSet<string> DiscussOpen { get; } = [];
+
+    /// <summary>
+    ///     Gets the discussion texts typed, by item identifier.
+    /// </summary>
+    private Dictionary<string, string> DiscussTexts { get; } = [];
+
+    /// <summary>
+    ///     Gets the message of the last failed discussion start for each check, by item identifier.
+    /// </summary>
+    private Dictionary<string, string> DiscussErrors { get; } = [];
+
+    /// <summary>
+    ///     Gets the checks a discussion was started for in this visit.
+    /// </summary>
+    private HashSet<string> DiscussStarted { get; } = [];
+
+    /// <summary>
+    ///     Whether the browser is asked, after the next render, to send the confirmation of identity form on its own.
+    /// </summary>
+    private bool _sendReauthForm;
+
+    /// <summary>
+    ///     Gets a value indicating whether the other reviewers' answers are hidden from the viewer: the viewer has not
+    ///     handed in their own ballot yet.
+    /// </summary>
+    private bool IsMasked => State?.IsMasked == true || Ballots?.IsMasked == true;
+
+    /// <summary>
+    ///     Gets a value indicating whether the review has more than one reviewer slot; only those reviews hide ballots,
+    ///     ask for "Submit" and show differing ballots.
+    /// </summary>
+    private bool IsMultiSlot => Ballots?.BallotsTotal > 1;
+
+    /// <summary>
+    ///     Gets a value indicating whether "Submit and sign" is the main button: the ballot is complete, nothing blocks
+    ///     signing and, for an identity-provider user, the provider is switched on.
+    /// </summary>
+    private bool ShowSubmitAndSign => CanSubmitBallot && Ballots?.CanSubmitAndSign == true
+                                      && (!CurrentIsExternal || Oidc.Value.Enabled);
+
+    /// <summary>
+    ///     Gets the page address of this review, where the viewer comes back to after confirming their identity.
+    /// </summary>
+    private string ReviewAddress => $"/projects/{ProjectId}/reviews/{Uri.EscapeDataString(ReviewId)}";
+
+    /// <summary>
     ///     Gets the identifier of the open section, or <c>null</c> when none is open.
     /// </summary>
     private string? OpenSectionId { get; set; }
@@ -261,7 +381,7 @@ public partial class ChecklistPage : ComponentBase
 
         // A follow-up shows what failed in the review it follows, so the reviewer decides that check again
         FollowedState = Review?.FollowsReviewId is { } followed && State is not null
-            ? await ChecklistService.GetAsync(ProjectId, followed)
+            ? await ChecklistService.GetAsync(ProjectId, followed, viewerUsername: CurrentUsername)
             : null;
         IsConcluded = project is not null && State is not null
             && (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsConcluded == true;
@@ -270,9 +390,55 @@ public partial class ChecklistPage : ComponentBase
         ReadOnly = project is not null && State is not null
             && !await Access.CanContributeAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
 
+        await LoadBallotViewAsync(actor);
+
         // Start where the work is: the first section with unanswered checks
         OpenSectionId = State?.FirstIncompleteSectionId();
         Loaded = true;
+    }
+
+    /// <summary>
+    ///     Loads what the viewer may see of the other ballots, which discussions they may start and how they sign.
+    /// </summary>
+    /// <param name="actor">The signed-in user, or <c>null</c> when nobody is signed in.</param>
+    /// <returns>A task that completes when everything is read.</returns>
+    /// <remarks>
+    ///     Nothing is loaded when the review or its checklist does not exist. Whether the viewer signs in with an
+    ///     identity provider and has a second factor is only looked up when "Submit and sign" can be offered.
+    /// </remarks>
+    private async Task LoadBallotViewAsync(Actor? actor)
+    {
+        Ballots = null;
+        Capabilities = ThreadCapabilities.None;
+        CurrentIsExternal = false;
+        CurrentHasTotp = false;
+        if (State is null || actor is null)
+        {
+            return;
+        }
+
+        Ballots = await ChecklistService.GetBallotViewAsync(actor, ProjectId, ReviewId);
+        Capabilities = await ThreadService.GetCapabilitiesAsync(actor, ProjectId, ReviewId);
+        if (Ballots?.CanSubmitAndSign != true)
+        {
+            return;
+        }
+
+        CurrentIsExternal = (await Users.GetAsync(actor.Username))?.IsExternal == true;
+        CurrentHasTotp = !CurrentIsExternal && await Totp.IsEnrolledAsync(actor.Username);
+    }
+
+    /// <summary>
+    ///     Reads the checklist and everything around it again, after something was stored.
+    /// </summary>
+    /// <returns>A task that completes when the page shows the new state.</returns>
+    private async Task ReloadAsync()
+    {
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
+        IsConcluded = IsConcluded
+            || (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsConcluded == true;
+        await LoadBallotViewAsync(actor);
     }
 
     /// <summary>
@@ -329,6 +495,19 @@ public partial class ChecklistPage : ComponentBase
         SectionErrors.Clear();
         Warning = null;
         BallotError = null;
+        Ballots = null;
+        Capabilities = ThreadCapabilities.None;
+        CurrentIsExternal = false;
+        CurrentHasTotp = false;
+        ReauthPending = false;
+        SignNotice = null;
+        SignError = null;
+        AssignError = null;
+        DiscussOpen.Clear();
+        DiscussTexts.Clear();
+        DiscussErrors.Clear();
+        DiscussStarted.Clear();
+        _sendReauthForm = false;
         _scrollTarget = null;
     }
 
@@ -349,6 +528,19 @@ public partial class ChecklistPage : ComponentBase
         {
             _interactive = true;
             StateHasChanged();
+        }
+
+        if (_sendReauthForm)
+        {
+            _sendReauthForm = false;
+            try
+            {
+                await JS.InvokeVoidAsync("reviewCenter.submitForm", "submit-sign-reauth-form");
+            }
+            catch (JSDisconnectedException)
+            {
+                // The browser went away; the button of the form stays for a later visit
+            }
         }
 
         if (_scrollTarget is not null)
@@ -556,7 +748,7 @@ public partial class ChecklistPage : ComponentBase
         ItemErrors.Remove(itemId);
         PendingOutcomes.Remove(itemId);
         JustificationTexts.Remove(itemId);
-        State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
+        await ReloadAsync();
     }
 
     /// <summary>
@@ -571,9 +763,23 @@ public partial class ChecklistPage : ComponentBase
     /// </remarks>
     private async Task SubmitBallotAsync(IReadOnlyList<AffectedSignature>? confirmed = null)
     {
+        SignNotice = null;
+        SignError = null;
+        await TrySubmitBallotAsync(confirmed, SubmitBallotAsync);
+    }
+
+    /// <summary>
+    ///     Hands in the own ballot and tells whether it is in.
+    /// </summary>
+    /// <param name="confirmed">The signatures the person has confirmed will no longer match; <c>null</c> for none.</param>
+    /// <param name="retry">What to repeat when the person confirms that signatures will no longer match.</param>
+    /// <returns><c>true</c> when the ballot is handed in; <c>false</c> when it waits for a confirmation or was refused.</returns>
+    private async Task<bool> TrySubmitBallotAsync(
+        IReadOnlyList<AffectedSignature>? confirmed, Func<IReadOnlyList<AffectedSignature>, Task> retry)
+    {
         if (!await GuardAsync())
         {
-            return;
+            return false;
         }
 
         try
@@ -588,20 +794,261 @@ public partial class ChecklistPage : ComponentBase
         catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
         {
             BallotError = null;
-            Warning = PendingSignatureWarning.Create(BallotWarningKey, confirmed, ex, SubmitBallotAsync);
-            return;
+            Warning = PendingSignatureWarning.Create(BallotWarningKey, confirmed, ex, retry);
+            return false;
         }
         catch (DomainRuleException ex)
         {
             IsConcluded |= ex.Rule == DomainRule.ReviewLocked;
             Warning = null;
             BallotError = ex.Message;
-            return;
+            return false;
         }
 
         Warning = null;
         BallotError = null;
-        State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
+        await ReloadAsync();
+        return true;
+    }
+
+    /// <summary>
+    ///     What the page says when the ballot is in but the standing that the viewer now sees differs, so nothing is
+    ///     signed.
+    /// </summary>
+    private const string ChangedStandingMessage =
+        "Your ballot is in, but you have not signed: something changed while it was handed in, " +
+        "and the answers of the other reviewers are shown now. Review them, then sign from the review page.";
+
+    /// <summary>
+    ///     Hands in the own ballot and signs the review in one go.
+    /// </summary>
+    /// <param name="credentials">What the viewer typed to confirm the signature; empty for an identity-provider user.</param>
+    /// <returns>A task that completes when the ballot is in and the signature is stored, or the problem is shown.</returns>
+    /// <remarks>
+    ///     The ballot is handed in first, so it counts even when signing does not work; the page then says so and points
+    ///     to the review. Before the hand-in the viewer may not see what the other reviewers answered, so the person
+    ///     signs only what the page shows them after the hand-in: the digest of the record is read, the page is loaded
+    ///     again for the person, who now sees the other ballots, and the digest is signed only when that view shows no
+    ///     check that the submitted ballots answer differently. When the view shows a difference nothing is signed;
+    ///     the page says that something changed, shows the answers, and the person signs from the review page after
+    ///     reading them. A record that changes after the digest was read is refused by the signing, so no signature
+    ///     is stored for it. A user with a password signs with that digest. A user of an identity provider is sent to
+    ///     confirm their identity with the provider and comes back to the review to sign; the typed credentials are not
+    ///     kept anywhere, so a confirmation of a change that makes signatures no longer match what was signed hands the
+    ///     ballot in and leaves signing to the review page.
+    /// </remarks>
+    private async Task SubmitAndSignAsync(SignerCredentials credentials)
+    {
+        SignNotice = null;
+        SignError = null;
+        ReauthPending = false;
+
+        // Read before handing in: the reload after the hand-in no longer looks the viewer up
+        var external = CurrentIsExternal;
+        if (!await TrySubmitBallotAsync(null, SubmitAfterConfirmationAsync) || State?.SlotId is not { } slotId)
+        {
+            return;
+        }
+
+        if (external)
+        {
+            // The viewer now sees the other ballots (the hand-in reloaded the page): when they differ, the person is not
+            // sent to confirm their identity for a signature on a record they have just learned about
+            await ReloadAsync();
+            if (Ballots is null || Ballots.IsMasked || Ballots.Differing.Count > 0)
+            {
+                SignError = ChangedStandingMessage;
+                return;
+            }
+
+            ReauthPending = true;
+            _sendReauthForm = true;
+            return;
+        }
+
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+
+            // The digest is read for the viewer, who has handed in and so sees everything, and the page is loaded again
+            // after it: when the record is still the one of that digest the view is the record that gets signed, and
+            // when it is not the signing refuses the digest
+            var approval = await SigningService.GetApprovalAsync(actor, ProjectId, ReviewId);
+            await ReloadAsync();
+            if (approval is null || approval.IsMasked || Ballots is null || Ballots.IsMasked || Ballots.Differing.Count > 0)
+            {
+                SignError = ChangedStandingMessage;
+                return;
+            }
+
+            await SigningService.SignWithCredentialsAsync(actor, ProjectId, ReviewId, slotId, approval.Digest, credentials);
+        }
+        catch (DomainRuleException ex)
+        {
+            SignError = $"Your ballot is in, but signing did not work: {ex.Message} You can sign from the review page.";
+            return;
+        }
+
+        SignNotice = "Your ballot is in and you have signed.";
+        await ReloadAsync();
+    }
+
+    /// <summary>
+    ///     Hands in the ballot after the person confirmed that signatures will no longer match what was signed, and
+    ///     points to the review for signing.
+    /// </summary>
+    /// <param name="confirmed">The signatures the person confirmed.</param>
+    /// <returns>A task that completes when the ballot is in or the problem is shown.</returns>
+    private async Task SubmitAfterConfirmationAsync(IReadOnlyList<AffectedSignature> confirmed)
+    {
+        if (await TrySubmitBallotAsync(confirmed, SubmitAfterConfirmationAsync))
+        {
+            SignNotice = "Your ballot is in. Open the review to sign it.";
+        }
+    }
+
+    /// <summary>
+    ///     Adds the signed-in user as a new reviewer of the review, with no alternate.
+    /// </summary>
+    /// <returns>A task that completes when the slot exists or the problem is shown.</returns>
+    /// <remarks>
+    ///     The shortcut always makes a new slot; it never takes over an existing one.
+    /// </remarks>
+    private async Task AssignMeAsync()
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        AssignError = null;
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            var user = await Users.GetAsync(actor.Username);
+            if (user is null)
+            {
+                AssignError = "Your account could not be found. Sign in again.";
+                return;
+            }
+
+            await SigningService.AddSlotAsync(actor, ProjectId, ReviewId, user.Id, null);
+        }
+        catch (DomainRuleException ex)
+        {
+            IsConcluded |= ex.Rule == DomainRule.ReviewLocked;
+            AssignError = ex.Message;
+            return;
+        }
+
+        await ReloadAsync();
+        OpenSectionId = State?.FirstIncompleteSectionId();
+    }
+
+    /// <summary>
+    ///     Opens or closes the Discuss form of a check.
+    /// </summary>
+    /// <param name="itemId">The check identifier.</param>
+    private void ToggleDiscuss(string itemId)
+    {
+        DiscussStarted.Remove(itemId);
+        if (!DiscussOpen.Remove(itemId))
+        {
+            DiscussOpen.Add(itemId);
+        }
+    }
+
+    /// <summary>
+    ///     Starts a discussion about a check with the typed text.
+    /// </summary>
+    /// <param name="itemId">The check identifier.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <param name="confirmedText">The text as it was at the first attempt; <c>null</c> to take the text typed now.</param>
+    /// <returns>A task that completes when the discussion is stored or the warning or problem is shown.</returns>
+    private async Task StartDiscussionAsync(
+        string itemId, IReadOnlyList<AffectedSignature>? confirmed = null, string? confirmedText = null)
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        var text = confirmedText ?? DiscussTexts.GetValueOrDefault(itemId) ?? string.Empty;
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            await ThreadService.StartThreadAsync(
+                ProjectId,
+                ReviewId,
+                ThreadAnchor.ForCheck(itemId),
+                actor,
+                text,
+                acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            DiscussErrors.Remove(itemId);
+            Warning = PendingSignatureWarning.Create(
+                DiscussWarningKey(itemId), confirmed, ex, slots => StartDiscussionAsync(itemId, slots, text));
+            return;
+        }
+        catch (DomainRuleException ex)
+        {
+            IsConcluded |= ex.Rule == DomainRule.ReviewLocked;
+            Warning = null;
+            DiscussErrors[itemId] = ex.Message;
+            return;
+        }
+
+        Warning = null;
+        DiscussErrors.Remove(itemId);
+        DiscussTexts.Remove(itemId);
+        DiscussOpen.Remove(itemId);
+        DiscussStarted.Add(itemId);
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for starting a discussion about a check.
+    /// </summary>
+    /// <param name="itemId">The check identifier.</param>
+    /// <returns>The key.</returns>
+    private static string DiscussWarningKey(string itemId)
+    {
+        return $"discuss-{itemId}";
+    }
+
+    /// <summary>
+    ///     Words the "who has handed in" line.
+    /// </summary>
+    /// <returns>For example "1 of 2 ballots handed in.".</returns>
+    private string BallotsLine()
+    {
+        return $"{Ballots!.BallotsSubmitted} of {Ballots.BallotsTotal} ballots handed in.";
+    }
+
+    /// <summary>
+    ///     Words the differing answers of one check side by side.
+    /// </summary>
+    /// <param name="answers">The answers of the reviewers, in slot order.</param>
+    /// <returns>For example "Alice: Pass / Bob: N/A".</returns>
+    private static string SideBySide(IReadOnlyList<BallotAnswerView> answers)
+    {
+        return string.Join(" / ", answers.Select(answer => $"{answer.ReviewerName}: {OutcomeLabel(answer.Outcome)}"));
+    }
+
+    /// <summary>
+    ///     Words an outcome for people.
+    /// </summary>
+    /// <param name="outcome">The outcome.</param>
+    /// <returns>"Pass", "Fail" or "N/A".</returns>
+    private static string OutcomeLabel(ChecklistOutcome outcome)
+    {
+        return outcome switch
+        {
+            ChecklistOutcome.Pass => "Pass",
+            ChecklistOutcome.Fail => "Fail",
+            _ => "N/A"
+        };
     }
 
     /// <summary>
@@ -653,7 +1100,7 @@ public partial class ChecklistPage : ComponentBase
         SectionErrors.Remove(sectionId);
         PendingNotApplicable.Remove(sectionId);
         ReasonTexts.Remove(sectionId);
-        State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
+        await ReloadAsync();
     }
 
     /// <summary>

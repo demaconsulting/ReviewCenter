@@ -514,6 +514,9 @@ never contain a password or a hash. An infrastructure failure of the store passe
 
 - **IReviewStore** — reads the record, the slots, the signatures, the review, the project, and the reopen history, and
   stores slots, signatures, and reopens.
+- **BallotVisibility** — decides whether the viewer of an approval may see the dispute counts, the outcome, and the
+  conclusion text; for a viewer who may not, the blockers carry one fixed sentence instead. The signing rules themselves
+  always use the true standing.
 - **IProjectAccess** — requires that the actor may work in the project, that the signer and the reviewers are members, and
   (for a reopen) that the actor administers the project.
 - **UserService** — looks up users, describes the reviewers, re-authenticates the signer (`ReauthenticatePasswordAsync`),

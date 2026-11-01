@@ -258,6 +258,49 @@ public sealed class SigningService
     }
 
     /// <summary>
+    ///     Reads the approval status of a review as a given viewer may see it: the same status as
+    ///     <see cref="GetApprovalAsync(int, string, CancellationToken)"/>, reduced by <see cref="ReviewApproval.Masked"/>
+    ///     while the viewer may not see the answers of the other reviewers yet (see <see cref="BallotVisibility"/>).
+    /// </summary>
+    /// <param name="viewer">
+    ///     The person who looks at the status; <c>null</c> is treated as a viewer who has not handed in a ballot, so the
+    ///     status is masked (fail closed) when it has to be.
+    /// </param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The status, or <c>null</c> when the review does not exist.</returns>
+    /// <remarks>
+    ///     The masked status is for showing only. Signing is checked against the unmasked blockers inside the signing
+    ///     methods, so the masking can never let a review be signed that must not be.
+    /// </remarks>
+    public async Task<ReviewApproval?> GetApprovalAsync(
+        Actor? viewer,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        var read = await ReadSnapshotAndApprovalAsync(projectId, reviewId, cancellationToken);
+        if (read is null)
+        {
+            return null;
+        }
+
+        // A single slot or a concluded review hides nothing, so no role needs to be looked up
+        var (snapshot, approval) = read.Value;
+        if (approval.IsConcluded || snapshot.Slots.Count <= 1)
+        {
+            return approval;
+        }
+
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var seesAll = review is not null
+                      && await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);
+        var user = viewer is null ? null : await _users.GetAsync(viewer.Username, cancellationToken);
+        return BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id) ? approval : approval.Masked();
+    }
+
+    /// <summary>
     ///     Reads the approval status of several reviews of a project with one set-based read of their snapshots,
     ///     loading the users once for all of them, and not at all when there are no reviews.
     /// </summary>
@@ -266,21 +309,109 @@ public sealed class SigningService
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>
     ///     The status of each review that exists, by review identifier; a review that does not exist is absent.
-    ///     Each status equals what <see cref="GetApprovalAsync"/> returns for the same review.
+    ///     Each status equals what <see cref="GetApprovalAsync(int, string, CancellationToken)"/> returns for the same
+    ///     review.
     /// </returns>
     public async Task<IReadOnlyDictionary<string, ReviewApproval>> GetApprovalsAsync(
         int projectId,
         IEnumerable<string> reviewIds,
         CancellationToken cancellationToken = default)
     {
+        var (reads, _) = await ReadManyAsync(projectId, reviewIds, cancellationToken);
+        return reads.ToDictionary(entry => entry.Key, entry => entry.Value.Approval);
+    }
+
+    /// <summary>
+    ///     Reads the approval status of several reviews of a project as a given viewer may see it: the batch form of
+    ///     <see cref="GetApprovalAsync(Actor?, int, string, CancellationToken)"/>, with the same constant number of
+    ///     reads as <see cref="GetApprovalsAsync(int, IEnumerable{string}, CancellationToken)"/>.
+    /// </summary>
+    /// <param name="viewer">The person who looks; <c>null</c> is masked where a review has to be masked.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The status of each review that exists, by review identifier, each masked exactly when
+    ///     <see cref="GetApprovalAsync(Actor?, int, string, CancellationToken)"/> would mask it.
+    /// </returns>
+    /// <remarks>
+    ///     The roles of the viewer are resolved once for the project; the reviews of the project are read (for the
+    ///     creator of each) only when a review actually has to be masked and the viewer is not an administrator or an
+    ///     Auditor.
+    /// </remarks>
+    public async Task<IReadOnlyDictionary<string, ReviewApproval>> GetApprovalsAsync(
+        Actor? viewer,
+        int projectId,
+        IEnumerable<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        var (reads, members) = await ReadManyAsync(projectId, reviewIds, cancellationToken);
+        var approvals = new Dictionary<string, ReviewApproval>();
+
+        // Resolved lazily: a project in which nothing has to be masked costs no role lookup at all
+        bool? seesAllInProject = null;
+        bool? canContribute = null;
+        IReadOnlyList<Review>? reviews = null;
+        var viewerId = viewer is null
+            ? null
+            : members.Values
+                .FirstOrDefault(user => string.Equals(user.Username, viewer.Username, StringComparison.OrdinalIgnoreCase))?.Id;
+        foreach (var (reviewId, read) in reads)
+        {
+            var (snapshot, approval) = read;
+            if (approval.IsConcluded || snapshot.Slots.Count <= 1)
+            {
+                approvals[reviewId] = approval;
+                continue;
+            }
+
+            seesAllInProject ??= await BallotVisibility.SeesAllInProjectAsync(_access, viewer, projectId, cancellationToken);
+            var seesAll = seesAllInProject.Value;
+            if (!seesAll && viewer is { ViaApiToken: false })
+            {
+                // Only the lead is left to find out. An administrator is already covered above, so the lead right is
+                // the creator of the review who can still contribute: the project role is looked up once for the whole
+                // batch and the creator comes from the reviews read once, not one membership lookup per review
+                reviews ??= await _store.ListReviewsAsync(projectId, cancellationToken);
+                var review = reviews.FirstOrDefault(r => r.Id == reviewId);
+                if (review?.CreatedBy is not null
+                    && string.Equals(review.CreatedBy, viewer.Username, StringComparison.OrdinalIgnoreCase))
+                {
+                    canContribute ??= await _access.CanContributeAsync(viewer, projectId, cancellationToken);
+                    seesAll = canContribute.Value;
+                }
+            }
+
+            approvals[reviewId] = BallotVisibility.CanSeeOthers(seesAll, snapshot, viewerId) ? approval : approval.Masked();
+        }
+
+        return approvals;
+    }
+
+    /// <summary>
+    ///     Reads the snapshots and statuses of several reviews with one set-based read, and the users once.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The snapshot and status of each review that exists, by review identifier (a review that does not exist is
+    ///     absent), and the users by identity; empty without any read of the users when there are no reviews.
+    /// </returns>
+    private async Task<(Dictionary<string, (ReviewSnapshot Snapshot, ReviewApproval Approval)> Reads,
+        IReadOnlyDictionary<int, User> Members)> ReadManyAsync(
+        int projectId,
+        IEnumerable<string> reviewIds,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(reviewIds);
         var ids = reviewIds.Distinct().ToList();
-        var approvals = new Dictionary<string, ReviewApproval>();
+        var reads = new Dictionary<string, (ReviewSnapshot Snapshot, ReviewApproval Approval)>();
 
         // Nothing to read, so do not load the whole user list
         if (ids.Count == 0)
         {
-            return approvals;
+            return (reads, new Dictionary<int, User>());
         }
 
         var memberIds = (await _store.ListMembershipsAsync(projectId, cancellationToken))
@@ -300,10 +431,10 @@ public sealed class SigningService
             : new Dictionary<string, IReadOnlyList<ReviewReopen>>();
         foreach (var (reviewId, snapshot) in snapshots)
         {
-            approvals[reviewId] = BuildApproval(snapshot, members, memberIds, history.GetValueOrDefault(reviewId));
+            reads[reviewId] = (snapshot, BuildApproval(snapshot, members, memberIds, history.GetValueOrDefault(reviewId)));
         }
 
-        return approvals;
+        return (reads, members);
     }
 
     /// <summary>
@@ -314,6 +445,21 @@ public sealed class SigningService
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The status, or <c>null</c> when the review does not exist.</returns>
     private async Task<ReviewApproval?> ReadApprovalAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken)
+    {
+        return (await ReadSnapshotAndApprovalAsync(projectId, reviewId, cancellationToken))?.Approval;
+    }
+
+    /// <summary>
+    ///     Reads the snapshot of a review and the approval status built from it.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The snapshot and the status, or <c>null</c> when the review does not exist.</returns>
+    private async Task<(ReviewSnapshot Snapshot, ReviewApproval Approval)?> ReadSnapshotAndApprovalAsync(
         int projectId,
         string reviewId,
         CancellationToken cancellationToken)
@@ -336,7 +482,7 @@ public sealed class SigningService
         var reopens = snapshot.Record.Reopens > 0
             ? await _store.ListReopensAsync(projectId, reviewId, cancellationToken)
             : null;
-        return BuildApproval(snapshot, members, memberIds, reopens);
+        return (snapshot, BuildApproval(snapshot, members, memberIds, reopens));
     }
 
     /// <summary>
@@ -406,7 +552,8 @@ public sealed class SigningService
             disputed,
             unsubmitted,
             assessment.Outcome,
-            assessment.ConclusionRequired);
+            assessment.ConclusionRequired,
+            record.Threads.Count(thread => thread.State == ReviewThreadState.Open && thread.IsCheckThread));
     }
 
     /// <summary>
@@ -1183,6 +1330,45 @@ public sealed class SigningService
         }
 
         return new Assessment(checklist, blockers, failed, outcome, conclusionRequired);
+    }
+
+    /// <summary>
+    ///     Tells whether a record, as it would stand once a ballot is handed in, could be signed, as far as the viewer
+    ///     may know.
+    /// </summary>
+    /// <param name="record">The record as it would stand.</param>
+    /// <param name="slotCount">The number of reviewer slots of the review.</param>
+    /// <param name="hidden">
+    ///     <c>true</c> when the viewer may not see the standing of the other reviewers (see
+    ///     <see cref="BallotVisibility"/>): disputes, check threads and the outcome then take no part, so the answer
+    ///     never gives them away.
+    /// </param>
+    /// <returns><c>true</c> when no blocker the viewer may know of is left.</returns>
+    internal static bool CanSignAfter(ReviewRecord record, int slotCount, bool hidden)
+    {
+        var view = BallotProjection.Consolidate(record, slotCount);
+        if (view is null || view.Result.Pending > 0)
+        {
+            return false;
+        }
+
+        // The threads the viewer may see; a hidden viewer does not know of the check threads
+        var open = record.Threads.Count(thread =>
+            thread.State == ReviewThreadState.Open && !(hidden && thread.IsCheckThread));
+        if (open > 0)
+        {
+            return false;
+        }
+
+        // Disputes and the conclusion a rejection needs are only known to a viewer who may see them
+        if (hidden)
+        {
+            return true;
+        }
+
+        var rejectedWithoutText = view.Result.Outcome == ReviewOutcome.Rejected
+                                  && string.IsNullOrWhiteSpace(record.ReviewConclusionText);
+        return view.Result.Disputed == 0 && !rejectedWithoutText;
     }
 
     /// <summary>

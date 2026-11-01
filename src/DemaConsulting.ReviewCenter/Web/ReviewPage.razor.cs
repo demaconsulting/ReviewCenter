@@ -1125,9 +1125,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
         var actor = await AuthenticationState.GetActorOrNullAsync();
         if (Review is not null)
         {
-            Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+            Threads = await ThreadService.ListAsync(actor, ProjectId, ReviewId);
             Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: actor?.Username);
-            Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
+            Approval = await SigningService.GetApprovalAsync(actor, ProjectId, ReviewId);
             if (IsLocked)
             {
                 // A locked review accepts no change, so nothing is left to confirm

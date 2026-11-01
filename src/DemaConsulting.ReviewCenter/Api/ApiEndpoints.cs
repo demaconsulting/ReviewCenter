@@ -729,7 +729,8 @@ internal static class ApiEndpoints
     {
         var approval = await services.Signing.GetApprovalAsync(review.ProjectId, review.Id, cancellationToken);
         var threadList = await services.Threads.ListAsync(review.ProjectId, review.Id, cancellationToken);
-        var checklist = await services.Checklists.GetAsync(review.ProjectId, review.Id, cancellationToken);
+        // The API reads as a system caller; masking it for the caller is deferred to the slice that masks the API
+        var checklist = await services.Checklists.GetForSystemAsync(review.ProjectId, review.Id, cancellationToken);
 
         // The checklist counts come from the consolidation of the submitted ballots (a single-slot review counts its
         // only ballot even while it is a draft); only items of applicable sections count

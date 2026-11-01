@@ -6,7 +6,7 @@
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
 #   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, ProjectChecklistService, InboxService,
-#   UserImpactService, and BallotConsolidation
+#   UserImpactService, BallotConsolidation, and BallotVisibility
 #   units, with the
 #   domain types they share
 #   (project, evidence settings, review,
@@ -678,6 +678,30 @@ sections:
           - BallotConsolidation_Consolidate_SubmittedEqual_Agreed
           - BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts
           - BallotConsolidation_Consolidate_AgreedFail_Rejected
+
+      - id: ReviewCenter-Core-BallotVisibility
+        title: >-
+          The Core subsystem shall keep the answers of the other reviewers of a review with several reviewer slots, and
+          everything that would reveal them (the disputed and failed counts, the provisional outcome, the conclusion
+          text, the discussions about checks, and the details of the audit entries that name an answer), from a viewer
+          who has not handed in their own ballot, unless the viewer leads or administers the project, is a system
+          administrator or an auditor, or the review is concluded, while who has handed in stays visible, and shall
+          offer the viewer who has handed in the differing answers side by side.
+        justification: |
+          Reviewers add value only when they judge on their own. One rule decides who may see the others and every
+          reader of the ballots asks it, so that no summary, list, or history can reveal what the checklist hides. The
+          rule is enforced where the data is read, and the stored record and its signatures are untouched.
+        children:
+          - ReviewCenter-BallotVisibility-Rule
+          - ReviewCenter-BallotVisibility-BallotView
+          - ReviewCenter-BallotVisibility-NoDisputeLeak
+          - ReviewCenter-BallotVisibility-Discussions
+          - ReviewCenter-BallotVisibility-AuditMasking
+        tests:
+          - BallotVisibility_CanSeeOthers_PlainContributorWithoutSlot_Masked
+          - SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome
+          - ChecklistService_GetBallotView_SubmittedViewer_ListsDifferingChecksInSlotOrder
+          - AuditMasking_ForViewer_OtherAnswer_HidesDetailKeepsActorAndHash
 
       - id: ReviewCenter-Core-FollowUp
         title: >-

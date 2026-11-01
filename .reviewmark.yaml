@@ -608,6 +608,8 @@ reviews:
       - "src/**/Web/NewMemberAccountPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
       - "test/**/Web/ProjectPageOverviewTests.cs"
+      - "test/**/Web/BallotMaskingPageTests.cs"
+      - "test/**/Web/BallotPageTestBase.cs"
       - "test/**/Web/AuditorPagesTests.cs"
       - "test/**/Web/ProjectAccessPageTests.cs"
       - "test/**/Web/EvidenceSettingsPageTests.cs"
@@ -658,6 +660,8 @@ reviews:
       - "test/**/Web/ReviewPageUnreadTests.cs"
       - "test/**/Web/ReviewPageRejectedTests.cs"
       - "test/**/Web/ReviewPageCheckThreadTests.cs"
+      - "test/**/Web/BallotMaskingPageTests.cs"
+      - "test/**/Web/BallotPageTestBase.cs"
       - "test/**/Web/InboxWebTestBase.cs"
       - "test/**/Web/ReviewLinksTests.cs"
       - "test/**/Identity/OidcReauthTests.cs"
@@ -676,11 +680,18 @@ reviews:
       - "docs/verification/review-center/web/checklist-page.md"
       - "src/**/Web/ChecklistPage.razor"
       - "src/**/Web/ChecklistPage.razor.cs"
+      - "src/**/Web/SignConfirm.razor"
+      - "src/**/Web/SignConfirm.razor.cs"
       - "src/**/Web/SignatureWarning.razor"
       - "src/**/Web/SignatureWarning.razor.cs"
       - "test/**/Web/ChecklistPageTests.cs"
       - "test/**/Web/ChecklistPageFollowUpTests.cs"
       - "test/**/Web/ChecklistPageBallotTests.cs"
+      - "test/**/Web/ChecklistPageSideBySideTests.cs"
+      - "test/**/Web/ChecklistPageSubmitAndSignTests.cs"
+      - "test/**/Web/ChecklistPageAssignMeTests.cs"
+      - "test/**/Web/BallotPageTestBase.cs"
+      - "test/**/Web/SignConfirmTests.cs"
 
   - id: ReviewCenter-Web-LoginPage
     title: Review of ReviewCenter LoginPage unit implementation
@@ -763,6 +774,8 @@ reviews:
       - "src/**/Web/HistoryPage.razor"
       - "src/**/Web/HistoryPage.razor.cs"
       - "test/**/Web/HistoryPageTests.cs"
+      - "test/**/Web/BallotMaskingPageTests.cs"
+      - "test/**/Web/BallotPageTestBase.cs"
 
   - id: ReviewCenter-Web-AuditPage
     title: Review of ReviewCenter AuditPage unit implementation
@@ -1243,6 +1256,27 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewConclusion.cs"
       - "test/**/Core/BallotConsolidationTests.cs"
       - "test/**/Core/BallotProjectionTests.cs"
+
+  - id: ReviewCenter-Core-BallotVisibility
+    title: Review of ReviewCenter BallotVisibility unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/ballot-visibility.yaml"
+      - "docs/design/review-center/core/ballot-visibility.md"
+      - "docs/verification/review-center/core/ballot-visibility.md"
+      - "docs/sysml2/model/review-center/core/ballot-visibility.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotVisibility.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotView.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ThreadCapabilities.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditMasking.cs"
+      - "test/**/Core/BallotVisibilityTests.cs"
+      - "test/**/Core/AuditMaskingTests.cs"
+      - "test/**/Core/BallotMaskingServiceTests.cs"
+      - "test/**/Core/BallotMaskingWorld.cs"
 
   - id: ReviewCenter-Core-ReviewPlanner
     title: Review of ReviewCenter ReviewPlanner unit implementation

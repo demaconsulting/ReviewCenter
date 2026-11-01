@@ -72,6 +72,11 @@
                 var element = document.querySelector('[data-testid="' + id + '"]');
                 if (element) { element.scrollIntoView({ block: block }); }
             },
+            submitForm: function (id) {
+                // Sends a form of this page (for example the confirmation of identity after "Submit and sign")
+                var form = document.querySelector('form[data-testid="' + id + '"]');
+                if (form && typeof form.submit === 'function') { form.submit(); }
+            },
             focusTestId: function (id) {
                 // Moves the keyboard focus (without scrolling; the scroll helper has already placed the element)
                 var element = document.querySelector('[data-testid="' + id + '"]');

@@ -99,7 +99,8 @@ public sealed record SlotStatus(
 /// <param name="NextStep">One short sentence that words what to do next.</param>
 /// <param name="Reopens">
 ///     The history of reopens of the review, oldest first; <c>null</c> or empty for a review never reopened. It is
-///     filled by <see cref="SigningService.GetApprovalAsync"/> and <see cref="SigningService.GetApprovalsAsync"/>.
+///     filled by <see cref="SigningService.GetApprovalAsync(int, string, CancellationToken)"/> and
+///     <see cref="SigningService.GetApprovalsAsync(int, IEnumerable{string}, CancellationToken)"/>.
 /// </param>
 /// <param name="OpenThreads">The number of comment threads that are open; the count behind the "threads are open" blocker.</param>
 /// <param name="UnansweredChecks">
@@ -134,6 +135,16 @@ public sealed record SlotStatus(
 ///     "A rejected review needs a conclusion" blocker, so it is <c>true</c> exactly when that sentence is among
 ///     <paramref name="Blockers"/>.
 /// </param>
+/// <param name="OpenCheckThreads">
+///     How many of <paramref name="OpenThreads"/> are check threads (threads about a check of the checklist, not about
+///     a file); the number a masked view takes out, because a check thread can reveal how another reviewer voted.
+/// </param>
+/// <param name="IsMasked">
+///     <c>true</c> when the status was reduced for a viewer who may not see the answers of the other reviewers yet (see
+///     <see cref="BallotVisibility"/>): the disputes, the provisional outcome, the conclusion requirement and the open
+///     check threads are left out of the counts and of the sentences. A masked status is never produced for a concluded
+///     review.
+/// </param>
 public sealed record ReviewApproval(
     ReviewConclusion Conclusion,
     string Digest,
@@ -148,8 +159,17 @@ public sealed record ReviewApproval(
     int DisputedChecks = 0,
     int UnsubmittedBallots = 0,
     ReviewOutcome? Outcome = null,
-    bool ConclusionRequired = false)
+    bool ConclusionRequired = false,
+    int OpenCheckThreads = 0,
+    bool IsMasked = false)
 {
+    /// <summary>
+    ///     The sentence that tells a viewer why the answers of the other reviewers are not shown; it is added to every
+    ///     masked status, so its presence reveals nothing.
+    /// </summary>
+    public const string HiddenNotice =
+        "The other reviewers' answers stay hidden until you hand in your own ballot.";
+
     /// <summary>
     ///     Gets a value indicating whether the review is concluded as approved.
     /// </summary>
@@ -160,4 +180,64 @@ public sealed record ReviewApproval(
     ///     locked.
     /// </summary>
     public bool IsConcluded => Conclusion != ReviewConclusion.None;
+
+    /// <summary>
+    ///     Reduces the status to what a viewer may see before handing in their own ballot.
+    /// </summary>
+    /// <returns>
+    ///     A status without the disputes, the failed checks, the provisional outcome, the conclusion requirement and the
+    ///     open check threads, whose blockers and next step are worded from what is left, plus
+    ///     <see cref="HiddenNotice"/>; the status itself when it is concluded or already masked.
+    /// </returns>
+    /// <remarks>
+    ///     The counts are reduced from the structured fields, never by taking sentences out of the blockers, so a new
+    ///     blocker sentence cannot leak a count by accident. Who has signed and the digest stay: they are progress, not
+    ///     a verdict. This status is for showing only; signing is checked against the unmasked blockers.
+    /// </remarks>
+    public ReviewApproval Masked()
+    {
+        // A concluded review has nothing left to hide, and a masked status is already reduced
+        if (IsConcluded || IsMasked)
+        {
+            return this;
+        }
+
+        // Rebuild the sentences from the counts that stay visible
+        var openOther = Math.Max(0, OpenThreads - OpenCheckThreads);
+        var blockers = new List<string>();
+        if (MissingChecklist)
+        {
+            blockers.Add("This review has no checklist.");
+        }
+
+        if (UnansweredChecks > 0)
+        {
+            blockers.Add(UnansweredChecks == 1
+                ? "1 checklist check is unanswered"
+                : $"{UnansweredChecks} checklist checks are unanswered");
+        }
+
+        if (openOther > 0)
+        {
+            blockers.Add(openOther == 1 ? "1 thread is open" : $"{openOther} threads are open");
+        }
+
+        // The notice comes last and always, so that its presence tells nothing about the hidden answers
+        blockers.Add(HiddenNotice);
+        var nextStep = openOther > 0
+            ? "Resolve the open threads. " + HiddenNotice
+            : "Hand in your ballot to see the other reviewers' answers.";
+        return this with
+        {
+            Blockers = blockers,
+            NextStep = nextStep,
+            OpenThreads = openOther,
+            OpenCheckThreads = 0,
+            FailedChecks = 0,
+            DisputedChecks = 0,
+            Outcome = null,
+            ConclusionRequired = false,
+            IsMasked = true
+        };
+    }
 }

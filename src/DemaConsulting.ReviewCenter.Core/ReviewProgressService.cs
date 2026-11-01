@@ -35,7 +35,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <para>
 ///         A project overview needs a constant number of reads however many reviews the project has: one read of the
 ///         review list (none when a caller that already has the list passes it to the overload that takes it), one
-///         batch read of all approvals (<see cref="SigningService.GetApprovalsAsync"/>, itself one
+///         batch read of all approvals (<see cref="SigningService.GetApprovalsAsync(Actor?, int, IEnumerable{string}, CancellationToken)"/>, itself one
 ///         set-based read of the snapshots of all reviews, <see cref="IReviewStore.ListSnapshotsAsync"/>, plus one of
 ///         the reopen history of the reviews that were reopened) and one read
 ///         of the last activity of all reviews (<see cref="IAuditStore.LastActivityAsync"/>). Reading is open to
@@ -110,7 +110,7 @@ public sealed class ReviewProgressService
     {
         await _access.RequireViewAsync(actor, projectId, cancellationToken);
         var reviews = await _reviews.ListAsync(projectId, cancellationToken);
-        return await ComputeAsync(projectId, reviews, cancellationToken);
+        return await ComputeAsync(actor, projectId, reviews, cancellationToken);
     }
 
     /// <summary>
@@ -132,17 +132,25 @@ public sealed class ReviewProgressService
     {
         ArgumentNullException.ThrowIfNull(reviews);
         await _access.RequireViewAsync(actor, projectId, cancellationToken);
-        return await ComputeAsync(projectId, reviews, cancellationToken);
+        return await ComputeAsync(actor, projectId, reviews, cancellationToken);
     }
 
     /// <summary>
     ///     Computes the progress of the given reviews; the caller has checked the access.
     /// </summary>
+    /// <param name="actor">The caller, who decides what is hidden (see <see cref="BallotVisibility"/>).</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviews">The reviews of the project.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The progress of each review that still exists, in the order given.</returns>
+    /// <remarks>
+    ///     For a review with several reviewers whose answers the caller may not see yet, the counts of disputed checks
+    ///     and failed checks and the checks of the threads about a check are left out, so the overview does not give
+    ///     away what the other reviewers answered. A caller that signed in with an API token is not masked here; the
+    ///     API is covered by the later API slice.
+    /// </remarks>
     private async Task<IReadOnlyList<ReviewProgress>> ComputeAsync(
+        Actor? actor,
         int projectId,
         IReadOnlyList<Review> reviews,
         CancellationToken cancellationToken)
@@ -153,7 +161,10 @@ public sealed class ReviewProgressService
         }
 
         // A constant number of reads, however many reviews the project has
-        var approvals = await _signing.GetApprovalsAsync(projectId, reviews.Select(r => r.Id), cancellationToken);
+        var ids = reviews.Select(r => r.Id);
+        var approvals = actor is { ViaApiToken: true }
+            ? await _signing.GetApprovalsAsync(projectId, ids, cancellationToken)
+            : await _signing.GetApprovalsAsync(actor, projectId, ids, cancellationToken);
         var activity = await _audit.LastActivityAsync(projectId, cancellationToken);
 
         var result = new List<ReviewProgress>(reviews.Count);

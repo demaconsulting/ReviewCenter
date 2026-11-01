@@ -225,7 +225,13 @@
            by who may write it, while the review is not locked *@
         <section class="card" data-testid="review-conclusion">
             <h2>Review conclusion</h2>
-            @if (ShowConclusionEditor)
+            @if (Approval?.IsMasked == true)
+            {
+                <p class="notice masked-note" role="status" data-testid="review-conclusion-hidden">
+                    The conclusion stays hidden until you hand in your own ballot.
+                </p>
+            }
+            else if (ShowConclusionEditor)
             {
                 <form data-testid="review-conclusion-form" novalidate @onsubmit="SaveConclusionAsync">
                     <div class="field">
@@ -264,9 +270,16 @@
             {
                 <div class="summary-cell" data-testid="checklist-card">
                     <span class="summary-label">Checklist</span>
-                    <span class="summary-value" data-testid="checklist-progress-summary">@ChecklistSummary()</span>
-                    <progress class="summary-progress" max="@Checklist.Overall.Total" value="@Checklist.Overall.Answered"
-                              aria-label="Checklist progress"></progress>
+                    @if (Checklist.IsMasked)
+                    {
+                        <span class="summary-value" data-testid="checklist-progress-summary">Hidden until you answer</span>
+                    }
+                    else
+                    {
+                        <span class="summary-value" data-testid="checklist-progress-summary">@ChecklistSummary()</span>
+                        <progress class="summary-progress" max="@Checklist.Overall.Total" value="@Checklist.Overall.Answered"
+                                  aria-label="Checklist progress"></progress>
+                    }
                     <a class="action outline small" href="/projects/@ProjectId/reviews/@ReviewId/checklist" data-testid="checklist-link">Open checklist</a>
                 </div>
             }

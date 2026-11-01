@@ -86,7 +86,8 @@ review found a problem, which is an answer); a section that does not apply count
 the totals, and any answers kept for it are ignored; the checklist is complete when every check of every
 applicable section is answered, so a checklist whose sections all do not apply is complete. A state also says whose
 view it is: `SlotId`, `BallotState` (`NotStarted`, `Draft`, `Submitted`) and `IsOwnBallot` for the ballot of a
-reviewer, `NoSlot` for a viewer who holds no slot, and `Consolidation` (the agreed standing) for the consolidated view.
+reviewer, `NoSlot` for a viewer who holds no slot, `Consolidation` (the agreed standing) for the consolidated view, and
+`IsMasked` for a viewer who may not see the standing yet.
 
 Rules for the input: a justification (for Fail and N/A) or a reason (for a section that does not apply) is not empty
 after trimming and has at most 2000 characters (`ReviewLimits.MaxJustificationLength`); it is stored trimmed. A
@@ -125,7 +126,9 @@ record. Rules:
   completeness again). Answering is then implicit, as it was before ballots. A ballot that no edit completes (a
   checklist whose sections all do not apply, or one that is completely carried) is handed in with `SubmitBallotAsync`.
 - *Own view*: `GetAsync` with a viewer who holds a slot returns the own ballot, drafts included, and never the draft of
-  another slot; every other viewer gets the consolidated standing of the submitted ballots (see `GetAsync`).
+  another slot; a viewer without a slot gets the consolidated standing of the submitted ballots in a review with a
+  single slot or a concluded review, and a masked state (see `GetAsync`) in a review with several slots that is not
+  concluded, unless the viewer is the lead, an administrator or an Auditor.
 - *Carried rows*: a follow-up review seeds each new ballot as a draft from the carried baseline rows, which keep their
   mark until the reviewer answers the check again (see Carried answers and sections).
 
@@ -189,11 +192,20 @@ and comments are not affected by the rule.
   review does not exist or has no checklist.
 - *Viewer dependent*: with a `viewerUsername` that is the primary or the alternate reviewer of a slot, the state is the
   own ballot of that slot, drafts included (`IsOwnBallot`, `BallotState`, `SlotId`), and never the ballot of another
-  slot. For every other viewer, and without a viewer, it is the consolidated standing of the submitted ballots
-  (`BallotProjection.Consolidate`): an agreed check is answered with the row of the lowest slot that answered it, and
-  a disputed or pending check has no answer. `NoSlot` is true when a viewer is given and holds no slot. A review with
+  slot. For a viewer who holds no slot it is the consolidated standing of the submitted ballots
+  (`BallotProjection.Consolidate`) when the viewer may see the others (a review with a single slot, a concluded
+  review, or a viewer who is the lead, an administrator or an Auditor): an agreed check is answered with the row of the
+  lowest slot that answered it, and a disputed or pending check has no answer. In a review with several slots that is
+  not concluded, a viewer without a slot who is none of those gets a state with no answers and no consolidation, and
+  `IsMasked` is true, because the standing would give away the answers of the others. `NoSlot` is true when a viewer is
+  given and holds no slot. A review with
   exactly one slot is read with its sole ballot as submitted, for the progress counts only, so a partly answered
   single-slot draft counts in the progress. `AuthorBlocked` is set as described above.
+- *System callers*: without a `viewerUsername` no viewer is asked about, so nothing is masked and `AuthorBlocked` is not
+  set: the consolidated standing is returned. This is an explicit, named path, `GetForSystemAsync`, for callers that
+  act for the system and not for a person (a report, a carry-over); a page that shows the state to a person always
+  passes the viewer. The API and the evidence read through the system path today; masking them is deferred to a later
+  slice (PR 5). A test pins that the system path is not masked and a viewer's read is.
 
 **SetSectionApplicabilityAsync**: Records whether a section applies in the ballot of the slot of the actor.
 
@@ -294,6 +306,8 @@ clock at construction, or a null actor, raises `ArgumentNullException`. Store fa
 
 - **IReviewStore** — reads the snapshot (frozen checklist, slots, ballots), and saves the ballot edits and the hand-in
   (injected).
+- **BallotVisibility** — decides whether the viewer may see the answers of the other reviewers; the state and the ballot
+  view that `GetAsync` and `GetBallotViewAsync` give to a viewer who may not hold nothing of them.
 - **IProjectAccess** — requires that the actor may work in the project (injected).
 - **IUserStore** — resolves the user name of a person to the identity that holds a reviewer slot, for the ballot of the
   actor and the view of a viewer, and for the review conclusion text (injected).

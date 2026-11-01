@@ -118,7 +118,9 @@ argument raises `ArgumentNullException`. Failures of the stores propagate unchan
 #### Dependencies
 
 - **ReviewService** — lists the reviews and decides whether one is overdue (injected).
-- **SigningService** — the approval status of every review with its slots, signatures, and blocker counts (injected).
+- **SigningService** — the approval status of every review with its slots, signatures, and blocker counts (injected);
+  asked for the viewer, so that the blockers of a viewer who may not see the answers of the other reviewers hold no
+  dispute count.
 - **IAuditStore** — the last activity of every review of the project (injected).
 - **IProjectAccess** — decides who may see the project (injected).
 

@@ -241,8 +241,10 @@ sections:
           The Web subsystem shall show on the review page the progress of the review's checklist with a link to
           a checklist page at /projects/{project}/reviews/{review}/checklist, where a reviewer can see what is left
           to do, answer each check in the ballot of the own reviewer slot as the signed-in user, mark sections as not
-          applicable, hand the ballot in, and be led to the next unanswered check, and where a user without a slot sees
-          the consolidated standing and is told how to join.
+          applicable, hand the ballot in, and be led to the next unanswered check, and where a user without a slot is
+          told how to join and sees the consolidated standing of a single-slot or concluded review, while in a
+          multi-slot review that is not concluded the standing stays hidden behind a notice unless the viewer is the
+          lead, an administrator or an Auditor.
         justification: |
           The checklist is worked through on its own page, and the review page shows how far it has got. The
           subsystem test covers the pages served from the database; answering needs a live connection and is
@@ -777,6 +779,34 @@ sections:
         tests:
           - LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
+
+      - id: ReviewCenter-Web-BallotExperience
+        title: >-
+          The Web subsystem shall keep the answers of the other reviewers hidden on the checklist page, the review
+          page, the project overview, and the history from a reviewer who has not handed in their own ballot, shall
+          offer the reviewer who has handed in the differing answers side by side with a button to discuss them,
+          shall offer Submit ballot, Submit and sign, and Assign me as reviewer where the rules accept them, and shall
+          explain all of this in the help topics.
+        justification: |
+          The reviewers have to give independent answers and then settle the differences, and the pages must make both
+          steps obvious without a manual. The behavior needs a live connection, so it is verified by the component
+          tests of the units.
+        children:
+          - ReviewCenter-ChecklistPage-HiddenBallots
+          - ReviewCenter-ChecklistPage-SideBySide
+          - ReviewCenter-ChecklistPage-SubmitAndSign
+          - ReviewCenter-ChecklistPage-SignConfirm
+          - ReviewCenter-ChecklistPage-AssignMe
+          - ReviewCenter-ReviewPage-BallotMasking
+          - ReviewCenter-ProjectPage-BallotMasking
+          - ReviewCenter-HistoryPage-BallotMasking
+        tests:
+          - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
+          - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
+          - ChecklistPage_SubmitAndSign_SubmitsThenSigns
+          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+          - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
+          - HistoryPage_HiddenViewer_HidesAnswerDetailsOnly
 
       - id: ReviewCenter-Web-TotpSecondFactor
         title: >-

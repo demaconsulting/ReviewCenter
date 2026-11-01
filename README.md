@@ -39,6 +39,8 @@ a project checklist, and sign the review with their credentials. Every action is
 - ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own
   template), answered per reviewer slot in its own ballot and consolidated into the agreed standing
 - 👥 **Reviewer Slots** - Primary and alternate reviewers share a ballot and sign each slot, early once the ballot is in
+- 🙈 **Independent Ballots** - Other reviewers' answers stay hidden until you hand in your own; then compare side by
+  side, discuss, and submit and sign in one step
 - ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to the agreed record; a change makes it out of
   date
 - 🔒 **Conclusion Lock** - Concluded (approved or rejected) reviews lock, admins reopen with a reason, authors cannot

@@ -770,3 +770,17 @@ sections:
           - ReviewPage_Render_CommentPostedAfterTheLoadStarted_IsNotStoredAsSeen
           - ReviewPage_Render_ParameterChangeToOtherReview_ReloadsBaselineAndMarksSeen
           - ReviewPage_Render_NoViewAccess_WritesNoState
+
+      - id: ReviewCenter-ReviewPage-BallotMasking
+        title: >-
+          The ReviewPage unit shall show a viewer who may not see the others, in a review with several slots, no
+          checklist standing (a note that it stays hidden until the own ballot is handed in for a member without a
+          slot, and only the own progress for a slot owner), no discussions about checks and no count of them, and no
+          conclusion text, and shall show all of it to the lead and the administrators.
+        justification: |
+          The review page summarizes the same ballots as the checklist, so it must follow the same rule or it would
+          give the hidden answers away through a count or a line of text.
+        tests:
+          - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
+          - ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden
+          - ReviewPage_Administrator_SeesCheckThreadsAndConclusion

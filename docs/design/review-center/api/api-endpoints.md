@@ -115,7 +115,8 @@ details and the summary also carry `followsReviewId`, and the details the two co
 **Read a review**: Checks the project first like every route (a project that the owner may not see is a 404 as for a
 missing project), then builds the details from the services that own each part: the review from `ReviewService`, the
 approval, blockers, and next step from `SigningService`, the thread counts from `ThreadService`, and the checklist
-counts from `ChecklistService`. The checklist counts follow the screen of a viewer who holds no slot, so they are those
+counts from `ChecklistService`. The checklist counts use the system-caller read of `ChecklistService`
+(`GetForSystemAsync`), which is not masked (masking the API is a later slice, PR 5), so they are those
 of the consolidated checklist of the submitted ballots (an agreed check is answered, a disputed or pending one is not;
 the one ballot of a review with a single slot counts before its hand-in), and only the items of applicable sections
 count. A draft ballot of a slot never changes them. The thread counts include the threads about a check of the checklist

@@ -143,8 +143,14 @@ N/A - standard test environment.
 - The form for a new review has an optional due date, a calendar day in UTC: a date from today to two years ahead is
   stored with the review, a date outside that range is refused with a message about the due date and creates nothing,
   and an empty field means no date.
+- A viewer who may not see the answers of the other reviewers sees no count of disputed checks in the blockers of a
+  review.
 
 #### Test Scenarios
+
+**ProjectPage_HiddenViewer_ShowsNoDisputedCountAsBlocker**: A reviewer with a draft opens the overview of a project
+whose review has disputed checks; the row shows no disputed count in its blockers. This scenario is tested by
+`ProjectPage_HiddenViewer_ShowsNoDisputedCountAsBlocker`.
 
 **Reviews from a repository** are verified in `NewReviewPageRepositoryTests.cs`, with the fake git provider of the
 `Web` tests (`FakeGitRepositoryProvider`) behind the real `RepositoryService` and `ReviewService`.

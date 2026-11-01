@@ -33,5 +33,6 @@ package ReviewCenter {
         part inboxService : InboxService;
         part userImpactService : UserImpactService;
         part ballotConsolidation : BallotConsolidation;
+        part ballotVisibility : BallotVisibility;
     }
 }

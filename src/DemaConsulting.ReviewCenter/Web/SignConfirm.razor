@@ -1,0 +1,36 @@
+@* SignConfirm: the credentials of "Submit and sign" on the checklist page (a helper of the ChecklistPage unit).
+
+   Shows the fields that confirm a signature for a person with a password (the password and, when a second factor is
+   enrolled, the current code) and the primary "Submit and sign" button. The parent decides what happens with the
+   credentials; this component hands them over and clears the fields at once, so a password is never kept, rendered or
+   logged here. A person who signs in with an identity provider has no fields: their button only asks the parent to
+   continue. Presentation only; the text and state live in SignConfirm.razor.cs. Every interactive element carries a
+   stable kebab-case data-testid. *@
+<form class="sign-confirm" data-testid="submit-sign-form" novalidate @onsubmit="SubmitAsync">
+    @if (NeedsPassword)
+    {
+        <div class="field">
+            <label for="submit-sign-password">Your password, to sign right away</label>
+            <input id="submit-sign-password" type="password" autocomplete="current-password"
+                   data-testid="submit-sign-password" @key="@($"password-{_resets}")"
+                   @oninput="e => _password = e.Value?.ToString() ?? string.Empty" />
+        </div>
+        @if (NeedsCode)
+        {
+            <div class="field">
+                <label for="submit-sign-totp">Current code from your authenticator app</label>
+                <input id="submit-sign-totp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                       data-testid="submit-sign-totp" @key="@($"totp-{_resets}")"
+                       @oninput="e => _code = e.Value?.ToString() ?? string.Empty" />
+            </div>
+        }
+    }
+    else
+    {
+        <p class="muted hint" data-testid="submit-sign-oidc-hint">
+            After your ballot is in, you confirm it is you with your identity provider and come back to sign.
+        </p>
+    }
+
+    <button type="submit" data-testid="submit-and-sign">Submit and sign</button>
+</form>

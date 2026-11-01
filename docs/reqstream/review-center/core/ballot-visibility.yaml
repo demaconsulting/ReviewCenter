@@ -1,0 +1,123 @@
+---
+# Software Unit Requirements for the BallotVisibility Unit
+#
+# The BallotVisibility unit decides who may see what the other reviewers answered in a review with several reviewer
+# slots, and carries that decision into what the services hand to a viewer: the ballot view of the checklist page
+# (BallotView), the approval, progress and inbox texts, the list of discussions about checks (ThreadCapabilities), and
+# the details of the audit trail (AuditMasking). Until a viewer has handed in their own ballot they see who has handed
+# in and nothing of what was answered, so that every reviewer decides on their own first.
+
+sections:
+  - title: BallotVisibility Unit Requirements
+    requirements:
+      - id: ReviewCenter-BallotVisibility-Rule
+        title: >-
+          The BallotVisibility class shall let a viewer see the answers of the other reviewers of a review with
+          several reviewer slots only when the viewer has handed in their own ballot, or leads the review,
+          administers the project, is a system administrator or an auditor, or when the review is concluded, shall
+          hide them from every other viewer, a project member who holds no slot included, shall never hide anything
+          in a review with one slot or none, and shall treat a viewer it does not know as one who has not handed in.
+        justification: |
+          Independent judgment is the point of having several reviewers: an answer that is read before the own
+          answer is given turns two verdicts into one. The rule is one pure test that every reader of ballots asks,
+          so that no page or service decides on its own. People who steer or audit the review need the full picture,
+          and once the review is concluded nothing is left to influence. A single reviewer has nobody to be
+          influenced by.
+        tests:
+          - BallotVisibility_CanSeeOthers_SingleSlot_AlwaysSeesAll
+          - BallotVisibility_CanSeeOthers_PlainContributorWithoutSlot_Masked
+          - BallotVisibility_CanSeeOthers_SlotOwnerWithoutSubmittedBallot_Masked
+          - BallotVisibility_CanSeeOthers_SlotOwnerSubmitted_SeesOthers
+          - BallotVisibility_CanSeeOthers_LeadAdminAuditor_SeeAll
+          - BallotVisibility_CanSeeOthers_Concluded_SeesAll
+
+      - id: ReviewCenter-BallotVisibility-BallotView
+        title: >-
+          The ChecklistService class shall give a viewer a ballot view of a review that lists, in the order of the
+          slots, what each submitted ballot answered for every check the submitted ballots answer differently, only
+          while the viewer may see the others, that tells how many ballots are handed in out of how many, that offers
+          the viewer to add themselves as a reviewer only when they are a member who may be a reviewer and hold no
+          slot, that offers submitting and signing in one step only when the own ballot is a complete draft in a review
+          with several slots and nothing but the hand-in blocks the signature, and shall give a viewer who holds no slot
+          and may not see the others an empty checklist state that is marked hidden, with no consolidation, while a read
+          without a viewer is the named system-caller path that is not masked.
+        justification: |
+          A reviewer who has handed in wants to compare, so the differences are listed with the names of those who
+          answered. The counts stay visible because they say who is still to come without giving anything away. The
+          shortcuts are offered only when the service would accept them, so the page never offers a step it must
+          refuse, and a viewer who may not see the others must not get the standing through the checklist either. The
+          callers that act for the system (the API and the evidence, masked in a later slice) use a named path, so
+          that an unmasked read is a visible choice and never a default of a page.
+        tests:
+          - ChecklistService_GetBallotView_SubmittedViewer_ListsDifferingChecksInSlotOrder
+          - ChecklistService_GetBallotView_ViewerWithoutSubmittedBallot_HidesDifferences
+          - ChecklistService_GetBallotView_LeadAdminAuditor_SeeDifferencesWithoutBallot
+          - ChecklistService_GetBallotView_CanAssignMe_OnlyForMemberWithoutSlot
+          - ChecklistService_GetBallotView_CompleteDraft_OffersSubmitAndSignOnlyWhenNothingBlocks
+          - ChecklistService_GetBallotView_UnknownReview_ReturnsNull
+          - ChecklistService_GetAsync_ViewerWithoutSlotAndBallot_ReturnsMaskedState
+          - ChecklistService_GetForSystemAsync_NoViewer_ReturnsUnmaskedStanding
+
+      - id: ReviewCenter-BallotVisibility-NoDisputeLeak
+        title: >-
+          The SigningService, ReviewProgressService, and InboxService classes shall, for a viewer who may not see the
+          others, give no number or word that reveals a dispute, a failed check, or the provisional outcome (no
+          disputed or failed count in a blocker, a progress line, or an inbox row, no outcome, and no conclusion text),
+          shall say in one fixed sentence that the standing is hidden until the viewer hands in their own ballot, shall
+          not count a discussion about a check as news in an inbox row of such a viewer, and
+          shall give the same texts for a list of reviews as for a single review.
+        justification: |
+          A count of disputed checks tells a reviewer that somebody answered differently, and where, which is exactly
+          what the hidden ballots keep back. The leak would come through the places that already summarize the
+          standing, so each of them asks the same rule, and a single fixed sentence leaves nothing to infer from the
+          wording.
+        tests:
+          - SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome
+          - SigningService_GetApproval_NullViewerAndSingleSlot_FailsClosedOnlyForSeveralSlots
+          - SigningService_GetApprovals_MaskedViewer_MatchesSingleRead
+          - SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch
+          - ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts
+          - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
+          - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer
+          - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
+
+      - id: ReviewCenter-BallotVisibility-Discussions
+        title: >-
+          The ThreadService class shall leave the discussions about checks out of the list of threads for a viewer who
+          may not see the others, discussions about files excepted, and shall tell a viewer whether they may start a
+          discussion about a check, which is the case for the lead of the review, a system administrator, a slot owner
+          who has handed in, and the owner of the only slot.
+        justification: |
+          A discussion about a check names the check and quotes the answers, so it carries the hidden ballots with it.
+          The thread count must not give the dispute away either. The capability answer lets a page offer a Discuss
+          button only to those whom the service would let start one.
+        tests:
+          - ThreadService_List_MaskedViewer_LeavesOutCheckThreads
+          - ThreadService_List_ReviewVanishesBetweenReads_LeavesOutCheckThreads
+          - ThreadService_GetCapabilities_CanStartCheckThread_MatchesCheckThreadRules
+
+      - id: ReviewCenter-BallotVisibility-AuditMasking
+        title: >-
+          The AuditMasking class shall replace, for a viewer who may not see the others, the detail of the audit
+          entries that name an answer, a change of the applicability of a section, or a discussion about a check by a
+          fixed sentence, shall do the same for every later entry of a discussion (a reply, a resolution, a reopening,
+          a change of kind or of the report flag) unless the entries show that the thread is about a file, shall keep
+          the action, the actor, the time, and the hashes of every entry as stored, shall never hide the entries of
+          the viewer themselves, shall return the entries unchanged for a viewer who may see the others, and shall
+          treat a viewer it does not know as one who may not.
+        justification: |
+          The history of a review is readable by every project member, and the detail of an answer entry names the
+          check and the outcome, so it would show a hidden ballot. A reply or a resolution of a discussion about a
+          check says as much as its start, and it names only the thread, so a thread that is not known to be about a
+          file is hidden as well. The change is made when the entries are read, so the stored chain and the export
+          that proves it stay as they were written, and the chain still verifies.
+        tests:
+          - AuditMasking_ForViewer_OtherAnswer_HidesDetailKeepsActorAndHash
+          - AuditMasking_ForViewer_OwnAnswer_StaysVisible
+          - AuditMasking_ForViewer_ApplicabilityAndCheckDiscussion_HiddenOthersKept
+          - AuditMasking_ForViewer_LaterEntryOfCheckThread_IsHiddenButFileThreadStays
+          - AuditMasking_ForViewer_ThreadOfUnknownStart_IsHidden
+          - AuditMasking_ForViewer_OwnEntryOfCheckThread_StaysVisible
+          - AuditMasking_ForViewer_CanSeeOthers_ReturnsEntriesUnchanged
+          - AuditMasking_ForViewer_UnknownViewer_HidesEveryAnswer
+          - AuditMasking_ForViewer_NullEntries_Throws
