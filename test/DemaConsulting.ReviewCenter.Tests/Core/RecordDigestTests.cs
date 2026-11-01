@@ -93,7 +93,7 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Builds an answer.
+    ///     Builds an answer of the ballot of slot 1.
     /// </summary>
     /// <param name="item">The check id.</param>
     /// <param name="outcome">The outcome.</param>
@@ -110,6 +110,7 @@ public class RecordDigestTests
         {
             ProjectId = 1,
             ReviewId = "rev-1",
+            SlotId = 1,
             ItemId = item,
             Outcome = outcome,
             Justification = justification,
@@ -120,11 +121,37 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Builds a record from its parts, defaulting to a small baseline.
+    ///     Builds the frozen checklist most records of these tests carry: the sections REQ (two checks) and DES (one).
     /// </summary>
-    /// <param name="fingerprint">The content fingerprint.</param>
+    /// <returns>The checklist.</returns>
+    private static ReviewChecklist TestChecklist()
+    {
+        return Checklist(
+            "default-1",
+            ChecklistSectionOf("REQ", "Requirements", ("REQ-01", "Is the code correct?"), ("REQ-02", "Is it traced?")),
+            ChecklistSectionOf("DES", "Design", ("DES-01", "Is it sound?")));
+    }
+
+    /// <summary>
+    ///     Builds a submitted ballot of slot 1.
+    /// </summary>
     /// <param name="answers">The answers.</param>
     /// <param name="sections">The section states.</param>
+    /// <returns>The ballot.</returns>
+    private static Ballot Submitted(
+        IReadOnlyList<ChecklistAnswer> answers,
+        IReadOnlyList<ChecklistSectionState> sections)
+    {
+        return new Ballot(1, BallotStatus.Submitted, _time, "ann", answers, sections);
+    }
+
+    /// <summary>
+    ///     Builds a record from its parts, defaulting to a small baseline: the test checklist and a submitted ballot of
+    ///     slot 1.
+    /// </summary>
+    /// <param name="fingerprint">The content fingerprint.</param>
+    /// <param name="answers">The answers of the ballot.</param>
+    /// <param name="sections">The section states of the ballot.</param>
     /// <param name="threads">The threads.</param>
     /// <param name="source">The source of the files; an upload when omitted.</param>
     /// <returns>The record.</returns>
@@ -137,9 +164,8 @@ public class RecordDigestTests
     {
         return new ReviewRecord(
             fingerprint,
-            null,
-            sections ?? [],
-            answers ?? [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")],
+            TestChecklist(),
+            [Submitted(answers ?? [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")], sections ?? [])],
             threads ?? [Thread(1), Thread(2, "b.txt", ReviewThreadState.Resolved)],
             source ?? ReviewSource.Upload);
     }
@@ -195,6 +221,7 @@ public class RecordDigestTests
         {
             ProjectId = 1,
             ReviewId = "rev-1",
+            SlotId = 1,
             SectionId = id,
             Applicable = applicable,
             Reason = reason,
@@ -205,19 +232,31 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Test that who marked a section as not applicable, and when, is not covered (unlike who answered a
-    ///     check): only the section and its reason are.
+    ///     Test that who marked a section as not applicable, and when, is not covered: only the standing of the section is.
     /// </summary>
     [Fact]
     public void RecordDigest_Compute_SectionSetterAndTime_NotCovered()
     {
-        // Arrange: the same section that does not apply, set by another person at another time
+        // Arrange: the same section that does not apply, set by another person at another time with another reason
         var one = Record(sections: [Section("DES", false, "none")]);
-        var other = Record(sections: [Section("DES", false, "none", "Bob", _time.AddDays(2))]);
+        var other = Record(sections: [Section("DES", false, "else", "Bob", _time.AddDays(2))]);
 
         // Act, Assert: the digests are equal
         Assert.Equal(RecordDigest.Compute(one), RecordDigest.Compute(other));
     }
+
+    /// <summary>
+    ///     The canonical lines of <see cref="TestChecklist"/>.
+    /// </summary>
+    private static readonly string[] _checklistLines =
+    [
+        "checklist 9:default-1",
+        "section 3:DES 6:Design",
+        "item 6:DES-01 12:Is it sound?",
+        "section 3:REQ 12:Requirements",
+        "item 6:REQ-01 20:Is the code correct?",
+        "item 6:REQ-02 13:Is it traced?"
+    ];
 
     /// <summary>
     ///     Test that the canonical text of a small record has exactly the documented shape.
@@ -236,20 +275,24 @@ public class RecordDigestTests
         // Act: build the canonical text
         var text = RecordDigest.Canonicalize(record);
 
-        // Assert: version line, fingerprint, answers, sections that do not apply, then the report with its one thread
+        // Assert: version line, fingerprint, checklist, the standing of the checks and sections, then the report
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v2",
-            "fingerprint 3:abc",
-            "source upload",
-            "checklist -",
-            "answers",
-            "answer 6:REQ-01 4:Fail 3:bad 3:Ann 3:ann",
-            "sections",
-            "not-applicable 3:DES 4:none",
-            "report",
-            "thread file 5:a.txt 4:Head 1 2",
-            $"claim 3:Ann 3:ann 10:Please fix {ticks}");
+            [
+                "ReviewCenter record v2",
+                "fingerprint 3:abc",
+                "source upload",
+                .. _checklistLines,
+                "checks",
+                "check 6:REQ-01 agreed 4:Fail",
+                "check 6:REQ-02 pending",
+                "sections",
+                "applicability 3:DES not-applicable",
+                "outcome none",
+                "report",
+                "thread file 5:a.txt 4:Head 1 2",
+                $"claim 3:Ann 3:ann 10:Please fix {ticks}"
+            ]);
         Assert.Equal(expected, text);
     }
 
@@ -280,15 +323,15 @@ public class RecordDigestTests
     public void RecordDigest_Compute_KnownRecord_MatchesKnownValue()
     {
         // Arrange: a record with only a fingerprint
-        var record = new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload);
+        var record = new ReviewRecord("abc", null, [], [], ReviewSource.Upload);
 
         // Act: compute the digest
         var digest = RecordDigest.Compute(record);
 
         // Assert: the SHA-256 of
-        // "ReviewCenter record v2\nfingerprint 3:abc\nsource upload\nchecklist -\nanswers\nsections\nreport",
+        // "ReviewCenter record v2\nfingerprint 3:abc\nsource upload\nchecklist -\nchecks\nsections\noutcome none\nreport",
         // worked out with an independent tool (a separate script that builds the text from the documented layout)
-        Assert.Equal("eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3", digest);
+        Assert.Equal("4c93e63f9251787ecc5a267ee3d3f28922757b299294add1709bf8a401fad5cd", digest);
     }
 
     /// <summary>
@@ -340,6 +383,7 @@ public class RecordDigestTests
         {
             ProjectId = answer.ProjectId,
             ReviewId = answer.ReviewId,
+            SlotId = 1,
             ItemId = answer.ItemId,
             Outcome = answer.Outcome,
             Justification = answer.Justification,
@@ -351,7 +395,7 @@ public class RecordDigestTests
             "default-1",
             ChecklistSectionOf("REQ", "Requirements", ("REQ-01", requirementText), ("REQ-02", "Is it traced?")),
             ChecklistSectionOf("DES", "Design", ("DES-01", "Is it sound?")));
-        return new ReviewRecord("abc", checklist, [], [stored], [], ReviewSource.Upload);
+        return new ReviewRecord("abc", checklist, [Submitted([stored], [])], [], ReviewSource.Upload);
     }
 
     /// <summary>
@@ -368,24 +412,24 @@ public class RecordDigestTests
         var text = RecordDigest.Canonicalize(record);
         var digest = RecordDigest.Compute(record);
 
-        // Assert: version, sections and checks sorted by id, then the answer with who answered
+        // Assert: version, sections and checks sorted by id, then the standing of the checks
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v2",
-            "fingerprint 3:abc",
-            "source upload",
-            "checklist 9:default-1",
-            "section 3:DES 6:Design",
-            "item 6:DES-01 12:Is it sound?",
-            "section 3:REQ 12:Requirements",
-            "item 6:REQ-01 20:Is the code correct?",
-            "item 6:REQ-02 13:Is it traced?",
-            "answers",
-            "answer 6:REQ-01 4:Pass - 3:Ann 3:ann",
-            "sections",
-            "report");
+            [
+                "ReviewCenter record v2",
+                "fingerprint 3:abc",
+                "source upload",
+                .. _checklistLines,
+                "checks",
+                "check 6:DES-01 pending",
+                "check 6:REQ-01 agreed 4:Pass",
+                "check 6:REQ-02 pending",
+                "sections",
+                "outcome none",
+                "report"
+            ]);
         Assert.Equal(expected, text);
-        Assert.Equal("2a6b6bc4de3a50d758ee5d5a9438c10c2f398576946ce3a828d5713ef70d91ef", digest);
+        Assert.Equal("a4ca2841f1831fa27b4c7b241bb2f77ca1977c91b2fe47d72b135c07af29e38c", digest);
     }
 
     /// <summary>
@@ -458,24 +502,27 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Test that who answered a check is covered (display name and user name), so a signature breaks when
-    ///     somebody else answers, while the moment of answering is not covered.
+    ///     Test that who answered a check, the justification and the moment of answering are not covered: a signature
+    ///     binds to what the reviewers agree on, not to who gave it or how it was worded.
     /// </summary>
     [Fact]
-    public void RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot()
+    public void RecordDigest_Compute_AnswererJustificationAndTime_NotCovered()
     {
-        // Arrange: the baseline and variants that change the display name, the user name and the time
+        // Arrange: the baseline and variants that change the display name, the user name, the time and the wording
         var before = RecordDigest.Compute(ChecklistRecord());
 
         // Act: compute each variant
         var otherName = RecordDigest.Compute(ChecklistRecord(by: "Bob", username: "ann"));
         var otherUser = RecordDigest.Compute(ChecklistRecord(by: "Ann", username: "ann2"));
         var otherTime = RecordDigest.Compute(ChecklistRecord(answeredAt: _time.AddDays(3)));
+        var ballot = Submitted([Answer("REQ-01", justification: "Because.")], []);
+        var otherWording = RecordDigest.Compute(ChecklistRecord() with { Ballots = [ballot] });
 
-        // Assert: the person matters, the time does not
-        Assert.NotEqual(before, otherName);
-        Assert.NotEqual(before, otherUser);
+        // Assert: none of them matters
+        Assert.Equal(before, otherName);
+        Assert.Equal(before, otherUser);
         Assert.Equal(before, otherTime);
+        Assert.Equal(before, otherWording);
     }
 
     /// <summary>
@@ -553,7 +600,7 @@ public class RecordDigestTests
             Created = _time,
             Comments = [Comment(70)]
         };
-        return new ReviewRecord("abc", null, [], [], [thread], ReviewSource.Upload);
+        return new ReviewRecord("abc", null, [], [thread], ReviewSource.Upload);
     }
 
     /// <summary>
@@ -561,8 +608,8 @@ public class RecordDigestTests
     ///     digests for both sides worked out with an independent tool.
     /// </summary>
     [Theory]
-    [InlineData(ThreadSide.Head, "4:Head", "00aacca477c6cb3b6e37c39f8252caa0852a4d28a9f2364c3865f632cc08651f")]
-    [InlineData(ThreadSide.Baseline, "8:Baseline", "2890acd760711bfee36a2319e0cb9c881fb0c21cf2d9b2ecb1c9b23e743b45aa")]
+    [InlineData(ThreadSide.Head, "4:Head", "15c6f2265ae8e9c29aea106ccaa687a7da34e99ebe18116cbeb8930c3e647bd7")]
+    [InlineData(ThreadSide.Baseline, "8:Baseline", "1d50c27f46fcc273951f1f36b8ecba3245dfc743fe7bf1656f4f1424920ee753")]
     public void RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue(ThreadSide side, string written, string expectedDigest)
     {
         // Arrange: an upload record with one thread on the given side
@@ -580,8 +627,9 @@ public class RecordDigestTests
             "fingerprint 3:abc",
             "source upload",
             "checklist -",
-            "answers",
+            "checks",
             "sections",
+            "outcome none",
             "report",
             $"thread file 5:a.txt {written} 1 2",
             $"claim 3:Ann 3:ann 10:Please fix {ticks}");
@@ -619,7 +667,7 @@ public class RecordDigestTests
             new("b.txt", ChangeKind.Deleted, "bs2", null)
         ];
         ReviewRecord Make(string? setId) =>
-            new("abc", null, [], [], [], new ReviewSource(7, sha1, sha2, "**/*", changes, setId));
+            new("abc", null, [], [], new ReviewSource(7, sha1, sha2, "**/*", changes, setId));
 
         // Act: compute the three digests
         var none = RecordDigest.Compute(Make(null));
@@ -627,9 +675,9 @@ public class RecordDigestTests
         var empty = RecordDigest.Compute(Make(string.Empty));
 
         // Assert: known answers worked out with an independent tool, all different, and the line shape
-        Assert.Equal("bb2723058729bb669e8c8858e0b4f913fd786e59d68d9d785093994b08012842", none);
-        Assert.Equal("a595db28364f05ba194b28dfee6d5ab6668160f4fd1639dd98ddc043a8991c74", core);
-        Assert.Equal("8759a10e14651b6bb8e6b434f01dd6ac9d4de4cb0d8876dfd6eb8bfca8f6959a", empty);
+        Assert.Equal("b80fa632a2aa11861ecb6bf8442c85a1485f80b0f0e84a408c9e78705835c747", none);
+        Assert.Equal("748c61eff2e4702ee896753c341c9c66c08cd51826c6a8d0e276f510de7d275a", core);
+        Assert.Equal("390050cf8169267cb7d48b3e327b1f4e5c182e42b9a06427e02a2edc635adb5a", empty);
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* 4:core\n", RecordDigest.Canonicalize(Make("core")));
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* -\n", RecordDigest.Canonicalize(Make(null)));
     }
@@ -646,7 +694,6 @@ public class RecordDigestTests
         var record = new ReviewRecord(
             "abc",
             null,
-            [],
             [],
             [],
             new ReviewSource(
@@ -672,11 +719,12 @@ public class RecordDigestTests
             "change 5:a.txt 8:Modified 3:bs1 3:hs1",
             "change 5:b.txt 7:Deleted 3:bs2 -",
             "checklist -",
-            "answers",
+            "checks",
             "sections",
+            "outcome none",
             "report");
         Assert.Equal(expected, text);
-        Assert.Equal("bb2723058729bb669e8c8858e0b4f913fd786e59d68d9d785093994b08012842", RecordDigest.Compute(record));
+        Assert.Equal("b80fa632a2aa11861ecb6bf8442c85a1485f80b0f0e84a408c9e78705835c747", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -770,12 +818,10 @@ public class RecordDigestTests
     [Theory]
     [InlineData("fingerprint")]
     [InlineData("answer-outcome")]
-    [InlineData("answer-justification")]
-    [InlineData("answer-justification-null-vs-empty")]
     [InlineData("answer-outcome-not-applicable")]
-    [InlineData("answer-added")]
+    [InlineData("answer-removed")]
     [InlineData("section-not-applicable")]
-    [InlineData("section-reason")]
+    [InlineData("section-applicable")]
     [InlineData("thread-added")]
     [InlineData("thread-anchor")]
     [InlineData("thread-start-line")]
@@ -804,20 +850,12 @@ public class RecordDigestTests
             "answer-outcome" => Record(
                 answers: [Answer("REQ-01", ChecklistOutcome.Fail, "x"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")],
                 sections: baseSections),
-            "answer-justification" => Record(
-                answers: [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "other")],
-                sections: baseSections),
-            "answer-justification-null-vs-empty" => Record(
-                answers: [Answer("REQ-01", justification: string.Empty), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")],
-                sections: baseSections),
             "answer-outcome-not-applicable" => Record(
                 answers: [Answer("REQ-01", ChecklistOutcome.NotApplicable), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")],
                 sections: baseSections),
-            "answer-added" => Record(
-                answers: [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a"), Answer("REQ-03")],
-                sections: baseSections),
-            "section-not-applicable" => Record(sections: [.. baseSections, Section("DOC", false, "none")]),
-            "section-reason" => Record(sections: [Section("DES", false, "different")]),
+            "answer-removed" => Record(answers: [Answer("REQ-01")], sections: baseSections),
+            "section-not-applicable" => Record(sections: [.. baseSections, Section("REQ", false, "none")]),
+            "section-applicable" => Record(sections: []),
             "thread-added" => Record(sections: baseSections, threads: [Thread(1), resolved, Thread(3)]),
             "thread-anchor" => Record(sections: baseSections, threads: [WithLines(Thread(1), 3, 4), resolved]),
             "thread-start-line" => Record(sections: baseSections, threads: [WithLines(Thread(1), 3, 2), resolved]),
@@ -884,33 +922,6 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Builds a checklist answer with explicit names, so that two names can be chosen to run together.
-    /// </summary>
-    /// <param name="justification">The justification, possibly <c>null</c>.</param>
-    /// <param name="by">The display name of the answerer.</param>
-    /// <param name="username">The user name of the answerer.</param>
-    /// <param name="outcome">The outcome.</param>
-    /// <returns>The answer to check <c>REQ-01</c>.</returns>
-    private static ChecklistAnswer AnswerWithNames(
-        string? justification,
-        string by,
-        string username,
-        ChecklistOutcome outcome = ChecklistOutcome.Pass)
-    {
-        return new ChecklistAnswer
-        {
-            ProjectId = 1,
-            ReviewId = "rev-1",
-            ItemId = "REQ-01",
-            Outcome = outcome,
-            Justification = justification,
-            AnsweredBy = by,
-            AnsweredByUsername = username,
-            AnsweredAt = _time
-        };
-    }
-
-    /// <summary>
     ///     Test that text cannot imitate the delimiters: each pair of records below would give the very same text
     ///     if strings were written without their length (values joined by a space, lines by a line feed), so
     ///     only the length prefix keeps their digests apart.
@@ -918,7 +929,7 @@ public class RecordDigestTests
     /// <param name="scenario">The name of the pair under test.</param>
     [Theory]
     [InlineData("comment-text-versus-two-comments")]
-    [InlineData("justification-versus-answerer-name")]
+    [InlineData("author-versus-username")]
     [InlineData("absent-versus-dash")]
     [InlineData("change-path-versus-kind-and-hash")]
     [InlineData("section-title-versus-item-line")]
@@ -934,15 +945,15 @@ public class RecordDigestTests
                 Record(threads: [Thread(1, comments: Comment(1, $"a {ticks}\ncomment Ann ann b"))]),
                 Record(threads: [Thread(1, "a.txt", ReviewThreadState.Open, Comment(1, "a"), Comment(2, "b"))])),
 
-            // A justification that runs into the display name of the answerer
-            "justification-versus-answerer-name" => (
-                Record(answers: [AnswerWithNames("x y", "z", "u")]),
-                Record(answers: [AnswerWithNames("x", "y z", "u")])),
+            // An author name that runs into the user name of the author
+            "author-versus-username" => (
+                Record(threads: [Thread(1, comments: Comment(1, "t", "a b", "u"))]),
+                Record(threads: [Thread(1, comments: Comment(1, "t", "a", "b u"))])),
 
-            // A justification that is absent versus one that is the text of the placeholder
+            // A hash that is absent versus one that is the text of the placeholder
             "absent-versus-dash" => (
-                Record(answers: [AnswerWithNames(null, "Ann", "ann")]),
-                Record(answers: [AnswerWithNames("-", "Ann", "ann")])),
+                Record(source: GitSource(changes: [new ChangedFile("a.txt", ChangeKind.Modified, null, "y")])),
+                Record(source: GitSource(changes: [new ChangedFile("a.txt", ChangeKind.Modified, "-", "y")]))),
 
             // A path that runs into the change kind, versus the shorter path with the kind and the baseline hash
             "change-path-versus-kind-and-hash" => (
@@ -972,17 +983,17 @@ public class RecordDigestTests
     [Fact]
     public void RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide()
     {
-        // Arrange: an empty justification and an answerer "a b" versus the justification " a" and the answerer "b",
-        // and an answerer that is empty versus one that ends in a space
-        var emptyJustification = Record(answers: [AnswerWithNames(string.Empty, "a b", "u")]);
-        var leadingSpace = Record(answers: [AnswerWithNames(" a", "b", "u")]);
-        var emptyAnswerer = Record(answers: [AnswerWithNames("a b", string.Empty, "u")]);
-        var trailingSpace = Record(answers: [AnswerWithNames("a", "b ", "u")]);
+        // Arrange: an empty comment text and an author "a b" versus the text " a" and the author "b",
+        // and an author that is empty versus one that ends in a space
+        var emptyText = Record(threads: [Thread(1, comments: Comment(1, string.Empty, "a b", "u"))]);
+        var leadingSpace = Record(threads: [Thread(1, comments: Comment(1, " a", "b", "u"))]);
+        var emptyAuthor = Record(threads: [Thread(1, comments: Comment(1, "a b", string.Empty, "u"))]);
+        var trailingSpace = Record(threads: [Thread(1, comments: Comment(1, "a", "b ", "u"))]);
 
         // Act: compute the digests
-        var first = RecordDigest.Compute(emptyJustification);
+        var first = RecordDigest.Compute(emptyText);
         var second = RecordDigest.Compute(leadingSpace);
-        var third = RecordDigest.Compute(emptyAnswerer);
+        var third = RecordDigest.Compute(emptyAuthor);
         var fourth = RecordDigest.Compute(trailingSpace);
 
         // Assert: each pair differs
@@ -999,7 +1010,7 @@ public class RecordDigestTests
     {
         // Arrange: the known record, once with the default and once with an explicit zero count, and the other
         // known records (a repository review, a checklist review, a review with a thread) with an explicit zero count
-        var legacy = new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload);
+        var legacy = new ReviewRecord("abc", null, [], [], ReviewSource.Upload);
         var zero = legacy with { Reopens = 0 };
         var gitSource = new ReviewSource(
             7,
@@ -1010,7 +1021,7 @@ public class RecordDigestTests
                 new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "hs1"),
                 new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null)
             ]);
-        var git = new ReviewRecord("abc", null, [], [], [], gitSource) with { Reopens = 0 };
+        var git = new ReviewRecord("abc", null, [], [], gitSource) with { Reopens = 0 };
         var checklist = ChecklistRecord() with { Reopens = 0 };
         var sided = SidedRecord(ThreadSide.Head) with { Reopens = 0 };
 
@@ -1018,12 +1029,12 @@ public class RecordDigestTests
         var canonical = RecordDigest.Canonicalize(zero);
 
         // Assert: the same known digests as before, and no reopens line
-        Assert.Equal("eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3", RecordDigest.Compute(zero));
+        Assert.Equal("4c93e63f9251787ecc5a267ee3d3f28922757b299294add1709bf8a401fad5cd", RecordDigest.Compute(zero));
         Assert.Equal(RecordDigest.Compute(legacy), RecordDigest.Compute(zero));
         Assert.DoesNotContain("reopens", canonical);
-        Assert.Equal("bb2723058729bb669e8c8858e0b4f913fd786e59d68d9d785093994b08012842", RecordDigest.Compute(git));
-        Assert.Equal("2a6b6bc4de3a50d758ee5d5a9438c10c2f398576946ce3a828d5713ef70d91ef", RecordDigest.Compute(checklist));
-        Assert.Equal("00aacca477c6cb3b6e37c39f8252caa0852a4d28a9f2364c3865f632cc08651f", RecordDigest.Compute(sided));
+        Assert.Equal("b80fa632a2aa11861ecb6bf8442c85a1485f80b0f0e84a408c9e78705835c747", RecordDigest.Compute(git));
+        Assert.Equal("a4ca2841f1831fa27b4c7b241bb2f77ca1977c91b2fe47d72b135c07af29e38c", RecordDigest.Compute(checklist));
+        Assert.Equal("15c6f2265ae8e9c29aea106ccaa687a7da34e99ebe18116cbeb8930c3e647bd7", RecordDigest.Compute(sided));
     }
 
     /// <summary>
@@ -1049,9 +1060,8 @@ public class RecordDigestTests
         };
         return new ReviewRecord(
             "abc",
-            null,
-            [],
-            [AnswerWithNames(string.Empty, "Bob", "bob", ChecklistOutcome.NotApplicable)],
+            Checklist("v1", ChecklistSectionOf("A", "Sec", ("A-1", "q"))),
+            [Submitted([OneAnswer("A-1", ChecklistOutcome.NotApplicable)], [])],
             [thread],
             new ReviewSource(
                 7,
@@ -1062,9 +1072,31 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Test that the enumeration names (<c>NotApplicable</c>, <c>Added</c>, <c>Resolved</c>), an empty
-    ///     justification, a whole-file anchor, a user name, and different times of a thread and its comment are
-    ///     written as documented, with known digests (also with one reopen) worked out with an independent script.
+    ///     Builds an answer of slot 1 to the given check, with an empty justification.
+    /// </summary>
+    /// <param name="itemId">The check id.</param>
+    /// <param name="outcome">The outcome.</param>
+    /// <returns>The answer.</returns>
+    private static ChecklistAnswer OneAnswer(string itemId, ChecklistOutcome outcome)
+    {
+        return new ChecklistAnswer
+        {
+            ProjectId = 1,
+            ReviewId = "rev-1",
+            SlotId = 1,
+            ItemId = itemId,
+            Outcome = outcome,
+            Justification = string.Empty,
+            AnsweredBy = "Bob",
+            AnsweredByUsername = "bob",
+            AnsweredAt = _time
+        };
+    }
+
+    /// <summary>
+    ///     Test that the enumeration names (<c>NotApplicable</c>, <c>Added</c>), an agreed outcome, a whole-file anchor,
+    ///     a user name, and different times of a thread and its comment are written as documented, with known digests
+    ///     (also with one reopen) worked out with an independent script.
     /// </summary>
     [Fact]
     public void RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue()
@@ -1086,16 +1118,19 @@ public class RecordDigestTests
             $"source git 7 40:{new string('a', 40)} 40:{new string('b', 40)} 4:**/* -",
             "changes",
             "change 5:c.txt 5:Added - 3:hs3",
-            "checklist -",
-            "answers",
-            "answer 6:REQ-01 13:NotApplicable 0: 3:Bob 3:bob",
+            "checklist 2:v1",
+            "section 1:A 3:Sec",
+            "item 3:A-1 1:q",
+            "checks",
+            "check 3:A-1 agreed 13:NotApplicable",
             "sections",
+            "outcome approved",
             "report",
             "thread file 5:a.txt 4:Head - -",
             $"claim 3:Bob 3:bob 4:Done {commentTicks}");
         Assert.Equal(expected, text);
-        Assert.Equal("c8bb5168eb86e1540291fe341d89c94ca71c711e0031112226508caf3358503e", digest);
-        Assert.Equal("1bd2f9a28c73eda31b0c1f71b1a3f07df4d09a1e1b5c2d58f3525070d170f4b8", reopenedDigest);
+        Assert.Equal("245104c8669f8eedbc77a42250fcbd0971c3aa53bc6d052f6717cde03d3984ba", digest);
+        Assert.Equal("13914386de652fabc98c7568dc4c8a1130abfaaeeba28b727520bedf309b9c5b", reopenedDigest);
     }
 
     /// <summary>
@@ -1106,7 +1141,7 @@ public class RecordDigestTests
     public void RecordDigest_Compute_ReopensChangeDigest()
     {
         // Arrange: the same content with no reopen, one and two reopens
-        var none = new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload);
+        var none = new ReviewRecord("abc", null, [], [], ReviewSource.Upload);
         var one = none with { Reopens = 1 };
         var two = none with { Reopens = 2 };
 

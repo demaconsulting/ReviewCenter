@@ -49,10 +49,11 @@ internal sealed class AttestationFixture
         Clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         AuditStore = new FakeAuditStore(Clock);
         Audit = new AuditService(AuditStore);
-        Users = new UserService(new FakeUserStore(), new FakePasswordHasher(), Clock);
+        var userStore = new FakeUserStore();
+        Users = new UserService(userStore, new FakePasswordHasher(), Clock);
         Access = new AllowAllProjectAccess(Store);
         Signing = TestServices.Signing(Store, Users, Clock);
-        Checklists = TestServices.Checklists(Store, Clock);
+        Checklists = TestServices.Checklists(Store, Clock, userStore);
     }
 
     /// <summary>
@@ -132,6 +133,7 @@ internal sealed class AttestationFixture
         await TestServices.Reviews(Store, Clock).CreateDraftAsync(
             ProjectId, reviewId, "Follow-up", [new("a.txt", TestContent.A)], new Actor("cyd", "Cyd"), cancellationToken, followsReviewId: ReviewId);
         var slot = await Signing.AddSlotAsync(new Actor("cyd", "Cyd"), ProjectId, reviewId, AnnUserId, BobUserId, cancellationToken);
+        await SubmitAsync(reviewId, slot.Id);
         var approval = await Signing.GetApprovalAsync(ProjectId, reviewId, cancellationToken);
         await Signing.SignAsync(TestActors.Ann, ProjectId, reviewId, slot.Id, approval!.Digest, Password, cancellationToken);
     }
@@ -163,9 +165,9 @@ internal sealed class AttestationFixture
 
         await TestServices.Reviews(fixture.Store, fixture.Clock).CreateDraftAsync(
             project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], cancellationToken);
-        await fixture.AnswerAllAsync(ChecklistOutcome.Pass);
         var slot = await fixture.Signing.AddSlotAsync(new Actor("cyd", "Cyd"), project.Id, ReviewId, ids["ann"], ids["bob"], cancellationToken);
         fixture.SlotId = slot.Id;
+        await fixture.AnswerAllAsync(ChecklistOutcome.Pass);
         if (signed)
         {
             await fixture.SignAsync();
@@ -175,9 +177,9 @@ internal sealed class AttestationFixture
     }
 
     /// <summary>
-    ///     Answers every check of the checklist. The answers are written to the store directly, so the step also works
-    ///     on an approved review, which the services refuse to change: it models a change that slipped in while a
-    ///     document was being prepared.
+    ///     Answers every check of the checklist in the ballot of the first slot and hands the ballot in. The answers are
+    ///     written to the store directly, so the step also works on an approved review, which the services refuse to
+    ///     change: it models a change that slipped in while a document was being prepared.
     /// </summary>
     /// <param name="outcome">The answer.</param>
     /// <param name="reviewId">The review to answer; the fixture's review when <c>null</c>.</param>
@@ -185,23 +187,56 @@ internal sealed class AttestationFixture
     public async Task AnswerAllAsync(ChecklistOutcome outcome, string? reviewId = null)
     {
         reviewId ??= ReviewId;
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var slot = (await Store.ListSlotsAsync(ProjectId, reviewId, cancellationToken))[0];
+        Store.IgnoreLockForBallots = true;
+        try
         {
-            await Store.SetChecklistAnswerAsync(
-                new ChecklistAnswer
-                {
-                    ProjectId = ProjectId,
-                    ReviewId = reviewId,
-                    ItemId = item.Id,
-                    Outcome = outcome,
-                    Justification = outcome == ChecklistOutcome.Pass ? null : "Changed after the signature.",
-                    AnsweredBy = TestActors.Ann.DisplayName,
-                    AnsweredByUsername = TestActors.Ann.Username,
-                    AnsweredAt = Clock.GetUtcNow()
-                },
-                AuditDraft.By(TestActors.Ann, "checklist.answered", item.Id, ProjectId, reviewId),
-                TestContext.Current.CancellationToken);
+            foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+            {
+                await Store.SetBallotAnswerAsync(
+                    new ChecklistAnswer
+                    {
+                        ProjectId = ProjectId,
+                        ReviewId = reviewId,
+                        SlotId = slot.Id,
+                        ItemId = item.Id,
+                        Outcome = outcome,
+                        Justification = outcome == ChecklistOutcome.Pass ? null : "Changed after the signature.",
+                        AnsweredBy = TestActors.Ann.DisplayName,
+                        AnsweredByUsername = TestActors.Ann.Username,
+                        AnsweredAt = Clock.GetUtcNow()
+                    },
+                    AuditDraft.By(TestActors.Ann, "checklist.answered", item.Id, ProjectId, reviewId),
+                    null,
+                    cancellationToken);
+            }
+
+            await SubmitAsync(reviewId, slot.Id);
         }
+        finally
+        {
+            Store.IgnoreLockForBallots = false;
+        }
+    }
+
+    /// <summary>
+    ///     Hands in the ballot of a slot straight in the store.
+    /// </summary>
+    /// <param name="reviewId">The review.</param>
+    /// <param name="slotId">The slot.</param>
+    /// <returns>A task that completes when the ballot is handed in.</returns>
+    public Task SubmitAsync(string reviewId, int slotId)
+    {
+        return Store.SubmitBallotAsync(
+            ProjectId,
+            reviewId,
+            slotId,
+            Clock.GetUtcNow(),
+            TestActors.Ann.Username,
+            AuditDraft.By(TestActors.Ann, "ballot.submitted", "slot", ProjectId, reviewId),
+            _ => true,
+            TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -257,6 +292,7 @@ internal sealed class AttestationFixture
         var cancellationToken = TestContext.Current.CancellationToken;
         var cyd = new Actor("cyd", "Cyd");
         var slot = await AddUnsignedSlotAsync(cancellationToken);
+        await EvidenceTestSupport.AnswerAllPassAsync(Checklists, ProjectId, ReviewId, cyd);
         var approval = await Signing.GetApprovalAsync(ProjectId, ReviewId, cancellationToken);
         await Signing.SignAsync(cyd, ProjectId, ReviewId, slot.Id, approval!.Digest, Password, cancellationToken);
     }

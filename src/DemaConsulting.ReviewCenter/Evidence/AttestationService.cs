@@ -478,7 +478,12 @@ internal sealed class AttestationService
             return [];
         }
 
-        var state = new ChecklistState(record.Checklist.Parse(), record.SectionStates, record.Answers);
+        var state = BallotProjection.Consolidate(record)?.State;
+        if (state is null)
+        {
+            return [];
+        }
+
         return state.Definition.Sections
             .Select(section => new AttestationSection(
                 section.Id,
@@ -499,7 +504,7 @@ internal sealed class AttestationService
                 }).ToList(),
                 state.IsApplicable(section.Id)
                     ? null
-                    : record.SectionStates.FirstOrDefault(s => s.SectionId == section.Id && !s.Applicable)?.CarriedFromReviewId))
+                    : state.SectionStateFor(section.Id)?.CarriedFromReviewId))
             .ToList();
     }
 

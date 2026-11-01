@@ -94,9 +94,13 @@ public class InboxServiceTests
         await world.SignAsync("r1", first.Id, "ann");
         Assert.Empty(await world.RowsAsync("ann", InboxSection.ToSign));
         var item = DefaultChecklist.Current.Sections[0].Items[0];
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("eve"), Ct,
-            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1"));
+            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("bob"), Ct,
+            acknowledged);
+
+        // Bob hands the changed ballot in again: it disagrees with the one ann signed
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, "r1", InboxTestWorld.ActorOf("bob"), Ct, acknowledged);
 
         // Act
         var rows = await world.RowsAsync("ann", InboxSection.ToSign);
@@ -787,6 +791,58 @@ public class InboxServiceTests
         var after = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
 
         // Assert
+        Assert.False(seen.IsUnread);
+        Assert.True(after.IsUnread);
+    }
+
+    /// <summary>
+    ///     Test that a draft ballot of another slot does not turn a read To sign row unread.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_Unread_DraftBallotOfOtherSlot_Ignored()
+    {
+        // Arrange: ann and bob are reviewers; ann has seen the review
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        var item = DefaultChecklist.Current.Sections[0].Items[0];
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: bob answers a check in his draft ballot without handing it in
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, "r1", item.Id, ChecklistOutcome.Pass, null, InboxTestWorld.ActorOf("bob"), Ct);
+        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+
+        // Assert: the draft is not news to ann
+        Assert.False(row.IsUnread);
+    }
+
+    /// <summary>
+    ///     Test that a submitted ballot of another slot turns a read To sign row unread.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_Unread_SubmittedBallotOfOtherSlot_IsUnread()
+    {
+        // Arrange: ann and bob are reviewers; ann has seen the review
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
+        var seen = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: bob answers every check and hands his ballot in
+        var bob = InboxTestWorld.ActorOf("bob");
+        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, "r1", bob, Ct);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, "r1", bob, Ct);
+        var after = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+
+        // Assert: the row was read before and is new now
         Assert.False(seen.IsUnread);
         Assert.True(after.IsUnread);
     }

@@ -102,14 +102,14 @@ public class UserImpactServiceTests
     [Fact]
     public async Task UserImpactService_GetImpactAsync_OutOfDateSlot_IsOpenWorkAsOutOfDate()
     {
-        // Arrange: ann signed, then a failed check changed the record, so the signature is out of date
+        // Arrange: ann signed, then bob's changed ballot disagreed with hers, so the record changed and her signature is out of date
         var setup = await ArrangeAsync();
         await setup.World.CreateReviewAsync("r1");
         await setup.World.AnswerAllAsync("r1");
         var first = await setup.World.AddSlotAsync("r1", "ann");
         await setup.World.AddSlotAsync("r1", "bob");
         await setup.World.SignAsync("r1", first.Id, "ann");
-        await setup.World.FailCheckAsync("r1", "eve");
+        await setup.World.FailCheckAsync("r1", "bob");
 
         // Act
         var ann = await setup.ImpactOfAsync("ann");

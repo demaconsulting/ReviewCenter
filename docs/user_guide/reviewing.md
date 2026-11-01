@@ -388,6 +388,16 @@ and the first section with unanswered checks is open when you arrive.
 
 ![The checklist page: two sections done, one in progress, and a justified N/A answer.](images/checklist-partial.png)
 
+**You answer in the ballot of your reviewer slot.** The checklist is answered by the reviewers of the slots of the
+review (the primary and the alternate of a slot share its ballot). A project member who has no slot sees the
+consolidated standing of the submitted ballots and the notice "You are not a reviewer of this review, so you see the
+consolidated standing but cannot answer.", and has to add a slot (see [Review Signatures](#review-signatures)) before
+answering. In a review with one slot nothing changes: your answers count at once, and the last answer hands the ballot
+in. In a review with several slots your answers are a draft that only you see; when every check that applies is
+answered, the button **Submit ballot** appears, and the ballot counts, for the digest, the progress, and the approval,
+only after you press it. Changing a submitted ballot makes it a draft again until you submit it. Where the submitted
+ballots differ on a check, the check is disputed and blocks signing until the reviewers agree.
+
 1. Open a section and choose Pass, Fail, or N/A for each check. A Pass is saved at once. For Fail and N/A a
    justification (up to 2000 characters) is required: type it in the box that appears and press Save. A missing
    justification is reported next to the box, and nothing is saved until it is given. You can change an answer at any
@@ -407,9 +417,10 @@ and the first section with unanswered checks is open when you arrive.
 The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it
 counts as answered, and its justification records the finding. A review with a Fail cannot be signed, and the files
 of a review never change, so the usual way on is a new review of the fixed revision (see When a Check Fails in the
-Review Practices chapter). Any later change to the record, including a checklist answer of another reviewer, makes the
-signatures given so far out of date, so answer first and sign last (see Sign Last in the same chapter). When a change
-of an answer or of the applicability of a section would do that, the page first shows a warning next to the check or the
+Review Practices chapter). Any later change to the agreed standing of the submitted ballots, such as a disagreement on a
+check, makes the
+signatures given so far out of date, so answer first and sign last (see Sign Last in the same chapter). When handing in
+a ballot, or an answer in a review with one slot, would do that, the page first shows a warning next to the check or the
 section that names every affected slot and signer. **Confirm change** stores the change; **Cancel** stores nothing, and
 the unsaved choice, justification, and reason stay as you typed them (a section you switched on goes back to not
 applicable).
@@ -466,11 +477,16 @@ the report flags of its comments, so a Finding stays a Finding. The
 review page also says "Follows X" with the number of answers and threads carried, and the earlier review lists the
 reviews that follow it.
 
+Answers are carried only from the submitted ballots of the earlier review (a draft ballot carries nothing), and an
+answer inside a section that is marked not applicable is not carried, because the section is carried as not
+applicable instead.
+
 **What is not carried over.** Fail answers, resolved threads, reviewer slots, signatures, and reopenings. A check that
 failed shows "Failed in review X" with the earlier justification, read-only, until it is answered again here. A carried
 open thread blocks approval until it is resolved, like any other open thread.
 
-**Signing is unchanged.** The follow-up is signed like any review: every check answered, no Fail, no open thread, and
+**Signing is unchanged.** The follow-up is signed like any review: every check answered in the submitted ballots, no
+Fail, no open thread, and
 the independence rules apply. Carrying an answer does not make you the answerer of it: the answer still names the
 person who gave it in the earlier review, so the person who creates the follow-up gets no credit for it and no
 exemption from the rules. The earlier review is not changed and stays In review; its attestation is not affected. The
@@ -490,7 +506,7 @@ review (see [The Project Page Overview](#the-project-page-overview)). An Approve
 
 **Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
 members of the project. Either of the two can sign the slot. A review can have any number of slots, or none; a review
-without a slot stays In review and its next step says "Add a reviewer slot.". Any member of the project (and any
+without a slot stays In review. Any member of the project (and any
 system administrator) can add a slot (open **Add a slot**,
 choose the reviewers and press **Add slot**) and change or remove a slot that is not signed (open **Change
 reviewers**, then **Save** or **Remove**). A user can be in only one slot of
@@ -516,7 +532,9 @@ the review in ReviewCenter is not excluded. The rule helps to keep the creator o
 it is not proof that the reviewer did not write the code. A project in which one person has to do both can switch the
 rule off.
 
-**Who may answer the checklist.** In a project that does not let authors answer the checklist of their own review
+**Who may answer the checklist.** Only a reviewer of a slot of the review can answer a check or change whether a section
+applies (the service refuses anybody else with "You are not a reviewer of this review"). In a project that does not let
+authors answer the checklist of their own review
 (the default), the person who created the review cannot answer a check or change whether a section applies; the
 service refuses it with a message that starts "You created this review, so you cannot answer its checklist". The
 comment threads are not affected. A review created from the command line has no recorded author.
@@ -546,6 +564,9 @@ and after that the slot offers **Sign** (see
 Sign In with an OpenID Connect Provider in the Users and Sign-in chapter). A review can be signed only when:
 
 - it has a checklist, and every check of an applicable section is answered;
+- your own ballot is submitted (in a review with one slot the last answer does that; the other reviewers may still be
+  at work, which allows early signing, and a later disagreement then makes your signature out of date);
+- no check of an applicable section is disputed between the submitted ballots;
 - no check of an applicable section is answered Fail (the files of a review never change, so after a Fail the usual
   way on is a new review of the fixed revision; see When a Check Fails in the Review Practices chapter); and
 - no thread is open.
@@ -557,23 +578,27 @@ statement.
 ![The signing form of a reviewer slot with the statement and password confirmation.](images/signature-confirmation.png)
 
 **What a signature covers.** A signature is bound to the record as it was when you signed. The record is the content
-fingerprint of the files, the wording of every checklist question, every checklist answer with its justification and
-the person who gave it, every section marked as not applicable with its reason, and the comments that are included in
-the report (a comment is chat, and not part of the record, unless it is included). For a review from a repository it
+fingerprint of the files, the wording of every checklist question, the consolidated standing of the submitted ballots
+(for every check the agreed answer, or that it is disputed or still open; for every section whether it is agreed to be
+not applicable or disputed; and the outcome), and the comments that are included in
+the report (a comment is chat, and not part of the record, unless it is included). Drafts, justifications, the
+name of the person who answered, the reasons of not applicable sections and the times are not part of it. For a review
+from a repository it
 also covers the repository, the
 baseline and head commits, the selection, and every changed file with its change kind and the hashes of its baseline
 and head content, so a signature cannot look current for a different selection or a different change. The
 **Record digest** in the Details section (shortened; the full
-value is its tooltip) identifies that record. The time an answer was given is not part of it, but who gave it is: if
-somebody else answers a check again, even with the same value, the earlier signatures go out of date. In general, any
-change to the record, including another reviewer's checklist answer or a change to the report, makes the
+value is its tooltip) identifies that record. If another reviewer submits the same answer for a check that the
+submitted ballots already agree on, the record does not change and the signatures stay current. In general, a change
+to the agreed standing, such as a first disagreement, or a change to the report, makes the
 signatures given so far out of date. Chat, and whether a thread is open or resolved, are not part of the record, so
 they never do; an open thread blocks signing instead. If the record
 changes while you are signing, the signature is refused and you are asked to review it and try again.
 
 **Out of date and Approved.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the current
 record, "Signature out of date" when it has signatures but the record has changed since (for example a changed
-answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot, every slot is
+answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot, every slot has submitted
+its ballot, the ballots agree on every check, every slot is
 signed for the current record, and no thread is open. A review whose slots are all signed but that has an open thread
 is not approved and not locked; the thread must be resolved first. While some slots are still unsigned, a change to the
 record makes the signatures given
@@ -600,7 +625,8 @@ review can be downloaded as a digitally signed PDF; see the section Signed Attes
 ## Locked Reviews and Reopening
 
 An approved review is **locked**. The lock is not a separate state: a review is locked while it has at least one
-reviewer slot, every slot holds a signature of the current record, and no comment thread is open, which is the same
+reviewer slot, every slot has a submitted ballot and the ballots agree, every slot holds a signature of the current
+record, and no comment thread is open, which is the same
 condition as **Approved**.
 The review page then shows a **Locked** badge next to the Approved badge and a notice: "This review is approved and
 locked. Its content, checklist and reviewers can no longer change. A project administrator can reopen it; the

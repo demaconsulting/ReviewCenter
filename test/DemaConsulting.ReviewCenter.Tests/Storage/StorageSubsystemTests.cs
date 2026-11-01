@@ -154,11 +154,17 @@ public class StorageSubsystemTests
         var first = Open(options);
         using (first.Provider)
         {
+            var users = NewUserService(first.Provider);
+            var ann = await users.CreateAsync("ann", "Ann", false, "correct horse battery", TestContext.Current.CancellationToken);
             var project = await first.Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
             projectId = project.Id;
+            await first.Store.AddMembershipAsync(ann.Id, projectId, TestContext.Current.CancellationToken);
             await first.Reviews.CreateDraftAsync(
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
-            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now));
+            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
+            await signing.AddSlotAsync(
+                TestActors.Ann, projectId, "rev-1", ann.Id, null, TestContext.Current.CancellationToken);
+            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now), NewUserStore(first.Provider));
             await checklists.SetAnswerAsync(
                 projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "Broken", TestActors.Ann, TestContext.Current.CancellationToken);
             await checklists.SetSectionApplicabilityAsync(
@@ -169,7 +175,7 @@ public class StorageSubsystemTests
         var second = Open(options);
         using (second.Provider)
         {
-            var state = await TestServices.Checklists(second.Store, new FixedTimeProvider(_now))
+            var state = await TestServices.Checklists(second.Store, new FixedTimeProvider(_now), NewUserStore(second.Provider))
                 .GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
             // Assert: the snapshot, the answer and the applicability survived
@@ -340,16 +346,16 @@ public class StorageSubsystemTests
             await first.Store.AddMembershipAsync(bob.Id, projectId, TestContext.Current.CancellationToken);
             await first.Reviews.CreateDraftAsync(
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
-            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now));
+            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
+            var slot = await signing.AddSlotAsync(
+                TestActors.Ann, projectId, "rev-1", ann.Id, bob.Id, TestContext.Current.CancellationToken);
+            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now), NewUserStore(first.Provider));
             foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
             {
                 await checklists.SetAnswerAsync(
                     projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
             }
 
-            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
-            var slot = await signing.AddSlotAsync(
-                TestActors.Ann, projectId, "rev-1", ann.Id, bob.Id, TestContext.Current.CancellationToken);
             var approval = await signing.GetApprovalAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
             await signing.SignAsync(
                 TestActors.Bob, projectId, "rev-1", slot.Id, approval!.Digest, "correct horse battery", TestContext.Current.CancellationToken);
@@ -398,14 +404,15 @@ public class StorageSubsystemTests
             await first.Store.AddMembershipAsync(ann.Id, projectId, cancellationToken);
             await first.Store.AddMembershipAsync(bob.Id, projectId, cancellationToken);
             await first.Reviews.CreateDraftAsync(projectId, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
-            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now));
+            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
+            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now), NewUserStore(first.Provider));
+            var slot = await signing.AddSlotAsync(
+                TestActors.Ann, projectId, "rev-1", bob.Id, null, cancellationToken);
             foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
             {
-                await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+                await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
             }
 
-            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
-            var slot = await signing.AddSlotAsync(TestActors.Ann, projectId, "rev-1", bob.Id, null, cancellationToken);
             digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
             await signing.SignAsync(TestActors.Bob, projectId, "rev-1", slot.Id, digest, "correct horse battery", cancellationToken);
         }
@@ -507,8 +514,18 @@ public class StorageSubsystemTests
     /// <returns>The service, over the real user store and a fast test hasher.</returns>
     private static UserService NewUserService(ServiceProvider provider)
     {
+        return new UserService(NewUserStore(provider), new FakePasswordHasher(), new FixedTimeProvider(_now));
+    }
+
+    /// <summary>
+    ///     Builds the real user store over the database of a provider.
+    /// </summary>
+    /// <param name="provider">The provider that owns the database factory.</param>
+    /// <returns>The user store.</returns>
+    private static UserStore NewUserStore(ServiceProvider provider)
+    {
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
-        return new UserService(new UserStore(factory, new AuditAppender(TimeProvider.System)), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        return new UserStore(factory, new AuditAppender(TimeProvider.System));
     }
 
     /// <summary>

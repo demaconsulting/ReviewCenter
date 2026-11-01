@@ -79,7 +79,7 @@ public class SigningServiceOpenThreadTests
     /// <returns>The record.</returns>
     private static ReviewRecord Record(params ReviewThread[] threads)
     {
-        return new ReviewRecord("abc", null, [], [], threads, ReviewSource.Upload, 0);
+        return new ReviewRecord("abc", null, [], threads, ReviewSource.Upload, 0);
     }
 
     /// <summary>

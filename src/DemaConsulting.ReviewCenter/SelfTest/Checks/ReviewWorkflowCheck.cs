@@ -197,21 +197,21 @@ internal static class ReviewWorkflowCheck
         People people,
         CancellationToken cancellationToken)
     {
-        // The author may not answer the checklist (the default rule), so the separate reviewer answers every item
+        // The author may not answer the checklist (the default rule), and a person without a reviewer slot has no ballot
+        // to answer on, so the separate reviewer is seated in the one slot before answering every item
         var checklists = provider.GetRequiredService<ChecklistService>();
         var allItems = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ToList();
         await ExpectRefusedAsync(
             DomainRule.AuthorCannotAnswer,
             () => checklists.SetAnswerAsync(
                 projectId, reviewId, allItems[0].Id, ChecklistOutcome.Pass, null, people.AuthorActor, cancellationToken));
-        foreach (var item in allItems)
-        {
-            await checklists.SetAnswerAsync(
-                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, people.ReviewerActor, cancellationToken);
-        }
+        await ExpectRefusedAsync(
+            DomainRule.NoReviewerSlot,
+            () => checklists.SetAnswerAsync(
+                projectId, reviewId, allItems[0].Id, ChecklistOutcome.Pass, null, people.ReviewerActor, cancellationToken));
 
         var signing = provider.GetRequiredService<SigningService>();
-        var digest = (await signing.GetApprovalAsync(projectId, reviewId, cancellationToken))?.Digest
+        var firstDigest = (await signing.GetApprovalAsync(projectId, reviewId, cancellationToken))?.Digest
             ?? throw new ValidationFailedException("The review has no record digest to sign.");
 
         // The author is refused as a reviewer. To show that the signature is refused as well, the rule is switched
@@ -226,12 +226,20 @@ internal static class ReviewWorkflowCheck
         await ExpectRefusedAsync(
             DomainRule.ReviewerNotIndependent,
             () => signing.SignAsync(
-                people.AuthorActor, projectId, reviewId, authorSlot.Id, digest, SelfTestServices.SelfTestSecret, cancellationToken));
+                people.AuthorActor, projectId, reviewId, authorSlot.Id, firstDigest, SelfTestServices.SelfTestSecret, cancellationToken));
         await signing.RemoveSlotAsync(people.AuthorActor, projectId, reviewId, authorSlot.Id, cancellationToken);
 
-        // The separate reviewer holds the one slot and signs
+        // The separate reviewer holds the one slot, answers every item (the last answer hands the ballot in) and signs
         var slot = await signing.AddSlotAsync(
             people.AuthorActor, projectId, reviewId, people.Reviewer.Id, null, cancellationToken);
+        foreach (var item in allItems)
+        {
+            await checklists.SetAnswerAsync(
+                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, people.ReviewerActor, cancellationToken);
+        }
+
+        var digest = (await signing.GetApprovalAsync(projectId, reviewId, cancellationToken))?.Digest
+            ?? throw new ValidationFailedException("The review has no record digest to sign.");
         await signing.SignAsync(
             people.ReviewerActor, projectId, reviewId, slot.Id, digest, SelfTestServices.SelfTestSecret, cancellationToken);
     }

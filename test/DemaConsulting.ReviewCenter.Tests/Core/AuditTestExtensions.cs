@@ -488,25 +488,25 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
-    ///     Sets a checklist section state in a store with a generic audit draft.
+    ///     Sets a section state of a ballot in a store with a generic audit draft (no automatic submit).
     /// </summary>
-    public static Task SetChecklistSectionStateAsync(
+    public static Task<Ballot> SetBallotSectionStateAsync(
         this IReviewStore store,
         ChecklistSectionState state,
         CancellationToken cancellationToken = default)
     {
-        return store.SetChecklistSectionStateAsync(state, Draft(), cancellationToken);
+        return store.SetBallotSectionStateAsync(state, Draft(), null, cancellationToken);
     }
 
     /// <summary>
-    ///     Sets a checklist answer in a store with a generic audit draft.
+    ///     Sets an answer of a ballot in a store with a generic audit draft (no automatic submit).
     /// </summary>
-    public static Task SetChecklistAnswerAsync(
+    public static Task<Ballot> SetBallotAnswerAsync(
         this IReviewStore store,
         ChecklistAnswer answer,
         CancellationToken cancellationToken = default)
     {
-        return store.SetChecklistAnswerAsync(answer, Draft(), cancellationToken);
+        return store.SetBallotAnswerAsync(answer, Draft(), null, cancellationToken);
     }
 
     /// <summary>
@@ -605,21 +605,43 @@ internal static class AuditTestExtensions
         CancellationToken cancellationToken = default)
     {
         const string password = "correct horse battery";
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var reviewer = await users.CreateAsync(reviewerName, reviewerName, UserRole.Reviewer, password, cancellationToken);
         await store.AddMembershipAsync(reviewer.Id, projectId, cancellationToken);
-        var checklists = TestServices.Checklists(store, clock);
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await checklists.SetAnswerAsync(
-                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
-        }
 
+        // The reviewer holds the one slot first: a person answers into the ballot of the own slot, and the last answer
+        // of a review with one slot hands the ballot in
         var signing = TestServices.Signing(store, users, clock);
         var actor = new Actor(reviewerName, reviewerName);
         var slot = await signing.AddSlotAsync(actor, projectId, reviewId, reviewer.Id, null, cancellationToken);
+        await AnswerAllAsync(TestServices.Checklists(store, clock, userStore), projectId, reviewId, actor, cancellationToken);
         var digest = (await signing.GetApprovalAsync(projectId, reviewId, cancellationToken))!.Digest;
         await signing.SignAsync(actor, projectId, reviewId, slot.Id, digest, password, cancellationToken);
         return digest;
+    }
+
+    /// <summary>
+    ///     Answers every check of the default checklist with Pass as the given actor, who must hold a reviewer slot of
+    ///     the review.
+    /// </summary>
+    /// <param name="checklists">The checklist service whose user store knows the actor.</param>
+    /// <param name="projectId">The project of the review.</param>
+    /// <param name="reviewId">The review to answer.</param>
+    /// <param name="actor">The slot owner who answers.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when every check is answered.</returns>
+    public static async Task AnswerAllAsync(
+        ChecklistService checklists,
+        int projectId,
+        string reviewId,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+        }
     }
 }

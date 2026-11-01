@@ -107,10 +107,10 @@ public class ApiSubsystemTests
         var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
         var store = app.Services.GetRequiredService<IReviewStore>();
         await EvidenceTestSupport.AddReviewAsync(store, TimeProvider.System, projectId, "REV-2", "Core-Logic", "one\n"u8.ToArray());
-        await EvidenceTestSupport.AnswerAllPassAsync(app.Services.GetRequiredService<ChecklistService>(), projectId, "REV-2");
         var annId = (await app.Services.GetRequiredService<UserService>().GetAsync("ann", TestContext.Current.CancellationToken))!.Id;
         var signing = app.Services.GetRequiredService<SigningService>();
         var slotId = await EvidenceTestSupport.AddSlotAsync(signing, projectId, "REV-2", annId);
+        await EvidenceTestSupport.AnswerAllPassAsync(app.Services.GetRequiredService<ChecklistService>(), projectId, "REV-2");
         await EvidenceTestSupport.SignAsync(signing, projectId, "REV-2", slotId, EvidenceTestSupport.Ann, TestBrowser.Password);
         var created = await CreateTokenAsync(app);
         using var client = ClientFor(app, created.Value, basic: true);

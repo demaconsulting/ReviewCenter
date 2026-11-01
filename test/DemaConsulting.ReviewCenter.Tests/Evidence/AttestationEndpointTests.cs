@@ -373,14 +373,14 @@ public class AttestationEndpointTests
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "REV-1", "First review", [new UploadedFile("a.txt", "one\ntwo\n"u8.ToArray())], new Actor("zed", "Zed"), cancellationToken);
         var ann = new Actor("ann", "Ann");
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slot = await signing.AddSlotAsync(ann, project.Id, "REV-1", ids["ann"], ids["bob"], cancellationToken);
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await app.Services.GetRequiredService<ChecklistService>().SetAnswerAsync(
                 project.Id, "REV-1", item.Id, ChecklistOutcome.Pass, null, ann, cancellationToken);
         }
 
-        var signing = app.Services.GetRequiredService<SigningService>();
-        var slot = await signing.AddSlotAsync(ann, project.Id, "REV-1", ids["ann"], ids["bob"], cancellationToken);
         if (signed)
         {
             var approval = await signing.GetApprovalAsync(project.Id, "REV-1", cancellationToken);

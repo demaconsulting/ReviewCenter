@@ -165,9 +165,10 @@ public class InboxPageTests : InboxWebTestBase
         await CreateInboxReviewAsync("r2");
         await AddSlotAsync("r2", "ann");
         await CreateInboxReviewAsync("r3");
-        await AnswerAllAsync("r3");
         var annSlot = await AddSlotAsync("r3", "ann");
         var bobSlot = await AddSlotAsync("r3", "bob");
+        await AnswerAllAsync("r3", "ann");
+        await AnswerAllAsync("r3", "bob");
         await SignSlotAsync("r3", annSlot.Id, "ann");
         await SignSlotAsync("r3", bobSlot.Id, "bob");
         SignInAs("ann", "Ann", false);

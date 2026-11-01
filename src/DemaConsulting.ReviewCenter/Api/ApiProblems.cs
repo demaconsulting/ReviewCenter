@@ -42,7 +42,8 @@ internal static class ApiProblems
     ///     review that is locked by its approval, or that is not locked when a reopen is asked, or a change that would
     ///     make a signature out of date without being acknowledged, or a review rule of the project that refuses the
     ///     change: the author answering the checklist, a reopener signing again, a reopen that would strand a slot), 429 when too many
-    ///     attempts were made, 502, 503 or 504 when git cannot be used, 403 when the caller is not allowed, 500 when
+    ///     attempts were made, 502, 503 or 504 when git cannot be used, 403 when the caller is not allowed (including an
+    ///     answer without a reviewer slot and a signature before the own ballot is handed in), 500 when
     ///     a stored credential cannot be read, otherwise 400 (a checklist definition that is not valid is 400 explicitly).
     /// </returns>
     public static int StatusOf(DomainRule rule)
@@ -79,6 +80,8 @@ internal static class ApiProblems
             DomainRule.ChecklistDefinitionInvalid or DomainRule.DueDateInvalid or DomainRule.FollowUpInvalid => StatusCodes.Status400BadRequest,
             DomainRule.ActorNotAllowed
                 or DomainRule.SigningNotAllowed
+                or DomainRule.NoReviewerSlot
+                or DomainRule.BallotNotSubmitted
                 or DomainRule.PasswordChangeRequired => StatusCodes.Status403Forbidden,
             DomainRule.CredentialsUnreadable => StatusCodes.Status500InternalServerError,
             _ => StatusCodes.Status400BadRequest

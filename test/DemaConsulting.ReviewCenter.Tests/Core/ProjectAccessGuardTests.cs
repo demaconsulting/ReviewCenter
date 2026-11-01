@@ -76,6 +76,7 @@ public class ProjectAccessGuardTests
                 project, "rev-1", item, ChecklistOutcome.Pass, null, actor, cancellationToken),
             ["applicability"] = () => world.Checklists.SetSectionApplicabilityAsync(
                 project, "rev-1", section, false, "not needed", actor, cancellationToken),
+            ["submit ballot"] = () => world.Checklists.SubmitBallotAsync(project, "rev-1", actor, cancellationToken),
             ["add slot"] = () => world.Signing.AddSlotAsync(
                 actor, project, "rev-1", world.Ids["usr"], null, cancellationToken),
             ["update slot"] = () => world.Signing.UpdateSlotAsync(
@@ -212,6 +213,7 @@ public class ProjectAccessGuardTests
         "ChecklistService.SetAnswerAsync",
         "ChecklistService.SetReviewConclusionTextAsync",
         "ChecklistService.SetSectionApplicabilityAsync",
+        "ChecklistService.SubmitBallotAsync",
         "RepositoryService.ListEnabledAsync",
         "ReviewPlanner.CreateAsync",
         "ReviewPlanner.PlanAsync",
@@ -316,6 +318,8 @@ public class ProjectAccessGuardTests
                 project, "rev-1", item, ChecklistOutcome.Pass, null, actor, cancellationToken),
             ["ChecklistService.SetSectionApplicabilityAsync"] = () => world.Checklists.SetSectionApplicabilityAsync(
                 project, "rev-1", section, false, "not needed", actor, cancellationToken),
+            ["ChecklistService.SubmitBallotAsync"] = () => world.Checklists.SubmitBallotAsync(
+                project, "rev-1", actor, cancellationToken),
             ["ChecklistService.SetReviewConclusionTextAsync"] = () => world.Checklists.SetReviewConclusionTextAsync(
                 project, "rev-1", "A conclusion.", actor, cancellationToken),
             ["SigningService.AddSlotAsync"] = () => world.Signing.AddSlotAsync(
@@ -416,10 +420,16 @@ public class ProjectAccessGuardTests
         // The test is about who may work, not about the author rule: root created the review and answers it below
         await world.Projects.SetReviewRuleAsync(
             new Actor("root", "root"), world.Own, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken);
+        await world.Projects.SetRequireIndependentReviewersAsync(
+            new Actor("root", "root"), world.Own, true, false, cancellationToken);
 
+        // A slot is held by a member, so the system administrator joins the project for the answers
+        await world.Store.AddMembershipAsync(world.Ids["root"], world.Own, ProjectRole.User, cancellationToken);
         // Act, Assert
         foreach (var actor in new[] { new Actor("padm", "padm"), new Actor("root", "root") })
         {
+            // Answering takes a reviewer slot of one's own
+            await world.Signing.AddSlotAsync(actor, world.Own, "rev-1", actor.Username == "padm" ? padm.Id : world.Ids["root"], null, cancellationToken);
             var thread = await world.Threads.StartThreadAsync(
                 world.Own, "rev-1", new ThreadAnchor("a.txt"), actor, "hello", cancellationToken);
             await world.Threads.ReplyAsync(world.Own, "rev-1", thread.Id, actor, "again", cancellationToken);

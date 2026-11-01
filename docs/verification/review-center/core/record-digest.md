@@ -3,11 +3,13 @@
 #### Verification Approach
 
 `RecordDigest` is verified with unit tests defined in `RecordDigestTests.cs` (the format and everything outside the
-report), `RecordDigestFollowUpTests.cs` (the follow-up lines), and `RecordDigestReportTests.cs` (the `report` block).
-The tests build small `ReviewRecord`
-values by hand and call the static methods directly. The format is proved twice: the exact canonical text of a small
-record is compared with the text of the design, and the digest of a record with no answers, sections, or threads is
-compared with a known SHA-256 value that was calculated independently of the implementation. The properties that the
+report), `RecordDigestBallotTests.cs` (the `check`, `applicability`, and `outcome` lines and what the consolidation of
+the ballots does and does not give the digest), `RecordDigestFollowUpTests.cs` (the follow-up lines), and
+`RecordDigestReportTests.cs` (the `report` block). The tests build small `ReviewRecord`
+values, with their submitted and draft ballots, by hand and call the static methods directly. The format is proved
+twice: the exact canonical text of a small record is compared with the text of the design, and the digest of a record
+with no ballots or threads is compared with a known SHA-256 value that was calculated independently of the
+implementation. The properties that the
 design promises (what changes the digest, what does not, and that the text cannot be confused) are proved by changing
 one value of a record at a time and comparing digests. The `report` block is pinned by golden vectors that an
 independent model (a Python script that builds the text from the rules of the design) produced before the tests were
@@ -21,8 +23,10 @@ N/A - standard test environment.
 
 - All unit tests pass with zero failures.
 - The canonical text of a record has the version line (`ReviewCenter record v2`), the fingerprint, the source (upload,
-  or repository with its changes), the checklist wording, the answers with who answered, the sections that do not
-  apply, and the `report` block, written as the design states. The `report` block is the `report` marker line followed
+  or repository with its changes), the checklist wording, the consolidated standing of the submitted ballots (a
+  `check` line for each check of an applicable section, an `applicability` line for each section that is not
+  applicable or disputed, and the `outcome` line), and the `report` block, written as the design states. The `report`
+  block is the `report` marker line followed
   by one `thread file` block for every thread that has an included comment, with the side, the anchor, and only the
   included comments (`claim`, `comment`, or `resolution`); with no such thread it is the marker line alone.
 - The digest is the SHA-256 of the UTF-8 canonical text as 64 lowercase hexadecimal characters, and equals the known
@@ -30,19 +34,23 @@ N/A - standard test environment.
   the less common values), for the review-set variants, for the two thread sides, and for the report vectors
   (a resolved Finding, an open Finding, a Question with an included reply, a baseline Finding, a carried Finding,
   a record with reopens, and two included threads).
-- Changing a covered value (the fingerprint, an answer, the reason of a section, an included comment and its text,
+- Changing a covered value (the fingerprint, the agreed outcome of a check, a check that is disputed or pending, a
+  section that is not applicable or disputed, the conclusion, an included comment and its text,
   author, user name, kind, or time, the side, either line, or the whole-file anchor of a thread with an included
-  comment, the source kind, the repository, a commit, the selection, the review-set, or the path, kind, or hash of a change,
-  or an added or removed change, or the wording of a check, a section title, or the checklist version) changes the
-  digest.
+  comment, the source kind, the repository, a commit, the selection, the review-set, or the path, kind, or hash of a
+  change, or an added or removed change, or the wording of a check, a section title, or the checklist version) changes
+  the digest.
+- Only the consolidation of the submitted ballots counts: a draft ballot, an agreeing second submit, and the order and
+  identities of the slots do not change the digest, and the first disagreement does. The `check` lines are sorted
+  ordinally, and the `outcome` line is `none`, `approved`, or `rejected`.
 - Chat is not covered: a thread of only chat comments gives the digest of a record without threads, chat added to a
   Finding does not change the digest, and neither does the state of a thread, its creation time, or its identity.
   Promoting, demoting, or toggling the flag of a reply changes the digest and doing it back restores it; a resolution
   note is covered only when it is included.
-- Reordering the answers, sections, threads, and changes, the checklist sections and checks, or giving them other
+- Reordering the ballots, threads, and changes, the checklist sections and checks, or giving them other
   identities, does not change the digest; a different order of the included comments of a thread does.
-- Who answered a check (display name or user name) changes the digest; when it was answered, a section that applies,
-  and who marked a section as not applicable and when, do not.
+- Who answered a check (display name or user name), the justification, and when it was answered are not covered, nor
+  is a section that applies, nor who marked a section as not applicable, why, and when.
 - A stored checklist definition that is not valid JSON, or is incomplete (a missing version, sections, section id,
   title or items, or item id or text), is not hidden: it raises a `JsonException`. A minimal complete definition
   still computes.
@@ -53,21 +61,22 @@ N/A - standard test environment.
   `reopens {count}` line, so its digest differs from that of the same record without reopens and from that of the same
   record with another count.
 - A review that follows nothing and has no carried row has no `follows` line and no `carried` suffix; a follow-up gets
-  a `follows {id}` line after the source block and the suffix `carried {id}`, after a space, on a carried answer,
-  not-applicable section, and included thread line, and any change of these marks changes the digest, while the number
-  that a carried thread had in the earlier review does not.
+  a `follows {id}` line after the source block and the suffix `carried {id}`, after a space, on a carried included
+  thread line, and any change of these marks changes the digest, while the number that a carried thread had in the
+  earlier review, and the carried marker of an answer, do not.
 - The review conclusion text (the free text, not the approved or rejected conclusion) is written as one
-  length-prefixed `conclusion-text` line between `sections` and `report` only when there is a text, so a record
+  length-prefixed `conclusion-text` line between `outcome` and `report` only when there is a text, so a record
   without one keeps its digest; the known digests of a one-line and a two-line text match, and setting, changing or
   clearing the text changes the digest.
 - A null record is rejected with an `ArgumentNullException` by both methods.
 
 #### Test Scenarios
 
-**RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat**: A record with one answer, one section that does not
-apply, one section that does, and one thread with one included comment gives exactly the canonical text of the design,
-with the length-prefixed strings, the version line, who answered, only the section that does not apply, and the
-`report` block with the `claim` line. This scenario is
+**RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat**: A record with a checklist, one submitted ballot with
+one answer, one section that is not applicable and one that is, and one thread with one included comment gives exactly
+the canonical text of the design, with the length-prefixed strings, the version line, the `check` lines (and none for
+the check of the section that is not applicable), the `applicability` line of only the section that is not applicable,
+the `outcome` line, and the `report` block with the `claim` line. This scenario is
 tested by `RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat`.
 
 **RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText**: Two equal records give the same digest, which is
@@ -75,13 +84,13 @@ tested by `RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat`.
 tested by `RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText`.
 
 **RecordDigest_Compute_KnownRecord_MatchesKnownValue**: The upload record with the fingerprint `abc` and nothing else
-has the digest `eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3` (version 2). This scenario is
+has the digest `4c93e63f9251787ecc5a267ee3d3f28922757b299294add1709bf8a401fad5cd` (version 2). This scenario is
 tested by `RecordDigest_Compute_KnownRecord_MatchesKnownValue`.
 
 **RecordDigest_Compute_ChecklistRecord_MatchesDocumentedFormatAndKnownValue**: An upload record whose checklist
 defines its sections and checks out of id order gives exactly the canonical text of the design (checklist version,
-sections and checks sorted by id, the answer with who answered) and the known digest
-`2a6b6bc4de3a50d758ee5d5a9438c10c2f398576946ce3a828d5713ef70d91ef`. This scenario is tested by
+sections and checks sorted by id, the `check` lines of the agreed and of the pending checks) and the known digest
+`a4ca2841f1831fa27b4c7b241bb2f77ca1977c91b2fe47d72b135c07af29e38c`. This scenario is tested by
 `RecordDigest_Compute_ChecklistRecord_MatchesDocumentedFormatAndKnownValue`.
 
 **RecordDigest_Compute_ChecklistWordingChange_ChangesDigest**: A theory over a changed question wording, a changed
@@ -93,10 +102,9 @@ differs from that of the unchanged record. This scenario is tested by
 in another order gives the same digest. This scenario is tested by
 `RecordDigest_Compute_ChecklistDefinitionOrder_SameDigest`.
 
-**RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot**: Answers that differ in the display name
-or in the user name of the person give digests that differ from the original; an answer that differs only in the
-time of answering has the same digest. This scenario is tested by
-`RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot`.
+**RecordDigest_Compute_AnswererJustificationAndTime_NotCovered**: Records whose answer differs only in the display
+name of the answerer, in the user name, in the time of answering, or in the justification give the same digest as the
+original. This scenario is tested by `RecordDigest_Compute_AnswererJustificationAndTime_NotCovered`.
 
 **RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws**: A theory over corrupted stored definitions: text
 that is not JSON, `null`, `{}`, a missing or null version, a missing or null list of sections, a null section, a
@@ -120,12 +128,12 @@ the baseline side gives two different digests. This scenario is tested by
 **RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat**: A repository record whose changes are given out of
 path order gives exactly the canonical text of the design (source line with the length-prefixed commits and
 selection and `-` for no review-set, the changes sorted by path, `-` for the head hash of a deleted file) and the
-known digest `bb2723058729bb669e8c8858e0b4f913fd786e59d68d9d785093994b08012842`. This scenario is tested by
+known digest `b80fa632a2aa11861ecb6bf8442c85a1485f80b0f0e84a408c9e78705835c747`. This scenario is tested by
 `RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat`.
 
 **RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty**: The repository record with no review-set,
 with the review-set `core`, and with the empty review-set gives three different digests, equal to the known values
-of the design (calculated with an independent tool; they start with `bb27`, `a595`, and `8759`), and the source line
+of the design (calculated with an independent tool; they start with `b80f`, `748c`, and `3900`), and the source line
 ends with `-`, `4:core`, and `0:`. This
 scenario is tested by `RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty`.
 
@@ -137,9 +145,9 @@ record. This scenario is tested by `RecordDigest_Compute_SourceChange_ChangesDig
 **RecordDigest_Compute_ChangeOrder_SameDigest**: The same changes in another order give the same digest. This
 scenario is tested by `RecordDigest_Compute_ChangeOrder_SameDigest`.
 
-**RecordDigest_Compute_CoveredChange_ChangesDigest**: A theory over a change of the fingerprint, the outcome (to Fail,
-or to NotApplicable) or the justification of an answer (to another text, or from absent to empty), an added answer, a
-section that no longer applies, the reason of such a section, an added included thread, a changed anchor (both lines,
+**RecordDigest_Compute_CoveredChange_ChangesDigest**: A theory over a change of the fingerprint, the outcome of an
+answer (to Fail, or to NotApplicable), an added answer, a removed answer, a section that is not applicable (added, or
+removed so that it applies), an added included thread, a changed anchor (both lines,
 the start line alone, the end line alone, a removed start or end line, or the whole file) or path of a thread, the
 text, the author display name, the author user name, or the time of an included comment, and an added included
 comment; each gives a digest that differs from that of the unchanged record (the state and the creation time of a
@@ -147,16 +155,18 @@ thread are covered by no case, because they are no longer part of the record). T
 `RecordDigest_Compute_CoveredChange_ChangesDigest`.
 
 **RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue**: A repository record with an added
-file, a NotApplicable answer with an empty justification, and a resolved whole-file thread with an included comment
-gives exactly the canonical text of the design and the known digests (without, and with
+file, a checklist, a submitted ballot with a NotApplicable answer and an empty justification, and a resolved
+whole-file thread with an included comment
+gives exactly the canonical text of the design (the check agreed as `NotApplicable`, `outcome approved`) and the known
+digests (`245104c8...84ba` without, and `13914386...9c5b` with
 one reopen) calculated with an independent script. This scenario is tested by
 `RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue`.
 
-**RecordDigest_Compute_SectionSetterAndTime_NotCovered**: A section that does not apply, set by another person at
-another time, gives the same digest. This scenario is tested by
+**RecordDigest_Compute_SectionSetterAndTime_NotCovered**: A section that is not applicable, set by another person at
+another time and with another reason, gives the same digest. This scenario is tested by
 `RecordDigest_Compute_SectionSetterAndTime_NotCovered`.
 
-**RecordDigest_Compute_ReorderedAndRenumbered_SameDigest**: The same answers, sections, and threads, listed in another
+**RecordDigest_Compute_ReorderedAndRenumbered_SameDigest**: The same ballot answers and threads, listed in another
 order and with other row identities, give the same digest. This scenario is tested by
 `RecordDigest_Compute_ReorderedAndRenumbered_SameDigest`.
 
@@ -167,21 +177,21 @@ has its known digest, a null `FollowsReviewId` is the same as none, and the
 text of a full record without markers has neither `follows` nor `carried`. This scenario is tested by
 `RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest`.
 
-**RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat**: A record that follows `rev-0` and carries an
-answer, a not-applicable section, and a thread has the `follows` line straight after the source and the `carried`
-suffix on the three lines, exactly as the design states. This scenario is tested by
-`RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat`.
+**RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat**: A record that follows `rev-0` and carries a
+thread has the `follows` line straight after the source and the `carried` suffix on the thread line, exactly as the
+design states. This scenario is tested by `RecordDigest_Canonicalize_FollowUpRecord_MatchesDocumentedFormat`.
 
 **RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest**: A theory: another followed review, and a missing or other
-carried mark on the answer, the section, or the thread, each gives a digest that differs from the baseline and from the
+carried mark on the thread, each gives a digest that differs from the baseline and from the
 same record that follows nothing. This scenario is tested by `RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest`.
 
 **RecordDigest_Compute_CarriedFromThreadId_NotCovered**: Two records whose carried thread had different numbers in the
 earlier review give the same digest. This scenario is tested by `RecordDigest_Compute_CarriedFromThreadId_NotCovered`.
 
 **ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange**: At the level of the service, the digest
-of a follow-up differs from that of a review that follows nothing and is not changed by a later change of the checklist
-of the project. This scenario is tested by `ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange`,
+of a follow-up differs from that of a review that follows nothing and is not changed by a later change of the
+checklist of the project. This scenario is tested by
+`ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange`,
 which is defined in `ReviewServiceFollowUpTests.cs`.
 
 **RecordDigest_Compute_CommentOrder_ChangesDigest**: The same two comments of a thread in the other order give another
@@ -192,16 +202,17 @@ digest as the original. This scenario is tested by `RecordDigest_Compute_Applica
 
 **RecordDigest_Compute_TextWithDelimiters_DoesNotCollide**: A theory over five pairs of different records that would
 have the very same text if strings were written without their length (values joined by a space, lines by a line
-feed): a comment whose text holds the next comment line versus two comments, a justification that runs into the
-display name of the answerer, an absent justification versus the text `-`, a path that runs into the change kind
-versus the shorter path with the kind and the baseline hash, and a checklist section title that holds an item line
-versus a title with a real item. Each pair gives different digests and different canonical texts; the test fails when
-the length prefix is removed. This scenario is tested by `RecordDigest_Compute_TextWithDelimiters_DoesNotCollide`.
+feed): a comment whose text holds the next comment line versus two comments, a comment author that runs into the
+user name versus the shorter author with the longer user name, an absent change hash versus the text `-`, a path that
+runs into the change kind versus the shorter path with the kind and the baseline hash, and a checklist section title
+that holds an item line versus a title with a real item. Each pair gives different digests and different canonical
+texts; the test fails when the length prefix is removed. This scenario is tested by
+`RecordDigest_Compute_TextWithDelimiters_DoesNotCollide`.
 
 **RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide**: Two pairs of records that would have the same text if
-strings were written without their length: an empty justification with the answerer "a b" versus the justification
-" a" (a leading space) with the answerer "b", and the justification "a b" with an empty answerer versus "a" with the
-answerer "b " (a trailing space).
+strings were written without their length: a comment with an empty text and the author "a b" versus the text " a" (a
+leading space) with the author "b", and the text "a b" with an empty author versus the text "a" with the author "b "
+(a trailing space).
 Each pair gives different digests; the test fails when the length prefix is removed. This scenario is tested by
 `RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide`.
 
@@ -213,6 +224,65 @@ scenario is tested by `RecordDigest_Compute_ZeroReopens_EqualsDigestWithoutReope
 **RecordDigest_Compute_ReopensChangeDigest**: The same record with a reopen count of 1 and of 2 gives two digests that
 differ from each other and from the record without reopens, and the canonical text ends with the line `reopens 1`
 for the first. This scenario is tested by `RecordDigest_Compute_ReopensChangeDigest`.
+
+**The consolidated standing** is verified in `RecordDigestBallotTests.cs` with hand-built records of a checklist (the
+section `a` with the checks `a-01` and `a-02`, and the section `b` with the check `b-01`) and submitted or draft
+ballots of numbered slots.
+
+**RecordDigest_Canonicalize_AgreedCheck_Line**: Two submitted ballots that answer every check Pass give the line
+`check 4:a-01 agreed 4:Pass` and the line `outcome approved`. This scenario is tested by
+`RecordDigest_Canonicalize_AgreedCheck_Line`, and covers `ReviewCenter-RecordDigest-ConsolidatedChecks`.
+
+**RecordDigest_Canonicalize_Disputed_Line**: Two submitted ballots that differ on the check `a-01` (Pass and Fail) give
+the line `check 4:a-01 disputed`, the line `check 4:a-02 agreed 4:Pass` for the check they agree on, and the line
+`outcome none`. This scenario is tested by `RecordDigest_Canonicalize_Disputed_Line`, and covers
+`ReviewCenter-RecordDigest-ConsolidatedChecks`.
+
+**RecordDigest_Canonicalize_Pending_Line**: A submitted ballot with only one answer gives the line
+`check 4:a-02 pending` for the check nobody has answered, and the line `outcome none`. This scenario is tested by
+`RecordDigest_Canonicalize_Pending_Line`, and covers `ReviewCenter-RecordDigest-ConsolidatedChecks`.
+
+**RecordDigest_Canonicalize_AgreedNaSection_Line**: Two submitted ballots that both mark the section `b` as not
+applicable (with different reasons) give the line `applicability 1:b not-applicable` and no `check` line for the check
+`b-01`. This scenario is tested by `RecordDigest_Canonicalize_AgreedNaSection_Line`, and covers
+`ReviewCenter-RecordDigest-ConsolidatedChecks`.
+
+**RecordDigest_Canonicalize_DisputedSection_Line**: A submitted ballot that marks the section `b` as not applicable
+and one that answers it give the line `applicability 1:b disputed`. This scenario is tested by
+`RecordDigest_Canonicalize_DisputedSection_Line`, and covers `ReviewCenter-RecordDigest-ConsolidatedChecks`.
+
+**RecordDigest_Canonicalize_ChecksSortedOrdinal**: A submitted ballot whose answers are in the order `b-01`, `a-02`,
+`a-01` gives the `check` lines in the order `a-01`, `a-02`, `b-01`. This scenario is tested by
+`RecordDigest_Canonicalize_ChecksSortedOrdinal`, and covers `ReviewCenter-RecordDigest-ConsolidatedChecks`.
+
+**RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected**: A record without a submitted ballot gives
+`outcome none`, one whose submitted ballot answers every check Pass gives `outcome approved`, and one with a Fail
+gives `outcome rejected`. This scenario is tested by `RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected`, and
+covers `ReviewCenter-RecordDigest-Outcome`.
+
+**RecordDigest_Compute_DraftBallot_DoesNotChangeDigest**: A record with a submitted ballot, and the same record with a
+draft ballot of another slot that answers and marks sections differently, give the same digest. This scenario is
+tested by `RecordDigest_Compute_DraftBallot_DoesNotChangeDigest`, and covers `ReviewCenter-RecordDigest-DraftIgnored`.
+
+**RecordDigest_Compute_AgreeingSecondSubmit_SameDigest**: A record with one submitted ballot and the same record with a
+second submitted ballot that agrees on every check give the same digest. This scenario is tested by
+`RecordDigest_Compute_AgreeingSecondSubmit_SameDigest`, and covers `ReviewCenter-RecordDigest-DraftIgnored`.
+
+**RecordDigest_Compute_FirstDisagreement_ChangesDigest**: Two agreeing submitted ballots, and the same pair where the
+second marks the first check as NotApplicable, give two different digests. This scenario is tested by
+`RecordDigest_Compute_FirstDisagreement_ChangesDigest`, and covers `ReviewCenter-RecordDigest-DraftIgnored`.
+
+**RecordDigest_Compute_JustificationAndAnswerer_NotCovered**: A submitted ballot with a Fail by one person and another
+with the same Fail, another justification, and another person give the same digest. This scenario is tested by
+`RecordDigest_Compute_JustificationAndAnswerer_NotCovered`, and covers `ReviewCenter-RecordDigest-NoBallotContent`.
+
+**RecordDigest_Compute_SlotOrderAndIds_NotCovered**: The same two agreeing submitted ballots listed with the slots 1 and
+2, and with the slots 9 and 4, give the same digest. This scenario is tested by
+`RecordDigest_Compute_SlotOrderAndIds_NotCovered`, and covers `ReviewCenter-RecordDigest-NoBallotContent`.
+
+**RecordDigest_Compute_CarriedMarker_NotCovered**: The same submitted ballot with every answer marked as carried from
+an earlier review and without the marker gives the same digest. This scenario is tested by
+`RecordDigest_Compute_CarriedMarker_NotCovered`, and covers `ReviewCenter-RecordDigest-NoBallotContent`.
 
 **The report block** is verified in `RecordDigestReportTests.cs` with the same hand-built records.
 
@@ -282,12 +352,12 @@ the format cannot produce the digest of another record. This scenario is tested 
 `RecordDigest_Compute_DelimitersInReportText_DoNotCollide`.
 
 **RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue**: The upload record with the fingerprint `abc` and the
-review conclusion text `Looks good.` has the line `conclusion-text 11:Looks good.` between `sections` and `report`,
-and the known digest `73c5cebe...5bd7`. This scenario is tested by
+review conclusion text `Looks good.` has the line `conclusion-text 11:Looks good.` between `outcome none` and `report`,
+and the known digest `fcae2e5e...6442`. This scenario is tested by
 `RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue`.
 
 **RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue**: A text of two lines (17 characters, one line
-feed) is written length-prefixed with its line feed, and has the known digest `51c21872...63b3`. This scenario is
+feed) is written length-prefixed with its line feed, and has the known digest `118f5fc4...8e21`. This scenario is
 tested by `RecordDigest_Compute_ReviewConclusionTextMultiLine_MatchesKnownValue`.
 
 **RecordDigest_Compute_ReviewConclusionTextChange_ChangesDigest**: A record without a text has no `conclusion-text`

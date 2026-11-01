@@ -424,7 +424,9 @@ sections:
       - id: ReviewCenter-System-SignatureBinding
         title: >-
           The tool shall bind every signature to the exact record that the signer reviewed, by a digest that covers
-          the content fingerprint, the checklist with who answered, every thread and comment, and the git source of
+          the content fingerprint, the checklist wording, the consolidated standing of the submitted ballots (agreed
+          answer, disputed, or open per check; agreed or disputed not-applicable per section; outcome; no answerer,
+          justification, slot or draft), the comments of the report, and the git source of
           the review, so that a change of any of them ends the approval, and shall refuse a signature when the
           record has changed since the page of the signer was drawn.
         tags: [system]
@@ -434,8 +436,8 @@ sections:
           made to approve something different from what they examined. It links the signature to its record in a
           way that cannot be moved to another record (21 CFR Part 11 section 11.70, signature/record linking;
           EU GMP Annex 11 clause 14). The system tests change the checklist and add a comment against a running
-          server; that each part of the digest (wording, who answered, order of comments, source, commits, selection,
-          changes, review-set) moves it is verified by the tests of the child requirements.
+          server; that each part of the digest (wording, consolidated ballot standing, order of comments, source,
+          commits, selection, changes, review-set) moves it is verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Storage-Signatures

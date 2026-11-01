@@ -162,15 +162,24 @@ internal static class InboxRules
     ///     Finds the checks answered Fail in the sections that apply.
     /// </summary>
     /// <param name="record">The record of the review.</param>
+    /// <param name="slotCount">
+    ///     The number of reviewer slots of the review, or <c>null</c> when it is not known; a review with one slot counts
+    ///     the answers of the one ballot even before it is handed in.
+    /// </param>
     /// <returns>The failed answers; empty when the review has no checklist or no failed check.</returns>
-    public static IReadOnlyList<ChecklistAnswer> FailedAnswers(ReviewRecord record)
+    public static IReadOnlyList<ChecklistAnswer> FailedAnswers(ReviewRecord record, int? slotCount = null)
     {
         if (record.Checklist is null)
         {
             return [];
         }
 
-        var state = new ChecklistState(record.Checklist.Parse(), record.SectionStates, record.Answers);
+        var state = BallotProjection.Consolidate(record, slotCount)?.State;
+        if (state is null)
+        {
+            return [];
+        }
+
         return state.Definition.Sections
             .Where(section => state.IsApplicable(section.Id))
             .SelectMany(section => section.Items)

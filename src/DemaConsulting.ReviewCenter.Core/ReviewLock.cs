@@ -26,7 +26,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     A review is concluded when it has at least one reviewer slot, every slot holds a signature of the current
-///     record digest, and no thread is open. The open-thread rule is deliberately separate from the digest: whether a
+///     record digest, no thread is open, and, for a review with a checklist, every slot has handed in its ballot and the
+///     submitted ballots agree on every check with the outcome approved (a rejected outcome does not conclude the review
+///     yet). The open-thread rule is deliberately separate from the digest: whether a
 ///     thread is open or resolved is not part of the digest (so resolving chat never makes a signature out of date),
 ///     but an open thread, chat or included, blocks signing and conclusion until somebody resolves it. A concluded
 ///     review is locked: nothing a signature covers (the report, checklist answers and applicability), nothing the
@@ -77,7 +79,34 @@ public static class ReviewLock
 
         // The digest is computed once; a slot is signed when any of its signatures carries it
         var digest = RecordDigest.Compute(record);
-        return slots.All(slot => signatures.Any(s => s.SlotId == slot.Id && s.RecordDigest == digest));
+        if (!slots.All(slot => signatures.Any(s => s.SlotId == slot.Id && s.RecordDigest == digest)))
+        {
+            return false;
+        }
+
+        // A review without a checklist has no ballots and keeps the rule above (it cannot be signed anyway)
+        return record.Checklist is null || BallotsAgreeOnApproval(record, slots);
+    }
+
+    /// <summary>
+    ///     Tells whether every slot has handed in its ballot and the ballots agree on every check and lead to approval.
+    /// </summary>
+    /// <param name="record">The record, with a checklist.</param>
+    /// <param name="slots">The reviewer slots of the review.</param>
+    /// <returns>
+    ///     <c>true</c> when each slot has a submitted ballot and the consolidation has no pending or disputed check and
+    ///     the outcome is approved. A rejected review is not concluded: the rejected conclusion is not available yet.
+    /// </returns>
+    private static bool BallotsAgreeOnApproval(ReviewRecord record, IReadOnlyList<ReviewerSlot> slots)
+    {
+        var submitted = record.Ballots.Where(b => b.Status == BallotStatus.Submitted).Select(b => b.SlotId).ToHashSet();
+        if (!slots.All(slot => submitted.Contains(slot.Id)))
+        {
+            return false;
+        }
+
+        var result = BallotConsolidation.Consolidate(record.Checklist!.Parse(), record.Ballots);
+        return result.Pending == 0 && result.Disputed == 0 && result.Outcome == ReviewOutcome.Approved;
     }
 
     /// <summary>

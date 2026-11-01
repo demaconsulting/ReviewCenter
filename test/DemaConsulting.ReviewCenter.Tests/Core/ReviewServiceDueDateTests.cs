@@ -168,16 +168,17 @@ public class ReviewServiceDueDateTests
     private static async Task<(int First, int Second)> SignFirstSlotAsync(World world)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await world.Checklists.SetAnswerAsync(
-                world.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, _member, cancellationToken);
-        }
-
         var first = await world.Signing.AddSlotAsync(
             _projectAdmin, world.ProjectId, "rev-1", world.Ids["reviewer1"], null, cancellationToken);
         var second = await world.Signing.AddSlotAsync(
             _projectAdmin, world.ProjectId, "rev-1", world.Ids["reviewer2"], null, cancellationToken);
+
+        // Each reviewer answers the checklist in the own ballot and hands it in
+        foreach (var reviewer in new[] { _reviewerOne, _reviewerTwo })
+        {
+            await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, "rev-1", reviewer, cancellationToken);
+            await world.Checklists.SubmitBallotAsync(world.ProjectId, "rev-1", reviewer, cancellationToken);
+        }
         var digest = (await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", cancellationToken))!.Digest;
         await world.Signing.SignAsync(_reviewerOne, world.ProjectId, "rev-1", first.Id, digest, Password, cancellationToken);
         return (first.Id, second.Id);

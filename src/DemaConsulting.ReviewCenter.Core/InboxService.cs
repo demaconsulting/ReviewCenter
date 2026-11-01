@@ -432,7 +432,7 @@ public sealed class InboxService
             // Failed checks: my own review has checks answered Fail
             if (isAuthor)
             {
-                var failed = InboxRules.FailedAnswers(record);
+                var failed = InboxRules.FailedAnswers(record, slots.Count);
                 if (failed.Count > 0)
                 {
                     var unread = failed.Any(
@@ -469,10 +469,17 @@ public sealed class InboxService
             return true;
         }
 
-        var (record, _, signatures) = review.Snapshot;
+        var (record, slots, signatures) = review.Snapshot;
         var username = review.User.Username;
+
+        // Only a submitted ballot is news to the others (it is what the record covers); the sole ballot of a
+        // single-slot review counts as submitted, consistent with the projection
+        var visibleBallots = slots.Count == 1
+            ? record.Ballots
+            : record.Ballots.Where(ballot => ballot.Status == BallotStatus.Submitted).ToList();
         if (signatures.Any(signature => signature.UserId != review.User.Id && signature.SignedAt > lastSeenAt)
-            || record.Answers.Any(answer => !InboxRules.SameUser(answer.AnsweredByUsername, username) && answer.AnsweredAt > lastSeenAt)
+            || visibleBallots.Any(ballot => ballot.Answers.Any(answer =>
+                   !InboxRules.SameUser(answer.AnsweredByUsername, username) && answer.AnsweredAt > lastSeenAt))
             || InboxRules.CountUnread(record.Threads, username, lastSeenCommentId) > 0)
         {
             return true;

@@ -29,6 +29,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     apply and the answer to each check. A section that does not apply needs a reason; a failed or
 ///     not-applicable check needs a justification. The person answering is the signed-in <see cref="Actor"/>,
 ///     never free text.
+///     The answers are held per reviewer slot: a person answers into the ballot of the slot they hold as primary or
+///     alternate reviewer (see <see cref="Ballot"/>), a person without a slot is refused with
+///     <see cref="DomainRule.NoReviewerSlot"/>, and the ballot counts in the record once it is handed in (see
+///     <see cref="SubmitBallotAsync"/>; a review with one slot hands it in with the last answer). <see cref="GetAsync"/>
+///     shows a reviewer the own ballot and everybody else the consolidated standing, never the ballot of another slot.
 ///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is approved (see
 ///     <see cref="ReviewLock"/>).
 ///     When the project requires it (on by default, also for projects that existed before the rule was enforced), the
@@ -108,14 +113,14 @@ public sealed class ChecklistService
         CancellationToken cancellationToken = default,
         string? viewerUsername = null)
     {
-        var checklist = await _store.GetChecklistAsync(projectId, reviewId, cancellationToken);
-        if (checklist is null)
+        // One consistent read of the record (with the ballots) and the slots
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (snapshot?.Record.Checklist is null)
         {
             return null;
         }
 
-        var sections = await _store.ListChecklistSectionStatesAsync(projectId, reviewId, cancellationToken);
-        var answers = await _store.ListChecklistAnswersAsync(projectId, reviewId, cancellationToken);
+        var definition = snapshot.Record.Checklist.Parse();
 
         // Only a viewer is asked about; the project and review are read for them alone
         var authorBlocked = viewerUsername is not null
@@ -123,7 +128,19 @@ public sealed class ChecklistService
                                 await _store.GetProjectAsync(projectId, cancellationToken),
                                 await _store.GetReviewAsync(projectId, reviewId, cancellationToken),
                                 viewerUsername);
-        return new ChecklistState(checklist.Parse(), sections, answers) { AuthorBlocked = authorBlocked };
+
+        // A reviewer sees the own ballot, drafts included, and never the ballot of another slot; everybody else sees the
+        // standing of the submitted ballots
+        var own = viewerUsername is null
+            ? null
+            : await FindOwnSlotAsync(viewerUsername, snapshot.Slots, cancellationToken);
+        if (own is not null)
+        {
+            var ballot = snapshot.Record.Ballots.FirstOrDefault(b => b.SlotId == own.Id);
+            return BallotProjection.ForBallot(definition, own.Id, ballot, authorBlocked);
+        }
+
+        return BallotProjection.Consolidate(snapshot.Record, snapshot.Slots.Count, authorBlocked, viewerUsername is not null)!.State;
     }
 
     /// <summary>
@@ -148,6 +165,7 @@ public sealed class ChecklistService
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.NoReviewerSlot"/> when the actor holds no reviewer slot of the review,
     ///     <see cref="DomainRule.AuthorCannotAnswer"/> when the actor created the review and the project does not let
     ///     the author answer, and
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
@@ -180,10 +198,14 @@ public sealed class ChecklistService
         // An approved review is locked: the checklist is part of what the signatures cover
         var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
+        // The answer goes into the ballot of the slot of the actor; nobody else has a ballot to answer on
+        var slot = await RequireOwnSlotAsync(actor, snapshot, cancellationToken);
+
         var state = new ChecklistSectionState
         {
             ProjectId = projectId,
             ReviewId = reviewId,
+            SlotId = slot.Id,
             SectionId = sectionId,
             Applicable = applicable,
             Reason = trimmedReason,
@@ -192,21 +214,16 @@ public sealed class ChecklistService
             SetAt = _timeProvider.GetUtcNow()
         };
 
-        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date
+        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date; the
+        // own signature of the reviewer is the one the change withdraws and needs none
+        var edited = BallotEdits.WithSectionState(CurrentBallot(snapshot, slot), slot.Id, state);
         SignatureImpact.RequireAcknowledged(
             snapshot,
-            snapshot is null
-                ? null
-                : snapshot.Record with
-                {
-                    SectionStates = snapshot.Record.SectionStates
-                        .Where(s => s.SectionId != sectionId)
-                        .Append(state)
-                        .ToList()
-                },
-            acknowledgedSlotIds);
+            AfterEdit(snapshot, definition, edited, state.SetAt, actor.Username),
+            acknowledgedSlotIds,
+            slot.Id);
 
-        await _store.SetChecklistSectionStateAsync(
+        await _store.SetBallotSectionStateAsync(
             state,
             AuditDraft.By(
                 actor,
@@ -216,6 +233,7 @@ public sealed class ChecklistService
                     : $"section {sectionId}: not applicable, reason sha256 {AuditText.ShortHash(trimmedReason)}",
                 projectId,
                 reviewId),
+            ballot => BallotConsolidation.IsComplete(definition, ballot),
             cancellationToken);
     }
 
@@ -242,6 +260,7 @@ public sealed class ChecklistService
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="outcome"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.NoReviewerSlot"/> when the actor holds no reviewer slot of the review,
     ///     <see cref="DomainRule.AuthorCannotAnswer"/> when the actor created the review and the project does not let
     ///     the author answer, and
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged;
@@ -279,10 +298,14 @@ public sealed class ChecklistService
         // An approved review is locked: the checklist is part of what the signatures cover
         var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
+        // The answer goes into the ballot of the slot of the actor; nobody else has a ballot to answer on
+        var slot = await RequireOwnSlotAsync(actor, snapshot, cancellationToken);
+
         var answer = new ChecklistAnswer
         {
             ProjectId = projectId,
             ReviewId = reviewId,
+            SlotId = slot.Id,
             ItemId = itemId,
             Outcome = outcome,
             Justification = trimmed,
@@ -291,21 +314,16 @@ public sealed class ChecklistService
             AnsweredAt = _timeProvider.GetUtcNow()
         };
 
-        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date
+        // A change to what the signatures cover needs the acknowledgement of every signature it makes out of date; the
+        // own signature of the reviewer is the one the change withdraws and needs none
+        var edited = BallotEdits.WithAnswer(CurrentBallot(snapshot, slot), slot.Id, answer);
         SignatureImpact.RequireAcknowledged(
             snapshot,
-            snapshot is null
-                ? null
-                : snapshot.Record with
-                {
-                    Answers = snapshot.Record.Answers
-                        .Where(a => a.ItemId != itemId)
-                        .Append(answer)
-                        .ToList()
-                },
-            acknowledgedSlotIds);
+            AfterEdit(snapshot, definition, edited, answer.AnsweredAt, actor.Username),
+            acknowledgedSlotIds,
+            slot.Id);
 
-        await _store.SetChecklistAnswerAsync(
+        await _store.SetBallotAnswerAsync(
             answer,
             AuditDraft.By(
                 actor,
@@ -315,7 +333,166 @@ public sealed class ChecklistService
                     : $"item {itemId}: {outcome}; justification sha256 {AuditText.ShortHash(trimmed)}",
                 projectId,
                 reviewId),
+            ballot => BallotConsolidation.IsComplete(definition, ballot),
             cancellationToken);
+    }
+
+    /// <summary>
+    ///     Hands in the ballot of the slot of the actor, so it counts in the consolidated record.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="actor">The signed-in user who hands the ballot in; must be the primary or alternate reviewer of a slot. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="acknowledgedSlotIds">
+    ///     The identities of the reviewer slots whose signatures the person agreed to make out of date, or
+    ///     <c>null</c> for none. Only needed when handing in the ballot changes the record while a signature of another
+    ///     slot is current.
+    /// </param>
+    /// <returns>The submitted ballot; a ballot that was submitted already is returned as it is.</returns>
+    /// <remarks>
+    ///     A review with exactly one slot hands the ballot in with the last answer, so this call is only needed when no
+    ///     answer fired the hand-in (a checklist whose sections are all not applicable, for example). The completeness
+    ///     test runs again inside the store transaction.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.NoReviewerSlot"/> when the actor holds no slot,
+    ///     <see cref="DomainRule.BallotIncomplete"/> when a check that applies has no answer,
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded, and
+    ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature of another slot is not
+    ///     acknowledged; nothing is stored then.
+    /// </exception>
+    public async Task<Ballot> SubmitBallotAsync(
+        int projectId,
+        string reviewId,
+        Actor actor,
+        CancellationToken cancellationToken = default,
+        IReadOnlyCollection<int>? acknowledgedSlotIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireContributeAsync(actor, projectId, cancellationToken);
+        await RequireNotAuthorAsync(projectId, reviewId, actor, cancellationToken);
+        var definition = await GetDefinitionAsync(projectId, reviewId, cancellationToken);
+        var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+        var slot = await RequireOwnSlotAsync(actor, snapshot, cancellationToken);
+
+        // The ballot as it would be once handed in; an incomplete one is refused here and again in the store
+        var current = CurrentBallot(snapshot, slot) ?? new Ballot(slot.Id, BallotStatus.Draft, null, null, [], []);
+        if (!BallotConsolidation.IsComplete(definition, current))
+        {
+            throw new DomainRuleException(
+                DomainRule.BallotIncomplete,
+                "The ballot cannot be submitted while a check that applies has no answer.");
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        var submitted = current with { Status = BallotStatus.Submitted, SubmittedAt = now, SubmittedByUsername = actor.Username };
+        SignatureImpact.RequireAcknowledged(
+            snapshot,
+            BallotEdits.WithBallot(snapshot!.Record, submitted),
+            acknowledgedSlotIds,
+            slot.Id);
+
+        var number = snapshot.Slots.OrderBy(s => s.Id).ToList().FindIndex(s => s.Id == slot.Id) + 1;
+        return await _store.SubmitBallotAsync(
+            projectId,
+            reviewId,
+            slot.Id,
+            now,
+            actor.Username,
+            AuditDraft.By(
+                actor,
+                "ballot.submitted",
+                $"slot {number}: ballot submitted ({current.Answers.Count} answers, {current.SectionStates.Count} section states)",
+                projectId,
+                reviewId),
+            ballot => BallotConsolidation.IsComplete(definition, ballot),
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Finds the slot a user holds in a review.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="slots">The slots of the review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The slot of which the user is the primary or the alternate reviewer; <c>null</c> for an unknown user or no slot.</returns>
+    private async Task<ReviewerSlot?> FindOwnSlotAsync(
+        string username,
+        IReadOnlyList<ReviewerSlot> slots,
+        CancellationToken cancellationToken)
+    {
+        if (slots.Count == 0)
+        {
+            return null;
+        }
+
+        var user = await _users.GetByUsernameAsync(username, cancellationToken);
+        return user is null
+            ? null
+            : slots.OrderBy(s => s.Id).FirstOrDefault(s => s.PrimaryUserId == user.Id || s.AlternateUserId == user.Id);
+    }
+
+    /// <summary>
+    ///     Finds the slot of the actor or refuses the change.
+    /// </summary>
+    /// <param name="actor">The signed-in user.</param>
+    /// <param name="snapshot">The snapshot of the review, or <c>null</c> when the review does not exist.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The slot of the actor.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.NoReviewerSlot"/> when the actor holds no slot.</exception>
+    private async Task<ReviewerSlot> RequireOwnSlotAsync(
+        Actor actor,
+        ReviewSnapshot? snapshot,
+        CancellationToken cancellationToken)
+    {
+        var slot = snapshot is null ? null : await FindOwnSlotAsync(actor.Username, snapshot.Slots, cancellationToken);
+        return slot ?? throw new DomainRuleException(
+            DomainRule.NoReviewerSlot,
+            "You are not a reviewer of this review, so you cannot answer its checklist. Add yourself as a reviewer " +
+            "slot first.");
+    }
+
+    /// <summary>
+    ///     Gets the ballot of a slot from a snapshot.
+    /// </summary>
+    /// <param name="snapshot">The snapshot of the review, or <c>null</c>.</param>
+    /// <param name="slot">The slot.</param>
+    /// <returns>The ballot, or <c>null</c> when the slot has none yet.</returns>
+    private static Ballot? CurrentBallot(ReviewSnapshot? snapshot, ReviewerSlot slot)
+    {
+        return snapshot?.Record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id);
+    }
+
+    /// <summary>
+    ///     Computes the record an edit of a ballot leads to.
+    /// </summary>
+    /// <param name="snapshot">The snapshot read before the edit, or <c>null</c> when the review does not exist.</param>
+    /// <param name="definition">The frozen checklist.</param>
+    /// <param name="edited">The ballot as a draft after the edit.</param>
+    /// <param name="at">The moment of the edit.</param>
+    /// <param name="username">The user name of the editor.</param>
+    /// <returns>
+    ///     The record with the edited ballot; the ballot is submitted when the review has exactly one slot and the edit
+    ///     completes it, as the store does, so the digest compared is the digest that results.
+    /// </returns>
+    private static ReviewRecord? AfterEdit(
+        ReviewSnapshot? snapshot,
+        ChecklistDefinition definition,
+        Ballot edited,
+        DateTimeOffset at,
+        string username)
+    {
+        if (snapshot is null)
+        {
+            return null;
+        }
+
+        var ballot = snapshot.Slots.Count == 1 && BallotConsolidation.IsComplete(definition, edited)
+            ? edited with { Status = BallotStatus.Submitted, SubmittedAt = at, SubmittedByUsername = username }
+            : edited;
+        return BallotEdits.WithBallot(snapshot.Record, ballot);
     }
 
     /// <summary>

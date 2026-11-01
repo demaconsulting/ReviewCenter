@@ -51,7 +51,8 @@ public class SigningServiceTests
     {
         var store = new FakeReviewStore();
         var clock = new MovableTimeProvider(_now);
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var ids = new Dictionary<string, int>();
         foreach (var (username, name) in new[] { ("ann", "Ann"), ("bob", "Bob"), ("cyd", "Cyd"), ("dee", "Dee") })
         {
@@ -72,34 +73,109 @@ public class SigningServiceTests
             users,
             TestServices.Signing(store, users, clock),
             TestServices.Threads(store, clock),
-            TestServices.Checklists(store, clock),
+            TestServices.Checklists(store, clock, userStore),
             project.Id,
             ids);
     }
 
     /// <summary>
-    ///     Answers every check of the checklist as Pass.
+    ///     Seats a user in a review (a slot of their own) unless they already hold a slot of it.
+    /// </summary>
+    /// <param name="fixture">The fixture.</param>
+    /// <param name="reviewId">The review.</param>
+    /// <param name="who">The user to seat.</param>
+    /// <returns>A task that completes when the user holds a slot.</returns>
+    private static async Task SeatAsync(Fixture fixture, string reviewId, Actor who)
+    {
+        var userId = fixture.Ids[who.Username];
+        var slots = await fixture.Store.ListSlotsAsync(fixture.ProjectId, reviewId, TestContext.Current.CancellationToken);
+        if (slots.Any(s => s.PrimaryUserId == userId || s.AlternateUserId == userId))
+        {
+            return;
+        }
+
+        await fixture.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = fixture.ProjectId, ReviewId = reviewId, PrimaryUserId = userId },
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Marks a review as answered: the primary reviewer of every slot of it, now or added later through
+    ///     <see cref="AddSlotAsync"/>, answers every check as Pass in the own ballot and hands it in.
     /// </summary>
     /// <param name="fixture">The fixture.</param>
     /// <param name="reviewId">The review to answer.</param>
-    /// <param name="answerer">Who answers; Ann when omitted.</param>
-    /// <returns>A task that completes when all checks are answered.</returns>
-    private static async Task AnswerAllAsync(Fixture fixture, string reviewId = "rev-1", Actor? answerer = null)
+    /// <returns>A task that completes when the existing slots have handed their ballots in.</returns>
+    private static async Task AnswerAllAsync(Fixture fixture, string reviewId = "rev-1")
     {
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        fixture.Answered.Add(reviewId);
+        foreach (var slot in await fixture.Store.ListSlotsAsync(fixture.ProjectId, reviewId, TestContext.Current.CancellationToken))
         {
-            await fixture.Checklists.SetAnswerAsync(
-                fixture.ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, answerer ?? TestActors.Ann, TestContext.Current.CancellationToken);
+            await AnswerAsPrimaryAsync(fixture, reviewId, slot);
         }
     }
 
     /// <summary>
-    ///     Creates the review <c>rev-2</c>, authored by <paramref name="author"/>, with every check answered by Dee
-    ///     (an author may not answer the checklist of their own review).
+    ///     Lets the primary reviewer of a slot answer every check as Pass and hand the ballot in.
     /// </summary>
     /// <param name="fixture">The fixture.</param>
-    /// <param name="author">The user who creates the review, and so its author; not Dee.</param>
-    /// <returns>A task that completes when the review is ready to be signed.</returns>
+    /// <param name="reviewId">The review.</param>
+    /// <param name="slot">The slot.</param>
+    /// <returns>A task that completes when the ballot is handed in.</returns>
+    private static async Task AnswerAsPrimaryAsync(Fixture fixture, string reviewId, ReviewerSlot slot)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerIds = new[] { slot.PrimaryUserId, slot.AlternateUserId }.OfType<int>();
+        foreach (var ownerId in ownerIds)
+        {
+            var username = fixture.Ids.First(pair => pair.Value == ownerId).Key;
+            var owner = new Actor(username, username);
+            try
+            {
+                await AuditTestExtensions.AnswerAllAsync(fixture.Checklists, fixture.ProjectId, reviewId, owner, cancellationToken);
+                await fixture.Checklists.SubmitBallotAsync(fixture.ProjectId, reviewId, owner, cancellationToken);
+                return;
+            }
+            catch (DomainRuleException ex) when (ex.Rule == DomainRule.AuthorCannotAnswer)
+            {
+                // The author of the review cannot answer; the alternate of the slot, if any, answers instead
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Adds a slot as Cyd; when the review is marked answered by <see cref="AnswerAllAsync"/>, the primary reviewer
+    ///     of the new slot answers every check and hands the ballot in.
+    /// </summary>
+    /// <param name="fixture">The fixture.</param>
+    /// <param name="reviewId">The review.</param>
+    /// <param name="primary">The user name of the primary reviewer.</param>
+    /// <param name="alternate">The user name of the alternate reviewer, or <c>null</c> for none.</param>
+    /// <returns>The slot.</returns>
+    private static async Task<ReviewerSlot> AddSlotAsync(Fixture fixture, string reviewId, string primary, string? alternate = null)
+    {
+        var slot = await fixture.Signing.AddSlotAsync(
+            Cyd,
+            fixture.ProjectId,
+            reviewId,
+            fixture.Ids[primary],
+            alternate is null ? null : fixture.Ids[alternate],
+            TestContext.Current.CancellationToken);
+        if (fixture.Answered.Contains(reviewId))
+        {
+            await AnswerAsPrimaryAsync(fixture, reviewId, slot);
+        }
+
+        return slot;
+    }
+
+    /// <summary>
+    ///     Creates the review <c>rev-2</c>, authored by <paramref name="author"/>, and marks it as answered (an author
+    ///     may not hold a slot of their own review, so the reviewers who are seated later answer it).
+    /// </summary>
+    /// <param name="fixture">The fixture.</param>
+    /// <param name="author">The user who creates the review, and so its author.</param>
+    /// <returns>A task that completes when the review is ready to be seated.</returns>
     private static async Task CreateAuthoredReviewAsync(Fixture fixture, Actor author)
     {
         await TestServices.Reviews(fixture.Store, fixture.Clock).CreateDraftAsync(
@@ -109,7 +185,7 @@ public class SigningServiceTests
             [new("a.txt", TestContent.A)],
             author,
             TestContext.Current.CancellationToken);
-        await AnswerAllAsync(fixture, "rev-2", new Actor("dee", "Dee"));
+        await AnswerAllAsync(fixture, "rev-2");
     }
 
     /// <summary>
@@ -132,9 +208,8 @@ public class SigningServiceTests
     private static async Task<(Fixture Fixture, ReviewerSlot Slot)> CreateReadyAsync()
     {
         var fixture = await CreateAsync();
+        var slot = await AddSlotAsync(fixture, "rev-1", "ann", "bob");
         await AnswerAllAsync(fixture);
-        var slot = await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["ann"], fixture.Ids["bob"], TestContext.Current.CancellationToken);
         return (fixture, slot);
     }
 
@@ -443,8 +518,7 @@ public class SigningServiceTests
         // Arrange: a slot signed by ann next to a second slot nobody has signed, so the review is not approved and
         // so not locked, optionally followed by a change of the record
         var (fixture, slot) = await CreateReadyAsync();
-        await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["cyd"], null, TestContext.Current.CancellationToken);
+        await AddSlotAsync(fixture, "rev-1", "cyd");
         var digest = (await ApprovalAsync(fixture)).Digest;
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken);
         if (outOfDate)
@@ -671,13 +745,13 @@ public class SigningServiceTests
     {
         // Arrange: a review with a slot, answered completely except for the "unanswered" case, then one blocker introduced
         var fixture = await CreateAsync();
+        var slot = await fixture.Signing.AddSlotAsync(
+            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["ann"], fixture.Ids["bob"], TestContext.Current.CancellationToken);
         if (blocker != "unanswered")
         {
             await AnswerAllAsync(fixture);
         }
 
-        var slot = await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["ann"], fixture.Ids["bob"], TestContext.Current.CancellationToken);
         var first = DefaultChecklist.Current.Sections[0].Items[0].Id;
         switch (blocker)
         {
@@ -764,8 +838,7 @@ public class SigningServiceTests
     {
         // Arrange: a slot signed by ann, next to a second slot nobody has signed, so the review is not locked
         var (fixture, slot) = await CreateReadyAsync();
-        await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["cyd"], null, TestContext.Current.CancellationToken);
+        await AddSlotAsync(fixture, "rev-1", "cyd");
         var digest = (await ApprovalAsync(fixture)).Digest;
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken);
 
@@ -790,6 +863,7 @@ public class SigningServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var fixture = await CreateAsync();
         var items = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ToList();
+        await SeatAsync(fixture, "rev-1", TestActors.Ann);
         await fixture.Checklists.SetAnswerAsync(
             fixture.ProjectId, "rev-1", items[0].Id, ChecklistOutcome.Fail, "Wrong", TestActors.Ann, cancellationToken);
         await fixture.Threads.StartThreadAsync(
@@ -887,8 +961,7 @@ public class SigningServiceTests
         // Arrange: two slots, so that the review is not approved and not locked when ann has signed the first
         var cancellationToken = TestContext.Current.CancellationToken;
         var (fixture, first) = await CreateReadyAsync();
-        var second = await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["cyd"], null, cancellationToken);
+        var second = await AddSlotAsync(fixture, "rev-1", "cyd");
         var signedDigest = (await ApprovalAsync(fixture)).Digest;
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", first.Id, signedDigest, Password, cancellationToken);
         var current = await ApprovalAsync(fixture);
@@ -898,15 +971,20 @@ public class SigningServiceTests
         ReviewThread? thread = null;
         if (change == "answer")
         {
-            await fixture.Checklists.SetAnswerAsync(
-                fixture.ProjectId,
-                "rev-1",
-                DefaultChecklist.Current.Sections[0].Items[0].Id,
-                ChecklistOutcome.NotApplicable,
-                "Does not apply to this change.",
-                TestActors.Bob,
-                cancellationToken,
-                acknowledged);
+            // Both reviewers hand in the changed answer, so that the consolidated record (and its digest) changes
+            foreach (var reviewer in new[] { TestActors.Bob, Cyd })
+            {
+                await fixture.Checklists.SetAnswerAsync(
+                    fixture.ProjectId,
+                    "rev-1",
+                    DefaultChecklist.Current.Sections[0].Items[0].Id,
+                    ChecklistOutcome.NotApplicable,
+                    "Does not apply to this change.",
+                    reviewer,
+                    cancellationToken,
+                    acknowledged);
+                await fixture.Checklists.SubmitBallotAsync(fixture.ProjectId, "rev-1", reviewer, cancellationToken, acknowledged);
+            }
         }
         else
         {
@@ -964,8 +1042,7 @@ public class SigningServiceTests
     {
         // Arrange: two slots (ann + bob, cy alone) on a ready review
         var (fixture, first) = await CreateReadyAsync();
-        var second = await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["cyd"], null, TestContext.Current.CancellationToken);
+        var second = await AddSlotAsync(fixture, "rev-1", "cyd");
         var digest = (await ApprovalAsync(fixture)).Digest;
 
         // Act: the first slot signs, then the second
@@ -986,17 +1063,16 @@ public class SigningServiceTests
     [Fact]
     public async Task SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot()
     {
-        // Arrange: a review that is otherwise ready
+        // Arrange: a review without slots; nobody can answer, so the checks stay unanswered and are the first blocker
         var fixture = await CreateAsync();
-        await AnswerAllAsync(fixture);
 
         // Act: read the status
         var approval = await ApprovalAsync(fixture);
 
-        // Assert: not approved, with the slot hint
+        // Assert: not approved, with no slot to sign; the next step names the unanswered checks that nobody can answer
         Assert.False(approval.IsApproved);
-        Assert.Empty(approval.Blockers);
-        Assert.Equal("Add a reviewer slot.", approval.NextStep);
+        Assert.Empty(approval.Slots);
+        Assert.Contains("checklist checks unanswered", approval.NextStep, StringComparison.Ordinal);
         Assert.Matches("^[0-9a-f]{64}$", approval.Digest);
     }
 
@@ -1215,8 +1291,7 @@ public class SigningServiceTests
         // Act: seat the author
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
             Cyd, fixture.ProjectId, "rev-2", primary, alternate, TestContext.Current.CancellationToken));
-        var control = await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-2", fixture.Ids["bob"], fixture.Ids["cyd"], TestContext.Current.CancellationToken);
+        var control = await AddSlotAsync(fixture, "rev-2", "bob", "cyd");
 
         // Assert: refused with the documented reason; a separate reviewer is accepted and is the only slot
         Assert.Equal(DomainRule.ReviewerNotIndependent, ex.Rule);
@@ -1237,8 +1312,7 @@ public class SigningServiceTests
         // Arrange: a review that ann created, with a slot for bob
         var fixture = await CreateAsync();
         await CreateAuthoredReviewAsync(fixture, TestActors.Ann);
-        var slot = await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-2", fixture.Ids["bob"], null, TestContext.Current.CancellationToken);
+        var slot = await AddSlotAsync(fixture, "rev-2", "bob");
         var primary = asPrimary ? fixture.Ids["ann"] : fixture.Ids["bob"];
         int? alternate = asPrimary ? null : fixture.Ids["ann"];
 
@@ -1267,7 +1341,7 @@ public class SigningServiceTests
             .SetRequireIndependentReviewersAsync(Cyd, fixture.ProjectId, true, false, cancellationToken);
 
         // Act: seat the author and let the author sign
-        var slot = await fixture.Signing.AddSlotAsync(Cyd, fixture.ProjectId, "rev-2", fixture.Ids["ann"], null, cancellationToken);
+        var slot = await AddSlotAsync(fixture, "rev-2", "ann", "dee");
         var digest = (await ApprovalAsync(fixture, "rev-2")).Digest;
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-2", slot.Id, digest, Password, cancellationToken);
 
@@ -1290,8 +1364,8 @@ public class SigningServiceTests
         await CreateAuthoredReviewAsync(fixture, TestActors.Ann);
         var projects = TestServices.Projects(fixture.Store, fixture.Clock);
         await projects.SetRequireIndependentReviewersAsync(Cyd, fixture.ProjectId, true, false, cancellationToken);
-        var own = await fixture.Signing.AddSlotAsync(Cyd, fixture.ProjectId, "rev-2", fixture.Ids["ann"], null, cancellationToken);
-        var other = await fixture.Signing.AddSlotAsync(Cyd, fixture.ProjectId, "rev-2", fixture.Ids["bob"], null, cancellationToken);
+        var own = await AddSlotAsync(fixture, "rev-2", "ann", "dee");
+        var other = await AddSlotAsync(fixture, "rev-2", "bob");
         await projects.SetRequireIndependentReviewersAsync(Cyd, fixture.ProjectId, false, true, cancellationToken);
         var digest = (await ApprovalAsync(fixture, "rev-2")).Digest;
 
@@ -1711,9 +1785,10 @@ public class SigningServiceTests
 
         if (scenario == "notReviewer")
         {
-            // dee becomes the primary reviewer of the still unsigned slot
+            // dee becomes the primary reviewer of the still unsigned slot; ann's answers leave with her, so dee answers
             await fixture.Signing.UpdateSlotAsync(
                 Cyd, fixture.ProjectId, "rev-1", slot.Id, fixture.Ids["dee"], null, cancellationToken);
+            await AuditTestExtensions.AnswerAllAsync(fixture.Checklists, fixture.ProjectId, "rev-1", TestActors.Dee, cancellationToken);
         }
 
         var signature = await fixture.Signing.SignAsync(
@@ -1739,8 +1814,7 @@ public class SigningServiceTests
     {
         var fixture = await CreateAsync();
         await AnswerAllAsync(fixture);
-        var slot = await fixture.Signing.AddSlotAsync(
-            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["cyd"], fixture.Ids["ann"], TestContext.Current.CancellationToken);
+        var slot = await AddSlotAsync(fixture, "rev-1", "cyd", "ann");
         await fixture.Signing.SignAsync(
             TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, (await ApprovalAsync(fixture)).Digest, Password, TestContext.Current.CancellationToken);
         return (fixture, slot);
@@ -1827,6 +1901,61 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the person who reopened a review, while barred from signing it, can still answer a check and hand
+    ///     in the ballot of the own slot.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_Ballot_ReopenerWhileRuleIsOn_EditsAndSubmitsButCannotSign()
+    {
+        // Arrange: cyd (primary of the only slot) reopens an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateApprovedWithAlternateAsync();
+        var firstItem = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
+
+        // Act: cyd changes an answer and puts it back, then hands the ballot in
+        await fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, "rev-1", firstItem, ChecklistOutcome.Fail, "Wrong.", Cyd, cancellationToken);
+        await fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, "rev-1", firstItem, ChecklistOutcome.Pass, null, Cyd, cancellationToken);
+        var submitted = await fixture.Checklists.SubmitBallotAsync(fixture.ProjectId, "rev-1", Cyd, cancellationToken);
+        var digest = (await ApprovalAsync(fixture)).Digest;
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+            Cyd, fixture.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken));
+
+        // Assert: the ballot is handed in, and only the signature is refused
+        Assert.Equal(BallotStatus.Submitted, submitted.Status);
+        Assert.Equal(ChecklistOutcome.Pass, submitted.Answers.Single(a => a.ItemId == firstItem).Outcome);
+        Assert.Equal(DomainRule.ReopenerCannotSign, ex.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a reopen leaves the submitted ballots submitted and, through the reopen count, makes every earlier
+    ///     signature out of date for good, even though the ballots still say what they said.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ReopenReviewAsync_BallotsStaySubmitted()
+    {
+        // Arrange: an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, _, digest) = await CreateApprovedAsync();
+
+        // Act
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
+        var record = (await fixture.Store.GetSnapshotAsync(fixture.ProjectId, "rev-1", cancellationToken))!.Record;
+        var approval = await ApprovalAsync(fixture);
+
+        // Assert: the ballot is still handed in, the reopen count moved the digest, and the same record with the old
+        // reopen count still has the digest the signature was given for
+        Assert.All(record.Ballots, ballot => Assert.Equal(BallotStatus.Submitted, ballot.Status));
+        Assert.NotEmpty(record.Ballots);
+        Assert.Equal(1, record.Reopens);
+        Assert.Equal(digest, RecordDigest.Compute(record with { Reopens = 0 }));
+        Assert.NotEqual(digest, approval.Digest);
+        Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots.Single().State);
+    }
+
+    /// <summary>
     ///     Test that a reopen that would leave a slot in which nobody may sign is refused with
     ///     <see cref="DomainRule.ReopenWouldStrandSlot"/>, naming the slot, and that nothing is recorded.
     /// </summary>
@@ -1837,8 +1966,8 @@ public class SigningServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var fixture = await CreateAsync();
         await AnswerAllAsync(fixture);
-        var first = await fixture.Signing.AddSlotAsync(Cyd, fixture.ProjectId, "rev-1", fixture.Ids["ann"], null, cancellationToken);
-        var second = await fixture.Signing.AddSlotAsync(Cyd, fixture.ProjectId, "rev-1", fixture.Ids["bob"], null, cancellationToken);
+        var first = await AddSlotAsync(fixture, "rev-1", "ann");
+        var second = await AddSlotAsync(fixture, "rev-1", "bob");
         var digest = (await ApprovalAsync(fixture)).Digest;
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", first.Id, digest, Password, cancellationToken);
         await fixture.Signing.SignAsync(TestActors.Bob, fixture.ProjectId, "rev-1", second.Id, digest, Password, cancellationToken);
@@ -1945,24 +2074,24 @@ public class SigningServiceTests
         await store.AddMembershipAsync(member.Id, project.Id, ProjectRole.User, cancellationToken);
         await TestServices.Reviews(store, clock).CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], rootActor, cancellationToken);
-        var checklists = TestServices.Checklists(store, clock);
-        var projectAdminActor = new Actor("pro", "pro");
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            // root created the review and may not answer it, so the project administrator does
-            await checklists.SetAnswerAsync(
-                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, projectAdminActor, cancellationToken);
-        }
-
+        var userActor = new Actor("mem", "mem");
+        var checklists = TestServices.Checklists(store, clock, userStore);
         var signing = new SigningService(store, users, access, clock);
 
         // The system administrator is not a member, and still arranges the slot
         var slot = await signing.AddSlotAsync(rootActor, project.Id, "rev-1", member.Id, null, cancellationToken);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            // root created the review and may not answer it, so the member of the slot does; the one ballot is handed in
+            await checklists.SetAnswerAsync(
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, userActor, cancellationToken);
+        }
+
         if (approve)
         {
             var digest = (await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken))!.Digest;
             await signing.SignAsync(
-                new Actor("mem", "mem"), project.Id, "rev-1", slot.Id, digest, Password, cancellationToken);
+                userActor, project.Id, "rev-1", slot.Id, digest, Password, cancellationToken);
         }
 
         return new RealAccessWorld(signing, store, project.Id, member.Id, projectAdmin.Id, slot.Id);
@@ -2004,5 +2133,12 @@ public class SigningServiceTests
         ThreadService Threads,
         ChecklistService Checklists,
         int ProjectId,
-        IReadOnlyDictionary<string, int> Ids);
+        IReadOnlyDictionary<string, int> Ids)
+    {
+        /// <summary>
+        ///     Gets the reviews that are marked as answered: the primary reviewer of every slot of such a review
+        ///     answers every check and hands the ballot in, as soon as the slot exists.
+        /// </summary>
+        public HashSet<string> Answered { get; } = [];
+    }
 }

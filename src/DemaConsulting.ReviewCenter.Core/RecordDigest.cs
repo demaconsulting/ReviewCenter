@@ -47,11 +47,15 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               (<c>-</c> when the review has none), then each section sorted by id (<c>section</c> line: id and
 ///               title) followed by its checks sorted by id (<c>item</c> line: id and question wording), so a
 ///               signature binds to the exact questions that were answered;</item>
-///         <item>every stored checklist answer, sorted by check id: id, outcome, justification, and who answered
-///               (display name and user name). The moment of answering is deliberately not covered, so answering
-///               the same value again as the same person does not invalidate a signature;</item>
-///         <item>the sections that do not apply, sorted by section id: id and reason (not who marked the section or
-///               when, which unlike an answer is not a statement the record makes);</item>
+///         <item>the consolidated standing of the ballots (see <see cref="BallotConsolidation"/>; only submitted
+///               ballots count, so a draft never changes the digest): a <c>checks</c> line, then one <c>check</c> line
+///               per check of the sections that apply, sorted by id: id and <c>agreed</c> with the outcome, or
+///               <c>disputed</c>, or <c>pending</c>;</item>
+///         <item>a <c>sections</c> line, then one <c>applicability</c> line per section that is not applicable or
+///               disputed, sorted by section id; and an <c>outcome</c> line (<c>none</c>, <c>approved</c> or
+///               <c>rejected</c>). Justifications, answerers, reasons, times and ballots of a slot that has not
+///               submitted are deliberately not covered, so a signature binds to what the reviewers agree on, not to how
+///               they worded it;</item>
 ///         <item>only when the review has a review conclusion text (see <see cref="ReviewRecord.ReviewConclusionText"/>), a
 ///               <c>conclusion-text</c> line with the text, so a signature binds to the words the reviewers wrote as the
 ///               conclusion of the record. The line is absent when there is no text, so the digest of a review without
@@ -73,10 +77,10 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     </list>
 ///     A follow-up review (one created from an earlier review, see <see cref="ReviewService"/>) adds two kinds of
 ///     conditional text, in the same way as <c>reopens</c>: a <c>follows {id}</c> line straight after the source block,
-///     and a <c>carried {id}</c> suffix at the end of an answer line, a not-applicable line and a thread line whose row
-///     was carried over from that review. They are written only when present, so the digest of a review that is not a
+///     and a <c>carried {id}</c> suffix at the end of a thread line whose thread was carried over from that review.
+///     They are written only when present, so the digest of a review that is not a
 ///     follow-up does not contain them; a signature of a follow-up
-///     therefore also binds to which review it follows and to which rows were carried rather than given in it.
+///     therefore also binds to which review it follows and to which threads were carried rather than started in it.
 ///     Strings are written as <c>{length}:{text}</c> (length in UTF-16 code units) and absent values as
 ///     <c>-</c>, so no text can imitate a delimiter; numbers use the invariant culture and times are written as
 ///     UTC ticks. All sorting is ordinal. The class is stateless and thread-safe.
@@ -126,23 +130,9 @@ public static class RecordDigest
         // The questions come before the answers so a signature binds to what was asked, not only to the replies
         AddChecklist(lines, record.Checklist);
 
-        // Answers, in check id order, with who answered; only the time is left out on purpose. A carried answer ends
-        // with the review it came from, so carried and given answers never share a digest
-        lines.Add("answers");
-        foreach (var answer in record.Answers.OrderBy(a => a.ItemId, StringComparer.Ordinal))
-        {
-            lines.Add(
-                $"answer {Text(answer.ItemId)} {Text(answer.Outcome.ToString())} {Text(answer.Justification)} " +
-                $"{Text(answer.AnsweredBy)} {Text(answer.AnsweredByUsername)}{Carried(answer.CarriedFromReviewId)}");
-        }
-
-        // Only the sections that do not apply matter; "applies" is the default and carries no reason
-        lines.Add("sections");
-        foreach (var section in record.SectionStates.Where(s => !s.Applicable).OrderBy(s => s.SectionId, StringComparer.Ordinal))
-        {
-            lines.Add($"not-applicable {Text(section.SectionId)} {Text(section.Reason)}{Carried(section.CarriedFromReviewId)}");
-        }
-
+        // The agreed standing of the submitted ballots replaces the individual answers: what a signature binds to is what
+        // the reviewers handed in and agree on, so a draft or a slot that has not submitted never changes the digest
+        AddConsolidation(lines, record);
         // The review conclusion text is part of what the reviewers sign; the line is absent when there is none, which
         // keeps the digest of every review without one as it was. It comes before the report, which ends the text
         if (record.ReviewConclusionText is not null)
@@ -179,6 +169,56 @@ public static class RecordDigest
     public static string Compute(ReviewRecord record)
     {
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Canonicalize(record))));
+    }
+
+    /// <summary>
+    ///     Writes the consolidated standing of the ballots: the agreed outcome of every check, the sections that do not
+    ///     apply or are disputed, and the outcome of the review.
+    /// </summary>
+    /// <remarks>
+    ///     Only submitted ballots take part (see <see cref="BallotConsolidation"/>). Each listed check gets one line with
+    ///     its standing: <c>agreed</c> with the outcome, <c>disputed</c> or <c>pending</c>; a section appears only when
+    ///     the submitted ballots all mark it not applicable or disagree on it. The checks of such a section are not
+    ///     listed. The lines are sorted by identifier, so the order of the checklist and of the ballots does not matter.
+    ///     A record without a checklist has no checks and no sections and the outcome <c>none</c>. Justifications,
+    ///     answerers and times are not covered: wording and authorship never decide what the reviewers agree on.
+    /// </remarks>
+    /// <param name="lines">The lines written so far.</param>
+    /// <param name="record">The record.</param>
+    private static void AddConsolidation(List<string> lines, ReviewRecord record)
+    {
+        var result = record.Checklist is null
+            ? null
+            : BallotConsolidation.Consolidate(record.Checklist.Parse(), record.Ballots);
+
+        lines.Add("checks");
+        foreach (var check in (result?.Checks ?? []).OrderBy(c => c.ItemId, StringComparer.Ordinal))
+        {
+            var standing = check.Consensus switch
+            {
+                CheckConsensus.Agreed => "agreed " + Text(check.Outcome.ToString()),
+                CheckConsensus.Disputed => "disputed",
+                _ => "pending"
+            };
+            lines.Add($"check {Text(check.ItemId)} {standing}");
+        }
+
+        lines.Add("sections");
+        foreach (var section in (result?.Sections ?? [])
+                     .Where(s => s.Consensus != SectionConsensus.Applicable)
+                     .OrderBy(s => s.SectionId, StringComparer.Ordinal))
+        {
+            var standing = section.Consensus == SectionConsensus.NotApplicable ? "not-applicable" : "disputed";
+            lines.Add($"applicability {Text(section.SectionId)} {standing}");
+        }
+
+        var outcome = result?.Outcome switch
+        {
+            ReviewOutcome.Approved => "approved",
+            ReviewOutcome.Rejected => "rejected",
+            _ => "none"
+        };
+        lines.Add("outcome " + outcome);
     }
 
     /// <summary>

@@ -119,17 +119,21 @@ public abstract class InboxWebTestBase : PageTestBase
     }
 
     /// <summary>
-    ///     Answers every check of the review as Pass.
+    ///     Answers every check of the review as Pass in the ballot of a reviewer and hands the ballot in; the
+    ///     reviewer must hold a slot of the review.
     /// </summary>
     /// <param name="reviewId">The review id.</param>
-    /// <returns>A task that completes when all checks are answered.</returns>
-    protected async Task AnswerAllAsync(string reviewId)
+    /// <param name="answerer">The user name of the slot owner who answers.</param>
+    /// <returns>A task that completes when the ballot is submitted.</returns>
+    protected async Task AnswerAllAsync(string reviewId, string answerer)
     {
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await Checklists.SetAnswerAsync(
-                ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, ActorOf("eve"), Ct);
+                ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, ActorOf(answerer), Ct);
         }
+
+        await Checklists.SubmitBallotAsync(ProjectId, reviewId, ActorOf(answerer), Ct);
     }
 
     /// <summary>

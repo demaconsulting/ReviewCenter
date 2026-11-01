@@ -69,6 +69,32 @@
                 answer it. You can still start, answer and resolve comment threads.
             </p>
         }
+        else if (State.NoSlot && !ReadOnly)
+        {
+            <p class="notice" role="status" data-testid="no-slot-notice">
+                You are not a reviewer of this review, so you see the consolidated standing but cannot answer. Add yourself
+                as a reviewer slot on the review page to answer the checklist.
+            </p>
+        }
+
+        @if (State.IsOwnBallot)
+        {
+            <p class="muted" data-testid="ballot-status">@BallotStatusLine()</p>
+            @if (CanSubmitBallot)
+            {
+                <button type="button" data-testid="submit-ballot" @onclick="() => SubmitBallotAsync()">Submit ballot</button>
+            }
+
+            @if (BallotError is not null)
+            {
+                <p class="error" role="alert" data-testid="ballot-error">@BallotError</p>
+            }
+
+            @if (Warning?.Key == BallotWarningKey)
+            {
+                <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
+            }
+        }
 
         <section class="card">
             <p class="status" data-testid="checklist-status">@StatusLine()</p>

@@ -42,16 +42,18 @@ sections:
 
       - id: ReviewCenter-SigningService-SlotEdit
         title: >-
-          The SigningService class shall let a slot that has never been signed be changed or removed, shall refuse
-          to change or remove a slot that has any signature, current or out of date, and shall reject a slot that
-          does not exist in the review.
+          The SigningService class shall let a slot that has never been signed be changed or removed, shall take the
+          ballot of a removed slot out of the record together with the slot, shall refuse to change or remove a slot
+          that has any signature, current or out of date, and shall reject a slot that does not exist in the review.
         justification: |
           A signature must always point to a slot that still says who the signer was. Allowing a signed slot to be
-          reassigned or removed would let the record claim that someone else approved.
+          reassigned or removed would let the record claim that someone else approved. The ballot belongs to its slot,
+          so it leaves with it.
         tests:
           - SigningService_UpdateAndRemoveSlotAsync_Unsigned_Succeed
           - SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned
           - SigningService_UpdateAndRemoveSlotAsync_UnknownSlot_ThrowsSlotNotFound
+          - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement
 
       - id: ReviewCenter-SigningService-Actor
         title: >-
@@ -94,12 +96,13 @@ sections:
       - id: ReviewCenter-SigningService-Blockers
         title: >-
           The SigningService class shall refuse to sign a review while a check in a section that applies is
-          unanswered, a check is answered Fail, or a thread is open (chat or included in the report), shall list each of
-          these as a blocker, and shall not count a check answered Fail in a section that does not apply.
+          unanswered in the consolidated ballots, a check is agreed as Fail, or a thread is open (chat or included in
+          the report), shall list each of these as a blocker, and shall not count a check answered Fail in a section
+          that does not apply.
         justification: |
-          A signature says the reviewer approves the record. That is not true while checks are unanswered, a check
-          has failed, or a discussion is still open, and a failed check in a section that was excluded is not part
-          of what is being approved.
+          A signature says the reviewer approves the record, and the record covers the consolidation of the submitted
+          ballots. That is not true while checks are unanswered, a check has failed, or a discussion is still open,
+          and a failed check in a section that was excluded is not part of what is being approved.
         tests:
           - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
           - SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock
@@ -109,8 +112,9 @@ sections:
       - id: ReviewCenter-SigningService-Sign
         title: >-
           The SigningService class shall store a signature for a primary reviewer or an alternate of a slot that
-          records the slot, the user, the display name at that time, the role, the time, the digest of the record,
-          and the fixed meaning text, and shall never change or remove a signature that has been stored.
+          records the slot, the user, the display name at that time, the role, the time, the digest of the record (which
+          covers the consolidation of the submitted ballots), and the fixed meaning text, and shall never change or
+          remove a signature that has been stored.
         justification: |
           The signature is the evidence of who approved which record and when. Keeping every signature unchanged
           means the history of approvals stays reliable after the record changes and is signed again.
@@ -163,12 +167,11 @@ sections:
         title: >-
           The SigningService class shall give for a review the digest of its record, for each slot whether it is
           not signed, signed with a current signature (naming the signer and time), or out of date because it was
-          signed only for an earlier record, whether the review is approved, which requires at least one slot, every
-          slot to have a current signature, and no open thread, the blockers, and one sentence naming the next step,
-          and shall
-          give nothing for a review that does not exist. The status shall also say for the primary and for the alternate
-          reviewer of each slot whether that user is still a member of the project, and shall keep the slot assigned
-          to a user who has been removed from the project.
+          signed only for an earlier record, whether the review is approved (see the Concluded requirement), the
+          blockers, and one sentence naming the next step, and shall give nothing for a review that does not exist.
+          The status shall also say for the primary and for the alternate reviewer of each slot whether that user is
+          still a member of the project, and shall keep the slot assigned to a user who has been removed from the
+          project.
         justification: |
           Approval has to follow the record. Computing it from the signatures and the record each time means a
           change to the record can never leave a review looking approved, and nothing about the status can be
@@ -266,7 +269,8 @@ sections:
       - id: ReviewCenter-SigningService-ApprovalLock
         title: >-
           The SigningService class shall treat a review that is concluded (every slot, at least one, has a signature
-          of the current record, and no thread is open) as locked, shall refuse to add, change, or remove a slot and
+          of the current record, and no thread is open; see the Concluded requirement for the ballots) as locked,
+          shall refuse to add, change, or remove a slot and
           shall refuse to sign while the review is locked, with the ReviewLocked rule and a message that says the
           review is concluded and has to be reopened first, and shall compute the lock from the signatures, the
           threads, and the record each time and not store it.
@@ -290,7 +294,9 @@ sections:
           store the reopening with the user, the time, the reason, and the digest of the approved record, shall record
           it in the audit trail as review.reopened, in the same transaction as the change, with the reason and the
           digest, shall keep every earlier signature as history that is out of date, and shall need fresh signatures
-          from every slot before the review is approved again.
+          from every slot before the review is approved again. The ballots of the slots shall stay as they are, so a
+          submitted ballot stays submitted, and the reopen count of the record, which the digest covers, shall make
+          every earlier signature out of date even though the ballots still say what they said.
         justification: |
           Leaving the lock has to be a deliberate and accountable act that an ordinary reviewer or a script cannot
           perform. The reason and the digest in the history show who reopened which approval and why, and keeping the
@@ -307,11 +313,13 @@ sections:
           - SigningService_ReopenReviewAsync_RealAccessRules_ReopensOnlyForAdministrators
           - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
           - SigningService_ReopenReviewAsync_AllSignedButThreadOpen_ThrowsReviewNotLocked
+          - SigningService_ReopenReviewAsync_BallotsStaySubmitted
 
       - id: ReviewCenter-SigningService-OpenThreadRule
         title: >-
           The SigningService class shall treat a review as concluded only when every slot, at least one, has a
-          signature of the current record and every thread is resolved, so that a review whose slots are all signed
+          signature of the current record and every thread is resolved (besides the ballot rules of the Concluded
+          requirement), so that a review whose slots are all signed
           but that still has an open thread, chat or included, is not concluded, not locked, and not approved, shall
           refuse a signature while a thread is open with the SigningNotAllowed rule, as a rule separate from the
           comparison of the digest, shall keep the signatures that exist valid when a chat thread is started after
@@ -394,10 +402,11 @@ sections:
       - id: ReviewCenter-SigningService-CarriedRecord
         title: >-
           The SigningService class shall treat the answers that a follow-up review carried from an earlier review as
-          answered checks, so that they do not block approval, and the open threads that it carried as open threads,
-          so that they block approval with the same message as any open thread, and shall still treat the user who
-          created the follow-up as its author for the rule of independent reviewers, whoever answered the carried
-          checks.
+          answered checks, so that they do not block approval (they are the consolidated answers of the earlier
+          review and seed draft ballots only, never submitted ones), and the open threads that it carried as open
+          threads, so that they block approval with the same message as any open thread, and shall still treat the
+          user who created the follow-up as its author for the rule of independent reviewers, whoever answered the
+          carried checks.
         justification: |
           A carried answer was given by a reviewer, so it is a real answer, but an open thread is an unresolved
           finding and must be resolved before approval wherever it was started. The rule of independence concerns the
@@ -412,8 +421,9 @@ sections:
           produce, which current signatures the change would make out of date, shall number each affected slot in the
           order of the slots and name its signer, and shall refuse the change with the SignaturesWouldBecomeOutOfDate
           rule, before anything is stored, unless the caller has acknowledged every affected slot, with a change that
-          leaves the digest of the record as it is (chat, for example), or a review without a current signature, needing
-          no acknowledgement.
+          leaves the digest of the record as it is (chat, for example, or a draft ballot that leaves the consolidated
+          standing alone), or a review without a current signature, needing no acknowledgement, and shall leave the
+          signature of the slot of the person who changes the own ballot out of the list when the caller excludes it.
         justification: |
           Whether a signature stays valid is decided by the digest of the record, so comparing the digest before and
           after the change finds the affected signatures exactly, without a trial write. Naming the slot number and
@@ -425,16 +435,98 @@ sections:
           - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
           - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
           - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
+          - SignatureImpact_RequireAcknowledged_DifferingBallot_ListsTheOtherSlot
+          - SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgement
+          - SignatureImpact_RequireAcknowledged_SameStanding_NoWarning
 
       - id: ReviewCenter-SigningService-ProgressCounts
         title: >-
           The SigningService class shall return with the approval status of a review, besides the sentences that say
-          what blocks the approval, the number of open threads, of unanswered checks, and of checks answered Fail,
-          calculated in the same step as the sentences so that each count equals the number it states, and shall
-          return for each person of a slot whether the account is enabled.
+          what blocks the approval, the number of open threads, of unanswered checks, of checks answered Fail, and of
+          checks on which the submitted ballots disagree, calculated in the same step as the sentences so that each
+          count equals the number it states, and shall return for each person of a slot whether the account is
+          enabled.
         justification: |
           The project overview and any later list of work need the numbers and not the text. Taking them from the
           step that writes the sentences means the two cannot disagree, and no second rule for what blocks a review
           can drift from the first. A slot whose person cannot sign any more has to be recognizable.
         tests:
           - SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences
+          - SigningService_SignAsync_Disputed_BlocksSigning
+
+      - id: ReviewCenter-SigningService-OwnBallotSubmitted
+        title: >-
+          The SigningService class shall refuse a signature of a slot whose own ballot has not been handed in
+          (submitted) with the BallotNotSubmitted rule and store nothing, after the comparison of the digest and the
+          check for an earlier signature and before the blockers, except that in a review with a single slot, where a
+          draft ballot counts for the progress and the blockers, the blockers are named first.
+        justification: |
+          The digest covers only the submitted ballots, so it cannot say whether the signer finished the own answers.
+          A signature that binds to the answers of the others while the own ballot is still a draft would approve a
+          standing the signer has not given.
+        tests:
+          - SigningService_SignAsync_OwnBallotDraft_ThrowsBallotNotSubmitted
+
+      - id: ReviewCenter-SigningService-EarlySigning
+        title: >-
+          The SigningService class shall let a slot sign as soon as its own ballot is submitted and nothing blocks the
+          review, without waiting for the ballots of the other slots, and shall make that signature out of date,
+          through the digest of the record, when a later ballot changes the consolidated standing, for example by a
+          disagreement.
+        justification: |
+          A reviewer who has finished should not have to wait for the others. What the signature approves is the
+          consolidated standing, so it stays valid while that standing is the same and ends when another reviewer's
+          ballot disagrees, as the digest rule always decides.
+        tests:
+          - SigningService_SignAsync_EarlySign_OtherSlotNotSubmitted_Succeeds
+          - SigningService_SignAsync_OtherSlotDisputes_SignatureOutOfDate
+
+      - id: ReviewCenter-SigningService-DisputedBlocker
+        title: >-
+          The SigningService class shall refuse to sign a review while the submitted ballots disagree on a check, with
+          the SigningNotAllowed rule and a message that names the number of checks disputed between the ballots, shall
+          list that number as a blocker, and shall return it as the count of disputed checks of the approval status.
+        justification: |
+          A signature approves one standing of the checklist. While reviewers disagree there is no such standing, so
+          nobody can sign until the ballots are settled.
+        tests:
+          - SigningService_SignAsync_Disputed_BlocksSigning
+
+      - id: ReviewCenter-SigningService-SlotBallotImpact
+        title: >-
+          The SigningService class shall require the acknowledgement of the other signed slots, with the
+          SignaturesWouldBecomeOutOfDate rule and before anything is stored, when removing a slot, or changing the
+          reviewers of a slot so that a reviewer leaves it, would change the consolidated standing, and so the digest,
+          because the ballot of the slot leaves the record, or reverts to a draft without the rows of the departed
+          reviewer, and shall not ask for it when the standing, and so the digest, stays as it is.
+        justification: |
+          The ballot of a slot is part of what the other signatures cover. Removing a slot whose submitted ballot
+          disagreed, for example, makes the others agree and so changes the digest; the person who does it has to see
+          whose signature this withdraws. A departing reviewer takes the own rows with them, which can do the same. A
+          change that leaves the standing as it is withdraws nothing, so it needs no confirmation.
+        tests:
+          - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement
+          - SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgement
+          - SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgement
+
+      - id: ReviewCenter-SigningService-Concluded
+        title: >-
+          The SigningService class shall treat a review as concluded, approved, and locked only when every slot has a
+          submitted ballot, no check is pending or disputed in the consolidation, the outcome is Approved (a Rejected
+          outcome is not concluded), every slot has a signature of the current digest, and no thread is open, shall
+          take the one definition of this from ReviewLock, and shall word the next step of a review that has blockers
+          as the hint for them, also when the review has no slot (for example that checks are unanswered).
+        justification: |
+          A review is approved only when every reviewer has handed in a ballot, they agree, and each has signed that
+          standing. Using one definition keeps the status, the locks, and the store from disagreeing about what is
+          approved. A review with no slot has no one who can answer its checks, so the open checks are the honest next
+          step.
+        tests:
+          - SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved
+          - ReviewLock_IsConcluded_UnsubmittedBallot_False
+          - ReviewLock_IsConcluded_Disputed_False
+          - ReviewLock_IsConcluded_AllSubmittedAgreedSigned_True
+          - ReviewLock_IsConcluded_AgreedBallotsOneSlotUnsigned_False
+          - ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False
+          - ReviewLock_IsConcluded_RejectedOutcome_False_Until1c3
+          - SigningService_NextStep_NoSlots_PointsToTheUnansweredChecks

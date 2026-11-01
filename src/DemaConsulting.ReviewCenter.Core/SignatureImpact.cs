@@ -81,6 +81,11 @@ internal static class SignatureImpact
     ///     chat leaves the digest alone.
     /// </param>
     /// <param name="acknowledged">The slot identities the person has acknowledged, or <c>null</c> for none.</param>
+    /// <param name="excludeSlotId">
+    ///     The slot whose own signature needs no acknowledgement, or <c>null</c> for none. A reviewer who changes the
+    ///     ballot of the own slot knows that the own signature, which the change withdraws, is out of date; the
+    ///     signatures of the other slots are still listed.
+    /// </param>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when the change alters the digest and a
     ///     current signature is not acknowledged; the exception lists the signatures not acknowledged.
@@ -88,7 +93,8 @@ internal static class SignatureImpact
     public static void RequireAcknowledged(
         ReviewSnapshot? snapshot,
         ReviewRecord? changed,
-        IReadOnlyCollection<int>? acknowledged)
+        IReadOnlyCollection<int>? acknowledged,
+        int? excludeSlotId = null)
     {
         if (snapshot is null)
         {
@@ -96,7 +102,7 @@ internal static class SignatureImpact
         }
 
         // Without a current signature there is nothing to lose, and no second digest is needed
-        var current = CurrentSignatures(snapshot);
+        var current = CurrentSignatures(snapshot).Where(s => s.SlotId != excludeSlotId).ToList();
         if (current.Count == 0)
         {
             return;

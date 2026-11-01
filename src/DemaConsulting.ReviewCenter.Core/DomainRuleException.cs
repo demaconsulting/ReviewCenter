@@ -330,7 +330,19 @@ public enum DomainRule
     /// <summary>
     ///     A ballot cannot be handed in while a check that applies has no answer; nothing is stored.
     /// </summary>
-    BallotIncomplete
+    BallotIncomplete,
+
+    /// <summary>
+    ///     The person is not the primary or alternate reviewer of any slot of the review, so there is no ballot to answer
+    ///     the checklist on; nothing is stored.
+    /// </summary>
+    NoReviewerSlot,
+
+    /// <summary>
+    ///     The signer has not handed in the ballot of the slot, so the signature would bind to answers that are not final;
+    ///     nothing is stored.
+    /// </summary>
+    BallotNotSubmitted
 }
 
 /// <summary>

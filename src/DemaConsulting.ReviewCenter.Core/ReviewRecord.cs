@@ -65,7 +65,7 @@ public sealed record ReviewSource(
 
 /// <summary>
 ///     A consistent snapshot of everything a signature covers: the content fingerprint, the source of the files,
-///     the checklist with its answers and section applicability, and all threads with their comments.
+///     the checklist with the ballots of its reviewers, and all threads with their comments.
 /// </summary>
 /// <remarks>
 ///     The snapshot is loaded by one store call so the digest and the signing blockers are computed from the
@@ -74,8 +74,10 @@ public sealed record ReviewSource(
 /// </remarks>
 /// <param name="ContentFingerprint">The content fingerprint of the review's file set.</param>
 /// <param name="Checklist">The frozen checklist of the review, or <c>null</c> when it has none.</param>
-/// <param name="SectionStates">The stored applicability of the checklist sections.</param>
-/// <param name="Answers">The stored checklist answers.</param>
+/// <param name="Ballots">
+///     The ballots of the reviewer slots, drafts included, in slot order (see <see cref="BallotConsolidation"/>); empty
+///     for a review without a ballot. Only the consolidation of the submitted ballots is part of the digest.
+/// </param>
 /// <param name="Threads">All threads of the review with their comments.</param>
 /// <param name="Source">Where the files came from; <see cref="ReviewSource.Upload"/> for an upload.</param>
 /// <param name="Reopens">
@@ -96,8 +98,7 @@ public sealed record ReviewSource(
 public sealed record ReviewRecord(
     string ContentFingerprint,
     ReviewChecklist? Checklist,
-    IReadOnlyList<ChecklistSectionState> SectionStates,
-    IReadOnlyList<ChecklistAnswer> Answers,
+    IReadOnlyList<Ballot> Ballots,
     IReadOnlyList<ReviewThread> Threads,
     ReviewSource Source,
     int Reopens = 0,

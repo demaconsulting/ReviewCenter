@@ -170,7 +170,24 @@ public partial class ChecklistPage : ComponentBase
     ///     Gets a value indicating whether the answers and the applicability of sections can not be changed on this page:
     ///     the review is locked, or the viewer created it and the project does not let the author answer.
     /// </summary>
-    private bool ControlsDisabled => IsLocked || State?.AuthorBlocked == true;
+    private bool ControlsDisabled => IsLocked || State?.AuthorBlocked == true || State?.IsOwnBallot == false;
+
+    /// <summary>
+    ///     Gets the message of the last failed hand-in of the own ballot, or <c>null</c>.
+    /// </summary>
+    private string? BallotError { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the Submit ballot button is shown: the viewer answers for a slot, the ballot
+    ///     is a draft with every check that applies answered, and nothing locks the page.
+    /// </summary>
+    private bool CanSubmitBallot => State is { IsOwnBallot: true, BallotState: BallotState.Draft, IsComplete: true }
+                                    && !ControlsDisabled;
+
+    /// <summary>
+    ///     Gets the key of the confirmation for handing in the ballot.
+    /// </summary>
+    private const string BallotWarningKey = "ballot";
 
     /// <summary>
     ///     Gets the identifier of the open section, or <c>null</c> when none is open.
@@ -311,6 +328,7 @@ public partial class ChecklistPage : ComponentBase
         ReasonTexts.Clear();
         SectionErrors.Clear();
         Warning = null;
+        BallotError = null;
         _scrollTarget = null;
     }
 
@@ -542,6 +560,51 @@ public partial class ChecklistPage : ComponentBase
     }
 
     /// <summary>
+    ///     Hands in the own ballot of the signed-in user and shows a rule violation next to the button.
+    /// </summary>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the ballot is handed in or the warning or problem is shown.</returns>
+    /// <remarks>
+    ///     A review with one reviewer slot hands the ballot in with the last answer; this button is for the cases in
+    ///     which no answer fired it, and for the reviews with several slots. Handing in can make signatures out of date
+    ///     and is then confirmed like any other change (see <see cref="SaveAnswerAsync"/>).
+    /// </remarks>
+    private async Task SubmitBallotAsync(IReadOnlyList<AffectedSignature>? confirmed = null)
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            await ChecklistService.SubmitBallotAsync(
+                ProjectId,
+                ReviewId,
+                actor,
+                acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            BallotError = null;
+            Warning = PendingSignatureWarning.Create(BallotWarningKey, confirmed, ex, SubmitBallotAsync);
+            return;
+        }
+        catch (DomainRuleException ex)
+        {
+            IsApproved |= ex.Rule == DomainRule.ReviewLocked;
+            Warning = null;
+            BallotError = ex.Message;
+            return;
+        }
+
+        Warning = null;
+        BallotError = null;
+        State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
+    }
+
+    /// <summary>
     ///     Stores the applicability of a section for the signed-in user and shows a rule violation in the section.
     /// </summary>
     /// <param name="sectionId">The section identifier.</param>
@@ -751,6 +814,20 @@ public partial class ChecklistPage : ComponentBase
     private bool IsUnsaved(string itemId)
     {
         return PendingOutcomes.ContainsKey(itemId) || JustificationTexts.ContainsKey(itemId);
+    }
+
+    /// <summary>
+    ///     Words the state of the own ballot.
+    /// </summary>
+    /// <returns>A short sentence that says whether the ballot counts yet.</returns>
+    private string BallotStatusLine()
+    {
+        return State!.BallotState switch
+        {
+            BallotState.Submitted => "Your ballot is submitted and counts in the review.",
+            BallotState.Draft => "Your ballot is a draft: it does not count until you submit it.",
+            _ => "You have not answered yet."
+        };
     }
 
     /// <summary>

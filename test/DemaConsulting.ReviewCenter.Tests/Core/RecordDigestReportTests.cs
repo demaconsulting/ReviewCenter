@@ -51,8 +51,9 @@ public class RecordDigestReportTests
         "fingerprint 3:abc",
         "source upload",
         "checklist -",
-        "answers",
-        "sections"
+        "checks",
+        "sections",
+        "outcome none"
     ];
 
     /// <summary>
@@ -162,7 +163,7 @@ public class RecordDigestReportTests
     /// <returns>The record.</returns>
     private static ReviewRecord Record(IReadOnlyList<ReviewThread>? threads = null, int reopens = 0)
     {
-        return new ReviewRecord("abc", null, [], [], threads ?? [], ReviewSource.Upload, reopens);
+        return new ReviewRecord("abc", null, [], threads ?? [], ReviewSource.Upload, reopens);
     }
 
     /// <summary>
@@ -212,8 +213,8 @@ public class RecordDigestReportTests
 
         // Assert
         Assert.Equal(Expected(), text);
-        Assert.EndsWith("\nsections\nreport", text);
-        Assert.Equal("eb725d508e04716f367b32ac442820c89667cc920020b10eacebf181d7365ab3", RecordDigest.Compute(record));
+        Assert.EndsWith("\nsections\noutcome none\nreport", text);
+        Assert.Equal("4c93e63f9251787ecc5a267ee3d3f28922757b299294add1709bf8a401fad5cd", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -240,7 +241,7 @@ public class RecordDigestReportTests
 
         // Act, Assert
         Assert.Equal(Expected(FindingLines(withResolution: true)), RecordDigest.Canonicalize(record));
-        Assert.Equal("d832d0790d0a53f644ccae5deedb323bfc501ed8b7492f70c313af88644d17e1", RecordDigest.Compute(record));
+        Assert.Equal("85fd4deda209cabf056853e516f4bc9167a0a1c624c72c1097fb661c8ae715ec", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -254,7 +255,7 @@ public class RecordDigestReportTests
 
         // Act, Assert
         Assert.Equal(Expected(FindingLines()), RecordDigest.Canonicalize(record));
-        Assert.Equal("00aacca477c6cb3b6e37c39f8252caa0852a4d28a9f2364c3865f632cc08651f", RecordDigest.Compute(record));
+        Assert.Equal("15c6f2265ae8e9c29aea106ccaa687a7da34e99ebe18116cbeb8930c3e647bd7", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -271,7 +272,7 @@ public class RecordDigestReportTests
         Assert.Equal(
             Expected("thread file 5:b.txt 4:Head - -", $"comment 3:Bob 3:bob 6:Reply? {_later.UtcTicks}"),
             RecordDigest.Canonicalize(record));
-        Assert.Equal("1ce88b76fb7ee47185876938f5eb20270fd4848a640342206e008f419fee096c", RecordDigest.Compute(record));
+        Assert.Equal("0773dc701c67366c9dabe5a739dd8cae85eaaa6144b191692624658e66a01128", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -285,7 +286,7 @@ public class RecordDigestReportTests
 
         // Act, Assert
         Assert.Equal(Expected(FindingLines("8:Baseline")), RecordDigest.Canonicalize(record));
-        Assert.Equal("2890acd760711bfee36a2319e0cb9c881fb0c21cf2d9b2ecb1c9b23e743b45aa", RecordDigest.Compute(record));
+        Assert.Equal("1d50c27f46fcc273951f1f36b8ecba3245dfc743fe7bf1656f4f1424920ee753", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -299,7 +300,7 @@ public class RecordDigestReportTests
 
         // Act, Assert
         Assert.Equal(Expected(FindingLines(carried: " carried 5:rev-0")), RecordDigest.Canonicalize(record));
-        Assert.Equal("dfe9775c4f9a8ae507966bbf1bdebe8c375ff4b63176b4a3dfe8464dcc1b4e15", RecordDigest.Compute(record));
+        Assert.Equal("522e3cfa290534db5d08f4776e1e8ac4c3994a35832c5ef9d1bf21d8588770c0", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -313,7 +314,7 @@ public class RecordDigestReportTests
 
         // Act, Assert
         Assert.Equal(Expected() + "\nreopens 1", RecordDigest.Canonicalize(record));
-        Assert.Equal("bf3f0cb98cfa4d84725f25f699f771c292755fb7becefa3a65400bba9a0fc398", RecordDigest.Compute(record));
+        Assert.Equal("451ecc03dcc8e16b0213f536a9521173b7a738e990bec2183d2eeb4f587f305d", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -338,7 +339,7 @@ public class RecordDigestReportTests
             ]);
         Assert.Equal(expected, RecordDigest.Canonicalize(forward));
         Assert.Equal(expected, RecordDigest.Canonicalize(backward));
-        Assert.Equal("4ff79bc0ab85820a0ba674aaccc642d17f818c43ad4ea2474aeb133798c69724", RecordDigest.Compute(forward));
+        Assert.Equal("14ffa2d70acda168008bc134a907b0be6918112a76758a10cdff1132fc4c45c4", RecordDigest.Compute(forward));
     }
 
     /// <summary>
@@ -507,7 +508,7 @@ public class RecordDigestReportTests
     /// <returns>The record.</returns>
     private static ReviewRecord RecordWithConclusionText(string? conclusionText)
     {
-        return new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload, 0, ReviewConclusionText: conclusionText);
+        return new ReviewRecord("abc", null, [], [], ReviewSource.Upload, 0, ReviewConclusionText: conclusionText);
     }
 
     /// <summary>
@@ -526,7 +527,7 @@ public class RecordDigestReportTests
         // Assert
         var expected = string.Join('\n', [.. _prefix, "conclusion-text 11:Looks good.", "report"]);
         Assert.Equal(expected, text);
-        Assert.Equal("73c5cebeca22e655eb130335b39f7836598a6adda65354c1b75f4b740e755bd7", RecordDigest.Compute(record));
+        Assert.Equal("fcae2e5e3f3404ec7715b8a10002f87f488112d7eb88e45a0c12711ea8376442", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -545,7 +546,7 @@ public class RecordDigestReportTests
         // Assert
         var expected = string.Join('\n', [.. _prefix, "conclusion-text 17:Line one\nLine two", "report"]);
         Assert.Equal(expected, text);
-        Assert.Equal("51c218722cbdc88a5dfa6ec6643957e09e6225574448ae23623ef812457a63b3", RecordDigest.Compute(record));
+        Assert.Equal("118f5fc446ef656ffbf30883b3392f9d85c5c32b18f4ab5a34edb4e666d8ae21", RecordDigest.Compute(record));
     }
 
     /// <summary>

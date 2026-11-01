@@ -734,7 +734,9 @@ created before it must be recreated too. Project member management adds the must
 settings add seven columns to the projects (`EvidenceAnonymousIndex`, `EvidenceAnonymousAttestations`,
 `EvidenceIncludeThreads`, `EvidenceIncludeReviewerNames`, `EvidenceIncludeChecklistWording`, `EvidenceIncludeFiles`,
 and `EvidenceIncludeGitContext`), and the record digest is labeled `ReviewCenter record v2`, a format private to
-ReviewCenter that also covers the wording of the checklist questions and who answered them. The sign-in with an
+ReviewCenter that also covers the wording of the checklist questions and the consolidated standing of the submitted
+ballots (the agreed answer, disputed, or open per check; agreed or disputed not-applicable per section; the outcome),
+and no answerer, justification, slot or draft. The sign-in with an
 OpenID Connect provider adds two columns to the users (`Users.ExternalIssuer` and `Users.ExternalSubject`) with a unique
 index on the pair. The two-factor sign-in adds two tables (`UserTotps` and `TotpRecoveryCodes`). There is no migration:
 recreate development databases created before them. The approval lock and the independent reviewers add the table
@@ -747,8 +749,9 @@ migration: a development database created before them must be deleted and create
 review adds the column `Reviews.DueDate`, which the server also creates only when the database is new (no migration).
 The follow-up review adds the columns `Reviews.FollowsReviewId`, `Reviews.CarriedAnswerCount`, and
 `Reviews.CarriedThreadCount`, and the carried-from columns of the checklist answers, the section states, and the
-threads, again with no migration. A review that follows nothing keeps its record digest, because the lines for a
-followed review and for carried rows are added to the digest only when they exist. The time of the last sign-in adds the
+threads, again with no migration. A review that follows nothing keeps its record digest, because the line for a
+followed review and the marker of a carried thread are added to the digest only when they exist. The time of the
+last sign-in adds the
 column `Users.LastSignInUtc`, again with no migration: a development database created before it must be deleted and
 created again. The comments of a thread add the columns `Comments.IncludeInReport` and `Comments.Kind`, again with no
 migration: a development database created before them must be deleted and created again.

@@ -89,19 +89,28 @@ internal static class EvidenceTestSupport
     }
 
     /// <summary>
-    ///     Answers every check of a review as passed.
+    ///     Answers every check of a review as passed and hands in the ballot; ann must hold a reviewer slot of the review
+    ///     and the checklist service must know her through the same user store as the signing service.
     /// </summary>
     /// <param name="checklists">The checklist service.</param>
     /// <param name="projectId">The project number.</param>
     /// <param name="reviewId">The review identifier.</param>
+    /// <param name="answerer">The slot owner who answers; ann when <c>null</c>.</param>
     /// <returns>A task that completes when every check is answered.</returns>
-    public static async Task AnswerAllPassAsync(ChecklistService checklists, int projectId, string reviewId)
+    public static async Task AnswerAllPassAsync(
+        ChecklistService checklists,
+        int projectId,
+        string reviewId,
+        Actor? answerer = null)
     {
+        var actor = answerer ?? Ann;
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await checklists.SetAnswerAsync(
-                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, Ann, TestContext.Current.CancellationToken);
+                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, actor, TestContext.Current.CancellationToken);
         }
+
+        await checklists.SubmitBallotAsync(projectId, reviewId, actor, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -158,8 +167,8 @@ internal static class EvidenceTestSupport
         int annUserId,
         string password)
     {
-        await AnswerAllPassAsync(checklists, projectId, reviewId);
         var slotId = await AddSlotAsync(signing, projectId, reviewId, annUserId);
+        await AnswerAllPassAsync(checklists, projectId, reviewId);
         await SignAsync(signing, projectId, reviewId, slotId, Ann, password);
     }
 }

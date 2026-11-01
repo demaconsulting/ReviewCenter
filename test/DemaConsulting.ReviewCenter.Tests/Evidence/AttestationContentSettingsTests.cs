@@ -66,7 +66,7 @@ public class AttestationContentSettingsTests
         Assert.Contains(lines, l => l.StartsWith("Participant 1", StringComparison.Ordinal));
         Assert.Contains(
             lines,
-            l => l.StartsWith("Answered by Participant", StringComparison.Ordinal) && l.EndsWith(" UTC", StringComparison.Ordinal));
+            l => l.StartsWith("Answered by Reviewer 1 (primary)", StringComparison.Ordinal) && l.EndsWith(" UTC", StringComparison.Ordinal));
         Assert.Contains(lines, l => l.Contains("by a signed-in user", StringComparison.Ordinal));
         Assert.Contains("Left out of this document: Reviewer names.", lines);
         Assert.Contains("Reviewer sign-offs", lines);
@@ -239,7 +239,7 @@ public class AttestationContentSettingsTests
     }
 
     /// <summary>
-    ///     Arranges a signed review in which cyd, who holds no seat, answered a check and resolved a thread.
+    ///     Arranges a signed review in which cyd, who holds no seat, started and resolved a thread.
     /// </summary>
     /// <param name="settings">The evidence settings of the project; the defaults when <c>null</c>.</param>
     /// <returns>The arranged world.</returns>
@@ -248,9 +248,6 @@ public class AttestationContentSettingsTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var fixture = await AttestationFixture.CreateAsync(signed: false);
         var cyd = new Actor("cyd", "Cyd");
-        var firstItem = DefaultChecklist.Current.Sections.SelectMany(s => s.Items).First();
-        await fixture.Checklists.SetAnswerAsync(
-            fixture.ProjectId, AttestationFixture.ReviewId, firstItem.Id, ChecklistOutcome.Pass, null, cyd, cancellationToken);
         var threads = TestServices.Threads(fixture.Store, fixture.Clock);
         var thread = await threads.StartThreadAsync(
             fixture.ProjectId, AttestationFixture.ReviewId, new ThreadAnchor("a.txt", null, null, ThreadSide.Head), cyd, SampleData.ThreadText, cancellationToken);

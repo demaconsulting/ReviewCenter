@@ -91,8 +91,8 @@ public class EvidenceIndexServiceTests
         // Arrange: a review with a set id and a slot that has not signed
         var fixture = await AttestationFixture.CreateAsync(signed: false);
         await EvidenceTestSupport.AddReviewAsync(fixture.Store, fixture.Clock, fixture.ProjectId, "set-1", "Core-Logic", TestContent.A);
-        await EvidenceTestSupport.AnswerAllPassAsync(fixture.Checklists, fixture.ProjectId, "set-1");
         await EvidenceTestSupport.AddSlotAsync(fixture.Signing, fixture.ProjectId, "set-1", await UserIdAsync(fixture, "ann"));
+        await EvidenceTestSupport.AnswerAllPassAsync(fixture.Checklists, fixture.ProjectId, "set-1");
 
         // Act: build the index
         var entries = await CreateService(fixture).BuildAsync(fixture.ProjectId, TestContext.Current.CancellationToken);
@@ -205,12 +205,14 @@ public class EvidenceIndexServiceTests
         var fixture = await AttestationFixture.CreateAsync(signed: false);
         fixture.Clock.Advance(new DateTimeOffset(2025, 3, 4, 23, 30, 0, TimeSpan.Zero) - fixture.Clock.GetUtcNow());
         await EvidenceTestSupport.AddReviewAsync(fixture.Store, fixture.Clock, fixture.ProjectId, "set-1", "Core-Logic", TestContent.A);
-        await EvidenceTestSupport.AnswerAllPassAsync(fixture.Checklists, fixture.ProjectId, "set-1");
         var annSlot = await EvidenceTestSupport.AddSlotAsync(fixture.Signing, fixture.ProjectId, "set-1", await UserIdAsync(fixture, "ann"));
         var cydSlot = await EvidenceTestSupport.AddSlotAsync(fixture.Signing, fixture.ProjectId, "set-1", fixture.CydUserId);
+        var cyd = new Actor("cyd", "Cyd");
+        await EvidenceTestSupport.AnswerAllPassAsync(fixture.Checklists, fixture.ProjectId, "set-1");
+        await EvidenceTestSupport.AnswerAllPassAsync(fixture.Checklists, fixture.ProjectId, "set-1", cyd);
         await EvidenceTestSupport.SignAsync(fixture.Signing, fixture.ProjectId, "set-1", annSlot, EvidenceTestSupport.Ann, AttestationFixture.Password);
         fixture.Clock.Advance(TimeSpan.FromHours(1));
-        await EvidenceTestSupport.SignAsync(fixture.Signing, fixture.ProjectId, "set-1", cydSlot, new Actor("cyd", "Cyd"), AttestationFixture.Password);
+        await EvidenceTestSupport.SignAsync(fixture.Signing, fixture.ProjectId, "set-1", cydSlot, cyd, AttestationFixture.Password);
 
         // Act: build the index
         var entries = await CreateService(fixture).BuildAsync(fixture.ProjectId, TestContext.Current.CancellationToken);
@@ -258,7 +260,7 @@ public class EvidenceIndexServiceTests
         var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, AttestationFixture.Password, cancellationToken);
         var signing = TestServices.Signing(store, users, clock);
-        var checklists = TestServices.Checklists(store, clock);
+        var checklists = TestServices.Checklists(store, clock, userStore);
         var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
         await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
         foreach (var (id, set) in new[] { ("r-1", "a-set"), ("r-2", "b-set"), ("r-3", "c-set") })

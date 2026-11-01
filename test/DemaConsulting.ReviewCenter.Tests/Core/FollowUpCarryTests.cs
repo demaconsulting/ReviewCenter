@@ -67,6 +67,7 @@ public class FollowUpCarryTests
         {
             ProjectId = 1,
             ReviewId = "old",
+            SlotId = 1,
             ItemId = item,
             Outcome = outcome,
             Justification = outcome == ChecklistOutcome.Pass ? null : "Because",
@@ -88,6 +89,7 @@ public class FollowUpCarryTests
         {
             ProjectId = 1,
             ReviewId = "old",
+            SlotId = 1,
             SectionId = section,
             Applicable = applicable,
             Reason = applicable ? null : "Not relevant",
@@ -163,7 +165,8 @@ public class FollowUpCarryTests
         var checklist = withChecklist
             ? new ReviewChecklist { ProjectId = 1, ReviewId = "old", Version = "v", Definition = Definition().ToJson() }
             : null;
-        return new ReviewRecord("fp", checklist, sections ?? [], answers ?? [], threads ?? [], ReviewSource.Upload);
+        var ballot = new Ballot(1, BallotStatus.Submitted, _then, "bob", answers ?? [], sections ?? []);
+        return new ReviewRecord("fp", checklist, [ballot], threads ?? [], ReviewSource.Upload);
     }
 
     /// <summary>

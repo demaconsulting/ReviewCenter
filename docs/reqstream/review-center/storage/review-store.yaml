@@ -147,17 +147,18 @@ sections:
         title: >-
           The ReviewStore class shall save the checklist snapshot of a review together with the review, return
           it, or nothing when the review has none, save the applicability of a section and the answer to a
-          check by replacing any earlier one so that each section and check has one row, and list them back
-          with their user names, display names, and times unchanged.
+          check in the ballot of a reviewer slot by replacing any earlier one so that each slot has one row for each
+          section and check, and read them back from the ballot with their user names, display names, and times
+          unchanged.
         justification: |
-          The snapshot must exist exactly when the review exists, and a check has one current answer. User names,
-          display names, and times are part of the record and must come back as saved.
+          The snapshot must exist exactly when the review exists, and a check has one current answer in each ballot.
+          User names, display names, and times are part of the record and must come back as saved.
         tests:
           - ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically
           - ReviewStore_GetChecklist_ReviewWithoutSnapshot_ReturnsNull
-          - ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem
-          - ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection
-          - ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps
+          - ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem
+          - ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection
+          - ReviewStore_BallotRows_RoundTripOutcomeAndTimestamps
 
       - id: ReviewCenter-ReviewStore-Slots
         title: >-
@@ -178,8 +179,9 @@ sections:
       - id: ReviewCenter-ReviewStore-Record
         title: >-
           The ReviewStore class shall read, as one consistent snapshot, the record of a review that a signature
-          covers - its content fingerprint, its checklist, the states of its sections, its answers, and its
-          threads with their comments in posting order - and return nothing for a review that does not exist.
+          covers - its content fingerprint, its checklist, the ballots of its reviewer slots with their answers and
+          section states, and its threads with their comments in posting order - and return nothing for a review
+          that does not exist.
         justification: |
           A signature binds a reviewer to exactly one state of the record. Reading the parts one after the other
           could mix two states, so the record is read as a whole. A review that does not exist has no record.
@@ -316,13 +318,12 @@ sections:
           review-level identity 0, and a concluded review with the ReviewLocked rule inside the write transaction. An
           edit shall make a submitted ballot a draft again, shall hand in a complete ballot at once in a review with
           exactly one slot, and shall add the audit entry of the status change, naming the slot number only, in the same
-          transaction as the edit, so that the hash chain stays intact. The review-level rows that the record and its
-          digest are built from shall neither list nor change with the rows of a ballot.
+          transaction as the edit, so that the hash chain stays intact. The review-level rows that a follow-up review
+          carries shall not be part of any ballot.
         justification: |
           Each reviewer needs an answer of their own, so a row can no longer be identified by the review and the check
           alone. A status that is stored without its entry, or an entry without its status, would leave the history of
-          the ballot untrue, and a record that changed with a draft would break the signatures made for it. The lock
-          check is part of the write, so a signed record cannot change under a signature.
+          the ballot untrue. The lock check is part of the write, so a signed record cannot change under a signature.
         tests:
           - ReviewStore_SetBallotAnswerAsync_FirstAnswer_CreatesDraftBallot
           - ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot
@@ -337,9 +338,54 @@ sections:
           - ReviewStore_SetBallotAnswerAsync_TwoSlots_NeverAutoSubmits
           - ReviewStore_ListBallotsAsync_TwoSlots_ReturnsOwnRowsInSlotOrder
           - ReviewStore_GetBallotAsync_NotStartedSlot_ReturnsNull
-          - ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows
-          - ReviewStore_GetRecordAsync_BallotRows_DoNotChangeTheRecordOrItsDigest
           - ReviewStore_BallotTransitions_KeepTheAuditChainIntact
+
+      - id: ReviewCenter-ReviewStore-RecordBallots
+        title: >-
+          The ReviewStore class shall load all ballots of a review, drafts included, each with its status, its answers,
+          and its section states, into the record that a signature covers, in slot order and from the rows of one read
+          transaction, for the single read of a record and for the snapshots of several reviews alike, so that the
+          snapshot of a review read in a batch equals the snapshot read alone, and shall load no ballot for a review
+          in which no slot has started one.
+        justification: |
+          The digest of a record covers the consolidation of the submitted ballots, and the services show a reviewer the
+          draft of their own slot, so the record must carry every ballot with its status and leave the choice of the
+          submitted ones to the digest. Loading the ballots of all reviews of a batch with set-based queries keeps the
+          cost of the overview constant, and sharing the loader with the single read keeps a batch entry from differing
+          from it.
+        tests:
+          - ReviewStore_GetRecordAsync_BallotRows_AreInTheRecordAsBallots
+          - ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments
+          - ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory
+
+      - id: ReviewCenter-ReviewStore-LegacyBaseline
+        title: >-
+          The ReviewStore class shall keep listing the review-level answers and section states that a follow-up review
+          carries from the review it follows (the legacy baseline) without any row of a ballot, shall refuse the
+          review-level slot identity in the methods that write a ballot, so that these rows can be created only with the
+          follow-up review, and shall store the answer
+          or section state that a reviewer gives to a carried check or section in the ballot of the slot, without the
+          carried mark, leaving the review-level carried row as it was.
+        justification: |
+          A follow-up review starts from what its predecessor agreed on. Those rows stay readable as the baseline that
+          seeds the ballot of a new slot, but a reviewer's answer belongs to the ballot of the reviewer's slot, so the
+          baseline must neither mix with the ballots nor change when somebody answers again.
+        tests:
+          - ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows
+          - ReviewStore_SetBallotAnswerAsync_BaselineSlotId_IsRefused
+          - ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker
+
+      - id: ReviewCenter-ReviewStore-SignOwnBallot
+        title: >-
+          The ReviewStore class shall refuse a signature with the BallotNotSubmitted rule, inside the write transaction
+          and without storing anything, while the ballot of the slot being signed is a draft or does not exist in a
+          review that has a checklist, and shall store the signature once that ballot is handed in.
+        justification: |
+          The digest covers only the submitted ballots, so a draft of the signer changes nothing in it and the digest
+          comparison cannot see it. The check inside the write transaction closes the gap to an edit that lands between
+          the check of the service and the write.
+        tests:
+          - ReviewStore_AddSignatureAsync_OwnBallotDraft_ThrowsBallotNotSubmitted
 
       - id: ReviewCenter-ReviewStore-BallotSubmit
         title: >-
@@ -390,24 +436,25 @@ sections:
           from and, for a thread, its number there), all
           in the one transaction that stores the review and its audit entry, so that a carry that fails stores no
           review, no row, and no entry, shall give the threads new numbers of their own, shall load the follow-up
-          and the carried marks into the record that a signature covers, and shall store an answer or a section that
-          replaces a carried one without the carried mark.
+          and the carried marks of the threads into the record that a signature covers, and shall store an answer or
+          a section that replaces a carried one in a ballot without the carried mark.
         justification: |
           A follow-up that exists without the answers it says it carried, or carried rows without the review, would
           make the record untrue, so everything is stored together or not at all. A thread of the new review is its own
-          thread, so it needs its own number. The mark is part of what a signature covers, so the record must load it,
-          and an answer that a person gave again must not keep a mark that says it was taken over.
+          thread, so it needs its own number. The follow-up link and the mark of a thread are part of what a signature
+          covers, so the record must load them, and an answer that a person gave again must not keep a mark that says
+          it was taken over.
         tests:
           - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
           - ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing
-          - ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker
+          - ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker
           - ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind
 
       - id: ReviewCenter-ReviewStore-ApprovalLockInTransaction
         title: >-
           The ReviewStore class shall refuse with the ReviewLocked rule, inside the same transaction that would store
           the change, to store a thread, a comment, a thread state, a resolution, a change of the kind of a thread, a
-          change of whether a comment is in the report, a section state, a checklist answer, a due date,
+          change of whether a comment is in the report, a section state or an answer of a ballot, a due date,
           or the addition, change, or removal of a reviewer slot, when the review is concluded at that moment, using
           the same definition of concluded as the Core services (every slot signed for the current record and no
           thread open), shall store nothing and no audit entry then, and

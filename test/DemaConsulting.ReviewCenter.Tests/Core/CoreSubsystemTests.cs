@@ -119,16 +119,7 @@ public class CoreSubsystemTests
     ///     fails the test instead of going unnoticed. The rules that only the git content source reports are
     ///     excluded here; the content sources subsystem and git tests cover them.
     /// </summary>
-    public static TheoryData<DomainRule> AllRules => [.. Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule) && !StoreOnlyRules.Contains(rule))];
-
-    /// <summary>
-    ///     The rules that only the store reports until a service enforces them; the ballot service of a later change
-    ///     adds the scenario and removes the rule from this list.
-    /// </summary>
-    private static readonly DomainRule[] StoreOnlyRules =
-    [
-        DomainRule.BallotIncomplete
-    ];
+    public static TheoryData<DomainRule> AllRules => [.. Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule))];
 
     /// <summary>
     ///     The rules reported only by the git content source (a revision that does not exist, git missing, a failed
@@ -199,8 +190,9 @@ public class CoreSubsystemTests
         var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
         var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
         var threads = TestServices.Threads(store, new FixedTimeProvider(_now));
-        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        var userStore = new FakeUserStore();
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now), userStore);
+        var users = new UserService(userStore, new FakePasswordHasher(), new FixedTimeProvider(_now));
         var root = await users.CreateAsync("root", "Root", UserRole.Admin, ValidPassword, TestContext.Current.CancellationToken);
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await store.AddMembershipAsync(root.Id, project.Id, TestContext.Current.CancellationToken);
@@ -216,11 +208,18 @@ public class CoreSubsystemTests
         // only answers are those the re-authentication scenario needs to get as far as the password
         Assert.Equal(rule, exception.Rule);
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
-        Assert.Equal(rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign ? 2 : 1, (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
+        Assert.Equal(
+            rule is DomainRule.ReviewerNotIndependent or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate
+                or DomainRule.ReopenerCannotSign or DomainRule.BallotNotSubmitted ? 2 : 1,
+            (await users.ListAsync(TestContext.Current.CancellationToken)).Count);
         Assert.Single(store.Reviews);
         Assert.Equal(rule is DomainRule.ResolutionNoteRequired or DomainRule.CommentNotTogglable ? 1 : 0, store.Threads.Count);
         var overall = (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall;
-        Assert.Equal(rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign or DomainRule.ReopenWouldStrandSlot ? overall.Total : 0, overall.Answered);
+        Assert.Equal(
+            rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned
+                or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign
+                or DomainRule.ReopenWouldStrandSlot or DomainRule.BallotNotSubmitted ? overall.Total : 0,
+            overall.Answered);
     }
 
     /// <summary>
@@ -615,7 +614,10 @@ public class CoreSubsystemTests
         DomainRule.ReviewerNotIndependent,
         DomainRule.SignaturesWouldBecomeOutOfDate,
         DomainRule.ReopenerCannotSign,
-        DomainRule.ReopenWouldStrandSlot
+        DomainRule.ReopenWouldStrandSlot,
+        DomainRule.NoReviewerSlot,
+        DomainRule.BallotNotSubmitted,
+        DomainRule.BallotIncomplete
     ];
 
     /// <summary>
@@ -667,6 +669,10 @@ public class CoreSubsystemTests
                 await store.AddMembershipAsync(author.Id, projectId, cancellationToken);
                 await signing.AddSlotAsync(actor, projectId, "rev-1", author.Id, null, cancellationToken);
                 return;
+            case DomainRule.NoReviewerSlot:
+                // Root answers a check without holding a slot of the review
+                await checklists.SetAnswerAsync(projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, actor, cancellationToken);
+                return;
         }
 
         // The rest need a slot of root and the digest of the record as it is
@@ -687,15 +693,18 @@ public class CoreSubsystemTests
                 var second = await users.CreateAsync("second", "Second", UserRole.Reviewer, ValidPassword, cancellationToken);
                 await store.AddMembershipAsync(second.Id, projectId, cancellationToken);
                 await signing.AddSlotAsync(actor, projectId, "rev-1", second.Id, null, cancellationToken);
+                await AnswerAllAndSubmitAsync(checklists, new Actor("second", "Second"), projectId, cancellationToken);
                 await AnswerAllAndSignAsync(signing, checklists, actor, projectId, slot.Id, cancellationToken);
                 await signing.RemoveSlotAsync(actor, projectId, "rev-1", slot.Id, cancellationToken);
                 return;
             case DomainRule.SignaturesWouldBecomeOutOfDate:
                 // A second slot nobody signs keeps the review from being approved and so from being locked; the
-                // first slot is signed, and then an answer changes without acknowledging that signature
+                // first slot is signed, and then the second hands in a Fail without acknowledging that signature
                 var other = await users.CreateAsync("other", "Other", UserRole.Reviewer, ValidPassword, cancellationToken);
                 await store.AddMembershipAsync(other.Id, projectId, cancellationToken);
                 await signing.AddSlotAsync(actor, projectId, "rev-1", other.Id, null, cancellationToken);
+                var otherActor = new Actor("other", "Other");
+                await AnswerAllAndSubmitAsync(checklists, otherActor, projectId, cancellationToken);
                 await AnswerAllAndSignAsync(signing, checklists, actor, projectId, slot.Id, cancellationToken);
                 await checklists.SetAnswerAsync(
                     projectId,
@@ -703,8 +712,30 @@ public class CoreSubsystemTests
                     DefaultChecklist.Current.Sections[0].Items[0].Id,
                     ChecklistOutcome.Fail,
                     "Found a problem.",
-                    actor,
+                    otherActor,
                     cancellationToken);
+                await checklists.SubmitBallotAsync(projectId, "rev-1", otherActor, cancellationToken);
+                return;
+            case DomainRule.BallotIncomplete:
+                // Root hands in a ballot that has no answer
+                await checklists.SubmitBallotAsync(projectId, "rev-1", actor, cancellationToken);
+                return;
+            case DomainRule.BallotNotSubmitted:
+                // A second slot hands in a complete ballot, so that only root's own ballot, answered but kept as
+                // a draft, stands in the way of the signature
+                var peer = await users.CreateAsync("peer", "Peer", UserRole.Reviewer, ValidPassword, cancellationToken);
+                await store.AddMembershipAsync(peer.Id, projectId, cancellationToken);
+                await signing.AddSlotAsync(actor, projectId, "rev-1", peer.Id, null, cancellationToken);
+                var peerActor = new Actor("peer", "Peer");
+                foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+                {
+                    await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, peerActor, cancellationToken);
+                    await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+                }
+
+                await checklists.SubmitBallotAsync(projectId, "rev-1", peerActor, cancellationToken);
+                digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+                await signing.SignAsync(actor, projectId, "rev-1", slot.Id, digest, ValidPassword, cancellationToken);
                 return;
             case DomainRule.ReopenWouldStrandSlot:
                 // The only slot belongs to root alone, who signs it and then reopens the review
@@ -758,13 +789,32 @@ public class CoreSubsystemTests
         int slotId,
         CancellationToken cancellationToken)
     {
+        await AnswerAllAndSubmitAsync(checklists, actor, projectId, cancellationToken);
+        var digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+        await signing.SignAsync(actor, projectId, "rev-1", slotId, digest, ValidPassword, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Answers every check of <c>rev-1</c> as passed and hands in the ballot of the actor's slot.
+    /// </summary>
+    /// <param name="checklists">The checklist service.</param>
+    /// <param name="actor">The reviewer, who holds a slot.</param>
+    /// <param name="projectId">The identity of the existing project.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the ballot is handed in.</returns>
+    private static async Task AnswerAllAndSubmitAsync(
+        ChecklistService checklists,
+        Actor actor,
+        int projectId,
+        CancellationToken cancellationToken)
+    {
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
         }
 
-        var digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
-        await signing.SignAsync(actor, projectId, "rev-1", slotId, digest, ValidPassword, cancellationToken);
+        // With several slots the ballot is handed in explicitly; with one it already is
+        await checklists.SubmitBallotAsync(projectId, "rev-1", actor, cancellationToken);
     }
 
     /// <summary>
@@ -917,19 +967,25 @@ public class CoreSubsystemTests
         var store = new FakeReviewStore();
         var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
         var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
-        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
+        var userStore = new FakeUserStore();
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now), userStore);
+        var users = new UserService(userStore, new FakePasswordHasher(), new FixedTimeProvider(_now));
+        var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
+        var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, TestContext.Current.CancellationToken);
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
         await reviews.CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        await signing.AddSlotAsync(TestActors.Ann, project.Id, "rev-1", ann.Id, null, TestContext.Current.CancellationToken);
 
-        // Act: read the new checklist, answer one check as failed, mark one section as not applicable, read again
-        var initial = await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken);
+        // Act: read the new checklist, answer one check as failed, mark one section as not applicable, read again as ann
+        var initial = await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken, "ann");
         await checklists.SetAnswerAsync(
             project.Id, "rev-1", "REQ-01", ChecklistOutcome.Fail, " Two requirements share an id ", TestActors.Ann,
             TestContext.Current.CancellationToken);
         await checklists.SetSectionApplicabilityAsync(
             project.Id, "rev-1", "DES", false, "No design files", TestActors.Ann, TestContext.Current.CancellationToken);
-        var after = await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken);
+        var after = await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken, "ann");
 
         // Assert: the review started with the whole default checklist
         Assert.NotNull(initial);
@@ -1069,8 +1125,9 @@ public class CoreSubsystemTests
         var store = new FakeReviewStore();
         var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
         var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
-        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        var userStore = new FakeUserStore();
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now), userStore);
+        var users = new UserService(userStore, new FakePasswordHasher(), new FixedTimeProvider(_now));
         var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
         var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, ValidPassword, cancellationToken);
@@ -1129,9 +1186,10 @@ public class CoreSubsystemTests
         var store = new FakeReviewStore();
         var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
         var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
-        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
+        var userStore = new FakeUserStore();
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now), userStore);
         var threads = TestServices.Threads(store, new FixedTimeProvider(_now));
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        var users = new UserService(userStore, new FakePasswordHasher(), new FixedTimeProvider(_now));
         var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
         var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, ValidPassword, cancellationToken);
@@ -1142,12 +1200,17 @@ public class CoreSubsystemTests
         var annActor = new Actor("ann", "Ann");
         var first = await signing.AddSlotAsync(annActor, project.Id, "rev-1", ann.Id, null, cancellationToken);
         await signing.AddSlotAsync(annActor, project.Id, "rev-1", bob.Id, null, cancellationToken);
+        var bobActor = new Actor("bob", "Bob");
+        await AnswerAllAndSubmitAsync(checklists, bobActor, project.Id, cancellationToken);
         await AnswerAllAndSignAsync(signing, checklists, annActor, project.Id, first.Id, cancellationToken);
         var itemId = DefaultChecklist.Current.Sections[0].Items[0].Id;
 
-        // Act: change an answer and start a thread without acknowledging
-        var answer = await Assert.ThrowsAsync<DomainRuleException>(() => checklists.SetAnswerAsync(
-            project.Id, "rev-1", itemId, ChecklistOutcome.Fail, "Found a problem.", annActor, cancellationToken));
+        // Act: the second slot changes its answer (a draft until handed in) and tries to hand it in; a thread is
+        // started, both without acknowledging
+        await checklists.SetAnswerAsync(
+            project.Id, "rev-1", itemId, ChecklistOutcome.Fail, "Found a problem.", bobActor, cancellationToken);
+        var answer = await Assert.ThrowsAsync<DomainRuleException>(
+            () => checklists.SubmitBallotAsync(project.Id, "rev-1", bobActor, cancellationToken));
         var thread = await Assert.ThrowsAsync<DomainRuleException>(() => threads.StartThreadAsync(
             project.Id, "rev-1", new ThreadAnchor("a.txt"), annActor, "A remark", cancellationToken,
             includeInReport: true));
@@ -1163,9 +1226,8 @@ public class CoreSubsystemTests
         Assert.Empty(store.Threads);
         Assert.Equal(SlotSignatureState.Signed, untouched!.Slots[0].State);
 
-        // Act: acknowledge the named slot and change the answer
-        await checklists.SetAnswerAsync(
-            project.Id, "rev-1", itemId, ChecklistOutcome.Fail, "Found a problem.", annActor, cancellationToken, [affected.SlotId]);
+        // Act: acknowledge the named slot and hand in the changed ballot
+        await checklists.SubmitBallotAsync(project.Id, "rev-1", bobActor, cancellationToken, [affected.SlotId]);
         var changed = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
 
         // Assert: the change went through and the signature is kept but out of date
@@ -1237,7 +1299,7 @@ public class CoreSubsystemTests
             users,
             projects,
             TestServices.Threads(store, clock),
-            TestServices.Checklists(store, clock),
+            TestServices.Checklists(store, clock, userStore),
             new SigningService(store, users, access, clock),
             project.Id,
             root,
@@ -1255,11 +1317,26 @@ public class CoreSubsystemTests
     /// <returns>A task that completes when every check is answered.</returns>
     private static async Task AnswerAllAsync(Realm realm, CancellationToken cancellationToken)
     {
+        await AnswerAllAsync(realm, realm.Bob, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Answers every check of <c>rev-1</c> as Pass as the given actor, who must hold a slot, and hands the
+    ///     ballot in where that is not implicit.
+    /// </summary>
+    /// <param name="realm">The realm.</param>
+    /// <param name="actor">The slot owner who answers.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when every check is answered.</returns>
+    private static async Task AnswerAllAsync(Realm realm, Actor actor, CancellationToken cancellationToken)
+    {
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await realm.Checklists.SetAnswerAsync(
-                realm.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, realm.Bob, cancellationToken);
+                realm.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
         }
+
+        await realm.Checklists.SubmitBallotAsync(realm.ProjectId, "rev-1", actor, cancellationToken);
     }
 
     /// <summary>
@@ -1284,8 +1361,8 @@ public class CoreSubsystemTests
         var thread = await realm.Threads.StartThreadAsync(
             realm.ProjectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), realm.Bob, "A remark", cancellationToken);
         await realm.Threads.ResolveAsync(realm.ProjectId, "rev-1", thread.Id, realm.Bob, cancellationToken);
-        await AnswerAllAsync(realm, cancellationToken);
         var slot = await realm.Signing.AddSlotAsync(realm.Bob, realm.ProjectId, "rev-1", realm.Ids["bob"], null, cancellationToken);
+        await AnswerAllAsync(realm, cancellationToken);
         var digest = (await ApprovalOfAsync(realm, cancellationToken)).Digest;
         await realm.Signing.SignAsync(realm.Bob, realm.ProjectId, "rev-1", slot.Id, digest, ValidPassword, cancellationToken);
         return (thread.Id, slot.Id, digest);
@@ -1429,8 +1506,9 @@ public class CoreSubsystemTests
 
         // Act: an administrator switches the rule off, the author is seated, and the rule is switched on again
         Assert.True(await realm.Projects.SetRequireIndependentReviewersAsync(realm.Root, pid, true, false, cancellationToken));
+        await realm.Projects.SetReviewRuleAsync(realm.Root, pid, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken);
         var slot = await realm.Signing.AddSlotAsync(realm.Cyd, pid, "rev-1", realm.Ids["ann"], null, cancellationToken);
-        await AnswerAllAsync(realm, cancellationToken);
+        await AnswerAllAsync(realm, realm.Ann, cancellationToken);
         var digest = (await ApprovalOfAsync(realm, cancellationToken)).Digest;
         Assert.True(await realm.Projects.SetRequireIndependentReviewersAsync(realm.Root, pid, false, true, cancellationToken));
         var signed = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.SignAsync(
@@ -1537,15 +1615,16 @@ public class CoreSubsystemTests
         var refused = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Checklists.SetAnswerAsync(
             pid, "rev-1", firstItem, ChecklistOutcome.Pass, null, realm.Ann, cancellationToken));
         await realm.Projects.SetReviewRuleAsync(realm.Root, pid, ReviewRule.NonAuthorChecklistAnswers, true, false, cancellationToken);
-        await realm.Checklists.SetAnswerAsync(pid, "rev-1", firstItem, ChecklistOutcome.Pass, null, realm.Ann, cancellationToken);
+        var noSlot = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Checklists.SetAnswerAsync(
+            pid, "rev-1", firstItem, ChecklistOutcome.Pass, null, realm.Ann, cancellationToken));
 
-        // Assert: refused first, stored once the rule is off
+        // Assert: refused for being the author first; with the rule off only the missing slot stands in the way
         Assert.Equal(DomainRule.AuthorCannotAnswer, refused.Rule);
-        Assert.Equal("Ann", (await realm.Checklists.GetAsync(pid, "rev-1", cancellationToken))!.AnswerFor(firstItem)!.AnsweredBy);
+        Assert.Equal(DomainRule.NoReviewerSlot, noSlot.Rule);
 
-        // Act: bob answers every check, dan signs the only slot, and dan reopens while the rule is on
-        await AnswerAllAsync(realm, cancellationToken);
+        // Act: dan, the reviewer of the only slot, answers every check and signs, and dan reopens while the rule is on
         var slot = await realm.Signing.AddSlotAsync(realm.Root, pid, "rev-1", dan.Id, null, cancellationToken);
+        await AnswerAllAsync(realm, danActor, cancellationToken);
         await realm.Signing.SignAsync(
             danActor, pid, "rev-1", slot.Id, (await ApprovalOfAsync(realm, cancellationToken)).Digest, ValidPassword, cancellationToken);
         var stranded = await Assert.ThrowsAsync<DomainRuleException>(() => realm.Signing.ReopenReviewAsync(

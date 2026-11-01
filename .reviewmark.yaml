@@ -678,6 +678,7 @@ reviews:
       - "src/**/Web/SignatureWarning.razor.cs"
       - "test/**/Web/ChecklistPageTests.cs"
       - "test/**/Web/ChecklistPageFollowUpTests.cs"
+      - "test/**/Web/ChecklistPageBallotTests.cs"
 
   - id: ReviewCenter-Web-LoginPage
     title: Review of ReviewCenter LoginPage unit implementation
@@ -977,6 +978,7 @@ reviews:
       - "test/**/Core/ReviewServiceDueDateTests.cs"
       - "test/**/Core/ReviewServiceFollowUpTests.cs"
       - "test/**/Core/FollowUpCarryTests.cs"
+      - "test/**/Core/FollowUpCarryConsolidatedTests.cs"
       - "test/**/ContentSources/ReviewFromGitTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -1032,6 +1034,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistOutcome.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistProgress.cs"
       - "test/**/Core/ChecklistServiceTests.cs"
+      - "test/**/Core/ChecklistServiceBallotTests.cs"
       - "test/**/Core/ChecklistServiceReviewConclusionTextTests.cs"
       - "test/**/Core/ChecklistValidatorTests.cs"
       - "test/**/Core/AuditEventTests.cs"
@@ -1074,6 +1077,7 @@ reviews:
       - "test/**/Core/RecordDigestTests.cs"
       - "test/**/Core/RecordDigestFollowUpTests.cs"
       - "test/**/Core/RecordDigestReportTests.cs"
+      - "test/**/Core/RecordDigestBallotTests.cs"
 
   - id: ReviewCenter-Core-SigningService
     title: Review of ReviewCenter SigningService unit implementation
@@ -1100,6 +1104,9 @@ reviews:
       - "test/**/Core/SigningServiceExternalTests.cs"
       - "test/**/Core/SigningServiceTotpTests.cs"
       - "test/**/Core/SigningServiceOpenThreadTests.cs"
+      - "test/**/Core/SigningServiceBallotTests.cs"
+      - "test/**/Core/ReviewLockBallotTests.cs"
+      - "test/**/Core/SignatureImpactBallotTests.cs"
       - "test/**/Core/CountingUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -1228,6 +1235,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewOutcome.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewConclusion.cs"
       - "test/**/Core/BallotConsolidationTests.cs"
+      - "test/**/Core/BallotProjectionTests.cs"
 
   - id: ReviewCenter-Core-ReviewPlanner
     title: Review of ReviewCenter ReviewPlanner unit implementation

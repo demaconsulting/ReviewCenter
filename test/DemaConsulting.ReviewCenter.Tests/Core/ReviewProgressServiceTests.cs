@@ -107,7 +107,14 @@ public partial class ReviewProgressServiceTests
         UserService Users,
         ReviewProgressService Progress,
         int ProjectId,
-        Dictionary<string, int> Ids);
+        Dictionary<string, int> Ids)
+    {
+        /// <summary>
+        ///     Gets the reviews marked as answered: the primary reviewer of each of their slots answers and hands the
+        ///     ballot in as soon as the slot exists.
+        /// </summary>
+        public HashSet<string> Answered { get; } = [];
+    }
 
     /// <summary>
     ///     Arranges the users, the project and the services; no review exists yet.
@@ -191,22 +198,40 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
-    ///     Answers every check of a review as Pass.
+    ///     Marks a review as answered: the primary reviewer of every slot of it, now or added later through
+    ///     <see cref="AddSlotAsync"/>, answers every check as Pass in the own ballot and hands it in.
     /// </summary>
     /// <param name="world">The world.</param>
     /// <param name="id">The review identifier.</param>
-    /// <returns>A task that completes when all checks are answered.</returns>
+    /// <returns>A task that completes when the existing slots have handed their ballots in.</returns>
     private static async Task AnswerAllAsync(World world, string id)
     {
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        world.Answered.Add(id);
+        foreach (var slot in await world.Store.ListSlotsAsync(world.ProjectId, id, TestContext.Current.CancellationToken))
         {
-            await world.Checklists.SetAnswerAsync(
-                world.ProjectId, id, item.Id, ChecklistOutcome.Pass, null, _member, TestContext.Current.CancellationToken);
+            await AnswerAsPrimaryAsync(world, id, slot);
         }
     }
 
     /// <summary>
-    ///     Adds a reviewer slot to a review.
+    ///     Lets the primary reviewer of a slot answer every check as Pass and hand the ballot in.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <param name="id">The review identifier.</param>
+    /// <param name="slot">The slot.</param>
+    /// <returns>A task that completes when the ballot is handed in.</returns>
+    private static async Task AnswerAsPrimaryAsync(World world, string id, ReviewerSlot slot)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var username = world.Ids.First(pair => pair.Value == slot.PrimaryUserId).Key;
+        var owner = new Actor(username, username);
+        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, id, owner, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, id, owner, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Adds a reviewer slot to a review; when the review is marked answered by <see cref="AnswerAllAsync"/>, the
+    ///     primary reviewer of the slot answers every check and hands the ballot in.
     /// </summary>
     /// <param name="world">The world.</param>
     /// <param name="id">The review identifier.</param>
@@ -222,6 +247,11 @@ public partial class ReviewProgressServiceTests
             world.Ids[primary],
             alternate is null ? null : world.Ids[alternate],
             TestContext.Current.CancellationToken);
+        if (world.Answered.Contains(id))
+        {
+            await AnswerAsPrimaryAsync(world, id, slot);
+        }
+
         return slot.Id;
     }
 
@@ -329,6 +359,7 @@ public partial class ReviewProgressServiceTests
         var world = await WorldAsync();
         await CreateReviewAsync(world, "rev-1");
         var first = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        await AddSlotAsync(world, "rev-1", "member");
         await world.Checklists.SetAnswerAsync(
             world.ProjectId, "rev-1", first, ChecklistOutcome.Fail, "Wrong", _member, cancellationToken);
         await world.Threads.StartThreadAsync(world.ProjectId, "rev-1", new ThreadAnchor("a.txt"), _member, "One", cancellationToken);

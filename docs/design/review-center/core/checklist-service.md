@@ -5,8 +5,9 @@
 #### Purpose
 
 `ChecklistService` owns the rules for the review checklist: it reads the checklist of a review with its answers,
-records whether a section applies to the review, records the answer to a check, and holds the free-text review
-conclusion text of the record. It is also the home of the
+records whether a section applies to the review, records the answer to a check, hands in the ballot of a reviewer
+slot, and holds the free-text review conclusion text of the record. The answers are held per reviewer slot, in a
+ballot (see Ballots below). It is also the home of the
 checklist types (`ChecklistDefinition`, `ChecklistSection`, `ChecklistItem`, `DefaultChecklist`, `ReviewChecklist`,
 `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`) and of `ChecklistState` and `ChecklistProgress`,
 which derive what is left to do.
@@ -54,19 +55,22 @@ the strict rules apply only where a definition enters the system or is taken for
 `Applicable`, `Reason`, `SetBy` (the display name of the person at that time), `SetByUsername` (the user name), and
 `SetAt` (UTC), and `CarriedFromReviewId` (the identifier of the earlier review the state was carried over from when the
 review was created as a follow-up, otherwise null; see `ReviewService`). A section without a row applies. `SlotId` is 0
-(`ChecklistAnswer.BaselineSlotId`) for the review-level rows that the record is built from, and the identity of a
-reviewer slot for the rows of that slot's ballot.
+(`ChecklistAnswer.BaselineSlotId`) for the review-level baseline rows that a follow-up carries (they only seed the
+ballots and are not part of the record), and the identity of a reviewer slot for the rows of that slot's ballot, where
+the service writes every change.
 
 **ChecklistAnswer**: the answer to one check: `ProjectId`, `ReviewId`, `SlotId`, `ItemId`, `Outcome`, `Justification`,
 `AnsweredBy` (the display name of the person at that time), `AnsweredByUsername` (the user name), `AnsweredAt`
 (UTC), and `CarriedFromReviewId` (the earlier review the answer was carried over from, otherwise null; a carried
 answer keeps the original answerer and time). A check has at most one answer per slot; answering again replaces it.
-`SlotId` is 0 (`BaselineSlotId`) for the review-level answers; the services keep reading and writing only those.
+`SlotId` is 0 (`BaselineSlotId`) for the review-level baseline answers of a follow-up, and the identity of the
+reviewer slot for an answer given in a ballot, which is the only kind the service writes. The answerer is kept in the
+ballot row but is not covered by the record digest.
 
 **ChecklistBallot**: the status of the ballot of one reviewer slot: `ProjectId`, `ReviewId`, `SlotId` (always above 0),
 `Status` (`BallotStatus`: `Draft` or `Submitted`), and, for a submitted ballot, `SubmittedAt` (UTC) and
-`SubmittedByUsername`. A slot without a row has not started a ballot. The type is stored by `ReviewStore` and is not
-yet used by a service.
+`SubmittedByUsername`. A slot without a row has not started a ballot. The type is stored by `ReviewStore`; the
+`Ballot` value of the record joins the status with the answers and section states of the slot.
 
 **ChecklistOutcome**: a closed enumeration with the values `Pass`, `Fail`, and `NotApplicable` (shown as N/A). It
 is stored as text.
@@ -80,7 +84,9 @@ number of sections that do not apply, the applicability and reason of a section,
 just switched off but not yet saved). The progress rules are: a failed check is answered (the
 review found a problem, which is an answer); a section that does not apply counts as done, contributes no checks to
 the totals, and any answers kept for it are ignored; the checklist is complete when every check of every
-applicable section is answered, so a checklist whose sections all do not apply is complete.
+applicable section is answered, so a checklist whose sections all do not apply is complete. A state also says whose
+view it is: `SlotId`, `BallotState` (`NotStarted`, `Draft`, `Submitted`) and `IsOwnBallot` for the ballot of a
+reviewer, `NoSlot` for a viewer who holds no slot, and `Consolidation` (the agreed standing) for the consolidated view.
 
 Rules for the input: a justification (for Fail and N/A) or a reason (for a section that does not apply) is not empty
 after trimming and has at most 2000 characters (`ReviewLimits.MaxJustificationLength`); it is stored trimmed. A
@@ -100,39 +106,75 @@ recreated.
 **Thread linking**: an earlier plan let a check be linked to a comment thread. It was dropped to keep the checklist
 simple; the checklist and the threads are independent, and the review page shows both counts side by side.
 
+**Ballots**: the answers and section states are held per reviewer slot, in the ballot of the slot (see
+`BallotConsolidation` for how the ballots are consolidated into the agreed standing that the record digest covers). A
+ballot is a `Draft` until its reviewer hands it in, and `Submitted` after; only submitted ballots count in the
+record. Rules:
+
+- *Slot required*: `SetAnswerAsync`, `SetSectionApplicabilityAsync` and `SubmitBallotAsync` need the actor to be the
+  primary or the alternate reviewer of a slot of the review (a user sits in one slot only). Anybody else, an
+  administrator included, is refused with `NoReviewerSlot` and nothing is stored. The edit goes into the ballot of that
+  slot and into no other.
+- *Edit*: every edit of a ballot, also of a submitted one, leaves it a draft. In a review with more than one slot the
+  reviewer then hands it in again with `SubmitBallotAsync`.
+- *Submit*: `SubmitBallotAsync` refuses an incomplete ballot (a check of an applicable section without an answer) with
+  `BallotIncomplete`, and an actor without a slot with `NoReviewerSlot`. It is idempotent: a submitted ballot is
+  returned as it is. It records `SubmittedAt` and `SubmittedByUsername`, and the audit entry `ballot.submitted`.
+- *Single slot*: in a review with exactly one slot nobody else has to agree and there is no separate hand-in step, so
+  the edit that makes the ballot complete hands it in (the store does this in the same transaction, after it tested
+  completeness again). Answering is then implicit, as it was before ballots. A ballot that no edit completes (a
+  checklist whose sections all do not apply, or one that is completely carried) is handed in with `SubmitBallotAsync`.
+- *Own view*: `GetAsync` with a viewer who holds a slot returns the own ballot, drafts included, and never the draft of
+  another slot; every other viewer gets the consolidated standing of the submitted ballots (see `GetAsync`).
+- *Carried rows*: a follow-up review seeds each new ballot as a draft from the carried baseline rows, which keep their
+  mark until the reviewer answers the check again (see Carried answers and sections).
+
 **Person**: the person who answers a check or decides on a section is the signed-in user, passed as an `Actor` by
 the page, never typed text. The display name at that time and the user name are stored with the answer or the
 decision, as for a comment author (see `ThreadService`). A null actor is a programming error and raises
 `ArgumentNullException`; there is no rule about the name, because the display name of a user was validated when the
 user was created.
 
-**Access**: every change (`SetAnswerAsync`, `SetSectionApplicabilityAsync`) first requires that the actor may work in
-the project (`IProjectAccess.RequireContributeAsync`), so a user outside the project, like an anonymous or disabled
-one, gets `ProjectNotFound`, identical to a project that does not exist, and a read-only member (an auditor) gets
-`ActorNotAllowed`, before the review or the input is looked at. Every member who may work in the project can answer.
-Reads (`GetAsync`) take no actor; the boundary guards them (every page and API handler first reads the project as the
-actor).
+**Access**: every change (`SetAnswerAsync`, `SetSectionApplicabilityAsync`, `SubmitBallotAsync`) first requires that the
+actor may work in the project (`IProjectAccess.RequireContributeAsync`), so a user outside the project, like an
+anonymous or disabled one, gets `ProjectNotFound`, identical to a project that does not exist, and a read-only member
+(an auditor) gets `ActorNotAllowed`, before the review or the input is looked at. A member who may work in the project
+and holds a slot of the review can answer (see Ballots). Reads (`GetAsync`) take no actor; the boundary guards them
+(every page and API handler first reads the project as the actor).
 
 **Approval lock**: the checklist is part of what the signatures cover, so while the review is approved (locked; see the
-`SigningService` unit) `SetAnswerAsync` and `SetSectionApplicabilityAsync` are refused with `ReviewLocked`. Each calls
-`ReviewLock.EnsureUnlockedAsync` after its input checks and before the store write, and the store repeats the check
-inside its write transaction. `GetAsync` is not affected. After an administrator reopens the review the checklist can
-change again.
+`SigningService` unit) `SetAnswerAsync`, `SetSectionApplicabilityAsync` and `SubmitBallotAsync` are refused with
+`ReviewLocked`. Each calls `ReviewLock.EnsureUnlockedAsync` after its input checks and before the store write, and the
+store repeats the check inside its write transaction. `GetAsync` is not affected. After an administrator reopens the
+review the checklist can change again.
 
-**Signature impact**: a change after somebody has signed makes that signature out of date (see "Signature impact" in
-the `SigningService` unit). `SetAnswerAsync` and `SetSectionApplicabilityAsync` therefore take an optional last
-argument `IReadOnlyCollection<int>? acknowledgedSlotIds`, after the cancellation token. Each builds the record as it
-would be after the change in memory, and passes it with the snapshot that `ReviewLock.EnsureUnlockedAsync` returned to
-`SignatureImpact.RequireAcknowledged`, which throws `SignaturesWouldBecomeOutOfDate` for the current signatures whose
-slots are not acknowledged. The digest decides: the same person saving the same value again, or marking a section
-applicable that has no row, does not change the record and needs no acknowledgement, while another person saving the
-same value does, because the person who answered is part of the digest. The check is the last one, after
-`ReviewLocked`, and nothing is stored when it fails.
+**Signature impact**: a change after somebody has signed can make that signature out of date (see "Signature impact" in
+the `SigningService` unit). `SetAnswerAsync`, `SetSectionApplicabilityAsync` and `SubmitBallotAsync` therefore take an
+optional last argument `IReadOnlyCollection<int>? acknowledgedSlotIds`, after the cancellation token. Each builds the
+record as it would be after the change in memory (`BallotEdits`) and passes it with the snapshot that
+`ReviewLock.EnsureUnlockedAsync` returned to `SignatureImpact.RequireAcknowledged`, together with the slot of the actor.
+The digest decides, and it covers the agreed standing of the submitted ballots and no answerer, so:
+
+- A draft does not count. An edit of a ballot in a review with more than one slot normally changes nothing the digest
+  covers; it needs an acknowledgement only when taking a submitted ballot back to a draft changes the agreed standing.
+  The impact is therefore checked where the standing changes: at the hand-in. `SubmitBallotAsync` refuses with
+  `SignaturesWouldBecomeOutOfDate` when the record with the ballot submitted has another digest and a current signature
+  of another slot is not in `acknowledgedSlotIds`, and nothing is stored. A ballot that agrees with the others leaves
+  the digest alone and needs no acknowledgement.
+- In a review with one slot the edit that completes the ballot hands it in, so the edit is checked as the hand-in, with
+  the ballot as the store will leave it.
+- The signature of the own slot of the reviewer never needs an acknowledgement: the change is the one that withdraws
+  it. The signatures of the other slots are listed, each by slot number and signer.
+- Another reviewer giving the same value does not change the digest (the answerer is not in it), so a signature stays.
+  Marking a section applicable that has no row, or saving a ballot to the value it already has, does not either.
+
+The check is the last one, after `ReviewLocked` and after the slot test, and nothing is stored when it fails.
 
 **Author rule**: while the project's `RequireNonAuthorChecklistAnswers` setting is on (the default, also for projects
 that existed before the rule was enforced; see `ProjectService`), the author of the review (`Review.CreatedBy`, the
 owner of the token for an API-token review, compared ignoring case; a review without an author is not restricted)
-cannot answer a check or change the applicability of a section: `SetAnswerAsync` and `SetSectionApplicabilityAsync`
+cannot answer a check or change the applicability of a section: `SetAnswerAsync`, `SetSectionApplicabilityAsync` and
+`SubmitBallotAsync`
 throw `AuthorCannotAnswer` ("You created this review, so you cannot answer its checklist..."). The check runs right
 after the access check, before the checklist is read and before the lock check, so an author of an approved review is
 told about the rule and not about the lock, and nothing is stored. `GetAsync` takes an optional `viewerUsername`; when
@@ -142,47 +184,68 @@ and comments are not affected by the rule.
 
 **GetAsync**: Reads the checklist of a review.
 
-- *Parameters*: `int projectId`, `string reviewId`, and a cancellation token.
+- *Parameters*: `int projectId`, `string reviewId`, a cancellation token, and the optional `string? viewerUsername`.
 - *Returns*: `Task<ChecklistState?>` — the frozen checklist with the section states and answers, or null when the
   review does not exist or has no checklist.
+- *Viewer dependent*: with a `viewerUsername` that is the primary or the alternate reviewer of a slot, the state is the
+  own ballot of that slot, drafts included (`IsOwnBallot`, `BallotState`, `SlotId`), and never the ballot of another
+  slot. For every other viewer, and without a viewer, it is the consolidated standing of the submitted ballots
+  (`BallotProjection.Consolidate`): an agreed check is answered with the row of the lowest slot that answered it, and
+  a disputed or pending check has no answer. `NoSlot` is true when a viewer is given and holds no slot. A review with
+  exactly one slot is read with its sole ballot as submitted, for the progress counts only, so a partly answered
+  single-slot draft counts in the progress. `AuthorBlocked` is set as described above.
 
-**SetSectionApplicabilityAsync**: Records whether a section applies.
+**SetSectionApplicabilityAsync**: Records whether a section applies in the ballot of the slot of the actor.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string sectionId`, `bool applicable`, `string? reason`,
   `Actor actor`, a cancellation token, and the optional `acknowledgedSlotIds`.
 - *Returns*: `Task`.
-- *Postconditions*: The section has one state; the reason is stored (trimmed) when the section does not apply and
-  cleared when it applies. Nothing is stored when a rule fails (including `ReviewLocked`).
+- *Postconditions*: The section has one state in the ballot of the slot; the reason is stored (trimmed) when the section
+  does not apply and cleared when it applies. The ballot is a draft, or submitted when the review has one slot and the
+  change completes it. Nothing is stored when a rule fails (including `ReviewLocked`).
 
-**SetAnswerAsync**: Records the answer to one check.
+**SetAnswerAsync**: Records the answer to one check in the ballot of the slot of the actor.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string itemId`, `ChecklistOutcome outcome`,
   `string? justification`, `Actor actor`, a cancellation token, and the optional `acknowledgedSlotIds`.
 - *Returns*: `Task`.
-- *Postconditions*: The check has exactly one answer, with the display name and user name of the actor and the UTC
-  time from the clock; an
-  earlier answer is replaced. Nothing is stored when a rule fails (including `ReviewLocked`).
+- *Postconditions*: The check has exactly one answer in the ballot of the slot, with the display name and user name of
+  the actor and the UTC time from the clock; an earlier answer of that slot is replaced. The ballot is a draft, or
+  submitted when the review has one slot and the answer completes it. Nothing is stored when a rule fails (including
+  `ReviewLocked`).
+
+**SubmitBallotAsync**: Hands in the ballot of the slot of the actor, so it counts in the record.
+
+- *Parameters*: `int projectId`, `string reviewId`, `Actor actor`, a cancellation token, and the optional
+  `acknowledgedSlotIds`.
+- *Returns*: `Task<Ballot>` — the submitted ballot; one that was submitted already is returned as it is.
+- *Postconditions*: The ballot is `Submitted` with the time and the user name of the actor, and `ballot.submitted` is
+  audited. Nothing is stored when a rule fails.
 
 The rules are checked in this order, and the first violation is reported: that the author is not refused by the
 project rule (`AuthorCannotAnswer`); that the review has a checklist
-(`ChecklistNotFound`); that the section or check is in the frozen checklist
-(`ChecklistItemNotFound`); the justification or reason (`ChecklistJustificationInvalid`); that the review is not
-locked (`ReviewLocked`); and that no current signature would silently become out of date
+(`ChecklistNotFound`); for the two edits, that the section or check is in the frozen checklist
+(`ChecklistItemNotFound`) and the justification or reason (`ChecklistJustificationInvalid`); that the review is not
+locked (`ReviewLocked`); that the actor holds a slot (`NoReviewerSlot`); for `SubmitBallotAsync`, that the ballot is
+complete (`BallotIncomplete`); and that no current signature of another slot would silently become out of date
 (`SignaturesWouldBecomeOutOfDate`). An outcome that is not
 a defined value is a programming error and throws `ArgumentOutOfRangeException` before any rule is checked.
 
 **Carried answers and sections**: a review that was created as a follow-up starts with answers and not-applicable
-section states that were carried over (written by the store with the review, not through these methods). They count as
-answers and decisions for `ChecklistState` (progress, `IsComplete`) exactly like answers given in the review, so the
-checklist needs no other change. Both write methods store a row with `CarriedFromReviewId` null: whoever answers a
-carried check again, or sets a carried section again, makes the row an answer of this review (new answerer, new time,
-no marker), even when the outcome and the justification are the same, and the store's write must not keep the old
-marker. The audit entries are those of any answer.
+section states that were carried over (written by the store with the review as baseline rows, not through these
+methods). The store seeds the draft ballot of each new slot from them, and a carried answer never hands the ballot in.
+They count as answers and decisions for `ChecklistState` (progress, `IsComplete`) exactly like answers given in the
+review, so the checklist needs no other change. The write methods store a row with `CarriedFromReviewId` null:
+whoever answers a carried check again, or sets a carried section again, makes the row an answer of this review (new
+answerer, new time, no marker), even when the outcome and the justification are the same, and the store's write must
+not keep the old marker. The audit entries are those of any answer.
 
 **Audit**: Changing the applicability of a section records `checklist.applicability-changed`, and answering a check
 records `checklist.answered`. The draft is passed to the store and saved in the same transaction. The detail of an
-answer names the item and the outcome and, when there is a justification, only a short hash of it, not the text. See
-the `AuditService` unit for the detail formats.
+answer names the item and the outcome and, when there is a justification, only a short hash of it, not the text. A
+hand-in records `ballot.submitted` (also when the answer of a single-slot review hands the ballot in, written by the
+store), and an edit that takes a submitted ballot back to a draft records `ballot.reopened`. See the `AuditService`
+unit for the detail formats.
 
 **Review conclusion text**: the free-text conclusion of the record, `Review.ReviewConclusionText` (plain text, at most
 `ReviewLimits.MaxConclusionTextLength` = 4000 characters). It is never the enumerated review conclusion (approved or
@@ -222,22 +285,27 @@ has no web page or API yet: it is written through the two methods below and show
 
 #### Error Handling
 
-Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store, project access, user store, or
+Rule violations raise `DomainRuleException` with the matching `DomainRule`; the ballot rules are `NoReviewerSlot` (the
+actor holds no slot) and `BallotIncomplete` (a hand-in with an unanswered check). A null store, project access, user
+store, or
 clock at construction, or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
 
 #### Dependencies
 
-- **IReviewStore** — reads the frozen checklist, section states and answers, and saves the changes (injected).
+- **IReviewStore** — reads the snapshot (frozen checklist, slots, ballots), and saves the ballot edits and the hand-in
+  (injected).
 - **IProjectAccess** — requires that the actor may work in the project (injected).
-- **IUserStore** — resolves the user name of a person to the identity that holds a reviewer slot, for the review
-  conclusion text (injected).
+- **IUserStore** — resolves the user name of a person to the identity that holds a reviewer slot, for the ballot of the
+  actor and the view of a viewer, and for the review conclusion text (injected).
+- **BallotConsolidation**, **BallotProjection** and **BallotEdits** — test that a ballot is complete, build the
+  consolidated or the own view, and compute the record an edit or a hand-in leads to (static, no state).
 - **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
   approved, and refuse one that would make a current signature out of date without acknowledgement.
-- **TimeProvider** — supplies the answer times (injected).
+- **TimeProvider** — supplies the answer and hand-in times (injected).
 
 #### Callers
 
-- **ChecklistPage** — reads, answers, and sets applicability.
+- **ChecklistPage** — reads, answers, sets applicability, and hands in the ballot.
 - **ReviewPage** — reads the progress for the summary and the next-step line.
 - **ReviewService** — takes the checklist of the project (validated with `ChecklistValidator`), or
   `DefaultChecklist.Current`, as the copy for a new review.

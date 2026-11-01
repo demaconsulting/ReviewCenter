@@ -212,9 +212,11 @@ a change that would make a signature out of date without acknowledgement (`Signa
 a change that a project review rule refuses (`AuthorCannotAnswer`, `ReopenerCannotSign`, `ReopenWouldStrandSlot`),
 and a changed record to 409; too many attempts to 429; an unavailable git to 503, a git access failure
 to
-502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, and a token action of a user who
-must change the password first to 403; unreadable credentials to
-500; and every other rule to 400. **ToResult** builds the problem description with the message of the rule as the
+502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, an answer or hand-in by a user
+without a reviewer slot (`NoReviewerSlot`), a signature while the own ballot is not handed in
+(`BallotNotSubmitted`), and a token action of a user who must change the password first to 403; unreadable
+credentials to 500; and every other rule (including `BallotIncomplete`) to 400. **ToResult** builds the problem
+description with the message of the rule as the
 detail;
 **NotFound** builds a 404; **ActorOf** builds the actor from a token principal (the user name, the display name, and the
 display id of the token, which is "unknown" when the claim is missing); **ActorOrAnonymous** returns that actor for an

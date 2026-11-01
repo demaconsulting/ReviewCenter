@@ -43,6 +43,7 @@ public class SigningServiceTotpTests
     /// </summary>
     /// <param name="Totp">The world of the second factor, with ann enrolled.</param>
     /// <param name="Signing">The signing service under test.</param>
+    /// <param name="Checklists">The checklist service of the same store and users.</param>
     /// <param name="Proofs">The proofs of the external user.</param>
     /// <param name="Secret">The secret of ann's authenticator.</param>
     /// <param name="ProjectId">The project.</param>
@@ -53,6 +54,7 @@ public class SigningServiceTotpTests
     private sealed record World(
         TotpTestWorld Totp,
         SigningService Signing,
+        ChecklistService Checklists,
         ReauthProofStore Proofs,
         byte[] Secret,
         int ProjectId,
@@ -86,19 +88,26 @@ public class SigningServiceTotpTests
 
         await TestServices.Reviews(store, clock).CreateDraftAsync(
             project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], cancellationToken);
-        var checklists = TestServices.Checklists(store, clock);
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-        {
-            await checklists.SetAnswerAsync(project.Id, ReviewId, item.Id, ChecklistOutcome.Pass, null, Boss, cancellationToken);
-        }
-
         var proofs = new ReauthProofStore(clock);
         var signing = new SigningService(
             store, totp.UserService, new AllowAllProjectAccess(store), clock, proofs, signingTotp ? totp.Totp : null);
         var annSlot = await signing.AddSlotAsync(Boss, project.Id, ReviewId, ann.Id, null, cancellationToken);
         var oliveSlot = await signing.AddSlotAsync(Boss, project.Id, ReviewId, olive.Id, null, cancellationToken);
+
+        // Both reviewers answer the checklist in their own ballot and submit it, so either slot can be signed
+        var checklists = TestServices.Checklists(store, clock, totp.Users);
+        foreach (var reviewer in new[] { new Actor("ann", "Ann"), new Actor("olive", "Olive") })
+        {
+            foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+            {
+                await checklists.SetAnswerAsync(project.Id, ReviewId, item.Id, ChecklistOutcome.Pass, null, reviewer, cancellationToken);
+            }
+
+            await checklists.SubmitBallotAsync(project.Id, ReviewId, reviewer, cancellationToken);
+        }
+
         totp.AdvanceSteps(2);
-        return new World(totp, signing, proofs, secret, project.Id, annSlot.Id, oliveSlot.Id, olive.Id, recovery);
+        return new World(totp, signing, checklists, proofs, secret, project.Id, annSlot.Id, oliveSlot.Id, olive.Id, recovery);
     }
 
     /// <summary>
@@ -284,7 +293,8 @@ public class SigningServiceTotpTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var boss = (await world.Totp.UserService.GetAsync("boss", cancellationToken))!;
         var extra = await world.Signing.AddSlotAsync(Boss, world.ProjectId, ReviewId, boss.Id, null, cancellationToken);
-
+        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, ReviewId, Boss, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, ReviewId, Boss, cancellationToken);
         // Act: a wrong password, then the right one without a code
         var failure = await Assert.ThrowsAsync<DomainRuleException>(
             () => SignAsync(world, Boss, extra.Id, "wrong password", null));

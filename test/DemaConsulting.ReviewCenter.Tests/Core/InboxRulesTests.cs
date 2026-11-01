@@ -54,9 +54,13 @@ public class InboxRulesTests
         };
         await world.SignAsync("r1", cySlot.Id, "cyd");
         var item = DefaultChecklist.Current.Sections[0].Items[0];
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("eve"), Ct,
-            await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1"));
+            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("ann"), Ct,
+            acknowledged);
+
+        // Ann hands the changed ballot in again: it now disagrees with the others, so the record changes
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, "r1", InboxTestWorld.ActorOf("ann"), Ct, acknowledged);
         states.Add(("out of date", await RulesAsync(world)));
 
         // Act: compare with the signing service at both moments
@@ -228,8 +232,8 @@ public class InboxRulesTests
             world.ProjectId, "r1", passItem.Id, ChecklistOutcome.Pass, null, InboxTestWorld.ActorOf("bob"), Ct);
 
         // Act
-        var record = (await world.Store.GetRecordAsync(world.ProjectId, "r1", Ct))!;
-        var failed = InboxRules.FailedAnswers(record);
+        var snapshot = (await world.Store.GetSnapshotAsync(world.ProjectId, "r1", Ct))!;
+        var failed = InboxRules.FailedAnswers(snapshot.Record, snapshot.Slots.Count);
 
         // Assert
         var answer = Assert.Single(failed);

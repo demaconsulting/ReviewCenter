@@ -324,6 +324,11 @@
                             <p class="error" role="alert" data-testid="slot-error-@slotId">@slotError</p>
                         }
 
+                        @if (Warning?.Key == SlotWarningKey(slotId))
+                        {
+                            <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
+                        }
+
                         @if (occupant && slot.State != SlotSignatureState.Signed && !ReadOnly)
                         {
                             @if (approval.Blockers.Count > 0)
@@ -336,6 +341,10 @@
                                             <li>@blocker</li>
                                         }
                                     </ul>
+                                    @if (SignMessage(slotId) is { } blockedError)
+                                    {
+                                        <p class="error" role="alert" data-testid="sign-error-@slotId">@blockedError</p>
+                                    }
                                 </div>
                             }
                             else if (ReopenerBlocked)

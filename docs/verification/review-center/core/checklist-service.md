@@ -3,12 +3,13 @@
 #### Verification Approach
 
 `ChecklistService`, the `DefaultChecklist` definition, and the progress rules of `ChecklistState` are verified with
-unit tests defined in `ChecklistServiceTests.cs`, and the strict validation of a definition (`ChecklistValidator`) with
+unit tests defined in `ChecklistServiceTests.cs`, the ballot rules (slot, hand-in, own view, impact of a hand-in) in
+`ChecklistServiceBallotTests.cs`, and the strict validation of a definition (`ChecklistValidator`) with
 the unit tests in `ChecklistValidatorTests.cs`, which need no store. The service is exercised over an in-memory fake
 store and the project-access double `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess`
 unit), so each
-test creates its own review and reads the stored result back. The freeze at review creation is verified in
-`ReviewServiceTests.cs`. The real database is covered by the `Storage` subsystem.
+test creates its own review, seats the reviewers in slots and reads the stored result back. The freeze at review
+creation is verified in `ReviewServiceTests.cs`. The real database is covered by the `Storage` subsystem.
 
 #### Test Environment
 
@@ -29,12 +30,20 @@ N/A - standard test environment.
 - A section marked as not applicable needs a reason, which is stored trimmed; marking it applicable again clears the
   reason; an unknown section is refused.
 - A Pass is stored without a justification; a Fail or N/A needs one; a justification is trimmed and limited to 2000
-  characters; an unknown review or item is refused; answering again replaces the earlier answer.
+  characters; an unknown review or item is refused; answering again replaces the earlier answer of the slot.
 - The answer carries the user name and the display name of the actor, with the UTC time; a missing actor is refused
   for an answer and for a section change.
 - Progress is counted per section and overall; a not-applicable section counts as done and leaves the totals; the
   checklist is complete when every applicable check is answered; the next unanswered check and the first incomplete
-  section are found.
+  section are found; the draft answers of the only slot of a review count in the consolidated progress, and those of
+  one of several slots do not.
+- Answering, changing a section and handing in a ballot need a reviewer slot of the review: anybody else is refused
+  with `NoReviewerSlot` and nothing is stored.
+- With several slots a ballot stays a draft until `SubmitBallotAsync` hands it in; an incomplete ballot is refused with
+  `BallotIncomplete`; handing in again changes nothing. With one slot the answer that completes the ballot hands it in,
+  and an earlier answer leaves it a draft.
+- A viewer who holds a slot gets the own ballot with its draft and nothing of another slot's draft; any other viewer
+  gets the consolidated standing of the submitted ballots, marked as without a slot when a viewer is given.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
 - While the project does not let authors answer the checklist (the default, also for projects that existed before the
@@ -42,10 +51,11 @@ N/A - standard test environment.
   `AuthorCannotAnswer`, also on an approved review (the rule is reported before the lock), and nothing is stored;
   another member is not affected, threads are not affected, the author may answer once the rule is off, and
   `GetAsync` reports `AuthorBlocked` for the author only while the rule is on.
-- A change that would make a current signature out of date is refused with `SignaturesWouldBecomeOutOfDate` naming
-  each affected slot number and signer, unless the slot is acknowledged, and nothing is stored; a review without a
-  current signature, a save that leaves the record as it is, and a locked review (`ReviewLocked` first) behave as
-  described.
+- A hand-in that would change the record digest and make a current signature of another slot out of date is refused
+  with `SignaturesWouldBecomeOutOfDate` naming each affected slot number and signer, unless the slot is acknowledged,
+  and nothing is stored; the signature of the own slot needs no acknowledgement; a draft edit, a hand-in that agrees
+  with the others, another slot giving the same value, a review without a current signature, and a locked review
+  (`ReviewLocked` first) behave as described.
 - Answers and not-applicable sections that a follow-up review carried count like the others (a review whose checks are
   all carried is complete); answering a carried check again, or setting a carried section again, stores a row without
   the carried mark and with the new person.
@@ -133,38 +143,99 @@ refused with an `ArgumentNullException` and nothing is stored. This scenario is 
 the user name of the actor and the UTC time of the clock. This scenario is tested by
 `ChecklistService_SetAnswer_StoresActorAndUtcTime`.
 
-**ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked**: A theory over the two changes of a checklist (an
-answer and the applicability of a section) on a review whose every slot holds a current signature; each is refused
-with `ReviewLocked` and the answers and sections are as they were. The fake store does not judge the lock itself, so
-the test shows that the service does. This scenario is tested by
+**ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked**: A theory over the changes of a checklist (an answer,
+the applicability of a section in both directions, and the hand-in of a ballot) on a review whose every slot holds a
+current signature; each is refused with `ReviewLocked` and the answers, sections and ballots are as they were. The fake
+store does not judge the lock itself, so the test shows that the service does. This scenario is tested by
 `ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked`.
 
-**ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow**: A review without a signature, and a review whose slot is
-signed, take a first answer, the same answer again by the same person, and the applicability of a section that has no
-row; none is refused and the signature stays current, because the digest of the record does not change. This scenario
-is tested by `ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow`.
+**ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow**: In a review with three slots and no signature, a reviewer
+changes an answer and a section, answers back to the earlier value, and hands the ballot in again; none is refused.
+After slot 1 signs, the reviewer changes the draft of the own ballot again; this is not refused either and the
+signature stays current, because a draft does not count and the other ballots still agree, so the digest of the record
+does not change. This scenario is tested by `ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow`.
 
-**ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing**: Another person saves the same value
-that a signed answer has; the person is part of the digest, so the change is refused with
-`SignaturesWouldBecomeOutOfDate` and the stored answer is unchanged. This scenario is tested by
-`ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing`.
+**ChecklistService_SetAnswerAsync_SameValueByOtherSlot_KeepsTheSignature**: With slot 1 signed, another reviewer saves
+the same value that the others gave, which takes the ballot of that reviewer back to a draft; nothing is refused, the
+others still agree, the answerer is not part of the digest, and the signature of slot 1 stays current. This scenario
+is tested by `ChecklistService_SetAnswerAsync_SameValueByOtherSlot_KeepsTheSignature`.
 
 **ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners**: Slots 1 (signed by its
-alternate) and 3 are signed and slot 2 is not; the refusal names slot 1 and slot 3 with the people who signed, and
-their identities. This
+alternate) and 3 are signed and slot 2 is not; a reviewer who disagrees changes an answer and hands the ballot in
+without an acknowledgement; the refusal at the hand-in names slot 1 and slot 3 with the people who signed, and their
+identities. This
 scenario is tested by `ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners`.
 
-**ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots**: Only some of the signed slots are
-acknowledged; the refusal names the others and nothing is stored. This scenario is tested by
+**ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots**: Slots 1 and 2 are signed and a
+reviewer disagrees in the draft; handing in with only some of the signed slots acknowledged, and with an unrelated
+slot acknowledged, is refused naming the others, and the ballot is not handed in. This scenario is tested by
 `ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots`.
 
-**ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate**: Every signed slot is acknowledged;
-the answer is stored and each signature is out of date. This scenario is tested by
+**ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate**: Every signed slot is acknowledged
+at the hand-in; the ballot is handed in and each signature is out of date. This scenario is tested by
 `ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate`.
 
 **ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement**: A section is switched to not applicable
-on a signed review; it is refused until the slots are acknowledged, and then it is stored. This scenario is tested by
-`ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement`.
+in the draft of a ballot on a signed review, which needs no acknowledgement; handing the ballot in is refused until the
+slot is acknowledged, and then it is handed in. Marking a section applicable that has no stored state changes nothing.
+This scenario is tested by `ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement`.
+
+**ChecklistService_SetAnswerAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: In a review whose one slot is held by
+another user, a member who holds no slot answers a check; the call is refused with `NoReviewerSlot` and the review has
+no ballot. This scenario is tested by `ChecklistService_SetAnswerAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`, which is
+defined in `ChecklistServiceBallotTests.cs`, like the scenarios below up to the hand-in impact.
+
+**ChecklistService_SubmitBallotAsync_ActorWithoutSlot_ThrowsNoReviewerSlot**: A member who holds no slot hands a ballot
+in; the call is refused with `NoReviewerSlot`. This scenario is tested by
+`ChecklistService_SubmitBallotAsync_ActorWithoutSlot_ThrowsNoReviewerSlot`.
+
+**ChecklistService_SubmitBallotAsync_TwoSlots_StaysDraftUntilSubmit**: In a review with two slots the reviewer of slot 1
+answers every check; the ballot is still a draft. After `SubmitBallotAsync` it is submitted, and a second call returns
+the submitted ballot and changes nothing. This scenario is tested by
+`ChecklistService_SubmitBallotAsync_TwoSlots_StaysDraftUntilSubmit`.
+
+**ChecklistService_SubmitBallotAsync_Incomplete_ThrowsBallotIncomplete**: In a review with two slots the reviewer
+answers one check only and hands in; the call is refused with `BallotIncomplete` and the ballot stays a draft. This
+scenario is tested by `ChecklistService_SubmitBallotAsync_Incomplete_ThrowsBallotIncomplete`.
+
+**ChecklistService_SetAnswerAsync_SingleSlotComplete_AutoSubmits**: The reviewer of the only slot answers every check
+but the last; the ballot is a draft. The last answer hands it in, with the user name of the reviewer. This scenario is
+tested by `ChecklistService_SetAnswerAsync_SingleSlotComplete_AutoSubmits`.
+
+**ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly**: In a review with three agreeing, submitted ballots, a reviewer
+changes an answer to Fail and does not hand it in. A read as that reviewer shows the own draft (`IsOwnBallot`, draft,
+Fail); a read as another reviewer shows the own Pass, never the draft; a read without a viewer shows the consolidated
+Pass. This scenario is tested by `ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly`.
+
+**ChecklistService_GetAsync_NoSlot_Consolidated**: In a review with two slots, the reviewer of one slot has a draft
+answer; a read as a member without a slot gives the consolidated standing, marked `NoSlot`, with no own ballot and no
+answer to that check. This scenario is tested by `ChecklistService_GetAsync_NoSlot_Consolidated`.
+
+**ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots**: Three submitted ballots
+agree and slot 1 has signed. A reviewer of another slot changes an answer to Fail; the edit is stored and the signature
+stays current, because the other ballots still agree. Handing the differing ballot in without an acknowledgement is
+refused with `SignaturesWouldBecomeOutOfDate` and the signature stays; with slot 1 acknowledged the hand-in is stored
+and the signature is out of date. This scenario is tested by
+`ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots`.
+
+**ChecklistService_SubmitBallotAsync_AgreeingSubmit_NoWarning**: Slot 1 has signed; a reviewer of another slot saves an
+answer to the value it has and hands the ballot in without an acknowledgement; nothing is refused and the signature of
+slot 1 is still current. This scenario is tested by `ChecklistService_SubmitBallotAsync_AgreeingSubmit_NoWarning`.
+
+**ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement**: The reviewer of slot 1 has signed, changes
+the own answer to Fail and hands the ballot in without any acknowledgement; nothing is refused and the own signature is
+out of date. This scenario is tested by `ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement`.
+
+**ChecklistService_Ballot_ReopenerWhileRuleIsOn_EditsAndSubmitsButCannotSign**: Cyd, the primary of the only slot,
+reopens an approved review while the project requires that the reopener does not sign again. Cyd changes an answer and
+puts it back and hands the ballot in; the ballot is submitted with the answer Pass. Cyd's request to sign is then
+refused with `ReopenerCannotSign`. The test is in `SigningServiceTests.cs`, which holds the reopening fixture. This
+scenario is tested by `ChecklistService_Ballot_ReopenerWhileRuleIsOn_EditsAndSubmitsButCannotSign`.
+
+**ChecklistService_BallotWrites_AuditorHoldingSlot_ThrowsActorNotAllowed**: With the real access rules, an auditor who
+still holds the only slot of a review tries to answer a check, to mark a section not applicable and to hand in the
+ballot. Each is refused with `ActorNotAllowed`, not `NoReviewerSlot`, and no ballot is stored. This scenario is tested
+by `ChecklistService_BallotWrites_AuditorHoldingSlot_ThrowsActorNotAllowed`.
 
 **ChecklistService_SetAnswerAsync_ApprovedReview_ReportsLockedBeforeImpact**: On an approved review the refusal is
 `ReviewLocked`, not the signature impact. This scenario is tested by
@@ -220,6 +291,12 @@ check that is neither answered nor in a not-applicable section. This scenario is
 **ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered**: The first incomplete section is the
 first applicable section with an unanswered check. This scenario is tested by
 `ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered`.
+
+**BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount**: A draft ballot is consolidated; with the
+slot count 1 its answer is in the standing that progress reads, and without the slot count (the view of the digest), or
+with two slots, it is not. This scenario is tested by
+`BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount`, which is defined in
+`BallotProjectionTests.cs`.
 
 **ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification**: A check is answered and the
 applicability of a section is changed; the entries `checklist.answered` and `checklist.applicability-changed` carry

@@ -945,40 +945,6 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public Task SetChecklistSectionStateAsync(
-        ChecklistSectionState state,
-        AuditDraft audit,
-        CancellationToken cancellationToken = default)
-    {
-        if (state.SlotId != ChecklistAnswer.BaselineSlotId)
-        {
-            throw new ArgumentException("A section state of a ballot is stored with SetBallotSectionStateAsync.", nameof(state));
-        }
-        _sectionStates.RemoveAll(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId
-            && s.SlotId == state.SlotId && s.SectionId == state.SectionId);
-        _sectionStates.Add(state);
-        Audits.Add(audit);
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
-    public Task SetChecklistAnswerAsync(
-        ChecklistAnswer answer,
-        AuditDraft audit,
-        CancellationToken cancellationToken = default)
-    {
-        if (answer.SlotId != ChecklistAnswer.BaselineSlotId)
-        {
-            throw new ArgumentException("An answer of a ballot is stored with SetBallotAnswerAsync.", nameof(answer));
-        }
-        _answers.RemoveAll(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId
-            && a.SlotId == answer.SlotId && a.ItemId == answer.ItemId);
-        _answers.Add(answer);
-        Audits.Add(audit);
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
     public Task<IReadOnlyList<Ballot>> ListBallotsAsync(
         int projectId,
         string reviewId,
@@ -1065,7 +1031,7 @@ internal sealed class FakeReviewStore : IReviewStore
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(slotId, ChecklistAnswer.BaselineSlotId);
-        await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
+        await EnsureBallotWritableAsync(projectId, reviewId, cancellationToken);
         _ = RequireSlotNumber(projectId, reviewId, slotId);
         var row = FindBallot(projectId, reviewId, slotId);
         if (row is { Status: BallotStatus.Submitted })
@@ -1197,7 +1163,7 @@ internal sealed class FakeReviewStore : IReviewStore
         Action storeRow,
         CancellationToken cancellationToken)
     {
-        await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
+        await EnsureBallotWritableAsync(projectId, reviewId, cancellationToken);
         var (slotNumber, slotCount) = RequireSlotNumber(projectId, reviewId, slotId);
         var wasSubmitted = FindBallot(projectId, reviewId, slotId) is { Status: BallotStatus.Submitted };
 
@@ -1236,6 +1202,13 @@ internal sealed class FakeReviewStore : IReviewStore
     /// </summary>
     public Func<int, string?> UsernameOfUser { get; set; } = _ => null;
 
+    /// <summary>
+    ///     Gets or sets a value indicating whether ballot writes ignore the lock of a concluded review, so a test can
+    ///     model a change that slipped in between two checks of a service, which the real store prevents by taking the
+    ///     lock inside its transaction.
+    /// </summary>
+    public bool IgnoreLockForBallots { get; set; }
+
     /// <inheritdoc />
     public Task<ReviewRecord?> GetRecordAsync(
         int projectId,
@@ -1251,11 +1224,10 @@ internal sealed class FakeReviewStore : IReviewStore
         var record = new ReviewRecord(
             review.ContentFingerprint,
             review.Checklist,
-            _sectionStates
-                .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == ChecklistAnswer.BaselineSlotId)
-                .ToList(),
-            _answers
-                .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == ChecklistAnswer.BaselineSlotId)
+            _ballots
+                .Where(b => b.ProjectId == projectId && b.ReviewId == reviewId)
+                .OrderBy(b => b.SlotId)
+                .Select(b => BuildBallot(b))
                 .ToList(),
             _threads.Where(t => t.ProjectId == projectId && t.ReviewId == reviewId).OrderBy(t => t.Id).ToList(),
             review.IsFromRepository
@@ -1555,6 +1527,14 @@ internal sealed class FakeReviewStore : IReviewStore
             throw new DomainRuleException(DomainRule.SigningNotAllowed, "A thread is open; resolve it before signing.");
         }
 
+        if (record.Checklist is not null
+            && !record.Ballots.Any(b => b.SlotId == signature.SlotId && b.Status == BallotStatus.Submitted))
+        {
+            throw new DomainRuleException(
+                DomainRule.BallotNotSubmitted,
+                "Your ballot has not been handed in; submit it before signing.");
+        }
+
         if (_signatures.Any(s => s.SlotId == signature.SlotId && s.RecordDigest == signature.RecordDigest))
         {
             throw new DomainRuleException(DomainRule.SigningNotAllowed, "This slot already has a signature of the current record.");
@@ -1656,6 +1636,18 @@ internal sealed class FakeReviewStore : IReviewStore
             IncludeInReport = include,
             Kind = comment.Kind
         };
+    }
+
+    /// <summary>
+    ///     Refuses a ballot write when the stored review is concluded, unless the test lets the write through.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the write may go on.</returns>
+    private Task EnsureBallotWritableAsync(int projectId, string reviewId, CancellationToken cancellationToken)
+    {
+        return IgnoreLockForBallots ? Task.CompletedTask : EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
     }
 
     /// <summary>

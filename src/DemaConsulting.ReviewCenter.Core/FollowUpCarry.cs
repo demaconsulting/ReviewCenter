@@ -30,11 +30,14 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     reads the earlier review from the store, calls these methods and hands the result to the store together with the new
 ///     review, so the rules can be tested without a store. What is carried:
 ///     <list type="bullet">
-///         <item>Pass and not-applicable answers whose check exists in the new checklist with exactly the same text (ordinal
+///         <item>Pass and not-applicable answers that the submitted ballots of the earlier review agree on, whose check exists
+///               in the new checklist with exactly the same text (ordinal
 ///               comparison of the text the answer was given against). Outcome, justification, answerer and time stay
-///               those of the original answer; the answer is marked as carried from the immediate source. Fail answers
+///               those of the original answer (the row of the lowest slot that answered it); the answer is marked as carried
+///               from the immediate source. Fail answers
 ///               are never carried: the check stays unanswered so a reviewer decides again.</item>
-///         <item>Not-applicable sections (with their reason) whose section exists in the new checklist with the same title.</item>
+///         <item>Not-applicable sections (with their reason) that the submitted ballots agree on, whose section exists in
+///               the new checklist with the same title.</item>
 ///         <item>Open threads whose file is in the new review, with all comments verbatim (each keeping whether it is part
 ///               of the report and whether it is a resolution note, so a carried Finding stays a Finding and chat stays
 ///               chat) and in the state Open. The anchor
@@ -98,7 +101,7 @@ public static class FollowUpCarry
     ///     Computes what the new review takes over from the earlier one.
     /// </summary>
     /// <param name="sourceId">The identifier of the earlier review (the immediate source).</param>
-    /// <param name="source">The record of the earlier review: its checklist, answers, section states and threads. Must not be null.</param>
+    /// <param name="source">The record of the earlier review: its checklist, ballots and threads. Must not be null.</param>
     /// <param name="sourceFiles">The files of the earlier review (metadata is enough). Must not be null.</param>
     /// <param name="projectId">The project of both reviews.</param>
     /// <param name="reviewId">The identifier of the new review.</param>
@@ -176,7 +179,21 @@ public static class FollowUpCarry
         var oldDefinition = source.Checklist.Parse();
         var oldItems = ItemTexts(oldDefinition);
         var newItems = ItemTexts(newDefinition);
-        foreach (var answer in source.Answers.OrderBy(a => a.ItemId, StringComparer.Ordinal))
+
+        // Only what the submitted ballots agree on is carried: the consolidated state holds the representative row of
+        // every agreed check and not-applicable section, so a disputed or pending check stays open in the new review
+        var consolidated = BallotProjection.Consolidate(source)?.State;
+        if (consolidated is null)
+        {
+            return (answers, sections);
+        }
+
+        var agreedAnswers = oldDefinition.Sections
+            .SelectMany(section => section.Items)
+            .Select(item => consolidated.AnswerFor(item.Id))
+            .OfType<ChecklistAnswer>()
+            .OrderBy(a => a.ItemId, StringComparer.Ordinal);
+        foreach (var answer in agreedAnswers)
         {
             // A Fail is not carried: the check stays open so a reviewer has to decide again. A check is carried only
             // when the question it was answered against is unchanged
@@ -203,7 +220,12 @@ public static class FollowUpCarry
         }
 
         var newTitles = newDefinition.Sections.ToDictionary(s => s.Id, s => s.Title, StringComparer.Ordinal);
-        foreach (var state in source.SectionStates.Where(s => !s.Applicable).OrderBy(s => s.SectionId, StringComparer.Ordinal))
+        var agreedStates = oldDefinition.Sections
+            .Select(section => consolidated.SectionStateFor(section.Id))
+            .OfType<ChecklistSectionState>()
+            .Where(s => !s.Applicable)
+            .OrderBy(s => s.SectionId, StringComparer.Ordinal);
+        foreach (var state in agreedStates)
         {
             if (!newTitles.TryGetValue(state.SectionId, out var title)
                 || !string.Equals(title, oldDefinition.Sections.FirstOrDefault(s => s.Id == state.SectionId)?.Title, StringComparison.Ordinal))

@@ -94,7 +94,7 @@ public class ReviewCenterSystemTests
     public async Task ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen()
     {
         // Arrange: a planned review, created by puppet, with a slot for second, whose checklist is not answered yet;
-        // second is signed in in a browser of their own, and puppet's browser changes the record later
+        // second is signed in in a browser of their own, and a second session of second changes the record later
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
         var browser = scenario.Browser;
         await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
@@ -104,8 +104,8 @@ public class ReviewCenterSystemTests
         var blockedText = await reviewer.TextOfAsync($"sign-blockers-{slot}");
         var blockedForm = await reviewer.ExistsAsync($"sign-form-{slot}");
 
-        // Act: answer the checklist, then try a wrong password
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        // Act: answer the checklist as the reviewer, then try a wrong password
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.");
         await scenario.OpenReviewAsync(reviewer);
         var formWhenReady = await reviewer.ExistsAsync($"sign-form-{slot}");
         await reviewer.OkAsync("fill", $"sign-password-{slot}", "this is not the password");
@@ -115,21 +115,16 @@ public class ReviewCenterSystemTests
         var approvalAfterWrong = await reviewer.TextOfAsync("review-approval");
         var statusAfterWrong = await reviewer.TextOfAsync($"slot-status-{slot}");
 
-        // Act: somebody changes the record in another session while the page of the reviewer still shows the old one
-        await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
-        await Scenario.OpenSectionAsync(browser, "req");
-        await browser.OkAsync("fill", "section-req-reason", "Changed while the other page was open.");
-        await browser.OkAsync("click", "section-req-save");
-        await Task.Delay(1000, TestContext.Current.CancellationToken);
-        await browser.WaitUntilAsync(
-            async () =>
-            {
-                await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
-                await Scenario.OpenSectionAsync(browser, "req");
-                return (await browser.EvalAsync("document.querySelector('[data-testid=section-req-reason]').value"))
-                    .Contains("Changed while", StringComparison.Ordinal);
-            },
-            "the changed reason to be stored");
+        // Act: somebody (second, in another session) makes the section of the requirements applicable again while the
+        // page of the reviewer still shows the old record; the ballot becomes a draft and the record changes
+        await using var editor = await scenario.StartSignedInBrowserAsync("editor", "second");
+        await editor.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
+        await Scenario.OpenSectionAsync(editor, "req");
+        await editor.OkAsync("check", "section-req-applicable");
+        await editor.OkAsync("click", "section-req-save");
+        await editor.WaitUntilAsync(
+            async () => !(await editor.TextOfAsync("section-req-progress")).Contains("Not applicable", StringComparison.Ordinal),
+            "the section to be applicable again");
 
         // Act: sign on the stale page with the right password
         await reviewer.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
@@ -139,7 +134,9 @@ public class ReviewCenterSystemTests
             "the refusal of the stale page");
         var approvalAfterStale = await reviewer.TextOfAsync("review-approval");
 
-        // Act: reload the page, so that it shows the record as it is now, and sign with the right password
+        // Act: the section is marked as not applicable again, the page is reloaded so that it shows the record as it
+        // is now, and the reviewer signs with the right password
+        await scenario.MarkAllSectionsNotApplicableAsync(editor, "Not relevant to this system test.");
         await scenario.OpenReviewAsync(reviewer);
         await Scenario.SignAsync(reviewer, slot);
 
@@ -168,9 +165,9 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
-    ///     Test that a change to the checklist after a signature does not go through silently: the page names the
-    ///     signature in a warning, cancelling leaves the signature as it was, and confirming stores the change and
-    ///     makes the signature out of date.
+    ///     Test that handing in a ballot that changes the record after a signature does not go through silently: the
+    ///     page names the signature in a warning, cancelling leaves the signature as it was, and confirming stores the
+    ///     ballot and makes the signature out of date.
     /// </summary>
     /// <returns>A task that completes when the test has finished.</returns>
     [Fact]
@@ -179,38 +176,42 @@ public class ReviewCenterSystemTests
         // Arrange: a review with two slots and an answered checklist, of which second has signed, so the review is
         // not approved and not locked
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
-        var browser = scenario.Browser;
         await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
         await scenario.OpenReviewAsync();
         var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
         await scenario.AddSlotAsync("Third Reviewer (third)", alternate: null);
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.");
         await scenario.OpenReviewAsync(reviewer);
         await reviewer.OkAsync("fill", $"sign-password-{slot}", PuppetEndToEndTests.UserPassword);
         await reviewer.OkAsync("click", $"sign-button-{slot}");
         await reviewer.WaitUntilAsync(
             async () => (await reviewer.TextOfAsync($"slot-status-{slot}")).Contains("Signed by", StringComparison.Ordinal),
             "the signature");
+        // Act: third answers differently (the requirements apply to third) and hands the ballot in, which the signature
+        // of second covers, so third is warned
+        await using var third = await scenario.StartSignedInBrowserAsync("third", "third");
+        await scenario.MarkAllSectionsNotApplicableAsync(third, "Not relevant to this system test.", except: "req");
+        await Scenario.OpenSectionAsync(third, "req");
+        for (var number = 1; number <= 8; number++)
+        {
+            await AnswerPassAsync(third, $"req-0{number}");
+        }
 
-        // Act: puppet changes a reason of the checklist, which the signature covers, and is warned
-        await browser.GotoAsync($"/projects/1/reviews/{scenario.ReviewId}/checklist", "checklist-page");
-        await Scenario.OpenSectionAsync(browser, "req");
-        await browser.OkAsync("fill", "section-req-reason", "Changed after the signature.");
-        await browser.OkAsync("click", "section-req-save");
-        await browser.OkAsync("wait", "signature-warning");
-        var warned = await browser.TextOfAsync("signature-warning-slots");
+        await third.OkAsync("click", "submit-ballot");
+        await third.OkAsync("wait", "signature-warning");
+        var warned = await third.TextOfAsync("signature-warning-slots");
 
         // Act: cancel, and look at the signature
-        await browser.OkAsync("click", "signature-warning-cancel");
-        await browser.WaitUntilAsync(async () => !await browser.ExistsAsync("signature-warning"), "the warning to go");
+        await third.OkAsync("click", "signature-warning-cancel");
+        await third.WaitUntilAsync(async () => !await third.ExistsAsync("signature-warning"), "the warning to go");
         await scenario.OpenReviewAsync(reviewer);
         var statusAfterCancel = await reviewer.TextOfAsync($"slot-status-{slot}");
 
-        // Act: change it again, confirm, and look at the signature
-        await browser.OkAsync("click", "section-req-save");
-        await browser.OkAsync("wait", "signature-warning");
-        await browser.OkAsync("click", "signature-warning-confirm");
-        await browser.WaitUntilAsync(async () => !await browser.ExistsAsync("signature-warning"), "the warning to go");
+        // Act: hand the ballot in again, confirm, and look at the signature
+        await third.OkAsync("click", "submit-ballot");
+        await third.OkAsync("wait", "signature-warning");
+        await third.OkAsync("click", "signature-warning-confirm");
+        await third.WaitUntilAsync(async () => !await third.ExistsAsync("signature-warning"), "the warning to go");
         await scenario.OpenReviewAsync(reviewer);
         var statusAfterConfirm = await reviewer.TextOfAsync($"slot-status-{slot}");
 
@@ -239,7 +240,7 @@ public class ReviewCenterSystemTests
         await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
         await scenario.OpenReviewAsync();
         var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.");
         await scenario.OpenReviewAsync();
         await browser.OkAsync("click", "file-select-0");
         await browser.OkAsync("wait", "new-thread-form");
@@ -361,7 +362,7 @@ public class ReviewCenterSystemTests
         await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
         await scenario.OpenReviewAsync();
         var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.");
         await scenario.OpenReviewAsync(reviewer);
         await Scenario.SignAsync(reviewer, slot);
 
@@ -517,6 +518,10 @@ public class ReviewCenterSystemTests
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
         var browser = scenario.Browser;
         await using var other = await scenario.StartSignedInBrowserAsync("other", "second");
+        await scenario.SetIndependentReviewersAsync(required: false);
+        await scenario.OpenReviewAsync();
+        await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await scenario.AddSlotAsync("Puppet Admin (puppet)", alternate: null);
         await scenario.SetReviewRuleAsync("author-checklist-switch", on: true);
         var checklist = $"/projects/1/reviews/{scenario.ReviewId}/checklist";
 
@@ -696,7 +701,7 @@ public class ReviewCenterSystemTests
         await browser.OkAsync("click", "review-due-save");
         await browser.WaitUntilAsync(() => browser.ExistsAsync("review-overdue"), "the Overdue badge of the first review");
         var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.");
         await scenario.OpenReviewAsync(reviewer);
         await Scenario.SignAsync(reviewer, slot);
 
@@ -783,7 +788,7 @@ public class ReviewCenterSystemTests
         var searchRow = await browser.EvalAsync("document.querySelector('[data-testid^=\"review-row-\"]').getAttribute('data-testid')");
 
         // Act: approve the first review as second, then read the overview again
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.");
         await scenario.OpenReviewAsync(reviewer);
         await Scenario.SignAsync(reviewer, slot);
         await browser.GotoAsync("/projects/1?stage=approved", "project-page");
@@ -929,21 +934,23 @@ public class ReviewCenterSystemTests
     [Fact]
     public async Task ReviewCenter_FollowUpReview_CarriesWhatHoldsAndIsApprovedOnItsOwn()
     {
-        // Arrange: puppet fails a check in the planned review A, passes the rest of its section, marks the other
-        // sections as not applicable and leaves an open thread; second is the reviewer of the follow-up
+        // Arrange: second, the reviewer of the planned review A, fails a check, passes the rest of its section, marks the
+        // other sections as not applicable and so hands the ballot in; puppet leaves an open thread
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
         var browser = scenario.Browser;
         await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.", except: "req");
-        await Scenario.OpenSectionAsync(browser, "req");
-        await browser.OkAsync("click", "check-fail-req-01");
-        await browser.OkAsync("wait", "check-justification-req-01");
-        await browser.OkAsync("fill", "check-justification-req-01", "The requirement is not traceable.");
-        await browser.OkAsync("click", "check-save-req-01");
-        await browser.WaitUntilAsync(() => browser.ExistsAsync("check-answered-by-req-01"), "the Fail of REQ-01 to be saved");
+        await scenario.OpenReviewAsync();
+        await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.", except: "req");
+        await Scenario.OpenSectionAsync(reviewer, "req");
+        await reviewer.OkAsync("click", "check-fail-req-01");
+        await reviewer.OkAsync("wait", "check-justification-req-01");
+        await reviewer.OkAsync("fill", "check-justification-req-01", "The requirement is not traceable.");
+        await reviewer.OkAsync("click", "check-save-req-01");
+        await reviewer.WaitUntilAsync(() => reviewer.ExistsAsync("check-answered-by-req-01"), "the Fail of REQ-01 to be saved");
         for (var number = 2; number <= 8; number++)
         {
-            await AnswerPassAsync(browser, $"req-0{number}");
+            await AnswerPassAsync(reviewer, $"req-0{number}");
         }
 
         await scenario.OpenReviewAsync();
@@ -982,21 +989,21 @@ public class ReviewCenterSystemTests
             "document.querySelector('[data-testid^=\"thread-state-\"]').getAttribute('data-testid').replace('thread-state-', '')");
         var threadMarked = await browser.ExistsAsync($"thread-carried-{threadId}");
 
-        // Act: read the checklist of the follow-up
-        await browser.GotoAsync($"/projects/1/reviews/{followId}/checklist", "checklist-page");
-        await Scenario.OpenSectionAsync(browser, "req");
-        var passCarried = await browser.ExistsAsync("check-carried-req-02");
-        var sectionCarried = await browser.ExistsAsync("section-des-carried");
-        var failCarried = await browser.ExistsAsync("check-carried-req-01");
-        var earlierFail = await browser.TextOfAsync("check-earlier-fail-req-01");
-        var failAnswered = await browser.ExistsAsync("check-answered-by-req-01");
-
-        // Act: decide the failed check again, resolve the carried thread, add the reviewer, and sign as second
-        await browser.OkAsync("click", "check-pass-req-01");
-        await browser.WaitUntilAsync(() => browser.ExistsAsync("check-answered-by-req-01"), "the new answer of REQ-01");
-        var earlierFailAfter = await browser.ExistsAsync("check-earlier-fail-req-01");
+        // Act: puppet makes second the reviewer of the follow-up, who reads its checklist
         await browser.GotoAsync($"/projects/1/reviews/{followId}", "review-page");
         var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
+        await reviewer.GotoAsync($"/projects/1/reviews/{followId}/checklist", "checklist-page");
+        await Scenario.OpenSectionAsync(reviewer, "req");
+        var passCarried = await reviewer.ExistsAsync("check-carried-req-02");
+        var sectionCarried = await reviewer.ExistsAsync("section-des-carried");
+        var failCarried = await reviewer.ExistsAsync("check-carried-req-01");
+        var earlierFail = await reviewer.TextOfAsync("check-earlier-fail-req-01");
+        var failAnswered = await reviewer.ExistsAsync("check-answered-by-req-01");
+
+        // Act: decide the failed check again, resolve the carried thread, and sign as second
+        await reviewer.OkAsync("click", "check-pass-req-01");
+        await reviewer.WaitUntilAsync(() => reviewer.ExistsAsync("check-answered-by-req-01"), "the new answer of REQ-01");
+        var earlierFailAfter = await reviewer.ExistsAsync("check-earlier-fail-req-01");
         await ClickFileAsync(browser, "guide.md");
         await browser.OkAsync("wait", $"thread-toggle-{threadId}");
         await browser.OkAsync("click", $"thread-toggle-{threadId}");
@@ -1061,7 +1068,7 @@ public class ReviewCenterSystemTests
         await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
         await scenario.OpenReviewAsync();
         var slot = await scenario.AddSlotAsync("Second Reviewer (second)", alternate: null);
-        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.");
+        await scenario.MarkAllSectionsNotApplicableAsync(reviewer, "Not relevant to this system test.");
 
         // Act: the reviewer opens the home page, then the inbox
         await reviewer.OkAsync("goto", "/");
@@ -1623,9 +1630,10 @@ public class ReviewCenterSystemTests
         }
 
         /// <summary>
-        ///     Marks every section of the checklist as not applicable, with a reason.
+        ///     Marks every section of the checklist as not applicable, with a reason, as the reviewer of a slot, and hands
+        ///     the ballot in when the review has more than one slot (with one slot, a finished ballot is handed in at once).
         /// </summary>
-        /// <param name="browser">The browser to use.</param>
+        /// <param name="browser">The browser of the person who holds a slot of the review.</param>
         /// <param name="reason">The reason.</param>
         /// <param name="except">The lower-case identifier of a section to leave alone, or <c>null</c> for none.</param>
         /// <returns>A task that completes when every section is saved.</returns>
@@ -1641,6 +1649,14 @@ public class ReviewCenterSystemTests
                 await browser.WaitUntilAsync(
                     async () => (await browser.TextOfAsync($"section-{section}-progress")).Contains("Not applicable", StringComparison.Ordinal),
                     $"section {section} to be saved");
+            }
+
+            if (await browser.ExistsAsync("submit-ballot"))
+            {
+                await browser.OkAsync("click", "submit-ballot");
+                await browser.WaitUntilAsync(
+                    async () => !await browser.ExistsAsync("submit-ballot"),
+                    "the ballot to be handed in");
             }
         }
 

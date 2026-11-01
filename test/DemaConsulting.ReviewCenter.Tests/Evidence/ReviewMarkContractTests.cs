@@ -275,8 +275,8 @@ public class ReviewMarkContractTests
         foreach (var review in Reviews)
         {
             await EvidenceTestSupport.AddReviewAsync(store, clock, project.Id, review.Id, review.SetId, review.Files);
-            await EvidenceTestSupport.AnswerAllPassAsync(checklists, project.Id, review.Id);
             var slotId = await EvidenceTestSupport.AddSlotAsync(signing, project.Id, review.Id, annId);
+            await EvidenceTestSupport.AnswerAllPassAsync(checklists, project.Id, review.Id);
             if (review.Signed)
             {
                 await EvidenceTestSupport.SignAsync(signing, project.Id, review.Id, slotId, EvidenceTestSupport.Ann, TestBrowser.Password);

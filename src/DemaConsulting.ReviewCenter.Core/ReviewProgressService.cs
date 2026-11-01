@@ -197,6 +197,7 @@ public sealed class ReviewProgressService
             && (approval.OpenThreads > 0
                 || approval.UnansweredChecks > 0
                 || approval.FailedChecks > 0
+                || approval.DisputedChecks > 0
                 || approval.MissingChecklist);
 
         return new ReviewProgress(

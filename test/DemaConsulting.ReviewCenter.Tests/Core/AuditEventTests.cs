@@ -120,7 +120,7 @@ public class AuditEventTests
             projects,
             reviewService,
             TestServices.Threads(reviews, clock),
-            TestServices.Checklists(reviews, clock),
+            TestServices.Checklists(reviews, clock, users),
             TestServices.Signing(reviews, userService, clock),
             project.Id,
             ids);
@@ -250,14 +250,17 @@ public class AuditEventTests
         var sectionId = DefaultChecklist.Current.Sections[1].Id;
         const string Justification = "Confidential reason hunter2";
 
-        // Act: Ann created the review and may not answer it, so Bob answers (the rule is not under test here)
+        // Act: Ann created the review and may not answer it, so Bob answers from a slot of his own (the rule is not
+        // under test here)
+        await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["bob"], null, TestContext.Current.CancellationToken);
+        var before = fixture.Reviews.Audits.Count;
         await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", firstItem, ChecklistOutcome.Pass, null, TestActors.Bob, TestContext.Current.CancellationToken);
         await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", firstItem, ChecklistOutcome.Fail, Justification, TestActors.Bob, TestContext.Current.CancellationToken);
         await fixture.Checklists.SetSectionApplicabilityAsync(fixture.ProjectId, "rev-1", sectionId, false, "Not relevant", TestActors.Bob, TestContext.Current.CancellationToken);
         await fixture.Checklists.SetSectionApplicabilityAsync(fixture.ProjectId, "rev-1", sectionId, true, null, TestActors.Bob, TestContext.Current.CancellationToken);
 
         // Assert
-        var drafts = fixture.Reviews.Audits.Skip(2).ToList();
+        var drafts = fixture.Reviews.Audits.Skip(before).ToList();
         Assert.Equal(["checklist.answered", "checklist.answered", "checklist.applicability-changed", "checklist.applicability-changed"], drafts.Select(d => d.Action));
         Assert.Equal($"item {firstItem}: Pass", drafts[0].Detail);
         Assert.Equal($"item {firstItem}: Fail; justification sha256 {AuditText.ShortHash(Justification)}", drafts[1].Detail);
@@ -278,12 +281,6 @@ public class AuditEventTests
         var fixture = await CreateAsync();
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        // Ann created the review and may not answer it, so Bob answers
-        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
-        {
-            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
-        }
-
         // A slot that is added and removed again first, so the slot under test has the identity 2 but is slot 1 on the page
         var placeholder = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], null, cancellationToken);
         await fixture.Signing.RemoveSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", placeholder.Id, cancellationToken);
@@ -295,6 +292,14 @@ public class AuditEventTests
         await fixture.Signing.UpdateSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", slot.Id, fixture.UserIds["ann"], fixture.UserIds["bob"], cancellationToken);
         var unknownUser = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
             TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["bob"] + 100, null, cancellationToken));
+
+        // Ann created the review and may not answer it, so Bob, the alternate of the slot, answers and hands in the ballot
+        var auditsBeforeAnswers = fixture.Reviews.Audits.Count;
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
+        {
+            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
+        }
+
         var digest = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, "rev-1", cancellationToken))!.Digest;
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken);
         var locked = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
@@ -303,7 +308,8 @@ public class AuditEventTests
         // Assert: the two refused adds record nothing, each for its own rule
         Assert.Equal(DomainRule.SlotUserInvalid, unknownUser.Rule);
         Assert.Equal(DomainRule.ReviewLocked, locked.Rule);
-        var drafts = fixture.Reviews.Audits.Skip(before).ToList();
+        Assert.Equal(before + 3, auditsBeforeAnswers);
+        var drafts = fixture.Reviews.Audits.Skip(before).Where(d => d.Action.StartsWith("slot.", StringComparison.Ordinal) || d.Action == "signature.added").ToList();
         Assert.Equal(["slot.added", "slot.updated", "slot.updated", "signature.added"], drafts.Select(d => d.Action));
         Assert.Equal("slot 1: primary ann, alternate bob", drafts[0].Detail);
         Assert.Equal("slot 1: primary bob, alternate none", drafts[1].Detail);
@@ -549,14 +555,14 @@ public class AuditEventTests
     [Fact]
     public async Task SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword()
     {
-        // Arrange: a review that may be signed (Bob answers, because Ann created it), and four wrong passwords already given
+        // Arrange: a review that may be signed (Bob, the alternate of the slot, answers, because Ann created it)
         var fixture = await CreateAsync();
+        var slot = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], fixture.UserIds["bob"], TestContext.Current.CancellationToken);
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
         {
             await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Bob, TestContext.Current.CancellationToken);
         }
 
-        var slot = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], null, TestContext.Current.CancellationToken);
         var digest = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, "rev-1", TestContext.Current.CancellationToken))!.Digest;
         for (var i = 0; i < 4; i++)
         {

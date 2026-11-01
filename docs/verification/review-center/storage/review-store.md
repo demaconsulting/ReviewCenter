@@ -54,14 +54,14 @@ be loadable on the test platform.
   that is not in the review.
 - A checklist snapshot is stored with its review and read back with its version; a review without one, and an
   unknown review, have none.
-- Answering a check again, or setting a section's applicability again, replaces the earlier row, so there is one
-  row per check and per section; outcome, display name, user name, and time are read back as saved, and only for
-  their own review.
+- Answering a check again, or setting a section's applicability again, in the ballot of a slot replaces the earlier row,
+  so there is one row per slot and per check and section; outcome, display name, user name, and time are read back as
+  saved, and only for their own review.
 - Reviewer slots are stored with database-assigned identities (a supplied identity is ignored), listed only for their
   own review in the order they were added, and refused for an unknown review; a slot can be updated and removed, and
   an unknown slot, or a slot reached through another review, is reported as not found.
-- The record of a review carries its fingerprint, section states, answers, and threads with their comments in posting
-  order, changes when a comment is added, and is none for an unknown review.
+- The record of a review carries its fingerprint, the ballots of its slots with their answers and section states, and
+  threads with their comments in posting order, changes when a comment is added, and is none for an unknown review.
 - A review from a repository is stored and read back with its repository, commits, selection, and for every file the
   change kind and baseline size and hash, without loading any file bytes; the baseline bytes are read on request and
   are none for a file without a baseline; its record carries the source and one change per file; an uploaded review
@@ -115,10 +115,11 @@ be loadable on the test platform.
   the stored date that is stored with one audit entry of the review (the chain verifies), a date that is not the
   stored one or an unknown review reports `false` and changes nothing and writes no entry, and of two writers that start
   from the same date exactly one succeeds. An approved review refuses the change with `ReviewLocked`.
-- The answers and section states of a slot are stored as that slot's ballot (a draft or handed-in status row), apart from
-  the rows of other slots and from the review-level rows, which the older methods, the listings, the record, and its
-  digest still use alone; the identity 0 is never a slot; a concluded review, an unknown slot, and an incomplete
-  hand-in are refused without a row or an entry; a hand-in is a compare-and-set, an edit reverts a handed-in ballot, and
+- The answers and section states of a slot are stored as that slot's ballot (a draft or handed-in status row), apart
+  from the rows of other slots and from the review-level rows that a follow-up review carries, which the listings keep
+  as the baseline; the record carries all ballots, drafts included, and the digest computed from it covers only the
+  handed-in ones; the identity 0 is never a slot; a concluded review, an unknown slot, and an incomplete hand-in are
+  refused without a row or an entry; a hand-in is a compare-and-set, an edit reverts a handed-in ballot, and
   a single-slot review hands in a complete ballot by itself, each with one audit entry that holds the slot number and
   counts only; a slot added to a follow-up review is seeded with the carried rows, a reassignment removes the rows of
   the departed reviewers, a removal removes all rows (a signed slot is refused and rolled back), and the chain verifies.
@@ -138,10 +139,11 @@ read back; an unknown slot and a slot through another review report false for up
 then removed and no slot is listed. This scenario is tested by
 `ReviewStore_UpdateAndRemoveSlotAsync_ExistingAndUnknown_ChangesOrReturnsFalse`.
 
-**ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments**: A review with an answer, a
-section marked not applicable, and a thread with a comment is read as a record, which carries the fingerprint, the
-answer, the section state, and the comment; after another comment is added the digest of the record differs. This
-scenario is tested by `ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments`.
+**ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments**: A review with a slot whose
+ballot holds an answer and a section marked not applicable, and a thread with a comment, is read as a record, which
+carries the fingerprint, the ballot with the answer and the section state, and the comment; after another comment is
+added the digest of the record differs. This scenario is tested by
+`ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments`.
 
 **ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull**: The record of an unknown review is requested; it is null.
 This scenario is tested by `ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull`.
@@ -177,7 +179,8 @@ This scenario is tested by `ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNu
 
 **ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory**: One project holds an approved review,
 a review reopened twice, a review whose signature a reopening made out of date and that then got a thread, a review with
-two threads, three comments, two answers, a section state, a checklist and two slots, a review without slots, a review
+two threads, three comments, two ballots (one with two answers and a section state, one with an answer), a checklist
+and two slots, a review without slots, a review
 from a repository with an added, a modified, and a deleted file, and a same-named review of another project. The batch
 read returns every review, each part of each snapshot equals the single read, the interesting parts are present, and the
 batch of reopens equals the single reads and leaves out the reviews that were never reopened. This scenario is tested by
@@ -233,19 +236,19 @@ scenario is tested by `ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomica
 review, both give no checklist. This scenario is tested by
 `ReviewStore_GetChecklist_ReviewWithoutSnapshot_ReturnsNull`.
 
-**ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem**: A check is answered Pass and then Fail with a
-justification, and another check is answered N/A; two answers are listed and the first holds the latest outcome and
-justification. This scenario is tested by `ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem`.
+**ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem**: In the ballot of a slot, a check is answered Pass and then Fail
+with a justification, and another check is answered N/A; two answers are read from the ballot and the first holds the
+latest outcome and justification. This scenario is tested by `ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem`.
 
-**ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection**: A section is stored as not applicable with a
-reason and then as applicable; one row is listed each time and holds the latest state, and the display name and
-user name of who set it. This scenario is tested by
-`ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection`.
+**ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection**: In the ballot of a slot, a section is stored as not
+applicable with a reason and then as applicable; one row is read each time and holds the latest state, and the display
+name and user name of who set it. This scenario is tested by
+`ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection`.
 
-**ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps**: A check of one review is answered N/A; the outcome,
-display name, user name, and time are read back as saved, and the other review has no answers. This scenario is
-tested by
-`ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps`.
+**ReviewStore_BallotRows_RoundTripOutcomeAndTimestamps**: A check is answered N/A in the ballot of a slot of one review;
+the outcome, display name, user name, and time are read back as saved, and the other review has no ballot. This
+scenario is tested by
+`ReviewStore_BallotRows_RoundTripOutcomeAndTimestamps`.
 
 **ReviewStore_AddProjectAsync_ValidProject_RoundTrips**: A project is stored; it is read back with the same
 values and a generated identity. This scenario is tested by `ReviewStore_AddProjectAsync_ValidProject_RoundTrips`.
@@ -615,8 +618,8 @@ concluded at that moment is refused with `ReviewLocked`; nothing is stored and n
 tested by `ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked`.
 
 **The ballots** are verified in `ReviewStoreBallotTests.cs` against a real SQLite database file, with the real
-`AuditAppender`. Only the new ballot methods and the slot methods read and write the rows of a slot; the older methods and
-the record keep the review-level rows (slot identity 0).
+`AuditAppender`. The ballot methods and the slot methods read and write the rows of a slot; the review-level rows
+(slot identity 0) are only the baseline that a follow-up review carries and that the readers of the older names list.
 
 **ReviewStore_SetBallotAnswerAsync_FirstAnswer_CreatesDraftBallot**: The first answer of a slot creates a draft ballot
 with the answer and the supplied audit entry. This scenario is tested by
@@ -650,13 +653,20 @@ in the order of the slots. This scenario is tested by
 **ReviewStore_GetBallotAsync_NotStartedSlot_ReturnsNull**: A slot without a ballot, and a slot that does not exist, read
 as no ballot. This scenario is tested by `ReviewStore_GetBallotAsync_NotStartedSlot_ReturnsNull`.
 
-**ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows**: The review-level listings return the
-review-level rows only. This scenario is tested by
+**ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows**: The review-level listings (the legacy
+baseline) return the review-level rows only, and a ballot holds its own rows only. This scenario is tested by
 `ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows`.
 
-**ReviewStore_GetRecordAsync_BallotRows_DoNotChangeTheRecordOrItsDigest**: Ballot rows and statuses change neither the
-record nor its digest. This scenario is tested by
-`ReviewStore_GetRecordAsync_BallotRows_DoNotChangeTheRecordOrItsDigest`.
+**ReviewStore_AddSignatureAsync_OwnBallotDraft_ThrowsBallotNotSubmitted**: In a review with a checklist and one slot
+whose ballot is a draft, a signature with the current digest is refused with `BallotNotSubmitted` and nothing is stored;
+after the ballot is handed in, the same signature with the new digest is stored. This scenario is tested by
+`ReviewStore_AddSignatureAsync_OwnBallotDraft_ThrowsBallotNotSubmitted`.
+
+**ReviewStore_GetRecordAsync_BallotRows_AreInTheRecordAsBallots**: A review-level row is in no ballot, and a record read
+before any ballot has none. After the edits and the hand-in of a ballot, the record carries that ballot with its status,
+its answer, and its section state, and the digest computed from the record equals the digest of the snapshot of the
+review. The ballot of the stored-review scenario above, which is still a draft, is in the record too.
+This scenario is tested by `ReviewStore_GetRecordAsync_BallotRows_AreInTheRecordAsBallots`.
 
 **ReviewStore_SetBallotAnswerAsync_SubmittedBallot_RevertsToDraftWithAudit**: An edit of a handed-in ballot makes it a
 draft again and records `ballot.reopened` with the slot number only. This scenario is tested by
@@ -728,17 +738,19 @@ stores, are verified in the tests of `AuditStore`.
 **ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn**: A follow-up review is added with a carried answer, a
 carried not-applicable section, and a carried thread with a comment. Read back, the review has `FollowsReviewId` and the
 two counts, the answer, the section, and the thread have the carried marks (and the thread its original number), the
-comment is unchanged, the record that a signature covers has them, and the audit chain verifies. This scenario is tested
+comment is unchanged, the record that a signature covers has the follow-up link and the thread mark while the carried
+rows belong to no ballot yet, and the audit chain verifies. This scenario is tested
 by `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`.
 
 **ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing**: A carried thread names a file that the new review does
 not have, so the database refuses. Afterwards the review, every carried row, and the audit entry do not exist, and the
 followed review is unchanged. This scenario is tested by `ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing`.
 
-**ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker**: An answer and a section state
-that were carried are set again by another person; the stored rows are the new ones, have no marker, and there is still
-one row each, while the carried thread keeps its marker. This scenario is tested by
-`ReviewStore_SetChecklistAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`.
+**ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker**: A slot starts from the carried
+rows; an answer and a section state that were carried are set again in its ballot by another person; the ballot holds
+the new rows, which have no marker, and there is still one row each, while the carried review-level rows and the
+carried thread keep their markers. This scenario is tested by
+`ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker`.
 
 **ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind**: A carried Finding with its included starting
 comment and its included Resolution comment is stored with the follow-up; read back, the comments keep their kinds and

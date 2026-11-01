@@ -39,53 +39,78 @@ public class ChecklistServiceTests
     private static readonly int[] _itemsPerSection = [8, 5, 4, 6, 3, 4, 2, 5, 3, 8, 2, 2, 2, 4];
 
     /// <summary>
-    ///     Creates a store with a project and the review <c>rev-1</c>, and a checklist service over it.
+    ///     Creates a store with a project and the review <c>rev-1</c>, and a checklist service over it. The user
+    ///     <c>ann</c> holds the one slot of the review, so her answers go into the one ballot, which is handed in with
+    ///     the last answer.
     /// </summary>
+    /// <param name="seated">The user name of the person who holds the one slot.</param>
     /// <returns>The store, the service and the id of the project.</returns>
-    private static async Task<(FakeReviewStore Store, ChecklistService Service, int ProjectId)> CreateAsync()
+    private static async Task<(FakeReviewStore Store, ChecklistService Service, int ProjectId)> CreateAsync(string? seated = "ann")
     {
+        var clock = new FixedTimeProvider(_now);
         var store = new FakeReviewStore();
-        var project = await TestServices.Projects(store, new FixedTimeProvider(_now))
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var project = await TestServices.Projects(store, clock)
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
-        await TestServices.Reviews(store, new FixedTimeProvider(_now)).CreateDraftAsync(
+        await TestServices.Reviews(store, clock).CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
-        return (store, TestServices.Checklists(store, new FixedTimeProvider(_now)), project.Id);
+        if (seated is not null)
+        {
+            var user = await users.CreateAsync(
+                seated, char.ToUpperInvariant(seated[0]) + seated[1..], UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+            await store.AddSlotAsync(
+                new ReviewerSlot { ProjectId = project.Id, ReviewId = "rev-1", PrimaryUserId = user.Id }, TestContext.Current.CancellationToken);
+        }
+
+        return (store, TestServices.Checklists(store, clock, userStore), project.Id);
     }
 
     /// <summary>
-    ///     Test that an answer and a section's applicability are refused with <see cref="DomainRule.ReviewLocked"/>
-    ///     while the review is approved, and that the record is unchanged.
+    ///     Test that an answer, a section's applicability (either way) and the hand-in of a ballot are refused with
+    ///     <see cref="DomainRule.ReviewLocked"/> while the review is approved, and that the record is unchanged.
     /// </summary>
-    /// <param name="operation">The mutation to try: answer or section.</param>
+    /// <param name="operation">The mutation to try: answer, section, sectionApplicable or submit.</param>
     [Theory]
     [InlineData("answer")]
     [InlineData("section")]
+    [InlineData("sectionApplicable")]
+    [InlineData("submit")]
     public async Task ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked(string operation)
     {
         // Arrange: a review approved by a separate reviewer (every check answered Pass)
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (store, service, projectId) = await CreateAsync();
+        var (store, service, projectId) = await CreateAsync(null);
         await AuditTestExtensions.ApproveReviewAsync(store, new FixedTimeProvider(_now), projectId, "rev-1", "approver", cancellationToken);
         var first = DefaultChecklist.Current.Sections[0];
         var answersBefore = (await service.GetAsync(projectId, "rev-1", cancellationToken))!.Overall.Answered;
+        var ballotsBefore = (await store.GetSnapshotAsync(projectId, "rev-1", cancellationToken))!.Record.Ballots;
 
-        // Act: try to change an answer, or to mark a section as not applicable
-        Task Mutate() => operation == "answer"
-            ? service.SetAnswerAsync(projectId, "rev-1", first.Items[0].Id, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken)
-            : service.SetSectionApplicabilityAsync(projectId, "rev-1", first.Id, false, "Not relevant.", TestActors.Ann, cancellationToken);
+        // Act: try to change an answer, to mark a section as not applicable or applicable, or to hand a ballot in
+        Task Mutate() => operation switch
+        {
+            "answer" => service.SetAnswerAsync(
+                projectId, "rev-1", first.Items[0].Id, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken),
+            "section" => service.SetSectionApplicabilityAsync(
+                projectId, "rev-1", first.Id, false, "Not relevant.", TestActors.Ann, cancellationToken),
+            "sectionApplicable" => service.SetSectionApplicabilityAsync(
+                projectId, "rev-1", first.Id, true, null, TestActors.Ann, cancellationToken),
+            _ => service.SubmitBallotAsync(projectId, "rev-1", TestActors.Ann, cancellationToken)
+        };
         var ex = await Assert.ThrowsAsync<DomainRuleException>(Mutate);
 
-        // Assert: refused as locked, and the answers are untouched
+        // Assert: refused as locked, and the answers and ballots are untouched
         Assert.Equal(DomainRule.ReviewLocked, ex.Rule);
         var state = (await service.GetAsync(projectId, "rev-1", cancellationToken))!;
         Assert.Equal(answersBefore, state.Overall.Answered);
         Assert.Equal(ChecklistOutcome.Pass, state.AnswerFor(first.Items[0].Id)!.Outcome);
         Assert.True(state.IsApplicable(first.Id));
+        Assert.Equal(ballotsBefore.Count, (await store.GetSnapshotAsync(projectId, "rev-1", cancellationToken))!.Record.Ballots.Count);
     }
 
     /// <summary>
-    ///     Test that a change is stored without any acknowledgement while no signature is current, and that saving the
-    ///     same answer again as the same person is a no-op that does not touch a current signature.
+    ///     Test that a change is stored without any acknowledgement while no signature is current, and that a change to
+    ///     a draft that leaves the consolidated record as it is does not touch a current signature.
     /// </summary>
     [Fact]
     public async Task ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow()
@@ -94,42 +119,44 @@ public class ChecklistServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await SignedReviewWorld.CreateAsync();
         var sectionId = DefaultChecklist.Current.Sections[0].Id;
+        var rita = SignedReviewWorld.ActorOf("rita");
 
-        // Act: change an answer and a section while there is no signature, then sign and save the same value again
+        // Act: change an answer and a section while there is no signature, then hand the ballot in again, sign, and
+        // change the draft of the own ballot again
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken);
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", rita, cancellationToken);
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, rita, cancellationToken);
+        await world.Checklists.SetSectionApplicabilityAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, true, null, rita, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, SignedReviewWorld.ReviewId, rita, cancellationToken);
         await world.SignAsync(1);
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
-        await world.Checklists.SetSectionApplicabilityAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, true, null, TestActors.Ann, cancellationToken);
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, rita, cancellationToken);
 
-        // Assert: the signature is still current
+        // Assert: the other ballots still agree, so the record did not change and the signature is still current
         Assert.Equal(SlotSignatureState.Signed, (await world.ApprovalAsync()).Slots[0].State);
     }
 
     /// <summary>
-    ///     Test that saving the same answer again as a different person is refused: the person who answered is part of
-    ///     the record, so the signature would become out of date. Nothing is stored.
+    ///     Test that a person who takes back the ballot of another slot is not refused while the record is as it was:
+    ///     a draft does not count in the digest, and the answerer is not part of it.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing()
+    public async Task ChecklistService_SetAnswerAsync_SameValueByOtherSlot_KeepsTheSignature()
     {
         // Arrange: slot 1 signed
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await SignedReviewWorld.CreateAsync();
         await world.SignAsync(1);
 
-        // Act: bob saves the value that ann gave
-        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken));
+        // Act: sam saves the value that rita gave, which takes his ballot back to a draft
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Pass, null, SignedReviewWorld.ActorOf("sam"), cancellationToken);
 
-        // Assert: refused naming slot 1, the answer is still ann's and the signature is current
-        Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
+        // Assert: nothing was refused, the others still agree, and the signature is current
         var state = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!;
-        Assert.Equal("Ann", state.AnswerFor(SignedReviewWorld.FirstItemId)!.AnsweredBy);
+        Assert.Equal(ChecklistOutcome.Pass, state.AnswerFor(SignedReviewWorld.FirstItemId)!.Outcome);
         Assert.Equal(SlotSignatureState.Signed, (await world.ApprovalAsync()).Slots[0].State);
     }
 
@@ -146,9 +173,12 @@ public class ChecklistServiceTests
         await world.SignAsync(1, alternate: true);
         await world.SignAsync(3);
 
-        // Act: change an answer without acknowledging
-        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken));
+        // Act: sam disagrees and hands the ballot in without acknowledging
+        var sam = SignedReviewWorld.ActorOf("sam");
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", sam, cancellationToken);
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SubmitBallotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken));
 
         // Assert: slot 1 (Alex) and slot 3 (Tess), with the slot identities, in the message and in the payload
         Assert.Equal(
@@ -165,19 +195,22 @@ public class ChecklistServiceTests
     [Fact]
     public async Task ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots()
     {
-        // Arrange: slots 1 and 2 signed
+        // Arrange: slots 1 and 2 signed, and tess disagrees in her draft
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await SignedReviewWorld.CreateAsync();
         await world.SignAsync(1);
         await world.SignAsync(2);
+        var tess = SignedReviewWorld.ActorOf("tess");
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", tess, cancellationToken);
 
-        // Act: acknowledge slot 1 only, and then only the unsigned slot 3
-        var partial = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken, [world.Slots[0].Id]));
-        var wrongSlot = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken, [world.Slots[2].Id]));
+        // Act: hand in acknowledging slot 1 only, and then only the unsigned slot 3
+        var partial = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SubmitBallotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, tess, cancellationToken, [world.Slots[0].Id]));
+        var wrongSlot = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SubmitBallotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, tess, cancellationToken, [world.Slots[2].Id]));
 
-        // Assert: only slot 2 remains in the first refusal, both remain in the second, and nothing was written
+        // Assert: only slot 2 remains in the first refusal, both remain in the second, and nothing was handed in
         Assert.Equal([2], partial.AffectedSlots.Select(s => s.SlotNumber));
         Assert.Equal([1, 2], wrongSlot.AffectedSlots.Select(s => s.SlotNumber));
         var state = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!;
@@ -186,23 +219,26 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that a change acknowledging every current signature is stored and leaves those signatures out of date.
+    ///     Test that a hand-in acknowledging every current signature is stored and leaves those signatures out of date.
     /// </summary>
     [Fact]
     public async Task ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate()
     {
-        // Arrange: slots 1 and 2 signed
+        // Arrange: slots 1 and 2 signed, and tess disagrees in her draft
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await SignedReviewWorld.CreateAsync();
         await world.SignAsync(1);
         await world.SignAsync(2);
-
-        // Act: change the answer acknowledging both
+        var tess = SignedReviewWorld.ActorOf("tess");
         await world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken, await world.SignedSlotIdsAsync());
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", tess, cancellationToken);
+
+        // Act: hand the ballot in acknowledging both
+        await world.Checklists.SubmitBallotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, tess, cancellationToken, await world.SignedSlotIdsAsync());
 
         // Assert: stored, and both signatures are kept but out of date
-        var state = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!;
+        var state = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken, "tess"))!;
         Assert.Equal(ChecklistOutcome.Fail, state.AnswerFor(SignedReviewWorld.FirstItemId)!.Outcome);
         var approval = await world.ApprovalAsync();
         Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots[0].State);
@@ -211,8 +247,9 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that marking a section as not applicable is refused while a signature is current, is stored once
-    ///     acknowledged, and that marking a section applicable when it has no stored state changes nothing.
+    ///     Test that marking a section as not applicable is a draft change that needs no acknowledgement, that handing
+    ///     the ballot in is refused while a signature is current, is stored once acknowledged, and that marking a
+    ///     section applicable when it has no stored state changes nothing.
     /// </summary>
     [Fact]
     public async Task ChecklistService_SetSectionApplicabilityAsync_Signed_NeedsAcknowledgement()
@@ -222,21 +259,24 @@ public class ChecklistServiceTests
         var world = await SignedReviewWorld.CreateAsync();
         await world.SignAsync(1);
         var sectionId = DefaultChecklist.Current.Sections[0].Id;
+        var sam = SignedReviewWorld.ActorOf("sam");
 
-        // Act: mark the section applicable (already is), not applicable without acknowledging, then acknowledged
+        // Act: sam marks the section applicable (already is), then not applicable; he hands in without acknowledging,
+        // then acknowledged
         await world.Checklists.SetSectionApplicabilityAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, true, null, TestActors.Ann, cancellationToken);
-        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetSectionApplicabilityAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, false, "Not relevant.", TestActors.Ann, cancellationToken));
+            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, true, null, sam, cancellationToken);
+        await world.Checklists.SetSectionApplicabilityAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, false, "Not relevant.", sam, cancellationToken);
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SubmitBallotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken));
         var untouched = (await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.IsApplicable(sectionId);
-        await world.Checklists.SetSectionApplicabilityAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, sectionId, false, "Not relevant.", TestActors.Ann, cancellationToken, await world.SignedSlotIdsAsync());
+        await world.Checklists.SubmitBallotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken, await world.SignedSlotIdsAsync());
 
-        // Assert: refused naming slot 1 and storing nothing, then stored and the signature is out of date
+        // Assert: refused naming slot 1 and handing nothing in, then stored and the signature is out of date
         Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
         Assert.Equal(1, Assert.Single(ex.AffectedSlots).SlotNumber);
         Assert.True(untouched);
-        Assert.False((await world.Checklists.GetAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.IsApplicable(sectionId));
         Assert.Equal(SlotSignatureState.OutOfDate, (await world.ApprovalAsync()).Slots[0].State);
     }
 
@@ -255,7 +295,7 @@ public class ChecklistServiceTests
 
         // Act: change an answer without acknowledging
         var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Checklists.SetAnswerAsync(
-            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", TestActors.Ann, cancellationToken));
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", SignedReviewWorld.ActorOf("rita"), cancellationToken));
 
         // Assert: refused as locked, with no slots listed
         Assert.Equal(DomainRule.ReviewLocked, ex.Rule);
@@ -636,14 +676,14 @@ public class ChecklistServiceTests
 
         // Act: answer it again as failed, with padding around the justification
         await service.SetAnswerAsync(
-            projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "  Not traceable  ", TestActors.Bob, TestContext.Current.CancellationToken);
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "  Not traceable  ", TestActors.Ann, TestContext.Current.CancellationToken);
         var state = await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
         // Assert: only the new answer counts
         var answer = state!.AnswerFor("REQ-01")!;
         Assert.Equal(ChecklistOutcome.Fail, answer.Outcome);
         Assert.Equal("Not traceable", answer.Justification);
-        Assert.Equal("Bob", answer.AnsweredBy);
+        Assert.Equal("Ann", answer.AnsweredBy);
         Assert.Equal(1, state.Overall.Answered);
     }
 
@@ -704,19 +744,19 @@ public class ChecklistServiceTests
         var (_, service, projectId) = await CreateAsync();
         var sectionId = DefaultChecklist.Current.Sections[0].Id;
 
-        // Act: the author (also with another case) answers and sets a section; bob answers
+        // Act: the author (also with another case) answers and sets a section; ann, who holds the slot, answers
         var answer = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetAnswerAsync(
             projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Author, cancellationToken));
         var section = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetSectionApplicabilityAsync(
             projectId, "rev-1", sectionId, false, "Reason", new Actor("AUTHOR", "Author"), cancellationToken));
-        await service.SetAnswerAsync(projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Bob, cancellationToken);
+        await service.SetAnswerAsync(projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
 
-        // Assert: both refused with the rule and the switch named; only bob's answer is stored
+        // Assert: both refused with the rule and the switch named; only ann's answer is stored
         Assert.Equal(DomainRule.AuthorCannotAnswer, answer.Rule);
         Assert.Equal(DomainRule.AuthorCannotAnswer, section.Rule);
         Assert.Contains("Authors cannot answer the checklist of their own review", answer.Message, StringComparison.Ordinal);
         var state = (await service.GetAsync(projectId, "rev-1", cancellationToken))!;
-        Assert.Equal("Bob", state.AnswerFor("REQ-01")!.AnsweredBy);
+        Assert.Equal("Ann", state.AnswerFor("REQ-01")!.AnsweredBy);
         Assert.Equal(1, state.Overall.Answered);
         Assert.True(state.IsApplicable(sectionId));
     }
@@ -727,9 +767,9 @@ public class ChecklistServiceTests
     [Fact]
     public async Task ChecklistService_Answer_AuthorWhileRuleIsOff_Stores()
     {
-        // Arrange: the rule is switched off
+        // Arrange: the rule is switched off, and the author holds the one slot
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (store, service, projectId) = await CreateAsync();
+        var (store, service, projectId) = await CreateAsync("author");
         await TestServices.Projects(store, new FixedTimeProvider(_now)).SetReviewRuleOffAsync(
             projectId, ReviewRule.NonAuthorChecklistAnswers, cancellationToken);
 
@@ -749,7 +789,7 @@ public class ChecklistServiceTests
     {
         // Arrange: an approved review created by the user "author"
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (store, service, projectId) = await CreateAsync();
+        var (store, service, projectId) = await CreateAsync(null);
         await AuditTestExtensions.ApproveReviewAsync(store, new FixedTimeProvider(_now), projectId, "rev-1", "approver", cancellationToken);
 
         // Act

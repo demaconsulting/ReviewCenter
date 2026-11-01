@@ -299,8 +299,13 @@ public class ReviewStoreSnapshotBatchTests
             "checklist=" + (record.Checklist is null ? "-" : record.Checklist.Version + "/" + record.Checklist.Definition.Length),
             "source=" + string.Join('|', record.Source.RepositoryId, record.Source.BaselineSha, record.Source.HeadSha, record.Source.Selection, record.Source.ReviewSetId),
             "changes=" + string.Join(';', record.Source.Changes.Select(c => $"{c.Path}:{c.Kind}:{c.BaselineSha256}:{c.HeadSha256}")),
-            "sections=" + string.Join(';', record.SectionStates.OrderBy(s => s.SectionId).Select(s => $"{s.SectionId}:{s.Applicable}:{s.Reason}")),
-            "answers=" + string.Join(';', record.Answers.OrderBy(a => a.ItemId).Select(a => $"{a.ItemId}:{a.Outcome}:{a.Justification}")),
+            "ballots=" + string.Join(
+                ';',
+                record.Ballots.OrderBy(b => b.SlotId).Select(b =>
+                    $"{b.SlotId}:{b.Status}:"
+                    + string.Join(',', b.Answers.OrderBy(a => a.ItemId).Select(a => $"{a.ItemId}:{a.Outcome}:{a.Justification}"))
+                    + ":"
+                    + string.Join(',', b.SectionStates.OrderBy(s => s.SectionId).Select(s => $"{s.SectionId}:{s.Applicable}:{s.Reason}")))),
             "threads=" + string.Join(
                 ';',
                 record.Threads.Select(t => $"{t.Id}:{t.State}:{t.FilePath}:[{string.Join(',', t.Comments.Select(c => c.Id + "=" + c.Text))}]")),
@@ -349,13 +354,16 @@ public class ReviewStoreSnapshotBatchTests
             thread.Id,
             new ReviewComment { Author = "Bob", AuthorUsername = "bob", Text = "Second", Created = _time },
             cancellationToken);
+        var busySlot = await AddSlotAsync(db, projectId, "REV-BUSY");
+        var otherBusySlot = await AddSlotAsync(db, projectId, "REV-BUSY");
         foreach (var itemId in new[] { "REQ-02", "REQ-01" })
         {
-            await db.Store.SetChecklistAnswerAsync(
+            await db.Store.SetBallotAnswerAsync(
                 new ChecklistAnswer
                 {
                     ProjectId = projectId,
                     ReviewId = "REV-BUSY",
+                    SlotId = busySlot,
                     ItemId = itemId,
                     Outcome = ChecklistOutcome.Fail,
                     Justification = "Bad " + itemId,
@@ -366,11 +374,12 @@ public class ReviewStoreSnapshotBatchTests
                 cancellationToken);
         }
 
-        await db.Store.SetChecklistSectionStateAsync(
+        await db.Store.SetBallotSectionStateAsync(
             new ChecklistSectionState
             {
                 ProjectId = projectId,
                 ReviewId = "REV-BUSY",
+                SlotId = busySlot,
                 SectionId = "DES",
                 Applicable = false,
                 Reason = "None",
@@ -379,8 +388,19 @@ public class ReviewStoreSnapshotBatchTests
                 SetAt = _time
             },
             cancellationToken);
-        await AddSlotAsync(db, projectId, "REV-BUSY");
-        await AddSlotAsync(db, projectId, "REV-BUSY");
+        await db.Store.SetBallotAnswerAsync(
+            new ChecklistAnswer
+            {
+                ProjectId = projectId,
+                ReviewId = "REV-BUSY",
+                SlotId = otherBusySlot,
+                ItemId = "REQ-01",
+                Outcome = ChecklistOutcome.Pass,
+                AnsweredBy = "Bob",
+                AnsweredByUsername = "bob",
+                AnsweredAt = _time
+            },
+            cancellationToken);
 
         await AddReviewAsync(db, projectId, "REV-EMPTY");
         await AddRepositoryReviewAsync(db, projectId, "REV-REPO");
@@ -409,8 +429,8 @@ public class ReviewStoreSnapshotBatchTests
         Assert.Single(batch["REV-STALE"].Signatures);
         Assert.Equal(2, batch["REV-BUSY"].Record.Threads.Count);
         Assert.Equal(["First", "Second"], batch["REV-BUSY"].Record.Threads[0].Comments.Select(c => c.Text));
-        Assert.Equal(2, batch["REV-BUSY"].Record.Answers.Count);
-        Assert.Single(batch["REV-BUSY"].Record.SectionStates);
+        Assert.Equal([2, 1], batch["REV-BUSY"].Record.Ballots.OrderBy(b => b.SlotId).Select(b => b.Answers.Count));
+        Assert.Single(batch["REV-BUSY"].Record.Ballots.Single(b => b.SlotId == busySlot).SectionStates);
         Assert.NotNull(batch["REV-BUSY"].Record.Checklist);
         Assert.Equal(2, batch["REV-BUSY"].Slots.Count);
         Assert.Empty(batch["REV-EMPTY"].Slots);

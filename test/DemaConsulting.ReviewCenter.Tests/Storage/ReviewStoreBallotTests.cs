@@ -32,7 +32,8 @@ namespace DemaConsulting.ReviewCenter.Tests.Storage;
 ///     entries of a change of the status, and what adding, reassigning and removing a slot does to a ballot.
 /// </summary>
 /// <remarks>
-///     The ballots are dormant in this change: the review-level rows of the record, and so the digest, never see them.
+///     The ballots are part of the record: the digest covers the consolidation of the submitted ones only, so a draft
+///     never changes it.
 /// </remarks>
 public class ReviewStoreBallotTests
 {
@@ -53,11 +54,18 @@ public class ReviewStoreBallotTests
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="follows">The followed review, or <c>null</c>.</param>
     /// <param name="carry">The carried rows, or <c>null</c>.</param>
+    /// <param name="checklist">The checklist of the review, or <c>null</c> for none.</param>
     /// <returns>The review, ready to add.</returns>
-    private static Review NewReview(int projectId, string reviewId, string? follows = null, ReviewCarryOver? carry = null)
+    private static Review NewReview(
+        int projectId,
+        string reviewId,
+        string? follows = null,
+        ReviewCarryOver? carry = null,
+        ReviewChecklist? checklist = null)
     {
         return new Review
         {
+            Checklist = checklist,
             ProjectId = projectId,
             Id = reviewId,
             Title = "Title",
@@ -267,6 +275,33 @@ public class ReviewStoreBallotTests
     }
 
     /// <summary>
+    ///     Writes a review-level (baseline) answer straight into the database: since the ballots exist, only the
+    ///     creation of a follow-up review writes such rows, so a test that needs one next to a ballot adds it here.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="answer">The answer, with the baseline slot identity.</param>
+    /// <returns>A task that completes when the row is stored.</returns>
+    private static async Task AddBaselineAnswerAsync(TestStore db, ChecklistAnswer answer)
+    {
+        await using var context = await db.Factory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        context.ChecklistAnswers.Add(answer);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Writes a review-level (baseline) section state straight into the database.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="state">The section state, with the baseline slot identity.</param>
+    /// <returns>A task that completes when the row is stored.</returns>
+    private static async Task AddBaselineSectionAsync(TestStore db, ChecklistSectionState state)
+    {
+        await using var context = await db.Factory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        context.ChecklistSectionStates.Add(state);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
     ///     Stores an answer in the ballot of a slot without an automatic hand-in.
     /// </summary>
     /// <param name="db">The database.</param>
@@ -408,8 +443,7 @@ public class ReviewStoreBallotTests
     }
 
     /// <summary>
-    ///     Test that the review-level identity 0 is not a slot: the ballot methods refuse it, and the review-level
-    ///     methods refuse the identity of a slot.
+    ///     Test that the review-level identity 0 is not a slot: the ballot methods refuse it.
     /// </summary>
     [Fact]
     public async Task ReviewStore_SetBallotAnswerAsync_BaselineSlotId_IsRefused()
@@ -427,8 +461,7 @@ public class ReviewStoreBallotTests
             NewSection(projectId, ChecklistAnswer.BaselineSlotId), Draft(projectId), null, cancellationToken));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => SubmitAsync(db, projectId, ChecklistAnswer.BaselineSlotId));
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, slotId), cancellationToken));
+        Assert.NotEqual(ChecklistAnswer.BaselineSlotId, slotId);
         Assert.Empty(await db.Store.ListBallotsAsync(projectId, "REV-1", cancellationToken));
     }
 
@@ -766,6 +799,58 @@ public class ReviewStoreBallotTests
     }
 
     /// <summary>
+    ///     Test that the store refuses a signature while the signer's own ballot is a draft, inside the write
+    ///     transaction, and accepts it once the ballot is handed in, because the digest covers only submitted ballots
+    ///     and cannot see the difference.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddSignatureAsync_OwnBallotDraft_ThrowsBallotNotSubmitted()
+    {
+        // Arrange: a review with a checklist, one slot and a draft ballot of that slot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var project = await db.Store.AddProjectAsync(new Project { Name = "P", Created = _time }, cancellationToken);
+        var checklist = new ReviewChecklist
+        {
+            ProjectId = project.Id,
+            ReviewId = "REV-1",
+            Version = DefaultChecklist.Version,
+            Definition = DefaultChecklist.Current.ToJson()
+        };
+        await db.Store.AddReviewAsync(NewReview(project.Id, "REV-1", checklist: checklist), cancellationToken);
+        var slotId = await AddSlotAsync(db, project.Id);
+        await SetAsync(db, NewAnswer(project.Id, slotId));
+
+        ReviewSignature SignatureOf(ReviewRecord record) => new()
+        {
+            ProjectId = project.Id,
+            ReviewId = "REV-1",
+            SlotId = slotId,
+            UserId = 1,
+            DisplayName = "Ann",
+            Role = SlotRole.Primary,
+            SignedAt = _time,
+            RecordDigest = RecordDigest.Compute(record),
+            Meaning = SigningService.MeaningText
+        };
+
+        var draftRecord = await db.Store.GetRecordAsync(project.Id, "REV-1", cancellationToken);
+
+        // Act: sign with the draft, then hand the ballot in and sign again
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => db.Store.AddSignatureAsync(SignatureOf(draftRecord!), cancellationToken));
+        var storedAfterRefusal = await db.Store.ListSignaturesAsync(project.Id, "REV-1", cancellationToken);
+        await SubmitAsync(db, project.Id, slotId);
+        var submittedRecord = await db.Store.GetRecordAsync(project.Id, "REV-1", cancellationToken);
+        var stored = await db.Store.AddSignatureAsync(SignatureOf(submittedRecord!), cancellationToken);
+
+        // Assert
+        Assert.Equal(DomainRule.BallotNotSubmitted, refused.Rule);
+        Assert.Empty(storedAfterRefusal);
+        Assert.Equal(slotId, stored.SlotId);
+    }
+
+    /// <summary>
     ///     Test that a slot that has no ballot yet reads as no ballot at all, and so does a slot that does not exist.
     /// </summary>
     [Fact]
@@ -799,9 +884,8 @@ public class ReviewStoreBallotTests
         var projectId = await AddReviewAsync(db);
         var slotId = await AddSlotAsync(db, projectId);
         await AddSlotAsync(db, projectId, 2);
-        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, ChecklistAnswer.BaselineSlotId), cancellationToken);
-        await db.Store.SetChecklistSectionStateAsync(
-            NewSection(projectId, ChecklistAnswer.BaselineSlotId, "other"), cancellationToken);
+        await AddBaselineAnswerAsync(db, NewAnswer(projectId, ChecklistAnswer.BaselineSlotId));
+        await AddBaselineSectionAsync(db, NewSection(projectId, ChecklistAnswer.BaselineSlotId, "other"));
         await SetAsync(db, NewAnswer(projectId, slotId, outcome: ChecklistOutcome.Fail));
         await db.Store.SetBallotSectionStateAsync(NewSection(projectId, slotId), Draft(projectId), null, cancellationToken);
 
@@ -819,21 +903,20 @@ public class ReviewStoreBallotTests
     }
 
     /// <summary>
-    ///     Test that ballot rows and ballot statuses change neither the record nor its digest, which still hold the
-    ///     review-level rows only.
+    ///     Test that ballot rows and ballot statuses are not part of the review-level rows, and that a handed-in ballot
+    ///     is in the record the digest is computed from.
     /// </summary>
     [Fact]
-    public async Task ReviewStore_GetRecordAsync_BallotRows_DoNotChangeTheRecordOrItsDigest()
+    public async Task ReviewStore_GetRecordAsync_BallotRows_AreInTheRecordAsBallots()
     {
-        // Arrange: a review-level row, then the digest
+        // Arrange: a review-level row, then the record
         var cancellationToken = TestContext.Current.CancellationToken;
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
         var slotId = await AddSlotAsync(db, projectId);
         await AddSlotAsync(db, projectId, 2);
-        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, ChecklistAnswer.BaselineSlotId), cancellationToken);
+        await AddBaselineAnswerAsync(db, NewAnswer(projectId, ChecklistAnswer.BaselineSlotId));
         var before = await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken);
-        var digest = RecordDigest.Compute(before!);
 
         // Act: edits and a hand-in of a ballot
         await SetAsync(db, NewAnswer(projectId, slotId, "REQ-02", ChecklistOutcome.Fail));
@@ -842,11 +925,13 @@ public class ReviewStoreBallotTests
         var after = await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken);
         var snapshot = await db.Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken);
 
-        // Assert
-        Assert.Equal(digest, RecordDigest.Compute(after!));
-        Assert.Equal("REQ-01", Assert.Single(after!.Answers).ItemId);
-        Assert.Empty(after.SectionStates);
-        Assert.Equal(digest, RecordDigest.Compute(snapshot!.Record));
+        // Assert: the review-level row is in no ballot, and the handed-in ballot is in the record and in the snapshot
+        Assert.Empty(before!.Ballots);
+        var ballot = Assert.Single(after!.Ballots);
+        Assert.Equal((slotId, BallotStatus.Submitted), (ballot.SlotId, ballot.Status));
+        Assert.Equal("REQ-02", Assert.Single(ballot.Answers).ItemId);
+        Assert.Single(ballot.SectionStates);
+        Assert.Equal(RecordDigest.Compute(after), RecordDigest.Compute(snapshot!.Record));
     }
 
     /// <summary>
@@ -888,7 +973,7 @@ public class ReviewStoreBallotTests
         var cancellationToken = TestContext.Current.CancellationToken;
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
-        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, ChecklistAnswer.BaselineSlotId), cancellationToken);
+        await AddBaselineAnswerAsync(db, NewAnswer(projectId, ChecklistAnswer.BaselineSlotId));
 
         // Act: the review-level row is not carried, so it seeds nothing
         var slotId = await AddSlotAsync(db, projectId);

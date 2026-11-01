@@ -77,15 +77,15 @@ sections:
       - id: ReviewCenter-DbContext-Checklist
         title: >-
           The ReviewCenterDbContext class shall map the checklist snapshot, the section states, and the check
-          answers to tables in which a review has at most one state per section and one answer per check, and
-          in which the rows belong to the review, so that the database refuses a second row for the same
-          section or check.
+          answers to tables in which a reviewer slot of a review has at most one state per section and one answer
+          per check, and in which the rows belong to the review, so that the database refuses a second row for the
+          same slot and section or check.
         justification: |
-          A check has one current answer. Having the database enforce that keeps the record consistent even when
-          two requests overlap.
+          A check has one current answer in each ballot. Having the database enforce that keeps the record consistent
+          even when two requests overlap.
         tests:
-          - ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem
-          - ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection
+          - ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem
+          - ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection
 
       - id: ReviewCenter-DbContext-Users
         title: >-

@@ -98,14 +98,14 @@ sections:
       - id: ReviewCenter-ChecklistService-Answer
         title: >-
           The ChecklistService class shall record the answer Pass, Fail, or N/A to a check of a review's
-          checklist, replacing an earlier answer to the same check, shall require a justification for Fail and
-          N/A, shall accept a justification of at most 2000 characters stored trimmed (none stored for an empty
-          one on a Pass), and shall reject a check that is not in the checklist and a review that has no
-          checklist, storing nothing on a violation.
+          checklist in the ballot of the reviewer slot of the actor, replacing an earlier answer of that slot to
+          the same check, shall require a justification for Fail and N/A, shall accept a justification of at most
+          2000 characters stored trimmed (none stored for an empty one on a Pass), and shall reject a check that
+          is not in the checklist and a review that has no checklist, storing nothing on a violation.
         justification: |
           A failed or not-applicable check is only useful to the next reader when it says why. A pass needs no
-          explanation. Replacing the answer lets a reviewer correct a mistake without leaving two answers to one
-          question.
+          explanation. Replacing the answer lets a reviewer correct a mistake without leaving two answers of one
+          reviewer to one question, while each reviewer keeps an answer of their own.
         tests:
           - ChecklistService_SetAnswer_PassWithoutJustification_Stores
           - ChecklistService_SetAnswer_FailOrNotApplicableWithoutJustification_Throws
@@ -118,25 +118,31 @@ sections:
         title: >-
           The ChecklistService class shall take the person of each answer and of each change of section
           applicability as the signed-in actor (user name and display name), reject a missing actor, and store
-          both names with the UTC time of the change.
+          both names with the UTC time of the change in the ballot of the slot of the actor, without making the
+          answerer part of the record digest.
         justification: |
           Every answer must be attributable and dated. The person is the signed-in user, who needs no check, and
-          storing the user name keeps the person identifiable if the display name changes later.
+          storing the user name keeps the person identifiable if the display name changes later. The answerer is
+          kept with the ballot row for the history; the digest covers the agreed standing, so another reviewer
+          giving the same answer does not change what a signature approves.
         tests:
           - ChecklistService_SetAnswer_NullActor_Throws
           - ChecklistService_SetAnswer_StoresActorAndUtcTime
 
       - id: ReviewCenter-ChecklistService-Progress
         title: >-
-          The ChecklistService class shall derive from a review's checklist the number of answered and total
-          checks per section and overall, counting a failed check as answered, leaving out the checks of a
-          section that does not apply (such a section counts as done) and any answers kept for it, shall report
-          the checklist complete when every check of every applicable section is answered, and shall give the
-          first section with unanswered checks and the first unanswered check.
+          The ChecklistService class shall derive from the checklist state of a review, the consolidated standing of
+          its submitted ballots or the ballot of one reviewer slot, the number of answered and total checks per
+          section and overall, counting a failed check as answered, leaving out the checks of a section that does
+          not apply (such a section counts as done) and any answers kept for it, shall report the checklist
+          complete when every check of every applicable section is answered, shall give the first section with
+          unanswered checks and the first unanswered check, and shall count the draft answers of the only slot of
+          a review in the progress of the consolidated standing.
         justification: |
           Reviewers need to see what is left to do without counting. One set of rules in one place keeps every
           page showing the same numbers, and the first unanswered check lets a page lead the reviewer to the
-          next piece of work.
+          next piece of work. A review with one slot has nobody to agree with and no separate hand-in step, so
+          its partly answered checklist shows its true progress.
         tests:
           - ChecklistState_Progress_CountsAnsweredPerSectionAndOverall
           - ChecklistState_Progress_NotApplicableSection_CountsAsDoneAndLeavesTotal
@@ -145,6 +151,7 @@ sections:
           - ChecklistState_Progress_AllSectionsNotApplicable_IsComplete
           - ChecklistState_NextUnansweredItemId_SkipsAnsweredAndNotApplicableSections
           - ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered
+          - BallotProjection_Consolidate_SingleSlotDraft_CountsOnlyWithTheSlotCount
 
       - id: ReviewCenter-ChecklistService-Audit
         title: >-
@@ -172,9 +179,9 @@ sections:
 
       - id: ReviewCenter-ChecklistService-ApprovalLock
         title: >-
-          The ChecklistService class shall refuse to answer a check and to change the applicability of a section in a
-          review that is approved and therefore locked, with the ReviewLocked rule, after the access check and before
-          anything is stored.
+          The ChecklistService class shall refuse to answer a check, to change the applicability of a section and to
+          hand in a ballot in a review that is approved and therefore locked, with the ReviewLocked rule, after the
+          access check and before anything is stored.
         justification: |
           The answers are part of what a signature approves. Changing one after the approval would make the approval
           describe a record that no longer exists, so the service refuses until an administrator reopens the review.
@@ -203,20 +210,24 @@ sections:
 
       - id: ReviewCenter-ChecklistService-SignatureImpact
         title: >-
-          The ChecklistService class shall refuse to answer a check and to change the applicability of a section when
-          the change would make a current signature out of date and the caller has not acknowledged the affected
-          slots, with the SignaturesWouldBecomeOutOfDate rule that names each affected slot number and signer, before
-          anything is stored, shall let a change that does not alter the record, or a review without a current
-          signature, pass without acknowledgement, shall refuse again only for the slots that remain
-          unacknowledged, and shall report a locked review with the ReviewLocked rule first. The exception shall keep
-          its own copy of the affected slots.
+          The ChecklistService class shall refuse to hand in the ballot of a reviewer slot (and, in a review with one
+          slot, the answer or section change that completes and thereby hands in the ballot) when the hand-in would
+          change the record digest and make a current signature of another slot out of date and the caller has not
+          acknowledged the affected slots, with the SignaturesWouldBecomeOutOfDate rule that names each affected slot
+          number and signer, before anything is stored, shall never require the acknowledgement of the signature of
+          the own slot of the reviewer, shall let a change that does not alter the digest, such as a draft edit or a
+          ballot that agrees with the others, or a review without a current signature, pass without acknowledgement,
+          shall refuse again only for the slots that remain unacknowledged, and shall report a locked review with the
+          ReviewLocked rule first. The exception shall keep its own copy of the affected slots.
         justification: |
-          The answers are part of what a signature approves. A change after the signing silently withdraws the
-          signature, so the service tells the caller which signatures would be lost and refuses until the caller
-          confirms. Saving the same answer again by the same person changes nothing, so it needs no confirmation.
+          The agreed standing of the ballots is what a signature approves. Handing in a ballot that changes that
+          standing silently withdraws the signatures of the other reviewers, so the service tells the caller which
+          signatures would be lost and refuses until the caller confirms. A draft, or a ballot that agrees with the
+          others, changes nothing, so it needs no confirmation, and a reviewer who changes the own ballot knows that
+          the own signature goes out of date.
         tests:
           - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
-          - ChecklistService_SetAnswerAsync_SameValueByOtherPerson_ThrowsAndStoresNothing
+          - ChecklistService_SetAnswerAsync_SameValueByOtherSlot_KeepsTheSignature
           - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
           - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
           - ChecklistService_SetAnswerAsync_FullAcknowledgement_StoresAndSignatureOutOfDate
@@ -227,10 +238,10 @@ sections:
       - id: ReviewCenter-ChecklistService-CarriedMarking
         title: >-
           The ChecklistService class shall store an answer, and the applicability of a section, that a person gives or
-          changes in a review that carries answers from an earlier review without the mark of the earlier review, so
-          that an answer carried over and then answered again, or a not-applicable section carried over and then set
-          again, belongs to the review and to the person who gave it, and shall count a carried answer as answered
-          for the progress of the checklist.
+          changes in the ballot of the own slot of a review that carries answers from an earlier review without the
+          mark of the earlier review, so that an answer carried into the ballot and then answered again, or a
+          not-applicable section carried into the ballot and then set again, belongs to the review and to the person
+          who gave it, and shall count a carried answer as answered for the progress of the checklist.
         justification: |
           The mark says that nobody in this review has looked at the answer yet. Once a person answers again, the
           answer is theirs, and keeping the mark would claim that it was taken over. A carried answer was given by a
@@ -238,6 +249,96 @@ sections:
         tests:
           - ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker
           - ReviewService_CreateDraftAsync_FollowUp_CarriedAnswersCountAsAnswered
+
+      - id: ReviewCenter-ChecklistService-BallotSlot
+        title: >-
+          The ChecklistService class shall require, for answering a check, changing the applicability of a section and
+          handing in a ballot, that the actor is the primary or the alternate reviewer of a slot of the review,
+          refusing any other actor with the NoReviewerSlot rule, storing nothing, and shall put the change into the
+          ballot of that slot and into no other.
+        justification: |
+          Each reviewer answers the checklist on their own, so that the reviewers can agree or disagree. An answer
+          needs the slot that owns it, and a person without a slot has no ballot to answer on.
+        tests:
+          - ChecklistService_SetAnswerAsync_ActorWithoutSlot_ThrowsNoReviewerSlot
+          - ChecklistService_SubmitBallotAsync_ActorWithoutSlot_ThrowsNoReviewerSlot
+
+      - id: ReviewCenter-ChecklistService-BallotSubmit
+        title: >-
+          The ChecklistService class shall keep the ballot of a slot of a review with more than one slot a draft until
+          its reviewer hands it in with SubmitBallotAsync, shall refuse to hand in a ballot in which a check of an
+          applicable section has no answer with the BallotIncomplete rule and store nothing, and shall treat handing
+          in a ballot that is submitted already as no change.
+        justification: |
+          Another reviewer must not see, or be bound by, an answer that its reviewer has not finished. The hand-in is
+          the moment the ballot counts in the record, so it needs a complete ballot, and repeating it must be safe.
+        tests:
+          - ChecklistService_SubmitBallotAsync_TwoSlots_StaysDraftUntilSubmit
+          - ChecklistService_SubmitBallotAsync_Incomplete_ThrowsBallotIncomplete
+
+      - id: ReviewCenter-ChecklistService-SingleSlotAutoSubmit
+        title: >-
+          The ChecklistService class shall hand in the ballot of the only slot of a review with the answer or the
+          section change that completes it, and shall keep it a draft until then, so that a review with one reviewer
+          needs no separate hand-in step.
+        justification: |
+          With one reviewer there is nobody to agree with and nobody to hide a draft from, so answering stays as
+          simple as it was before each reviewer had a ballot.
+        tests:
+          - ChecklistService_SetAnswerAsync_SingleSlotComplete_AutoSubmits
+
+      - id: ReviewCenter-ChecklistService-OwnBallotView
+        title: >-
+          The ChecklistService class shall give a viewer who holds a slot of a review the own ballot, drafts
+          included, and never the draft of another slot, and shall give every other viewer the consolidated standing
+          of the submitted ballots, marked as without a slot when a viewer is given and holds none.
+        justification: |
+          A reviewer needs to see and continue the own work, while an unfinished ballot of somebody else must stay
+          private until it is handed in. Everybody else reads the agreed standing, which is what the record covers.
+        tests:
+          - ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly
+          - ChecklistService_GetAsync_NoSlot_Consolidated
+
+      - id: ReviewCenter-ChecklistService-BallotImpact
+        title: >-
+          The ChecklistService class shall, when a ballot is handed in, compare the record digest after the hand-in
+          with the digest now, shall refuse with the SignaturesWouldBecomeOutOfDate rule when the digest would change
+          and a current signature of another slot is not acknowledged in the acknowledgedSlotIds argument, shall let a
+          hand-in that leaves the digest as it is pass without a warning, and shall not ask a reviewer to acknowledge
+          the signature of the own slot.
+        justification: |
+          A ballot that changes the agreed standing withdraws the signatures of the other reviewers, so they are named
+          before the ballot counts. A ballot that agrees with the others changes nothing. A reviewer who changes the
+          own ballot knows that the own signature goes out of date.
+        tests:
+          - ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots
+          - ChecklistService_SubmitBallotAsync_AgreeingSubmit_NoWarning
+          - ChecklistService_SubmitBallotAsync_SignedOwnSlot_NoSelfAcknowledgement
+
+      - id: ReviewCenter-ChecklistService-ReopenerBallot
+        title: >-
+          The ChecklistService class shall let the person who reopened a review, while the project requires that the
+          person who reopened a review does not sign it again, answer a check, change the applicability of a section
+          and hand in the ballot of the own slot like any other reviewer, so that the person is barred from signing
+          only (with the ReopenerCannotSign rule of the SigningService) and not from the ballot.
+        justification: |
+          The rule keeps the person who reopened a review from approving it alone. It does not say that the person may
+          not review. A reopener who holds a slot has to be able to correct and hand in the own ballot, or the review
+          could not be completed by the slot.
+        tests:
+          - ChecklistService_Ballot_ReopenerWhileRuleIsOn_EditsAndSubmitsButCannotSign
+
+      - id: ReviewCenter-ChecklistService-BallotAccess
+        title: >-
+          The ChecklistService class shall refuse an actor who may only read the project, such as an auditor, with the
+          ActorNotAllowed rule when the actor answers a check, changes the applicability of a section or hands in a
+          ballot, also when the actor still holds a slot of the review, before the slot of the actor is looked up (so
+          that the NoReviewerSlot rule is not the reason) and storing nothing.
+        justification: |
+          An auditor reads the record and never changes it. A person who was a reviewer and became an auditor can still
+          hold a slot, so the role, not the slot, decides, and the refusal names the role.
+        tests:
+          - ChecklistService_BallotWrites_AuditorHoldingSlot_ThrowsActorNotAllowed
 
       - id: ReviewCenter-ChecklistService-ReviewConclusionText
         title: >-

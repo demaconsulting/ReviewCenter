@@ -737,13 +737,15 @@ public class ReviewStoreTests
     /// <param name="itemId">The check identifier.</param>
     /// <param name="outcome">The outcome.</param>
     /// <param name="justification">The justification, if any.</param>
+    /// <param name="slotId">The slot whose ballot holds the answer.</param>
     /// <returns>The answer.</returns>
-    private static ChecklistAnswer NewAnswer(int projectId, string itemId, ChecklistOutcome outcome, string? justification)
+    private static ChecklistAnswer NewAnswer(int projectId, string itemId, ChecklistOutcome outcome, string? justification, int slotId)
     {
         return new ChecklistAnswer
         {
             ProjectId = projectId,
             ReviewId = "REV-1",
+            SlotId = slotId,
             ItemId = itemId,
             Outcome = outcome,
             Justification = justification,
@@ -751,6 +753,20 @@ public class ReviewStoreTests
             AnsweredByUsername = "ann",
             AnsweredAt = _created
         };
+    }
+
+    /// <summary>
+    ///     Adds a slot of the user 1 to a review.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The owning project.</param>
+    /// <param name="reviewId">The review id.</param>
+    /// <returns>The identity of the slot.</returns>
+    private static async Task<int> AddSlotAsync(TestStore db, int projectId, string reviewId = "REV-1")
+    {
+        var slot = await db.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = projectId, ReviewId = reviewId, PrimaryUserId = 1 }, TestContext.Current.CancellationToken);
+        return slot.Id;
     }
 
     /// <summary>
@@ -801,20 +817,21 @@ public class ReviewStoreTests
     }
 
     /// <summary>
-    ///     Test that answering a check again replaces the answer instead of adding a second row.
+    ///     Test that answering a check again in the ballot of a slot replaces the answer instead of adding a second row.
     /// </summary>
     [Fact]
-    public async Task ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem()
+    public async Task ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem()
     {
-        // Arrange: a review
+        // Arrange: a review with a slot
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
+        var slotId = await AddSlotAsync(db, projectId);
 
         // Act: answer a check, answer it again, and answer another one
-        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, "REQ-01", ChecklistOutcome.Pass, null), TestContext.Current.CancellationToken);
-        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, "REQ-01", ChecklistOutcome.Fail, "Broken"), TestContext.Current.CancellationToken);
-        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, "REQ-02", ChecklistOutcome.NotApplicable, "None"), TestContext.Current.CancellationToken);
-        var answers = await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        await db.Store.SetBallotAnswerAsync(NewAnswer(projectId, "REQ-01", ChecklistOutcome.Pass, null, slotId), TestContext.Current.CancellationToken);
+        await db.Store.SetBallotAnswerAsync(NewAnswer(projectId, "REQ-01", ChecklistOutcome.Fail, "Broken", slotId), TestContext.Current.CancellationToken);
+        await db.Store.SetBallotAnswerAsync(NewAnswer(projectId, "REQ-02", ChecklistOutcome.NotApplicable, "None", slotId), TestContext.Current.CancellationToken);
+        var answers = (await db.Store.GetBallotAsync(projectId, "REV-1", slotId, TestContext.Current.CancellationToken))!.Answers;
 
         // Assert: one row per check, the first one holding the latest answer
         Assert.Equal(2, answers.Count);
@@ -824,18 +841,21 @@ public class ReviewStoreTests
     }
 
     /// <summary>
-    ///     Test that setting the applicability of a section again replaces the state instead of adding a row.
+    ///     Test that setting the applicability of a section again in the ballot of a slot replaces the state instead of
+    ///     adding a row.
     /// </summary>
     [Fact]
-    public async Task ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection()
+    public async Task ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection()
     {
-        // Arrange: a review
+        // Arrange: a review with a slot
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
+        var slotId = await AddSlotAsync(db, projectId);
         ChecklistSectionState State(bool applicable, string? reason) => new()
         {
             ProjectId = projectId,
             ReviewId = "REV-1",
+            SlotId = slotId,
             SectionId = "DES",
             Applicable = applicable,
             Reason = reason,
@@ -845,10 +865,10 @@ public class ReviewStoreTests
         };
 
         // Act: mark the section as not applicable, then as applicable again
-        await db.Store.SetChecklistSectionStateAsync(State(false, "No design"), TestContext.Current.CancellationToken);
-        var notApplicable = await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
-        await db.Store.SetChecklistSectionStateAsync(State(true, null), TestContext.Current.CancellationToken);
-        var applicable = await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        await db.Store.SetBallotSectionStateAsync(State(false, "No design"), TestContext.Current.CancellationToken);
+        var notApplicable = (await db.Store.GetBallotAsync(projectId, "REV-1", slotId, TestContext.Current.CancellationToken))!.SectionStates;
+        await db.Store.SetBallotSectionStateAsync(State(true, null), TestContext.Current.CancellationToken);
+        var applicable = (await db.Store.GetBallotAsync(projectId, "REV-1", slotId, TestContext.Current.CancellationToken))!.SectionStates;
 
         // Assert: one row each time, holding the latest state
         Assert.Equal("No design", Assert.Single(notApplicable).Reason);
@@ -859,23 +879,25 @@ public class ReviewStoreTests
     }
 
     /// <summary>
-    ///     Test that the outcome and the times of checklist rows round-trip, and that rows are kept per review.
+    ///     Test that the outcome and the times of ballot rows round-trip, and that rows are kept per review.
     /// </summary>
     [Fact]
-    public async Task ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps()
+    public async Task ReviewStore_BallotRows_RoundTripOutcomeAndTimestamps()
     {
-        // Arrange: two reviews in one project
+        // Arrange: two reviews in one project, each with a slot
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
         await db.Store.AddReviewAsync(NewReview(projectId, "REV-2", ("a.txt", TestContent.A)), TestContext.Current.CancellationToken);
+        var slotId = await AddSlotAsync(db, projectId);
+        await AddSlotAsync(db, projectId, "REV-2");
 
         // Act: answer a check of the first review with a time that has an offset of zero
-        await db.Store.SetChecklistAnswerAsync(
-            NewAnswer(projectId, "REQ-01", ChecklistOutcome.NotApplicable, "Not relevant"), TestContext.Current.CancellationToken);
-        var first = await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
-        var second = await db.Store.ListChecklistAnswersAsync(projectId, "REV-2", TestContext.Current.CancellationToken);
+        await db.Store.SetBallotAnswerAsync(
+            NewAnswer(projectId, "REQ-01", ChecklistOutcome.NotApplicable, "Not relevant", slotId), TestContext.Current.CancellationToken);
+        var first = (await db.Store.GetBallotAsync(projectId, "REV-1", slotId, TestContext.Current.CancellationToken))!.Answers;
+        var second = await db.Store.ListBallotsAsync(projectId, "REV-2", TestContext.Current.CancellationToken);
 
-        // Assert: outcome, name and time survived, and the other review has no answers
+        // Assert: outcome, name and time survived, and the other review has no ballot
         var answer = Assert.Single(first);
         Assert.Equal(ChecklistOutcome.NotApplicable, answer.Outcome);
         Assert.Equal("Ann", answer.AnsweredBy);

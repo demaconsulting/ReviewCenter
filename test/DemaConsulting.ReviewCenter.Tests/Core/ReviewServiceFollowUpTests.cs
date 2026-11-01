@@ -118,7 +118,8 @@ public class ReviewServiceFollowUpTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var store = new FakeReviewStore();
         var clock = new MovableTimeProvider(_now);
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var ids = new Dictionary<string, int>();
         foreach (var (username, name) in new[] { ("ann", "Ann"), ("bob", "Bob"), ("cyd", "Cyd") })
         {
@@ -146,7 +147,7 @@ public class ReviewServiceFollowUpTests
             store,
             clock,
             TestServices.Reviews(store, clock, repositories, git),
-            TestServices.Checklists(store, clock),
+            TestServices.Checklists(store, clock, userStore),
             TestServices.Threads(store, clock),
             TestServices.Signing(store, users, clock),
             TestServices.ProjectChecklists(store),
@@ -248,16 +249,53 @@ public class ReviewServiceFollowUpTests
     /// <param name="outcome">The outcome.</param>
     /// <param name="by">Who answers; Bob when omitted.</param>
     /// <returns>A task that completes when the answer is stored.</returns>
-    private static Task AnswerAsync(World w, string review, string item, ChecklistOutcome outcome = ChecklistOutcome.Pass, Actor? by = null)
+    private static async Task AnswerAsync(World w, string review, string item, ChecklistOutcome outcome = ChecklistOutcome.Pass, Actor? by = null)
     {
-        return w.Checklists.SetAnswerAsync(
+        var actor = by ?? TestActors.Bob;
+        await SeatAsync(w, review, actor);
+        await w.Checklists.SetAnswerAsync(
             w.ProjectId,
             review,
             item,
             outcome,
             outcome == ChecklistOutcome.Pass ? null : "Because",
-            by ?? TestActors.Bob,
+            actor,
             TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Seats a user as the primary of a new reviewer slot of a review unless the user already holds a slot there,
+    ///     because a person answers into the ballot of the own slot.
+    /// </summary>
+    /// <param name="w">The world.</param>
+    /// <param name="review">The review.</param>
+    /// <param name="who">The user to seat.</param>
+    /// <returns>A task that completes when the user holds a slot.</returns>
+    private static async Task SeatAsync(World w, string review, Actor who)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = w.Ids[who.Username];
+        var slots = await w.Store.ListSlotsAsync(w.ProjectId, review, cancellationToken);
+        if (slots.All(s => s.PrimaryUserId != userId && s.AlternateUserId != userId))
+        {
+            await w.Signing.AddSlotAsync(_cyd, w.ProjectId, review, userId, null, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Marks a section of a review as not applicable, as the given user in the own slot.
+    /// </summary>
+    /// <param name="w">The world.</param>
+    /// <param name="review">The review.</param>
+    /// <param name="section">The section id.</param>
+    /// <param name="by">Who marks it; Bob when omitted.</param>
+    /// <returns>A task that completes when the state is stored.</returns>
+    private static async Task NotApplicableAsync(World w, string review, string section, Actor? by = null)
+    {
+        var actor = by ?? TestActors.Bob;
+        await SeatAsync(w, review, actor);
+        await w.Checklists.SetSectionApplicabilityAsync(
+            w.ProjectId, review, section, false, "Not relevant", actor, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -306,6 +344,28 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
+    ///     Reads the carried answers of a review: the review-level rows a follow-up starts from.
+    /// </summary>
+    /// <param name="w">The world.</param>
+    /// <param name="review">The review.</param>
+    /// <returns>The carried answers.</returns>
+    private static Task<IReadOnlyList<ChecklistAnswer>> CarriedAnswersAsync(World w, string review)
+    {
+        return w.Store.ListChecklistAnswersAsync(w.ProjectId, review, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Reads the carried section states of a review: the review-level rows a follow-up starts from.
+    /// </summary>
+    /// <param name="w">The world.</param>
+    /// <param name="review">The review.</param>
+    /// <returns>The carried section states.</returns>
+    private static Task<IReadOnlyList<ChecklistSectionState>> CarriedSectionsAsync(World w, string review)
+    {
+        return w.Store.ListChecklistSectionStatesAsync(w.ProjectId, review, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
     ///     Gets the audit detail of the creation of a review.
     /// </summary>
     /// <param name="w">The world.</param>
@@ -341,7 +401,7 @@ public class ReviewServiceFollowUpTests
         await UploadAsync(w, "rev-1");
         await AnswerAsync(w, "rev-1", "a-01");
         await AnswerAsync(w, "rev-1", "a-02", ChecklistOutcome.Fail);
-        await w.Checklists.SetSectionApplicabilityAsync(w.ProjectId, "rev-1", "b", false, "Not relevant", TestActors.Bob, TestContext.Current.CancellationToken);
+        await NotApplicableAsync(w, "rev-1", "b");
         var before = RecordDigest.Compute(await RecordAsync(w, "rev-1"));
 
         // Act: Ann creates the follow-up
@@ -349,12 +409,12 @@ public class ReviewServiceFollowUpTests
 
         // Assert: one answer (a-01) and the section are carried; the Fail is open again
         var record = await RecordAsync(w, "rev-2");
-        var answer = Assert.Single(record.Answers);
+        var answer = Assert.Single(await w.Store.ListChecklistAnswersAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken));
         Assert.Equal("a-01", answer.ItemId);
         Assert.Equal("Bob", answer.AnsweredBy);
         Assert.Equal("bob", answer.AnsweredByUsername);
         Assert.Equal("rev-1", answer.CarriedFromReviewId);
-        var state = Assert.Single(record.SectionStates);
+        var state = Assert.Single(await w.Store.ListChecklistSectionStatesAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken));
         Assert.Equal(("b", "Not relevant", "rev-1"), (state.SectionId, state.Reason, state.CarriedFromReviewId));
         Assert.Equal("rev-1", record.FollowsReviewId);
         Assert.Equal("rev-1", review.FollowsReviewId);
@@ -364,8 +424,10 @@ public class ReviewServiceFollowUpTests
         Assert.Equal(before, RecordDigest.Compute(await RecordAsync(w, "rev-1")));
         Assert.Null((await RecordAsync(w, "rev-1")).FollowsReviewId);
 
-        // Assert: the checklist state names the review a section was carried from, and nothing for the others
-        var checklist = (await w.Checklists.GetAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!;
+        // Assert: the checklist state names the review a section was carried from, and nothing for the others; the carried
+        // rows reach a person's own ballot when the person takes a slot of the follow-up
+        await SeatAsync(w, "rev-2", TestActors.Bob);
+        var checklist = (await w.Checklists.GetAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken, "bob"))!;
         Assert.Equal("rev-1", checklist.CarriedFromFor("b"));
         Assert.Null(checklist.CarriedFromFor("a"));
     }
@@ -385,10 +447,11 @@ public class ReviewServiceFollowUpTests
         // Act
         await UploadAsync(w, "rev-2", follows: "rev-1");
 
-        // Assert: the checklist is complete and nobody but Bob answered
-        var state = (await w.Checklists.GetAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!;
+        // Assert: once Bob takes a slot, the checklist of his own ballot is complete and nobody but Bob answered
+        await SeatAsync(w, "rev-2", TestActors.Bob);
+        var state = (await w.Checklists.GetAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken, "bob"))!;
         Assert.True(state.IsComplete);
-        Assert.All((await RecordAsync(w, "rev-2")).Answers, a => Assert.Equal("bob", a.AnsweredByUsername));
+        Assert.All(await CarriedAnswersAsync(w, "rev-2"), a => Assert.Equal("bob", a.AnsweredByUsername));
     }
 
     /// <summary>
@@ -403,13 +466,14 @@ public class ReviewServiceFollowUpTests
         await UploadAsync(w, "rev-1");
         await AnswerAsync(w, "rev-1", "a-01");
         await AnswerAsync(w, "rev-1", "a-02");
+        await AnswerAsync(w, "rev-1", "b-01");
         await SetChecklistAsync(w, Definition("v2", "First, reworded"));
 
         // Act
         await UploadAsync(w, "rev-2", follows: "rev-1");
 
-        // Assert: only the unchanged check is carried
-        Assert.Equal(["a-02"], (await RecordAsync(w, "rev-2")).Answers.Select(a => a.ItemId));
+        // Assert: only the unchanged checks are carried
+        Assert.Equal(["a-02", "b-01"], (await CarriedAnswersAsync(w, "rev-2")).Select(a => a.ItemId).Order());
     }
 
     /// <summary>
@@ -426,7 +490,7 @@ public class ReviewServiceFollowUpTests
         await w.Threads.ReplyAsync(w.ProjectId, "rev-1", open.Id, TestActors.Ann, "Reply", TestContext.Current.CancellationToken);
         var done = await ThreadAsync(w, "rev-1", line: null);
         await w.Threads.ResolveAsync(w.ProjectId, "rev-1", done.Id, TestActors.Bob, TestContext.Current.CancellationToken);
-        await AnswerAsync(w, "rev-1", "a-01");
+        await AnswerAllAsync(w, "rev-1");
 
         // Act
         var review = await UploadAsync(w, "rev-2", follows: "rev-1");
@@ -439,7 +503,7 @@ public class ReviewServiceFollowUpTests
         Assert.Equal(["Please look", "Reply"], thread.Comments.Select(c => c.Text));
         Assert.Equal(["bob", "ann"], thread.Comments.Select(c => c.AuthorUsername));
         Assert.Equal(1, review.CarriedThreadCount);
-        Assert.Contains(", follows 'rev-1'; carried 1 answer, 1 thread, 1 resolved thread not carried", CreatedDetail(w, "rev-2"), StringComparison.Ordinal);
+        Assert.Contains(", follows 'rev-1'; carried 3 answers, 1 thread, 1 resolved thread not carried", CreatedDetail(w, "rev-2"), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -701,7 +765,7 @@ public class ReviewServiceFollowUpTests
         var w = await CreateAsync();
         await UploadAsync(w, "rev-1");
         await AnswerAllAsync(w, "rev-1");
-        var slot = await w.Signing.AddSlotAsync(_cyd, w.ProjectId, "rev-1", w.Ids["bob"], null, TestContext.Current.CancellationToken);
+        var slot = Assert.Single(await w.Store.ListSlotsAsync(w.ProjectId, "rev-1", TestContext.Current.CancellationToken));
         var digest = (await w.Signing.GetApprovalAsync(w.ProjectId, "rev-1", TestContext.Current.CancellationToken))!.Digest;
         await w.Signing.SignAsync(TestActors.Bob, w.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken);
         Assert.True((await w.Signing.GetApprovalAsync(w.ProjectId, "rev-1", TestContext.Current.CancellationToken))!.IsApproved);
@@ -711,8 +775,8 @@ public class ReviewServiceFollowUpTests
         await UploadAsync(w, "rev-3", follows: "rev-2");
 
         // Assert: the approved source's slots and signatures are not carried; markers name the immediate source
-        Assert.All((await RecordAsync(w, "rev-2")).Answers, a => Assert.Equal("rev-1", a.CarriedFromReviewId));
-        Assert.All((await RecordAsync(w, "rev-3")).Answers, a => Assert.Equal("rev-2", a.CarriedFromReviewId));
+        Assert.All(await CarriedAnswersAsync(w, "rev-2"), a => Assert.Equal("rev-1", a.CarriedFromReviewId));
+        Assert.All(await CarriedAnswersAsync(w, "rev-3"), a => Assert.Equal("rev-2", a.CarriedFromReviewId));
         Assert.Equal("rev-2", (await RecordAsync(w, "rev-3")).FollowsReviewId);
         Assert.False((await w.Signing.GetApprovalAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!.IsApproved);
         Assert.Empty((await w.Signing.GetApprovalAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!.Slots);
@@ -760,22 +824,23 @@ public class ReviewServiceFollowUpTests
         await UploadAsync(w, "rev-1");
         await AnswerAsync(w, "rev-1", "a-01");
         await AnswerAsync(w, "rev-1", "a-02");
-        await w.Checklists.SetSectionApplicabilityAsync(w.ProjectId, "rev-1", "b", false, "Not relevant", TestActors.Bob, TestContext.Current.CancellationToken);
+        await NotApplicableAsync(w, "rev-1", "b");
         await UploadAsync(w, "rev-2", follows: "rev-1");
         var digest = RecordDigest.Compute(await RecordAsync(w, "rev-2"));
 
         // Act: Cyd answers a-01 again, and sets section b again
         await AnswerAsync(w, "rev-2", "a-01", by: _cyd);
-        await w.Checklists.SetSectionApplicabilityAsync(w.ProjectId, "rev-2", "b", false, "Not relevant", _cyd, TestContext.Current.CancellationToken);
+        await NotApplicableAsync(w, "rev-2", "b", _cyd);
 
-        // Assert
+        // Assert: in the ballot of Cyd's slot, which started from the carried rows
         var record = await RecordAsync(w, "rev-2");
-        var renewed = record.Answers.Single(a => a.ItemId == "a-01");
+        var ballot = Assert.Single(record.Ballots);
+        var renewed = ballot.Answers.Single(a => a.ItemId == "a-01");
         Assert.Null(renewed.CarriedFromReviewId);
         Assert.Equal("cyd", renewed.AnsweredByUsername);
-        Assert.Equal("rev-1", record.Answers.Single(a => a.ItemId == "a-02").CarriedFromReviewId);
-        Assert.Null(record.SectionStates.Single().CarriedFromReviewId);
-        Assert.Equal("cyd", record.SectionStates.Single().SetByUsername);
+        Assert.Equal("rev-1", ballot.Answers.Single(a => a.ItemId == "a-02").CarriedFromReviewId);
+        Assert.Null(ballot.SectionStates.Single().CarriedFromReviewId);
+        Assert.Equal("cyd", ballot.SectionStates.Single().SetByUsername);
         Assert.NotEqual(digest, RecordDigest.Compute(record));
     }
 
@@ -841,7 +906,8 @@ public class ReviewServiceFollowUpTests
         await ThreadAsync(w, "rev-1");
         await UploadAsync(w, "rev-2", follows: "rev-1");
 
-        // Act
+        // Act: Bob takes the only slot, so the carried answers are in the ballot that counts
+        await SeatAsync(w, "rev-2", TestActors.Bob);
         var blocked = (await w.Signing.GetApprovalAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!;
         var thread = Assert.Single((await RecordAsync(w, "rev-2")).Threads);
         await w.Threads.ResolveAsync(w.ProjectId, "rev-2", thread.Id, _cyd, TestContext.Current.CancellationToken);
@@ -864,18 +930,20 @@ public class ReviewServiceFollowUpTests
         await UploadAsync(w, "rev-1");
         await AnswerAllAsync(w, "rev-1");
         await UploadAsync(w, "rev-2", follows: "rev-1");
-        var slot = await w.Signing.AddSlotAsync(_cyd, w.ProjectId, "rev-2", w.Ids["bob"], null, TestContext.Current.CancellationToken);
+        await SeatAsync(w, "rev-2", TestActors.Bob);
+        var slot = Assert.Single(await w.Store.ListSlotsAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken));
+        await w.Checklists.SubmitBallotAsync(w.ProjectId, "rev-2", TestActors.Bob, TestContext.Current.CancellationToken);
         var digest = (await w.Signing.GetApprovalAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken))!.Digest;
         await w.Signing.SignAsync(TestActors.Bob, w.ProjectId, "rev-2", slot.Id, digest, Password, TestContext.Current.CancellationToken);
 
         // Act
-        var locked = await Assert.ThrowsAsync<DomainRuleException>(() => AnswerAsync(w, "rev-2", "a-01", ChecklistOutcome.Fail, _cyd));
+        var locked = await Assert.ThrowsAsync<DomainRuleException>(() => AnswerAsync(w, "rev-2", "a-01", ChecklistOutcome.Fail));
         await w.Signing.ReopenReviewAsync(_cyd, w.ProjectId, "rev-2", "Needs another look", TestContext.Current.CancellationToken);
-        await AnswerAsync(w, "rev-2", "a-01", ChecklistOutcome.Fail, _cyd);
+        await AnswerAsync(w, "rev-2", "a-01", ChecklistOutcome.Fail);
 
         // Assert
         Assert.Equal(DomainRule.ReviewLocked, locked.Rule);
-        Assert.Equal(ChecklistOutcome.Fail, (await RecordAsync(w, "rev-2")).Answers.Single(a => a.ItemId == "a-01").Outcome);
+        Assert.Equal(ChecklistOutcome.Fail, Assert.Single((await RecordAsync(w, "rev-2")).Ballots).Answers.Single(a => a.ItemId == "a-01").Outcome);
         Assert.Equal("rev-1", (await RecordAsync(w, "rev-2")).FollowsReviewId);
     }
 
@@ -898,7 +966,7 @@ public class ReviewServiceFollowUpTests
         // Assert: refused for the duplicate id; only the original rows exist
         Assert.Equal(DomainRule.ReviewIdDuplicate, exception.Rule);
         Assert.Single(w.Store.Reviews);
-        Assert.Single((await RecordAsync(w, "rev-1")).Answers);
+        Assert.Single(Assert.Single((await RecordAsync(w, "rev-1")).Ballots).Answers);
         Assert.Single((await RecordAsync(w, "rev-1")).Threads);
     }
 
@@ -916,7 +984,7 @@ public class ReviewServiceFollowUpTests
         await UploadAsync(w, "rev-1", ["a.txt", "b.txt"]);
         await AnswerAsync(w, "rev-1", "a-01");
         await AnswerAsync(w, "rev-1", "a-02", ChecklistOutcome.Fail);
-        await w.Checklists.SetSectionApplicabilityAsync(w.ProjectId, "rev-1", "b", false, "Not relevant", TestActors.Bob, TestContext.Current.CancellationToken);
+        await NotApplicableAsync(w, "rev-1", "b");
         await ThreadAsync(w, "rev-1", "a.txt");
         var resolved = await ThreadAsync(w, "rev-1", "a.txt", null);
         await w.Threads.ResolveAsync(w.ProjectId, "rev-1", resolved.Id, TestActors.Bob, TestContext.Current.CancellationToken);
@@ -935,7 +1003,7 @@ public class ReviewServiceFollowUpTests
         Assert.Equal(["b.txt"], preview.DroppedThreadFiles);
         Assert.Equal(preview.CarriedAnswers, review.CarriedAnswerCount);
         Assert.Equal(preview.CarriedThreads, review.CarriedThreadCount);
-        Assert.Equal(preview.CarriedSections, (await RecordAsync(w, "rev-2")).SectionStates.Count);
+        Assert.Equal(preview.CarriedSections, (await CarriedSectionsAsync(w, "rev-2")).Count);
     }
 
     /// <summary>

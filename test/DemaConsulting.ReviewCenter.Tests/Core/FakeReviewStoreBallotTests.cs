@@ -114,7 +114,7 @@ public class FakeReviewStoreBallotTests
         Assert.Equal(ChecklistOutcome.Pass, Assert.Single(ballots[0].Answers).Outcome);
         Assert.Equal(ChecklistOutcome.Fail, Assert.Single(ballots[1].Answers).Outcome);
         Assert.Empty(await store.ListChecklistAnswersAsync(projectId, "REV-1", cancellationToken));
-        Assert.Empty((await store.GetRecordAsync(projectId, "REV-1", cancellationToken))!.Answers);
+        Assert.Equal(slots, (await store.GetRecordAsync(projectId, "REV-1", cancellationToken))!.Ballots.Select(b => b.SlotId));
     }
 
     /// <summary>
