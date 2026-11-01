@@ -1072,8 +1072,21 @@ internal sealed class FakeReviewStore : IReviewStore
         SetBallotStatus(projectId, reviewId, slotId, BallotStatus.Submitted, submittedAt, submittedByUsername);
         var submitted = BuildBallot(FindBallot(projectId, reviewId, slotId)!);
         Audits.Add(audit);
+        if (AfterSubmitBallot is { } hook)
+        {
+            // Runs once: the action itself may hand in another ballot
+            AfterSubmitBallot = null;
+            await hook();
+        }
+
         return submitted;
     }
+
+    /// <summary>
+    ///     Gets or sets an action that runs once right after a ballot was handed in, so a test can simulate somebody
+    ///     else changing the record at that moment.
+    /// </summary>
+    public Func<Task>? AfterSubmitBallot { get; set; }
 
     /// <summary>
     ///     Gets the 1-based number of a slot among the slots of its review and the number of slots, as the real store does.

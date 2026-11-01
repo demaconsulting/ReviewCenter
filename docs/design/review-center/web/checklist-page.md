@@ -23,9 +23,11 @@ answered yet.", "Your ballot is a draft: it does not count until you submit it."
 counts in the review."); a **Submit ballot** button hands in a draft that answers every check it requires. In a review
 with a single slot an answer or an edit that completes the ballot hands it in at once, so the page then shows the
 ballot as submitted and no button; a complete draft that no such answer produced (a follow-up whose checks are all
-carried, or a checklist without checks) still shows the button. A user who holds no slot (and is not read-only) sees the
-consolidated standing of the
-submitted ballots and the notice `no-slot-notice`, and cannot answer. When the review is concluded (approved or
+carried, or a checklist without checks) still shows the button. A user who holds no slot (and is not read-only) sees
+the notice `no-slot-notice` and cannot answer; in a review with a single slot or a concluded review the user also sees
+the consolidated standing of the submitted ballots, and in a review with several slots that is not concluded the
+standing is masked as described below, unless the user is the lead, an administrator or an Auditor. When the review is
+concluded (approved or
 rejected), and so locked, the page shows a banner (`checklist-locked`): "This review is concluded (approved or
 rejected) and locked, so the checklist is read-only." followed by the remark that a project
 administrator can reopen the review, and disables the section applicability switch, the reason field and its Save, the
@@ -37,6 +39,26 @@ every control is disabled. When the project does not let authors answer the chec
 `author-answer-blocked` (another project member has to answer; comment threads are still available) and disables the
 same controls, unless the review is locked, which shows only the lock banner. Nothing else changes for the author, and
 every other member sees no notice.
+
+In a review with several slots the page keeps the answers of the other reviewers from a viewer who may not see them
+(see *BallotVisibility*): a reviewer who has not handed in the own ballot, and a member who holds no slot. Such a viewer
+sees the line `ballots-handed-in` ("2 of 3 ballots handed in.") and the notice `ballots-hidden-notice` (the answers of
+the others stay hidden until the own ballot is handed in), and no standing, no count of disputed checks, and no
+different-answers badge; the lead, a project or system administrator, and an Auditor see everything, and so does
+everybody once the review is concluded. A review with a single slot shows none of this. A viewer who has handed in the
+own ballot sees, under every check that the submitted ballots answer differently, the line `ballot-others-{id}` ("Ann:
+Pass / Bob: N/A", in slot order, with the justifications) and a "Different answers" badge, and a **Discuss** button
+that opens a small form (`discuss-form-{id}`); starting it creates a discussion thread about that check through
+`ThreadService` and shows a link to the review page where the thread is read and answered. A reviewer whose own ballot
+is a complete draft in a review with several slots, where nothing but the hand-in blocks the signature, sees **Submit
+and sign** as the main action (`submit-and-sign`, with the password field `submit-sign-password`, and the code field
+`submit-sign-totp` when the account has a second factor) and **Submit ballot** as the secondary one. The first hands in
+the ballot and then signs it for the viewer's slot; when the signature is refused the ballot stays handed in and the
+page says so and links to the review page. An account of an identity provider has no password to give, so its button
+hands in the ballot and then offers the confirmation at the provider, which leads back to the page. A member who holds
+no slot, and who may be a reviewer, sees **Assign me as reviewer** (`assign-me`), which adds a new slot with the user as
+primary reviewer and no alternate, through `SigningService.AddSlotAsync`, and never takes the place of
+a reviewer who is already there.
 
 #### Data Model
 
@@ -54,7 +76,10 @@ page that was loaded before the last signature stops offering the controls at it
 own ballot (`State.IsOwnBallot` is false: the viewer holds no slot). `State` comes from
 `ChecklistService.GetAsync(projectId, reviewId, viewerUsername: ...)` with the user name of the signed-in user, every
 time the page reads the checklist; for a slot owner it is the own ballot (`IsOwnBallot`, `BallotState`, `SlotId`), for
-every other viewer the consolidated standing (`NoSlot` is true for a viewer without a slot). `AuthorBlocked` is
+every other viewer the consolidated standing of the submitted ballots, or, when the viewer may not see the others yet
+(a review with several slots that is not concluded), a state without a standing (`IsMasked`; `NoSlot` is true for a
+viewer without a slot). The page never reads the checklist without the viewer: a read without a viewer is the unmasked
+system-caller path of `ChecklistService` (`GetForSystemAsync`), which no page uses. `AuthorBlocked` is
 computed in the same call; a page loaded before the project switched the rule on shows the refusal message of
 the rule (`AuthorCannotAnswer`) in the error line of the check or section, stores nothing, and shows the notice after
 the next read. A page loaded before the user lost the slot shows the refusal `NoReviewerSlot` in the same way.
@@ -64,8 +89,9 @@ project is not visible to the user), and
 the name of the owning project shown in the breadcrumb.
 
 **State**: the `ChecklistState` of the review (`null` when the review has no checklist); it is read again after each
-change. **FollowedState**: for a follow-up review, the consolidated `ChecklistState` of the review it follows (read with
-`ChecklistService.GetAsync` and no viewer, once when the page loads), so a check that failed there can be shown;
+change. **FollowedState**: for a follow-up review, the `ChecklistState` of the review it follows (read with
+`ChecklistService.GetAsync` and the viewer, once when the page loads, so it is masked for the viewer in the same way as
+the review itself), so a check that failed there can be shown;
 `null` otherwise.
 
 **OpenSectionId**: the section whose checks are shown; at most one.
@@ -98,6 +124,15 @@ follow-up review also `section-{id}-carried` and
 check identifiers are written in lower case (`section-req-toggle`,
 `check-pass-req-01`). The justification box, its Save button, the reason box and its Save button exist only while
 they are needed.
+
+**Ballots**: the `BallotView` of the viewer, read from `ChecklistService.GetBallotViewAsync` whenever the checklist is
+read (`IsMasked`, the differing checks with the answers of every slot, the counts of handed-in ballots,
+`CanSubmitAndSign`, and `CanAssignMe`). **Capabilities**: the `ThreadCapabilities` of the viewer, which decide whether
+Discuss is offered.
+**CurrentIsExternal**, **CurrentHasTotp**: the kind of account of the viewer, which decide the entries of Submit and
+sign. **DiscussOpen**, **DiscussTexts**, **DiscussErrors**, **DiscussStarted**: the state of the Discuss forms, by check.
+**SignNotice**, **SignError**, **AssignError**, **ReauthPending**: the messages and the pending confirmation at the
+identity provider of the actions above.
 
 #### Key Methods
 
@@ -185,6 +220,33 @@ target; a connection that is already gone is ignored.
 The checklist is read when the page loads and after each change made on the page. An answer saved in another browser
 appears when this page is next loaded or changed; nothing is pushed.
 
+**SubmitAndSignAsync**: Hands in the own ballot with the same checks as the Submit ballot button (including the
+confirmation of signatures that would no longer match what was signed after the hand-in; after such a confirmation only
+the hand-in is made and the page points to the review page for the signature), and then signs for the viewer's slot with
+the password and the code that `SignConfirm` handed over, through `SigningService.SignWithCredentialsAsync`. Before the
+hand-in a viewer in a review with several slots has not seen the answers of the others, so the page never signs a record
+the viewer has not been shown: after the hand-in it reads the digest of the record for the viewer
+(`SigningService.GetApprovalAsync`, which is no longer masked now that the ballot is in), then reloads the page, so the
+view the viewer is shown is the record of that digest, and signs that digest only when the reloaded view shows no check
+that the submitted ballots answer differently (`Ballots.Differing` is empty). When it shows a difference, or the digest
+could not be read unmasked, nothing is signed: the page shows `sign-error` ("Your ballot is in, but you have not
+signed: something changed while it was handed in, and the answers of the other reviewers are shown now. Review them,
+then sign from the review page."), shows the answers side by side, and the viewer signs from the review page after
+reading them, which is the second confirmation. When the record changes between the read of the digest and the
+signature, the store refuses the digest (`RecordChanged`), so a changed record is never signed by this step. A refusal
+of the signature leaves the ballot handed in and shows `sign-error` with a link to the review page; success shows
+`sign-notice`. For an
+account of an identity provider the ballot is handed in and the page shows `submit-sign-reauth-hint` with the button
+that starts the confirmation at the provider. The kind of account is read before the hand-in, because the reload that
+follows it no longer offers the combined step.
+
+**AssignMeAsync**: Adds a new reviewer slot with the viewer as primary reviewer through `SigningService.AddSlotAsync`
+and reloads; a refusal of the rules is shown as `assign-error`.
+
+**StartDiscussionAsync**: Starts a discussion thread about a check with the typed text through `ThreadService`; an empty
+text is refused with `discuss-error-{id}`, and the same signature warning applies as for any other change after which a
+signature would no longer match what was signed.
+
 #### Error Handling
 
 A review that does not exist or whose project the user may not see (the same message), and a review without a
@@ -211,12 +273,26 @@ in" message on this page.
 - **ReviewService** — reads the review.
 - **SignatureWarning** — draws the signature warning banner and holds the pending request (`PendingSignatureWarning`);
   it is a part of this unit.
-- **SigningService** — tells whether the review is concluded (`GetApprovalAsync`), which is what locks the page.
-- **ChecklistService** — reads the checklist (the own ballot for a slot owner, the consolidated standing for everyone
-  else, and tells, for the signed-in user, whether the author rule blocks them,
+- **SignConfirm** — draws the password field (and the code field when the account has a second factor) of Submit and
+  sign, hands the entries to the page once when the button is pressed and clears the password field; for an account of
+  an identity provider it draws no field. It is a part of this unit and is used only by this page (the review page has
+  its own signing form).
+- **SigningService** — tells whether the review is concluded (`GetApprovalAsync`), which is what locks the page, tells
+  whether Submit and sign is offered (`CanSignAfter(record, slotCount, hidden)`, used for `CanSubmitAndSign` of the
+  ballot view), signs for Submit and sign (`SignWithCredentialsAsync`), and adds the slot of Assign me
+  (`AddSlotAsync`).
+- **ThreadService** — starts the discussion about a check and tells which discussions the viewer may start
+  (`GetCapabilitiesAsync`).
+- **UserService** and **TotpService** — find the account of the viewer and tell whether it signs in at an identity
+  provider or has a second factor, so that Submit and sign asks for the right entries.
+- **ChecklistService** — reads the checklist (the own ballot for a slot owner, the consolidated standing for a viewer
+  who may see it, and a state without a standing for one who may not; and tells, for the signed-in user, whether the
+  author rule blocks them,
   `AuthorBlocked`) and records answers, section decisions, and the hand-in of the ballot; it refuses a change of a
   locked review with `ReviewLocked`, the change of the author with `AuthorCannotAnswer`, and an answer or hand-in of a
-  user without a slot with `NoReviewerSlot`, and an incomplete hand-in with `BallotIncomplete`.
+  user without a slot with `NoReviewerSlot`, and an incomplete hand-in with `BallotIncomplete`; its ballot view
+  (`GetBallotViewAsync`) says whether the answers of the others are hidden from the viewer, which checks differ, how
+  many ballots are handed in, and whether Assign me and Submit and sign are offered.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
   name for the breadcrumb.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.

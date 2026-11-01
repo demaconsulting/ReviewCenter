@@ -46,7 +46,11 @@ subsystem): `history-page` (root), `breadcrumb-projects-link`, `project-link`, `
   address. The project is read with `ProjectService.GetAsync(actor, projectId)`, and when the user may not see it
   nothing of the review is loaded. The entries are read with `AuditService.ListAsync` for the project and the review; a
   review that does not exist, or of a project the user may not see, shows the message
-  "Review '{id}' does not exist in project {n}." and no entries.
+  "Review '{id}' does not exist in project {n}." and no entries. The page of entries is then given to
+  `AuditMasking.ForViewer`, with the answer of `ChecklistService.GetBallotViewAsync` whether the viewer may see the
+  answers of the other reviewers and the identity of the viewer, so that the detail of an entry that names an answer of
+  another reviewer reads "details are hidden until you hand in your own ballot" for a reviewer who has not handed in,
+  while the action, the actor, and the time stay as stored. The stored trail and its export are not changed.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 
@@ -71,6 +75,8 @@ the address, as nothing is pushed.
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **AuditService** — reads the page of entries.
+- **ChecklistService**, **UserService**, and **AuditMasking** (Core) — tell whether the viewer may see the answers of
+  the other reviewers and who the viewer is, and hide the detail of the answer entries from a viewer who may not.
 - **ReviewService** and **ProjectService** — read the review, and the project (for the actor) and its name.
 - **AuthenticationStateProvider** (ASP.NET Core) — gives the signed-in user.
 - **ASP.NET Core Blazor components** — the component base class, query parameters, authorization attribute, and the

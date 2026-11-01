@@ -44,3 +44,16 @@ sections:
           - Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries
           - HistoryPage_Render_NonMember_LooksLikeAMissingReview
           - HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries
+
+      - id: ReviewCenter-HistoryPage-BallotMasking
+        title: >-
+          The HistoryPage component shall replace the details of the entries that name an answer for a viewer who has
+          not handed in their own ballot in a review with several slots by a note that they are hidden, with the
+          action, the actor, and the time still shown, and shall show the details in full to a viewer who may see the
+          others.
+        justification: |
+          The history is open to every member of the project, so it would otherwise give away the answers that the
+          checklist hides. The page asks the service, so the stored trail stays as it was written.
+        tests:
+          - HistoryPage_HiddenViewer_HidesAnswerDetailsOnly
+          - HistoryPage_Administrator_SeesFullAnswerDetails

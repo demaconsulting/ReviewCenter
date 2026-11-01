@@ -275,8 +275,10 @@ selection (a text area with one pattern per line, `!` to exclude).
 **OnParametersSetAsync** (`ProjectPage`): Loads the project for the actor with `ProjectService.GetAsync(actor, id)`.
 When the project does not exist or the user may not see it, `Project` is null, nothing else is loaded, and the page
 shows the same message for both. Otherwise it reads the progress of all reviews with one call of
-`ReviewProgressService.GetProgressAsync` (a constant number of reads however many reviews the project has; this replaces
-the former ask of the approval status of each review), applies the filters, the sort order, and the paging of the query
+`ReviewProgressService.GetProgressAsync` for the actor (a constant number of reads however many reviews the project
+has; this replaces the former ask of the approval status of each review; the blockers it returns hold no count of
+disputed or failed checks for a viewer who may not see the answers of the other reviewers), applies the filters, the
+sort order, and the paging of the query
 string (`ApplyView`), and loads whether the user may contribute and whether the user administers the project. The
 enabled repositories are read only for a user who may contribute, because a read-only member (an auditor) neither plans
 nor creates reviews and the repository registry refuses such a read; for an administrator the members are loaded too.

@@ -355,8 +355,9 @@ The review page lists the threads about checks in a card named **Check discussio
 review has one. You can read, reply to, and resolve them there. The reviewer slot owners may start one once they have
 submitted their ballot (the only reviewer of a review with a single slot may also do so while the ballot is still a
 draft, because there is no other ballot to hide), and so may the review's lead and a system administrator; any other
-member is refused. The control to start a thread about a check is not on the pages yet; it arrives with a later version
-of the ballot screen.
+member is refused. On the checklist page, the **Discuss** button next to a check on which the ballots differ starts one
+(see [Review Checklist](#review-checklist)); a viewer who has not handed in a ballot in a review with several slots does
+not see the check discussions or how many there are, but the lead and the administrators do.
 
 A thread about a check is not carried into a follow-up review, because the checklist of the follow-up is frozen anew.
 Such threads do not need the confirmation of the dropped open threads; the form tells how many are left out.
@@ -412,16 +413,39 @@ and the first section with unanswered checks is open when you arrive.
 ![The checklist page: two sections done, one in progress, and a justified N/A answer.](images/checklist-partial.png)
 
 **You answer in the ballot of your reviewer slot.** The checklist is answered by the reviewers of the slots of the
-review (the primary and the alternate of a slot share its ballot). A project member who has no slot sees the
-consolidated standing of the submitted ballots and the notice "You are not a reviewer of this review, so you see the
-consolidated standing but cannot answer.", and has to add a slot (see [Review Signatures](#review-signatures)) before
-answering. In a review with one slot nothing changes: your answers count at once, and the answer that completes the
+review (the primary and the alternate of a slot share its ballot). A project member who has no slot can add a new slot
+for themselves with **Assign me as reviewer** (it always adds a new slot, with you as the primary reviewer and no
+alternate, and never takes the place of another reviewer), or see [Review Signatures](#review-signatures) for the other
+ways to add a slot, and has to do so before answering. In a review with one slot nothing changes: your answers count at
+once, and the answer that completes the
 ballot hands it in (a complete draft that no answer produced, such as a follow-up whose checks are all carried, still
 shows **Submit ballot**). In a review with several slots your answers are a draft that only you see; when every check
 that applies is
 answered, the button **Submit ballot** appears, and the ballot counts, for the digest, the progress, and the approval,
 only after you press it. Changing a submitted ballot makes it a draft again until you submit it. Where the submitted
 ballots differ on a check, the check is disputed and blocks signing until the reviewers agree.
+
+**Other reviewers' answers stay hidden until you hand in yours.** In a review with several slots, the checklist page
+tells you only how many ballots are handed in ("2 of 3 ballots handed in."), so that you know who is still to come, and
+nothing about what they answered: no answers, no count of checks that are disputed, and no outcome so far. The same
+holds on the review page, the project overview, the inbox, and the history of the review, where the details of other
+reviewers' answers read "details are hidden until you hand in your own ballot". This is meant to keep your own judgment
+independent, and it applies to a project member who holds no slot as well. It does not apply to the lead of the review,
+the administrators of the project, the system administrators, and the Auditors, who see everything, and everybody sees
+everything once the review is concluded. A review with one slot hides nothing.
+
+**After you hand in, compare.** Under every check on which the submitted ballots differ, the page shows the answers side
+by side with the names ("Ann: Pass / Bob: N/A") and a **Different answers** mark. **Discuss** next to it opens a small
+form: type what you want to ask or point out and start the discussion, which is a thread about that check on the review
+page.
+
+**Submit and sign.** When your ballot is complete, nothing else blocks the signature, and the review has several slots,
+the main button is **Submit and sign**. Type your password (and the code of your second factor if you have one) next to
+it: your ballot is handed in and then signed in one step. If the signature is refused, for example because of a wrong
+password, your ballot stays handed in, and the page says so and links to the review page, where you can sign. If you
+sign in with an identity provider, the button hands in your ballot and then takes you to the provider to confirm who you
+are, and back. **Submit ballot** stays available if you only want to hand in. A review with one slot keeps its single
+step of answering and shows no **Submit and sign** button.
 
 1. Open a section and choose Pass, Fail, or N/A for each check. A Pass is saved at once. For Fail and N/A a
    justification (up to 2000 characters) is required: type it in the box that appears and press Save. A missing
@@ -796,7 +820,9 @@ project does not exist.
   `1 disputed`), and "conclusion needed" when the ballots agree on a Fail and the review has no conclusion text yet.
   The checks are counted from the consolidated checklist of the submitted ballots; the draft of a reviewer never
   changes them (in a review with one slot the answers count before the hand-in). A dash means nothing blocks the
-  review. A Fail answer is not a blocker; it leads to a rejected review.
+  review. A Fail answer is not a blocker; it leads to a rejected review. A viewer who has not handed in the own ballot
+  in a review with several slots sees no count of disputed checks and no failed-check or outcome text there, only that
+  the standing stays hidden until the own ballot is handed in.
 - **Waiting on.** The people who still have to sign: the primary reviewer, and a different alternate, of each slot that
   is not signed or is out of date. A disabled account is shown with "(disabled)". A concluded review waits on nobody.
 - **Last activity.** The time (UTC) of the newest entry of the audit trail of the review, or its creation time.

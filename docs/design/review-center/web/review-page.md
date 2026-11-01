@@ -265,7 +265,10 @@ the component when only the route changes, so following a link to another review
 the previous review, its file content, or a half-typed comment. Each file's `View` button has an `aria-label` of
 `View {path}` so that screen-reader users can tell the buttons apart.
 
-**RefreshAsync**: Reloads everything the record depends on: the threads, the checklist, the approval (with the reopen
+**RefreshAsync**: Reloads everything the record depends on: the threads (without the discussions about checks for a
+viewer who may not see the answers of the other reviewers, see *BallotVisibility*), the checklist (for such a viewer a
+note "Hidden until you answer" in place of the standing, and the conclusion area replaced by a note that the conclusion
+stays hidden until the own ballot is handed in), the approval (with the reopen
 history), the candidates for a slot, the review rule and the administrator right for the reopen form, and the user name
 of the signed-in user. The user name is read straight from the authentication
 state, not through `GetActorAsync`, so that a reload that meets an ended sign-in state does not fail; the page is replaced

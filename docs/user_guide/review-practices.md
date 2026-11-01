@@ -104,14 +104,16 @@ record that the signatures bind to.
 ## Ballots and Early Signing
 
 Every slot answers the checklist in its own ballot, so a review with two or more slots collects independent opinions:
-the primary and the alternate of a slot share one ballot, and a reviewer sees the own ballot while it is a draft, but
-only the submitted ballots of the others (as the consolidated standing). A ballot counts only after its reviewer presses
-**Submit ballot**; changing it afterward makes it a draft again until it is handed in again. Practices that follow:
+the primary and the alternate of a slot share one ballot, and a reviewer sees the own ballot while it is a draft, and
+nothing of the others until the own ballot is handed in (then the differing answers are shown side by side). A ballot
+counts only after its reviewer presses **Submit ballot**, or **Submit and sign** to hand in and sign in one step;
+changing it afterward makes it a draft again until it is handed in again. Practices that follow:
 
-- **Answer on your own.** Do not copy another slot's draft; you cannot see it anyway. The value of a second slot is
-  that it reaches its own conclusion.
+- **Answer on your own.** Do not copy another slot's draft; you cannot see it anyway, and the others' answers stay
+  hidden until you have handed in yours. The value of a second slot is that it reaches its own conclusion.
 - **Settle a disagreement, do not overwrite it.** Where two submitted ballots give a check different answers, the
-  check is disputed and blocks signing. Talk to the other reviewer in a thread; the reviewer who changes the mind
+  check is disputed and blocks signing. Press **Discuss** next to the check, or talk to the other reviewer in a thread;
+  the reviewer who changes the mind
   changes the own answer and hands the ballot in again. Use the thread to record why.
 - **Hand in when you are done.** A ballot that stays a draft never counts, so the review waits. The checklist page tells
   you whether your own ballot is a draft or submitted; ask the other reviewers about theirs.

@@ -291,11 +291,14 @@ sections:
       - id: ReviewCenter-ChecklistService-OwnBallotView
         title: >-
           The ChecklistService class shall give a viewer who holds a slot of a review the own ballot, drafts
-          included, and never the draft of another slot, and shall give every other viewer the consolidated standing
-          of the submitted ballots, marked as without a slot when a viewer is given and holds none.
+          included, and never the draft of another slot, and shall give a viewer who holds no slot the consolidated
+          standing of the submitted ballots (marked as without a slot) in a review with a single slot or a concluded
+          review, and, in a review with several slots that is not concluded, a masked state instead for such a viewer
+          unless the viewer is the lead, an administrator or an Auditor (see ReviewCenter-BallotVisibility-BallotView).
         justification: |
           A reviewer needs to see and continue the own work, while an unfinished ballot of somebody else must stay
-          private until it is handed in. Everybody else reads the agreed standing, which is what the record covers.
+          private until it is handed in. Where the answers of the others are open to the viewer, the agreed standing
+          is what the record covers.
         tests:
           - ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly
           - ChecklistService_GetAsync_NoSlot_Consolidated

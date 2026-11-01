@@ -141,7 +141,9 @@ template.
   reviewers");
   the project route also shows, in that card, the checklist that new reviews start with;
   the checklist route shows the checklist, where a reviewer answers each check in the ballot of the own slot and hands
-  the ballot in (everybody else sees the consolidated standing). A project that
+  the ballot in (everybody else sees the consolidated standing in a review with a single slot and in a concluded
+  review; in a review with several slots that is not concluded a viewer who has not handed in a ballot sees a notice and
+  the number of ballots in, unless the viewer is the lead, an administrator or an Auditor). A project that
   does not exist, and equally a project the user may not see, is reported on the page itself with the same
   message, "Project N does not exist.", with HTTP status 200, so that a user who is no member cannot tell a hidden
   project from a missing one; a review that does not exist is reported on the page itself.
@@ -568,6 +570,16 @@ read-only, and `ReviewPage` shows the review that is followed, the counts carrie
 follow-ups of the review. The pages hold no carry rule of their own. A choice of the follow-up in the review planner is
 not offered.
 
+#### Hidden ballots
+
+In a review with several reviewer slots the pages keep the answers of the other reviewers from a viewer who may not see
+them (the rule is `BallotVisibility` in the `Core` subsystem). `ChecklistPage` shows such a viewer only how many ballots
+are handed in, and a viewer who has handed in the differing answers side by side with a Discuss button; it offers Submit
+and sign for a complete draft and Assign me as reviewer for a member without a slot. `ReviewPage` shows no checklist
+standing, no discussion about a check, and no conclusion text to such a viewer, `ProjectPage` shows no disputed count
+in the blockers, and `HistoryPage` hides the detail of the answer entries of others. The pages hold no rule of their
+own: they ask the services what the viewer may see and show it, and the stored data is never changed.
+
 #### Signed attestation
 
 An approved review offers the download of its signed PDF attestation (a review concluded as rejected shows a note that
@@ -655,7 +667,9 @@ administrator can record it elsewhere: the verification alone cannot tell that t
 history link in the title row of the review page is shown to every signed-in user who may see the project, and the
 audit link of the page
 frame only to a system administrator, which is a convenience and not the protection: the page has its own
-authorization.
+authorization. Masking of ballot content (see *BallotVisibility*) applies to `HistoryPage`, which every member may open:
+it shows the entries of the review through `AuditMasking.ForViewer`. `AuditPage` and `ProjectAuditPage` are open only
+to administrators and Auditors, who may see every ballot, so they show every entry in full and are not masked.
 
 #### Repositories
 

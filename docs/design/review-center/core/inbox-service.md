@@ -108,6 +108,8 @@ enters the record digest.
 
 - **IInboxStore** — the read-state rows and the involved reviews (implemented by `InboxStore`).
 - **IReviewStore** — the snapshot of a review: threads, ballots, signatures, reopenings.
+- **BallotVisibility** — decides whether the viewer may see the dispute and failure texts of a review; the inbox of a
+  viewer who may not holds none.
 - **IProjectAccess** — decides which projects the user may see and whether the user may contribute.
 - **IUserStore** — finds the user of an actor.
 - **RecordDigest**, **ReviewLock** and **BallotProjection** — the current digest and the conclusion

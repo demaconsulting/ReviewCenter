@@ -179,8 +179,22 @@ N/A - standard test environment.
   and the thread; the viewer's own comments are never marked; once the page is live the read state is stored, so the
   next visit shows no markers; a change of the address to another review loads the baseline of that review; and a user
   who may not see the project leaves no read state behind.
+- A viewer who may not see the answers of the other reviewers sees no checklist standing (a note for a member without
+  a slot, the own progress for a slot owner), no discussion about a check and no count of them, and no conclusion text;
+  the lead and an administrator see them.
 
 #### Test Scenarios
+
+**ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads**: A reviewer with a draft opens a review whose other
+reviewers answered and started a discussion about a check; no discussion, no count, and no conclusion text is shown,
+and the note says it stays hidden. This scenario is tested by
+`ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads`.
+
+**ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden**: A member without a slot sees "Hidden until you answer" in
+place of the checklist standing. This scenario is tested by `ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden`.
+
+**ReviewPage_Administrator_SeesCheckThreadsAndConclusion**: An administrator sees the discussion about the check and the
+conclusion. This scenario is tested by `ReviewPage_Administrator_SeesCheckThreadsAndConclusion`.
 
 **Reviews from a repository** are verified in `ReviewPageRepositoryTests.cs` over a review stored with a source,
 changed files, and baseline bytes.

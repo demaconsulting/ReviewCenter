@@ -339,7 +339,8 @@ sections:
           while an unanswered check, a disputed check, or an open thread blocks the review, shall offer no way to
           change or remove a slot that holds a signature, and, while the project requires independent reviewers,
           which is the default and which a project administrator can switch off and on with the change audited,
-          shall refuse the person who created a review as a reviewer of it and as its signer.
+          shall refuse the person who created a review as a reviewer of it and as its signer, and shall keep what the
+          other reviewers answered hidden from a reviewer who has not handed in their own ballot.
         tags: [system]
         justification: |
           A review is independent only when the people who approve it are fixed beforehand, are distinct, and
@@ -353,7 +354,8 @@ sections:
           tool does not match the authors of the commits in the reviewed repository to users, and it does not
           decide who else may be named. The system tests drive the web interface and the API of a running server:
           the refusal of a non-member by the server itself, and of every other person than the slot holders, is
-          verified by the tests of the child requirements.
+          verified by the tests of the child requirements. Independent judgment also means that a reviewer does not
+          read the answers of the others before giving their own, so those stay hidden until the own ballot is in.
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Web-Signatures
@@ -362,6 +364,8 @@ sections:
           - ReviewCenter-Core-IndependentReviewers
           - ReviewCenter-Storage-ReviewIntegrity
           - ReviewCenter-Web-ReviewRules
+          - ReviewCenter-Core-BallotVisibility
+          - ReviewCenter-Web-BallotExperience
         tests:
           - ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
@@ -370,6 +374,7 @@ sections:
           - CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign
           - CoreSubsystem_IndependentReviewers_SettingChangeIsAuditedAndAdminOnly
           - CoreSubsystem_ApiTokenReview_AuthorIsTokenUser
+          - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
 
       - id: ReviewCenter-System-ReviewRuleSwitches
         title: >-

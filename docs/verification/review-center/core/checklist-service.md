@@ -42,8 +42,10 @@ N/A - standard test environment.
 - With several slots a ballot stays a draft until `SubmitBallotAsync` hands it in; an incomplete ballot is refused with
   `BallotIncomplete`; handing in again changes nothing. With one slot the answer that completes the ballot hands it in,
   and an earlier answer leaves it a draft.
-- A viewer who holds a slot gets the own ballot with its draft and nothing of another slot's draft; any other viewer
-  gets the consolidated standing of the submitted ballots, marked as without a slot when a viewer is given.
+- A viewer who holds a slot gets the own ballot with its draft and nothing of another slot's draft; a viewer without a
+  slot gets the consolidated standing of the submitted ballots, marked as without a slot, in a review with a single slot
+  or a concluded review (a review with several slots that is not concluded gives such a viewer a masked state, see the
+  verification of *BallotVisibility*); a read without a viewer is the system-caller path and is not masked.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
 - While the project does not let authors answer the checklist (the default, also for projects that existed before the
@@ -207,9 +209,10 @@ changes an answer to Fail and does not hand it in. A read as that reviewer shows
 Fail); a read as another reviewer shows the own Pass, never the draft; a read without a viewer shows the consolidated
 Pass. This scenario is tested by `ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly`.
 
-**ChecklistService_GetAsync_NoSlot_Consolidated**: In a review with two slots, the reviewer of one slot has a draft
-answer; a read as a member without a slot gives the consolidated standing, marked `NoSlot`, with no own ballot and no
-answer to that check. This scenario is tested by `ChecklistService_GetAsync_NoSlot_Consolidated`.
+**ChecklistService_GetAsync_NoSlot_Consolidated**: In a review with one slot, held by a reviewer who has a draft
+answer, a read as a member without a slot gives the consolidated standing (the review has a single slot, so nothing is
+hidden), marked `NoSlot`, with no own ballot and no answer to that check, because the draft does not count. This
+scenario is tested by `ChecklistService_GetAsync_NoSlot_Consolidated`.
 
 **ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots**: Three submitted ballots
 agree and slot 1 has signed. A reviewer of another slot changes an answer to Fail; the edit is stored and the signature

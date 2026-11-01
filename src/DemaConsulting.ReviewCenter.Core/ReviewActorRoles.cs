@@ -85,6 +85,22 @@ internal static class ReviewActorRoles
     }
 
     /// <summary>
+    ///     Finds the slot a user holds in a review from the identity of the user, without any lookup.
+    /// </summary>
+    /// <param name="userId">The identity of the user; <c>null</c> for nobody or an unknown user.</param>
+    /// <param name="slots">The reviewer slots of the review. Must not be null.</param>
+    /// <returns>
+    ///     The slot with the lowest identity of which the user is the primary or the alternate reviewer; <c>null</c> when
+    ///     the user holds no slot.
+    /// </returns>
+    public static ReviewerSlot? FindOwnSlot(int? userId, IReadOnlyList<ReviewerSlot> slots)
+    {
+        return userId is null
+            ? null
+            : slots.OrderBy(s => s.Id).FirstOrDefault(s => s.PrimaryUserId == userId || s.AlternateUserId == userId);
+    }
+
+    /// <summary>
     ///     Finds the slot a person holds in a review, to look up the status of their ballot.
     /// </summary>
     /// <param name="users">The user store used to resolve the user name to an identity. Must not be null.</param>

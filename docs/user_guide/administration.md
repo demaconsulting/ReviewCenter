@@ -107,8 +107,11 @@ cannot be one of its reviewers and cannot sign it.
 alternate of a slot can answer a check, change whether a section applies, or hand in the ballot. A member who holds no
 slot, a project administrator and a system administrator included, is refused with "You are not a reviewer of this
 review, so you cannot answer its checklist. Add yourself as a reviewer slot first."; every member can add the slot.
-Everyone who may see the project reads the checklist: the reviewer of a slot reads the own ballot, a draft included,
-and everybody else reads the consolidated standing of the submitted ballots (see Reviewing).
+Everyone who may see the project reads the checklist: the reviewer of a slot reads the own ballot, a draft included.
+Everybody else reads the consolidated standing of the submitted ballots in a review with a single slot and in a
+concluded review. In a review with several slots that is not concluded, a viewer who has not handed in a ballot of
+their own sees only how many ballots are in, behind a notice, unless the viewer is the lead of the review, an
+administrator or an Auditor (see Reviewing).
 
 **Tokens.** A personal access token acts as its owner and carries the owner's memberships, so it reads and creates
 reviews only in the projects the owner can see, and the API lists only those projects (see

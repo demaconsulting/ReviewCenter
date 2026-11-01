@@ -24,8 +24,17 @@ N/A - standard test environment.
 - Markup in an actor, an action, or a detail is shown as text and not interpreted.
 - The page links back to the review, and the review page links to the history.
 - A visitor who is not signed in sees no entries.
+- A viewer who has not handed in the own ballot in a review with several slots sees the detail of the answer entries of
+  other reviewers replaced by a note, with the action, the actor, and the time shown; an administrator sees the details.
 
 #### Test Scenarios
+
+**HistoryPage_HiddenViewer_HidesAnswerDetailsOnly**: A reviewer with a draft opens the history of a review with several
+slots; the answer entries of the other reviewer show the hidden note and the actor, and the other entries are as
+stored. This scenario is tested by `HistoryPage_HiddenViewer_HidesAnswerDetailsOnly`.
+
+**HistoryPage_Administrator_SeesFullAnswerDetails**: An administrator sees the full detail of the same entries. This
+scenario is tested by `HistoryPage_Administrator_SeesFullAnswerDetails`.
 
 **HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst**: The trail holds entries of two reviews; the page
 of one review lists its entries only, newest first. This scenario is tested by

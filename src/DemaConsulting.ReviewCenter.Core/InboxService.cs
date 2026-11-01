@@ -219,9 +219,17 @@ public sealed class InboxService
             }
 
             states.TryGetValue((candidate.ProjectId, candidate.ReviewId), out var state);
+
+            // Who may see the answers of the other reviewers: the people who steer or check the review, and those who
+            // have handed in their own ballot (see BallotVisibility)
+            var hidden = snapshot.Slots.Count > 1
+                         && !BallotVisibility.CanSeeOthers(
+                             await SeesAllAsync(actor, user, candidate, right.Contribute, cancellationToken),
+                             snapshot,
+                             user.Id);
             await AddItemsAsync(
                 items,
-                new ReviewContext(user, visible[candidate.ProjectId].Name, candidate, snapshot, state, today, right.Contribute, right.Member),
+                new ReviewContext(user, visible[candidate.ProjectId].Name, candidate, snapshot, state, today, right.Contribute, right.Member, hidden),
                 cancellationToken);
         }
 
@@ -356,6 +364,32 @@ public sealed class InboxService
     }
 
     /// <summary>
+    ///     Tells whether the user sees everything in a review without handing in a ballot: the creator of the review who
+    ///     can still contribute, an administrator of the project or the system, and an Auditor.
+    /// </summary>
+    /// <param name="actor">The signed-in user.</param>
+    /// <param name="user">The user behind the actor.</param>
+    /// <param name="candidate">The light description of the review.</param>
+    /// <param name="contribute">Whether the user may contribute in the project.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the user steers or checks the review.</returns>
+    private async Task<bool> SeesAllAsync(
+        Actor? actor,
+        User user,
+        InboxCandidate candidate,
+        bool contribute,
+        CancellationToken cancellationToken)
+    {
+        // The creator leads the review while they can still work in the project
+        if (contribute && InboxRules.SameUser(candidate.CreatedBy, user.Username))
+        {
+            return true;
+        }
+
+        return await BallotVisibility.SeesAllInProjectAsync(_access, actor, candidate.ProjectId, cancellationToken);
+    }
+
+    /// <summary>
     ///     Finds the user behind an actor.
     /// </summary>
     /// <param name="actor">The actor; may be null.</param>
@@ -390,6 +424,10 @@ public sealed class InboxService
         var isAuthor = InboxRules.SameUser(review.Candidate.CreatedBy, username);
         var mine = slots.Where(slot => InboxRules.IsAssigned(slot, review.User.Id)).ToList();
         var overdue = !concluded && review.Candidate.DueDate is { } due && due < review.Today;
+
+        // The threads the user may know of; a discussion about a check stays hidden from a user who may not see the
+        // other reviewers' answers yet, so neither its count nor its replies show
+        var threads = review.Hidden ? record.Threads.Where(thread => !thread.IsCheckThread).ToList() : record.Threads;
 
         InboxItem Row(InboxSection section, string chip, bool unread, string? detail = null)
         {
@@ -428,7 +466,7 @@ public sealed class InboxService
             // Replies waiting: someone answered in a thread of mine, or on my review
             if (review.Contribute)
             {
-                var waiting = InboxRules.WaitingThreads(record.Threads, username, isAuthor);
+                var waiting = InboxRules.WaitingThreads(threads, username, isAuthor);
                 if (waiting.Count > 0)
                 {
                     var unread = InboxRules.CountUnread(waiting, username, lastSeenCommentId) > 0;
@@ -438,7 +476,7 @@ public sealed class InboxService
 
             // Failed checks: my own review has checks answered Fail; agreed, they make the review reject, otherwise they
             // are a disagreement to resolve
-            if (isAuthor)
+            if (isAuthor && !review.Hidden)
             {
                 var failed = InboxRules.FailedAnswers(record, slots.Count);
                 if (failed.Count > 0)
@@ -492,7 +530,10 @@ public sealed class InboxService
         if (signatures.Any(signature => signature.UserId != review.User.Id && signature.SignedAt > lastSeenAt)
             || visibleBallots.Any(ballot => ballot.Answers.Any(answer =>
                    !InboxRules.SameUser(answer.AnsweredByUsername, username) && answer.AnsweredAt > lastSeenAt))
-            || InboxRules.CountUnread(record.Threads, username, lastSeenCommentId) > 0)
+            || InboxRules.CountUnread(
+                   review.Hidden ? record.Threads.Where(thread => !thread.IsCheckThread).ToList() : record.Threads,
+                   username,
+                   lastSeenCommentId) > 0)
         {
             return true;
         }
@@ -562,6 +603,10 @@ public sealed class InboxService
     /// <param name="Today">The current date (UTC), for the due date.</param>
     /// <param name="Contribute">Whether the user may contribute in the project.</param>
     /// <param name="Member">Whether the user is an explicit member of the project.</param>
+    /// <param name="Hidden">
+    ///     Whether the user may not see the answers of the other reviewers yet, so nothing about the threads of the
+    ///     checks may show (see <see cref="BallotVisibility"/>).
+    /// </param>
     private sealed record ReviewContext(
         User User,
         string ProjectName,
@@ -570,7 +615,8 @@ public sealed class InboxService
         ReviewUserState? State,
         DateOnly Today,
         bool Contribute,
-        bool Member);
+        bool Member,
+        bool Hidden);
 
     /// <summary>
     ///     The approval facts of one review that the information rows need.

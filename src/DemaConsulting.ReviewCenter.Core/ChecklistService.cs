@@ -33,7 +33,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     alternate reviewer (see <see cref="Ballot"/>), a person without a slot is refused with
 ///     <see cref="DomainRule.NoReviewerSlot"/>, and the ballot counts in the record once it is handed in (see
 ///     <see cref="SubmitBallotAsync"/>; a review with one slot hands it in with the last answer). <see cref="GetAsync"/>
-///     shows a reviewer the own ballot and everybody else the consolidated standing, never the ballot of another slot.
+///     shows a reviewer the own ballot and a viewer without a slot the consolidated standing of the submitted ballots,
+///     except that in a review with several slots that is not concluded the standing is hidden from a viewer who has
+///     not handed in an own ballot and does not lead the review, administer the project or audit it (see
+///     <see cref="BallotVisibility"/>). A caller that reads for the system and not for a person uses
+///     <see cref="GetForSystemAsync"/>. The service never shows the draft of another slot.
 ///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is concluded (approved
 ///     or rejected, see <see cref="ReviewLock"/>).
 ///     When the project requires it (on by default, also for projects that existed before the rule was enforced), the
@@ -97,16 +101,45 @@ public sealed class ChecklistService
     }
 
     /// <summary>
+    ///     Reads the checklist of a review as a system caller: the consolidated standing of the submitted ballots,
+    ///     never masked.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The state, or <c>null</c> when the review does not exist or has no checklist.</returns>
+    /// <remarks>
+    ///     This is the named path for callers that act for the system and not for a person (a report, a carry-over).
+    ///     It is the same as <see cref="GetAsync"/> without a viewer: no viewer is asked about, so nothing is
+    ///     hidden and <see cref="ChecklistState.AuthorBlocked"/> is not set. The API and the evidence still read
+    ///     through it without masking; that is deferred to the slice that masks them. A page must not use it.
+    /// </remarks>
+    public Task<ChecklistState?> GetForSystemAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        return GetAsync(projectId, reviewId, cancellationToken, null);
+    }
+
+    /// <summary>
     ///     Reads the checklist of a review with its answers and section applicability.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <param name="viewerUsername">
-    ///     The user name of the person who looks at the checklist, or <c>null</c> (the default) when there is none;
-    ///     it decides <see cref="ChecklistState.AuthorBlocked"/>.
+    ///     The user name of the person who looks at the checklist, or <c>null</c> (the default) for a system caller
+    ///     (see <see cref="GetForSystemAsync"/>); it decides <see cref="ChecklistState.AuthorBlocked"/>, and whether
+    ///     the standing of the other reviewers is hidden from a viewer who holds no slot (see
+    ///     <see cref="BallotVisibility"/>). Without a viewer nothing is hidden, so a caller that shows the state to a
+    ///     person must always pass the viewer.
     /// </param>
-    /// <returns>The state, or <c>null</c> when the review does not exist or has no checklist.</returns>
+    /// <returns>
+    ///     The state, or <c>null</c> when the review does not exist or has no checklist. For a viewer who may not see the
+    ///     other reviewers' answers yet and holds no slot, the state has no answers and no consolidation and
+    ///     <see cref="ChecklistState.IsMasked"/> is set.
+    /// </returns>
     public async Task<ChecklistState?> GetAsync(
         int projectId,
         string reviewId,
@@ -123,14 +156,19 @@ public sealed class ChecklistService
         var definition = snapshot.Record.Checklist.Parse();
 
         // Only a viewer is asked about; the project and review are read for them alone
-        var authorBlocked = viewerUsername is not null
-                            && IsAuthorBlocked(
-                                await _store.GetProjectAsync(projectId, cancellationToken),
-                                await _store.GetReviewAsync(projectId, reviewId, cancellationToken),
-                                viewerUsername);
+        Review? review = null;
+        var authorBlocked = false;
+        if (viewerUsername is not null)
+        {
+            review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+            authorBlocked = IsAuthorBlocked(
+                await _store.GetProjectAsync(projectId, cancellationToken),
+                review,
+                viewerUsername);
+        }
 
-        // A reviewer sees the own ballot, drafts included, and never the ballot of another slot; everybody else sees the
-        // standing of the submitted ballots
+        // A reviewer sees the own ballot, drafts included, and never the ballot of another slot; somebody without a slot
+        // sees the standing of the submitted ballots unless it is masked below
         var own = viewerUsername is null
             ? null
             : await FindOwnSlotAsync(viewerUsername, snapshot.Slots, cancellationToken);
@@ -140,7 +178,165 @@ public sealed class ChecklistService
             return BallotProjection.ForBallot(definition, own.Id, ballot, authorBlocked);
         }
 
+        // Somebody without a slot may not see the answers of the reviewers of a review with several slots, unless they
+        // steer or check the review or it is concluded: the standing would give the answers away
+        if (viewerUsername is not null && review is not null
+            && !BallotVisibility.CanSeeOthers(
+                await BallotVisibility.SeesAllInReviewAsync(_access, new Actor(viewerUsername, viewerUsername), review, cancellationToken),
+                snapshot,
+                null))
+        {
+            return new ChecklistState(definition, [], [])
+            {
+                AuthorBlocked = authorBlocked,
+                NoSlot = true,
+                IsMasked = true
+            };
+        }
+
         return BallotProjection.Consolidate(snapshot.Record, snapshot.Slots.Count, authorBlocked, viewerUsername is not null)!.State;
+    }
+
+    /// <summary>
+    ///     Reads what the checklist page needs to know about the ballots for one viewer: whether the answers of the
+    ///     other reviewers are hidden, the checks the submitted ballots answer differently, and which ballot actions
+    ///     are offered.
+    /// </summary>
+    /// <param name="viewer">The signed-in user who looks; <c>null</c> is a viewer who has handed in nothing.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The view, or <c>null</c> when the review does not exist or has no checklist.</returns>
+    /// <remarks>
+    ///     While the viewer may not see the answers of the other reviewers (see <see cref="BallotVisibility"/>) the view
+    ///     lists no differing check, so nothing can be learned from it. "Submit and sign" is offered for a complete draft
+    ///     of a review with several slots when nothing blocks signing once it is handed in; a viewer who may not see the
+    ///     disputes yet is judged by the blockers that viewer may see, so the offer itself never reveals a dispute. A
+    ///     review with one slot offers neither, because its ballot is handed in with the last answer.
+    /// </remarks>
+    public async Task<BallotView?> GetBallotViewAsync(
+        Actor? viewer,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (snapshot?.Record.Checklist is null)
+        {
+            return null;
+        }
+
+        // The viewer's facts: who they are, the slot they hold, and whether they steer or check the review
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var project = await _store.GetProjectAsync(projectId, cancellationToken);
+        var user = viewer is null ? null : await _users.GetByUsernameAsync(viewer.Username, cancellationToken);
+        var own = ReviewActorRoles.FindOwnSlot(user?.Id, snapshot.Slots);
+        var seesAll = review is not null
+                      && await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);
+        var canSee = BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id);
+        var concluded = ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures);
+        var consolidated = BallotProjection.Consolidate(snapshot.Record, snapshot.Slots.Count)!;
+        var differing = canSee
+            ? await DifferingChecksAsync(snapshot, consolidated.Result, cancellationToken)
+            : new Dictionary<string, IReadOnlyList<BallotAnswerView>>();
+
+        // What the viewer may do about their ballot: only a person who may contribute, while the review is open
+        var canWork = viewer is { ViaApiToken: false }
+                      && !concluded
+                      && await _access.CanContributeAsync(viewer, projectId, cancellationToken);
+        var canSubmitAndSign = canWork && snapshot.Slots.Count > 1 && own is not null
+                               && CanSignOnceSubmitted(snapshot, own, !canSee);
+
+        // A member who may be a reviewer and holds no slot can add themselves; the author cannot while the project
+        // requires independent reviewers (the slot would be refused)
+        var independent = project is { RequireIndependentReviewers: true }
+                          && !string.IsNullOrEmpty(review?.CreatedBy)
+                          && string.Equals(review.CreatedBy, viewer?.Username, StringComparison.OrdinalIgnoreCase);
+        var canAssignMe = canWork && user is { Enabled: true } && own is null && !independent
+                          && await _store.GetMembershipAsync(user.Id, projectId, cancellationToken)
+                              is { Role: ProjectRole.User or ProjectRole.ProjectAdmin };
+        return new BallotView(
+            !canSee,
+            differing,
+            consolidated.Result.BallotsSubmitted,
+            snapshot.Slots.Count,
+            canSubmitAndSign,
+            canAssignMe);
+    }
+
+    /// <summary>
+    ///     Tells whether the draft of a slot, once handed in, leaves nothing that blocks signing.
+    /// </summary>
+    /// <param name="snapshot">The snapshot of the review.</param>
+    /// <param name="slot">The slot of the viewer.</param>
+    /// <param name="hidden">
+    ///     <c>true</c> when the viewer may not see the other reviewers' standing yet, so only the blockers the viewer may
+    ///     know of count.
+    /// </param>
+    /// <returns><c>true</c> when the ballot is a complete draft and the review could be signed after handing it in.</returns>
+    private static bool CanSignOnceSubmitted(ReviewSnapshot snapshot, ReviewerSlot slot, bool hidden)
+    {
+        var definition = snapshot.Record.Checklist!.Parse();
+        var ballot = CurrentBallot(snapshot, slot);
+        if (ballot is null || ballot.Status != BallotStatus.Draft || !BallotConsolidation.IsComplete(definition, ballot))
+        {
+            return false;
+        }
+
+        // A viewer who may not see the others yet would sign without knowing whether a rejection needs its conclusion
+        // text, so a ballot with a Fail is left to the review page, where the whole picture is shown
+        if (hidden && ballot.Answers.Any(answer => answer.Outcome == ChecklistOutcome.Fail))
+        {
+            return false;
+        }
+
+        // The record as it would be once the ballot is handed in
+        var submitted = ballot with { Status = BallotStatus.Submitted };
+        var after = BallotEdits.WithBallot(snapshot.Record, submitted);
+        return SigningService.CanSignAfter(after, snapshot.Slots.Count, hidden);
+    }
+
+    /// <summary>
+    ///     Lists the checks that the submitted ballots answer differently, with each ballot's answer.
+    /// </summary>
+    /// <param name="snapshot">The snapshot of the review.</param>
+    /// <param name="result">The consolidation of the submitted ballots.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The answers of the submitted ballots by check identifier, in slot order.</returns>
+    private async Task<Dictionary<string, IReadOnlyList<BallotAnswerView>>> DifferingChecksAsync(
+        ReviewSnapshot snapshot,
+        BallotConsolidationResult result,
+        CancellationToken cancellationToken)
+    {
+        var differing = new Dictionary<string, IReadOnlyList<BallotAnswerView>>();
+        var disputed = result.Checks.Where(check => check.Consensus == CheckConsensus.Disputed).ToList();
+        if (disputed.Count == 0)
+        {
+            return differing;
+        }
+
+        // Names and numbers of the slots, read once for all checks
+        var names = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id, user => user.DisplayName);
+        var ordered = snapshot.Slots.OrderBy(slot => slot.Id).ToList();
+        foreach (var check in disputed)
+        {
+            var answers = new List<BallotAnswerView>();
+            foreach (var (slotId, outcome) in check.Outcomes)
+            {
+                var slot = ordered.First(s => s.Id == slotId);
+                var ballot = snapshot.Record.Ballots.First(b => b.SlotId == slotId);
+                var justification = ballot.Answers.Last(a => a.ItemId == check.ItemId).Justification;
+                answers.Add(new BallotAnswerView(
+                    ordered.IndexOf(slot) + 1,
+                    names.GetValueOrDefault(slot.PrimaryUserId, $"user {slot.PrimaryUserId}"),
+                    outcome,
+                    justification));
+            }
+
+            differing[check.ItemId] = answers;
+        }
+
+        return differing;
     }
 
     /// <summary>

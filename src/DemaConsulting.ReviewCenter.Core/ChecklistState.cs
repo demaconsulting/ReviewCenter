@@ -95,11 +95,19 @@ public sealed class ChecklistState
     public bool IsOwnBallot { get; init; }
 
     /// <summary>
-    ///     Gets a value indicating whether the review has no reviewer slot the viewer could answer for, so the viewer sees
-    ///     the consolidated standing and cannot answer; set by <see cref="ChecklistService.GetAsync"/> for a viewer
-    ///     without a slot.
+    ///     Gets a value indicating whether the viewer holds no reviewer slot, so the viewer cannot answer; set by
+    ///     <see cref="ChecklistService.GetAsync"/> for a viewer without a slot. Such a viewer sees the consolidated
+    ///     standing, or, when <see cref="IsMasked"/> is set, no standing.
     /// </summary>
     public bool NoSlot { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the viewer may not see the answers of the other reviewers yet, so this state
+    ///     holds no answer and no consolidation; set by <see cref="ChecklistService.GetAsync"/> for a viewer without a
+    ///     slot of a review with several slots that is not concluded, unless the viewer is the lead, an administrator
+    ///     or an Auditor (see <see cref="BallotVisibility"/>).
+    /// </summary>
+    public bool IsMasked { get; init; }
 
     /// <summary>
     ///     Gets the consolidation this state was built from, or <c>null</c> for the state of one ballot.

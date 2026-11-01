@@ -342,6 +342,16 @@ in-memory ballots, for example by `BallotConsolidation_Consolidate_SubmittedEqua
 `BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts`, and
 `BallotConsolidation_Consolidate_AgreedFail_Rejected`.
 
+**Ballot visibility**: The unit tests of `BallotVisibility`, `AuditMasking`, `ChecklistService`, `SigningService`,
+`ReviewProgressService`, `InboxService`, and `ThreadService` verify the subsystem requirement that the answers of the
+other reviewers stay hidden until the own ballot is handed in. The rule for the lead, the administrators, the single
+slot, the concluded review, and the member without a slot, the ballot view with the differing answers, the approval
+without a dispute count, and the audit entries without the detail of an answer are tested over in-memory stores and the
+real access rules, for example by `BallotVisibility_CanSeeOthers_PlainContributorWithoutSlot_Masked`,
+`SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome`,
+`ChecklistService_GetBallotView_SubmittedViewer_ListsDifferingChecksInSlotOrder`, and
+`AuditMasking_ForViewer_OtherAnswer_HidesDetailKeepsActorAndHash`.
+
 **Rejected outcome**: The unit tests of `SigningService`, `ReviewLock`, `ReviewProgressService`, `InboxService`, and
 `ThreadService` verify the rejected conclusion. A rejection with a conclusion text is signed and stored with the outcome
 Rejected, which is tested by `SigningService_SignAsync_RejectedWithText_StoresRejectedSignature`; without the text it is

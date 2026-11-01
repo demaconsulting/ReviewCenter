@@ -3,7 +3,10 @@
 #### Verification Approach
 
 `ChecklistPage` is verified with component tests defined in `ChecklistPageTests.cs`, `ChecklistPageFollowUpTests.cs`
-(the marks of a follow-up review), and `ChecklistPageBallotTests.cs` (the ballot controls), which use the bUnit test
+(the marks of a follow-up review), and `ChecklistPageBallotTests.cs` (the ballot controls). The hidden ballots and the
+side-by-side answers are verified in `ChecklistPageSideBySideTests.cs`, Submit and sign in
+`ChecklistPageSubmitAndSignTests.cs`, Assign me in `ChecklistPageAssignMeTests.cs` (all over the shared helper
+`BallotPageTestBase.cs`), and the `SignConfirm` component in `SignConfirmTests.cs`, and use the bUnit test
 context
 to render the real component over real Core services and an in-memory fake store holding a review with the default
 checklist. The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display
@@ -58,6 +61,21 @@ N/A - standard test environment.
   `author-answer-blocked` and the same controls disabled (without `data-locked`), no other member sees the notice, the
   notice is not shown when the rule is off, an approved review shows only the lock notice, and a page that was loaded
   before the rule was switched on shows the refusal of the rule when the author clicks, and stores nothing.
+- In a review with several slots, a reviewer who has not handed in sees the count of handed-in ballots and the notice
+  that the others stay hidden, and no standing, no disputed count, and no different-answers badge; a member without a
+  slot sees the same count and no standing; an administrator sees the differing answers without a ballot; a review
+  with one slot shows none of it.
+- A reviewer who has handed in sees the differing answers by name in slot order under the check, with a badge, and
+  Discuss starts a discussion thread about the check, refuses an empty text, and closes on cancel.
+- A complete draft offers Submit and sign as the main action and Submit ballot as the secondary one; an incomplete
+  draft and a review with one slot offer neither combination; Submit and sign hands in and signs, a wrong password
+  leaves the ballot handed in and explains, a change by another reviewer between the hand-in and the signature leaves
+  the ballot handed in, signs nothing and says that something changed, Submit ballot alone does not sign, and an
+  account of an identity provider is handed in and then asked to confirm at the provider.
+- Assign me as reviewer adds a new slot for a member without one and keeps the existing slots; it is offered to a project
+  administrator without a slot, and to nobody who holds a slot or is no member.
+- `SignConfirm` hands the password (and the code) over once and clears the password field, and draws no field for an
+  account of an identity provider.
 
 **ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection**: The page is rendered for a new review; the
 status line, the overall progress, all 14 sections with their progress, and exactly one open section are shown, and
@@ -255,3 +273,86 @@ Fail. This scenario is tested by `ChecklistPage_Render_FollowUp_DecidedAgainOrEa
 and the project then reworded one of them before the follow-up was created. The follow-up shows no earlier Fail for the
 reworded check, because the earlier justification belongs to other wording, and still shows it for the unchanged check.
 This scenario is tested by `ChecklistPage_Render_FollowUp_ReworkedCheckThatFailed_ShowsNoEarlierFail`.
+
+**ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts**: In a review with three slots two ballots are handed in
+with different answers, and the third reviewer has a draft. The page shows how many ballots are handed in and the notice
+that the others stay hidden, and neither a standing, nor a count of disputed checks, nor a name of another reviewer next
+to an answer. This scenario is tested by `ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts`.
+
+**ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount**: A member without a slot opens the checklist of such a
+review and sees the count and the Assign me button, and no standing. This scenario is tested by
+`ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount`.
+
+**ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks**: A reviewer who has handed in sees "Ann: Pass /
+Bob: N/A" under the check on which the ballots differ and not under a check on which they agree. This scenario is tested
+by `ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks`.
+
+**ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers**: A system administrator who holds no slot sees the
+differing answers. This scenario is tested by `ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers`.
+
+**ChecklistPage_SingleSlot_ShowsNoBallotCountsOrSideBySide**: A review with one slot shows no count of ballots and no
+side-by-side line. This scenario is tested by `ChecklistPage_SingleSlot_ShowsNoBallotCountsOrSideBySide`.
+
+**ChecklistPage_DisputedCheck_DiscussStartsCheckThread**: Discuss is pressed, a text is typed, and the discussion is
+started; a thread about the check exists with that text, and a link to the review page is shown. This scenario is tested
+by `ChecklistPage_DisputedCheck_DiscussStartsCheckThread`.
+
+**ChecklistPage_DiscussWithoutText_ShowsError**: Discuss is started without text; a message is shown next to the form
+and no thread is created. This scenario is tested by `ChecklistPage_DiscussWithoutText_ShowsError`.
+
+**ChecklistPage_DiscussCancel_ClosesTheForm**: Cancel closes the Discuss form. This scenario is tested by
+`ChecklistPage_DiscussCancel_ClosesTheForm`.
+
+**ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction**: A reviewer with a complete draft in a review with
+two slots sees Submit and sign as the main action with the password field, and Submit ballot as the secondary one. This
+scenario is tested by `ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction`.
+
+**ChecklistPage_IncompleteDraft_OffersNoSubmitButtons**: An incomplete draft offers neither button. This scenario is
+tested by `ChecklistPage_IncompleteDraft_OffersNoSubmitButtons`.
+
+**ChecklistPage_SubmitAndSign_SubmitsThenSigns**: The password is typed and Submit and sign is pressed; the ballot is
+submitted and the slot has signed. This scenario is tested by `ChecklistPage_SubmitAndSign_SubmitsThenSigns`.
+
+**ChecklistPage_SubmitAndSign_WrongPassword_KeepsBallotAndExplains**: A wrong password is typed; the ballot is handed
+in, no signature is stored, and the page says so. This scenario is tested by
+`ChecklistPage_SubmitAndSign_WrongPassword_KeepsBallotAndExplains`.
+
+**ChecklistPage_SubmitBallotAlone_DoesNotSign**: Submit ballot is pressed; the ballot is handed in and the slot has not
+signed. This scenario is tested by `ChecklistPage_SubmitBallotAlone_DoesNotSign`.
+
+**ChecklistPage_SingleSlot_OffersNoSubmitAndSign**: A review with one slot offers no Submit and sign button. This
+scenario is tested by `ChecklistPage_SingleSlot_OffersNoSubmitAndSign`.
+
+**ChecklistPage_SubmitAndSign_ProviderUser_SubmitsThenAsksToConfirmIdentity**: A reviewer whose account is of an
+identity provider presses the button; the ballot is handed in and the page asks for the confirmation at the provider.
+This scenario is tested by `ChecklistPage_SubmitAndSign_ProviderUser_SubmitsThenAsksToConfirmIdentity`.
+
+**ChecklistPage_SubmitAndSign_OtherReviewerChangesAnswerAfterHandIn_SignsNothingAndExplains**: A reviewer presses
+Submit and sign while the other reviewer changes an answer so that the ballots differ right after the hand-in. The
+ballot is handed in, no signature is stored, the page says that something changed and that the ballot is not signed,
+and shows the differing answers that the reviewer now sees, so the reviewer reads them and signs from the review page.
+This scenario is tested by
+`ChecklistPage_SubmitAndSign_OtherReviewerChangesAnswerAfterHandIn_SignsNothingAndExplains`.
+
+**ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes**: A member without a slot presses Assign me; a new slot with
+the member as primary reviewer and no alternate exists, and the other slots are as before. This scenario is tested by
+`ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes`.
+
+**ChecklistPage_ProjectAdministratorWithoutSlot_OffersAssignMe**: A project administrator without a slot is offered the
+button. This scenario is tested by `ChecklistPage_ProjectAdministratorWithoutSlot_OffersAssignMe`.
+
+**ChecklistPage_ViewerWithSlot_OffersNoAssignMe**: A reviewer who holds a slot is not offered the button. This scenario
+is tested by `ChecklistPage_ViewerWithSlot_OffersNoAssignMe`.
+
+**ChecklistPage_NonMember_OffersNoAssignMe**: A user who is no member sees no button. This scenario is tested by
+`ChecklistPage_NonMember_OffersNoAssignMe`.
+
+**SignConfirm_PasswordUser_HandsPasswordOverOnceAndClearsField**: The password is typed and the button pressed; the
+password is handed over once and the field is empty afterwards. This scenario is tested by
+`SignConfirm_PasswordUser_HandsPasswordOverOnceAndClearsField`.
+
+**SignConfirm_UserWithSecondFactor_HandsPasswordAndCodeOver**: With a second factor the password and the code are
+handed over. This scenario is tested by `SignConfirm_UserWithSecondFactor_HandsPasswordAndCodeOver`.
+
+**SignConfirm_ProviderUser_ShowsNoFieldsAndHandsOverNothing**: For an account of an identity provider no field is shown
+and nothing is handed over. This scenario is tested by `SignConfirm_ProviderUser_ShowsNoFieldsAndHandsOverNothing`.

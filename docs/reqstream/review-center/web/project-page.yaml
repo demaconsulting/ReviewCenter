@@ -725,3 +725,13 @@ sections:
           - ProjectPage_ReviewRules_NewSwitches_StaleValue_ShowsMessageAndReloads
           - ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement
           - ProjectPage_ReviewRules_NonAdmin_HidesCard
+
+      - id: ReviewCenter-ProjectPage-BallotMasking
+        title: >-
+          The ProjectPage unit shall show no disputed count in the blockers of a review for a viewer who has not
+          handed in their own ballot in a review with several slots.
+        justification: |
+          The overview is open to every member, and a blocker that says how many checks are disputed would reveal that
+          the reviewers differ.
+        tests:
+          - ProjectPage_HiddenViewer_ShowsNoDisputedCountAsBlocker

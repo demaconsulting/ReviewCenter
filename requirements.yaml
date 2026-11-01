@@ -97,6 +97,7 @@ includes:
   - docs/reqstream/review-center/core/inbox-service.yaml
   - docs/reqstream/review-center/core/user-impact-service.yaml
   - docs/reqstream/review-center/core/ballot-consolidation.yaml
+  - docs/reqstream/review-center/core/ballot-visibility.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml

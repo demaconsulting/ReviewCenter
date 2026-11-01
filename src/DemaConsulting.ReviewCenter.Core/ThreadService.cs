@@ -665,6 +665,86 @@ public sealed class ThreadService
     }
 
     /// <summary>
+    ///     Lists the threads of a review as a given viewer may see them: the threads about a check are left out while
+    ///     the viewer may not see the answers of the other reviewers yet (see <see cref="BallotVisibility"/>), because
+    ///     such a thread, or only its number, could give away how another reviewer answered.
+    /// </summary>
+    /// <param name="viewer">
+    ///     The person who looks; <c>null</c> is treated as a viewer who has handed in nothing, so check threads are left
+    ///     out of a review that has to hide them (fail closed).
+    /// </param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The visible threads in creation order; empty when there are none or the review does not exist.</returns>
+    public async Task<IReadOnlyList<ReviewThread>> ListAsync(
+        Actor? viewer,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        var threads = await _store.ListThreadsAsync(projectId, reviewId, cancellationToken);
+
+        // Nothing to hide without a check thread, so no role needs to be looked up
+        if (!threads.Any(thread => thread.IsCheckThread))
+        {
+            return threads;
+        }
+
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        var review = snapshot is null ? null : await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        if (snapshot is null || review is null)
+        {
+            return threads;
+        }
+
+        var seesAll = await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);
+        var user = viewer is null ? null : await _users.GetByUsernameAsync(viewer.Username, cancellationToken);
+        var visible = BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id);
+        return visible ? threads : threads.Where(thread => !thread.IsCheckThread).ToList();
+    }
+
+    /// <summary>
+    ///     Tells what a person may start in a review, so the page offers only what would be accepted.
+    /// </summary>
+    /// <param name="actor">The signed-in user; <c>null</c> may start nothing.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The capabilities; <see cref="ThreadCapabilities.None"/> for nobody, a person who cannot contribute, a review
+    ///     that does not exist and a concluded review (it is locked).
+    /// </returns>
+    public async Task<ThreadCapabilities> GetCapabilitiesAsync(
+        Actor? actor,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        if (actor is null || !await _access.CanContributeAsync(actor, projectId, cancellationToken))
+        {
+            return ThreadCapabilities.None;
+        }
+
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        var review = snapshot is null ? null : await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        if (snapshot is null || review is null
+            || ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+        {
+            return ThreadCapabilities.None;
+        }
+
+        // The same facts the start of a check thread gathers; the rule alone decides
+        var isSystemAdmin = await _access.IsSystemAdminAsync(actor, cancellationToken);
+        var isLead = await ReviewActorRoles.IsLeadAsync(_access, actor, review, cancellationToken);
+        var slot = await ReviewActorRoles.FindOwnSlotAsync(_users, actor, snapshot.Slots, cancellationToken);
+        var ballot = slot is null ? null : snapshot.Record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id);
+        var canStartCheck = snapshot.Record.Checklist is not null
+                            && CheckThreadRules.CanStart(isSystemAdmin, isLead, slot is not null, ballot?.Status, snapshot.Slots.Count);
+        return new ThreadCapabilities(true, canStartCheck);
+    }
+
+    /// <summary>
     ///     Selects the threads of a review for the thread index, newest activity first.
     /// </summary>
     /// <param name="threads">The threads of the review.</param>

@@ -88,13 +88,14 @@ sections:
       - id: ReviewCenter-ChecklistPage-NoSlot
         title: >-
           The ChecklistPage unit shall tell a signed-in user who holds no reviewer slot of the review, and who is not
-          read-only, that they see the consolidated standing of the submitted ballots but cannot answer until they
-          add themselves as a reviewer slot, with neither a ballot status nor a Submit ballot button, and with the
-          answer controls disabled.
+          read-only, that they cannot answer until they add themselves as a reviewer slot, with neither a ballot
+          status nor a Submit ballot button, and with the answer controls disabled; in a review with a single slot or
+          a concluded review the notice also says that they see the consolidated standing of the submitted ballots
+          (a multi-slot review that is not concluded is covered by ReviewCenter-ChecklistPage-HiddenBallots).
         justification: |
           Only a reviewer answers a checklist, so a project member without a slot would otherwise meet controls that
-          the service refuses. The notice says why and what to do, and the standing they still see is the one that every
-          other reader sees.
+          the service refuses. The notice says why and what to do, and where the standing is open to everyone (a
+          single-slot or concluded review) the standing they see is the one that every other reader sees.
         tests:
           - ChecklistPage_NoSlot_ShowsHint
 
@@ -216,3 +217,96 @@ sections:
           - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
           - ChecklistPage_Render_FollowUp_DecidedAgainOrEarlierReview_ShowsNoEarlierFail
           - ChecklistPage_Render_FollowUp_ReworkedCheckThatFailed_ShowsNoEarlierFail
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots
+        title: >-
+          The ChecklistPage unit shall tell a reviewer of a review with several reviewer slots who has not handed in
+          their own ballot how many ballots are handed in out of how many, and that the answers of the others stay
+          hidden until the own ballot is handed in, shall show no standing, no number of disputed checks, and no
+          different-answers mark to that reviewer, shall tell a member without a slot the same count with no
+          standing, shall show everything to an administrator without a ballot, and shall show none of it for a review
+          with a single slot.
+        justification: |
+          Seeing that somebody answered differently, or what they answered, would sway the reviewer before the own
+          answer is given. Who has handed in stays visible, because it tells who is still to come, and the people who
+          steer the review need the whole picture. A single reviewer has nobody to be swayed by, so that page keeps
+          its plain form.
+        tests:
+          - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
+          - ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount
+          - ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers
+          - ChecklistPage_SingleSlot_ShowsNoBallotCountsOrSideBySide
+
+      - id: ReviewCenter-ChecklistPage-SideBySide
+        title: >-
+          The ChecklistPage unit shall show a reviewer who has handed in their own ballot, under every check that the
+          submitted ballots answer differently, the answers by name side by side in the order of the slots, shall mark
+          the check with a different-answers badge, and shall offer a Discuss button that opens a small form and
+          starts a discussion thread about that check with the text given, refusing an empty text with a message
+          next to the form, closing the form on cancel, and linking to the review page for the thread.
+        justification: |
+          After the own ballot is in, the reviewers are meant to compare and to settle the difference. Seeing who
+          answered what, in one line, is the quickest way to know whom to talk to, and a button next to the check
+          turns that into the conversation without a search for the right place.
+        tests:
+          - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
+          - ChecklistPage_DisputedCheck_DiscussStartsCheckThread
+          - ChecklistPage_DiscussWithoutText_ShowsError
+          - ChecklistPage_DiscussCancel_ClosesTheForm
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign
+        title: >-
+          The ChecklistPage unit shall offer, in a review with several reviewer slots whose own ballot is a complete
+          draft and where nothing but the hand-in blocks the signature, a Submit and sign button as the main action
+          with the password field (and the code field of the second factor) beside it, and the Submit ballot button
+          as a secondary action, shall hand the ballot in and then sign when the button is pressed, keeping the
+          handed-in ballot and saying so when the signature is refused, shall hand the ballot in for an account of an
+          identity provider and then ask the user to confirm the identity at the provider, and shall offer neither
+          button for an incomplete draft, and not Submit and sign in a review with a single slot, and shall sign only
+          the digest of the record that the viewer is shown after the hand-in, so that when the reloaded view shows a
+          check that the submitted ballots answer differently nothing is signed and the page says that something
+          changed.
+        justification: |
+          Handing in and signing are two steps that most reviewers want as one, once the answers are final and nobody
+          else is in the way. Offering it only when the signature would be accepted avoids a refusal, and keeping the
+          hand-in when the signature fails means no work is lost. The identity provider cannot be asked from the
+          same step, so the ballot is handed in first and the confirmation follows. Before the hand-in the viewer has
+          not seen the answers of the other reviewers, so a signature given in the same click must never cover a
+          record that the viewer has not been shown: when the view after the hand-in reveals a difference, the
+          viewer reads it and signs on the review page, which is the second confirmation.
+        tests:
+          - ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction
+          - ChecklistPage_IncompleteDraft_OffersNoSubmitButtons
+          - ChecklistPage_SubmitAndSign_SubmitsThenSigns
+          - ChecklistPage_SubmitAndSign_WrongPassword_KeepsBallotAndExplains
+          - ChecklistPage_SubmitAndSign_OtherReviewerChangesAnswerAfterHandIn_SignsNothingAndExplains
+          - ChecklistPage_SubmitBallotAlone_DoesNotSign
+          - ChecklistPage_SingleSlot_OffersNoSubmitAndSign
+          - ChecklistPage_SubmitAndSign_ProviderUser_SubmitsThenAsksToConfirmIdentity
+
+      - id: ReviewCenter-ChecklistPage-SignConfirm
+        title: >-
+          The SignConfirm component shall show the password field, and the code field when the user has a second
+          factor, for a local account, and no field for an account of an identity provider, shall hand the entries
+          to the page once when the button is pressed, and shall clear the password field afterwards.
+        justification: |
+          The secrets of a signature must not stay in the page, and the form must match the way the account signs in.
+          The component is small and reusable, so its behavior is tested on its own.
+        tests:
+          - SignConfirm_PasswordUser_HandsPasswordOverOnceAndClearsField
+          - SignConfirm_UserWithSecondFactor_HandsPasswordAndCodeOver
+          - SignConfirm_ProviderUser_ShowsNoFieldsAndHandsOverNothing
+
+      - id: ReviewCenter-ChecklistPage-AssignMe
+        title: >-
+          The ChecklistPage unit shall offer a project member who may be a reviewer and holds no slot an Assign me as
+          reviewer button that adds a new slot with the user as primary reviewer and no alternate, leaving every
+          existing slot as it is, and shall offer it to nobody who holds a slot or who is not a member.
+        justification: |
+          A member who wants to review should not need to find the page of the slots. The shortcut only ever adds a
+          slot, so it can never take a place that somebody else holds.
+        tests:
+          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+          - ChecklistPage_ProjectAdministratorWithoutSlot_OffersAssignMe
+          - ChecklistPage_ViewerWithSlot_OffersNoAssignMe
+          - ChecklistPage_NonMember_OffersNoAssignMe

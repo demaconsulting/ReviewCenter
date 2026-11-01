@@ -1069,6 +1069,30 @@ a.action:active {
     margin-left: 0.75rem;
 }
 
+/* Differing answers of the reviewers: a warning border and an icon with a text, so color is never the only cue */
+.ballot-others {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--warning-border);
+    border-left-width: 4px;
+    border-radius: 0.25rem;
+    background: var(--warning-background);
+    color: var(--warning-text);
+}
+
+.ballot-others .badge {
+    margin-right: 0.5rem;
+}
+
+/* The note that says the answers of the others are still hidden */
+.masked-note {
+    margin: 0.5rem 0;
+}
+
+.sign-confirm {
+    margin: 0.5rem 0;
+}
+
 .section-next {
     margin: 0.75rem 0 0;
 }

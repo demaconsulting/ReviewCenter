@@ -73,22 +73,61 @@
         else if (State.NoSlot && !ReadOnly)
         {
             <p class="notice" role="status" data-testid="no-slot-notice">
-                You are not a reviewer of this review, so you see the consolidated standing but cannot answer. Add yourself
-                as a reviewer slot on the review page to answer the checklist.
+                @if (Ballots?.CanAssignMe == true)
+                {
+                    <text>You are not a reviewer of this review yet. Add yourself to answer the checklist.</text>
+                }
+                else
+                {
+                    <text>You are not a reviewer of this review, so you cannot answer. Ask for a reviewer slot on the review
+                        page to answer the checklist.</text>
+                }
             </p>
+            @if (Ballots?.CanAssignMe == true)
+            {
+                <button type="button" data-testid="assign-me" @onclick="AssignMeAsync">Assign me as reviewer</button>
+            }
+
+            @if (AssignError is not null)
+            {
+                <p class="error" role="alert" data-testid="assign-error">@AssignError</p>
+            }
+        }
+
+        @if (IsMultiSlot)
+        {
+            <p class="muted" data-testid="ballots-handed-in">@BallotsLine()</p>
+            @if (IsMasked)
+            {
+                <p class="notice masked-note" role="status" data-testid="ballots-hidden-notice">
+                    The other reviewers' answers stay hidden until you hand in your own ballot, so everyone decides
+                    on their own first. Their names and whether they have handed in stay visible.
+                </p>
+            }
         }
 
         @if (State.IsOwnBallot)
         {
             <p class="muted" data-testid="ballot-status">@BallotStatusLine()</p>
+            @if (ShowSubmitAndSign)
+            {
+                <SignConfirm NeedsPassword="@(!CurrentIsExternal)" NeedsCode="@CurrentHasTotp" OnSubmitAndSign="SubmitAndSignAsync" />
+                <p class="muted hint">Or hand in your ballot now and sign later.</p>
+            }
+
             @if (CanSubmitBallot)
             {
-                <button type="button" data-testid="submit-ballot" @onclick="() => SubmitBallotAsync()">Submit ballot</button>
+                <button type="button" class="@(ShowSubmitAndSign ? "secondary" : null)" data-testid="submit-ballot" @onclick="() => SubmitBallotAsync()">Submit ballot</button>
             }
 
             @if (BallotError is not null)
             {
                 <p class="error" role="alert" data-testid="ballot-error">@BallotError</p>
+            }
+
+            @if (SignError is not null)
+            {
+                <p class="error" role="alert" data-testid="sign-error">@SignError <a href="@ReviewAddress" data-testid="sign-error-review-link">Open the review</a></p>
             }
 
             @if (Warning?.Key == BallotWarningKey)
@@ -97,6 +136,30 @@
             }
         }
 
+        @if (SignNotice is not null)
+        {
+            <p class="notice" role="status" data-testid="sign-notice">@SignNotice <a href="@ReviewAddress" data-testid="sign-notice-review-link">Open the review</a></p>
+        }
+
+        @if (ReauthPending)
+        {
+            <form method="post" action="/auth/oidc/reauth" data-testid="submit-sign-reauth-form">
+                <AntiforgeryToken />
+                <input type="hidden" name="projectId" value="@ProjectId" />
+                <input type="hidden" name="reviewId" value="@ReviewId" />
+                <input type="hidden" name="slotId" value="@State.SlotId" />
+                <input type="hidden" name="returnUrl" value="@ReviewAddress" />
+                <p class="notice" role="status" data-testid="submit-sign-reauth-hint">
+                    Your ballot is in. To sign, confirm it is you: @Oidc.Value.DisplayName asks you to sign in again, then
+                    you come back to the review to sign.
+                </p>
+                <button type="submit" data-testid="submit-sign-reauth">Confirm identity with @Oidc.Value.DisplayName</button>
+            </form>
+        }
+
+        @* A viewer without a ballot who may not see the others yet gets no standing: it would show answers *@
+        @if (!State.IsMasked)
+        {
         <section class="card">
             <p class="status" data-testid="checklist-status">@StatusLine()</p>
             <p data-testid="checklist-progress">@ProgressLine()</p>
@@ -109,6 +172,7 @@
                 <a class="action outline" href="/projects/@ProjectId/reviews/@ReviewId" data-testid="back-to-review-link">Back to the review</a>
             }
         </section>
+        }
 
         <ul class="checklist-sections">
             @foreach (var section in State.Definition.Sections)
@@ -123,8 +187,11 @@
                         <button type="button" class="section-toggle" aria-expanded="@(isOpen ? "true" : "false")"
                                 data-testid="section-@sid-toggle" @onclick="() => GuardedAsync(() => ToggleSection(sectionId))">
                             <span class="section-title"><span class="section-chevron" aria-hidden="true">@(isOpen ? "\u25BE" : "\u25B8")</span>@section.Title</span>
-                            <span class="badge @SectionBadgeClass(section.Id, progress.IsDone)"
-                                  data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
+                            @if (!State.IsMasked)
+                            {
+                                <span class="badge @SectionBadgeClass(section.Id, progress.IsDone)"
+                                      data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
+                            }
                         </button>
                     </h2>
                     @if (State.CarriedFromFor(section.Id) is { } carriedSection)
@@ -235,6 +302,50 @@
                                             @if (answer is not null)
                                             {
                                                 <p class="muted hint" data-testid="check-answered-by-@iid">Answered by @answer.AnsweredBy, @FormatTime(answer.AnsweredAt)</p>
+                                            }
+
+                                            @if (Ballots?.Differing.TryGetValue(item.Id, out var differing) == true)
+                                            {
+                                                <p class="ballot-others ballot-disagree" data-testid="ballot-others-@iid">
+                                                    <span class="badge"><span aria-hidden="true">&#9888; </span>Different answers</span>
+                                                    <span data-testid="ballot-others-text-@iid">@SideBySide(differing)</span>
+                                                </p>
+                                                @if (Capabilities.CanStartCheckThread && !DiscussOpen.Contains(item.Id))
+                                                {
+                                                    <button type="button" class="secondary" data-testid="discuss-@iid"
+                                                            @onclick="() => ToggleDiscuss(itemId)">Discuss</button>
+                                                }
+                                            }
+
+                                            @if (DiscussOpen.Contains(item.Id))
+                                            {
+                                                <div class="field" data-testid="discuss-form-@iid">
+                                                    <label for="discuss-text-@iid">What do you want to talk about?</label>
+                                                    <textarea id="discuss-text-@iid" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
+                                                              data-testid="discuss-text-@iid" value="@DiscussTexts.GetValueOrDefault(item.Id)"
+                                                              @oninput="e => DiscussTexts[itemId] = e.Value?.ToString() ?? string.Empty"></textarea>
+                                                </div>
+                                                <div class="form-actions">
+                                                    <button type="button" data-testid="discuss-start-@iid" @onclick="() => StartDiscussionAsync(itemId)">Start discussion</button>
+                                                    <button type="button" class="secondary" data-testid="discuss-cancel-@iid" @onclick="() => ToggleDiscuss(itemId)">Cancel</button>
+                                                </div>
+                                            }
+
+                                            @if (DiscussErrors.TryGetValue(item.Id, out var discussError))
+                                            {
+                                                <p class="error" role="alert" data-testid="discuss-error-@iid">@discussError</p>
+                                            }
+
+                                            @if (Warning?.Key == DiscussWarningKey(item.Id))
+                                            {
+                                                <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
+                                            }
+
+                                            @if (DiscussStarted.Contains(item.Id))
+                                            {
+                                                <p class="notice" role="status" data-testid="discuss-started-@iid">
+                                                    Discussion started. Find it on <a href="@ReviewAddress">the review page</a>.
+                                                </p>
                                             }
                                         </li>
                                     }

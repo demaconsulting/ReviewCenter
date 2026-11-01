@@ -371,6 +371,16 @@ follow-ups and the carried-thread mark on the review page. They are tested by
 `ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail`, and
 `ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark`.
 
+**Ballot experience**: The unit tests of `ChecklistPage`, `ReviewPage`, `ProjectPage`, and `HistoryPage` verify the
+subsystem requirement for the hidden ballots: a reviewer who has not handed in sees only the count of handed-in ballots,
+the side-by-side answers and the Discuss button follow the own hand-in, Submit and sign and Assign me as reviewer are
+offered where the rules accept them, and the review page, the overview, and the history show no answer or dispute count
+to a viewer who may not see them. They are tested by `ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts`,
+`ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks`, `ChecklistPage_SubmitAndSign_SubmitsThenSigns`,
+`ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes`,
+`ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads`, and
+`HistoryPage_HiddenViewer_HidesAnswerDetailsOnly`.
+
 **Temporary password**: A user who signed in with a temporary password is confined to the account page. The layout
 shows no navigation tabs and sends the browser to `/account` from every page except the account, help, and about pages,
 which is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`; the account page shows a banner and

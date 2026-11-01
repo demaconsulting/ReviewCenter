@@ -262,6 +262,8 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 #### Dependencies
 
 - **IReviewStore** — checks the review, reads file content, and stores and reads threads (injected).
+- **BallotVisibility** — decides whether the viewer may see the discussions about checks (left out of the list
+  otherwise); `GetCapabilitiesAsync` tells which discussions the viewer may start.
 - **IProjectAccess** — requires that the actor may work in the project (injected), and decides the lead role.
 - **IUserStore** — resolves the actor to a user to find out whether the actor owns a reviewer slot (injected).
 - **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
