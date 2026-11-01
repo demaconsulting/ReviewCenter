@@ -34,9 +34,10 @@ public sealed class ChecklistAnswer
     ///     The value of <see cref="SlotId"/> for a review-level answer, one that belongs to no reviewer slot.
     /// </summary>
     /// <remarks>
-    ///     Today every answer is a review-level answer. Later, such a row is only the baseline that a follow-up review
-    ///     carries from the earlier review before any slot exists, and from which the ballot of a new slot is seeded.
-    ///     It is never a ballot, because no reviewer slot has the identity 0.
+    ///     An answer lives in the ballot of the reviewer slot that gave it (<see cref="SlotId"/> greater than 0). Only
+    ///     the baseline that a follow-up review carries from the earlier review before any slot exists uses this value;
+    ///     the ballot of a new slot is seeded from it. Such a row is never a ballot and is not part of the record or
+    ///     its digest, because no reviewer slot has the identity 0.
     /// </remarks>
     public const int BaselineSlotId = 0;
 

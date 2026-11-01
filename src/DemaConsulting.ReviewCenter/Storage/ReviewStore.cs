@@ -32,8 +32,9 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     Each operation uses its own short-lived context from the factory, so the store is safe for
 ///     concurrent use by all browser sessions. Read operations are untracked, and listing a review
 ///     never loads file bytes. The checklist snapshot is stored in the same transaction as its review.
-///     Answers and section states are replaced in place (one row per check or section and slot; the rows without a slot are
-///     the review-level rows the record is built from, the rows of a slot make its ballot). Ballot changes run in one
+///     Answers and section states are replaced in place (one row per check or section and slot; the rows of a slot make
+///     its ballot, which the record carries; the rows without a slot are only the baseline that a follow-up review carries,
+///     belong to no ballot and are no part of the record). Ballot changes run in one
 ///     transaction with the status row of the ballot and up to two audit entries (the change, then a status change of the
 ///     ballot). Slots are plain rows.
 ///     Signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness

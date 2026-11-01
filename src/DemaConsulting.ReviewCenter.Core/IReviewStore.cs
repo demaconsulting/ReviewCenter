@@ -44,7 +44,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     overtaken by a change; nothing is stored then.
 ///     The checklist answers and section states are held per reviewer slot: the list methods
 ///     (<see cref="ListChecklistAnswersAsync"/>, <see cref="ListChecklistSectionStatesAsync"/>) see only the
-///     review-level rows (<see cref="ChecklistAnswer.BaselineSlotId"/>, the rows a follow-up review carries), while the
+///     review-level rows (<see cref="ChecklistAnswer.BaselineSlotId"/>, the baseline a follow-up review carries, which
+///     belongs to no ballot and is no part of the record), while the
 ///     record carries the ballots and the ballot methods
 ///     (<see cref="ListBallotsAsync"/>, <see cref="GetBallotAsync"/>, <see cref="SetBallotAnswerAsync"/>,
 ///     <see cref="SetBallotSectionStateAsync"/>, <see cref="SubmitBallotAsync"/>) work on the rows of one slot and

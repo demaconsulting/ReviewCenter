@@ -45,12 +45,13 @@ application; the rest of the system sees only the Core store interfaces.
   recomputes the digest of the stored record: a digest that is not the current one raises a `DomainRuleException` for
   `RecordChanged` and stores nothing, a second signature of the same slot and digest raises one for
   `SigningNotAllowed`, and an unknown slot or review raises one for `SlotNotFound` or `ReviewNotFound`. The answers and
-  section states of one reviewer slot form its ballot (the `SlotId` column, 0 for the review-level rows of the record),
-  with a status row (`Draft` or `Submitted`); the ballot methods are dormant, the older checklist methods and the record
-  read the review-level rows only, a slot added to a follow-up review is seeded with the carried rows, a reassigned slot
-  loses the rows of the departed reviewers, and a removed slot loses all its ballot rows (see `ReviewStore`). Every
-  change of
-  data is stored together with its audit entry in one transaction, and a change that has no effect stores no entry.
+  section states of one reviewer slot form its ballot (the `SlotId` column), with a status row (`Draft` or
+  `Submitted`). `ChecklistService` writes them through the ballot methods, and the record, the digest and signing read
+  the submitted ballots. Slot 0 holds only the baseline that a follow-up review carries: it belongs to no ballot and is
+  no part of the record or the digest. A slot added to a follow-up review is seeded with the carried rows, a reassigned
+  slot loses the rows of the departed reviewers, and a removed slot loses all its ballot rows (see `ReviewStore`).
+  Every change of data is stored together with its audit entry in one transaction, and a change that has no effect
+  stores no entry.
   The membership of a user in a project (the project role `ProjectAdmin` or `User`) is added, changed, removed, read,
   and listed by project and by user; a second membership of the same user in the same project raises a
   `DomainRuleException` for `MembershipExists`, a membership of an unknown project or user is refused by the foreign

@@ -118,8 +118,9 @@ public sealed record SlotStatus(
 /// </param>
 /// <param name="UnsubmittedBallots">
 ///     The number of slots whose ballot has not been handed in (a draft, or none yet); zero for a review without a
-///     checklist. A single-slot review hands the ballot in with the last answer, so there the count is one exactly while
-///     the checklist is incomplete.
+///     checklist. Every such slot counts, whatever the state of the answers. A single-slot review hands the ballot in
+///     with the last answer, but a complete single-slot draft that needs no answer (for example because all checks
+///     were carried over) is not handed in automatically, so it still counts one until it is submitted.
 /// </param>
 public sealed record ReviewApproval(
     bool IsApproved,
