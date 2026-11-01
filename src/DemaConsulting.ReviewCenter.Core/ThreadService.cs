@@ -407,7 +407,7 @@ public sealed class ThreadService
         {
             throw new DomainRuleException(
                 DomainRule.ResolutionNoteRequired,
-                "A finding can only be resolved with a note that says what was done.");
+                "A finding needs a short note on what was done before it can be resolved.");
         }
 
         var resolution = note is null
@@ -617,8 +617,8 @@ public sealed class ThreadService
         {
             throw new DomainRuleException(
                 DomainRule.CommentNotTogglable,
-                "Only a reply can be included on its own; promote or demote the thread to change its starting comment " +
-                "and its resolution notes.");
+                "Only a reply can be added to the report or taken out of it on its own. Make the whole thread a " +
+                "finding or a question to change its first comment.");
         }
 
         // Setting the flag to the value it has is a no-op: no acknowledgement, no audit entry
@@ -699,22 +699,21 @@ public sealed class ThreadService
             return threads.Where(thread => !thread.IsCheckThread).ToList();
         }
 
-        var seesAll = await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);
-        var user = viewer is null ? null : await _users.GetByUsernameAsync(viewer.Username, cancellationToken);
-        var visible = BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id);
+        var visible = await CanSeeCheckThreadsAsync(viewer, review, snapshot, cancellationToken);
         return visible ? threads : threads.Where(thread => !thread.IsCheckThread).ToList();
     }
 
     /// <summary>
-    ///     Tells what a person may start in a review, so the page offers only what would be accepted.
+    ///     Tells what a person may start in a review and do with each thread (promote, demote, resolve, add a reply
+    ///     to the report), so the page offers only what would be accepted.
     /// </summary>
-    /// <param name="actor">The signed-in user; <c>null</c> may start nothing.</param>
+    /// <param name="actor">The signed-in user; <c>null</c> may do nothing.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>
-    ///     The capabilities; <see cref="ThreadCapabilities.None"/> for nobody, a person who cannot contribute, a review
-    ///     that does not exist and a concluded review (it is locked).
+    ///     The capabilities; <see cref="ThreadCapabilities.None"/> for nobody, an API-token caller, a person who
+    ///     cannot contribute (an auditor), a review that does not exist and a concluded review (it is locked).
     /// </returns>
     public async Task<ThreadCapabilities> GetCapabilitiesAsync(
         Actor? actor,
@@ -722,7 +721,7 @@ public sealed class ThreadService
         string reviewId,
         CancellationToken cancellationToken = default)
     {
-        if (actor is null || !await _access.CanContributeAsync(actor, projectId, cancellationToken))
+        if (actor is null || actor.ViaApiToken || !await _access.CanContributeAsync(actor, projectId, cancellationToken))
         {
             return ThreadCapabilities.None;
         }
@@ -742,7 +741,36 @@ public sealed class ThreadService
         var ballot = slot is null ? null : snapshot.Record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id);
         var canStartCheck = snapshot.Record.Checklist is not null
                             && CheckThreadRules.CanStart(isSystemAdmin, isLead, slot is not null, ballot?.Status, snapshot.Slots.Count);
-        return new ThreadCapabilities(true, canStartCheck);
+
+        // What may be done with each thread the person may see; a thread about a check is not listed for a viewer who
+        // may not see it, so the list gives away neither its existence nor its identity
+        var checkThreadsVisible = !snapshot.Record.Threads.Any(thread => thread.IsCheckThread)
+                                  || await CanSeeCheckThreadsAsync(actor, review, snapshot, cancellationToken);
+        var threads = snapshot.Record.Threads
+            .Where(thread => checkThreadsVisible || !thread.IsCheckThread)
+            .Select(thread => ActionsFor(actor, thread, slot is not null, isLead))
+            .ToList();
+        return new ThreadCapabilities(true, canStartCheck) { Threads = threads };
+    }
+
+    /// <summary>
+    ///     Tells whether a viewer may see the threads about a check of a review, which depends on whether they may see
+    ///     the answers of the other reviewers.
+    /// </summary>
+    /// <param name="viewer">The person who looks; <c>null</c> sees nothing of them (fail closed).</param>
+    /// <param name="review">The review.</param>
+    /// <param name="snapshot">The snapshot of the review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the viewer may see the threads about a check.</returns>
+    private async Task<bool> CanSeeCheckThreadsAsync(
+        Actor? viewer,
+        Review review,
+        ReviewSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var seesAll = await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);
+        var user = viewer is null ? null : await _users.GetByUsernameAsync(viewer.Username, cancellationToken);
+        return BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id);
     }
 
     /// <summary>
@@ -803,12 +831,13 @@ public sealed class ThreadService
         ArgumentNullException.ThrowIfNull(threads);
 
         var all = threads.ToList();
-        var open = all.Count(thread => thread.State == ReviewThreadState.Open);
+        var counts = ThreadCounts.From(all);
+        var open = counts.Open;
 
         // Without a checklist the sentence depends on the threads alone
         if (checklist is null)
         {
-            return ThreadsOnlyStep(all.Count, open);
+            return ThreadsOnlyStep(counts);
         }
 
         // With a checklist the unanswered checks come first, then disputed and failed checks, then the open threads
@@ -832,7 +861,7 @@ public sealed class ThreadService
 
         if (open > 0)
         {
-            parts.Add(Counted(open, "open thread to resolve", "open threads to resolve"));
+            parts.Add($"{counts.OpenText} to resolve");
         }
 
         if (conclusionRequired)
@@ -852,22 +881,16 @@ public sealed class ThreadService
     /// <summary>
     ///     Words the next action for a review that has no checklist.
     /// </summary>
-    /// <param name="threadCount">The number of threads of the review.</param>
-    /// <param name="open">The number of open threads.</param>
-    /// <returns>One short sentence about the threads.</returns>
-    private static string ThreadsOnlyStep(int threadCount, int open)
+    /// <param name="counts">The threads of the review, counted by kind and state.</param>
+    /// <returns>One short sentence about the threads, naming the open Findings and Questions.</returns>
+    private static string ThreadsOnlyStep(ThreadCounts counts)
     {
-        if (threadCount == 0)
+        if (counts.Total == 0)
         {
             return "No discussion yet - select a file and comment on a line.";
         }
 
-        return open switch
-        {
-            0 => "All threads resolved.",
-            1 => "1 open thread to resolve.",
-            _ => $"{open} open threads to resolve."
-        };
+        return counts.Open == 0 ? "All threads resolved." : $"{counts.OpenText} to resolve.";
     }
 
     /// <summary>
@@ -979,7 +1002,37 @@ public sealed class ThreadService
         string reviewId,
         CancellationToken cancellationToken)
     {
+        var isSlotOwner = await ReviewActorRoles.IsSlotOwnerAsync(_users, actor, snapshot.Slots, cancellationToken);
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var isLead = review is not null && await ReviewActorRoles.IsLeadAsync(_access, actor, review, cancellationToken);
+        return RolesFor(actor, thread, comment, isSlotOwner, isLead);
+    }
+
+    /// <summary>
+    ///     Combines the facts about a person into the relations to one thread; the one place that does, for the
+    ///     enforcement and for the capabilities a page shows, so they cannot differ.
+    /// </summary>
+    /// <param name="actor">The signed-in user.</param>
+    /// <param name="thread">The thread.</param>
+    /// <param name="comment">The comment in question, or <c>null</c> when the action is about the thread.</param>
+    /// <param name="isSlotOwner">Whether the person is the primary or the alternate of any slot of the review.</param>
+    /// <param name="isLead">Whether the person leads the review.</param>
+    /// <returns>The relations that apply; none for an API token, which may not decide on kinds or reports.</returns>
+    private static ThreadActorRole RolesFor(
+        Actor actor,
+        ReviewThread thread,
+        ReviewComment? comment,
+        bool isSlotOwner,
+        bool isLead)
+    {
+        // A token acts for a user without being that user: it never counts as the starter, an author, a reviewer or
+        // the lead, so promoting, demoting and the report toggle are refused for it
         var roles = ThreadActorRole.None;
+        if (actor.ViaApiToken)
+        {
+            return roles;
+        }
+
         if (thread.Comments.Count > 0 && SameUser(thread.Comments[0].AuthorUsername, actor.Username))
         {
             roles |= ThreadActorRole.Starter;
@@ -990,18 +1043,44 @@ public sealed class ThreadService
             roles |= ThreadActorRole.CommentAuthor;
         }
 
-        if (await ReviewActorRoles.IsSlotOwnerAsync(_users, actor, snapshot.Slots, cancellationToken))
+        if (isSlotOwner)
         {
             roles |= ThreadActorRole.SlotOwner;
         }
 
-        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
-        if (review is not null && await ReviewActorRoles.IsLeadAsync(_access, actor, review, cancellationToken))
+        if (isLead)
         {
             roles |= ThreadActorRole.Lead;
         }
 
         return roles;
+    }
+
+    /// <summary>
+    ///     Works out what a person may do with one thread.
+    /// </summary>
+    /// <param name="actor">The signed-in user.</param>
+    /// <param name="thread">The thread.</param>
+    /// <param name="isSlotOwner">Whether the person is the primary or the alternate of any slot of the review.</param>
+    /// <param name="isLead">Whether the person leads the review.</param>
+    /// <returns>The actions the rules of the service would accept.</returns>
+    private static ThreadActions ActionsFor(Actor actor, ReviewThread thread, bool isSlotOwner, bool isLead)
+    {
+        var roles = RolesFor(actor, thread, null, isSlotOwner, isLead);
+
+        // The same rules as the service: a Question is promoted unless it is resolved without a resolution note, a
+        // Finding is demoted, and the reply of a person (or any reply, for the lead) can be toggled on its own
+        var hasNote = thread.Comments.Any(c => c.Kind == ReviewCommentKind.Resolution);
+        var canPromote = thread.Kind == ThreadKind.Question
+                         && ThreadKindRules.CanPromote(roles)
+                         && (thread.State == ReviewThreadState.Open || hasNote);
+        var canDemote = thread.Kind == ThreadKind.Finding && ThreadKindRules.CanDemote(roles);
+        var toggles = thread.Comments
+            .Where(c => ThreadKindRules.IsToggleable(thread, c)
+                        && ThreadKindRules.CanToggleReply(RolesFor(actor, thread, c, isSlotOwner, isLead)))
+            .Select(c => c.Id)
+            .ToList();
+        return new ThreadActions(thread.Id, canPromote, canDemote, true, toggles);
     }
 
     /// <summary>

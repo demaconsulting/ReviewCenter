@@ -991,8 +991,8 @@ public class ThreadServiceTests
     /// <param name="expected">The expected sentence.</param>
     [Theory]
     [InlineData(0, 0, "No discussion yet - select a file and comment on a line.")]
-    [InlineData(1, 0, "1 open thread to resolve.")]
-    [InlineData(3, 1, "3 open threads to resolve.")]
+    [InlineData(1, 0, "1 open question to resolve.")]
+    [InlineData(3, 1, "3 open questions to resolve.")]
     [InlineData(0, 2, "All threads resolved.")]
     public void ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction(int open, int resolved, string expected)
     {
@@ -1018,9 +1018,9 @@ public class ThreadServiceTests
     [Theory]
     [InlineData(12, 0, 0, "12 checklist checks unanswered.")]
     [InlineData(1, 0, 0, "1 checklist check unanswered.")]
-    [InlineData(12, 2, 0, "12 checklist checks unanswered, 2 open threads to resolve.")]
-    [InlineData(5, 1, 3, "5 checklist checks unanswered, 1 open thread to resolve.")]
-    [InlineData(0, 3, 0, "Checklist complete; 3 open threads to resolve.")]
+    [InlineData(12, 2, 0, "12 checklist checks unanswered, 2 open questions to resolve.")]
+    [InlineData(5, 1, 3, "5 checklist checks unanswered, 1 open question to resolve.")]
+    [InlineData(0, 3, 0, "Checklist complete; 3 open questions to resolve.")]
     [InlineData(0, 0, 2, "Checklist complete and all threads resolved.")]
     [InlineData(0, 0, 0, "Checklist complete.")]
     public void ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads(
@@ -1047,7 +1047,7 @@ public class ThreadServiceTests
     /// <param name="expected">The expected sentence.</param>
     [Theory]
     [InlineData(0, 1, 0, "Checklist complete; 1 check answered Fail.")]
-    [InlineData(0, 3, 2, "Checklist complete; 3 checks answered Fail, 2 open threads to resolve.")]
+    [InlineData(0, 3, 2, "Checklist complete; 3 checks answered Fail, 2 open questions to resolve.")]
     [InlineData(4, 1, 0, "4 checklist checks unanswered, 1 check answered Fail.")]
     public void ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads(
         int unanswered, int failed, int open, string expected)
@@ -1074,11 +1074,11 @@ public class ThreadServiceTests
     /// <param name="expected">The expected sentence.</param>
     [Theory]
     [InlineData(0, 0, 1, 0, false, "1 check disputed between the ballots.")]
-    [InlineData(0, 0, 2, 1, false, "2 checks disputed between the ballots, 1 open thread to resolve.")]
+    [InlineData(0, 0, 2, 1, false, "2 checks disputed between the ballots, 1 open question to resolve.")]
     [InlineData(3, 0, 1, 0, false, "3 checklist checks unanswered, 1 check disputed between the ballots.")]
     [InlineData(0, 1, 0, 0, true, "Checklist complete; 1 check answered Fail, a conclusion stating the reasons is needed.")]
     [InlineData(0, 1, 0, 2, true,
-        "Checklist complete; 1 check answered Fail, 2 open threads to resolve, a conclusion stating the reasons is needed.")]
+        "Checklist complete; 1 check answered Fail, 2 open questions to resolve, a conclusion stating the reasons is needed.")]
     public void ThreadService_NextStep_DisputedAndConclusion_AreNamed(
         int unanswered, int failed, int disputed, int open, bool conclusionRequired, string expected)
     {

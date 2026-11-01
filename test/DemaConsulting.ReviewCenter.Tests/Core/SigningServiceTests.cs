@@ -868,7 +868,7 @@ public class SigningServiceTests
             Assert.Equal(1, approval.OpenThreads);
             Assert.Equal(1, approval.FailedChecks);
             Assert.Equal(items.Count - 1, approval.UnansweredChecks);
-            Assert.Contains("1 thread is open", approval.Blockers);
+            Assert.Contains("1 open question to resolve", approval.Blockers);
             Assert.DoesNotContain("1 check is answered Fail", approval.Blockers);
             Assert.Contains($"{items.Count - 1} checklist checks are unanswered", approval.Blockers);
         }

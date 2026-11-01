@@ -784,3 +784,102 @@ sections:
           - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
           - ReviewPage_MemberWithoutSlot_ShowsChecklistStandingHidden
           - ReviewPage_Administrator_SeesCheckThreadsAndConclusion
+
+      - id: ReviewCenter-ReviewPage-ThreadKinds
+        title: >-
+          The ReviewPage unit shall show every thread as either a Question (a neutral speech-bubble icon and the
+          visible word Question) or a Finding (an amber flag icon, the visible word Finding and an In report badge),
+          in the thread card, the thread index and the check discussions, and shall mark the lines of the diff that
+          have threads with one marker per kind (a gray bubble for questions, an amber flag for findings), each with
+          a count, a title and an accessible name such as 2 questions or 1 finding, both on a row that has both
+          kinds, and never with the icon or the color alone.
+        justification: |
+          A Question is conversation and a Finding goes into the report, so the reader must tell them apart at a
+          glance and without relying on color. Icons are hidden from assistive technology, so every marker carries
+          its meaning as text, and the markers must work in the light and the dark theme.
+        tests:
+          - ThreadKindBadge_Question_ShowsIconAndLabel
+          - ThreadKindBadge_Finding_ShowsFlagLabelAndInReportBadge
+          - ThreadKindBadge_Kinds_UseDifferentIcons
+          - ThreadKindBadge_Compact_NamesKindAndCount
+          - DiffView_Markers_UseDifferentIconPerKind
+          - DiffView_Markers_MixedRow_ShowsBothKindsWithCounts
+          - DiffView_Markers_EveryMarkerHasTextNameAndHiddenIcon
+          - DiffView_Markers_NoThreads_NoMarkers
+          - ReviewPage_KindMarkers_EveryMarkerHasTextLabel
+          - ReviewPage_CheckThread_ShowsKindBadgeAndPromote
+
+      - id: ReviewCenter-ReviewPage-ThreadComposer
+        title: >-
+          The ReviewPage unit shall offer, wherever a new thread is started (a line, a diff row, a whole file, or a
+          check of the checklist), a choice between Question (the default) and Finding (goes in the report) with the
+          text box and Ctrl+Enter to send, shall start the thread with the kind chosen, shall offer the same choice
+          in a review with a single slot, and shall offer in the reply box an Add to report check box so that a reply
+          is chat unless it is ticked.
+        justification: |
+          The kind is decided when the thread is written, so the form must make the choice plain and make Question
+          the harmless default. A reply that matters for the report must be addable without leaving the box.
+        tests:
+          - ThreadComposer_DefaultsToQuestion
+          - ThreadComposer_FindingChoice_StartsFindingThread
+          - ThreadComposer_ReplyAddToReport_SetsIncludeInReport
+          - ThreadComposer_Error_IsShownAsAlert
+          - ReviewPage_SingleSlot_KindChoiceStillAvailable
+          - ChecklistPage_DiscussFinding_KindChosenInComposer
+
+      - id: ReviewCenter-ReviewPage-ThreadActions
+        title: >-
+          The ReviewPage unit shall show in each thread card, driven by the capabilities that the Core computes, the
+          buttons to make a Question a Finding, to make a Finding a Question, to add a reply to the report or take it
+          out, and to resolve or reopen the thread, only to the people who may use them and never for an auditor or
+          after the conclusion, shall show each comment as a chat bubble or with an In report mark, shall ask for a
+          short resolution note when a Finding is resolved (optional for a Question) and let the person cancel,
+          and shall, when a change alters the digest, ask for the confirmation that names the signatures it makes
+          out of date, store nothing on cancel and audit the change once it is confirmed.
+        justification: |
+          The page must not offer what the rules would refuse, and a decision that changes the report must be a
+          deliberate one: the note says why a Finding is closed, and the signers must know that moving content into
+          or out of the report asks them to sign again.
+        tests:
+          - ThreadCard_Question_ShowsQuestionBadgeAndChatBubbles
+          - ThreadCard_Finding_ShowsFindingBadgeAndInReportMarkOnStartingComment
+          - ThreadCard_PromoteVisibleForSlotOwner_HiddenForAuditor
+          - ThreadCard_DemoteHiddenForNonStarterNonLead
+          - ThreadCard_ReplyReportToggle_OnlyAuthorOrLead
+          - ThreadCard_ResolveFinding_AsksForNoteThenReopens
+          - ResolveNoteDialog_Finding_RequiresNote
+          - ResolveNoteDialog_Question_NoteOptional
+          - ResolveNoteDialog_Cancel_HandsOverNothing
+          - ReviewPage_Promote_AfterSignature_ShowsSignatureImpactAndAudits
+          - ReviewPage_Demote_AfterSignature_NamesAffectedSigners
+          - ReviewPage_ResolveFinding_AfterSignature_CancelKeepsTheTypedNote
+          - ReviewPage_ReplyReportToggle_AddsAndRemovesReplyFromReport
+          - ReviewPage_Concluded_ThreadActionsAbsent
+          - ReviewPage_Auditor_SeesKindsButNoThreadActions
+
+      - id: ReviewCenter-ReviewPage-ThreadKindIndex
+        title: >-
+          The ReviewPage unit shall let the reader filter the thread index by kind (All, Questions, Findings) and by
+          state (All, Open, Resolved), with the count of each choice, shall show the kind badge in every row, and
+          shall show in the summary strip the number of open questions and the number of open findings.
+        justification: |
+          A reader who prepares the report wants the findings first, and a reader who answers wants the open
+          questions, so both views must be one click away with their counts.
+        tests:
+          - ReviewPage_ThreadIndex_FiltersByKindWithCounts
+          - ReviewPage_SummaryStrip_ShowsQuestionAndFindingCounts
+
+      - id: ReviewCenter-ReviewPage-ConclusionFindings
+        title: >-
+          The ReviewPage unit shall show the conclusion of a concluded review as a card with the outcome as an icon
+          and text, the conclusion text, the findings that are in the report with their resolution notes, and the
+          signers with the time, shall show the empty state while no conclusion is written, and shall show a viewer
+          who may not see the others only the notice.
+        justification: |
+          The conclusion is the record that the review leaves behind, so it must say what was decided, why, and which
+          findings were closed how, without depending on color, and must not give away hidden ballots.
+        tests:
+          - ReviewPage_ConclusionCard_Rejected_ShowsOutcomeTextFindingsAndSigners
+          - ReviewPage_ConclusionCard_Approved_ShowsApprovedOutcomeWithoutFindings
+          - ReviewPage_ConclusionCard_InProgress_ShowsEmptyStateAndOpenFindings
+          - ReviewPage_ConclusionCard_MaskedViewer_ShowsNoticeOnly

@@ -842,7 +842,7 @@ internal sealed class FakeReviewStore : IReviewStore
         {
             throw new DomainRuleException(
                 DomainRule.ResolutionNoteRequired,
-                "A finding can only be resolved with a note that says what was done.");
+                "A finding needs a short note on what was done before it can be resolved.");
         }
 
         var comments = _threads[index].Comments.ToList();
@@ -912,7 +912,7 @@ internal sealed class FakeReviewStore : IReviewStore
 
         if (_threads[index].Comments[0].Id == comment.Id || comment.Kind == ReviewCommentKind.Resolution)
         {
-            throw new DomainRuleException(DomainRule.CommentNotTogglable, "Only a reply can be included on its own.");
+            throw new DomainRuleException(DomainRule.CommentNotTogglable, "Only a reply can be added to the report or taken out of it on its own.");
         }
 
         if (comment.IncludeInReport == include)

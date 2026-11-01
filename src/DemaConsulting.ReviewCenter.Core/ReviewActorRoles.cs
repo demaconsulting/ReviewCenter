@@ -64,18 +64,18 @@ internal static class ReviewActorRoles
     ///     Tells whether a person is the primary or the alternate reviewer of any of the given slots.
     /// </summary>
     /// <param name="users">The user store used to resolve the user name to an identity. Must not be null.</param>
-    /// <param name="actor">The signed-in user; may be null, which is never a slot owner.</param>
+    /// <param name="actor">The signed-in user; <c>null</c> and an API token are never a slot owner.</param>
     /// <param name="slots">The reviewer slots of the review. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns><c>true</c> when the person is known and holds a slot; <c>false</c> for an unknown user and for the
-    /// command line, which has no user record.</returns>
+    /// <returns><c>true</c> when the person is known and holds a slot; <c>false</c> for an unknown user, for an API
+    /// token and for the command line, which has no user record.</returns>
     public static async Task<bool> IsSlotOwnerAsync(
         IUserStore users,
         Actor? actor,
         IReadOnlyList<ReviewerSlot> slots,
         CancellationToken cancellationToken)
     {
-        if (actor is null || slots.Count == 0)
+        if (actor is null || actor.ViaApiToken || slots.Count == 0)
         {
             return false;
         }

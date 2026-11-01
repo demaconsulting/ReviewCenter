@@ -460,9 +460,9 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Contains("anchored", cut.Find("[data-testid='code-line-3']").ClassList);
         Assert.Contains("anchored", cut.Find("[data-testid='code-line-4']").ClassList);
         Assert.Empty(cut.FindAll("[data-testid='line-marker-1']"));
-        Assert.Equal("1", cut.Find("[data-testid='line-marker-2']").TextContent);
+        Assert.Equal("1", cut.Find("[data-testid='line-marker-question-2-count']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='line-marker-3']"));
-        Assert.Equal("1", cut.Find("[data-testid='line-marker-4']").TextContent);
+        Assert.Equal("1", cut.Find("[data-testid='line-marker-question-4-count']").TextContent);
 
         // Assert: only the threads of this file are listed, in order, with anchor, state and comments
         Assert.Equal(3, cut.FindAll("[data-testid='threads-list'] > li").Count);
@@ -743,8 +743,9 @@ public partial class ReviewPageTests : PageTestBase
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
 
-        // Act: resolve
+        // Act: resolve (a question needs no note, so the note dialog is confirmed empty)
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{thread.Id}']").ClickAsync();
 
         // Assert: resolved and collapsed, so it offers to expand; the counts moved
         Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);
@@ -782,8 +783,9 @@ public partial class ReviewPageTests : PageTestBase
         await cut.Find($"[data-testid='thread-expand-{resolved.Id}']").ClickAsync();
         SignOutQuietly();
 
-        // Act: resolve the open thread
+        // Act: resolve the open thread (the dialog for the note opens first)
         await cut.Find($"[data-testid='thread-toggle-{open.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{open.Id}']").ClickAsync();
 
         // Assert: the page is the not-found page, and both threads keep their state
         Assert.NotEmpty(cut.FindAll("[data-testid='review-not-found']"));
@@ -871,12 +873,13 @@ public partial class ReviewPageTests : PageTestBase
 
         // Assert: the checks and one open thread to resolve are named in one sentence
         Assert.Equal(
-            "58 checklist checks unanswered, 1 open thread to resolve.",
+            "58 checklist checks unanswered, 1 open question to resolve.",
             cut.Find("[data-testid='next-step']").TextContent);
 
         // Act: resolve it
         var thread = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{thread.Id}']").ClickAsync();
 
         // Assert: only the checks are left
         Assert.Equal("58 checklist checks unanswered.", cut.Find("[data-testid='next-step']").TextContent);
@@ -998,7 +1001,7 @@ public partial class ReviewPageTests : PageTestBase
 
         // Assert: the row button's accessible name carries the same facts, not just the file
         Assert.Equal(
-            "Show Lines 2-3 of a.txt, Open, 2 comments, first by Ann, last activity 2025-03-04 05:06 UTC",
+            "Show Lines 2-3 of a.txt, Question, Open, 2 comments, first by Ann, last activity 2025-03-04 05:06 UTC",
             cut.Find($"[data-testid='index-row-{open.Id}']").GetAttribute("aria-label"));
         // Act, Assert: All shows both threads, with the counts in the filter buttons
         await cut.Find("[data-testid='index-filter-all']").ClickAsync();
@@ -1097,6 +1100,7 @@ public partial class ReviewPageTests : PageTestBase
 
         // Act: resolve the open thread
         await cut.Find($"[data-testid='thread-toggle-{open.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{open.Id}']").ClickAsync();
 
         // Assert: it collapsed
         Assert.Empty(cut.FindAll($"[data-testid='comment-text-{open.Id}-1']"));
@@ -1528,7 +1532,7 @@ public partial class ReviewPageTests : PageTestBase
         // Assert: the blockers are listed and there is no sign form
         var blockers = cut.Find($"[data-testid='sign-blockers-{slot.Id}']").TextContent;
         Assert.Contains("58 checklist checks are unanswered", blockers, StringComparison.Ordinal);
-        Assert.Contains("1 thread is open", blockers, StringComparison.Ordinal);
+        Assert.Contains("1 open question to resolve", blockers, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slot.Id}']"));
 
         // Act: render as cyd, who is not in the slot
@@ -2134,6 +2138,7 @@ public partial class ReviewPageTests : PageTestBase
         await cut.Find($"[data-testid='reply-text-{thread.Id}']").InputAsync("Second");
         await cut.Find($"[data-testid='reply-button-{thread.Id}']").ClickAsync();
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{thread.Id}']").ClickAsync();
         Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);
         await cut.Find($"[data-testid='thread-expand-{thread.Id}']").ClickAsync();
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
@@ -2160,8 +2165,9 @@ public partial class ReviewPageTests : PageTestBase
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
 
-        // Act: resolve
+        // Act: resolve (the note is optional for a question)
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='resolve-note-confirm-{thread.Id}']").ClickAsync();
 
         // Assert: resolved, still one comment, and still a Question
         Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);

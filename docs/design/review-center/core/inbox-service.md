@@ -49,7 +49,9 @@ are assigned in posting order and never reused, so one integer per review tells 
     signature that no longer covers the record. The state of a slot is the one the approval of the review uses.
   - *Replies waiting*: the user may contribute, the review is not concluded, and there is an open thread whose last
     comment is by someone else (a comment of the system counts as someone else) in which the user, holding a slot of
-    the review, wrote a comment, or of whose review the user is the creator. The chip gives the number of such threads.
+    the review, wrote a comment, or of whose review the user is the creator. The chip gives the number of such threads,
+    and the detail sentence names the kinds of those threads ("Waiting for your reply: 2 open findings, 1 open
+    question.").
     A thread counts whether its comments are chat or included in the report, and a review whose slots are all signed
     but that has an open thread is not concluded, so it still lists the thread here.
   - *Failed checks*: the user created the review, it is not concluded, and its consolidated checklist (the standing

@@ -466,6 +466,17 @@ public partial class DiffView : ComponentBase
     }
 
     /// <summary>
+    ///     Counts the threads that start at a cell, by kind, for the markers in its gutter.
+    /// </summary>
+    /// <param name="line">The line shown in the cell.</param>
+    /// <param name="side">The side of the cell.</param>
+    /// <returns>The counts of the Question and Finding threads that start on this line and side.</returns>
+    private ThreadCounts MarkerCounts(DiffLine line, ThreadSide side)
+    {
+        return ThreadCounts.From(Threads.Where(t => t.Side == side && InRange(line, side, t.StartLine, t.StartLine)));
+    }
+
+    /// <summary>
     ///     Tells whether a cell is the line a link points at or inside the anchor of the focused thread.
     /// </summary>
     /// <param name="line">The line shown in the cell.</param>

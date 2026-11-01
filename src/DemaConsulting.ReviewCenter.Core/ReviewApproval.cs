@@ -102,7 +102,7 @@ public sealed record SlotStatus(
 ///     filled by <see cref="SigningService.GetApprovalAsync(int, string, CancellationToken)"/> and
 ///     <see cref="SigningService.GetApprovalsAsync(int, IEnumerable{string}, CancellationToken)"/>.
 /// </param>
-/// <param name="OpenThreads">The number of comment threads that are open; the count behind the "threads are open" blocker.</param>
+/// <param name="OpenThreads">The number of comment threads that are open; the count behind the "N open findings, M open questions to resolve" blocker.</param>
 /// <param name="UnansweredChecks">
 ///     The number of checks of applicable sections that have no answer; the count behind the "checks are unanswered"
 ///     blocker. Zero for a review without a checklist.
@@ -145,6 +145,10 @@ public sealed record SlotStatus(
 ///     check threads are left out of the counts and of the sentences. A masked status is never produced for a concluded
 ///     review.
 /// </param>
+/// <param name="OpenQuestions">How many of <paramref name="OpenThreads"/> are Questions (chat).</param>
+/// <param name="OpenFindings">How many of <paramref name="OpenThreads"/> are Findings (part of the report).</param>
+/// <param name="OpenCheckQuestions">How many of <paramref name="OpenQuestions"/> are check threads.</param>
+/// <param name="OpenCheckFindings">How many of <paramref name="OpenFindings"/> are check threads.</param>
 public sealed record ReviewApproval(
     ReviewConclusion Conclusion,
     string Digest,
@@ -161,7 +165,11 @@ public sealed record ReviewApproval(
     ReviewOutcome? Outcome = null,
     bool ConclusionRequired = false,
     int OpenCheckThreads = 0,
-    bool IsMasked = false)
+    bool IsMasked = false,
+    int OpenQuestions = 0,
+    int OpenFindings = 0,
+    int OpenCheckQuestions = 0,
+    int OpenCheckFindings = 0)
 {
     /// <summary>
     ///     The sentence that tells a viewer why the answers of the other reviewers are not shown; it is added to every
@@ -217,9 +225,11 @@ public sealed record ReviewApproval(
                 : $"{UnansweredChecks} checklist checks are unanswered");
         }
 
+        var openQuestions = Math.Max(0, OpenQuestions - OpenCheckQuestions);
+        var openFindings = Math.Max(0, OpenFindings - OpenCheckFindings);
         if (openOther > 0)
         {
-            blockers.Add(openOther == 1 ? "1 thread is open" : $"{openOther} threads are open");
+            blockers.Add(ThreadCounts.OpenPhrase(openQuestions, openFindings) + " to resolve");
         }
 
         // The notice comes last and always, so that its presence tells nothing about the hidden answers
@@ -233,6 +243,10 @@ public sealed record ReviewApproval(
             NextStep = nextStep,
             OpenThreads = openOther,
             OpenCheckThreads = 0,
+            OpenQuestions = openQuestions,
+            OpenFindings = openFindings,
+            OpenCheckQuestions = 0,
+            OpenCheckFindings = 0,
             FailedChecks = 0,
             DisputedChecks = 0,
             Outcome = null,

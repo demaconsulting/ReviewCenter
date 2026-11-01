@@ -197,6 +197,38 @@ public class ChecklistPageSideBySideTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Test that the Discuss form of a check offers the choice of kind with Question as the default, and that
+    ///     choosing "Finding (goes in the report)" starts a Finding.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_DiscussFinding_KindChosenInComposer()
+    {
+        // Arrange
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob", ChecklistOutcome.Fail);
+        SignInAs("bob", "Bob", false);
+        var cut = RenderPage(projectId);
+        await OpenFirstSectionAsync(cut);
+        await cut.Find($"[data-testid='discuss-{FirstItemTestId}']").ClickAsync();
+
+        // Assert: Question is the default
+        var kindId = $"discuss-kind-{FirstItemTestId}";
+        Assert.True(cut.Find($"[data-testid='{kindId}-question']").HasAttribute("checked"));
+        Assert.False(cut.Find($"[data-testid='{kindId}-finding']").HasAttribute("checked"));
+
+        // Act: choose Finding and start
+        await cut.Find($"[data-testid='{kindId}-finding']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "finding" });
+        await cut.Find($"[data-testid='discuss-text-{FirstItemTestId}']").InputAsync("This check needs a fix");
+        await cut.Find($"[data-testid='discuss-start-{FirstItemTestId}']").ClickAsync();
+
+        // Assert: the thread is a Finding
+        var thread = Assert.Single(await Threads.ListAsync(projectId, ReviewKey, TestContext.Current.CancellationToken));
+        Assert.Equal(ThreadKind.Finding, thread.Kind);
+        Assert.Equal(FirstItemId, thread.CheckItemId);
+    }
+
+    /// <summary>
     ///     Test that an empty discussion is refused with the reason shown next to the check.
     /// </summary>
     [Fact]

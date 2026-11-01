@@ -23,6 +23,21 @@ included is a **Finding**, and every other thread is a **Question** (a `ThreadKi
 Question can still hold included replies, which are part of the record. The state of a thread (open or resolved) is not
 part of the record.
 
+#### Capabilities and counts
+
+`GetCapabilitiesAsync` answers, for the actor and a review, what the page may offer: whether a thread may be started
+and whether a discussion about a check may be started (`ThreadCapabilities`), and for each thread a `ThreadActions`
+value with `CanPromote`, `CanDemote`, `CanResolve`, and the identifiers of the comments whose report flag the actor may
+toggle. It uses the internal rules the actions themselves use (`ThreadKindRules`, `ThreadActorRole`, and
+`ReviewActorRoles`): a Question is promoted by the starter of the thread, by the owner of any slot of the review, or by
+the lead (the creator who may contribute, or a project or system administrator); a Finding is demoted only by the
+starter or the lead; the report flag of a reply is toggled only by its author or the lead. An auditor, an API token,
+and any viewer of a concluded review are allowed nothing, and a thread that does not exist gets
+`ThreadActions.None`. A resolved Question without a resolution note is promoted only after it was reopened and
+resolved again with a note, as `PromoteAsync` demands. `ThreadCounts` counts the threads of a review by kind and state
+(open and resolved Questions and Findings), words the open ones ("2 open findings, 1 open question"), and is the one
+count used by the summary strip, the progress, and the inbox.
+
 #### Data Model
 
 **ReviewThread**: a data class (init-only properties) of `Id` (assigned by the store), `ProjectId`, `ReviewId`,
@@ -106,8 +121,11 @@ reads the project as the actor).
 thread, the owner of a reviewer slot of the review (primary or alternate), and a lead (the creator of the review, who
 can still work in the project, or an administrator of the project); demoting is allowed for the starter and a lead;
 setting the flag of a reply is allowed for the
-author of that reply and a lead. Anybody else gets `ActorNotAllowed`. The roles are read by `ReviewActorRoles` and
-decided by the internal `ThreadKindRules`.
+author of that reply and a lead. Anybody else gets `ActorNotAllowed`. A personal access token never has a role: the
+relations are empty for an actor that came with a token (`ViaApiToken`), even when the user holds the slot, started the
+thread or wrote the reply, so a token is refused promote, demote and the report toggle with the same error, and
+`GetCapabilitiesAsync` offers it nothing (starting, replying and resolving by token are unchanged). The roles are read
+by `ReviewActorRoles` and decided by the internal `ThreadKindRules`.
 
 **Approval lock and conclusion**: while the review is concluded it is locked (see the `SigningService` unit), so every
 change of a thread is refused with `ReviewLocked` ("This review is concluded and locked. A project administrator must
@@ -223,13 +241,15 @@ progress of its checklist (`ChecklistProgress?`), the number of checks answered 
 number of checks disputed between the ballots (`disputedChecks`, default 0), and whether a rejected review still needs
 its conclusion text (`conclusionRequired`, default false) as one short
 sentence. Without a checklist: "No
-discussion yet - select a file and comment on a line." when there are no threads, "1 open thread to resolve." or
-"{n} open threads to resolve." when some are open, and "All threads resolved." otherwise. With a checklist the
+discussion yet - select a file and comment on a line." when there are no threads, "{open} to resolve." when some are
+open, where `{open}` is the open threads worded by kind (`ThreadCounts.OpenPhrase`), Findings first, for example
+"1 open finding to resolve.", "1 open question to resolve." or "2 open findings, 1 open question to resolve.", and
+"All threads resolved." otherwise. With a checklist the
 unanswered checks come first, then the disputed checks ("{n} checks disputed between the ballots"), then the checks
 answered Fail, then the open threads, then the conclusion ("a conclusion stating the reasons is needed"), and the
 sentence stays one line:
-"{n} checklist checks unanswered, {k} checks answered Fail, {m} open threads to resolve." (a part that is zero is
-left out), "Checklist complete; {k} checks answered Fail, {m} open threads to resolve." when the checklist is
+"{n} checklist checks unanswered, {k} checks answered Fail, {open} to resolve." (a part that is zero is
+left out), "Checklist complete; {k} checks answered Fail, {open} to resolve." when the checklist is
 complete but failed checks, open threads, or the conclusion remain, "Checklist complete and all threads resolved." when
 there are
 threads and all are resolved, and "Checklist complete." when the checklist is complete and there are no threads

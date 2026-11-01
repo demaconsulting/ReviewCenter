@@ -420,3 +420,33 @@ sections:
           - ThreadService_ResolveAsync_WithNote_Audit_HasNoteHashButNotText
           - ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport
           - ThreadService_NoOpReportMutations_RecordNothing
+
+      - id: ReviewCenter-ThreadService-Capabilities
+        title: >-
+          The ThreadService class shall tell a viewer, with the same rules that the thread actions enforce, whether
+          each thread may be made a Finding (by the starter of the thread, any reviewer of a slot, or the lead),
+          made a Question again (by the starter or the lead only), or resolved, and which comments may be added to or
+          taken out of the report (by the author of the reply or the lead), and shall tell an auditor, an API token,
+          and any viewer of a concluded review that nothing is allowed, so that a page offers exactly the actions that
+          would be accepted, and shall count the threads by kind and state for every page that shows a count.
+        justification: |
+          A button that the rules refuse is a trap, and a page that works the rules out for itself would drift from
+          the service. One answer from one place keeps both the same, and one count keeps the summary strip, the
+          progress, and the inbox in step.
+        tests:
+          - ThreadCapabilities_Promote_StarterSlotOwnerAndLead
+          - ThreadCapabilities_Demote_StarterAndLeadOnly
+          - ThreadCapabilities_ResolvedQuestion_PromoteNeedsResolutionNote
+          - ThreadCapabilities_Auditor_NothingAllowed
+          - ThreadCapabilities_ApiToken_NothingAllowed
+          - ThreadCapabilities_ApiToken_PromoteRefused
+          - ThreadCapabilities_ApiToken_DemoteRefused
+          - ThreadCapabilities_ApiToken_ToggleReplyRefused
+          - ThreadCapabilities_Concluded_NothingAllowed
+          - ThreadCapabilities_ToggleReply_AuthorOrLead
+          - ThreadCapabilities_Resolve_AnyContributor_UnknownThreadNothing
+          - ThreadCapabilities_Equality_ComparesPerThreadActionsByValue
+          - ThreadCounts_SplitByKindAndState
+          - ThreadCounts_OpenPhrase_NamesTheKinds
+          - ThreadCounts_KindPhrases_NameZeroOneAndMany
+          - ThreadCounts_From_NullThreads_Throws

@@ -149,7 +149,7 @@ public partial class WebSubsystemTests
         // Assert: the next step, the index row of the open thread (activity read back from the database) and
         // the collapsed details
         Assert.Equal(
-            "58 checklist checks unanswered, 1 open thread to resolve.",
+            "58 checklist checks unanswered, 1 open question to resolve.",
             page.QuerySelector("[data-testid='next-step']")?.TextContent);
         Assert.Single(page.QuerySelectorAll("[data-testid='thread-index-list'] > li"));
         Assert.False(string.IsNullOrWhiteSpace(page.QuerySelector("[data-testid^='index-activity-']")?.TextContent));

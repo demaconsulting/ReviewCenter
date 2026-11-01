@@ -271,6 +271,11 @@ public partial class ChecklistPage : ComponentBase
     private Dictionary<string, string> DiscussTexts { get; } = [];
 
     /// <summary>
+    ///     Gets whether the discussion typed for each check goes in the report (a Finding), by item identifier.
+    /// </summary>
+    private Dictionary<string, bool> DiscussReports { get; } = [];
+
+    /// <summary>
     ///     Gets the message of the last failed discussion start for each check, by item identifier.
     /// </summary>
     private Dictionary<string, string> DiscussErrors { get; } = [];
@@ -505,6 +510,7 @@ public partial class ChecklistPage : ComponentBase
         AssignError = null;
         DiscussOpen.Clear();
         DiscussTexts.Clear();
+        DiscussReports.Clear();
         DiscussErrors.Clear();
         DiscussStarted.Clear();
         _sendReauthForm = false;
@@ -964,9 +970,13 @@ public partial class ChecklistPage : ComponentBase
     /// <param name="itemId">The check identifier.</param>
     /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
     /// <param name="confirmedText">The text as it was at the first attempt; <c>null</c> to take the text typed now.</param>
+    /// <param name="confirmedReport">The kind choice as it was at the first attempt; <c>null</c> to take it as chosen now.</param>
     /// <returns>A task that completes when the discussion is stored or the warning or problem is shown.</returns>
     private async Task StartDiscussionAsync(
-        string itemId, IReadOnlyList<AffectedSignature>? confirmed = null, string? confirmedText = null)
+        string itemId,
+        IReadOnlyList<AffectedSignature>? confirmed = null,
+        string? confirmedText = null,
+        bool? confirmedReport = null)
     {
         if (!await GuardAsync())
         {
@@ -974,6 +984,7 @@ public partial class ChecklistPage : ComponentBase
         }
 
         var text = confirmedText ?? DiscussTexts.GetValueOrDefault(itemId) ?? string.Empty;
+        var report = confirmedReport ?? DiscussReports.GetValueOrDefault(itemId);
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
@@ -983,13 +994,14 @@ public partial class ChecklistPage : ComponentBase
                 ThreadAnchor.ForCheck(itemId),
                 actor,
                 text,
-                acknowledgedSlotIds: SlotIds(confirmed));
+                acknowledgedSlotIds: SlotIds(confirmed),
+                includeInReport: report);
         }
         catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
         {
             DiscussErrors.Remove(itemId);
             Warning = PendingSignatureWarning.Create(
-                DiscussWarningKey(itemId), confirmed, ex, slots => StartDiscussionAsync(itemId, slots, text));
+                DiscussWarningKey(itemId), confirmed, ex, slots => StartDiscussionAsync(itemId, slots, text, report));
             return;
         }
         catch (DomainRuleException ex)
@@ -1003,6 +1015,7 @@ public partial class ChecklistPage : ComponentBase
         Warning = null;
         DiscussErrors.Remove(itemId);
         DiscussTexts.Remove(itemId);
+        DiscussReports.Remove(itemId);
         DiscussOpen.Remove(itemId);
         DiscussStarted.Add(itemId);
     }

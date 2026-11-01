@@ -34,7 +34,8 @@ a project checklist, and sign the review with their credentials. Every action is
   filters and sorting
 - 🔁 **Follow-up Reviews** - A review after a failed one carries over the agreed passed answers and open threads (web and
   API)
-- 💬 **Threaded Comments** - Discuss files, line ranges, or a check of the checklist; an open one blocks signing
+- 💬 **Questions and Findings** - Discuss files, line ranges, or a check of the checklist; a Question is conversation, a
+  Finding goes into the signed report with its resolution note; an open one blocks signing
 - 📥 **Inbox** - What waits for you: signatures to give, replies, failed checks, and unread comments
 - ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own
   template), answered per reviewer slot in its own ballot and consolidated into the agreed standing

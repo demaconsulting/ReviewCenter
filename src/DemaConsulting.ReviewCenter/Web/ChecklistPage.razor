@@ -319,16 +319,23 @@
 
                                             @if (DiscussOpen.Contains(item.Id))
                                             {
-                                                <div class="field" data-testid="discuss-form-@iid">
-                                                    <label for="discuss-text-@iid">What do you want to talk about?</label>
-                                                    <textarea id="discuss-text-@iid" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
-                                                              data-testid="discuss-text-@iid" value="@DiscussTexts.GetValueOrDefault(item.Id)"
-                                                              @oninput="e => DiscussTexts[itemId] = e.Value?.ToString() ?? string.Empty"></textarea>
-                                                </div>
-                                                <div class="form-actions">
-                                                    <button type="button" data-testid="discuss-start-@iid" @onclick="() => StartDiscussionAsync(itemId)">Start discussion</button>
-                                                    <button type="button" class="secondary" data-testid="discuss-cancel-@iid" @onclick="() => ToggleDiscuss(itemId)">Cancel</button>
-                                                </div>
+                                                <ThreadComposer Text="@(DiscussTexts.GetValueOrDefault(item.Id) ?? string.Empty)"
+                                                                TextChanged="@(text => DiscussTexts[itemId] = text)"
+                                                                IncludeInReport="DiscussReports.GetValueOrDefault(item.Id)"
+                                                                IncludeInReportChanged="@(report => DiscussReports[itemId] = report)"
+                                                                OnSubmit="() => StartDiscussionAsync(itemId)"
+                                                                TextLabel="What do you want to talk about?"
+                                                                SubmitLabel="Start discussion"
+                                                                FormTestId="@($"discuss-form-{iid}")"
+                                                                TextTestId="@($"discuss-text-{iid}")"
+                                                                SubmitTestId="@($"discuss-start-{iid}")"
+                                                                ErrorTestId="@($"discuss-composer-error-{iid}")"
+                                                                HintTestId="@($"discuss-submit-hint-{iid}")"
+                                                                KindTestId="@($"discuss-kind-{iid}")">
+                                                    <Actions>
+                                                        <button type="button" class="secondary" data-testid="discuss-cancel-@iid" @onclick="() => ToggleDiscuss(itemId)">Cancel</button>
+                                                    </Actions>
+                                                </ThreadComposer>
                                             }
 
                                             @if (DiscussErrors.TryGetValue(item.Id, out var discussError))

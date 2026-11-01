@@ -143,3 +143,17 @@ sections:
           middle of a request.
         tests:
           - ReviewProgressService_Constructor_NullArgument_Throws
+
+      - id: ReviewCenter-ReviewProgressService-KindCounts
+        title: >-
+          The ReviewProgressService class shall report the open threads split into open questions and open findings
+          (their sum being the open threads), shall word the progress, blocker and next-step texts by kind (for
+          example 2 open findings, 1 open question), and shall not count the discussions about checks for a viewer who
+          may not see them.
+        justification: |
+          A reviewer decides what to do next by the kind of work that is open, and a count of discussions about checks
+          would give away what the others answered.
+        tests:
+          - ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings
+          - ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads
+          - ThreadCounts_MaskedViewer_NeverCountsCheckThreads

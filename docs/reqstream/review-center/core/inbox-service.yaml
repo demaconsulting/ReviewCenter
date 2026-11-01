@@ -168,3 +168,13 @@ sections:
           - InboxService_MarkAllReadAsync_UpsertsEveryListedReview
           - InboxService_MarkAllReadAsync_CommentAfterTheStart_StaysUnread
           - InboxService_NullArguments_Throw
+
+      - id: ReviewCenter-InboxService-KindWording
+        title: >-
+          The InboxService class shall word the text of a review that waits for a reply by the kind of the open
+          threads, naming the open findings and the open questions.
+        justification: |
+          A reply to a finding is more urgent than a reply to a question, so the inbox must say which of the two
+          is waiting.
+        tests:
+          - InboxService_GetInboxAsync_RepliesWaiting_TextNamesFindingsAndQuestions

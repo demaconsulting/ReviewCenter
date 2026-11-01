@@ -42,8 +42,14 @@ N/A - standard test environment.
 - Marking never moves the state back, stores nothing for a user who may not see the review, and marking all stores a
   state for every listed review, including the ones that were never opened.
 - Missing arguments are refused.
+- The Replies waiting row names the kinds of the threads that wait ("Waiting for your reply: 1 open finding, 2 open
+  questions.").
 
 #### Test Scenarios
+
+**InboxService_GetInboxAsync_RepliesWaiting_TextNamesFindingsAndQuestions**: A finding and two questions wait for the
+reply of the user; the chip is "3 waiting" and the detail names one open finding and two open questions. This scenario
+is tested by `InboxService_GetInboxAsync_RepliesWaiting_TextNamesFindingsAndQuestions`.
 
 **InboxService_GetInboxAsync_PrimarySlotNotSigned_ShowsToSignItem**: The primary reviewer of a slot without a signature
 finds the review under To sign with the chip "Not signed", and the row is unread. This scenario is tested by

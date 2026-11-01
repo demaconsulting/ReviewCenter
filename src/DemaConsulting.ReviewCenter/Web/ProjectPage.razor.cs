@@ -599,7 +599,7 @@ public partial class ProjectPage : ComponentBase
 
         if (progress.OpenThreads > 0)
         {
-            parts.Add(progress.OpenThreads + (progress.OpenThreads == 1 ? " open thread" : " open threads"));
+            parts.Add(progress.OpenThreadsText);
         }
 
         if (progress.UnansweredChecks > 0)

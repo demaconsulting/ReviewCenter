@@ -1,0 +1,22 @@
+@* ResolveNoteDialog: the short note that is asked for when a thread is resolved (a helper of the ReviewPage unit).
+
+   A Finding needs a note that says how it was dealt with (for example "fixed in abc123", "ticket #123" or "not an
+   issue"), because the note is printed in the report; for a Question the note is optional. The dialog sits inline in
+   the thread, not in a pop-up. It keeps the typed note only until Resolve or Cancel; the parent decides what Resolve
+   does. The note is plain text. Every interactive element carries a stable kebab-case data-testid. *@
+<div class="resolve-note-dialog" role="group" aria-label="@Title" data-testid="@($"resolve-note-{Suffix}")">
+    <label for="@($"resolve-note-text-{Suffix}")">@Prompt</label>
+    <textarea id="@($"resolve-note-text-{Suffix}")" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
+              placeholder="@Placeholder" data-testid="@($"resolve-note-text-{Suffix}")"
+              data-ctrl-enter-submits="@($"resolve-note-confirm-{Suffix}")"
+              @oninput="e => _note = e.Value?.ToString() ?? string.Empty"></textarea>
+    @if (_error is not null)
+    {
+        <p class="error" role="alert" data-testid="@($"resolve-note-error-{Suffix}")">@_error</p>
+    }
+    <div class="form-actions">
+        <button type="button" data-testid="@($"resolve-note-confirm-{Suffix}")" @onclick="ConfirmAsync">Resolve</button>
+        <button type="button" class="secondary" data-testid="@($"resolve-note-cancel-{Suffix}")"
+                @onclick="CancelAsync">Cancel</button>
+    </div>
+</div>
