@@ -42,6 +42,9 @@ Acceptance Criteria).
   whose byte range covers everything except the signature value, that holds the review, and that carries the notice
   about the self-signed key; the download is in the audit trail.
 - A review that is not complete is not offered on the page, and the download is refused with 409.
+- A review concluded as rejected is not offered either (the page shows a note instead) and the evidence index never
+  lists it; its attestation request is answered `NotApproved` (409), and `NotFound` without credentials; these are
+  verified in the unit tests of `AttestationService` and `EvidenceIndexService`.
 - The attestation download and the evidence index answer a user who is not a member of the project exactly like a
   project that does not exist (404), and a member and a system administrator are served. A request without credentials
   is served only when the project has switched on that route (see the `Api` subsystem).

@@ -324,7 +324,7 @@ public interface IReviewStore
     ///     The comparison and the update are one atomic step (compare-and-set) inside the transaction that also stores
     ///     the audit entry, like <see cref="UpdateEvidenceSettingsAsync"/>, so two people who save at the same time
     ///     cannot silently overwrite each other and the audit entry always names the value that was replaced. The
-    ///     method also refuses with <see cref="DomainRule.ReviewLocked"/> when the review is approved, checked inside
+    ///     method also refuses with <see cref="DomainRule.ReviewLocked"/> when the review is concluded (approved or rejected), checked inside
     ///     the same transaction (see <see cref="ReviewLock"/>). The due date is not part of the record digest.
     /// </remarks>
     /// <param name="projectId">The project identity.</param>
@@ -337,7 +337,7 @@ public interface IReviewStore
     ///     <c>true</c> when the due date was changed; <c>false</c> (and nothing recorded) when the review does not exist
     ///     or its due date is no longer <paramref name="expected"/>.
     /// </returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is approved.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewLocked"/> when the review is concluded.</exception>
     Task<bool> UpdateDueDateAsync(
         int projectId,
         string reviewId,
@@ -930,7 +930,7 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Reopens an approved review: stores the reopen and its audit entry in one transaction.
+    ///     Reopens a concluded (approved or rejected) review: stores the reopen and its audit entry in one transaction.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>

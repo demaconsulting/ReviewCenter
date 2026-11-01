@@ -2,11 +2,12 @@
 
 #### Verification Approach
 
-`SigningService` is verified with unit tests defined in seven files in the `Core` test folder: `SigningServiceTests.cs`
+`SigningService` is verified with unit tests defined in eight files in the `Core` test folder: `SigningServiceTests.cs`
 (slots, signing, re-authentication with a password, the out-of-date logic, the lock, and the reopening),
 `SigningServiceExternalTests.cs` (the signature of a user of an external identity provider), `SigningServiceTotpTests.cs`
 (the second factor), `AuditEventTests.cs` (the audit entries), `SigningServiceBallotTests.cs` (signing and approval
-with ballots), `ReviewLockBallotTests.cs` (the ballot conditions of a concluded review), and
+with ballots), `SigningServiceRejectedTests.cs` (the Rejected outcome and its conclusion text), `ReviewLockBallotTests.cs`
+(the ballot conditions of a concluded review, approved or rejected), and
 `SignatureImpactBallotTests.cs` (the impact check for changes of ballots), with the counting user store of
 `CountingUserStore.cs`
 as a helper of the first. The service depends on a review
@@ -52,7 +53,8 @@ N/A - standard test environment.
   slot and the reopening of a review by an unknown or disabled user.
 - A slot with a signature, current or out of date, cannot be changed or removed; an unsigned one can.
 - The primary or the alternate reviewer signs with the password entered again, and the signature records the slot, the
-  user, the role, the time, the digest, and the meaning text.
+  user, the role, the time, the digest, the agreed outcome (Approved, or Rejected when the ballots agree on at least one
+  Fail), and the meaning text of that outcome.
 - Nobody else can sign a slot, a disabled user cannot sign, and a reviewer who has been removed from the project
   cannot sign.
 - A wrong, empty, or missing password gives `ReauthenticationFailed`, and repeated failures lock the account as at
@@ -64,9 +66,12 @@ N/A - standard test environment.
   refusal before the password step keeps the proof.
 - The page can ask whether a proof exists without spending it, and the check before a confirmation accepts only an
   external member who is a reviewer of the slot.
-- Signing is refused with the blockers named while a check is unanswered in the consolidated ballots, a check of an
-  applicable section is agreed as Fail, the submitted ballots disagree on a check, or a thread is open (chat or included
-  in the report); a Fail in a section that does not apply does not block.
+- Signing is refused with the blockers named while a check is unanswered in the consolidated ballots, the submitted
+  ballots disagree on a check, a thread is open (chat or included in the report), or a rejected outcome has no review
+  conclusion text. A check answered Fail is not a blocker: it is counted in `FailedChecks` as information, and the
+  agreed Fail makes the outcome Rejected; a Fail in a section that does not apply is not counted.
+- Signing a rejected outcome without a non-blank conclusion text is refused with `ConclusionRequired` when the
+  conclusion is the only blocker, and with `SigningNotAllowed` listing every blocker otherwise; nothing is stored.
 - Signing is refused when the record changed after the signer saw it, and when the slot already has a signature of the
   current record. The open-thread check is separate from the comparison of digests and is repeated by the store inside
   the transaction that saves the signature.
@@ -75,14 +80,20 @@ N/A - standard test environment.
   is current; the review is then not approved, the slot can be signed again, and the earlier signature is kept. Chat
   and the state of a thread do not change the record.
 - A review is approved only when it has at least one slot, every slot has a submitted ballot, the ballots agree on
-  every check with the outcome Approved (a Rejected outcome is not concluded yet), every slot has a current signature,
-  and no thread is open; a review whose slots are all signed but that has an open thread is not approved, which the
+  every check with the outcome Approved, every slot has a current signature of the outcome Approved, and no thread is
+  open; a review whose slots are all signed but that has an open thread is not approved, which the
   status shows with the count of open threads. A review without a slot is not approved and its next step names the
   unanswered checks.
-- A concluded review (all submitted and agreed, all signed, no open thread) is locked: adding, changing, and removing a
-  slot and signing are
+- A review is concluded as rejected when the ballots agree on at least one Fail, a conclusion text is present, every
+  slot has a current signature of the outcome Rejected, and no thread is open; it is then not approved, its next step
+  starts with "Rejected.", and it is locked. A signature of an approval does not conclude a review whose ballots now
+  agree on a rejection, because the record digest differs and the signature is out of date.
+- A concluded review (approved or rejected: all submitted and agreed, all signed with the same outcome, no open thread)
+  is locked: adding, changing, and removing a
+  slot and signing, and a change of the conclusion text, are
   refused with `ReviewLocked`, the message of which says that an administrator must reopen the review, and nothing is
-  stored. An administrator can reopen only a concluded review.
+  stored. An administrator can reopen only a concluded review, a rejected one included, which leaves it in review and
+  keeps the signatures as history.
 - A reviewer whose own ballot is still a draft cannot sign, with `BallotNotSubmitted` (except in a review with a single
   slot that has blockers, where the blockers are named), and nothing is stored.
 - A slot signs as soon as its own ballot is submitted, while the ballot of another slot is still a draft; when another
@@ -223,11 +234,13 @@ account, so that the right password is then refused at the signature and at sign
 scenario is tested by `SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin`.
 
 **SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker**: A theory over a review with an unanswered
-check, with a check answered Fail, and with an open thread; each is refused with `SigningNotAllowed`, the message and
-the blockers of the status name the blocker, the review is not approved, and nothing is stored. This scenario is
+check and with an open thread; each is refused with `SigningNotAllowed`, the message and
+the blockers of the status name the blocker, the review is not approved, and nothing is stored. A check answered Fail is
+no longer a case of this theory, because it is not a blocker. This scenario is
 tested by `SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker`.
 
-**SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock**: A check answered Fail blocks signing; after
+**SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock**: A check answered Fail makes the agreed
+outcome Rejected, so the status has the blocker that asks for a conclusion text; after
 its section is marked as not applicable the blockers are empty. This scenario is tested by
 `SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock`.
 
@@ -390,7 +403,8 @@ an empty or null list. These scenarios are tested by
 **SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences**: A review has one Fail answer, the other
 checks unanswered, and one open thread; an approved review is arranged too. The structured counts of the status
 (`OpenThreads`, `UnansweredChecks`, `FailedChecks`) equal the numbers in the blocker sentences, in the single read and in
-the batch read, and are zero for the approved review. This scenario is tested by
+the batch read, and are zero for the approved review; the Fail answer is counted but has no blocker sentence. This
+scenario is tested by
 `SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences`.
 
 **SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence**: A review is stored without a
@@ -657,7 +671,50 @@ draft, although every slot is signed and the digest is unchanged
 (`ReviewLock_IsConcluded_Disputed_False`); true when every ballot is handed in, the ballots agree, and every slot is
 signed (`ReviewLock_IsConcluded_AllSubmittedAgreedSigned_True`); false when the ballots are handed in and agree but one
 slot has no signature (`ReviewLock_IsConcluded_AgreedBallotsOneSlotUnsigned_False`); false when they are handed in,
-agree and are signed but a thread is open (`ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False`); and false when
-every slot answers the first check Fail
-and hands in, because the Rejected conclusion does not exist yet
-(`ReviewLock_IsConcluded_RejectedOutcome_False_Until1c3`).
+agree and are signed but a thread is open (`ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False`); true when every
+slot answers the first check Fail, hands in, a conclusion text is present and every slot is signed for the rejection
+(`ReviewLock_IsConcluded_RejectedAllSignedWithText_True`, which also reads the concluded outcome Rejected); false when the
+conclusion text is blank (`ReviewLock_IsConcluded_RejectedNoText_False`, concluded outcome None); false when every
+signature says approved although the ballots agree on a rejection
+(`ReviewLock_IsConcluded_RejectedSignedForApproval_False`); and false when one slot of the rejection is unsigned
+(`ReviewLock_IsConcluded_RejectedOneSlotUnsigned_False`). The concluded outcome itself is Approved for agreed, signed
+ballots (`ReviewLock_ConcludedOutcome_AllSubmittedAgreedSigned_Approved`) and None while the ballots are disputed
+(`ReviewLock_ConcludedOutcome_Disputed_None`).
+
+**SigningService_SignAsync_RejectedWithText_StoresRejectedSignature**: All ballots agree on a Fail and the conclusion
+text is written. The status has the outcome Rejected, no blocker and the next step "Ready for signatures (rejected
+outcome)."; rita signs, and the stored signature has the
+outcome Rejected and `SigningService.MeaningRejectedText` as its meaning, and the `signature.added` audit detail names
+"outcome Rejected". This scenario is tested by `SigningService_SignAsync_RejectedWithText_StoresRejectedSignature`.
+
+**SigningService_SignAsync_Approved_StoresApprovedSignature**: In the signed review of the test world rita signs; the
+stored signature has the outcome Approved and `SigningService.MeaningText`, and the audit detail names "outcome
+Approved". This scenario is tested by `SigningService_SignAsync_Approved_StoresApprovedSignature`.
+
+**SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired**: The ballots agree on a Fail but no conclusion text
+is written. Signing is refused with `ConclusionRequired`, the status sets `ConclusionRequired`, lists
+`SigningService.ConclusionRequiredText` as a blocker, the next step asks for a conclusion, and no slot is signed. This
+scenario is tested by `SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired`.
+
+**SigningService_SignAsync_RejectedBlankText_ThrowsConclusionRequired**: A conclusion text of white space only counts as
+no text; signing is refused with `ConclusionRequired`. This scenario is tested by
+`SigningService_SignAsync_RejectedBlankText_ThrowsConclusionRequired`.
+
+**SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth**: The conclusion text is
+missing and a thread is open. Signing is refused with `SigningNotAllowed`, and the message lists both the conclusion
+blocker and the open thread. This scenario is tested by
+`SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth`.
+
+**SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved**: Two of three slots sign the rejection
+and the review is not concluded; after the last signs, the conclusion is Rejected, the review is concluded and not
+approved, the next step starts with "Rejected.", and a change of the conclusion text is refused with `ReviewLocked`. This
+scenario is tested by `SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved`.
+
+**SigningService_ReopenReviewAsync_Rejected_ReopensTheReview**: An administrator reopens a rejected, concluded review;
+afterwards it is not concluded, the conclusion is None, and the reopen is listed. This scenario is tested by
+`SigningService_ReopenReviewAsync_Rejected_ReopensTheReview`.
+
+**SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate**: Rita signs the approval; then
+every ballot turns to a Fail with the signature acknowledged. The signature of rita is out of date, the review is not
+concluded, and the outcome is Rejected. This scenario is tested by
+`SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate`.

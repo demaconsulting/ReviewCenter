@@ -22,13 +22,15 @@ N/A - standard test environment.
   chip "Not signed" or "Out of date, sign again", and a signed slot gives no row.
 - A thread in which the user wrote, or of the user's own review, whose latest comment is by someone else (the system
   counts) is a reply waiting; a thread whose latest comment is the user's own, and a resolved thread, are not.
-- The author finds the failed checks of the review with the number, and a Fail in a section that does not apply is
-  ignored.
-- An approval by someone else, or a reopening by someone else, after the user last saw the review is an update; it is
-  not counted as action, and an own signature or an own reopening is no update.
-- An approved review has no action row (a review whose slots are all signed but that has an open thread is not
-  approved, so it still has the Replies waiting rows), and a past due date marks an open review overdue and an
-  approved one not.
+- The author finds the failed checks of the review with the number and the detail "A Fail the reviewers agree on makes
+  the review reject; a Fail only one reviewer gave is a disagreement to resolve.", and a Fail in a section that does
+  not apply is ignored.
+- An approval or a rejection by someone else, or a reopening by someone else, after the user last saw the review is an
+  update (with the chip "Approved", "Rejected" or "Reopened"); it is not counted as action, and an own signature or an
+  own reopening is no update. A review concluded as rejected has no failed-checks and no to-sign rows.
+- A concluded review has no action row (a review whose slots are all signed but that has an open thread is not
+  concluded, so it still has the Replies waiting rows), and a past due date marks an open review overdue and a
+  concluded one not.
 - An auditor, a non-member, a removed member, a disabled user, a user with a temporary password, no actor, the command
   line, and an unknown name get no sign or reply rows or an empty inbox without an error; a system administrator who is
   no member gets only what is their own.
@@ -102,6 +104,16 @@ a comment of someone else. This scenario is tested by `InboxService_GetInboxAsyn
 **InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount**: The author sees the failed
 checks of the review with the number, and the failures are new to the author. This scenario is tested by
 `InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount`.
+
+**InboxService_GetInboxAsync_FailedChecks_TextSaysAgreedFailRejectsAndSingleFailIsDisagreement**: Bob answers a check of
+the review of the author as Fail; the failed-checks row of the author has the detail "A Fail the reviewers agree on
+makes the review reject; a Fail only one reviewer gave is a disagreement to resolve." This scenario is tested by
+`InboxService_GetInboxAsync_FailedChecks_TextSaysAgreedFailRejectsAndSingleFailIsDisagreement`.
+
+**InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction**: Both slots reject and sign, ann first and
+bob five minutes later. The inbox of ann has one row, in Updates, with `InboxService.RejectedChip`, no action is
+counted, and the review has no failed-checks row of the author and no to-sign row of bob. This scenario is tested by
+`InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction`.
 
 **InboxService_GetInboxAsync_FailInNotApplicableSection_IsIgnored**: A failed check in a section that does not apply is
 ignored. This scenario is tested by `InboxService_GetInboxAsync_FailInNotApplicableSection_IsIgnored`.

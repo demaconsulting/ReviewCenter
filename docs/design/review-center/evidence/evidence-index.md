@@ -31,11 +31,13 @@ attestation. Nothing is stored: the index is built for each request.
   evidence settings of the project are read (`EvidenceSettingsService.GetEffectiveAsync`), and unless the project
   exists and has `AnonymousIndex` on the rule of a missing project is thrown, the same as for a project that does not
   exist, and nothing else is read. A review is considered only when it has a review-set id. Its approval
-  is read from `SigningService` (all in one batch, see Cost);
-  a review that has no approval, or whose approval is not complete (no slot, an unsigned slot, or a signature of an
-  older record), is not listed. The completion time of a review is the latest `SignedAt` of its slots. Of the reviews
+  is read from `SigningService` (all in one batch, see Cost); a review that has no approval, or whose approval is not
+  complete and approved (no slot, an unsigned slot, a signature of an older record, or a rejected conclusion), is not
+  listed. The completion time of a review is the latest `SignedAt` of its
+  slots. Of the reviews
   with the same id and fingerprint the one with the latest completion time is kept and, for the same time, the one with
-  the lowest review id (ordinal). The result is always a pass, so the entry has no result field: the endpoint writes
+  the lowest review id (ordinal). A review concluded as rejected (every slot signed the outcome rejected) is not
+  approved, so it is never listed. The result is always a pass, so the entry has no result field: the endpoint writes
   `pass`.
 
 #### Error Handling
@@ -44,8 +46,10 @@ A review that cannot be read as complete is not listed, and no review causes an 
 constructor raises `ArgumentNullException`. A null actor is not an error: it is an anonymous request, which is checked
 against the project switch (see `BuildAsync`). Exceptions of the stores reach the caller.
 
-**Why only passes**: A review with a failed checklist answer cannot be signed, so no completed review has failed. The
-index therefore never holds a `fail` entry, and ReviewMark shows a review without a current entry as missing or stale.
+**Why only passes**: Only an approved review is listed. A review with a failed checklist answer can be concluded, but as
+rejected (see `SigningService`), and a rejected review is never listed, because it is no evidence that the file set
+passed. The index therefore never holds a `fail` entry, and ReviewMark shows a review without a current entry as missing
+or stale.
 
 **Why reviews without a review-set id are skipped**: ReviewMark matches an entry by the review-set id of its
 configuration. Only a review that was planned from a review-set (see `ReviewPlanner`) has one. A review that was made by

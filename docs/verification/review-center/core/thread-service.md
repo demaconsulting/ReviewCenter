@@ -204,6 +204,13 @@ open threads, and four unanswered checks with one failed check each give the mat
 checks named before the open threads. This scenario is tested by
 `ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads`.
 
+**ThreadService_NextStep_DisputedAndConclusion_AreNamed**: A theory over the number of unanswered checks, checks
+answered Fail, disputed checks, open threads, and whether a conclusion is needed: one disputed check, two disputed
+checks with an open thread, unanswered checks with a disputed check, and a failed check with a needed conclusion, with
+and without open threads, each give the matching sentence. The disputed checks are named and the checklist is not called
+complete while a check is disputed; a needed conclusion ends the sentence with "a conclusion stating the reasons is
+needed". This scenario is tested by `ThreadService_NextStep_DisputedAndConclusion_AreNamed`.
+
 **ThreadService_Mutations_ApprovedReview_ThrowReviewLocked**: A theory over the four changes of a thread (start, reply,
 resolve, and reopen) on a concluded review, that is a review whose every slot holds a current signature and that has no
 open thread; each is refused with `ReviewLocked`, the

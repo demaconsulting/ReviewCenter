@@ -77,12 +77,30 @@ sections:
         title: >-
           The HelpPage unit shall state in the Reviewers and signing topic that, while the project rule is on, the
           person who reopened a review cannot sign it again, and that a reopen that would leave a slot without anyone
-          who may sign is refused.
+          who may sign is refused, and shall explain that a Fail answer does not block signing, that the signature of
+          a review in which the ballots agree on a Fail records a rejection, and that a rejection needs a conclusion
+          text.
         justification: |
-          The rule and the refusal look like errors when met without explanation. The topic that explains signing
-          is the place a reviewer or an administrator looks first.
+          The rules and the refusal look like errors when met without explanation, and a reviewer who has found a
+          failed check must know that the way to end the review is to reject it with reasons. The topic that explains
+          signing is the place a reviewer or an administrator looks first.
         tests:
           - HelpSigningPage_Render_ExplainsTheReopenerRule
+          - HelpPage_Signing_NoLongerSaysFailBlocks
+
+      - id: ReviewCenter-HelpPage-ReadingReviewTopic
+        title: >-
+          The HelpPage unit shall state in the Reading a review topic that the holder of a reviewer slot owns a ballot,
+          answers the checks in it, submits it and then signs, and that the review concludes when every slot has signed
+          the same, current record, that a concluded review, approved or rejected, is locked, and shall tell the holder
+          of a reviewer slot where to write the review conclusion, in the Review conclusion card.
+        justification: |
+          A reviewer needs to know that the ballot is their own and must be submitted before signing, that a review
+          ends only when every slot has signed the same record, that a rejection is written in the review conclusion,
+          and that a review that is concluded can no longer be changed. The topic that explains the review page is the
+          place to say it.
+        tests:
+          - HelpPage_ReadingReview_ShowsSlotOwnerNote
 
       - id: ReviewCenter-HelpPage-ApiTokensTopic
         title: >-

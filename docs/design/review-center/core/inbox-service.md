@@ -37,24 +37,30 @@ are assigned in posting order and never reused, so one integer per review tells 
   unknown name), a user who must change a temporary password, and a user who may see no project.
 - *Algorithm*: Find the user from the actor. List the projects the user may see (through `IProjectAccess`) and the
   reviews in which the user is a reviewer or the creator (`IInboxStore.ListInvolvedReviewsAsync`), keep those of visible
-  projects, and read the read-state rows of the user. For each such review load one snapshot, because the approval
-  depends on the record digest and on the open threads (a review is approved only when every slot is signed for the
-  current record and no thread is open), and add rows by these rules:
-  - *To sign*: the user may contribute and is a member, the review is not approved, and a slot of the user (primary
+  projects, and read the read-state rows of the user. For each such review load one snapshot, because the conclusion
+  depends on the record digest and on the open threads (a review is concluded, as approved or as rejected, only when
+  every slot is signed for the current record with the outcome the record has now and no thread is open), and add rows
+  by these rules:
+  - *To sign*: the user may contribute and is a member, the review is not concluded, and a slot of the user (primary
     or alternate) is not signed. The chip is "Not signed", or "Out of date, sign again" when every such slot has a
     signature that no longer covers the record. The state of a slot is the one the approval of the review uses.
-  - *Replies waiting*: the user may contribute, the review is not approved, and there is an open thread whose last
+  - *Replies waiting*: the user may contribute, the review is not concluded, and there is an open thread whose last
     comment is by someone else (a comment of the system counts as someone else) in which the user, holding a slot of
     the review, wrote a comment, or of whose review the user is the creator. The chip gives the number of such threads.
     A thread counts whether its comments are chat or included in the report, and a review whose slots are all signed
-    but that has an open thread is not approved, so it still lists the thread here.
-  - *Failed checks*: the user created the review, it is not approved, and it has checks answered Fail in a section
-    that applies. The chip gives the number.
-  - *Updates*: the review is approved and its completing signature (the latest of the current digest) is by someone
-    else and newer than `LastSeenAt`, or it was reopened by someone else after that time. A signature of the user's
+    but that has an open thread is not concluded, so it still lists the thread here.
+  - *Failed checks*: the user created the review, it is not concluded, and it has checks answered Fail in a section
+    that applies. The chip gives the number, and the detail sentence is "A Fail the reviewers agree on makes the review
+    reject; a Fail only one reviewer gave is a disagreement to resolve." because a Fail answer no longer blocks signing
+    but, when the ballots agree on it, leads to a rejected outcome. A concluded review has no
+    failed-checks row and no to-sign row.
+  - *Updates*: the review is concluded and its completing signature (the latest of the current digest) is by someone
+    else and newer than `LastSeenAt`, or it was reopened by someone else after that time. The chip is "Approved"
+    (`ApprovedChip`) for an approved review and "Rejected" (`RejectedChip`) for a review concluded as rejected, so a
+    rejection is shown as an update and never as an action. A signature of the user's
     own is no news. Updates are always unread, carry no due mark, and are not counted as action.
 
-  The due date is shown on the action rows, as overdue when it is past and the review is not approved.
+  The due date is shown on the action rows, as overdue when it is past and the review is not concluded.
 - *Unread*: a row is unread when the user has no read-state row, or the reason is newer than the row: a comment of
   someone else with a higher identity than `LastSeenCommentId`, a signature or a reopening after `LastSeenAt`, or a
   Fail answered by someone else after `LastSeenAt`. A To sign row follows the same rule, so it is unread when
@@ -95,7 +101,8 @@ enters the record digest.
 - **IReviewStore** — the snapshot of a review: threads, answers, signatures, reopenings.
 - **IProjectAccess** — decides which projects the user may see and whether the user may contribute.
 - **IUserStore** — finds the user of an actor.
-- **RecordDigest** and **ReviewLock** — the current digest and the conclusion (`ReviewLock.IsConcluded`) of a review, so
+- **RecordDigest** and **ReviewLock** — the current digest and the conclusion (`ReviewLock.ConcludedOutcome`) of a
+  review, so
   the inbox and the review page never disagree.
 - **TimeProvider** — the read times and the due dates.
 

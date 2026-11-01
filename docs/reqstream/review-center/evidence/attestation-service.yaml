@@ -12,15 +12,19 @@ sections:
       - id: ReviewCenter-AttestationService-Approved
         title: >-
           The AttestationService class shall release an attestation only for a review that exists and has a current
-          signature in every reviewer slot for the current record, and shall report an unknown review as not found and
-          any other review as not approved, without asking for the signing key.
+          signature of the outcome Approved in every reviewer slot for the current record, shall report an unknown
+          review as not found and any other review as not approved, without asking for the signing key, and shall
+          answer a review that was concluded as Rejected, for an actor, as not approved with the message that the
+          review was rejected and that a signed attestation of a rejected review is not available yet.
         justification: |
-          The attestation is evidence that a review is complete. It must never be produced for a review that is not,
-          and a record that changed after the signatures must not be attested as approved.
+          The attestation is evidence that a review is complete and approved. It must never be produced for a review
+          that is not, and a record that changed after the signatures must not be attested as approved. A rejected
+          review is complete but not approved, and the answer says so instead of leaving the reader to guess.
         tests:
           - AttestationService_GenerateAsync_UnknownReview_ReturnsNotFound
           - AttestationService_GenerateAsync_SlotNotSigned_ReturnsNotApprovedWithoutAskingForTheKey
           - AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved
+          - AttestationService_GenerateAsync_RejectedConcluded_ReturnsNotApprovedWithRejectedMessageWithoutKey
 
       - id: ReviewCenter-AttestationService-Visibility
         title: >-
@@ -43,6 +47,7 @@ sections:
           - AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
           - AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing
+          - AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound
 
       - id: ReviewCenter-AttestationService-Revalidation
         title: >-

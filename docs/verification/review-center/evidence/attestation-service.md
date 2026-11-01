@@ -42,6 +42,9 @@ N/A - standard test environment (everything runs in memory).
   event then names the actor `anonymous`.
 - A request without an actor for a review that is not complete gets `NotFound`, the same answer as for a review that
   does not exist, while an actor gets `NotApproved`.
+- A review concluded as rejected has no attestation: an actor gets `NotApproved` with the message "The review was
+  rejected. A signed attestation of a rejected review is not available yet.", without the key being asked for and with
+  nothing recorded, and a request without an actor gets `NotFound`, so the outcome is not disclosed.
 - A review that is approved is locked, and the attestation is still produced for it. A review that was reopened by an
   administrator and signed again gives a PDF with a "Reopen history" section (time, who, reason, and the previous
   digest of each reopen), and a review that was never reopened gives a PDF without that section. When the reviewer
@@ -181,6 +184,16 @@ display name appear nowhere in the PDF, which names a participant label instead.
 **AttestationService_GenerateAsync_LockedReview_StillRenders**: An approved (locked) review is asked for. The status is
 `Ok` with a signed PDF, so the lock does not stop the attestation. This scenario is tested by
 `AttestationService_GenerateAsync_LockedReview_StillRenders`.
+
+**AttestationService_GenerateAsync_RejectedConcluded_ReturnsNotApprovedWithRejectedMessageWithoutKey**: Every ballot is
+a Fail, the conclusion text is written, and the slot signs the rejection. A signed-in caller gets `NotApproved` with a
+message that says the review was rejected, there is no content, nothing is recorded in the audit trail, and the key
+provider was not called. This scenario is tested by
+`AttestationService_GenerateAsync_RejectedConcluded_ReturnsNotApprovedWithRejectedMessageWithoutKey`.
+
+**AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound**: The same rejected, concluded review is
+in a project that allows anonymous attestation PDFs. A request without an actor gets `NotFound`, the answer for a review
+that does not exist. This scenario is tested by `AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound`.
 
 **AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers**: An approved review and an
 approved follow-up that carried every Pass answer are asked for. The follow-up's attestation names the followed review

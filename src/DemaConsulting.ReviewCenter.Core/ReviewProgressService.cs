@@ -192,12 +192,17 @@ public sealed class ReviewProgressService
         {
             stage = ReviewStage.Approved;
         }
+        else if (approval.IsConcluded)
+        {
+            stage = ReviewStage.Rejected;
+        }
 
-        var blocked = !approval.IsApproved
+        // An agreed Fail answer is not a blocker (it leads to a rejected outcome); a missing conclusion text is
+        var blocked = !approval.IsConcluded
             && (approval.OpenThreads > 0
                 || approval.UnansweredChecks > 0
-                || approval.FailedChecks > 0
                 || approval.DisputedChecks > 0
+                || approval.ConclusionRequired
                 || approval.MissingChecklist);
 
         return new ReviewProgress(
@@ -207,7 +212,7 @@ public sealed class ReviewProgressService
             approval.Slots.Count,
             approval.Slots.Count(s => s.State == SlotSignatureState.Signed),
             approval.Slots.Count(s => s.State == SlotSignatureState.OutOfDate),
-            approval.IsApproved ? [] : WaitingOn(approval.Slots),
+            approval.IsConcluded ? [] : WaitingOn(approval.Slots),
             approval.OpenThreads,
             approval.UnansweredChecks,
             approval.FailedChecks,
@@ -215,11 +220,13 @@ public sealed class ReviewProgressService
             review.Created,
             activity.TryGetValue(review.Id, out var last) ? last : review.Created,
             review.DueDate,
-            _reviews.IsOverdue(review, approval.IsApproved),
-            approval.IsApproved,
-            !approval.IsApproved && approval.Reopens is { Count: > 0 },
+            _reviews.IsOverdue(review, approval.IsConcluded),
+            approval.Conclusion,
+            !approval.IsConcluded && approval.Reopens is { Count: > 0 },
             blocked,
-            review.FollowsReviewId);
+            review.FollowsReviewId,
+            approval.ConclusionRequired,
+            approval.DisputedChecks);
     }
 
     /// <summary>

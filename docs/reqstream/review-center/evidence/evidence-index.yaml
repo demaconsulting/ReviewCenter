@@ -10,17 +10,20 @@ sections:
       - id: ReviewCenter-EvidenceIndex-Completed
         title: >-
           The EvidenceIndexService class shall list a review of the project only when every reviewer slot of the
-          review has signed the record that the review has now, and shall not list a review that is not complete, a
-          review that changed after it was signed, or a review of another project.
+          review has signed the record that the review has now with the outcome Approved, and shall not list a review
+          that is not complete, a review that changed after it was signed, a review that was concluded as Rejected, or
+          a review of another project.
         justification: |
           An entry in the index tells ReviewMark that the files with that fingerprint were reviewed and approved. A
-          review that is still open, or whose record changed after the signatures, has no such approval.
+          review that is still open, or whose record changed after the signatures, has no such approval, and a review
+          that was rejected is the opposite of one.
         tests:
           - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
           - EvidenceIndexService_Build_IncompleteReview_IsNotListed
           - EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed
           - EvidenceIndexService_Build_OtherProject_IsNotListed
           - EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce
+          - EvidenceIndexService_Build_RejectedConcludedReview_IsNeverListed
 
       - id: ReviewCenter-EvidenceIndex-Identity
         title: >-

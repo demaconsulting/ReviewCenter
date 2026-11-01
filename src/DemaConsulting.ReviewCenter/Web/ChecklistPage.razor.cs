@@ -87,7 +87,7 @@ public partial class ChecklistPage : ComponentBase
 
     /// <summary>
     ///     Gets or sets the service that computes the approval status of a review, supplied by dependency injection;
-    ///     an approved review is locked and its checklist is shown read-only.
+    ///     an approved or rejected review is locked and its checklist is shown read-only.
     /// </summary>
     [Inject]
     private SigningService SigningService { get; set; } = null!;
@@ -137,10 +137,10 @@ public partial class ChecklistPage : ComponentBase
     private ChecklistState? FollowedState { get; set; }
 
     /// <summary>
-    ///     Gets a value indicating whether the review is approved and therefore locked: the checklist is read-only until
-    ///     an administrator reopens the review.
+    ///     Gets a value indicating whether the review is concluded (approved or rejected) and therefore locked: the
+    ///     checklist is read-only until an administrator reopens the review.
     /// </summary>
-    private bool IsApproved { get; set; }
+    private bool IsConcluded { get; set; }
 
     /// <summary>
     ///     Gets a value indicating whether the user may only read this project (an auditor); every control that
@@ -149,10 +149,10 @@ public partial class ChecklistPage : ComponentBase
     private bool ReadOnly { get; set; }
 
     /// <summary>
-    ///     Gets a value indicating whether the controls that change the checklist are disabled: the review is approved
+    ///     Gets a value indicating whether the controls that change the checklist are disabled: the review is concluded
     ///     and locked, or the user may only read.
     /// </summary>
-    private bool IsLocked => IsApproved || ReadOnly;
+    private bool IsLocked => IsConcluded || ReadOnly;
 
     /// <summary>
     ///     Gets the value rendered into the <c>data-locked</c> attribute of a disabled control: <c>true</c> when the
@@ -263,8 +263,8 @@ public partial class ChecklistPage : ComponentBase
         FollowedState = Review?.FollowsReviewId is { } followed && State is not null
             ? await ChecklistService.GetAsync(ProjectId, followed)
             : null;
-        IsApproved = project is not null && State is not null
-            && (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsApproved == true;
+        IsConcluded = project is not null && State is not null
+            && (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsConcluded == true;
 
         // A member who may only read (an auditor) sees the checklist with every control disabled
         ReadOnly = project is not null && State is not null
@@ -317,7 +317,7 @@ public partial class ChecklistPage : ComponentBase
         Review = null;
         State = null;
         FollowedState = null;
-        IsApproved = false;
+        IsConcluded = false;
         ReadOnly = false;
         ProjectName = null;
         OpenSectionId = null;
@@ -546,7 +546,7 @@ public partial class ChecklistPage : ComponentBase
         catch (DomainRuleException ex)
         {
             // Somebody signed the last slot while the page was open: show the page as locked from now on
-            IsApproved |= ex.Rule == DomainRule.ReviewLocked;
+            IsConcluded |= ex.Rule == DomainRule.ReviewLocked;
             Warning = null;
             ItemErrors[itemId] = ex.Message;
             return;
@@ -593,7 +593,7 @@ public partial class ChecklistPage : ComponentBase
         }
         catch (DomainRuleException ex)
         {
-            IsApproved |= ex.Rule == DomainRule.ReviewLocked;
+            IsConcluded |= ex.Rule == DomainRule.ReviewLocked;
             Warning = null;
             BallotError = ex.Message;
             return;
@@ -643,7 +643,7 @@ public partial class ChecklistPage : ComponentBase
         }
         catch (DomainRuleException ex)
         {
-            IsApproved |= ex.Rule == DomainRule.ReviewLocked;
+            IsConcluded |= ex.Rule == DomainRule.ReviewLocked;
             Warning = null;
             SectionErrors[sectionId] = ex.Message;
             return;

@@ -227,7 +227,8 @@ public class CoreSubsystemTests
         Assert.Equal(
             rule is DomainRule.ReauthenticationFailed or DomainRule.ReviewLocked or DomainRule.SlotSigned
                 or DomainRule.SignaturesWouldBecomeOutOfDate or DomainRule.ReopenerCannotSign
-                or DomainRule.ReopenWouldStrandSlot or DomainRule.BallotNotSubmitted ? overall.Total : 0,
+                or DomainRule.ReopenWouldStrandSlot or DomainRule.BallotNotSubmitted or DomainRule.ConclusionRequired
+                ? overall.Total : 0,
             overall.Answered);
     }
 
@@ -626,7 +627,8 @@ public class CoreSubsystemTests
         DomainRule.ReopenWouldStrandSlot,
         DomainRule.NoReviewerSlot,
         DomainRule.BallotNotSubmitted,
-        DomainRule.BallotIncomplete
+        DomainRule.BallotIncomplete,
+        DomainRule.ConclusionRequired
     ];
 
     /// <summary>
@@ -743,6 +745,25 @@ public class CoreSubsystemTests
                 }
 
                 await checklists.SubmitBallotAsync(projectId, "rev-1", peerActor, cancellationToken);
+                digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+                await signing.SignAsync(actor, projectId, "rev-1", slot.Id, digest, ValidPassword, cancellationToken);
+                return;
+            case DomainRule.ConclusionRequired:
+                // The only slot belongs to root, who answers every check Pass except one Fail and signs: the rejection
+                // has no conclusion text, which is the only thing that stands in the way
+                foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+                {
+                    await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+                }
+
+                await checklists.SetAnswerAsync(
+                    projectId,
+                    "rev-1",
+                    DefaultChecklist.Current.Sections[0].Items[0].Id,
+                    ChecklistOutcome.Fail,
+                    "Found a problem.",
+                    actor,
+                    cancellationToken);
                 digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
                 await signing.SignAsync(actor, projectId, "rev-1", slot.Id, digest, ValidPassword, cancellationToken);
                 return;

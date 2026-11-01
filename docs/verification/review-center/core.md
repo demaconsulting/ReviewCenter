@@ -71,13 +71,18 @@ N/A - standard test environment.
   with `SignaturesWouldBecomeOutOfDate`, naming the slot and its signer, and nothing is stored; with the slot
   acknowledged it goes through and the signature is kept as out of date. Chat never needs the acknowledgement, and an
   open thread, chat or included, blocks signing and conclusion.
+- A review whose agreed ballots contain a Fail is not blocked by it: the signatures record the outcome Rejected, signing
+  needs a review conclusion text (`ConclusionRequired` otherwise), and the review is concluded as rejected, and so
+  locked, when every slot is signed for the rejection and no thread is open; a rejected review can be reopened like an
+  approved one (see the unit tests of `SigningService`, `ReviewLock`, and `ReviewProgressService`).
 - While a project requires independent reviewers (the default), the author of a review is refused as reviewer of a slot
   and as signer, also for a slot that was filled earlier and for a review created through a token (its author is the
   owner of the token); only a project administrator switches the rule, and every switch is audited.
 - Every change made through the services is recorded in the audit trail with the person, the action, and a detail
   that never holds a password or a token; recorded entries verify as an intact chain.
 - The inbox of a user lists the reviews that need the user (a signature to give, a reply waiting, failed checks) and
-  the updates (approval and reopening by others), counts the distinct reviews that need action, marks the comments of
+  the updates (approval, rejection and reopening by others), counts the distinct reviews that need action, marks the
+  comments of
   others after the last seen one as unread, and gives nothing to users who may not act (see the unit tests of
   `InboxService`).
 - The offboarding impact of a user lists the reviewer slots of unlocked reviews that still wait for the user and the
@@ -111,7 +116,8 @@ N/A - standard test environment.
   a system administrator can reset the second factor; each change is audited without a secret or a code (see the unit
   tests of `TotpService`, `TotpChallengeStore`, `UserService`, and `SigningService`).
 - The progress of the reviews of a project gives, for each review, the stage derived from its approval status (Setup,
-  In review, Approved), the signatures given, needed, and out of date, the people it waits on, the blocker counts that
+  In review, Approved, Rejected), the signatures given, needed, and out of date, the people it waits on, the blocker
+  counts that
   equal the numbers in the blocker sentences, the last activity from the audit trail, and the overdue state of the
   due date rule, with one read of the approvals and one of the activity however many reviews there are, to everyone who
   may see the project and to nobody else (see the unit tests of `ReviewProgressService`, `SigningService`, and
@@ -333,3 +339,14 @@ the sections that apply or not, the outcome derived from them, and the test of a
 in-memory ballots, for example by `BallotConsolidation_Consolidate_SubmittedEqual_Agreed`,
 `BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts`, and
 `BallotConsolidation_Consolidate_AgreedFail_Rejected`.
+
+**Rejected outcome**: The unit tests of `SigningService`, `ReviewLock`, `ReviewProgressService`, `InboxService`, and
+`ThreadService` verify the rejected conclusion. A rejection with a conclusion text is signed and stored with the outcome
+Rejected, which is tested by `SigningService_SignAsync_RejectedWithText_StoresRejectedSignature`; without the text it is
+refused with `ConclusionRequired`, which is tested by `SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired`;
+the review is concluded as rejected when every slot has signed, which is tested by
+`SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved` and
+`ReviewLock_IsConcluded_RejectedAllSignedWithText_True`; its stage is Rejected, which is tested by
+`ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked`; the inbox shows it as an update, which
+is tested by `InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction`; and the next step names disputed
+checks and the needed conclusion, which is tested by `ThreadService_NextStep_DisputedAndConclusion_AreNamed`.

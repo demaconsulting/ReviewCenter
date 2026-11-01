@@ -248,6 +248,46 @@ public partial class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the checklist of a review concluded as rejected shows the locked notice, which names both
+    ///     outcomes, and disables every control that would change it.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_RejectedConcludedReview_IsReadOnly()
+    {
+        // Arrange: a review whose only slot (rita) rejected it with a conclusion text and signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync(seatAnn: false);
+        var rita = new Actor("rita", "Rita");
+        var user = await Users.CreateAsync("rita", "Rita", UserRole.Reviewer, SigningPassword, cancellationToken);
+        await Store.AddMembershipAsync(user.Id, projectId, cancellationToken);
+        var slot = await Signing.AddSlotAsync(rita, projectId, "REV-1", user.Id, null, cancellationToken);
+        var first = true;
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                projectId, "REV-1", item.Id, first ? ChecklistOutcome.Fail : ChecklistOutcome.Pass, first ? "Wrong." : null, rita, cancellationToken);
+            first = false;
+        }
+
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", rita, cancellationToken);
+        await Checklists.SetReviewConclusionTextAsync(projectId, "REV-1", "Not ready.", rita, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        await Signing.SignAsync(rita, projectId, "REV-1", slot.Id, approval!.Digest, SigningPassword, cancellationToken);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert: the notice names both outcomes and the answer buttons are disabled
+        var notice = cut.Find("[data-testid='checklist-locked']").TextContent;
+        Assert.Contains("approved or rejected", notice, StringComparison.Ordinal);
+        await cut.Find("[data-testid='section-req-toggle']").ClickAsync();
+        foreach (var testId in new[] { "check-pass-req-01", "check-fail-req-01", "check-na-req-01" })
+        {
+            Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
+        }
+    }
+
+    /// <summary>
     ///     The password of the reviewers that sign in the signature warning tests.
     /// </summary>
     private const string SigningPassword = "correct horse battery";

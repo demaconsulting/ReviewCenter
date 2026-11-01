@@ -136,7 +136,8 @@ sections:
 
       - id: ReviewCenter-ChecklistPage-Locked
         title: >-
-          The ChecklistPage unit shall show a notice that the review is approved and locked, and disable the answer
+          The ChecklistPage unit shall show a notice that the review is concluded, approved or rejected, and locked,
+          and disable the answer
           buttons, the justification fields, the save buttons, and the applicability switches of the sections, while
           the review is locked, and shall keep the checklist readable and the navigation available.
         justification: |
@@ -145,6 +146,7 @@ sections:
           stale page still sends it.
         tests:
           - ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls
+          - ChecklistPage_Render_RejectedConcludedReview_IsReadOnly
 
       - id: ReviewCenter-ChecklistPage-AuthorBlocked
         title: >-

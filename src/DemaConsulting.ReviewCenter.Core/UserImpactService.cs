@@ -186,7 +186,7 @@ public sealed class UserImpactService
     }
 
     /// <summary>
-    ///     Adds the open work of one slot, unless its review is approved or the slot holds a current signature.
+    ///     Adds the open work of one slot, unless its review is concluded or the slot holds a current signature.
     /// </summary>
     /// <param name="work">The open work collected so far.</param>
     /// <param name="candidate">The slot of the user.</param>

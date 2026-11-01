@@ -120,7 +120,8 @@ sections:
         title: >-
           The Storage subsystem shall keep the reviewer slots of each review and the signatures made for them in
           the database file, so that they are all still there, unchanged, when the database is opened again, and
-          a signature is still current for a record that has not changed, and shall never let a signature be
+          a signature is still current for a record that has not changed, together with the outcome (Approved or
+          Rejected) that each signature records, and shall never let a signature be
           stored for a record that has changed or a signed slot be deleted.
         justification: |
           Signatures are the evidence that a review was approved and must outlive the process that created them.
@@ -136,6 +137,7 @@ sections:
           - ReviewCenter-DbContext-ReviewConclusionText
         tests:
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
+          - StorageSubsystem_Signatures_OutcomePersistsAcrossReopen
 
       - id: ReviewCenter-Storage-AuditTrail
         title: >-

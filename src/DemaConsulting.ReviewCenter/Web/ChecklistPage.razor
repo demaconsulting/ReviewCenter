@@ -5,7 +5,7 @@
    checklist with their progress. One section is open at a time (the first with unanswered checks to begin with);
    it offers the "applies to this review" switch (with a required reason when it does not) and one row per check
    with Pass / Fail / N/A buttons. Fail and N/A ask for a justification next to the buttons. When the review is
-   approved (locked) a notice says so and every control that changes the checklist is disabled and marked
+   concluded (approved or rejected, locked) a notice says so and every control that changes the checklist is disabled and marked
    data-locked="true"; navigation stays available. Every interactive
    element and every key value carries a stable kebab-case data-testid (section and check ids are lower-cased,
    for example "check-pass-req-01"), and the data-interactive marker on the root flips to "true" once the live
@@ -55,10 +55,11 @@
             </p>
         }
 
-        @if (IsApproved)
+        @if (IsConcluded)
         {
             <p class="notice" role="status" data-testid="checklist-locked">
-                This review is approved and locked, so the checklist is read-only. A project administrator can reopen the
+                This review is concluded (approved or rejected) and locked, so the checklist is read-only. A project
+                administrator can reopen the
                 review; the signatures are then kept as history and the review must be signed again.
             </p>
         }

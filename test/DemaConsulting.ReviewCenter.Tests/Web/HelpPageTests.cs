@@ -109,6 +109,42 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the reading-a-review topic says which people can write the conclusion in the Review conclusion card
+    ///     and that a concluded review is locked.
+    /// </summary>
+    [Fact]
+    public void HelpPage_ReadingReview_ShowsSlotOwnerNote()
+    {
+        // Act: render the topic page
+        var page = Render<HelpReadingReviewPage>();
+
+        // Assert
+        var text = page.Markup;
+        Assert.Contains("you own a ballot: answer the checks in your own ballot, submit it, then sign.", text, StringComparison.Ordinal);
+        Assert.Contains("The review concludes when every slot has signed the same, current record.", text, StringComparison.Ordinal);
+        Assert.Contains("A concluded (approved or rejected) review is locked", text, StringComparison.Ordinal);
+        Assert.Contains("If you hold a slot of the review", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Review conclusion</strong> card", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the signing topic no longer says that a Fail answer blocks signing and explains the rejected
+    ///     outcome and its conclusion text.
+    /// </summary>
+    [Fact]
+    public void HelpPage_Signing_NoLongerSaysFailBlocks()
+    {
+        // Act: render the topic page
+        var page = Render<HelpSigningPage>();
+
+        // Assert
+        var text = page.Markup;
+        Assert.Contains("A Fail answer does not block signing", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Rejected</strong>", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("answered Fail", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the attestation topic explains what the signature proves and does not prove, and the signing key.
     /// </summary>
     [Fact]
@@ -374,6 +410,8 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("<strong>To sign</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Replies waiting</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Failed checks</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("makes the review reject", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("unless the answers change", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Updates</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>New</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Mark all as read</strong>", text, StringComparison.Ordinal);

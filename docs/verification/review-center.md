@@ -92,7 +92,7 @@ loopback TCP ports.
   git commit authors are not matched.
 - A review may carry an optional due date, a UTC calendar day that is not part of the record: it is set when the review
   is created or planned and may be changed or cleared by an administrator or the creator, each change audited; the page
-  shows an Overdue badge once the date has passed unless the review is approved, and an approved review keeps its date
+  shows an Overdue badge once the date has passed unless the review is concluded, and a concluded review keeps its date
   without a badge and without an edit form (`ReviewCenter-System-DueDate`).
 - The project page shows a lead, for every review of the project, its stage, its signatures, what blocks it, who it
   waits on, its last activity, and its due date, with a summary by stage and overdue, filters, sorting, and paging that
@@ -115,11 +115,16 @@ loopback TCP ports.
   was drawn, and a later comment ends the approval (`ReviewCenter-System-SignatureBinding`).
 - The reviewed content, posted comments, and signatures are not offered for editing, an audit entry edited behind the
   tool is found by `audit verify`, and a change of the record after a signature, made while the review is still open,
-  makes the review In review again with the signature kept. An approved review is locked: every change to it is
+  makes the review In review again with the signature kept. A concluded (approved or rejected) review is locked: every
+  change to it is
   refused in the core services and in the database transaction, the review page shows it as Locked with its controls
   disabled, and only a project or system administrator can reopen it, with a reason that is audited together with the
   previous digest; the earlier signatures stay as history and fresh signatures are needed
   (`ReviewCenter-System-RecordImmutability`).
+- A Fail answer does not block signing: when the ballots agree on a Fail, a reviewer may sign the rejected outcome once
+  the review conclusion is written, and a review whose every slot holds a current signature of the rejected outcome is
+  concluded as rejected and locked, has no attestation, and is never listed in the evidence index; an administrator can
+  reopen it like an approved review.
 - Every change of data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an audit trail whose
   entries are chained by hashes, and the change and its entry are stored together; the entries never contain a password
   or the text of a comment or justification (verified at the level of the child requirements; the system tests show

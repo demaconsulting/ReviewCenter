@@ -26,7 +26,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <remarks>
 ///     The numeric values are persisted with signatures and must never be renumbered. A review that has no
 ///     outcome yet has no value of this type (<c>null</c>); see <see cref="ReviewConclusion"/> for the derived
-///     display state that also has a value for that case.
+///     display state that also has a value for that case. Every <see cref="ReviewSignature"/> records the outcome it
+///     attests (<see cref="ReviewSignature.Outcome"/>).
 /// </remarks>
 public enum ReviewOutcome
 {

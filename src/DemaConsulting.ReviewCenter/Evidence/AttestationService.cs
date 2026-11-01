@@ -200,9 +200,13 @@ internal sealed class AttestationService
         // incomplete review looks like a missing one; people who are signed in get the informative answer
         if (!approval.IsApproved)
         {
+            // A rejected review is concluded, but its signed attestation is not available yet; say so plainly
+            var message = approval.IsConcluded
+                ? "The review was rejected. A signed attestation of a rejected review is not available yet."
+                : "The review is not complete: not every reviewer slot has signed the current record, or a thread is open.";
             return actor is null
                 ? NotFoundResult()
-                : new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record, or a thread is open.");
+                : new AttestationResult(AttestationStatus.NotApproved, null, null, message);
         }
 
         // Then the key: without a usable key there is nothing to produce, and nothing is recorded

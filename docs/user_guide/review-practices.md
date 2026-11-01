@@ -10,24 +10,29 @@ to your own process.
 Know the hard rules first, because the practices build on them. A review can be signed only when:
 
 - every check of an applicable checklist section is answered;
-- no check is answered Fail; and
-- no comment thread is open.
+- the submitted ballots do not disagree on a check;
+- no comment thread is open; and
+- for a rejection, the review has a written conclusion that states the reasons.
+
+A Fail answer does not block signing. When the agreed ballots contain a Fail, the outcome that is signed is
+**Rejected**; otherwise it is **Approved**. The number of failed checks is shown for information only.
 
 Signing asks the signer to confirm their identity again (the password, or a fresh sign-in at the identity provider),
-and a signature covers the whole record as it was at that moment. While only some slots are signed, a change to the
+and a signature covers the whole record as it was at that moment, with the outcome it records. While only some slots
+are signed, a change to the
 record, such as a changed answer, makes the signatures given so far out of date; the page warns you
 and asks for a confirmation first (see *What Makes a Signature Out of Date*). Chat does not: a comment that is not
-included in the report is never part of the record. When every slot is signed and no thread is open, the review is
-Approved and **locked**: ReviewCenter then refuses every change of its threads, checklist, and
-reviewers until a project administrator reopens it (see *Approved Reviews Are Locked* below).
+included in the report is never part of the record. When every slot is signed for the same outcome and no thread is
+open, the review is concluded, as Approved or as Rejected, and **locked**: ReviewCenter then refuses every change of its
+threads, checklist, and reviewers until a project administrator reopens it (see *Concluded Reviews Are Locked* below).
 
 The product also constrains the reviewers: a slot holds only enabled members of the project, a person can be in only
 one slot, and only the primary or the alternate of a slot can sign it. In addition, a project requires independent
 reviewers by default: the person who created the review in ReviewCenter cannot be a reviewer of it or sign it. That
 setting can be switched off per project, it compares only the creator of the review (not the authors of git commits),
 and it does not apply to a review created from the command line, which has no recorded author. Two more rules are on by
-default: the person who created a review cannot answer its checklist, and the person who reopened an approved review
-cannot sign it again (see *Who May Answer the Checklist* and *Approved Reviews Are Locked*). See the Reviewing and
+default: the person who created a review cannot answer its checklist, and the person who reopened a concluded review
+cannot sign it again (see *Who May Answer the Checklist* and *Concluded Reviews Are Locked*). See the Reviewing and
 Administration chapters (Review Rules) for the exact rules. Everything else is up to the team: who writes a comment,
 who resolves it, and how it is worded.
 
@@ -59,7 +64,7 @@ agree on, do not.
 Ordinary discussion does not alter the record. A comment is **chat** unless it is included in the report, and chat,
 replies to it, and the state of a thread (resolved or open) are not part of what a signature covers. This version of
 the pages posts chat only, so starting a thread, replying, resolving, and reopening never make a signature out of
-date. An open thread still blocks signing, and a review that has an open thread is not Approved even when every slot
+date. An open thread still blocks signing, and a review that has an open thread is not concluded even when every slot
 is signed. The due date of a review is planning information and is not part of the record, so changing it leaves the
 signatures current.
 
@@ -79,7 +84,8 @@ the signers are done, or agree with them first (see *Sign Last* below).
   so do not use it to move on quickly; an answer is recorded under your name in your ballot, and the agreed answers
   go into the signed record.
 - **Fail** when the check is not met. A justification is required. State what is wrong and where, and point to the
-  thread that holds the details, because checklist answers are not linked to threads by the product.
+  thread that holds the details, because checklist answers are not linked to threads by the product. When the ballots
+  agree on a Fail, the review ends as Rejected (see *When a Check Fails*).
 - **N/A** when the check cannot apply to the files of this review. A justification is required as well. Say why in a
   way a later reader can verify, for example "No database code in this change set", not just "not relevant". If a whole
   section does not apply, clear the switch of the section and give the reason once.
@@ -98,31 +104,39 @@ Any change to the agreed standing of the submitted ballots (such as a reviewer d
 change to the
 report makes the signatures given so far out of date. So agree who is still to answer, let them
 finish, close the open threads (an open thread blocks the signature), and only then sign; the signature of the last
-reviewer is the one that approves the review. If a late change
+reviewer is the one that concludes the review. If a late change
 is needed, the page warns you which signatures it voids; after you confirm, the reviewers who already signed sign the
 new record again. A reviewer may sign as soon as the own ballot is submitted, but then a later disagreement of another
 reviewer makes that signature out of date.
 
 ## When a Check Fails
 
-A Fail is a valid, recorded answer, but a review with a Fail cannot be signed. The product has no signed "review
-failed" or "rejected" outcome yet: a review is either Approved or still In review, and the evidence index lists only
-complete reviews. A suggested path:
+A Fail is a valid, recorded answer, and it does not block signing. When the submitted ballots agree on a Fail, the
+reviewers sign the review as **Rejected**, and a rejected review is a concluded, locked review that records the finding.
+A suggested path:
 
 1. Record the Fail with a justification, and start a thread on the lines concerned that explains why and what the
    author should change.
-2. The author fixes the code in the repository. The files of an existing review never change, so the fix needs a new
+2. Settle every disagreement between the ballots and resolve the open threads. They block a rejection like an approval.
+3. Write the reasons in the **Review conclusion** card of the review page. A rejected review cannot be signed without
+   this text, and the slots say "A rejected review needs a conclusion stating the reasons" until it is there. Name the
+   failed checks and what must change, because the text is the summary a later reader sees first.
+4. Every slot signs. The sign form shows "You are signing: REJECTED" and the statement "I have reviewed this record and
+   reject it.". When every slot has signed, the review is Rejected and locked.
+5. The author fixes the code in the repository. The files of an existing review never change, so the fix needs a new
    review of the fixed revision.
-3. Create a follow-up review of the fixed revision: choose the failed review under **Follow up on an earlier review**
-   in the form for a new review. The new review takes over what still holds and shows the Fail again, so the
+6. Create a follow-up review of the fixed revision: choose the rejected review under **Follow up on an earlier
+   review** in the form for a new review. The new review takes over what still holds and shows the Fail again, so the
    reviewers decide it anew (see Follow-up Reviews in the Reviewing chapter).
-4. Ask the reviewers to check that the earlier findings are fixed, resolve the carried threads, answer the failed
+7. Ask the reviewers to check that the earlier findings are fixed, resolve the carried threads, answer the failed
    check again, and sign.
 
-The earlier review stays In review. Teams that need evidence of a failed review should keep that unsigned review, with
-its threads, answers, and its **History** (the audit trail of the review); the follow-up names it, and its attestation
-says which review it follows.
-There is no attestation PDF for a review that is not Approved, so the review record and its history are the evidence.
+The rejected review stays as the record of what was found: its threads, answers, conclusion, and its **History** (the
+audit trail of the review); the follow-up names it, and its attestation says which review it follows. If the failed
+answer was a mistake, a project administrator can reopen the rejected review like any locked review (see *Concluded
+Reviews Are Locked*) and the reviewers correct the answer.
+There is no attestation PDF for a rejected review yet, and the evidence index never lists one, so the review record and
+its history are the evidence of the rejection.
 
 ## Handling Minor Findings Without Blocking
 
@@ -141,7 +155,7 @@ thread (a Finding, a thread that is included in the report, needs a resolution n
 Write the reason as a
 reply first, then resolve. A reply can also be added to a resolved thread (expand it first), and it does not reopen it.
 Resolving or replying to a thread that is only chat does not make a signature out of date, but close every thread
-before the last signature anyway: an open thread blocks signing, and once the review is Approved and locked it refuses
+before the last signature anyway: an open thread blocks signing, and once the review is concluded and locked it refuses
 both.
 Say what was done and who decided, for example "Declined by the author after discussion with Alex: ...", because a
 resolved thread is shown collapsed, and the audit trail records who pressed the button but not why.
@@ -166,15 +180,15 @@ Prefer that the person who raised the thread resolves it, after the author has r
 agree on an outcome, the reviewer who agrees with it can resolve it instead. Do not let the author resolve their own
 reviewers' threads without a reply that the reviewer has seen. The product does not enforce any of this: every member of
 the project can resolve or reopen any thread, so it is a convention to agree on in the team. Reopen a thread that was
-resolved too early, before the review is approved; after that the lock refuses it.
+resolved too early, before the review is concluded; after that the lock refuses it.
 
 ## Baselines and Scope
 
-- **Keep reviews small.** A review of a few related files can be read carefully, and a Fail or an open thread blocks
+- **Keep reviews small.** A review of a few related files can be read carefully, and a Fail or an open thread affects
   only that review.
 - **Review against the previous revision.** Give a repository review a baseline, so the diff shows what changed and the
   reviewers do not read the unchanged code again. With **Plan reviews**, the default compares each review-set with its
-  last signed review, so changes of an unsigned (for example failed) review are not skipped.
+  last signed review, so changes of an unsigned review are not skipped.
 - **Know the trade-off with ReviewMark.** A review made from the changes since a baseline holds only the changed
   files, so its fingerprint is not the one ReviewMark computes for the whole review-set, and ReviewMark reports it as
   stale. If you enforce review-sets with the evidence index, review all files of the set (see Use the Evidence Index
@@ -193,32 +207,34 @@ the code. If your process needs more (for example, that nobody who committed to 
 convention: check the commit authors yourself when you choose the reviewers. Keep your team's rule consistent with the
 project's review rules setting.
 
-## Approved Reviews Are Locked
+## Concluded Reviews Are Locked
 
-An Approved review is **Locked**: every slot has signed the current record and no thread is open, and the review page
-shows a Locked badge.
-The lock is not a separate state; it lasts exactly while the review is Approved. A project administrator or a system
-administrator can **Reopen** it in the locked notice of the review page, with a reason of 1 to 250 characters. A reopen
+An Approved or Rejected review is **Locked**: every slot has signed the same outcome for the current record, no thread
+is open (and a rejected review has its conclusion text), and the review page shows a Locked badge.
+The lock is not a separate state; it lasts exactly while the review is Approved or Rejected. A project administrator or
+a system administrator can **Reopen** it in the locked notice of the review page, with a reason of 1 to 250 characters.
+A reopen
 is audited (`review.reopened`, with the reason and the previous digest) and listed in the **Reopen history** of the
 review. It puts the review back In review. The earlier signatures stay as history but are out of date for good, even
-if the content is changed back, so the reviewers must sign again. Reading, the attestation PDF, and the evidence index
-keep working while the review is locked, and a review that was reopened is not in the evidence index until it is
-approved again.
+if the content is changed back, so the reviewers must sign again. Reading, the attestation PDF of an Approved review,
+and the evidence index keep working while the review is locked, and a review that was reopened is not in the evidence
+index until it is approved again.
 
-- **Treat Approved as final.** Finish the discussion, the checklist, and the reviewer slots before the last signature,
-  because afterward nothing can change without a reopen.
-- **Reopen sparingly.** A reopen undoes the approval and nothing takes it back. Reopen only when the approval must
+- **Treat a conclusion as final.** Finish the discussion, the checklist, the conclusion text, and the reviewer slots
+  before the last signature, because afterward nothing can change without a reopen.
+- **Reopen sparingly.** A reopen undoes the conclusion and nothing takes it back. Reopen only when the outcome must
   really be undone, for example a wrong answer or a finding that was missed, not for a late nit-pick or a typo.
 - **State the reason concretely.** The reason is recorded as text in the audit trail and, once the review is approved
   again, in the attestation PDF, so write what was wrong and who asked, for example "Missed SQL injection in Orders.cs
   line 40, found by Alex after approval", not "needs rework".
-- **Prefer a new review for new work.** Files of a review never change. If the code changed after approval, create a
-  new review of the new revision (see *When a Check Fails*) and leave the approved one as the record of what was
-  approved. Reopen is for correcting the judgment on the same files.
+- **Prefer a new review for new work.** Files of a review never change. If the code changed after the conclusion,
+  create a
+  new review of the new revision (see *When a Check Fails*) and leave the concluded one as the record of what was
+  decided. Reopen is for correcting the judgment on the same files.
 - **Sign again with care.** After a reopen, the reviewers read what changed (the **Reopen history** and the **History**
   of the review) before they sign the new record.
 - **Reopen is not a re-stamp.** While the project requires it (the default), the person who reopened a review cannot
-  sign it again, so the one who undoes an approval cannot approve the new record alone. The review page shows that
+  sign it again, so the one who undoes a conclusion cannot conclude the new record alone. The review page shows that
   person a notice instead of the sign form. A reopen is refused when it would leave a slot in which nobody may sign (for
   example, the administrator is the only reviewer of a slot), and the message names the slots. Give each slot an
   alternate, or ask another administrator to reopen, or switch the rule off for the project.
@@ -228,6 +244,8 @@ approved again.
 - **Sign only when the record you saw is final.** Before you sign, check that all threads and answers are as you
   expect. While other slots are unsigned, a change to the answers or the report afterward makes your signature out of
   date; when you are the last signer, the review locks and the record cannot change without an administrator's reopen.
+- **Check the outcome.** The sign form says "You are signing: APPROVED" or "You are signing: REJECTED". Read it before
+  you enter your password, because it states the statement that you confirm.
 - **A stale signature means review again.** When a slot says "Signature out of date", read what changed (the thread
   list and the **History** of the review show it) before you sign the new record. Do not sign only because the
   button is there.

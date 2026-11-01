@@ -305,15 +305,17 @@ sections:
 
       - id: ReviewCenter-System-Signatures
         title: >-
-          The tool shall approve a review only while every named reviewer slot has signed the record as it is now,
-          show on the review and in the list of reviews whether it is Approved or In review, and keep every
+          The tool shall conclude a review, as approved or as rejected, only while every named reviewer slot has signed
+          the record as it is now with that outcome, a rejection being possible only with a conclusion text, show on
+          the review and in the list of reviews whether it is Approved, Rejected, or In review, and keep every
           signature in the database across restarts.
         tags: [system]
         justification: |
-          A formal review ends with the approval of the named reviewers. Approval must be a state that the tool
+          A formal review ends with the decision of the named reviewers, which is an approval or, when a check has
+          failed, a rejection with stated reasons. The outcome must be a state that the tool
           derives from the signatures and the current record, never a flag that somebody sets, so that what the
-          user sees as Approved is what the reviewers signed (21 CFR Part 11 section 11.50 and section 11.70,
-          signed records and signature linking).
+          user sees as Approved or Rejected is what the reviewers signed (21 CFR Part 11 section 11.50 and
+          section 11.70, signed records and signature linking).
         children:
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Core-Signatures
@@ -331,7 +333,7 @@ sections:
           The tool shall have the reviewers of a review named beforehand in reviewer slots, each a primary reviewer
           with an optional alternate, offering only members of the project and putting each person in one slot
           only, shall never let an API token sign a review or arrange its reviewers, shall offer no way to sign
-          while an unanswered check, a Fail answer, or an open thread blocks the review, shall offer no way to
+          while an unanswered check, a disputed check, or an open thread blocks the review, shall offer no way to
           change or remove a slot that holds a signature, and, while the project requires independent reviewers,
           which is the default and which a project administrator can switch off and on with the change audited,
           shall refuse the person who created a review as a reviewer of it and as its signer.
@@ -453,7 +455,8 @@ sections:
         title: >-
           The tool shall keep the reviewed content, every posted comment, and every signature as they were stored,
           offer no way to edit or delete a posted comment or to change or remove a signature, lock a review against
-          every change as soon as it is approved, until a project or system administrator reopens it with a reason
+          every change as soon as it is concluded, as approved or as rejected, until a project or system administrator
+          reopens it with a reason
           that is audited, show a review as In review again, with its signatures kept as history, as soon as the
           record changes after it was signed or the review is reopened, so that an approval never stands for a
           record that nobody signed, and let an edit of a stored audit entry be found by the verification of the

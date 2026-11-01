@@ -171,4 +171,37 @@ internal static class EvidenceTestSupport
         await AnswerAllPassAsync(checklists, projectId, reviewId);
         await SignAsync(signing, projectId, reviewId, slotId, Ann, password);
     }
+
+    /// <summary>
+    ///     Concludes a review as rejected: one slot for ann whose ballot answers the first check Fail and every other
+    ///     check Pass, with a conclusion text, signed.
+    /// </summary>
+    /// <param name="checklists">The checklist service.</param>
+    /// <param name="signing">The signing service.</param>
+    /// <param name="projectId">The project number.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="annUserId">The identity of the user ann.</param>
+    /// <param name="password">The password of ann.</param>
+    /// <returns>A task that completes when the review is concluded as rejected.</returns>
+    public static async Task CompleteRejectedAsync(
+        ChecklistService checklists,
+        SigningService signing,
+        int projectId,
+        string reviewId,
+        int annUserId,
+        string password)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var slotId = await AddSlotAsync(signing, projectId, reviewId, annUserId);
+        var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        await checklists.SetAnswerAsync(projectId, reviewId, first.Id, ChecklistOutcome.Fail, "Wrong.", Ann, cancellationToken);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items).Skip(1))
+        {
+            await checklists.SetAnswerAsync(projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, Ann, cancellationToken);
+        }
+
+        await checklists.SubmitBallotAsync(projectId, reviewId, Ann, cancellationToken);
+        await checklists.SetReviewConclusionTextAsync(projectId, reviewId, "Not ready.", Ann, cancellationToken);
+        await SignAsync(signing, projectId, reviewId, slotId, Ann, password);
+    }
 }

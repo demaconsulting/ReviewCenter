@@ -284,11 +284,13 @@ The stored state of the review (`Draft` is its only value) is not shown on the r
 
 **Overview** (`ProjectPage`): Above the reviews a summary strip counts the reviews of the project in each stage and the
 overdue ones (`project-summary-setup`, `project-summary-in-review`, `project-summary-approved`,
-`project-summary-overdue`), counted over all reviews and not changed by the filters. A filter form (`review-filter`)
+`project-summary-rejected` ("N rejected"), `project-summary-overdue`), counted over all reviews and not changed by the
+filters. A filter form (`review-filter`)
 holds the stage (`filter-stage`), "overdue only" (`filter-overdue`), "blocked only" (`filter-blocked`), a text search of
 the identifier and title (`filter-search`), and Apply (`filter-apply`) and Clear (`filter-clear`) controls; it is a form
 with the GET method, so that the view is always the address. The state of the view lives in the query string only:
-`stage` (`setup`, `in-review`, or `approved`), `overdue=1`, `blocked=1`, `sort` (`id`, `stage`, `activity`, `due`, or
+`stage` (`setup`, `in-review`, `approved`, or `rejected`), `overdue=1`, `blocked=1`, `sort` (`id`, `stage`,
+`activity`, `due`, or
 `signatures`), `dir` (`asc` or `desc`), `q`, and `page`. A value that is not understood is ignored (a `page` that is
 not a whole number is page 1), and a page out of range is brought into range. The text of `q` is shown encoded, never
 as markup.
@@ -303,10 +305,13 @@ direction when the column is the current one; the last activity sorts newest fir
 ascending, a review without a due date comes last in either direction, and ties are broken by the review identifier.
 The table shows 25 reviews to a page (`reviews-paging` with `reviews-range`, `reviews-prev`, and `reviews-next`, which
 keep the filters), and `reviews-no-match` says so when the filters match nothing. Each row (`review-row-{id}`) shows the
-review (link `review-link-{id}` and title), its stage badge (`review-approval-{id}`: Setup, In review, or Approved, and
+review (link `review-link-{id}` and title), its stage badge (`review-approval-{id}`: Setup, In review, Approved, or
+Rejected, and
 a "Reopened" mark for a reopened review), the signatures (`review-progress-{id}`: signed of required, and "n out of
-date" when any), what blocks it (`review-blockers-{id}`: "No checklist", open threads, unanswered checks, Fail
-answers), the people it
+date" when any), what blocks it (`review-blockers-{id}`: "No checklist", open threads, unanswered checks, and
+"conclusion needed" when a rejected outcome has no conclusion text, and the number of disputed checks, such as
+"1 disputed"; a Fail answer is not a blocker and is not listed),
+the people it
 waits on (`review-waiting-{id}`), the last activity, and the due date with the Overdue badge
 (`review-overdue-{id}`) of the rule of `ReviewService`. The created, last activity, and due dates, and their `datetime`
 attributes, are written with `CultureInfo.InvariantCulture` (Gregorian digits such as `2026-03-04`), like the review page

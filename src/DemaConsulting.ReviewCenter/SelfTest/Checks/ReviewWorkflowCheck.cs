@@ -153,7 +153,7 @@ internal static class ReviewWorkflowCheck
                     && !string.IsNullOrEmpty(approval.Digest),
                 "The signed review was not found in the evidence index with its fingerprint and record digest.");
 
-            // An approved review is locked: a change is refused, and only an administrator's reopen (with a reason)
+            // A concluded (approved or rejected) review is locked: a change is refused, and only an administrator's reopen (with a reason)
             // takes it back to review
             await CheckLockAndReopenAsync(provider, project.Id, reviewId, actor, reviewerActor, cancellationToken);
 
@@ -245,7 +245,7 @@ internal static class ReviewWorkflowCheck
     }
 
     /// <summary>
-    ///     Shows that an approved review refuses a change, and that an administrator's reopen takes it back to review.
+    ///     Shows that a concluded review refuses a change, and that an administrator's reopen takes it back to review.
     /// </summary>
     /// <param name="provider">The service provider.</param>
     /// <param name="projectId">The project number.</param>

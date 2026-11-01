@@ -15,19 +15,23 @@ sections:
       - id: ReviewCenter-ReviewProgressService-Stage
         title: >-
           The ReviewProgressService class shall derive the stage of every review from its approval status and not
-          from the stored state of the review: Setup while it has no reviewer slot, Approved when every slot has a
-          valid signature and nothing blocks the approval (an open thread is a blocker, so a review whose slots are
-          all signed but that has an open thread is In review), and In review otherwise, including a review that was
-          reopened after an approval, which it shall flag as reopened.
+          from the stored state of the review: Setup while it has no reviewer slot, Approved when the review is
+          concluded as approved (every slot has a valid signature of the approval and nothing blocks it), Rejected
+          when it is concluded as rejected (every slot has a valid signature of the rejection, nothing blocks it, and
+          the conclusion text is present), and In review otherwise (an open thread is a blocker, so a review whose
+          slots are all signed but that has an open thread is In review), including a review that was
+          reopened after a conclusion, which it shall flag as reopened.
         justification: |
-          A lead wants to know whether a review has not started, is under way, or is done. The stored state only says
-          whether a review is open or closed, and a review that was reopened is open again whatever it was before, so
+          A lead wants to know whether a review has not started, is under way, or is done, and how it ended. The
+          stored state only says whether a review is open or closed, and a review that was reopened is open again
+          whatever it was before, so
           the stage is computed from the same approval status that the review page shows and cannot disagree with it.
         tests:
           - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
           - ReviewProgressService_GetProgressAsync_ProjectWithoutReviews_IsEmpty
           - ReviewProgressService_GetProgressAsync_ReopenedReview_IsFlaggedAndNotApproved
           - ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked
+          - ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked
 
       - id: ReviewCenter-ReviewProgressService-SlotProgress
         title: >-
@@ -43,10 +47,10 @@ sections:
 
       - id: ReviewCenter-ReviewProgressService-WaitingOn
         title: >-
-          The ReviewProgressService class shall name, for a review that is not approved, the primary reviewer and,
+          The ReviewProgressService class shall name, for a review that is not concluded, the primary reviewer and,
           when that is another person, the alternate reviewer of every slot that is not signed or is out of date,
           each person once and in slot order, show a person whose account is disabled with the suffix "(disabled)",
-          and name nobody for an approved review.
+          and name nobody for a concluded review, approved or rejected.
         justification: |
           A lead who has to chase a review needs the names of the people to ask. A primary reviewer who can no
           longer sign must be recognizable, so the lead knows the slot has to be reassigned and not waited for.
@@ -56,23 +60,28 @@ sections:
       - id: ReviewCenter-ReviewProgressService-Blockers
         title: >-
           The ReviewProgressService class shall report for every review the number of open threads, of unanswered
-          checks, and of checks answered Fail, and whether the review has no checklist, taken from the same blocker
-          counts and flag of the approval status that the blocker sentences of the review page come from, and shall
-          mark an unapproved review with any of them as blocked.
+          checks, and of checks answered Fail (information only, never a blocker), whether the review has no checklist,
+          and whether a rejection still needs its conclusion text, taken from the same blocker
+          counts and flags of the approval status that the blocker sentences of the review page come from, and shall
+          mark a review that is not concluded with any blocker as blocked, and a review with only Fail answers as not
+          blocked.
         justification: |
           What blocks a review is a different question from who has not signed. The counts and the sentences are
           produced in one place, so the overview and the review page cannot disagree about why a review is not
-          approved.
+          concluded.
         tests:
           - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
           - ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked
           - ReviewProgressService_GetProgressAsync_AllSignedOpenThread_IsInReviewAndBlocked
+          - ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired
+          - ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked
 
       - id: ReviewCenter-ReviewProgressService-Overdue
         title: >-
           The ReviewProgressService class shall report for every review its due date and whether it is overdue by the
-          rule of the ReviewService class: overdue from the day after the due date until the review is approved, not
-          on the due date itself, never for a review without a due date, and never for an approved review.
+          rule of the ReviewService class: overdue from the day after the due date until the review is concluded
+          (approved or rejected), not
+          on the due date itself, never for a review without a due date, and never for a concluded review.
         justification: |
           The overview and the review page must agree on which reviews are late, so the overview asks the rule that
           the page uses and does not repeat it.

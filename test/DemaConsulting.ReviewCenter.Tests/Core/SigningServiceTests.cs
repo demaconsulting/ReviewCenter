@@ -736,10 +736,9 @@ public class SigningServiceTests
     ///     Test that every blocker is reported, signing is refused while any exists, and the refusal is not a
     ///     password attempt.
     /// </summary>
-    /// <param name="blocker">The blocker under test: unanswered, fail or thread.</param>
+    /// <param name="blocker">The blocker under test: unanswered or thread.</param>
     [Theory]
     [InlineData("unanswered")]
-    [InlineData("fail")]
     [InlineData("thread")]
     public async Task SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker(string blocker)
     {
@@ -752,17 +751,10 @@ public class SigningServiceTests
             await AnswerAllAsync(fixture);
         }
 
-        var first = DefaultChecklist.Current.Sections[0].Items[0].Id;
-        switch (blocker)
+        if (blocker == "thread")
         {
-            case "fail":
-                await fixture.Checklists.SetAnswerAsync(
-                    fixture.ProjectId, "rev-1", first, ChecklistOutcome.Fail, "It is wrong", TestActors.Ann, TestContext.Current.CancellationToken);
-                break;
-            case "thread":
-                await fixture.Threads.StartThreadAsync(
-                    fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Look at this", TestContext.Current.CancellationToken);
-                break;
+            await fixture.Threads.StartThreadAsync(
+                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Look at this", TestContext.Current.CancellationToken);
         }
 
         var approval = await ApprovalAsync(fixture);
@@ -773,12 +765,7 @@ public class SigningServiceTests
 
         // Assert: refused with a blocker sentence; not approved, nothing stored
         Assert.Equal(DomainRule.SigningNotAllowed, exception.Rule);
-        var expected = blocker switch
-        {
-            "fail" => "answered Fail",
-            "thread" => "open",
-            _ => "unanswered"
-        };
+        var expected = blocker == "thread" ? "open" : "unanswered";
         Assert.Contains(approval.Blockers, text => text.Contains(expected, StringComparison.Ordinal));
         Assert.False(approval.IsApproved);
         Assert.Empty(await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", TestContext.Current.CancellationToken));
@@ -854,7 +841,7 @@ public class SigningServiceTests
     /// <summary>
     ///     Test that the structured blocker counts of the approval status (open threads, unanswered checks and Fail
     ///     answers) equal the numbers in the blocker sentences, for a single read and for the batch read, and are zero
-    ///     for an approved review.
+    ///     for an approved review. A Fail answer is counted, but it is information and no blocker sentence.
     /// </summary>
     [Fact]
     public async Task SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences()
@@ -882,7 +869,7 @@ public class SigningServiceTests
             Assert.Equal(1, approval.FailedChecks);
             Assert.Equal(items.Count - 1, approval.UnansweredChecks);
             Assert.Contains("1 thread is open", approval.Blockers);
-            Assert.Contains("1 check is answered Fail", approval.Blockers);
+            Assert.DoesNotContain("1 check is answered Fail", approval.Blockers);
             Assert.Contains($"{items.Count - 1} checklist checks are unanswered", approval.Blockers);
         }
 

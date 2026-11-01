@@ -152,20 +152,23 @@ sections:
       - id: ReviewCenter-ProjectPage-Approval
         title: >-
           The ProjectPage unit shall show on each listed review a badge for its stage: Setup while it has no reviewer
-          slot, Approved when it has at least one reviewer slot and every slot has a current signature, and In review
-          otherwise.
+          slot, Approved when it has at least one reviewer slot and every slot has a current signature of approval,
+          Rejected when every slot has a current signature of rejection and the review has its conclusion text, and
+          In review otherwise.
         justification: |
-          Users scan the project page to see which reviews are finished. The stage is computed from the current
-          record, so a review whose record changed after signing is shown as In review again.
+          Users scan the project page to see which reviews are finished and how they ended. The stage is computed from
+          the current record, so a review whose record changed after signing is shown as In review again.
         tests:
           - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndApproval
           - ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview
+          - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
 
       - id: ReviewCenter-ProjectPage-Progress
         title: >-
           The ProjectPage unit shall show for each listed review, besides its link, title, and stage, the signatures
           as given of needed with the number that are out of date, what blocks the approval (a missing checklist, open
-          threads, unanswered checks, checks answered Fail), the people it waits on, the time of the last activity,
+          threads, unanswered checks, disputed checks, a rejection that still needs its conclusion, and no Fail count,
+          as a Fail does not block), the people it waits on, the time of the last activity,
           and the due date with the Overdue badge of the rule while the review is overdue, all taken from the
           progress service in one read for the whole project, and shall write the creation date, the last activity,
           the due date, and their machine-readable time attributes in the invariant culture, in Gregorian digits,
@@ -178,22 +181,27 @@ sections:
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_ReviewWithoutChecklist_ShowsNoChecklistBlockerAndIsBlocked
+          - ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker
           - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
+          - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
 
       - id: ReviewCenter-ProjectPage-Summary
         title: >-
           The ProjectPage unit shall show above the reviews a summary of the number of reviews of the project in each
-          stage and the number that are overdue, counted over all reviews and not only the ones that a filter shows.
+          stage, including the rejected ones, and the number that are overdue, counted over all reviews and not only
+          the ones that a filter shows.
         justification: |
           The summary is the answer to "how are we doing" at one glance, and it must not change when the lead narrows
           the table.
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_QueryFilters_NarrowTheTable
+          - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
 
       - id: ReviewCenter-ProjectPage-ProgressFilter
         title: >-
-          The ProjectPage unit shall let the user narrow the reviews by stage, to the overdue ones, to the blocked
+          The ProjectPage unit shall let the user narrow the reviews by stage (Setup, In review, Approved, or
+          Rejected), to the overdue ones, to the blocked
           ones, and by a text that is part of the review identifier or title, and shall keep the choice in the query
           string of the page (stage, overdue, blocked, q), so that a link or a reload shows the same table, and shall
           say so when no review matches. A value of the query string that it does not understand shall be ignored,
@@ -209,6 +217,7 @@ sections:
           - ProjectPage_Render_InvalidQueryValues_AreIgnoredAndShowTheDefaultView
           - ProjectPage_Render_InvalidPageValues_ShowAValidPage
           - ProjectPage_Render_HostileMarkup_IsRenderedEncoded
+          - ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker
 
       - id: ReviewCenter-ProjectPage-ProgressSort
         title: >-

@@ -215,8 +215,9 @@ sections:
       - id: ReviewCenter-ReviewStore-Signatures
         title: >-
           The ReviewStore class shall keep signatures append-only, offering only to add a signature and to list
-          the signatures of one review in the order they were added. It shall store every value of a signature
-          and assign its identifier. It shall refuse a signature, store nothing, and report that the record
+          the signatures of one review in the order they were added. It shall store every value of a signature,
+          including its outcome (Approved or Rejected), and assign its identifier. It shall refuse a signature, store
+          nothing, and report that the record
           changed when the digest of the signature is not the digest of the record stored at that moment, even
           when another request changes the record at the same time. It shall refuse a second signature of the
           same slot with the same digest as a signing that is not allowed, and refuse a signature for a slot or
@@ -230,6 +231,7 @@ sections:
           - ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing
           - ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed
           - ReviewStore_AddSignatureAsync_UnknownSlotOrReview_IsRefused
+          - ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome
           - ReviewStore_SerializableTransaction_TakesWriteLockAtBegin
 
       - id: ReviewCenter-ReviewStore-EvidenceSettings

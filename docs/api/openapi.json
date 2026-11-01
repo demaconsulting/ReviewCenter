@@ -1138,11 +1138,11 @@
           },
           "overdue": {
             "type": "boolean",
-            "description": "`true` when the due date is before today (UTC) and the review is not approved."
+            "description": "`true` when the due date is before today (UTC) and the review is not concluded (approved or rejected)."
           },
           "approved": {
             "type": "boolean",
-            "description": "`true` when every reviewer slot has signed the current record and no thread is open."
+            "description": "`true` when the review concluded as approved: every reviewer slot has signed the current record, no thread is open and the outcome is Approved. For a Rejected review every slot has signed but the flag stays `false`."
           },
           "approvalDigest": {
             "type": "string",
@@ -1260,7 +1260,7 @@
           },
           "overdue": {
             "type": "boolean",
-            "description": "`true` when the due date is before today (UTC) and the review is not approved."
+            "description": "`true` when the due date is before today (UTC) and the review is not concluded (approved or rejected)."
           },
           "followsReviewId": {
             "type": [
@@ -1271,7 +1271,7 @@
           },
           "approved": {
             "type": "boolean",
-            "description": "`true` when every reviewer slot holds a current signature and no thread is open (the review is approved and locked).",
+            "description": "`true` when the review concluded as approved: every reviewer slot holds a current signature, no thread is open and the outcome is Approved (the review is then locked). For a Rejected review the flag stays `false`.",
             "default": false
           },
           "slotsRequired": {

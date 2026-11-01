@@ -22,11 +22,12 @@ from a broken rule to a status and the helpers that build a problem description 
 The answers carry only what a program needs: a summary has no file count and no details; the details of a review hold
 the title, state, fingerprint, creator and the flag that the review was created through the API, the optional due date
 (`dueDate`, the text `yyyy-MM-dd`, or null) and whether the review is overdue (`overdue`: the date is before today in
-UTC and the review is not approved), the source of a review
+UTC and the review is not concluded as approved or rejected), the source of a review
 from a repository, the approval state and record digest, the slots (the primary and alternate reviewer are user names,
 and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the
 next
-step. A summary carries `dueDate` and `overdue` as well, and the progress of the review: `approved`, `slotsRequired`,
+step. A summary carries `dueDate` and `overdue` as well, and the progress of the review: `approved` (true only for a
+review concluded as approved, never for a rejected one; the shape is unchanged), `slotsRequired`,
 `slotsSigned`, `slotsOutOfDate`, and `lastActivity` (the time of the newest audit entry of the review, or its creation
 time). The list takes all of them from `ReviewProgressService` (the same service as the project page), which reads the
 approvals and the last activity of all reviews of the project at once; the list endpoint reads the reviews of the project
@@ -212,7 +213,8 @@ a change that would make a signature out of date without acknowledgement (`Signa
 a change that a project review rule refuses (`AuthorCannotAnswer`, `ReopenerCannotSign`, `ReopenWouldStrandSlot`),
 and a changed record to 409; too many attempts to 429; an unavailable git to 503, a git access failure
 to
-502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, an answer or hand-in by a user
+502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, a rejected outcome that is signed
+without a conclusion text (`ConclusionRequired`), an answer or hand-in by a user
 without a reviewer slot (`NoReviewerSlot`), a signature while the own ballot is not handed in
 (`BallotNotSubmitted`), and a token action of a user who must change the password first to 403; unreadable
 credentials to 500; and every other rule (including `BallotIncomplete`) to 400. **ToResult** builds the problem
@@ -233,7 +235,8 @@ checklist answers, or its reviewer slots, and none that signs or reopens a revie
 the web pages with a re-authentication, and an API token is refused for them in Core). The mapping of `ReviewLocked` and
 `ReviewNotLocked` to 409 is therefore defense in depth for a future endpoint, and no wire shape of the interface
 changed. The read endpoints (the review, the checklist and thread counts, the attestation, and the evidence index) are
-not affected by the lock; a reopened review simply reads as not approved.
+not affected by the lock; a reopened review simply reads as not approved. A review concluded as rejected is locked in
+the same way and reads as not approved (`approved` is false); no endpoint signs or concludes it.
 
 **Signature impact and the API**: the same holds for `SignaturesWouldBecomeOutOfDate`: no endpoint calls the methods
 that raise it, so the 409 mapping is defense in depth and the problem body is still the message of the rule. When an

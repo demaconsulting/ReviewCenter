@@ -16,12 +16,13 @@ action, so the reviewer does not have to scroll back: the same "Next unanswered 
 checklist is complete, a link back to the review. A Fail is shown in a different color than a Pass. It
 is a Razor component split into presentation (`ChecklistPage.razor`) and behavior (`ChecklistPage.razor.cs`). It
 reads and writes the checklist only through `ChecklistService`, so every checklist rule is applied there. It requires
-a signed-in user, and every answer and section decision is saved on behalf of that user. When the review is approved,
-and so locked, the page shows a banner (`checklist-locked`) that says the checklist is read-only and that a project
+a signed-in user, and every answer and section decision is saved on behalf of that user. When the review is concluded
+(approved or rejected), and so locked, the page shows a banner (`checklist-locked`): "This review is concluded
+(approved or rejected) and locked, so the checklist is read-only." followed by the remark that a project
 administrator can reopen the review, and disables the section applicability switch, the reason field and its Save, the
 Pass, Fail, and N/A buttons, and the justification field and its Save. The answers stay visible. For a member who may
 only read (the Auditor role) the page shows a `readonly-notice` and treats the checklist as locked in the same way
-(`IsLocked` is true when the review is approved or the viewer is read-only), so every control is disabled. When the project
+(`IsLocked` is true when the review is concluded or the viewer is read-only), so every control is disabled. When the project
 does not let authors answer the checklist (the default; see `ProjectService`) and the signed-in user is the author of
 the review, the page instead shows the notice `author-answer-blocked` (another project member has to answer; comment
 threads are still available) and disables the same controls, unless the review is locked, which shows only the lock
@@ -33,7 +34,8 @@ The page instance is created per browser connection, so its state is per user.
 
 **ProjectId**, **ReviewId**: the route parameters.
 
-**IsLocked**: whether the review is locked. It is read from `SigningService.GetApprovalAsync` (`IsApproved`) when the
+**IsLocked**: whether the review is locked (concluded, or the viewer is read-only); **IsConcluded**: whether the review
+is concluded as approved or rejected. It is read from `SigningService.GetApprovalAsync` (`IsConcluded`) when the
 page loads, only for a review that has a checklist, and is also set when a save is refused with `ReviewLocked`, so a
 page that was loaded before the last signature stops offering the controls at its first refused save. **LockedMarker**:
 `true` while locked, written to the `data-locked` attribute of the disabled applicability switch and outcome buttons.
@@ -176,7 +178,7 @@ in" message on this page.
 - **ChecklistService** — reads the checklist (and tells, for the signed-in user, whether the author rule blocks them,
   `AuthorBlocked`) and records answers and section decisions; it refuses a change of a locked
   review with `ReviewLocked` and the change of the author with `AuthorCannotAnswer`.
-- **SigningService** — tells whether the review is approved (`GetApprovalAsync`), which is what locks the page.
+- **SigningService** — tells whether the review is concluded (`GetApprovalAsync`), which is what locks the page.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
   name for the breadcrumb.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.

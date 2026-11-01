@@ -24,7 +24,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The derived state of a review that is shown to people: what the reviewers have concluded, if anything.
 /// </summary>
 /// <remarks>
-///     It is computed from the consolidated ballots and the signatures and never stored. The values
+///     It is computed from the consolidated ballots and the signatures (see <see cref="ReviewLock.ConcludedOutcome"/>)
+///     and never stored. The values
 ///     <see cref="Approved"/> and <see cref="Rejected"/> equal those of <see cref="ReviewOutcome"/>.
 /// </remarks>
 public enum ReviewConclusion

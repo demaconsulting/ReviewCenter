@@ -52,7 +52,7 @@ internal static class HelpTopics
         new("comments-and-threads", "Comments and threads", "Comment on a line or a file, reply, resolve and share a link."),
         new("checklist", "Checklist", "Answer each check Pass, Fail or N/A."),
         new("reviewers-and-signing", "Reviewers and signing",
-            "Reviewer slots, signing with your password or identity provider, and approval."),
+            "Reviewer slots, signing with your password or identity provider, and approval or rejection."),
         new("signed-attestation", "Signed attestation", "Download a digitally signed PDF of a completed review."),
         new("audit-trail", "Audit trail", "Every action is recorded in a tamper-evident chain."),
         new("planning-reviews", "Planning reviews", "Create the reviews of a repository's review-sets in one go."),

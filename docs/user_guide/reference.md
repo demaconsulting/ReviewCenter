@@ -285,7 +285,8 @@ misconfiguration failures automatically.
 
 ## Review Lock and Independence Reference
 
-This section lists, in one place, the audit actions, messages, and settings of the approval lock and of the
+This section lists, in one place, the audit actions, messages, and settings of the lock of a concluded (approved or
+rejected) review and of the
 independent reviewers. The chapters Reviewing and Administration explain how they work.
 
 | Audit action                            | Detail                                               |
@@ -298,9 +299,14 @@ For `project.review-rule-changed` the setting is `RequireNonAuthorChecklistAnswe
 
 The messages that the user sees:
 
-- "This review is approved and locked. A project administrator must reopen it before it can change." for a change of
-  an approved review, and for a signature on it.
-- "The review is not locked, so there is nothing to reopen." for a reopen of a review that is not approved.
+- "This review is concluded and locked. A project administrator must reopen it before it can change." for a change of
+  a concluded (approved or rejected) review, and for a signature on it.
+- "The review is not locked, so there is nothing to reopen." for a reopen of a review that is not concluded.
+- "A rejected review needs a conclusion stating the reasons" as the blocker of a signature, and as the refusal of a
+  signature (rule ConclusionRequired, status 403), when the ballots agree on a Fail and the review has no conclusion
+  text.
+- "The review was rejected. A signed attestation of a rejected review is not available yet." for the attestation
+  of a rejected review.
 - "A reason of at most 250 characters is required to reopen a review." for a reopen with no reason or a longer one.
 - "You created this review, so you cannot be a reviewer of it. A different project member must review and sign it, or
   a project administrator can switch off 'Require independent reviewers'." when the author tries to sign.
@@ -345,13 +351,16 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 
 | Group | A review is listed when | Needs action |
 | ----- | ----------------------- | ------------ |
-| To sign | You are primary or alternate of a slot that is not signed or out of date; not approved | Yes |
+| To sign | You are primary or alternate of a slot that is not signed or out of date; not concluded | Yes |
 | Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
-| Failed checks | You authored the review, it is not approved, and an applicable check is answered Fail | Yes |
-| Updates | Someone else completed the approval, or reopened the review, after you last saw it | No |
+| Failed checks | You authored the review, it is not concluded, and an applicable check is answered Fail | Yes |
+| Updates | Someone else concluded (approved or rejected) or reopened the review after you last saw it | No |
 
 - Only members who may contribute are given To sign and Replies waiting; an auditor gets neither. A user who is
   disabled, has a temporary password, or is not a known user gets an empty inbox.
+- A failed-checks entry reads "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is
+  a disagreement to resolve."; the chip of an update is
+  "Approved", "Rejected", or "Reopened".
 - The count on the home page is the number of distinct reviews in the first three groups, so a review in two groups
   counts once. Updates are never counted. The badge of the Inbox tab in the header shows the same count, read when a
   page is opened and kept for 30 seconds for each user, so it can be up to 30 seconds behind; it is hidden at zero and

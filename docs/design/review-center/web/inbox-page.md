@@ -18,7 +18,8 @@ The page uses the standard page container with a heading row that holds the titl
 there are. When no review needs action a muted line says so. Each group that has rows has a heading and a list of row
 cards (To sign, Replies waiting, Failed checks, Updates, in this order). A row shows the review title as a link, the
 project and the review identifier muted, an optional detail sentence, and on the right a "New" badge when the row is
-unread, a chip with the reason, and, for the action groups, the due date, marked "Overdue" when it is past.
+unread, a chip with the reason (the Updates group includes the Rejected chip for a review concluded as rejected), and,
+for the action groups, the due date, marked "Overdue" when it is past.
 
 #### Data Model
 

@@ -11,7 +11,7 @@ write, such as creating a review, is refused with **403**.
 
 A token **never signs**. Signing a review, and adding, changing, or removing a reviewer slot, are not available in the
 API: there is no route for them, and the service refuses a token even if one existed. A signature always needs a
-person who enters the password again in the browser. For the same reason a token cannot **reopen** an approved review
+person who enters the password again in the browser. For the same reason a token cannot **reopen** a concluded review
 or change the review rules of a project (there is no route, and the service refuses a token); an administrator does
 both in the web pages (see Reopening an Approved Review and Review Rules in the Administration chapter).
 
@@ -121,9 +121,10 @@ The answer is a JSON object with a `reviews` list. Each entry has:
 
 What is listed:
 
-- Only **complete** reviews: every reviewer slot has signed the record that the review has now. A review that is not
-  complete, that was changed after the signatures, or that an administrator reopened and that is not signed again, is
-  not listed, so it never satisfies a review-set.
+- Only **complete** reviews that were **approved**: every reviewer slot has signed approval for the record that the
+  review has now. A review that is not
+  complete, that was changed after the signatures, that an administrator reopened and that is not signed again, or that
+  was concluded as **Rejected**, is not listed, so it never satisfies a review-set.
 - Only reviews that were **planned from a review-set**. A review that was created by uploading files, by choosing a
   repository by hand, or through the API has no review-set identifier and is not listed.
 - One entry for each identifier and fingerprint: the review that was completed last. The list is ordered by identifier
@@ -131,7 +132,8 @@ What is listed:
 
 Limits to know about:
 
-- There are no `fail` entries. A review with a failed answer cannot be completed, so it is simply missing.
+- There are no `fail` entries. A review with a failed answer is concluded as Rejected, and a rejected review is never
+  listed, so it is simply missing.
 - A review made from the **changes since a baseline** holds only the changed files, so its fingerprint is not the one
   ReviewMark computes for the whole review-set, and ReviewMark reports it as stale.
 - **Line endings.** The fingerprint of a review from a repository is calculated from the exact bytes that are committed
@@ -162,8 +164,9 @@ that passed or were not applicable, the sections that were not applicable, and t
 are carried into the new one, and answers that failed and threads that are resolved are not. Omitted, `null`, or blank
 means that the review follows nothing. The earlier review must be in the same project and must have at least one file
 path in common with the new one; both must come from the same review-set when both have one, otherwise from the same
-repository (or both be uploads). The earlier review may be in review or approved. The answer is a **400** that names
-`FollowUpInvalid` and nothing is created when the earlier review does not exist in the project (the answer does not say
+repository (or both be uploads). The earlier review may be in review, approved, or rejected. The answer is a **400**
+that names `FollowUpInvalid` and nothing is created when the earlier review does not exist in the project (the answer
+does not say
 whether it exists in another project) or does not fit, or when an open thread of the earlier review is on a file that
 the new review does not have. In the last case, repeat the request with `"acknowledgeDroppedThreads": true` to confirm
 that those threads are dropped. A carried answer keeps its author and time, and a carried thread keeps its comments; a
@@ -185,18 +188,20 @@ The review starts as a **Draft**, like a review created on the web pages. It is 
 the token (by its short identifier, never its value). A person assigns the reviewers and the reviewers sign in the
 browser. The **author** of the review is the owner of the token: in a project that requires independent reviewers (the
 default; see Review Rules in the Administration chapter), the owner of the token that created a review cannot be one of
-its reviewers and cannot sign it, just as if the owner had created it in the browser. A review that is approved is
+its reviewers and cannot sign it, just as if the owner had created it in the browser. A review that is concluded
+(approved or rejected) is
 locked and cannot change until an administrator reopens it in the web pages (see Locked Reviews and Reopening in the
 Reviewing chapter).
 
 **`state` and `approved`.** The review data has both a `state` and an `approved` field. `state` is the stored
 life-cycle value, and in this release it is always `Draft`, even after the review is signed; it is kept so that clients
-that read it keep working. Use `approved` (`true` while every reviewer slot has signed the current record, and the
-review is locked) to find out whether a review is approved.
+that read it keep working. Use `approved` (`true` while every reviewer slot has signed approval for the current record,
+and the review is locked) to find out whether a review is approved. It is `true` for an approved review only: a review
+that was concluded as **Rejected** is locked but `approved` is `false`. The shape of the data has not changed.
 
 **`dueDate` and `overdue`.** The review data of the list and of one review has `dueDate` (`yyyy-MM-dd`, or `null` when
-the review has none) and `overdue` (`true` when the date is before today in UTC and the review is not approved; an
-approved review is never overdue, and keeps its date).
+the review has none) and `overdue` (`true` when the date is before today in UTC and the review is not concluded; an
+approved or rejected review is never overdue, and keeps its date).
 
 **Progress fields.** Each review of the list also has `approved` (the same as above), `slotsRequired` (the number of
 reviewer slots), `slotsSigned` (the slots with a valid signature on the current record), `slotsOutOfDate` (the slots
@@ -225,19 +230,24 @@ follows none).
 - A request that is not valid is answered **400** with the fields at fault (a stored checklist definition that cannot be
   read is also **400**); a project, review, or repository that does
   not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
-  repository, an attestation of a review that is not complete, or a change that is refused because the review is
-  approved and locked (or a reopen of a review that is not locked, or a change that a project review rule refuses)
+  repository, an attestation of a review that is not complete (a rejected review included), or a change that is
+  refused because the review is
+  concluded and locked (or a reopen of a review that is not locked, or a change that a project review rule refuses)
   **409** (a request without a token, possible on the
   anonymous attestation route, gets **404** instead); and a git repository that is not reachable
   **502**, **503**, or **504**.
-- A **locked review** stays readable. `GET` of the review shows `approved: true`, and its attestation PDF and the
+- A **locked review** stays readable. `GET` of the review shows `approved: true` for an approved review (`false` for a
+  rejected one), and the attestation PDF of an approved review and the
   evidence index keep working; the wire format has not changed. The API has no route that changes a thread, a checklist
   answer, or a reviewer slot, so a token does not meet the lock today. If a refusal because of the lock is reported, it
-  is a **409** problem document whose detail is "This review is approved and locked. A project administrator must reopen
-  it before it can change.". There is no reopen route in the API. The same holds for the review rules of the project
+  is a **409** problem document whose detail is "This review is concluded and locked. A project administrator must
+  reopen it before it can change.". There is no reopen route in the API. The same holds for the review rules of the
+  project
   (authors cannot answer the checklist, the person who reopened cannot sign again): the API has no route that answers a
   check, signs, or reopens, so a refusal for one of them would also be a **409** problem document, and the rules are on
-  by default for ALL existing projects.
+  by default for ALL existing projects. A refusal because a rejected review has no conclusion text yet (the rule
+  ConclusionRequired) would be a **403** problem document whose detail is "A rejected review needs a conclusion stating
+  the reasons.".
 - Any other address under `/api` is answered with a JSON **404**, with or without a token, for every standard HTTP
   method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`).
 - The server behind a reverse proxy needs the setting described in Secure Cookie Behind a Reverse Proxy (in the

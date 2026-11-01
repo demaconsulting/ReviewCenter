@@ -32,7 +32,9 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
   `attestation-{projectId}-{reviewId}.pdf`, `Cache-Control: no-store`). The statuses are 200 for the document, 404 (empty
   on this route) for a review that does not exist and for a project that the user may not view, 409 (a problem
   description, "The review is not complete") for a review that is not
-  approved and 409 ("The review changed during generation") for a review that changed while the document was being
+  approved (a review concluded as rejected gets the message "The review was rejected. A signed attestation of a rejected
+  review is not available yet.") and 409 ("The review changed during generation") for a review that changed while the
+  document was being
   prepared, and 500 (a problem description, "Attestation signing key unavailable", with the reason) when the key cannot
   be used. A visitor who is not signed in is redirected to the sign-in page by the authentication scheme; anonymous
   access, when a project allows it, exists only on the API route of the `Api` subsystem, never on this page route.
@@ -188,7 +190,7 @@ tiny and the event states the digest that was attested. The user interface offer
 for an approved review, but the endpoint decides again, so the rule does not depend on the page. The document prints
 every checklist comment in full; the only caps are on the list of resolved threads (see `AttestationRenderer`).
 
-**Approval lock, reopen, and the evidence**: An approved review is locked in `Core`, so the record that an attestation
+**Approval lock, reopen, and the evidence**: A concluded review is locked in `Core`, so the record that an attestation
 describes cannot change after the approval, and the "changed during generation" window that this subsystem checks is
 only left for a reopen or a stale signature. Reading, the attestation, and the evidence index keep working on a locked
 review. When an administrator reopens a review, the review is no longer complete: the attestation endpoint answers as for
@@ -221,9 +223,9 @@ evidence is not kept twice. The completion rule is the one of the attestation: a
 has
 signed the record that the review has now. Only a review that has a review-set id is listed, because ReviewMark matches
 by
-that id and a made-up id could satisfy a review-set that nobody reviewed. The result is always `pass`, because a review
-with a
-failed answer cannot be completed. ReviewMark keeps one entry for an id and fingerprint, so the index has one: the
+that id and a made-up id could satisfy a review-set that nobody reviewed. The result is always `pass`, because only an
+approved review is listed: a review concluded as rejected is locked but never listed. ReviewMark keeps one entry for an
+id and fingerprint, so the index has one: the
 review
 that was completed last. The `file` of an entry is the address of the attestation, which the endpoint builds from the
 request.

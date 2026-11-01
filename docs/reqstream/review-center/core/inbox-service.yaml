@@ -54,22 +54,28 @@ sections:
 
       - id: ReviewCenter-InboxService-FailedChecks
         title: >-
-          The InboxService class shall list as failed checks every review that is not approved and was created by the
+          The InboxService class shall list as failed checks every review that is not concluded and was created by the
           user and has at least one check answered Fail in a section that applies, with a chip that gives the number of
-          failed checks, and shall ignore a Fail in a section that is marked not applicable.
+          failed checks and a text that says an agreed Fail makes the review reject and a Fail only one reviewer gave is
+          a disagreement to resolve, shall ignore a
+          Fail in a section that is marked not applicable, and shall list no failed checks and nothing to sign for a
+          concluded review.
         justification: |
-          The creator of a review answers for it. A failed check is the signal that the content must change, and a
-          check of a section that does not apply to the review is not a finding.
+          The creator of a review answers for it. A failed check is the signal that the content must change, or that
+          the review will end as rejected, and a check of a section that does not apply to the review is not a
+          finding.
         tests:
           - InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount
           - InboxService_GetInboxAsync_FailInNotApplicableSection_IsIgnored
           - InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound
+          - InboxService_GetInboxAsync_FailedChecks_TextSaysAgreedFailRejectsAndSingleFailIsDisagreement
 
       - id: ReviewCenter-InboxService-Updates
         title: >-
           The InboxService class shall list as updates, for information and never counted as action, a review of which
-          the user is a reviewer or the creator when it was approved by a signature of somebody else or was reopened by
-          somebody else after the user last saw it, with the chip Approved or Reopened and the name of that person,
+          the user is a reviewer or the creator when it was approved or rejected by a signature of somebody else or was
+          reopened by somebody else after the user last saw it, with the chip Approved, Rejected, or Reopened and the
+          name of that person,
           and shall list no update for a signature or a reopening of the user's own, nor for a review that was seen
           since.
         justification: |
@@ -80,6 +86,7 @@ sections:
           - InboxService_GetInboxAsync_ApprovedSinceLastSeen_ShowsUpdate_NotCountedAsAction
           - InboxService_GetInboxAsync_ReopenedByOther_ShowsUpdate
           - InboxService_GetInboxAsync_ReopenedByMe_ShowsNoUpdate
+          - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
           - InboxRules_CompletingSignature_LatestOfCurrentDigest_IsFound
 
       - id: ReviewCenter-InboxService-Access
@@ -88,7 +95,7 @@ sections:
           call, shall offer a signature to give and a reply only to a user who may work in the project and, for a
           signature, is a member of it, so that an auditor gets none of them, shall give a user who is disabled, has a
           temporary password, is unknown, or is anonymous an empty inbox and a count of zero without an error, shall
-          show a review that is approved no action, and shall give a system administrator only the reviews in which
+          show a review that is concluded no action, and shall give a system administrator only the reviews in which
           the administrator is a reviewer or the creator.
         justification: |
           The inbox must never reveal a project to somebody who may not see it, nor ask a read-only member for work
@@ -101,6 +108,7 @@ sections:
           - InboxService_GetInboxAsync_TemporaryPasswordUser_GetsEmptyView
           - InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView
           - InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems
+          - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
           - InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews
 
       - id: ReviewCenter-InboxService-Count

@@ -1445,6 +1445,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     Role = signature.Role,
                     SignedAt = signature.SignedAt,
                     RecordDigest = signature.RecordDigest,
+                    Outcome = signature.Outcome,
                     Meaning = signature.Meaning
                 };
                 context.Signatures.Add(entity);

@@ -66,7 +66,7 @@ public partial class ProjectPage : ComponentBase
 
     /// <summary>
     ///     Gets or sets the stage filter, from the <c>stage</c> query value: <c>setup</c>, <c>in-review</c> or
-    ///     <c>approved</c>; anything else shows every stage.
+    ///     <c>approved</c> or <c>rejected</c>; anything else shows every stage.
     /// </summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "stage")]
@@ -196,6 +196,7 @@ public partial class ProjectPage : ComponentBase
         "setup" => ReviewStage.Setup,
         "in-review" => ReviewStage.InReview,
         "approved" => ReviewStage.Approved,
+        "rejected" => ReviewStage.Rejected,
         _ => null
     };
 
@@ -241,10 +242,11 @@ public partial class ProjectPage : ComponentBase
     ///     Gets the number of reviews of the project per stage and overdue, for the summary strip; not affected by the
     ///     filters.
     /// </summary>
-    private (int Setup, int InReview, int Approved, int Overdue) Summary =>
+    private (int Setup, int InReview, int Approved, int Rejected, int Overdue) Summary =>
         (Progress.Count(p => p.Stage == ReviewStage.Setup),
             Progress.Count(p => p.Stage == ReviewStage.InReview),
             Progress.Count(p => p.Stage == ReviewStage.Approved),
+            Progress.Count(p => p.Stage == ReviewStage.Rejected),
             Progress.Count(p => p.IsOverdue));
 
     /// <summary>
@@ -538,7 +540,23 @@ public partial class ProjectPage : ComponentBase
         {
             ReviewStage.Setup => "setup",
             ReviewStage.InReview => "in-review",
+            ReviewStage.Rejected => "rejected",
             _ => "approved"
+        };
+    }
+
+    /// <summary>
+    ///     Gets the extra CSS class of the stage badge of a review.
+    /// </summary>
+    /// <param name="stage">The stage.</param>
+    /// <returns><c>approved</c> or <c>rejected</c> for a concluded review; <c>null</c> otherwise.</returns>
+    private static string? StageBadgeClass(ReviewStage stage)
+    {
+        return stage switch
+        {
+            ReviewStage.Approved => "approved",
+            ReviewStage.Rejected => "rejected",
+            _ => null
         };
     }
 
@@ -553,6 +571,7 @@ public partial class ProjectPage : ComponentBase
         {
             ReviewStage.Setup => "Setup",
             ReviewStage.InReview => "In review",
+            ReviewStage.Rejected => "Rejected",
             _ => "Approved"
         };
     }
@@ -562,12 +581,12 @@ public partial class ProjectPage : ComponentBase
     /// </summary>
     /// <param name="progress">The progress of the review.</param>
     /// <returns>
-    ///     The missing checklist, open threads, unanswered checks and Fail answers; a dash when none or the review is
-    ///     approved.
+    ///     The missing checklist, open threads, unanswered checks, disputed checks and the missing conclusion; a dash
+    ///     when none or the review is concluded. Fail answers are not blockers: they lead to a rejection.
     /// </returns>
     private static string BlockersText(ReviewProgress progress)
     {
-        if (progress.IsApproved)
+        if (progress.IsConcluded)
         {
             return "-";
         }
@@ -588,9 +607,14 @@ public partial class ProjectPage : ComponentBase
             parts.Add(progress.UnansweredChecks + " unanswered");
         }
 
-        if (progress.FailedChecks > 0)
+        if (progress.DisputedChecks > 0)
         {
-            parts.Add(progress.FailedChecks + " Fail");
+            parts.Add(progress.DisputedChecks + " disputed");
+        }
+
+        if (progress.ConclusionRequired)
+        {
+            parts.Add("conclusion needed");
         }
 
         return parts.Count == 0 ? "-" : string.Join(", ", parts);

@@ -52,7 +52,8 @@ public class ApiEndpointsTests
 
     /// <summary>
     ///     Test that the project member rules map to the statuses the API documents: the last project administrator
-    ///     is a conflict, too many attempts is 429, and a pending password change is forbidden.
+    ///     is a conflict, too many attempts is 429, and a pending password change or a rejection without a conclusion
+    ///     is forbidden.
     /// </summary>
     /// <param name="rule">The rule that failed.</param>
     /// <param name="status">The expected HTTP status.</param>
@@ -63,6 +64,7 @@ public class ApiEndpointsTests
     [InlineData(DomainRule.ChecklistDefinitionInvalid, 400)]
     [InlineData(DomainRule.DueDateInvalid, 400)]
     [InlineData(DomainRule.FollowUpInvalid, 400)]
+    [InlineData(DomainRule.ConclusionRequired, 403)]
     public void ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus(DomainRule rule, int status)
     {
         // Arrange: nothing to prepare

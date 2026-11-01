@@ -271,6 +271,31 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
+    ///     Adds a slot of the first reviewer whose ballot answers every check Pass except the first, which is a Fail,
+    ///     hands the ballot in and optionally writes the conclusion text.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <param name="id">The review identifier.</param>
+    /// <param name="withText"><c>true</c> to write the conclusion text.</param>
+    /// <returns>The identity of the slot.</returns>
+    private static async Task<int> AddRejectingSlotAsync(World world, string id, bool withText)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var slot = await world.Signing.AddSlotAsync(_projectAdmin, world.ProjectId, id, world.Ids["reviewer1"], null, cancellationToken);
+        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, id, _reviewerOne, cancellationToken);
+        var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, id, first.Id, ChecklistOutcome.Fail, "Wrong.", _reviewerOne, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, id, _reviewerOne, cancellationToken);
+        if (withText)
+        {
+            await world.Checklists.SetReviewConclusionTextAsync(world.ProjectId, id, "Not ready.", _reviewerOne, cancellationToken);
+        }
+
+        return slot.Id;
+    }
+
+    /// <summary>
     ///     Reads the progress of the project as the project administrator and picks one review.
     /// </summary>
     /// <param name="world">The world.</param>
@@ -300,6 +325,78 @@ public partial class ReviewProgressServiceTests
     /// <returns>The regular expression.</returns>
     [GeneratedRegex("^[0-9]+")]
     private static partial Regex LeadingNumber();
+
+    /// <summary>
+    ///     Test that a review whose only slot signed an agreed rejection with a conclusion text has the stage Rejected
+    ///     and is neither blocked nor waiting on anybody.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked()
+    {
+        // Arrange: one slot whose ballot is a Fail, with the conclusion text, signed
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        var slotId = await AddRejectingSlotAsync(world, "rev-1", withText: true);
+        await SignAsync(world, "rev-1", slotId, _reviewerOne);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+
+        // Assert: concluded as rejected, which is not an approval
+        Assert.Equal(ReviewStage.Rejected, progress.Stage);
+        Assert.Equal(ReviewConclusion.Rejected, progress.Conclusion);
+        Assert.False(progress.IsApproved);
+        Assert.False(progress.IsBlocked);
+        Assert.Empty(progress.WaitingOn);
+        Assert.Equal(1, progress.SlotsSigned);
+    }
+
+    /// <summary>
+    ///     Test that an agreed Fail is no blocker of its own: the progress keeps the failed count, lists no Fail
+    ///     blocker, and asks only for the conclusion text while there is none.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired()
+    {
+        // Arrange: one slot whose ballot is a Fail, without the conclusion text
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AddRejectingSlotAsync(world, "rev-1", withText: false);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+        var approval = (await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", TestContext.Current.CancellationToken))!;
+
+        // Assert
+        Assert.Equal(ReviewStage.InReview, progress.Stage);
+        Assert.True(progress.ConclusionRequired);
+        Assert.True(progress.IsBlocked);
+        Assert.Equal(1, progress.FailedChecks);
+        Assert.Contains(SigningService.ConclusionRequiredText, approval.Blockers);
+        Assert.DoesNotContain(approval.Blockers, text => text.Contains("Fail", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that once a conclusion text is written, an agreed Fail leaves nothing that blocks.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked()
+    {
+        // Arrange: one slot whose ballot is a Fail, with the conclusion text, not yet signed
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AddRejectingSlotAsync(world, "rev-1", withText: true);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+
+        // Assert
+        Assert.Equal(ReviewStage.InReview, progress.Stage);
+        Assert.False(progress.ConclusionRequired);
+        Assert.False(progress.IsBlocked);
+        Assert.Equal(1, progress.FailedChecks);
+        Assert.Empty((await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", TestContext.Current.CancellationToken))!.Blockers);
+    }
 
     /// <summary>
     ///     Test that the stage is derived from the slots and signatures: no slot is Setup, an unsigned slot is In review,
@@ -349,7 +446,8 @@ public partial class ReviewProgressServiceTests
 
     /// <summary>
     ///     Test that the blocker counts equal the numbers in the blocker sentences of the approval status, for an
-    ///     unanswered check, a Fail answer and an open thread, and that an approved review is not blocked.
+    ///     unanswered check and an open thread, that a Fail answer is counted but is no blocker, and that an approved
+    ///     review is not blocked.
     /// </summary>
     [Fact]
     public async Task ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers()
@@ -379,7 +477,7 @@ public partial class ReviewProgressServiceTests
         Assert.Equal(CountInBlocker(approval, "unanswered"), progress.UnansweredChecks);
         Assert.True(progress.UnansweredChecks > 0);
         Assert.Equal(1, progress.FailedChecks);
-        Assert.Equal(CountInBlocker(approval, "Fail"), progress.FailedChecks);
+        Assert.DoesNotContain(approval.Blockers, text => text.Contains("Fail", StringComparison.Ordinal));
         Assert.Equal(approval.OpenThreads, progress.OpenThreads);
         Assert.Equal(approval.UnansweredChecks, progress.UnansweredChecks);
         Assert.Equal(approval.FailedChecks, progress.FailedChecks);

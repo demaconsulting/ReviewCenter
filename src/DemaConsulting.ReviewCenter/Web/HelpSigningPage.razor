@@ -15,8 +15,11 @@
                 you come back to the review to press <strong>Sign</strong>. The confirmation is good for one
                 signature and a few minutes.</li>
             <li>A slot can be signed only when you have submitted your ballot (with one slot the last answer does it),
-                every checklist check is answered, no check is answered Fail or disputed between the ballots, and no
-                thread is open.</li>
+                every checklist check is answered, no check is disputed between the ballots, and no
+                thread is open. A Fail answer does not block signing: it makes the agreed outcome
+                <strong>Rejected</strong>, and the signing form tells you which outcome you sign. To sign a rejected
+                review, the review needs a written conclusion with the reasons (the <strong>Review conclusion</strong>
+                card on the review page).</li>
             <li>A later change to what the signatures cover, such as a disagreement on a check that was agreed, makes the
                 earlier signatures
                 out of date, and the reviewer signs again. Before it does that, ReviewCenter shows a warning that names
@@ -25,8 +28,10 @@
                 blocks signing until it is resolved.
                 The review is <strong>Approved</strong> when every slot has submitted its ballot, the ballots agree,
                 every slot is signed for its current state and no thread
-                is open.</li>
-            <li>An approved review is <strong>locked</strong>: nobody can add comments, change answers, change the
+                is open. It is <strong>Rejected</strong> when the ballots agree on a Fail, every slot is signed for
+                that outcome and the conclusion text is written.</li>
+            <li>An approved or rejected review is <strong>locked</strong>: nobody can add comments, change answers,
+                change the
                 files or the reviewers. A project admin or a system administrator can <strong>reopen</strong> it with
                 a reason; this is recorded in the audit trail, the old signatures are kept as history, and the
                 reviewers must sign again.</li>

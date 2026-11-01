@@ -40,10 +40,11 @@ N/A - standard test environment.
   review once the whole checklist is complete.
 - Every interactive element has a kebab-case `data-testid`, and the interactive marker is `true` after the page has
   rendered on a live connection.
-- A review that is approved is shown as locked: a notice (`checklist-locked`) says that the checklist is read-only and
+- A review that is concluded (approved or rejected) is shown as locked: a notice (`checklist-locked`) says that the
+  checklist is read-only and
   that an administrator can reopen the review, and the Pass, Fail, and N/A buttons, the justification and reason boxes,
   the save buttons, and the applicability switches are disabled and marked `data-locked="true"`, while the sections
-  can still be opened and read; a review that is not approved shows no notice and enabled controls.
+  can still be opened and read; a review that is not concluded shows no notice and enabled controls.
 - While the project does not let authors answer the checklist, the author of the review sees the notice
   `author-answer-blocked` and the same controls disabled (without `data-locked`), no other member sees the notice, the
   notice is not shown when the rule is off, an approved review shows only the lock notice, and a page that was loaded
@@ -145,6 +146,10 @@ scenario is tested by `ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDi
 **ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice**: The author of an approved review sees
 `checklist-locked` and not `author-answer-blocked`. This scenario is tested by
 `ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice`.
+
+**ChecklistPage_Render_RejectedConcludedReview_IsReadOnly**: The page is rendered for a review concluded as rejected;
+the notice `checklist-locked` is shown with the wording for a review that is concluded (approved or rejected), and the
+controls are disabled. This scenario is tested by `ChecklistPage_Render_RejectedConcludedReview_IsReadOnly`.
 
 **ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing**: The page is loaded while the rule is
 off, the rule is switched on, and the author clicks Pass; the error line of the check contains "Authors cannot answer

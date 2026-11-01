@@ -389,6 +389,44 @@ public class ReviewStoreSigningTests
     }
 
     /// <summary>
+    ///     Test that the outcome of a signature is stored and read back: a rejection stays a rejection, and a signature
+    ///     built without an outcome is an approval.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome()
+    {
+        // Arrange: two slots and the current digest
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var first = await db.Store.AddSlotAsync(NewSlot(projectId), TestContext.Current.CancellationToken);
+        var second = await db.Store.AddSlotAsync(NewSlot(projectId, 3, null), TestContext.Current.CancellationToken);
+        var digest = await DigestAsync(db, projectId);
+        var rejected = new ReviewSignature
+        {
+            ProjectId = projectId,
+            ReviewId = "REV-1",
+            SlotId = first.Id,
+            UserId = 1,
+            DisplayName = "Ann",
+            Role = SlotRole.Alternate,
+            SignedAt = _time,
+            RecordDigest = digest,
+            Outcome = ReviewOutcome.Rejected,
+            Meaning = SigningService.MeaningRejectedText
+        };
+
+        // Act
+        await db.Store.AddSignatureAsync(rejected, TestContext.Current.CancellationToken);
+        await db.Store.AddSignatureAsync(NewSignature(projectId, second.Id, digest), TestContext.Current.CancellationToken);
+        var read = await db.Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(ReviewOutcome.Rejected, read.Single(s => s.SlotId == first.Id).Outcome);
+        Assert.Equal(SigningService.MeaningRejectedText, read.Single(s => s.SlotId == first.Id).Meaning);
+        Assert.Equal(ReviewOutcome.Approved, read.Single(s => s.SlotId == second.Id).Outcome);
+    }
+
+    /// <summary>
     ///     Test that a digest that is not the one of the stored record is refused inside the store and nothing
     ///     is stored, both for a made-up digest and for one that was current until the record changed.
     /// </summary>

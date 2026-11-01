@@ -66,7 +66,10 @@ request) in that time.
   anything else is read or recorded. The evidence settings are taken from the project at this point and used for the
   whole call. The approval is read from `SigningService`; a missing
   review gives `NotFound` and a
-  review that is not complete gives `NotApproved`, in both cases without asking for the key. A request without an actor
+  review that is not complete gives `NotApproved`, in both cases without asking for the key. A review that was concluded
+  as rejected is not approved either: for an actor it gives `NotApproved` with the message "The review was rejected. A
+  signed attestation of a rejected review is not available yet." (also without asking for the key), and an anonymous
+  request still gets `NotFound`. A request without an actor
   gets `NotFound` ("The review was not found.", the same as for a missing review) for a review that is not complete, so
   that an anonymous caller cannot list review identifiers or their state; `NotApproved` is for an actor. Then the key is
   requested;

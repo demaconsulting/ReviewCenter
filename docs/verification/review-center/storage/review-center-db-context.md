@@ -35,7 +35,7 @@ be loadable on the test platform.
   pair refuses a second user with the same pair while any number of users without one are allowed.
 - The tables for reviewer slots and signatures are created; the database refuses a slot for a review that does not
   exist, refuses to remove a slot that has a signature, and refuses a second signature of the same slot with the same
-  digest; the role, digest, and meaning of a signature are read back as stored.
+  digest; the role, digest, outcome (approved or rejected), and meaning of a signature are read back as stored.
 - The table for repositories stores every field of a registration including the project and the encrypted token, and
   its unique index on the project and the name ignores case, so the same name can be used in two projects.
 - The table for project memberships holds one row per user and project, refuses a second row for the same pair, and
@@ -155,6 +155,11 @@ signing that is not allowed, and one signature remains. This scenario is tested 
 **ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A signature is stored and read back with its
 role, its 64-character digest, and its meaning text unchanged, which verifies the signatures table.
 This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
+
+**ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome**: A signature with the rejected outcome and one built
+without an outcome are stored and read back; the first is still a rejection and the second is an approval, which
+verifies the outcome column of the signatures table. This scenario is tested by
+`ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome`.
 
 **Repositories table**: The `Repositories` table is exercised by the tests of `RepositoryStore`: a repository round-trips
 with every field, which is tested by `RepositoryStore_AddAsync_Repository_RoundTripsAndAudits`, the encrypted token is

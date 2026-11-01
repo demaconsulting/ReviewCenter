@@ -139,15 +139,33 @@ public partial class InboxPage : ComponentBase
     ///     Gets the style class of the chip of a row.
     /// </summary>
     /// <param name="item">The row.</param>
-    /// <returns>A class name; failed checks and out-of-date signatures use the warning style, approvals the success style.</returns>
+    /// <returns>
+    ///     A class name; failed checks use the warning style, approvals the success style and a rejection the failure
+    ///     style.
+    /// </returns>
     private static string? ChipClass(InboxItem item)
     {
         return item.Section switch
         {
             InboxSection.ToSign or InboxSection.RepliesWaiting => "pending",
             InboxSection.FailedChecks => "failed",
-            _ => item.Chip == InboxService.ApprovedChip ? "approved" : "pending"
+            _ => UpdateChipClass(item.Chip)
         };
+    }
+
+    /// <summary>
+    ///     Gets the style class of the chip of an update row.
+    /// </summary>
+    /// <param name="chip">The chip text.</param>
+    /// <returns>The class: <c>approved</c>, <c>rejected</c> or <c>pending</c> for everything else.</returns>
+    private static string UpdateChipClass(string chip)
+    {
+        if (chip == InboxService.ApprovedChip)
+        {
+            return "approved";
+        }
+
+        return chip == InboxService.RejectedChip ? "rejected" : "pending";
     }
 
     /// <summary>

@@ -41,11 +41,12 @@ N/A - standard test environment.
 - An unknown project shows a not-found message and no form, and so does a project the user is no member of (the same
   message, `project-not-found`, and nothing of the project, on the project page and on the page for a new review); a
   known project shows its name and description and
-  its reviews as rows with link, title, and a stage badge (Setup, In review, or Approved), or an empty message. A review
-  whose every slot has a current signature is Approved; a review without slots is in Setup; a review with an unsigned
-  slot is In review.
+  its reviews as rows with link, title, and a stage badge (Setup, In review, Approved, or Rejected), or an empty message.
+  A review whose every slot has a current signature of the same outcome is Approved or Rejected; a review without slots
+  is in Setup; a review with an unsigned slot is In review.
 - The reviews table shows, for each review, its signatures, its blockers, the people it waits on, its last activity, and
-  its due date with the Overdue badge; a summary strip counts the reviews per stage and the overdue ones; the filters
+  its due date with the Overdue badge; a summary strip counts the reviews per stage (including "N rejected") and the
+  overdue ones; the filters
   (stage, overdue, blocked, text), the sort, and the page (25 to a page) are read from the query string and kept by the
   links; the created, last activity, and due dates are written in Gregorian digits whatever the culture of the request;
   and a read-only auditor of the project sees the same table without the New review and Plan controls.
@@ -378,10 +379,20 @@ signed with the right password and one review without slots; the first is listed
 
 **ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary**: A project has reviews in each stage,
 with a signed slot, an out-of-date signature, open threads, an unanswered check, a Fail answer, a due date, and a past
-due date. Each row shows its stage, its signatures (such as 2/3 and "1 out of date"), its blockers, the people it waits
+due date. Each row shows its stage, its signatures (such as 2/3 and "1 out of date"), its blockers (for example "1 open
+thread, conclusion needed"), the people it waits
 on, its last activity, and its due date with the Overdue badge only where it applies; the summary strip counts the
 reviews per stage and the overdue ones. This scenario is tested by
 `ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary`.
+
+**ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker**: A review is concluded as rejected. Its row
+shows the Rejected badge, the summary strip shows "1 rejected" (`project-summary-rejected`), the stage filter
+`stage=rejected` lists it, and no blocker names a number of Fail answers. This scenario is tested by
+`ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker`.
+
+**ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker**: A review has two slots whose submitted ballots differ
+in exactly one check and nothing else blocks it. Its blockers cell reads "1 disputed" instead of a dash, and the blocked
+filter lists the review. This scenario is tested by `ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker`.
 
 **ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates**: The current culture and the current UI culture
 are set to `th-TH` (restored afterwards); the test first checks that this culture writes another year than 2025 for a

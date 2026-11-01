@@ -189,6 +189,66 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that a review concluded as rejected has no attestation: a signed-in caller is told that it was rejected
+    ///     and that no attestation of a rejection is available yet, the key is not asked for and nothing is recorded.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_RejectedConcluded_ReturnsNotApprovedWithRejectedMessageWithoutKey()
+    {
+        // Arrange: every ballot is a Fail, the conclusion text is written and the slot signed the rejection
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        await fixture.AnswerAllAsync(ChecklistOutcome.Fail);
+        await fixture.Checklists.SetReviewConclusionTextAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, "Not ready.", TestActors.Ann, cancellationToken);
+        await fixture.SignAsync();
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
+
+        // Assert
+        Assert.Equal(AttestationStatus.NotApproved, result.Status);
+        Assert.Null(result.Content);
+        Assert.Contains("rejected", result.Message, StringComparison.Ordinal);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+        Assert.Equal(0, keys.Requests);
+    }
+
+    /// <summary>
+    ///     Test that an anonymous request for a review concluded as rejected gets the answer of a review that does not
+    ///     exist, so the outcome of a review is not disclosed.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound()
+    {
+        // Arrange: a rejected, concluded review in a project that allows anonymous attestation PDFs
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        await fixture.AnswerAllAsync(ChecklistOutcome.Fail);
+        await fixture.Checklists.SetReviewConclusionTextAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, "Not ready.", TestActors.Ann, cancellationToken);
+        await fixture.SignAsync();
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+        Assert.True(await fixture.Store.UpdateEvidenceSettingsAsync(
+            fixture.ProjectId,
+            EvidenceSettings.Default,
+            EvidenceSettings.Default with { AnonymousAttestations = true },
+            AuditDraft.By(TestActors.Ann, EvidenceSettingsService.ChangedAction, "x", fixture.ProjectId),
+            cancellationToken));
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, null, cancellationToken);
+
+        // Assert
+        Assert.Equal(AttestationStatus.NotFound, result.Status);
+        Assert.Equal("The review was not found.", result.Message);
+        Assert.Equal(0, keys.Requests);
+    }
+
+    /// <summary>
     ///     Test that a request without an actor gets the answer of a review that does not exist when the review is not
     ///     complete, so it cannot be used to list review identifiers or their state, while a signed-in caller keeps
     ///     the informative not-approved answer; nothing is recorded and the key is not asked for.

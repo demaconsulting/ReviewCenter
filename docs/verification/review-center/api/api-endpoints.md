@@ -29,7 +29,8 @@ N/A - standard test environment (a temporary database and key folder are created
   problem that names the due date and creates nothing.
 - An invalid body is a 400 problem that names the field, a body that is not JSON of the right shape is a 400 problem, a
   body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status; the rule
-  for the last project administrator is 409, too many attempts 429, a required password change 403, and the rules for a
+  for a last project administrator is 409, too many attempts 429, a required password change 403, a rejected outcome
+  without a conclusion (`ConclusionRequired`) 403, and the rules for a
   locked review (`ReviewLocked`) and for a review that is not locked (`ReviewNotLocked`) are 409, and so is the rule
   for a change that would make a signature out of date without acknowledgement (`SignaturesWouldBecomeOutOfDate`), and
   the three rules of the project that refuse the author or the reopener (`AuthorCannotAnswer`, `ReopenerCannotSign`,
@@ -232,8 +233,8 @@ unknown project are sent. The answers are 409, 400, 400, and 404, each a problem
 This scenario is tested by `ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus`.
 
 **ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus**: The status for each of the rules `LastProjectAdmin`,
-`TooManyAttempts`, `PasswordChangeRequired`, `DueDateInvalid`, and `FollowUpInvalid` is asked of `ApiProblems`; the
-answers are 409, 429, 403, 400, and 400. This
+`TooManyAttempts`, `PasswordChangeRequired`, `DueDateInvalid`, `FollowUpInvalid`, and `ConclusionRequired` is asked of
+`ApiProblems`; the answers are 409, 429, 403, 400, 400, and 403. This
 scenario is tested by `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus`.
 
 **ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409**: The status for each of the rules `ReviewLocked` and

@@ -29,10 +29,15 @@ is its position in creation order, counted from 1, and that position is the "slo
 
 **ReviewSignature**: an immutable record of one signature: `Id`, `ProjectId`, `ReviewId`, `SlotId`, `UserId`,
 `DisplayName` (copied when signing, so it stays readable if the user is renamed or disabled), `Role` (the role the
-signer had in the slot), `SignedAt` (UTC), `RecordDigest`, and `Meaning`. Signatures are never changed or deleted.
+signer had in the slot), `SignedAt` (UTC), `RecordDigest`, `Outcome`, and `Meaning`. Signatures are never changed or
+deleted. `Outcome` is a `ReviewOutcome` (`Approved` or `Rejected`, default `Approved`): the agreed outcome of the
+consolidated ballots that the signer signed. `Rejected` means the submitted ballots agree on at least one Fail answer.
+Because the digest covers the consolidated standing, a signature of the current digest always attests the outcome the
+record has now.
 
-**Meaning**: every signature carries the text of `SigningService.MeaningText`: "I have reviewed this record and
-approve it."
+**Meaning**: every signature carries the text of its outcome, given by `SigningService.MeaningFor(outcome)`: for
+`Approved` the text of `SigningService.MeaningText`, "I have reviewed this record and approve it.", and for `Rejected`
+the text of `SigningService.MeaningRejectedText`, "I have reviewed this record and reject it."
 
 **ReviewRecord**: the immutable snapshot of a review that the digest and the blockers are computed from: the content
 fingerprint, the frozen checklist (or `null`), the section decisions, the answers, and the threads with their
@@ -56,13 +61,20 @@ on a ballot changes no signature. Progress and blockers read through the same pr
 never reaches the digest: in a review with exactly one slot, whose reviewer has nobody to agree with, the sole draft
 ballot counts as submitted for the counts of progress and blockers, so the reviewer sees what is left to answer.
 
-**ReviewApproval**: the computed status of a review: `IsApproved`, the current `Digest`, the `Slots` (one `SlotStatus`
+**ReviewApproval**: the computed status of a review: `Conclusion`, the current `Digest`, the `Slots` (one `SlotStatus`
 each), the `Blockers`, the `NextStep` sentence, and `Reopens`, the reopen history, oldest first (`null` or empty for
-a review that was never reopened; it is read only when the record's reopen count is above zero). `IsApproved` means
-that the review is concluded (see below) and is also the lock: there is no separate stored or computed "locked" flag.
-It also carries the counts behind the blockers (`OpenThreads`, `UnansweredChecks`, `FailedChecks`, `MissingChecklist`),
-`DisputedChecks`, the number of checks and sections on which the submitted ballots disagree, and `UnsubmittedBallots`,
-the number of slots whose ballot has not been handed in (zero for a review without a checklist).
+a review that was never reopened; it is read only when the record's reopen count is above zero). `Conclusion` is a
+`ReviewConclusion`: `Approved` or `Rejected` when the review is concluded (see below), otherwise `None`.
+`IsApproved` is true only for `Approved`, and `IsConcluded` is true for both; a concluded review is also the lock:
+there is no separate stored or computed "locked" flag.
+It also carries the counts behind the blockers (`OpenThreads`, `UnansweredChecks`, `MissingChecklist`),
+`FailedChecks`, the number of checks that the submitted ballots agree on as Fail (informational only: it is not a
+blocker), `DisputedChecks`, the number of checks and sections on which the submitted ballots disagree, and
+`UnsubmittedBallots`, the number of slots whose ballot has not been handed in (zero for a review without a
+checklist). `Outcome` is the outcome that a signature made now would attest (`null` while a check is pending or
+disputed, a ballot is not handed in, or there is no checklist), and `ConclusionRequired` is true exactly when the
+outcome is `Rejected` and the review has no conclusion text, which is when the conclusion blocker is among the
+`Blockers`.
 A `SlotStatus` holds the slot identity, its
 number, the primary and alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state,
 and, for a signed slot, the name
@@ -77,24 +89,31 @@ keeps the flag too.
 
 **Status is computed, never stored.** A slot is `Signed` when it has a signature whose digest equals the digest of the
 record now, `OutOfDate` when it has signatures but none of them is current, and `NotSigned` otherwise. A review is
-concluded (and `IsApproved` is true) when it has at least one slot, every slot has a submitted ballot, the
-consolidation of the ballots has no pending and no disputed check and its outcome is `Approved`, every slot is
-`Signed`, **and no thread is open**; a review without slots is "In review". A `Rejected` outcome is not concluded: the
-concluded state of a rejected review is not available yet. A change to the record (a new included comment, a changed
-consolidated answer) therefore makes
+concluded when it has at least one slot, every slot has a submitted ballot, the consolidation of the ballots has no
+pending and no disputed check, every slot is `Signed` with a signature whose `Outcome` equals the agreed outcome
+(`Approved` or `Rejected`), **and no thread is open**; a rejected review is concluded only when it also has a review
+conclusion text that is not blank. A review without slots is "In review". The conclusion is `Approved` or `Rejected`
+according to the agreed outcome, so a Fail answer does not keep a review open: the review concludes as rejected when
+the reviewers have signed the rejection. A change to the record (a new included comment, a changed
+consolidated answer, a changed conclusion text) therefore makes
 the signatures go out of date by itself, and setting the record back restores them, because the signatures were never
 touched. Chat and the state of a thread are not in the digest, so they never change a signature; an open thread keeps
 the review from being concluded by a rule that is separate from the digest (the thread state is read from the record,
 not from the digest), so a fully signed review with an open thread is not concluded and not locked, and it is
 concluded when the thread is resolved. The one definition of "concluded" is
-`ReviewLock.IsConcluded(record, slots, signatures)`: at least one slot, no open thread, every slot holds a
-signature whose digest equals the current digest and, for a review with a checklist, the ballot conditions above. A
-review without a checklist has no ballots and keeps the first conditions (it cannot be signed anyway).
+`ReviewLock.ConcludedOutcome(record, slots, signatures)`, which returns `Approved`, `Rejected`, or `None`:
+at least one slot, no open thread, every slot holds a
+signature whose digest equals the current digest and whose `Outcome` equals the outcome the record has now (a
+signature with another stored outcome never concludes the review, which fails safe) and, for a review with a
+checklist, the ballot conditions above, and for a rejected outcome a conclusion text that is not blank. A
+review without a checklist has no ballots and keeps the first conditions (it cannot be signed anyway) and is approved.
+`ReviewLock.IsConcluded` is `ConcludedOutcome` not equal to `None`.
 `GetApprovalAsync`, the lock checks of all Core services, and the lock
 checks inside the store transactions all call it, so they cannot disagree.
 
-**Approval lock**: a concluded review is locked, so that what the signatures cover cannot change silently. While the
-review is concluded, every change of reviewed content is refused with `ReviewLocked` ("This review is concluded and
+**Approval lock**: a concluded review (approved or rejected) is locked, so that what the signatures cover cannot change
+silently. While the review is concluded, every change of reviewed content is refused with `ReviewLocked` ("This review
+is concluded and
 locked. A project administrator must reopen it before it can change."): starting, replying to, resolving, reopening,
 promoting, and demoting a thread and including a reply in the report or taking it out (`ThreadService`), a checklist
 answer and the applicability of a section (`ChecklistService`), and adding,
@@ -163,7 +182,8 @@ thread.
 
 **Reopen**: `ReopenReviewAsync` is the only way out of the lock. It needs a project administrator or a system
 administrator (anyone else: `ActorNotAllowed`; an API token is always refused) and a reason of 1 to 250 characters after
-trimming (`ReopenReasonInvalid`). It works only on a concluded review (`ReviewNotLocked`: "The review is not locked, so
+trimming (`ReopenReasonInvalid`). It works only on a concluded (approved or rejected) review (`ReviewNotLocked`: "The
+review is not locked, so
 there is nothing to reopen."). The reopen is stored as a `ReviewReopen` with the previous digest, and the number of reopens
 becomes part of the record digest (see `RecordDigest`). Consequently the earlier signatures are kept as history but are
 out of date and can never be current again, not even when the content is changed back; the review is "In review" and
@@ -192,7 +212,7 @@ independence rule, so a refused call costs nothing and no attempt is counted. A 
 further read. Whoever reopened is matched by user name, ignoring case, in the reopen history.
 
 **Stranded slots**: the reopener rule alone would let an administrator make a review impossible to approve, because a
-reopen needs an approved review, so every slot has a signature and none of them can be changed afterwards. While the
+reopen needs a concluded review, so every slot has a signature and none of them can be changed afterwards. While the
 rule is on, `ReopenReviewAsync` therefore refuses a reopen with `ReopenWouldStrandSlot` when a slot would have nobody
 who may sign: "Slot 1 would have no one who may sign; ask another administrator or switch the rule off." The blocked
 people are the administrator who reopens and the earlier reopening administrators; the pure helper
@@ -200,7 +220,7 @@ people are the administrator who reopens and the earlier reopening administrator
 the slots whose primary is blocked and whose alternate is missing or blocked, numbered as the review page shows them,
 and `ReopenRules.StrandedMessage` words the refusal. Every slot counts, not only the ones that were signed by the
 administrator. The check runs after the review is known to be locked and before anything is stored, so a refusal
-records nothing and the review stays approved. Out of scope: an occupant that is disabled or no longer a member is not
+records nothing and the review stays concluded. Out of scope: an occupant that is disabled or no longer a member is not
 considered, and the inbox can still list the review under "To sign" for a blocked reopener who shares a slot.
 
 **Rules for slots**:
@@ -218,15 +238,18 @@ considered, and the inbox can still list the review under "To sign" for a blocke
   only to be a reviewer in one (see the rule above) and to sign (step 1 of signing). A slot that has any signature,
   current or out of date, can
   no longer be changed or removed, because a signature must always point to a slot that still describes who signed.
-  A change of reviewers after a signature is therefore a new slot. While the review is approved (locked), slots cannot
+  A change of reviewers after a signature is therefore a new slot. While the review is concluded (locked), slots cannot
   be added, changed, or removed at all (`ReviewLocked`).
 
 **Blockers**: a review can be signed only when it has a checklist, every check of an applicable section is answered in
-the consolidated ballots, the submitted ballots do not disagree on any check, no agreed check of an applicable section
-is answered Fail, and no thread is open. Otherwise the blockers are returned as
+the consolidated ballots, the submitted ballots do not disagree on any check, no thread is open, and, when the agreed
+outcome is `Rejected`, the review has a conclusion text that is not blank. A check agreed as Fail is **not** a blocker:
+it leads to the outcome `Rejected`, which is signed like an approval (`FailedChecks` only informs). Otherwise the
+blockers are returned as
 plain sentences, in this order: "This review has no checklist.", "{n} checklist check(s) is/are unanswered", "{n}
-checklist check(s) is/are disputed between the ballots", "{n}
-check(s) is/are answered Fail", and "{n} thread(s) is/are open". The checklist of a review is fixed when it is created.
+checklist check(s) is/are disputed between the ballots", "{n} thread(s) is/are open", and
+`SigningService.ConclusionRequiredText`, "A rejected review needs a conclusion stating the reasons". The checklist of a
+review is fixed when it is created.
 The counts come from the consolidation (see "Ballots"): a check is unanswered while it is pending, and a check is
 disputed while the submitted ballots give it different outcomes (a disputed section counts once). **Disputed checks
 block signing** (`DisputedBlocker`): refusing a signature while reviewers disagree keeps a signature from approving a
@@ -243,11 +266,14 @@ blocker is a rule of its own and does not depend on the digest: the store repeat
 a signature, after the digest check, and refuses with `SigningNotAllowed` when any thread, chat or included, is open.
 It covers a thread that was started or reopened after the signer loaded the page.
 
-**Next step**: "Approved. Every reviewer slot has a current signature." when the review is approved; otherwise, when
-there are blockers, the sentence of `ThreadService.NextStep` for the threads, the checklist progress, and the
-number of failed checks (so a review without a slot, whose checks nobody can answer, points to the unanswered checks,
-for example "58 checklist checks unanswered."); otherwise "Add a reviewer slot." when there is no slot and "Ready for
-signatures." when there is one.
+**Next step**: "Approved. Every reviewer slot has a current signature." when the review is approved and "Rejected. Every
+reviewer slot has a current signature." when it is rejected; otherwise, when
+there are blockers, the sentence of `ThreadService.NextStep` for the threads, the checklist progress, the number of
+failed checks, the number of disputed checks, and whether a conclusion text is still needed (so a review without a
+slot, whose checks nobody can answer, points to the unanswered checks,
+for example "58 checklist checks unanswered."); otherwise "Add a reviewer slot." when there is no slot, "Ready for
+signatures (rejected outcome)." when there is a slot and the ballots agree on the rejected outcome, and "Ready for
+signatures." when there is a slot otherwise.
 
 **Signing** takes the actor (the signed-in user, never a form value), the slot, the digest the signer was looking at
 (`expectedDigest`), and the password. It checks, in this order, and stops at the first failure:
@@ -260,7 +286,7 @@ signatures." when there is one.
 3. The actor is the primary or the alternate reviewer of the slot (`ActorNotAllowed`: "You are not a reviewer of this
    slot."). The role is taken from the seat.
    Then, when the project requires independent reviewers and the actor created the review, the signature is refused
-   (`ReviewerNotIndependent`); and when the review is already approved it is locked and the signature is refused
+   (`ReviewerNotIndependent`); and when the review is already concluded it is locked and the signature is refused
    (`ReviewLocked`), which tells the signer why instead of "already signed".
 4. The digest of the record now equals `expectedDigest` (`RecordChanged`: "The record changed while you were signing.
    Review it and try again."), so nobody signs something they have not seen.
@@ -270,7 +296,10 @@ signatures." when there is one.
    so it cannot say whether the signer finished, and this rule does. The exception is a review with a single slot:
    its sole draft counts for the blockers, so when that review has blockers, the blockers of step 7 are named first
    (the open checks are the better message). A review without a checklist has no ballots and skips this step.
-7. There are no blockers (`SigningNotAllowed`, with the blockers in the message, including the disputed checks).
+7. There are no blockers. When the conclusion is the only blocker (the outcome is `Rejected` and the conclusion text
+   is blank) the refusal is `ConclusionRequired` with the message `ConclusionRequiredText` followed by a period;
+   otherwise it is `SigningNotAllowed` with all the blockers in the message (the conclusion sentence among them, and
+   including the disputed checks). The outcome the signature attests is then the agreed outcome of the consolidation.
 8. The password is right: it is checked by `UserService.ReauthenticatePasswordAsync`, which is the check the sign-in
    uses with its own action code, so the hashing, the lockout counting, and the generic failure are the same. Any
    failure (wrong, locked out, disabled, unknown) gives
@@ -295,7 +324,8 @@ signatures." when there is one.
    recorded as `signature.reauth-failed` (detail `wrong code`); a right code clears the counter. When the service has no
    `TotpService` a required second factor cannot be satisfied and the signature is refused (fail closed). A user of an
    external identity provider and a signer without a second factor are not affected, and the code is ignored for them.
-9. The signature is stored by `IReviewStore.AddSignatureAsync`, which recomputes the digest inside a serializable
+9. The signature is stored by `IReviewStore.AddSignatureAsync` with its `Outcome` and the meaning of that outcome, which
+   recomputes the digest inside a serializable
    transaction and refuses the signature when the record changed since step 4.
 
 **Early signing**: a slot may sign as soon as its own ballot is submitted and nothing blocks the review; the ballots
@@ -332,7 +362,9 @@ as a singleton. The store transaction of step 9 covers changes of the record tha
 that every change made by an actor is re-authorized by the service, whatever the caller showed. The integrity rules add
 `ReviewLocked`, `ReviewNotLocked`, `ReopenReasonInvalid`, and `ReviewerNotIndependent`. The impact check adds
 `SignaturesWouldBecomeOutOfDate`. The ballots add `BallotNotSubmitted`, raised by signing when the own ballot has not
-been handed in (step 6), and the two rules that `ChecklistService` raises and that reach this unit through the same
+been handed in (step 6), and `ConclusionRequired`, raised by signing when the agreed outcome is `Rejected`, the
+review has no conclusion text and nothing else blocks (step 7; the API answers it with HTTP 403), and the two rules
+that `ChecklistService` raises and that reach this unit through the same
 type: `NoReviewerSlot` (the person holds no slot of the review, so there is no ballot to answer on) and
 `BallotIncomplete` (a ballot cannot be handed in while a check that applies has no answer); neither is raised by
 this service, and nothing is stored when any of them is.
@@ -354,8 +386,8 @@ not found.
   concurrent change cannot make the digest, the blockers, and the signature status describe different states. The
   members of the project are read through `ListMembershipsAsync` to fill `SlotMember.IsMember`. The reopen history is
   read through `ListReopensAsync` only when the record's reopen count is above zero.
-- *Blocker counts*: `ReviewApproval` also carries `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `DisputedChecks`,
-  `UnsubmittedBallots`, and the flag
+- *Blocker counts*: `ReviewApproval` also carries `OpenThreads`, `UnansweredChecks`, `FailedChecks` (informational),
+  `DisputedChecks`, `UnsubmittedBallots`, the outcome `Outcome`, the flag `ConclusionRequired`, and the flag
   `MissingChecklist`. They are counted in the one place that writes the blocker sentences (`BuildApproval`, one additive
   region), so each number equals the one in its sentence and the flag is true exactly when the "no checklist" sentence
   is present; the sentences are unchanged. `ReviewProgressService` and any later list of work use
@@ -408,7 +440,7 @@ not found.
   the slot is deleted with it; when the record without that ballot has another digest (for example the slot held the
   only dissent), the signatures of the other slots must be acknowledged first (`SignaturesWouldBecomeOutOfDate`).
 
-**ReopenReviewAsync**: Reopens an approved (locked) review.
+**ReopenReviewAsync**: Reopens a concluded (approved or rejected, locked) review.
 
 - *Parameters*: the actor, project identity, review identifier, the reason, and a cancellation token.
 - *Preconditions*: The actor and the review identifier are not null. The actor is not an API token, has an enabled
@@ -451,7 +483,8 @@ The API has no route for these operations, so this check is the second, independ
 a route that is added later without the rule. Reading the approval is not restricted.
 
 **Audit**: Adding, updating, and removing a slot record `slot.added`, `slot.updated`, and `slot.removed`, and signing
-records `signature.added` with the slot, the role, and the record digest the reviewer signed. The slot is named by its
+records `signature.added` with the slot, the role, the outcome (`Approved` or `Rejected`), and the record digest the
+reviewer signed. The slot is named by its
 number on the review page (its position in creation order, counted from 1, so after a removal the numbers of the later
 slots move down by one, as on the page), never by its database identifier: a slot is added as
 `slots.Count + 1`, and a changed, removed, or signed slot gets the count of the slots with a smaller identity plus one,

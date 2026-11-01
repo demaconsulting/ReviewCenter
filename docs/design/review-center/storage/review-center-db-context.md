@@ -132,7 +132,9 @@ repository registry is the one exception, see `Repositories`).
   signature to its review, and a signature is deleted with its review. `SlotId` relates the signature to its slot
   (see below). `UserId` is the identity of the signer; `DisplayName` (the name at the time) is required, at most 100;
   `Role` (the role in the slot, primary or alternate) is stored as text, at most 32; `SignedAt`; `RecordDigest` is
-  required, at most 64 (a SHA-256 value written in hexadecimal); `Meaning` is required, at most 256. A unique index
+  required, at most 64 (a SHA-256 value written in hexadecimal); `Outcome` (the outcome the signer attested, approved
+  or rejected) is required and stored as its number (`ReviewOutcome` promises never to renumber), with the default
+  approved; `Meaning` is required, at most 256. A unique index
   on `SlotId` plus `RecordDigest` allows one signature of a record per slot. Signatures are append-only: the mapping
   has no update path and the application never updates or deletes a row.
 - **ReviewReopens** (`ReviewReopen`): key `Id`, assigned by the database, so it grows with the order of the reopens.
@@ -207,7 +209,8 @@ deleted and created again (there are no migrations; the development database is 
 the `PersonalAccessTokens` table and the creator columns of a review (`CreatedBy`, `CreatedViaApi`): a database created
 before the personal-access-token slice does not have them and must be deleted and created again. The same holds for the
 `DueDate` column of a review: there is no migration for it either, `EnsureCreated` does not add a column to an existing
-table, and development databases are recreated. The same holds for the `ReviewConclusionText` column of a review. The
+table, and development databases are recreated. The same holds for the `ReviewConclusionText` column of a review and for
+the `Outcome` column of a signature. The
 same holds for the follow-up columns (`FollowsReviewId`,
 `CarriedAnswerCount`, `CarriedThreadCount` of a review, `CarriedFromReviewId` of an answer, a section state and a
 thread, `CarriedFromThreadId` of a thread) and the index on `ProjectId` and `FollowsReviewId`. The same holds for the

@@ -91,10 +91,10 @@ be loadable on the test platform.
   settings which are no longer stored, and a change of an unknown project, change nothing and write no entry.
 - A change of reviewed content (a thread, a comment, the state of a thread, a resolution, the kind of a thread, the
   report flag of a comment, a checklist answer, the applicability of a
-  section) and a change of the reviewer slots (add, update, remove) on a concluded review (every slot signed for the
-  current record and no thread open) is refused inside the write
+  section) and a change of the reviewer slots (add, update, remove) on a concluded review (every slot signed with the
+  same outcome for the current record and no thread open, approved or rejected) is refused inside the write
   transaction with `ReviewLocked`, whatever the caller did before, and stores no row and no audit entry; the same
-  change on a review that is not approved is stored; a change of a review that does not exist is not refused as
+  change on a review that is not concluded is stored; a change of a review that does not exist is not refused as
   locked; and when a change races with the final signature of a review, exactly one of them takes effect (the change
   is refused as locked, or the signature as a changed record) and the stored state agrees with it.
 - A reopen of an approved review stores one row with the administrator, the display name, the time, the reason, and the
@@ -203,6 +203,11 @@ and reading the 20 reviews one by one sends more than five times as many. This s
 **ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A slot is signed with the current digest; the
 signature is stored with a database-assigned identity and listed with the slot, user, display name, role, time, digest,
 and meaning unchanged. This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
+
+**ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome**: Two slots are signed with the current digest, the
+first with the rejected outcome and the rejection meaning text, the second with a signature built without an outcome.
+The signatures are listed with the first as a rejection with its meaning text unchanged and the second as an approval.
+This scenario is tested by `ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome`.
 
 **ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing**: A signature is added with a digest
 that was made up, and with a digest that was current until a thread was added; each throws a `DomainRuleException` for

@@ -1552,6 +1552,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Role = signature.Role,
             SignedAt = signature.SignedAt,
             RecordDigest = signature.RecordDigest,
+            Outcome = signature.Outcome,
             Meaning = signature.Meaning
         };
         _signatures.Add(stored);

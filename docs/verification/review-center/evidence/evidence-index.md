@@ -23,7 +23,8 @@ running server is a manual check.
 - All tests pass with zero failures.
 - A complete review that has a review-set id is listed with that id, its content fingerprint, the UTC day of its latest
   signature, and the review that it stands for.
-- A review without a review-set id, an incomplete review, a review that changed after it was signed, and a review of
+- A review without a review-set id, an incomplete review, a review concluded as rejected, a review that changed after it
+  was signed, and a review of
   another project are not listed.
 - Of several reviews with the same id and fingerprint, the one that was completed last is listed, and for the same time
   the one with the lowest review id; the order is by id and then by fingerprint.
@@ -48,6 +49,11 @@ index is empty. This scenario is tested by `EvidenceIndexService_Build_Incomplet
 
 **EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed**: The record of a signed review changes. The index
 is empty. This scenario is tested by `EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed`.
+
+**EvidenceIndexService_Build_RejectedConcludedReview_IsNeverListed**: A review with a review-set id is concluded as
+rejected (every ballot is a Fail, the conclusion text is written, and the slot signs the rejection), and a review with
+another set id is approved. Only the approved review is listed, because the index lists approved reviews only. This
+scenario is tested by `EvidenceIndexService_Build_RejectedConcludedReview_IsNeverListed`.
 
 **EvidenceIndexService_Build_NoSetId_IsSkipped**: A complete review has no review-set id. The index is empty. This
 scenario is tested by `EvidenceIndexService_Build_NoSetId_IsSkipped`.

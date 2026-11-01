@@ -26,9 +26,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     A review is concluded when it has at least one reviewer slot, every slot holds a signature of the current
-///     record digest, no thread is open, and, for a review with a checklist, every slot has handed in its ballot and the
-///     submitted ballots agree on every check with the outcome approved (a rejected outcome does not conclude the review
-///     yet). The open-thread rule is deliberately separate from the digest: whether a
+///     record digest that attests the outcome the record has now, no thread is open, and, for a review with a
+///     checklist, every slot has handed in its ballot and the submitted ballots agree on every check. The agreed
+///     outcome is approved, or rejected when an agreed check failed; a rejected review is concluded only when it also
+///     has a review conclusion text that is not blank (the reasons), so a rejection is never signed without them.
+///     The open-thread rule is deliberately separate from the digest: whether a
 ///     thread is open or resolved is not part of the digest (so resolving chat never makes a signature out of date),
 ///     but an open thread, chat or included, blocks signing and conclusion until somebody resolves it. A concluded
 ///     review is locked: nothing a signature covers (the report, checklist answers and applicability), nothing the
@@ -54,8 +56,7 @@ public static class ReviewLock
     /// <param name="slots">The reviewer slots of the review. Must not be null.</param>
     /// <param name="signatures">The signatures of the review, current and out of date. Must not be null.</param>
     /// <returns>
-    ///     <c>true</c> when there is at least one slot, each slot has a signature of the current digest, and every
-    ///     thread of the record is resolved.
+    ///     <c>true</c> when the review is concluded as approved or as rejected (see <see cref="ConcludedOutcome"/>).
     /// </returns>
     /// <remarks>
     ///     Pure and stateless, so the Storage subsystem can call it from inside a transaction with data it loaded
@@ -66,47 +67,90 @@ public static class ReviewLock
         IReadOnlyList<ReviewerSlot> slots,
         IReadOnlyList<ReviewSignature> signatures)
     {
+        return ConcludedOutcome(record, slots, signatures) != ReviewConclusion.None;
+    }
+
+    /// <summary>
+    ///     Decides how the review is concluded, if it is.
+    /// </summary>
+    /// <param name="record">The record as it is now. Must not be null.</param>
+    /// <param name="slots">The reviewer slots of the review. Must not be null.</param>
+    /// <param name="signatures">The signatures of the review, current and out of date. Must not be null.</param>
+    /// <returns>
+    ///     <see cref="ReviewConclusion.Approved"/> or <see cref="ReviewConclusion.Rejected"/> when there is at least
+    ///     one slot, every thread of the record is resolved, each slot has a signature of the current digest that
+    ///     attests the outcome the record has now and, for a review with a checklist, each slot has a submitted ballot,
+    ///     no check is pending or disputed and the outcome is agreed; a rejected outcome also needs a review conclusion
+    ///     text that is not blank. Otherwise <see cref="ReviewConclusion.None"/>.
+    /// </returns>
+    /// <remarks>
+    ///     This is the one definition of a concluded review; <see cref="IsConcluded"/> is derived from it. A review
+    ///     without a checklist has no ballots and concludes as approved (it cannot be signed anyway). A signature
+    ///     whose stored outcome differs from the outcome the record has now never concludes the review (fail safe).
+    /// </remarks>
+    public static ReviewConclusion ConcludedOutcome(
+        ReviewRecord record,
+        IReadOnlyList<ReviewerSlot> slots,
+        IReadOnlyList<ReviewSignature> signatures)
+    {
         if (slots.Count == 0)
         {
-            return false;
+            return ReviewConclusion.None;
         }
 
         // An open thread keeps the review open, however many signatures are current
         if (record.Threads.Any(t => t.State != ReviewThreadState.Resolved))
         {
-            return false;
+            return ReviewConclusion.None;
         }
 
-        // The digest is computed once; a slot is signed when any of its signatures carries it
-        var digest = RecordDigest.Compute(record);
-        if (!slots.All(slot => signatures.Any(s => s.SlotId == slot.Id && s.RecordDigest == digest)))
+        var outcome = AgreedOutcome(record, slots);
+        if (outcome is null)
         {
-            return false;
+            return ReviewConclusion.None;
         }
 
-        // A review without a checklist has no ballots and keeps the rule above (it cannot be signed anyway)
-        return record.Checklist is null || BallotsAgreeOnApproval(record, slots);
+        // A rejection is signed together with the reasons for it
+        if (outcome == ReviewOutcome.Rejected && string.IsNullOrWhiteSpace(record.ReviewConclusionText))
+        {
+            return ReviewConclusion.None;
+        }
+
+        // The digest is computed once; a slot is signed when a signature of it carries the digest and the outcome
+        var digest = RecordDigest.Compute(record);
+        if (!slots.All(slot => signatures.Any(
+                s => s.SlotId == slot.Id && s.RecordDigest == digest && s.Outcome == outcome)))
+        {
+            return ReviewConclusion.None;
+        }
+
+        return outcome == ReviewOutcome.Rejected ? ReviewConclusion.Rejected : ReviewConclusion.Approved;
     }
 
     /// <summary>
-    ///     Tells whether every slot has handed in its ballot and the ballots agree on every check and lead to approval.
+    ///     Gets the outcome every slot's signature has to attest: the agreed outcome of the submitted ballots.
     /// </summary>
-    /// <param name="record">The record, with a checklist.</param>
+    /// <param name="record">The record.</param>
     /// <param name="slots">The reviewer slots of the review.</param>
     /// <returns>
-    ///     <c>true</c> when each slot has a submitted ballot and the consolidation has no pending or disputed check and
-    ///     the outcome is approved. A rejected review is not concluded: the rejected conclusion is not available yet.
+    ///     <see cref="ReviewOutcome.Approved"/> for a review without a checklist; otherwise the outcome of the
+    ///     consolidation when each slot has a submitted ballot and no check is pending or disputed; else <c>null</c>.
     /// </returns>
-    private static bool BallotsAgreeOnApproval(ReviewRecord record, IReadOnlyList<ReviewerSlot> slots)
+    private static ReviewOutcome? AgreedOutcome(ReviewRecord record, IReadOnlyList<ReviewerSlot> slots)
     {
+        if (record.Checklist is null)
+        {
+            return ReviewOutcome.Approved;
+        }
+
         var submitted = record.Ballots.Where(b => b.Status == BallotStatus.Submitted).Select(b => b.SlotId).ToHashSet();
         if (!slots.All(slot => submitted.Contains(slot.Id)))
         {
-            return false;
+            return null;
         }
 
-        var result = BallotConsolidation.Consolidate(record.Checklist!.Parse(), record.Ballots);
-        return result.Pending == 0 && result.Disputed == 0 && result.Outcome == ReviewOutcome.Approved;
+        var result = BallotConsolidation.Consolidate(record.Checklist.Parse(), record.Ballots);
+        return result.Pending == 0 && result.Disputed == 0 ? result.Outcome : null;
     }
 
     /// <summary>

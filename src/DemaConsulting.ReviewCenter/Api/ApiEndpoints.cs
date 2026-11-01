@@ -731,7 +731,8 @@ internal static class ApiEndpoints
         var threadList = await services.Threads.ListAsync(review.ProjectId, review.Id, cancellationToken);
         var checklist = await services.Checklists.GetAsync(review.ProjectId, review.Id, cancellationToken);
 
-        // The checklist counts follow the screen: only items of applicable sections count
+        // The checklist counts come from the consolidation of the submitted ballots (a single-slot review counts its
+        // only ballot even while it is a draft); only items of applicable sections count
         var items = 0;
         var answered = 0;
         var failed = 0;
@@ -775,7 +776,7 @@ internal static class ApiEndpoints
             review.Selection,
             review.ReviewSetId,
             DueDateText(review.DueDate),
-            services.Reviews.IsOverdue(review, approval?.IsApproved ?? false),
+            services.Reviews.IsOverdue(review, approval?.IsConcluded ?? false),
             approval?.IsApproved ?? false,
             approval?.Digest ?? string.Empty,
             slots,

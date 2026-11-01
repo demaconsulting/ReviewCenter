@@ -304,17 +304,19 @@ sections:
       - id: ReviewCenter-Core-Signatures
         title: >-
           The Core subsystem shall let a review have reviewer slots with a primary reviewer and an optional
-          alternate, let a reviewer sign the review only when nothing blocks it and only after confirming the
+          alternate, let a reviewer sign the review, as approved or, when the ballots agree on a Fail, as rejected
+          with a conclusion text, only when nothing blocks it (a Fail answer does not) and only after confirming the
           password again, bind each signature to a digest of the review record, keep every signature unchanged,
-          and show a signature as out of date, and the review as not approved, as soon as the record changes
+          and show a signature as out of date, and the review as not concluded, as soon as the record changes
           until every slot has signed the new record, and refuse a change of the record that would make a current
           signature out of date until the caller acknowledges the affected slots.
         justification: |
-          A signature is only worth something if it says who approved which content. Binding it to a digest of
-          the record, and computing the approval from the record each time, means an approval can never outlive
-          the content it approved, and asking for the password again shows the approval came from the person.
-          Naming the signatures that a change would withdraw, and refusing until the caller confirms, keeps a
-          signature from being lost unnoticed.
+          A signature is only worth something if it says who signed which content and with what outcome. Binding it
+          to a digest of the record, and computing the conclusion from the record each time, means a conclusion can
+          never outlive the content it concluded, and asking for the password again shows the signature came from the
+          person. A failed check is a finding, so it leads to a rejection that states its reasons and not to a review
+          that nobody can sign. Naming the signatures that a change would withdraw, and refusing until the caller
+          confirms, keeps a signature from being lost unnoticed.
         children:
           - ReviewCenter-RecordDigest-Format
           - ReviewCenter-RecordDigest-NullRecord
@@ -346,6 +348,7 @@ sections:
           - ReviewCenter-SigningService-EarlySigning
           - ReviewCenter-SigningService-DisputedBlocker
           - ReviewCenter-SigningService-SlotBallotImpact
+          - ReviewCenter-SigningService-RejectedOutcome
           - ReviewCenter-ThreadService-SignatureImpact
         tests:
           - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
@@ -353,8 +356,9 @@ sections:
 
       - id: ReviewCenter-Core-ApprovalLock
         title: >-
-          The Core subsystem shall treat a review that every slot has signed for the current record as approved and
-          locked, refuse every change of its threads, checklist answers, section applicability, and reviewer slots,
+          The Core subsystem shall treat a review that every slot has signed for the current record with the same
+          outcome, as approved or as rejected (with a conclusion text), as concluded and locked, refuse every change
+          of its threads, checklist answers, section applicability, and reviewer slots,
           and refuse a further signature, with the ReviewLocked rule, until an administrator of the project or a system
           administrator reopens it with a reason, shall refuse the reopening of a review that is not locked with the
           ReviewNotLocked rule, shall keep every earlier signature as history after the reopening, out of date for good,
@@ -362,7 +366,7 @@ sections:
           again, and shall record the reopening, with the reason and the digest of the approved record, in the audit
           trail.
         justification: |
-          An approval is only worth something if the content it approved cannot move afterwards. Locking the approved
+          An approval is only worth something if the content it approved cannot move afterwards. Locking the concluded
           review, and allowing only a deliberate, explained, and recorded reopening by someone responsible for the
           project, keeps the record that was signed the record that exists, and keeps the history of approvals complete.
         children:
@@ -598,8 +602,9 @@ sections:
 
       - id: ReviewCenter-Core-Progress
         title: >-
-          The Core subsystem shall answer for every review of a project which stage it is in (Setup, In review, or
-          Approved, derived from the approval status and not from the stored state), how many signatures it has of
+          The Core subsystem shall answer for every review of a project which stage it is in (Setup, In review,
+          Approved, or Rejected, derived from the approval status and not from the stored state), how many signatures
+          it has of
           the number it needs and how many are out of date, whom it waits on (a disabled person marked), what blocks
           its approval with the numbers that equal the blocker sentences of the approval status, whether it is
           overdue, and when it last changed according to the audit trail, with a number of reads that does not grow

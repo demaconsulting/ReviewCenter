@@ -30,7 +30,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <see cref="ReviewUserState"/>) says what is new. Only reviews of projects the user can see are considered, so
 ///     a removed member, a disabled user, a user with a temporary password and an anonymous or command-line actor
 ///     get an empty inbox and no error. The rules live in <see cref="InboxRules"/>. Reading is cheap per review but
-///     needs one snapshot for each review the user is involved in, because "approved" depends on the record digest.
+///     needs one snapshot for each review the user is involved in, because "concluded" (approved or rejected) depends
+///     on the record digest.
 ///     Read state is not audited and not part of the record digest. The service holds no state of its own and is
 ///     safe for concurrent use as long as the injected stores are.
 /// </remarks>
@@ -50,6 +51,11 @@ public sealed class InboxService
     ///     The chip of an approved review.
     /// </summary>
     public const string ApprovedChip = "Approved";
+
+    /// <summary>
+    ///     The chip of a rejected review.
+    /// </summary>
+    public const string RejectedChip = "Rejected";
 
     /// <summary>
     ///     The chip of a reopened review.
@@ -376,7 +382,8 @@ public sealed class InboxService
     {
         var (record, slots, signatures) = review.Snapshot;
         var digest = RecordDigest.Compute(record);
-        var concluded = ReviewLock.IsConcluded(record, slots, signatures);
+        var conclusion = ReviewLock.ConcludedOutcome(record, slots, signatures);
+        var concluded = conclusion != ReviewConclusion.None;
         var lastSeenCommentId = review.State?.LastSeenCommentId ?? 0;
         var lastSeenAt = review.State?.LastSeenAt ?? DateTimeOffset.MinValue;
         var username = review.User.Username;
@@ -429,7 +436,8 @@ public sealed class InboxService
                 }
             }
 
-            // Failed checks: my own review has checks answered Fail
+            // Failed checks: my own review has checks answered Fail; agreed, they make the review reject, otherwise they
+            // are a disagreement to resolve
             if (isAuthor)
             {
                 var failed = InboxRules.FailedAnswers(record, slots.Count);
@@ -437,14 +445,18 @@ public sealed class InboxService
                 {
                     var unread = failed.Any(
                         answer => !InboxRules.SameUser(answer.AnsweredByUsername, username) && answer.AnsweredAt > lastSeenAt);
-                    items.Add(Row(InboxSection.FailedChecks, $"{failed.Count} failed", unread));
+                    items.Add(Row(
+                        InboxSection.FailedChecks,
+                        $"{failed.Count} failed",
+                        unread,
+                        "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is a disagreement to resolve."));
                 }
             }
         }
 
         if (mine.Count > 0 || isAuthor)
         {
-            await AddUpdatesAsync(items, review, Row, new ApprovalFacts(concluded, digest, signatures, lastSeenAt), cancellationToken);
+            await AddUpdatesAsync(items, review, Row, new ApprovalFacts(conclusion, digest, signatures, lastSeenAt), cancellationToken);
         }
     }
 
@@ -510,13 +522,14 @@ public sealed class InboxService
         ApprovalFacts facts,
         CancellationToken cancellationToken)
     {
-        if (facts.Approved)
+        if (facts.Conclusion != ReviewConclusion.None)
         {
-            // A signature of my own that completes the approval is not news to me
+            // A signature of my own that completes the conclusion is not news to me
             var completing = InboxRules.CompletingSignature(facts.Signatures, facts.Digest);
             if (completing is not null && completing.UserId != review.User.Id && completing.SignedAt > facts.LastSeenAt)
             {
-                items.Add(row(InboxSection.Updates, ApprovedChip, true, $"Signed by {completing.DisplayName}."));
+                var chip = facts.Conclusion == ReviewConclusion.Rejected ? RejectedChip : ApprovedChip;
+                items.Add(row(InboxSection.Updates, chip, true, $"Signed by {completing.DisplayName}."));
             }
 
             return;
@@ -562,12 +575,12 @@ public sealed class InboxService
     /// <summary>
     ///     The approval facts of one review that the information rows need.
     /// </summary>
-    /// <param name="Approved">Whether the review is approved.</param>
+    /// <param name="Conclusion">How the review is concluded; <see cref="ReviewConclusion.None"/> while it is in review.</param>
     /// <param name="Digest">The digest of the current record.</param>
     /// <param name="Signatures">The signatures of the review.</param>
     /// <param name="LastSeenAt">The time the user last saw the review; the minimum value when never.</param>
     private sealed record ApprovalFacts(
-        bool Approved,
+        ReviewConclusion Conclusion,
         string Digest,
         IReadOnlyList<ReviewSignature> Signatures,
         DateTimeOffset LastSeenAt);

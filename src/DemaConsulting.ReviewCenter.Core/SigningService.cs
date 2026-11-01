@@ -38,11 +38,14 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     issued for exactly this user, review and slot; without one the signature is refused and
 ///     <c>signature.reauth-failed</c> is recorded. The signer is the <see cref="Actor"/> taken from the signed-in principal, never a form
 ///     field, and the password is neither stored, logged nor put in a message. A signature is allowed only when
-///     every applicable check is answered, none is answered Fail and no thread is open; otherwise the blockers
-///     are returned as plain sentences. A signature is current only while its digest (see
-///     <see cref="RecordDigest"/>) equals the digest of the record now. The status (Approved or In review) is
-///     computed on demand and never stored.
-///     An approved review is locked: while every slot holds a current signature and no thread is open, the threads,
+///     every applicable check is answered, no ballots are disputed and no thread is open; otherwise the blockers
+///     are returned as plain sentences. An agreed Fail answer is not a blocker: it leads to the outcome Rejected,
+///     which is signed like an approval and needs a conclusion text stating the reasons. Every signature records the
+///     outcome it attests. A signature is current only while its digest (see
+///     <see cref="RecordDigest"/>) equals the digest of the record now. The status (Approved, Rejected or In review)
+///     is computed on demand and never stored.
+///     A concluded (approved or rejected) review is locked: while every slot holds a current signature of the same
+///     outcome and no thread is open, the threads,
 ///     checklist answers,
 ///     applicability and the reviewer slots are refused with <see cref="DomainRule.ReviewLocked"/> (see
 ///     <see cref="ReviewLock"/>), and signing is refused too. Only <see cref="ReopenReviewAsync"/>, which needs an
@@ -57,9 +60,29 @@ namespace DemaConsulting.ReviewCenter.Core;
 public sealed class SigningService
 {
     /// <summary>
-    ///     The statement every signature makes.
+    ///     The statement a signature of an approved outcome makes.
     /// </summary>
     public const string MeaningText = "I have reviewed this record and approve it.";
+
+    /// <summary>
+    ///     The statement a signature of a rejected outcome makes.
+    /// </summary>
+    public const string MeaningRejectedText = "I have reviewed this record and reject it.";
+
+    /// <summary>
+    ///     The reason a rejected review cannot be signed without a conclusion; it is also the blocker sentence.
+    /// </summary>
+    public const string ConclusionRequiredText = "A rejected review needs a conclusion stating the reasons";
+
+    /// <summary>
+    ///     Gets the statement a signature of an outcome makes.
+    /// </summary>
+    /// <param name="outcome">The outcome the signature attests.</param>
+    /// <returns><see cref="MeaningRejectedText"/> for a rejected outcome, otherwise <see cref="MeaningText"/>.</returns>
+    public static string MeaningFor(ReviewOutcome outcome)
+    {
+        return outcome == ReviewOutcome.Rejected ? MeaningRejectedText : MeaningText;
+    }
 
     /// <summary>
     ///     The store that persists slots and signatures and reads the record.
@@ -223,7 +246,7 @@ public sealed class SigningService
     /// <remarks>
     ///     A slot is <see cref="SlotSignatureState.Signed"/> when a signature of the current digest exists,
     ///     <see cref="SlotSignatureState.OutOfDate"/> when it has signatures but none of them is current, and
-    ///     <see cref="SlotSignatureState.NotSigned"/> otherwise. The review is approved when it has at least one slot
+    ///     <see cref="SlotSignatureState.NotSigned"/> otherwise. The review is concluded when it has at least one slot
     ///     and every slot is signed.
     /// </remarks>
     public Task<ReviewApproval?> GetApprovalAsync(
@@ -360,18 +383,19 @@ public sealed class SigningService
                 current?.SignedAt));
         }
 
-        var isApproved = ReviewLock.IsConcluded(record, slots, signatures);
-        var (checklist, blockers, failed) = Assess(record, slots.Count);
+        var conclusion = ReviewLock.ConcludedOutcome(record, slots, signatures);
+        var assessment = Assess(record, slots.Count);
+        var (checklist, blockers, failed) = (assessment.Checklist, assessment.Blockers, assessment.Failed);
         var unsubmitted = record.Checklist is null
             ? 0
             : slots.Count(slot => record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State != BallotState.Submitted);
         var disputed = checklist?.Consolidation?.Disputed ?? 0;
         return new ReviewApproval(
-            isApproved,
+            conclusion,
             digest,
             statuses,
             blockers,
-            NextStepFor(isApproved, blockers, statuses.Count, record, checklist, failed),
+            NextStepFor(conclusion, blockers, statuses.Count, record, checklist, failed, assessment.ConclusionRequired, assessment.Outcome),
             reopens,
             // The structured counts behind the blocker sentences of Assess, so a list can show them without parsing
             record.Threads.Count(thread => thread.State == ReviewThreadState.Open),
@@ -380,7 +404,9 @@ public sealed class SigningService
             // Assess returns no checklist state exactly when it adds the "no checklist" blocker
             checklist is null,
             disputed,
-            unsubmitted);
+            unsubmitted,
+            assessment.Outcome,
+            assessment.ConclusionRequired);
     }
 
     /// <summary>
@@ -426,7 +452,7 @@ public sealed class SigningService
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.ReviewNotFound"/> or
     ///     <see cref="DomainRule.SlotUserInvalid"/> when a rule is violated; nothing is stored then. Also thrown with
-    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved and with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded (approved or rejected) and with
     ///     <see cref="DomainRule.ReviewerNotIndependent"/> when a chosen user created the review and the project
     ///     requires independent reviewers.
     /// </exception>
@@ -446,7 +472,7 @@ public sealed class SigningService
             await EnsureActorAsync(actor, projectId, cancellationToken);
             await EnsureReviewAsync(projectId, reviewId, cancellationToken);
 
-            // An approved review is locked: who may sign it can not change until it is reopened
+            // A concluded (approved or rejected) review is locked: who may sign it can not change until it is reopened
             await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
             var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
             await ValidateMembersAsync(
@@ -497,7 +523,7 @@ public sealed class SigningService
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.SlotNotFound"/>,
     ///     <see cref="DomainRule.SlotSigned"/> (the slot has any signature, current or out of date) or
     ///     <see cref="DomainRule.SlotUserInvalid"/> when a rule is violated; nothing is stored then. Also thrown with
-    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved,
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded (approved or rejected),
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged and with
     ///     <see cref="DomainRule.ReviewerNotIndependent"/> as <see cref="AddSlotAsync"/> does.
     /// </exception>
@@ -573,7 +599,7 @@ public sealed class SigningService
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.SlotNotFound"/> or
     ///     <see cref="DomainRule.SlotSigned"/> when a rule is violated; nothing is removed then. Also thrown with
-    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved and with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded (approved or rejected) and with
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when a current signature is not acknowledged.
     /// </exception>
     public async Task RemoveSlotAsync(
@@ -676,7 +702,7 @@ public sealed class SigningService
                     $"A reason of at most {ReviewLimits.MaxReopenReasonLength} characters is required to reopen a review.");
             }
 
-            // What: only an approved review is locked; the digest of that approval goes into the history
+            // What: only a concluded (approved or rejected) review is locked; the digest of that conclusion goes into the history
             var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken)
                            ?? throw ReviewNotFound(reviewId);
             if (!ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures))
@@ -834,7 +860,7 @@ public sealed class SigningService
 
             // The record must be the one the signer saw, and must be signable; both are refused before the
             // password is asked for
-            var digest = await EnsureSignableAsync(
+            var (digest, outcome) = await EnsureSignableAsync(
                 record, projectId, reviewId, slotId, expectedDigest, cancellationToken);
 
             // Re-authenticate, after every other check passed
@@ -853,12 +879,13 @@ public sealed class SigningService
                     Role = role,
                     SignedAt = _timeProvider.GetUtcNow(),
                     RecordDigest = digest,
-                    Meaning = MeaningText
+                    Outcome = outcome,
+                    Meaning = MeaningFor(outcome)
                 },
                 AuditDraft.By(
                     actor,
                     "signature.added",
-                    $"slot {slotNumber}, role {role}, record digest {digest}",
+                    $"slot {slotNumber}, role {role}, outcome {outcome}, record digest {digest}",
                     projectId,
                     reviewId),
                 cancellationToken);
@@ -937,11 +964,12 @@ public sealed class SigningService
     /// <param name="slotId">The slot to sign in.</param>
     /// <param name="expectedDigest">The digest the signer saw.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The digest of the record, which the signature will point to.</returns>
+    /// <returns>The digest of the record, which the signature will point to, and the outcome the signature attests.</returns>
     /// <exception cref="DomainRuleException">
-    ///     Thrown when the record changed, the slot already has a current signature or a blocker remains.
+    ///     Thrown when the record changed, the slot already has a current signature or a blocker remains, with
+    ///     <see cref="DomainRule.ConclusionRequired"/> when the outcome is rejected and the conclusion text is blank.
     /// </exception>
-    private async Task<string> EnsureSignableAsync(
+    private async Task<(string Digest, ReviewOutcome Outcome)> EnsureSignableAsync(
         ReviewRecord record,
         int projectId,
         string reviewId,
@@ -949,7 +977,7 @@ public sealed class SigningService
         string expectedDigest,
         CancellationToken cancellationToken)
     {
-        // An approved review is locked, so nobody signs it again; the message says why instead of "already signed"
+        // A concluded (approved or rejected) review is locked, so nobody signs it again; the message says why instead of "already signed"
         await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
         var digest = RecordDigest.Compute(record);
@@ -967,7 +995,8 @@ public sealed class SigningService
         }
 
         var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
-        var (_, blockers, _) = Assess(record, slots.Count);
+        var assessment = Assess(record, slots.Count);
+        var blockers = assessment.Blockers;
 
         // The signer's own ballot must be handed in: the digest covers only the submitted ballots, so it cannot say so.
         // A review with one slot hands the ballot in with the last answer, so there the open checks are the better
@@ -982,6 +1011,13 @@ public sealed class SigningService
                 "not among them yet.");
         }
 
+        // The conclusion is the only blocker: the dedicated rule names it exactly. With other blockers the generic
+        // message lists them all, the conclusion among them.
+        if (assessment.ConclusionRequired && blockers.Count == 1)
+        {
+            throw new DomainRuleException(DomainRule.ConclusionRequired, ConclusionRequiredText + ".");
+        }
+
         if (blockers.Count > 0)
         {
             throw new DomainRuleException(
@@ -989,7 +1025,11 @@ public sealed class SigningService
                 "The review cannot be signed yet: " + string.Join("; ", blockers) + ".");
         }
 
-        return digest;
+        // No blocker remains, so the submitted ballots agree and the outcome is known: the signature attests it. The
+        // digest of the same record covers it, so the signature stays tied to what the signer was shown.
+        var outcome = BallotConsolidation.Consolidate(record.Checklist!.Parse(), record.Ballots).Outcome
+                      ?? throw new DomainRuleException(DomainRule.SigningNotAllowed, "The review has no outcome yet.");
+        return (digest, outcome);
     }
 
     /// <summary>
@@ -1079,15 +1119,17 @@ public sealed class SigningService
     /// <param name="record">The record.</param>
     /// <param name="slotCount">The number of reviewer slots of the review.</param>
     /// <returns>
-    ///     The consolidated checklist state (or <c>null</c> without a checklist), the blockers as plain sentences (empty
-    ///     when the review can be signed) and the number of checks the submitted ballots agree on as Fail in sections
-    ///     that apply.
+    ///     The assessment: the consolidated checklist state (or <c>null</c> without a checklist), the blockers as plain
+    ///     sentences (empty when the review can be signed), the number of checks the submitted ballots agree on as Fail
+    ///     in sections that apply (informational, not a blocker), the outcome the consolidation leads to and whether
+    ///     the conclusion blocker is among the blockers.
     /// </returns>
     /// <remarks>
     ///     A review with one slot counts the partial draft of that slot in the progress and the blockers (never in the
-    ///     digest), so the single reviewer sees what is left to answer.
+    ///     digest), so the single reviewer sees what is left to answer. An agreed Fail answer does not block signing:
+    ///     the outcome is then rejected, and a rejected outcome needs a conclusion text that is not blank.
     /// </remarks>
-    private static (ChecklistState? Checklist, IReadOnlyList<string> Blockers, int Failed) Assess(
+    private static Assessment Assess(
         ReviewRecord record,
         int slotCount)
     {
@@ -1102,9 +1144,11 @@ public sealed class SigningService
 
         var checklist = view?.State;
         var failed = view?.Result.Failed ?? 0;
+        var outcome = view?.Result.Outcome;
+        var conclusionRequired = false;
         if (view is not null)
         {
-            // Every check of an applicable section must be answered, and none may be a Fail
+            // Every check of an applicable section must be answered
             var unanswered = view.Result.Pending;
             if (unanswered > 0)
             {
@@ -1122,10 +1166,8 @@ public sealed class SigningService
                     : $"{disputed} checklist checks are disputed between the ballots");
             }
 
-            if (failed > 0)
-            {
-                blockers.Add(failed == 1 ? "1 check is answered Fail" : $"{failed} checks are answered Fail");
-            }
+            // A rejection is signed with its reasons; the outcome is only known when nothing is pending or disputed
+            conclusionRequired = outcome == ReviewOutcome.Rejected && string.IsNullOrWhiteSpace(record.ReviewConclusionText);
         }
 
         // Every thread must be resolved
@@ -1135,38 +1177,77 @@ public sealed class SigningService
             blockers.Add(open == 1 ? "1 thread is open" : $"{open} threads are open");
         }
 
-        return (checklist, blockers, failed);
+        if (conclusionRequired)
+        {
+            blockers.Add(ConclusionRequiredText);
+        }
+
+        return new Assessment(checklist, blockers, failed, outcome, conclusionRequired);
     }
+
+    /// <summary>
+    ///     What blocks signing a record and what the signature would attest; see <see cref="Assess"/>.
+    /// </summary>
+    /// <param name="Checklist">The consolidated checklist state, or <c>null</c> without a checklist.</param>
+    /// <param name="Blockers">The blockers as plain sentences; empty when the review can be signed.</param>
+    /// <param name="Failed">The number of agreed Fail answers in sections that apply.</param>
+    /// <param name="Outcome">The outcome the consolidation leads to, or <c>null</c> while it is not known.</param>
+    /// <param name="ConclusionRequired">Whether the conclusion blocker is among the blockers.</param>
+    private sealed record Assessment(
+        ChecklistState? Checklist,
+        IReadOnlyList<string> Blockers,
+        int Failed,
+        ReviewOutcome? Outcome,
+        bool ConclusionRequired);
 
     /// <summary>
     ///     Words the next step for the reader of a review.
     /// </summary>
-    /// <param name="isApproved">Whether the review is approved.</param>
+    /// <param name="conclusion">How the review is concluded.</param>
     /// <param name="blockers">The blockers of signing.</param>
     /// <param name="slotCount">The number of slots.</param>
     /// <param name="record">The record.</param>
     /// <param name="checklist">The checklist state, or <c>null</c> without a checklist.</param>
     /// <param name="failed">The number of failed checks.</param>
+    /// <param name="conclusionRequired">Whether a rejected review still needs its conclusion text.</param>
+    /// <param name="outcome">The outcome the consolidation leads to, or <c>null</c> while it is not known.</param>
     /// <returns>One short sentence.</returns>
     private static string NextStepFor(
-        bool isApproved,
+        ReviewConclusion conclusion,
         IReadOnlyList<string> blockers,
         int slotCount,
         ReviewRecord record,
         ChecklistState? checklist,
-        int failed)
+        int failed,
+        bool conclusionRequired,
+        ReviewOutcome? outcome)
     {
-        if (isApproved)
+        if (conclusion == ReviewConclusion.Approved)
         {
             return "Approved. Every reviewer slot has a current signature.";
         }
 
-        if (blockers.Count > 0)
+        if (conclusion == ReviewConclusion.Rejected)
         {
-            return ThreadService.NextStep(record.Threads, checklist?.Overall, failed);
+            return "Rejected. Every reviewer slot has a current signature.";
         }
 
-        return slotCount == 0 ? "Add a reviewer slot." : "Ready for signatures.";
+        if (blockers.Count > 0)
+        {
+            return ThreadService.NextStep(
+                record.Threads,
+                checklist?.Overall,
+                failed,
+                checklist?.Consolidation?.Disputed ?? 0,
+                conclusionRequired);
+        }
+
+        if (slotCount == 0)
+        {
+            return "Add a reviewer slot.";
+        }
+
+        return outcome == ReviewOutcome.Rejected ? "Ready for signatures (rejected outcome)." : "Ready for signatures.";
     }
 
     /// <summary>
@@ -1428,7 +1509,7 @@ public sealed class SigningService
     /// <summary>
     ///     Checks that a reopen would not leave a slot in which nobody may sign again.
     /// </summary>
-    /// <param name="snapshot">The snapshot of the approved review that is reopened.</param>
+    /// <param name="snapshot">    the snapshot of the concluded review that is reopened.</param>
     /// <param name="user">The administrator who reopens.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>

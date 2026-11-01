@@ -32,12 +32,13 @@ public class ReviewLockBallotTests
     ///     Stores a current signature for every slot of the world, straight into the store.
     /// </summary>
     /// <param name="world">The world.</param>
+    /// <param name="outcome">The outcome the signatures attest; approved by default.</param>
     /// <returns>A task that completes when the signatures are stored.</returns>
-    private static async Task StoreAllSignaturesAsync(SignedReviewWorld world)
+    private static async Task StoreAllSignaturesAsync(SignedReviewWorld world, ReviewOutcome outcome = ReviewOutcome.Approved)
     {
         for (var slot = 1; slot <= 3; slot++)
         {
-            await world.StoreSignatureAsync(slot);
+            await world.StoreSignatureAsync(slot, outcome);
         }
     }
 
@@ -143,12 +144,105 @@ public class ReviewLockBallotTests
     }
 
     /// <summary>
-    ///     Test that a review whose ballots agree on a Fail is not concluded: the rejected conclusion does not exist yet.
+    ///     Test that a review whose ballots agree on a Fail, with a conclusion text and every slot signed for the
+    ///     rejection, is concluded.
     /// </summary>
     [Fact]
-    public async Task ReviewLock_IsConcluded_RejectedOutcome_False_Until1c3()
+    public async Task ReviewLock_IsConcluded_RejectedAllSignedWithText_True()
     {
-        // Arrange: every slot answers the first check Fail and hands its ballot in, then all slots are signed
+        // Arrange
+        var world = await RejectedWorldAsync(withText: true);
+        await StoreAllSignaturesAsync(world, ReviewOutcome.Rejected);
+
+        // Act and assert
+        Assert.True(await IsConcludedAsync(world));
+        Assert.Equal(ReviewConclusion.Rejected, await ConcludedOutcomeAsync(world));
+    }
+
+    /// <summary>
+    ///     Test that a rejected review is not concluded while the conclusion text is blank.
+    /// </summary>
+    [Fact]
+    public async Task ReviewLock_IsConcluded_RejectedNoText_False()
+    {
+        // Arrange
+        var world = await RejectedWorldAsync(withText: false);
+        await StoreAllSignaturesAsync(world, ReviewOutcome.Rejected);
+
+        // Act and assert
+        Assert.False(await IsConcludedAsync(world));
+        Assert.Equal(ReviewConclusion.None, await ConcludedOutcomeAsync(world));
+    }
+
+    /// <summary>
+    ///     Test that a signature made for another outcome than the agreed one does not conclude the review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewLock_IsConcluded_RejectedSignedForApproval_False()
+    {
+        // Arrange: the ballots agree on a rejection, but every signature says approved
+        var world = await RejectedWorldAsync(withText: true);
+        await StoreAllSignaturesAsync(world, ReviewOutcome.Approved);
+
+        // Act and assert
+        Assert.False(await IsConcludedAsync(world));
+    }
+
+    /// <summary>
+    ///     Test that a rejected review is not concluded while one slot has no signature.
+    /// </summary>
+    [Fact]
+    public async Task ReviewLock_IsConcluded_RejectedOneSlotUnsigned_False()
+    {
+        // Arrange
+        var world = await RejectedWorldAsync(withText: true);
+        await world.StoreSignatureAsync(1, ReviewOutcome.Rejected);
+        await world.StoreSignatureAsync(2, ReviewOutcome.Rejected);
+
+        // Act and assert
+        Assert.False(await IsConcludedAsync(world));
+    }
+
+    /// <summary>
+    ///     Test that a review with an approved conclusion reports the approved conclusion.
+    /// </summary>
+    [Fact]
+    public async Task ReviewLock_ConcludedOutcome_AllSubmittedAgreedSigned_Approved()
+    {
+        // Arrange
+        var world = await SignedReviewWorld.CreateAsync();
+        await StoreAllSignaturesAsync(world);
+
+        // Act and assert
+        Assert.Equal(ReviewConclusion.Approved, await ConcludedOutcomeAsync(world));
+    }
+
+    /// <summary>
+    ///     Test that a review whose ballots are disputed or pending has no concluded outcome.
+    /// </summary>
+    [Fact]
+    public async Task ReviewLock_ConcludedOutcome_Disputed_None()
+    {
+        // Arrange: sam disagrees, all slots are signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var sam = SignedReviewWorld.ActorOf("sam");
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", sam, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken);
+        await StoreAllSignaturesAsync(world);
+
+        // Act and assert
+        Assert.Equal(ReviewConclusion.None, await ConcludedOutcomeAsync(world));
+    }
+
+    /// <summary>
+    ///     Creates a world whose three ballots all answer the first check Fail, optionally with a conclusion text.
+    /// </summary>
+    /// <param name="withText"><c>true</c> to write a review conclusion text.</param>
+    /// <returns>The world; nobody has signed.</returns>
+    private static async Task<SignedReviewWorld> RejectedWorldAsync(bool withText)
+    {
         var cancellationToken = TestContext.Current.CancellationToken;
         var world = await SignedReviewWorld.CreateAsync();
         foreach (var owner in new[] { "rita", "sam", "tess" })
@@ -159,9 +253,28 @@ public class ReviewLockBallotTests
             await world.Checklists.SubmitBallotAsync(world.ProjectId, SignedReviewWorld.ReviewId, actor, cancellationToken);
         }
 
-        await StoreAllSignaturesAsync(world);
+        if (withText)
+        {
+            await world.Checklists.SetReviewConclusionTextAsync(
+                world.ProjectId,
+                SignedReviewWorld.ReviewId,
+                "The first check failed.",
+                SignedReviewWorld.ActorOf("rita"),
+                cancellationToken);
+        }
 
-        // Act and assert
-        Assert.False(await IsConcludedAsync(world));
+        return world;
+    }
+
+    /// <summary>
+    ///     Reads the concluded outcome of the review as it is stored now.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <returns>The answer of <see cref="ReviewLock.ConcludedOutcome"/>.</returns>
+    private static async Task<ReviewConclusion> ConcludedOutcomeAsync(SignedReviewWorld world)
+    {
+        var snapshot = (await world.Store.GetSnapshotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, TestContext.Current.CancellationToken))!;
+        return ReviewLock.ConcludedOutcome(snapshot.Record, snapshot.Slots, snapshot.Signatures);
     }
 }

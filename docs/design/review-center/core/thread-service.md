@@ -111,7 +111,8 @@ reopen it before it can change."): `StartThreadAsync`, `ReplyAsync`, `ResolveAsy
 `ReviewLock.EnsureUnlockedAsync` after the access check and the checks of the input, and before the store write, so
 nothing can change what the signatures cover. The store repeats the
 check inside its write transaction. `ListAsync` is not affected. After an administrator reopens the review, threads can
-change again. A review is concluded when every slot (at least one) is signed for the current record and no thread is
+change again. A review is concluded (approved or rejected) when every slot (at least one) is signed for the current record
+with the outcome the record has now and no thread is
 open; a signed review with an open thread is therefore not locked, and its threads can still be resolved.
 
 **Signature impact**: only a change of the digest makes a current signature out of date (see "Signature impact" in
@@ -199,18 +200,26 @@ order; the list is empty when there are none or the review does not exist.
 The sort is done in memory because the database cannot order by a time stamp. Nothing is stored or read.
 
 **NextStep**: A static, pure function that words the next action for the threads of a review and, optionally, the
-progress of its checklist (`ChecklistProgress?`) and the number of checks answered Fail (default 0) as one short
+progress of its checklist (`ChecklistProgress?`), the number of checks answered Fail (`failedChecks`, default 0), the
+number of checks disputed between the ballots (`disputedChecks`, default 0), and whether a rejected review still needs
+its conclusion text (`conclusionRequired`, default false) as one short
 sentence. Without a checklist: "No
 discussion yet - select a file and comment on a line." when there are no threads, "1 open thread to resolve." or
 "{n} open threads to resolve." when some are open, and "All threads resolved." otherwise. With a checklist the
-unanswered checks come first, then the checks answered Fail, then the open threads, and the sentence stays one line:
+unanswered checks come first, then the disputed checks ("{n} checks disputed between the ballots"), then the checks
+answered Fail, then the open threads, then the conclusion ("a conclusion stating the reasons is needed"), and the
+sentence stays one line:
 "{n} checklist checks unanswered, {k} checks answered Fail, {m} open threads to resolve." (a part that is zero is
 left out), "Checklist complete; {k} checks answered Fail, {m} open threads to resolve." when the checklist is
-complete but failed checks or open threads remain, "Checklist complete and all threads resolved." when there are
+complete but failed checks, open threads, or the conclusion remain, "Checklist complete and all threads resolved." when
+there are
 threads and all are resolved, and "Checklist complete." when the checklist is complete and there are no threads
-(singular forms are used for one). Having no threads yet is not a task when a checklist exists, so the checklist
-leads. The failed checks are counted by the caller (`SigningService`), because each one blocks signing; with the
-default of 0 the wording is the same as before signing existed.
+(singular forms are used for one). A disputed check means the checklist is not complete, so the sentence then has no
+"Checklist complete;" prefix, and the disputed checks are named (an earlier version did not name them). Having no
+threads yet is not a task when a checklist exists, so the checklist
+leads. The failed, disputed, and conclusion parts are supplied by the caller (`SigningService`); a failed check does
+not block signing, it only tells the reader that the review will be rejected; with the defaults the wording is the
+same as before signing existed.
 
 **ReviewThread.LastActivity**: A read-only value derived from the comments, the time of the latest comment (the
 thread's `Created` when it has none). It is not stored, so the database is unchanged.
