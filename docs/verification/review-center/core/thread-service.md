@@ -76,8 +76,9 @@ N/A - standard test environment.
   ballot are refused with `ActorNotAllowed`. A concluded review refuses it with `ReviewLocked`, a start that would
   outdate a signature needs the acknowledgement, and the audit entry names the check and never the text.
 - The capabilities of a viewer equal the rules that the actions enforce (promote: starter, slot owner, lead; demote:
-  starter, lead; toggle: author of the reply, lead), an auditor, an API token, and a concluded review allow nothing,
-  and the threads are counted by kind and state with the open ones worded by kind.
+  starter, lead; toggle: author of the reply, lead), an auditor and a concluded review allow nothing, a token gets what
+  its user gets except the lead's rights, and the threads are counted by kind and state with the open ones worded by
+  kind.
 
 #### Test Scenarios
 
@@ -590,16 +591,13 @@ owner. This scenario is tested by `ThreadCapabilities_Demote_StarterAndLeadOnly`
 cannot be promoted, and one with a note can. This scenario is tested by
 `ThreadCapabilities_ResolvedQuestion_PromoteNeedsResolutionNote`.
 
-**ThreadCapabilities_Auditor_NothingAllowed**, **ThreadCapabilities_ApiToken_NothingAllowed**, and
-**ThreadCapabilities_Concluded_NothingAllowed**: An auditor, an actor with an API token, and every viewer of a
-concluded review are allowed nothing. These scenarios are tested by the tests of the same names.
+**ThreadCapabilities_Auditor_NothingAllowed** and **ThreadCapabilities_Concluded_NothingAllowed**: An auditor and every
+viewer of a concluded review are allowed nothing. These scenarios are tested by the tests of the same names.
 
-**ThreadCapabilities_ApiToken_PromoteRefused**, **ThreadCapabilities_ApiToken_DemoteRefused**, and
-**ThreadCapabilities_ApiToken_ToggleReplyRefused**: The service itself, not only the capabilities, refuses an actor
-with an API token the promote, the demote and the report toggle of a reply, even when the token is of the slot owner,
-the starter, the reply author, or the lead; the error is `ActorNotAllowed`, the same as for a plain member who is not
-permitted, and nothing is changed. The same token can still reply and resolve. These scenarios are tested by the
-tests of the same names.
+**ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead**: A token of a slot owner is offered the promote that the
+slot owner is offered, as the service enforces it by user name; a token of the lead is offered neither promote nor
+demote, because a token is never a lead. This scenario is tested by
+`ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead`.
 
 **ThreadCapabilities_ToggleReply_AuthorOrLead**: The author of a reply and the lead may toggle it, other people may
 not, and the starting comment and a resolution note cannot be toggled. This scenario is tested by

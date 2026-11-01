@@ -712,8 +712,9 @@ public sealed class ThreadService
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>
-    ///     The capabilities; <see cref="ThreadCapabilities.None"/> for nobody, an API-token caller, a person who
-    ///     cannot contribute (an auditor), a review that does not exist and a concluded review (it is locked).
+    ///     The capabilities; <see cref="ThreadCapabilities.None"/> for nobody, a person who
+    ///     cannot contribute (an auditor), a review that does not exist and a concluded review (it is locked). An API
+    ///     token gets what its user gets, except the lead's rights, which a token never holds.
     /// </returns>
     public async Task<ThreadCapabilities> GetCapabilitiesAsync(
         Actor? actor,
@@ -721,7 +722,7 @@ public sealed class ThreadService
         string reviewId,
         CancellationToken cancellationToken = default)
     {
-        if (actor is null || actor.ViaApiToken || !await _access.CanContributeAsync(actor, projectId, cancellationToken))
+        if (actor is null || !await _access.CanContributeAsync(actor, projectId, cancellationToken))
         {
             return ThreadCapabilities.None;
         }
@@ -1017,7 +1018,7 @@ public sealed class ThreadService
     /// <param name="comment">The comment in question, or <c>null</c> when the action is about the thread.</param>
     /// <param name="isSlotOwner">Whether the person is the primary or the alternate of any slot of the review.</param>
     /// <param name="isLead">Whether the person leads the review.</param>
-    /// <returns>The relations that apply; none for an API token, which may not decide on kinds or reports.</returns>
+    /// <returns>The relations that apply.</returns>
     private static ThreadActorRole RolesFor(
         Actor actor,
         ReviewThread thread,
@@ -1025,14 +1026,9 @@ public sealed class ThreadService
         bool isSlotOwner,
         bool isLead)
     {
-        // A token acts for a user without being that user: it never counts as the starter, an author, a reviewer or
-        // the lead, so promoting, demoting and the report toggle are refused for it
+        // A token acts for its user: it counts as the starter, an author or a slot owner of that user, but never as
+        // the lead (the lead fact is false for a token), as for the thread actions of the earlier slices
         var roles = ThreadActorRole.None;
-        if (actor.ViaApiToken)
-        {
-            return roles;
-        }
-
         if (thread.Comments.Count > 0 && SameUser(thread.Comments[0].AuthorUsername, actor.Username))
         {
             roles |= ThreadActorRole.Starter;

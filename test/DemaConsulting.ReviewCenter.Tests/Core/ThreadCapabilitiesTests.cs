@@ -152,113 +152,26 @@ public class ThreadCapabilitiesTests
     }
 
     /// <summary>
-    ///     Test that a person who comes with a personal access token is offered nothing, though the service would
-    ///     enforce the rules by user name.
+    ///     Test that a personal access token is offered what its user is offered, as the service enforces the rules by
+    ///     user name, except the rights of the lead, which a token never holds.
     /// </summary>
     [Fact]
-    public async Task ThreadCapabilities_ApiToken_NothingAllowed()
+    public async Task ThreadCapabilities_ApiToken_ActsForItsUserButIsNeverLead()
     {
-        // Arrange
-        var world = await WorldAsync();
-        await StartAsync(world, "usr");
-        var token = new Actor("root", "root") { ApiTokenId = "tok-1" };
-
-        // Act
-        var capabilities = await world.Threads.GetCapabilitiesAsync(
-            token, world.Project, ReviewId, TestContext.Current.CancellationToken);
-
-        // Assert
-        Assert.Equal(ThreadCapabilities.None, capabilities);
-    }
-
-    /// <summary>
-    ///     Test that the service itself refuses a personal access token, even one of the slot owner or the starter,
-    ///     when it promotes a Question, with the error a person who is not permitted gets.
-    /// </summary>
-    [Fact]
-    public async Task ThreadCapabilities_ApiToken_PromoteRefused()
-    {
-        // Arrange: a Question by usr; mem is the person who is not permitted
-        var cancellationToken = TestContext.Current.CancellationToken;
+        // Arrange: a Question by usr; alt holds a slot, root leads
         var world = await WorldAsync();
         var id = await StartAsync(world, "usr");
-        var refused = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.PromoteAsync(world.Project, ReviewId, id, Who("mem"), cancellationToken));
 
         // Act
-        var slotOwner = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.PromoteAsync(world.Project, ReviewId, id, Token("alt"), cancellationToken));
-        var starter = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.PromoteAsync(world.Project, ReviewId, id, Token("usr"), cancellationToken));
-        var lead = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.PromoteAsync(world.Project, ReviewId, id, Token("root"), cancellationToken));
+        var slotOwnerToken = await world.Threads.GetCapabilitiesAsync(
+            Token("alt"), world.Project, ReviewId, TestContext.Current.CancellationToken);
+        var leadToken = await world.Threads.GetCapabilitiesAsync(
+            Token("root"), world.Project, ReviewId, TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.Equal(DomainRule.ActorNotAllowed, refused.Rule);
-        Assert.Equal(refused.Rule, slotOwner.Rule);
-        Assert.Equal(refused.Rule, starter.Rule);
-        Assert.Equal(refused.Rule, lead.Rule);
-        Assert.False((await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken)).Single().Comments[0].IncludeInReport);
-    }
-
-    /// <summary>
-    ///     Test that the service itself refuses a personal access token, even one of the starter or the lead, when it
-    ///     demotes a Finding.
-    /// </summary>
-    [Fact]
-    public async Task ThreadCapabilities_ApiToken_DemoteRefused()
-    {
-        // Arrange: a Finding by usr
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var world = await WorldAsync();
-        var id = await StartAsync(world, "usr", include: true);
-        var refused = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.DemoteAsync(world.Project, ReviewId, id, Who("mem"), cancellationToken));
-
-        // Act
-        var starter = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.DemoteAsync(world.Project, ReviewId, id, Token("usr"), cancellationToken));
-        var lead = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.DemoteAsync(world.Project, ReviewId, id, Token("root"), cancellationToken));
-
-        // Assert
-        Assert.Equal(DomainRule.ActorNotAllowed, refused.Rule);
-        Assert.Equal(refused.Rule, starter.Rule);
-        Assert.Equal(refused.Rule, lead.Rule);
-        Assert.True((await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken)).Single().Comments[0].IncludeInReport);
-    }
-
-    /// <summary>
-    ///     Test that the service itself refuses a personal access token, even one of the author of the reply or the
-    ///     lead, when it toggles a reply into the report, and that the same token may still reply and resolve.
-    /// </summary>
-    [Fact]
-    public async Task ThreadCapabilities_ApiToken_ToggleReplyRefused()
-    {
-        // Arrange: a Question by usr with a reply of alt
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var world = await WorldAsync();
-        var id = await StartAsync(world, "usr");
-        var reply = await world.Threads.ReplyAsync(world.Project, ReviewId, id, Who("alt"), "Reply", cancellationToken);
-        var refused = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.SetCommentIncludedAsync(world.Project, ReviewId, id, reply.Id, true, Who("mem"), cancellationToken));
-
-        // Act
-        var author = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.SetCommentIncludedAsync(world.Project, ReviewId, id, reply.Id, true, Token("alt"), cancellationToken));
-        var lead = await Assert.ThrowsAsync<DomainRuleException>(
-            () => world.Threads.SetCommentIncludedAsync(world.Project, ReviewId, id, reply.Id, true, Token("root"), cancellationToken));
-        var tokenReply = await world.Threads.ReplyAsync(world.Project, ReviewId, id, Token("alt"), "By token", cancellationToken);
-        await world.Threads.ResolveAsync(world.Project, ReviewId, id, Token("alt"), cancellationToken);
-
-        // Assert
-        Assert.Equal(DomainRule.ActorNotAllowed, refused.Rule);
-        Assert.Equal(refused.Rule, author.Rule);
-        Assert.Equal(refused.Rule, lead.Rule);
-        Assert.False(tokenReply.IncludeInReport);
-        Assert.Equal(
-            ReviewThreadState.Resolved,
-            (await world.Threads.ListAsync(world.Project, ReviewId, cancellationToken)).Single().State);
+        Assert.True(slotOwnerToken.CanPromote(id));
+        Assert.False(leadToken.CanPromote(id));
+        Assert.False(leadToken.CanDemote(id));
     }
 
     /// <summary>

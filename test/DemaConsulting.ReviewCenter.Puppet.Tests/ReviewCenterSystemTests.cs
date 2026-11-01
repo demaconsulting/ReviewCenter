@@ -249,6 +249,8 @@ public class ReviewCenterSystemTests
         var threadPath = await browser.EvalAsync(
             "document.querySelector('[data-testid^=\"thread-state-\"]').getAttribute('data-testid').replace('thread-state-', '')");
         await browser.OkAsync("click", $"thread-toggle-{threadPath}");
+        await browser.OkAsync("wait", $"resolve-note-confirm-{threadPath}");
+        await browser.OkAsync("click", $"resolve-note-confirm-{threadPath}");
         await browser.WaitUntilAsync(
             async () => (await browser.TextOfAsync($"thread-state-{threadPath}")).Contains("Resolved", StringComparison.Ordinal),
             "the thread to be resolved");
@@ -1006,6 +1008,8 @@ public class ReviewCenterSystemTests
         await ClickFileAsync(browser, "guide.md");
         await browser.OkAsync("wait", $"thread-toggle-{threadId}");
         await browser.OkAsync("click", $"thread-toggle-{threadId}");
+        await browser.OkAsync("wait", $"resolve-note-confirm-{threadId}");
+        await browser.OkAsync("click", $"resolve-note-confirm-{threadId}");
         await browser.WaitUntilAsync(
             async () => (await browser.TextOfAsync($"thread-state-{threadId}")).Contains("Resolved", StringComparison.Ordinal),
             "the carried thread to be resolved");

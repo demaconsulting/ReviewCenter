@@ -31,9 +31,10 @@ value with `CanPromote`, `CanDemote`, `CanResolve`, and the identifiers of the c
 toggle. It uses the internal rules the actions themselves use (`ThreadKindRules`, `ThreadActorRole`, and
 `ReviewActorRoles`): a Question is promoted by the starter of the thread, by the owner of any slot of the review, or by
 the lead (the creator who may contribute, or a project or system administrator); a Finding is demoted only by the
-starter or the lead; the report flag of a reply is toggled only by its author or the lead. An auditor, an API token,
-and any viewer of a concluded review are allowed nothing, and a thread that does not exist gets
-`ThreadActions.None`. A resolved Question without a resolution note is promoted only after it was reopened and
+starter or the lead; the report flag of a reply is toggled only by its author or the lead. An auditor and any viewer
+of a concluded review are allowed nothing, an API token is allowed what its user is allowed except the rights of the
+lead (which a token never holds), and a thread that does not exist gets `ThreadActions.None`. A resolved Question
+without a resolution note is promoted only after it was reopened and
 resolved again with a note, as `PromoteAsync` demands. `ThreadCounts` counts the threads of a review by kind and state
 (open and resolved Questions and Findings), words the open ones ("2 open findings, 1 open question"), and is the one
 count used by the summary strip, the progress, and the inbox.
@@ -120,11 +121,10 @@ reads the project as the actor).
 **Roles for the kind and the flag**: promoting a Question to a Finding is allowed for the member who started the
 thread, the owner of a reviewer slot of the review (primary or alternate), and a lead (the creator of the review, who
 can still work in the project, or an administrator of the project); demoting is allowed for the starter and a lead;
-setting the flag of a reply is allowed for the
-author of that reply and a lead. Anybody else gets `ActorNotAllowed`. A personal access token never has a role: the
-relations are empty for an actor that came with a token (`ViaApiToken`), even when the user holds the slot, started the
-thread or wrote the reply, so a token is refused promote, demote and the report toggle with the same error, and
-`GetCapabilitiesAsync` offers it nothing (starting, replying and resolving by token are unchanged). The roles are read
+setting the flag of a reply is allowed for the author of that reply and a lead. Anybody else gets `ActorNotAllowed`. A
+personal access token acts for its user: the relations of starter, reply author and slot owner are found by user name
+as for a password session, but a token is never a lead (`ReviewActorRoles.IsLeadAsync`), so `GetCapabilitiesAsync` and
+the enforcement agree for it. The roles are read
 by `ReviewActorRoles` and decided by the internal `ThreadKindRules`.
 
 **Approval lock and conclusion**: while the review is concluded it is locked (see the `SigningService` unit), so every
