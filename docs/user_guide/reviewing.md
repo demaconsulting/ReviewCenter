@@ -298,7 +298,8 @@ top of the page says what is left to do: start a discussion, how many open threa
 are resolved (it also counts the unanswered checks of the [Review Checklist](#review-checklist)). The file list shows
 the number of open threads of each file.
 
-The thread index lists the threads of all files with the file, the lines, the state, the number of comments, the
+The thread index lists the threads of all files with the file (a thread about a check shows "Check discussion"), the
+lines, the state, the number of comments, the
 author of the first comment, and the time of the last activity, newest first. Use the All, Open, and Resolved
 buttons (which show the totals) to filter it; it starts with Open. Press a row to show that thread: its file is
 selected, its lines are highlighted, and the page scrolls to them.
@@ -343,6 +344,23 @@ and in the thread. Your own comments are never marked. The page remembers what y
 markers are gone the next time you open the review; see [Your Inbox](#your-inbox) for the list of what is new
 across all reviews.
 
+### Discussions About a Check
+
+A thread can be about one check of the checklist instead of a file. Such a thread has no file and no lines: its anchor
+reads `Check {id}`, and the thread index shows "Check discussion" where a file path would be. It is a thread like any
+other (chat by default, a Finding after promotion, with replies, a resolve, and a reopen), and an open one blocks
+signing and the conclusion of the review.
+
+The review page lists the threads about checks in a card named **Check discussions**, which is shown only when the
+review has one. You can read, reply to, and resolve them there. The reviewer slot owners may start one once they have
+submitted their ballot (the only reviewer of a review with a single slot may also do so while the ballot is still a
+draft, because there is no other ballot to hide), and so may the review's lead and a system administrator; any other
+member is refused. The control to start a thread about a check is not on the pages yet; it arrives with a later version
+of the ballot screen.
+
+A thread about a check is not carried into a follow-up review, because the checklist of the follow-up is frozen anew.
+Such threads do not need the confirmation of the dropped open threads; the form tells how many are left out.
+
 ### Sharing links
 
 Every file, line and thread of a review has a stable link that opens the review page at that place. The address bar
@@ -356,7 +374,7 @@ page you came from. Copy the address and send it to a colleague.
 | `/projects/{id}/reviews/{reviewId}/files/{path}` | That file, as a diff when it can be compared |
 | `/projects/{id}/reviews/{reviewId}/files/{path}?line=12` | The same, scrolled to and highlighting head line 12 |
 | `/projects/{id}/reviews/{reviewId}/files/{path}?line=12&side=baseline` | The same for baseline line 12 |
-| `/projects/{id}/reviews/{reviewId}/threads/{threadId}` | The thread's file, scrolled to the highlighted thread |
+| `/projects/{id}/reviews/{reviewId}/threads/{threadId}` | The thread's file at the thread (a check thread: its card) |
 
 Every thread has a **Link** next to its state, shown as a button; it opens the thread's address. Next to it,
 **Copy link** copies the full address to the clipboard and briefly shows "Copied" next to the button (or "Copy failed"
@@ -494,7 +512,8 @@ their work.
    project that can fit the chosen source: for uploaded files the uploaded reviews, for a repository the reviews of
    the same repository. The title is suggested as "Follow-up to {review id}"; you can change it.
 3. For uploaded files, the form shows what would be carried over before you create the review: the answers, the
-   sections, the open threads, the resolved threads that are not carried, and the open threads whose file is not in the
+   sections, the open threads, the resolved threads that are not carried, the check discussions that are not carried,
+   and the open threads whose file is not in the
    new review. For a repository the files are known only when the review is created, so the form shows no counts.
 4. If open threads would be dropped, because their file is not among the new files, tick **I have checked the open
    threads of the earlier review whose files are not in this one**.
@@ -518,7 +537,8 @@ an answer, that ballot decides. An
 answer inside a section that is marked not applicable is not carried, because the section is carried as not
 applicable instead.
 
-**What is not carried over.** Fail answers, resolved threads, reviewer slots, signatures, and reopenings. A check that
+**What is not carried over.** Fail answers, resolved threads, threads about a check, reviewer slots, signatures, and
+reopenings. A check that
 failed shows "Failed in review X" with the earlier justification, read-only, until it is answered again here. A carried
 open thread blocks the conclusion until it is resolved, like any other open thread.
 

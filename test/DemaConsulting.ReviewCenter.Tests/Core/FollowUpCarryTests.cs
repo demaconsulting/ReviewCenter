@@ -548,6 +548,73 @@ public class FollowUpCarryTests
     }
 
     /// <summary>
+    ///     Builds a thread of the earlier review about a check, with one comment.
+    /// </summary>
+    /// <param name="id">The thread identity.</param>
+    /// <param name="state">The state.</param>
+    /// <returns>The thread, with no file and no lines.</returns>
+    private static ReviewThread CheckThread(int id, ReviewThreadState state = ReviewThreadState.Open)
+    {
+        return new ReviewThread
+        {
+            Id = id,
+            ProjectId = 1,
+            ReviewId = "old",
+            FilePath = string.Empty,
+            CheckItemId = "a-01",
+            State = state,
+            Created = _then,
+            Comments = [new ReviewComment { Id = id * 10, ThreadId = id, Author = "Bob", AuthorUsername = "bob", Text = "About the check", Created = _then }]
+        };
+    }
+
+    /// <summary>
+    ///     Test that threads about a check, open or resolved, are never carried, are only counted as left out and are
+    ///     counted neither as resolved threads nor as dropped files, while the file threads next to them are handled
+    ///     as before.
+    /// </summary>
+    [Fact]
+    public void FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped()
+    {
+        // Arrange
+        var record = Record(threads:
+        [
+            CheckThread(1),
+            CheckThread(2, ReviewThreadState.Resolved),
+            Thread(3, state: ReviewThreadState.Resolved),
+            Thread(4)
+        ]);
+
+        // Act
+        var carry = Compute(record);
+
+        // Assert
+        Assert.Equal(2, carry.CheckThreadsLeftOut);
+        Assert.Equal(1, carry.ResolvedThreadsNotCarried);
+        Assert.Empty(carry.DroppedThreadFiles);
+        Assert.Equal([4], carry.Threads.Select(t => t.CarriedFromThreadId));
+    }
+
+    /// <summary>
+    ///     Test that an open thread about a check needs no acknowledgement of a dropped thread, because it is not a
+    ///     thread on a file that left the review.
+    /// </summary>
+    [Fact]
+    public void FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement()
+    {
+        // Arrange: the only thread is an open one about a check, and the review has no files in common
+        var record = Record(threads: [CheckThread(1)]);
+
+        // Act
+        var carry = Compute(record, oldFiles: [File("a.txt")], newFiles: [File("other.txt")]);
+
+        // Assert
+        Assert.Empty(carry.DroppedThreadFiles);
+        Assert.Empty(carry.Threads);
+        Assert.Equal(1, carry.CheckThreadsLeftOut);
+    }
+
+    /// <summary>
     ///     Test that a line anchor is kept only when the content of the side it refers to is identical in both
     ///     reviews, and otherwise moves to the whole file with a system comment at the end that names the original
     ///     anchor.

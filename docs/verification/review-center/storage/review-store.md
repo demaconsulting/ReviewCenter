@@ -50,8 +50,9 @@ be loadable on the test platform.
   are refused; each change is stored with its audit entry.
 - A signature is refused inside its transaction with `SigningNotAllowed` while any thread of the review is open, after
   the comparison of the digest, and nothing is stored.
-- Threads are listed only for their own review, in creation order, and the database refuses a thread for a file
-  that is not in the review.
+- Threads are listed only for their own review, in creation order; the store refuses a thread on a file that is not
+  in the review with an `InvalidOperationException` (the database no longer ties a thread to a file, only to its
+  review).
 - A checklist snapshot is stored with its review and read back with its version; a review without one, and an
   unknown review, have none.
 - Answering a check again, or setting a section's applicability again, in the ballot of a slot replaces the earlier row,
@@ -324,9 +325,21 @@ a thread of another review report false. This scenario is tested by
 interleaved order; each review lists only its own threads in creation order, and an unknown review lists none. This
 scenario is tested by `ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder`.
 
-**ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase**: A thread for a file that is not in the review
-raises a `DbUpdateException` and no thread is stored. This scenario is tested by
-`ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase`.
+**ReviewStore_AddThreadAsync_FileThreadOnMissingFile_IsRefused**: A thread on a file that is not in the review is
+refused by the store with an `InvalidOperationException` and no thread is stored. This scenario is tested by
+`ReviewStore_AddThreadAsync_FileThreadOnMissingFile_IsRefused`.
+
+**ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId**: A thread about a check is stored with an empty file
+and no file row, reads back with its check identifier, takes a reply and can be resolved, while a file thread beside it
+reads back without a check. This scenario is tested by `ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId`.
+
+**ReviewStore_AddThreadAsync_ThreadWithBothOrNeitherAnchor_IsRefused**: A thread that names both a file and a check,
+neither, a check with a line range, or an empty check identifier is refused with an `ArgumentException` and nothing is
+stored. This scenario is tested by `ReviewStore_AddThreadAsync_ThreadWithBothOrNeitherAnchor_IsRefused`.
+
+**ReviewStore_Conclude_OpenCheckThread_IsRefusedInTheTransaction**: With one of two slots signed and an open check
+thread, the second signature is refused with the `SigningNotAllowed` rule, one signature remains and the review is not
+concluded. This scenario is tested by `ReviewStore_Conclude_OpenCheckThread_IsRefusedInTheTransaction`.
 
 **ReviewStore_AddThreadAsync_Side_IsPersisted**: A thread on the baseline side and a thread on the head side are
 stored and read back with the side they were given. This scenario is tested by
@@ -757,7 +770,8 @@ rows belong to no ballot yet, and the audit chain verifies. This scenario is tes
 by `ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn`.
 
 **ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing**: A carried thread names a file that the new review does
-not have, so the database refuses. Afterwards the review, every carried row, and the audit entry do not exist, and the
+not have, so the store refuses with an `InvalidOperationException` (the database has no foreign key from a thread to a
+file). Afterwards the review, every carried row, and the audit entry do not exist, and the
 followed review is unchanged. This scenario is tested by `ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing`.
 
 **ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker**: A slot starts from the carried

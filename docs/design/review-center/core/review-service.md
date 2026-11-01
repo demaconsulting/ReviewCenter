@@ -12,8 +12,9 @@ back. It is also the home of the review types: `Review`, `ReviewFile`, `ReviewSt
 #### Data Model
 
 **FollowUpPreview**: the answer of `PreviewFollowUpAsync`, a record of `CarriedAnswers`, `CarriedSections`,
-`CarriedThreads`, `ResolvedThreadsNotCarried`, and `DroppedThreadFiles` (the sorted distinct paths of open threads whose
-file the new review does not have).
+`CarriedThreads`, `ResolvedThreadsNotCarried`, `DroppedThreadFiles` (the sorted distinct paths of open threads whose
+file the new review does not have), and `CheckThreadsLeftOut` (the number of threads about a check, open or resolved,
+that stay behind; default 0).
 
 **Review**: a data class (init-only properties) of `ProjectId`, `Id` (the review identifier, unique within its project),
 `Title`, `State`, `Created`, `ContentFingerprint`, `Files` (a list of `ReviewFile`), and `Checklist` (the frozen
@@ -202,7 +203,11 @@ its files, the new review's files and checklist, and the creation time, and retu
 - *Storage*: the carried rows are written by the store as review-level baseline rows (slot 0). They seed the draft
   ballot of each reviewer slot of the new review and never count in the record by themselves, so a carried answer does
   not hand a ballot in (see `ChecklistService`).
-- *Threads*: in the order of the earlier threads. A resolved thread is counted (`ResolvedThreadsNotCarried`) and not
+- *Threads*: in the order of the earlier threads. A thread about a check of the checklist, open or resolved, is never
+  carried: it is counted in `CheckThreadsLeftOut`, it is neither a resolved thread that is not carried nor a thread on
+  a dropped file, and it needs no acknowledgement (the checklist of the follow-up may differ, and a thread without a
+  file must not be mistaken for one on a file that left the review). A resolved thread is counted
+  (`ResolvedThreadsNotCarried`) and not
   carried. An open thread whose file is not in the new review goes to `DroppedThreadFiles` (sorted, distinct). Any
   other open thread is carried open with every comment verbatim (author, user name, text, time, kind, and the report
   flag), its original creation time, `CarriedFromReviewId` and `CarriedFromThreadId` (the number it had there). A
@@ -230,7 +235,8 @@ reviewer without the mark (see `ChecklistService`).
 **Preview of a follow-up**: `PreviewFollowUpAsync` takes the project, the earlier review, the uploaded files and the
 actor. It needs only the right to view the project, stores and audits nothing, and checks the files with the same rules
 as `CreateDraftAsync` (count, paths, sizes, unique paths) before it applies the fit check and the carry computation of
-the creation. A set of files that the creation would refuse is therefore refused with the same rule and message.
+the creation. A set of files that the creation would refuse is therefore refused with the same rule and message. The
+preview reports only the number of check threads that stay behind (`CheckThreadsLeftOut`), not what they say.
 
 **Audit of a follow-up**: the detail of `review.created` gets `, follows 'X'; carried N answers, M threads` (after the
 files, and on the repository path after the fingerprint; before the set, due date and token text), followed by

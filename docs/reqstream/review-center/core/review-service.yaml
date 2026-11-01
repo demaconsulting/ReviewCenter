@@ -413,6 +413,21 @@ sections:
           - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
           - ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened
 
+      - id: ReviewCenter-ReviewService-FollowUpCheckThreads
+        title: >-
+          The ReviewService class shall not carry a thread about a check into a follow-up review, open or resolved,
+          shall count such threads as left out and tell that count in the preview of the follow-up, shall count them
+          neither as resolved threads that are not carried nor as threads on dropped files, and shall therefore ask
+          for no acknowledgement of dropped threads because of them.
+        justification: |
+          The checklist of the follow-up may differ from the earlier one, so a thread about one of its checks may
+          have nothing left to discuss, and a thread without a file must never be mistaken for one on a file that
+          left the review. The person who creates the follow-up still learns how many discussions stay behind.
+        tests:
+          - FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped
+          - FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement
+          - ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut
+
       - id: ReviewCenter-ReviewService-FollowUpPreview
         title: >-
           The ReviewService class shall tell a member of the project who may see it, without storing anything and

@@ -674,7 +674,8 @@ public sealed class ReviewService
             carry.SectionStates.Count,
             carry.Threads.Count,
             carry.ResolvedThreadsNotCarried,
-            carry.DroppedThreadFiles);
+            carry.DroppedThreadFiles,
+            carry.CheckThreadsLeftOut);
     }
 
     /// <summary>

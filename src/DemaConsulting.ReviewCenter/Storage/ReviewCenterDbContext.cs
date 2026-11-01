@@ -317,24 +317,29 @@ internal sealed class ReviewCenterDbContext : DbContext
             file.Property(f => f.BaselineSha256).HasMaxLength(Sha256HexColumnLength);
         });
 
-        // Threads: identity assigned by the database; tied to a file of the review, so a thread can never
-        // name a file that is not there, and it goes away with its file. State is stored by name
+        // Threads: identity assigned by the database; tied to the review (and so removed with it). A file thread names
+        // a file of the review and a check thread (CheckItemId set) names a check of the frozen checklist; the
+        // store, not a foreign key, guarantees that a file thread's file exists, because a check thread has no file
+        // row to point at. State is stored by name
         modelBuilder.Entity<ReviewThread>(thread =>
         {
             thread.HasKey(t => t.Id);
             thread.Property(t => t.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             thread.Property(t => t.FilePath).IsRequired().HasMaxLength(ReviewLimits.MaxPathLength);
+            thread.Property(t => t.CheckItemId).HasMaxLength(ReviewLimits.MaxChecklistIdLength);
             thread.Property(t => t.State).HasConversion<string>().HasMaxLength(StateColumnLength);
             thread.Property(t => t.Side).HasConversion<string>().HasMaxLength(StateColumnLength).HasDefaultValue(ThreadSide.Head);
 
             // A carried thread names the review and the thread it was copied from (plain values, no foreign keys)
             thread.Property(t => t.CarriedFromReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
 
-            // The kind is derived from the flag of the starting comment, never stored
+            // The kind is derived from the flag of the starting comment, never stored; so is the check marker
             thread.Ignore(t => t.Kind);
-            thread.HasOne<ReviewFile>()
+            thread.Ignore(t => t.IsCheckThread);
+            thread.HasIndex(t => new { t.ProjectId, t.ReviewId });
+            thread.HasOne<Review>()
                 .WithMany()
-                .HasForeignKey(t => new { t.ProjectId, t.ReviewId, t.FilePath })
+                .HasForeignKey(t => new { t.ProjectId, t.ReviewId })
                 .OnDelete(DeleteBehavior.Cascade);
             thread.HasMany(t => t.Comments)
                 .WithOne()

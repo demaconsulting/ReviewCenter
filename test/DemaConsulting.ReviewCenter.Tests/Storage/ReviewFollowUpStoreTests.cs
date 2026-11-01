@@ -201,7 +201,8 @@ public class ReviewFollowUpStoreTests
 
     /// <summary>
     ///     Test that a carry that fails halfway creates nothing: when a carried thread names a file that the review
-    ///     does not have, the database refuses, and afterwards neither the review nor any carried row nor an audit
+    ///     does not have, the store refuses (the database has no foreign key from a thread to a file), and afterwards
+    ///     neither the review nor any carried row nor an audit
     ///     entry of the review exists, while the followed review is untouched.
     /// </summary>
     [Fact]
@@ -214,7 +215,7 @@ public class ReviewFollowUpStoreTests
         var broken = NewReview(projectId, "REV-2", "REV-1", NewCarry(projectId, "missing.txt"));
 
         // Act
-        await Assert.ThrowsAsync<DbUpdateException>(() => db.Store.AddReviewAsync(broken, cancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => db.Store.AddReviewAsync(broken, cancellationToken));
 
         // Assert: nothing of the follow-up exists
         Assert.Null(await db.Store.GetReviewAsync(projectId, "REV-2", cancellationToken));

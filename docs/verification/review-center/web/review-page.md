@@ -4,7 +4,7 @@
 
 `ReviewPage` is verified with component tests defined in `ReviewPageTests.cs` and
 `ReviewPageRepositoryTests.cs` and `ReviewPageDiffTests.cs` and `ReviewPageFollowUpTests.cs` (the marks of a follow-up
-review), which use the bUnit test context to
+review) and `ReviewPageCheckThreadTests.cs` (the card of check discussions), which use the bUnit test context to
 render the real component over real Core services and an in-memory fake store holding a review of known files.
 The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display name "Ann")
 unless a test signs in as someone else. The signing tests also create real users (with a password) through
@@ -509,6 +509,23 @@ the display name of the signed-in user. This scenario is tested by
 **ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary**: Resolving an open thread (which collapses it) and,
 after expanding it, reopening it changes the state label, the button label, and the summary counts. This scenario is
 tested by `ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary`.
+
+**ReviewPage_CheckThread_ListedInIndexWithCheckLabel**: A thread about a check is listed in the thread index with the
+label "Check discussion" in place of a file path, the card of check discussions shows it with the anchor `Check {id}`,
+and a review without such a thread has no card. This scenario is tested by
+`ReviewPage_CheckThread_ListedInIndexWithCheckLabel`.
+
+**ReviewPage_CheckThread_ReplyAndResolve_Work**: With no file chosen, a reply in the card is stored, and resolving the
+thread moves it to the resolved count and collapses it. This scenario is tested by
+`ReviewPage_CheckThread_ReplyAndResolve_Work`.
+
+**ReviewPage_CheckThreadDeepLink_ShowsCheckCard**: The address of a thread about a check focuses the thread in its card
+and shows no message, although the thread has no file. This scenario is tested by
+`ReviewPage_CheckThreadDeepLink_ShowsCheckCard`.
+
+**ReviewPage_CheckThread_DoesNotSelectFile**: Choosing a thread about a check in the index shows the thread without
+choosing a file and keeps a file that was chosen before. This scenario is tested by
+`ReviewPage_CheckThread_DoesNotSelectFile`.
 
 **ReviewPage_Render_ThreadText_IsShownAsPlainText**: Markup in a comment is shown as text and creates no element.
 This scenario is tested by `ReviewPage_Render_ThreadText_IsShownAsPlainText`.

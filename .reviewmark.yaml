@@ -657,6 +657,7 @@ reviews:
       - "test/**/Web/ReviewPageDiffTests.cs"
       - "test/**/Web/ReviewPageUnreadTests.cs"
       - "test/**/Web/ReviewPageRejectedTests.cs"
+      - "test/**/Web/ReviewPageCheckThreadTests.cs"
       - "test/**/Web/InboxWebTestBase.cs"
       - "test/**/Web/ReviewLinksTests.cs"
       - "test/**/Identity/OidcReauthTests.cs"
@@ -996,6 +997,7 @@ reviews:
       - "docs/verification/review-center/core/thread-service.md"
       - "src/DemaConsulting.ReviewCenter.Core/ThreadService.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ThreadKindRules.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/CheckThreadRules.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ThreadKind.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewCommentKind.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewActorRoles.cs"
@@ -1008,6 +1010,8 @@ reviews:
       - "test/**/Core/ThreadServiceTests.cs"
       - "test/**/Core/ThreadServiceReportTests.cs"
       - "test/**/Core/ThreadKindRulesTests.cs"
+      - "test/**/Core/CheckThreadTests.cs"
+      - "test/**/Core/CheckThreadRulesTests.cs"
       - "test/**/Core/ReviewActorRolesTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -1079,6 +1083,7 @@ reviews:
       - "test/**/Core/RecordDigestFollowUpTests.cs"
       - "test/**/Core/RecordDigestReportTests.cs"
       - "test/**/Core/RecordDigestBallotTests.cs"
+      - "test/**/Core/RecordDigestCheckThreadTests.cs"
 
   - id: ReviewCenter-Core-SigningService
     title: Review of ReviewCenter SigningService unit implementation
@@ -1414,6 +1419,7 @@ reviews:
       - "test/**/Storage/ReviewDueDateStoreTests.cs"
       - "test/**/Storage/ReviewStoreReviewConclusionTextTests.cs"
       - "test/**/Storage/ReviewStoreBallotTests.cs"
+      - "test/**/Storage/ReviewStoreCheckThreadTests.cs"
       - "test/**/Storage/ReviewFollowUpStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 

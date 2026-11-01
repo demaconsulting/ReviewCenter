@@ -235,6 +235,37 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that the counts of the review details include threads about a check, open and resolved, with no change
+    ///     to the shape of the answer.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_ReviewDetail_Counts_IncludeCheckThreads()
+    {
+        // Arrange: a review with an open and a resolved thread about a check
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        var threads = app.Services.GetRequiredService<ThreadService>();
+        var ann = new Actor("ann", "Ann");
+        var items = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ToList();
+        await threads.StartThreadAsync(projectId, "REV-1", ThreadAnchor.ForCheck(items[0].Id), ann, "Open", cancellationToken);
+        var done = await threads.StartThreadAsync(projectId, "REV-1", ThreadAnchor.ForCheck(items[1].Id), ann, "Done", cancellationToken);
+        await threads.ResolveAsync(projectId, "REV-1", done.Id, ann, cancellationToken);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+
+        // Act
+        var response = await client.GetAsync($"/api/projects/{projectId}/reviews/REV-1", cancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: both are counted
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var counts = json.RootElement.GetProperty("counts");
+        Assert.Equal(1, counts.GetProperty("openThreads").GetInt32());
+        Assert.Equal(1, counts.GetProperty("resolvedThreads").GetInt32());
+    }
+
+    /// <summary>
     ///     Test that an invalid checklist definition is a 400 (explicitly, not by default) whose problem answer
     ///     carries the message of the rule.
     /// </summary>

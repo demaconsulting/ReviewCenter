@@ -796,6 +796,11 @@ selected; the page shows the counts that `ReviewService.PreviewFollowUpAsync` re
 and the identifier, and creating stores a review that follows the chosen one with the carried counts. This scenario is
 tested by `NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp`.
 
+**NewReviewPage_FollowUp_CheckThreads_PreviewCountsThemAsNotCarried**: The earlier review has a discussion about a
+check besides its file threads; the preview says that one check discussion is not carried and still counts only the
+file threads as carried open threads. This scenario is tested by
+`NewReviewPage_FollowUp_CheckThreads_PreviewCountsThemAsNotCarried`.
+
 **NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion**: A title that was typed stays when an earlier review is
 chosen. This scenario is tested by `NewReviewPage_FollowUp_TypedTitle_IsNotReplacedBySuggestion`.
 

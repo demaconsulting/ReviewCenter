@@ -609,6 +609,18 @@ scenario is tested by `SigningService_ChatThreadAfterPartialSigning_KeepsSignatu
 thread open, the review is not approved and the status counts the open thread. This scenario is tested by
 `SigningService_GetApprovalAsync_OpenThreadAllSigned_IsNotApprovedAndCountsOpenThread`.
 
+**SigningService_SignAsync_OpenCheckThread_IsRefused**: An open thread about a check refuses the signature of a slot
+with the `SigningNotAllowed` rule, like any open thread. This scenario is tested by
+`SigningService_SignAsync_OpenCheckThread_IsRefused`.
+
+**SigningService_SignAsync_ResolvedCheckThread_IsAllowed**: A resolved thread about a check does not block the
+signature, and resolving the last open one frees it. This scenario is tested by
+`SigningService_SignAsync_ResolvedCheckThread_IsAllowed`.
+
+**SigningService_GetApprovalAsync_OpenCheckThread_BlocksConclusion**: With every slot signed and a thread about a check
+open, the review is not approved, the status counts the thread and names it as a blocker, and resolving it concludes the
+review. This scenario is tested by `SigningService_GetApprovalAsync_OpenCheckThread_BlocksConclusion`.
+
 **SigningService_ReopenReviewAsync_AllSignedButThreadOpen_ThrowsReviewNotLocked**: An administrator cannot reopen a
 review whose slots are all signed but that has an open thread, because it is not concluded; the refusal is
 `ReviewNotLocked`. This scenario is tested by

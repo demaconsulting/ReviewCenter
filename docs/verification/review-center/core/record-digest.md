@@ -5,7 +5,8 @@
 `RecordDigest` is verified with unit tests defined in `RecordDigestTests.cs` (the format and everything outside the
 report), `RecordDigestBallotTests.cs` (the `check`, `applicability`, and `outcome` lines and what the consolidation of
 the ballots does and does not give the digest), `RecordDigestFollowUpTests.cs` (the follow-up lines), and
-`RecordDigestReportTests.cs` (the `report` block). The tests build small `ReviewRecord`
+`RecordDigestReportTests.cs` (the `report` block), and `RecordDigestCheckThreadTests.cs` (the block of a thread about a
+check). The tests build small `ReviewRecord`
 values, with their submitted and draft ballots, by hand and call the static methods directly. The format is proved
 twice: the exact canonical text of a small record is compared with the text of the design, and the digest of a record
 with no ballots or threads is compared with a known SHA-256 value that was calculated independently of the
@@ -350,6 +351,23 @@ another digest. This scenario is tested by `RecordDigest_Compute_ReportCommentOr
 **RecordDigest_Compute_DelimitersInReportText_DoNotCollide**: Text in an included comment that holds the delimiters of
 the format cannot produce the digest of another record. This scenario is tested by
 `RecordDigest_Compute_DelimitersInReportText_DoNotCollide`.
+
+**RecordDigest_Compute_IncludedCheckThreadComment_UsesCheckAnchorLine**: An included comment of a thread about a check
+is written under the line `thread check 3:C-1` (the length-prefixed identifier alone) and has a known digest that was
+calculated independently of the implementation. This scenario is tested by
+`RecordDigest_Compute_IncludedCheckThreadComment_UsesCheckAnchorLine`.
+
+**RecordDigest_Compute_ChatCheckThread_DoesNotChangeDigest**: A thread about a check that holds chat only, open or
+resolved, gives the digest of the empty report. This scenario is tested by
+`RecordDigest_Compute_ChatCheckThread_DoesNotChangeDigest`.
+
+**RecordDigest_Compute_FileThreadsOnly_DigestUnchangedByCheckThreadSupport**: The digests of records with file threads
+only equal the values they had before check threads existed. This scenario is tested by
+`RecordDigest_Compute_FileThreadsOnly_DigestUnchangedByCheckThreadSupport`.
+
+**RecordDigest_Compute_CheckAndFileBlocks_AreSortedOrdinally**: Check and file blocks are sorted by their text in any
+order of the threads, so a check block comes before a file block. This scenario is tested by
+`RecordDigest_Compute_CheckAndFileBlocks_AreSortedOrdinally`.
 
 **RecordDigest_Compute_ReviewConclusionText_MatchesKnownValue**: The upload record with the fingerprint `abc` and the
 review conclusion text `Looks good.` has the line `conclusion-text 11:Looks good.` between `outcome none` and `report`,

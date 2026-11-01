@@ -463,7 +463,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `FileTooLarge` | A file is larger than the per-file limit |
 | `TotalSizeExceeded` | The files together are larger than the total limit |
 | `CommentTextInvalid` | The comment text is empty after trimming or is too long |
-| `ThreadAnchorInvalid` | The file is not in the review, or the line range does not fit the file (see ThreadService) |
+| `ThreadAnchorInvalid` | A file is not in the review, lines do not fit it, or a file and a check are both or neither |
 | `ThreadNotFound` | A reply, resolve, reopen, promotion, or report change names a thread or comment that is not there |
 | `ResolutionNoteRequired` | A Finding (a thread whose starting comment is in the report) is resolved without a note |
 | `CommentNotTogglable` | The report flag of a starting comment or of a resolution note is set on its own |

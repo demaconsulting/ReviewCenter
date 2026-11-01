@@ -463,6 +463,16 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 // identities without touching the caller's objects
                 if (review.CarryOver is { } carry)
                 {
+                    // The database has no foreign key from a thread to a file, so a carried thread must name a file of
+                    // the new review here; a thread about a check is never carried
+                    var carriedFileMissing = carry.Threads.Any(
+                        t => t.CheckItemId is not null || !review.Files.Any(f => f.Path == t.FilePath));
+                    if (carriedFileMissing)
+                    {
+                        throw new InvalidOperationException(
+                            $"A thread carried into review '{review.Id}' does not name a file of the review.");
+                    }
+
                     context.ChecklistAnswers.AddRange(carry.Answers);
                     context.ChecklistSectionStates.AddRange(carry.SectionStates);
                     context.Threads.AddRange(carry.Threads.Select(CopyCarriedThread));
@@ -625,11 +635,42 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         ArgumentNullException.ThrowIfNull(thread);
         ArgumentNullException.ThrowIfNull(audit);
 
+        // A thread has exactly one kind of anchor; a mix (or none) is a caller error, refused before the database is
+        // touched. A check thread has no file, no lines and the head side
+        var isCheck = thread.CheckItemId is not null;
+        var anchorIsValid = isCheck
+            ? thread.CheckItemId!.Length > 0
+              && thread.FilePath.Length == 0
+              && thread.StartLine is null
+              && thread.EndLine is null
+              && thread.Side == ThreadSide.Head
+            : thread.FilePath.Length > 0;
+        if (!anchorIsValid)
+        {
+            throw new ArgumentException(
+                "A thread is anchored to exactly one of a file or a check; a check thread has no file and no lines.",
+                nameof(thread));
+        }
+
         return await appender.ExecuteAsync<ReviewThread>(
             factory,
             async context =>
             {
                 await EnsureNotLockedAsync(context, thread.ProjectId, thread.ReviewId, cancellationToken);
+
+                // The database has no foreign key from a thread to a file (a check thread has no file), so the rule
+                // that a file thread names a file of its review is enforced here, in the same transaction as the insert
+                if (!isCheck)
+                {
+                    var fileExists = await context.ReviewFiles.AnyAsync(
+                        f => f.ProjectId == thread.ProjectId && f.ReviewId == thread.ReviewId && f.Path == thread.FilePath,
+                        cancellationToken);
+                    if (!fileExists)
+                    {
+                        throw new InvalidOperationException(
+                            $"The file '{thread.FilePath}' does not exist in review '{thread.ReviewId}'.");
+                    }
+                }
 
                 // Insert fresh entities so that the database always assigns the identities, whatever the caller supplied
                 var entity = new ReviewThread
@@ -637,6 +678,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     ProjectId = thread.ProjectId,
                     ReviewId = thread.ReviewId,
                     FilePath = thread.FilePath,
+                    CheckItemId = thread.CheckItemId,
                     Side = thread.Side,
                     StartLine = thread.StartLine,
                     EndLine = thread.EndLine,
@@ -2292,6 +2334,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             ProjectId = thread.ProjectId,
             ReviewId = thread.ReviewId,
             FilePath = thread.FilePath,
+            CheckItemId = thread.CheckItemId,
             Side = thread.Side,
             StartLine = thread.StartLine,
             EndLine = thread.EndLine,

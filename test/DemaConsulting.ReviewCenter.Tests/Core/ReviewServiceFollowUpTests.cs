@@ -1036,6 +1036,37 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
+    ///     Test that the preview and the creation leave threads about a check out, report only how many there are, and
+    ///     need no acknowledgement for them, while the file thread next to them is carried.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut()
+    {
+        // Arrange: an open and a resolved thread about a check, and an open thread on a.txt
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1", ["a.txt"]);
+        await w.Threads.StartThreadAsync(w.ProjectId, "rev-1", ThreadAnchor.ForCheck("a-01"), TestActors.Bob, "Open", cancellationToken);
+        var done = await w.Threads.StartThreadAsync(w.ProjectId, "rev-1", ThreadAnchor.ForCheck("a-02"), TestActors.Bob, "Done", cancellationToken);
+        await w.Threads.ResolveAsync(w.ProjectId, "rev-1", done.Id, TestActors.Bob, cancellationToken);
+        await ThreadAsync(w, "rev-1", "a.txt");
+
+        // Act: preview, then create without any acknowledgement
+        var preview = await w.Reviews.PreviewFollowUpAsync(
+            w.ProjectId, "rev-1", [new UploadedFile("a.txt", TestContent.A)], TestActors.Ann, cancellationToken);
+        var review = await UploadAsync(w, "rev-2", ["a.txt"], follows: "rev-1");
+
+        // Assert: only the file thread is carried, and the check threads are only counted
+        Assert.Equal(2, preview.CheckThreadsLeftOut);
+        Assert.Equal(1, preview.CarriedThreads);
+        Assert.Equal(0, preview.ResolvedThreadsNotCarried);
+        Assert.Empty(preview.DroppedThreadFiles);
+        Assert.Equal(1, review.CarriedThreadCount);
+        var carried = Assert.Single((await RecordAsync(w, "rev-2")).Threads);
+        Assert.False(carried.IsCheckThread);
+    }
+
+    /// <summary>
     ///     Test that the preview writes nothing and audits nothing: no review, no record row and no audit entry is added,
     ///     and the earlier review keeps its digest.
     /// </summary>

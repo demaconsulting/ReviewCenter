@@ -562,7 +562,7 @@
                             <button type="button" class="index-row" data-testid="index-row-@row.Id"
                                     aria-label="@IndexRowLabel(row)"
                                     @onclick="() => ViewThreadAsync(rowThread)">
-                                <span class="path" data-testid="index-file-@row.Id">@row.FilePath</span>
+                                <span class="path" data-testid="index-file-@row.Id">@IndexPathLabel(row)</span>
                                 <span data-testid="index-anchor-@row.Id">@AnchorLabel(row)</span>
                                 <span class="badge @(row.State == ReviewThreadState.Resolved ? "resolved" : null)" data-testid="index-state-@row.Id">@row.State</span>
                                 @if (ThreadHasUnread(row))
@@ -579,35 +579,9 @@
             }
         </section>
 
-        @if (SelectedPath is not null)
-        {
-            var fileThreads = Threads.Where(t => t.FilePath == SelectedPath).ToList();
-            var focusedThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId && t.Side == ThreadSide.Head);
-            var focusedBaselineThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId && t.Side == ThreadSide.Baseline);
-
-            // In the diff the threads are drawn under their lines; only whole-file threads are listed below it
-            var hasLineDiff = HasLineDiff;
-            var listedThreads = hasLineDiff ? fileThreads.Where(t => t.StartLine is null).ToList() : fileThreads;
-            var composerRange = hasLineDiff && !IsLocked && !ReadOnly ? ComposerRange() : null;
-            var inlineComposer = composerRange is not null;
-            ThreadSide? composerSide = inlineComposer ? NewSide : null;
-
-            // Lines inside the range of a head thread are highlighted in the head view; the first line of a range
-            // carries a count marker. Threads on the baseline side belong to the diff and the baseline view.
-            var anchoredLines = new HashSet<int>();
-            var startCounts = new Dictionary<int, int>();
-            foreach (var thread in fileThreads.Where(t => t.StartLine is not null && t.Side == ThreadSide.Head))
-            {
-                for (var line = thread.StartLine!.Value; line <= thread.EndLine!.Value; line++)
-                {
-                    anchoredLines.Add(line);
-                }
-
-                startCounts[thread.StartLine!.Value] = startCounts.GetValueOrDefault(thread.StartLine!.Value) + 1;
-            }
-
-            // One thread: its header, comments, reply box and resolve control; used in the diff and in the list
-            RenderFragment<ReviewThread> threadCard = item => @<li class="thread @(item.Id == FocusedThreadId ? "focused" : null)" data-testid="thread-@item.Id">
+        // One thread: its header, comments, reply box and resolve control; used in the diff, in the list of a
+        // file and in the card of the check discussions
+        RenderFragment<ReviewThread> threadCard = item => @<li class="thread @(item.Id == FocusedThreadId ? "focused" : null)" data-testid="thread-@item.Id">
                 @{
                     var threadId = item.Id;
                     var resolved = item.State == ReviewThreadState.Resolved;
@@ -687,6 +661,50 @@
                     }
                 }
             </li>;
+
+        @if (CheckThreads().Count > 0)
+        {
+            <section class="card" data-testid="check-discussions">
+                <h2>Check discussions</h2>
+                <p class="muted" data-testid="check-discussions-note">
+                    Discussions about a check of the checklist, not about a file. An open one blocks signing and
+                    concluding the review, like any other open thread.
+                </p>
+                <ul class="item-list threads" data-testid="check-threads-list">
+                    @foreach (var checkThread in CheckThreads())
+                    {
+                        @threadCard(checkThread)
+                    }
+                </ul>
+            </section>
+        }
+
+        @if (SelectedPath is not null)
+        {
+            var fileThreads = Threads.Where(t => t.FilePath == SelectedPath).ToList();
+            var focusedThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId && t.Side == ThreadSide.Head);
+            var focusedBaselineThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId && t.Side == ThreadSide.Baseline);
+
+            // In the diff the threads are drawn under their lines; only whole-file threads are listed below it
+            var hasLineDiff = HasLineDiff;
+            var listedThreads = hasLineDiff ? fileThreads.Where(t => t.StartLine is null).ToList() : fileThreads;
+            var composerRange = hasLineDiff && !IsLocked && !ReadOnly ? ComposerRange() : null;
+            var inlineComposer = composerRange is not null;
+            ThreadSide? composerSide = inlineComposer ? NewSide : null;
+
+            // Lines inside the range of a head thread are highlighted in the head view; the first line of a range
+            // carries a count marker. Threads on the baseline side belong to the diff and the baseline view.
+            var anchoredLines = new HashSet<int>();
+            var startCounts = new Dictionary<int, int>();
+            foreach (var thread in fileThreads.Where(t => t.StartLine is not null && t.Side == ThreadSide.Head))
+            {
+                for (var line = thread.StartLine!.Value; line <= thread.EndLine!.Value; line++)
+                {
+                    anchoredLines.Add(line);
+                }
+
+                startCounts[thread.StartLine!.Value] = startCounts.GetValueOrDefault(thread.StartLine!.Value) + 1;
+            }
 
             // The new-thread form; in the diff it is drawn under the selected line, otherwise in its own card
             RenderFragment newThreadForm = @<form data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">

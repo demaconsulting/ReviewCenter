@@ -255,6 +255,24 @@ sections:
           - RecordDigest_Compute_ReportCommentOrder_ChangesDigest
           - RecordDigest_Compute_DelimitersInReportText_DoNotCollide
 
+      - id: ReviewCenter-RecordDigest-CheckThread
+        title: >-
+          The RecordDigest class shall write the block of a thread about a check, in place of the file anchor, as the
+          line thread check followed by the length-prefixed identifier of the check and nothing else (no side, no
+          lines and no carried marker), shall write the included comments of the thread and leave out chat in the
+          same way as for a thread on a file, shall sort the blocks of both kinds together ordinally, and shall
+          leave the canonical text, and so the digest, of a record whose threads are all about files unchanged.
+        justification: |
+          A comment that the owner includes in the report belongs to the signed record wherever it was made, and the
+          check it is about is part of what it says. A check has no file, lines or side, so the anchor line names the
+          check alone. A signature on a record with file threads only must stay valid, so the layout of those blocks
+          cannot move.
+        tests:
+          - RecordDigest_Compute_IncludedCheckThreadComment_UsesCheckAnchorLine
+          - RecordDigest_Compute_ChatCheckThread_DoesNotChangeDigest
+          - RecordDigest_Compute_FileThreadsOnly_DigestUnchangedByCheckThreadSupport
+          - RecordDigest_Compute_CheckAndFileBlocks_AreSortedOrdinally
+
       - id: ReviewCenter-RecordDigest-ConsolidatedChecks
         title: >-
           The RecordDigest class shall write the standing of the checks and sections from the consolidation of the

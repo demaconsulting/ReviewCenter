@@ -99,6 +99,24 @@ sections:
           - ReviewStore_AddCommentAsync_IncludedReply_PersistsFlag
           - ReviewStore_GetRecordAsync_ThreadKind_DerivedFromStartingComment
 
+      - id: ReviewCenter-ReviewStore-CheckThreads
+        title: >-
+          The ReviewStore class shall save a thread about a check of the checklist, with its check identifier, an
+          empty file and no lines, without any file row, and read the identifier back, shall refuse a thread that
+          names both a file and a check or neither with an ArgumentException, shall refuse inside the transaction a
+          thread on a file that the review does not have with an InvalidOperationException, with nothing saved in
+          each case, and shall refuse the final
+          signature of a review while a check thread is open, inside the transaction that saves it.
+        justification: |
+          A thread belongs to its review, and only a thread on a file needs that file. The database no longer ties a
+          thread to a file, so the store must keep the rule that a file thread names a file of its review, and that
+          a thread has one anchor. A discussion about a check blocks the signature like any other open thread.
+        tests:
+          - ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId
+          - ReviewStore_AddThreadAsync_FileThreadOnMissingFile_IsRefused
+          - ReviewStore_AddThreadAsync_ThreadWithBothOrNeitherAnchor_IsRefused
+          - ReviewStore_Conclude_OpenCheckThread_IsRefusedInTheTransaction
+
       - id: ReviewCenter-ReviewStore-ThreadReport
         title: >-
           The ReviewStore class shall resolve a thread in one transaction together with the Resolution comment that

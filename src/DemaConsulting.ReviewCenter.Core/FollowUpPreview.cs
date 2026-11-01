@@ -37,9 +37,14 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The sorted paths of files that have open threads in the earlier review but are not in the new one; those threads
 ///     would not be carried and the creator has to acknowledge that.
 /// </param>
+/// <param name="CheckThreadsLeftOut">
+///     How many threads about a check (open or resolved) the earlier review has; they are never carried and need no
+///     acknowledgement, so only their number is shown. Zero by default.
+/// </param>
 public sealed record FollowUpPreview(
     int CarriedAnswers,
     int CarriedSections,
     int CarriedThreads,
     int ResolvedThreadsNotCarried,
-    IReadOnlyList<string> DroppedThreadFiles);
+    IReadOnlyList<string> DroppedThreadFiles,
+    int CheckThreadsLeftOut = 0);

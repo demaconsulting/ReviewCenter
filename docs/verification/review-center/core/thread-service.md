@@ -5,7 +5,9 @@
 `ThreadService` is verified with unit tests defined in `ThreadServiceTests.cs`, `ThreadServiceReportTests.cs` (the
 report rules, the acknowledgements, and the audit entries), `ThreadKindRulesTests.cs` (the kind and the role rules),
 and `ReviewActorRolesTests.cs` (how a person becomes the lead or a slot owner, directly and through the thread
-actions, with the real access rules). The tests use the real service and
+actions, with the real access rules), `CheckThreadTests.cs` (the threads about a check, through the service with the
+real access rules for the roles), and `CheckThreadRulesTests.cs` (the pure rule of who may start a check thread). The
+tests use the real service and
 the real `FileText` with a fake in-memory store (`FakeReviewStore`), the project-access double
 `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess` unit), and a fixed clock, so
 every rule can be
@@ -66,6 +68,13 @@ N/A - standard test environment.
   reply, a promotion, a demotion, a toggle, the resolution of a Finding) is refused with
   `SignaturesWouldBecomeOutOfDate` unless the slots are acknowledged. A reply to a thread that does not exist is
   `ThreadNotFound`, and an invalid anchor is reported before the signature impact.
+- A thread about a check is stored with the check, an empty file, no lines, and the head side; an anchor that names a
+  file and a check, a check with lines or the baseline side, a missing checklist, and a check that is not in the
+  checklist are refused and nothing is stored. It takes replies, resolution, and reopening like any thread.
+- A check thread is started by an administrator, the lead, a reviewer whose ballot is submitted, and the owner of the
+  only slot (with a draft); an auditor, a plain contributor, and a reviewer of one of several slots with a draft or no
+  ballot are refused with `ActorNotAllowed`. A concluded review refuses it with `ReviewLocked`, a start that would
+  outdate a signature needs the acknowledgement, and the audit entry names the check and never the text.
 
 #### Test Scenarios
 
@@ -474,6 +483,66 @@ the note and never its text. This scenario is tested by
 **ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport**: The entries `thread.started` and
 `thread.replied` say `in report` when the comment is included. This scenario is tested by
 `ThreadService_StartThreadAsync_IncludeInReport_Audit_MarksInReport`.
+
+**ThreadService_StartThreadAsync_CheckAnchor_StoresCheckThreadWithEmptyFileAndNoLines**: A thread about a check is
+stored with the check, an empty file, no lines, and the head side. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchor_StoresCheckThreadWithEmptyFileAndNoLines`.
+
+**ThreadService_StartThreadAsync_CheckAnchorUnknownItem_ThrowsChecklistItemNotFound**: A check that the frozen
+checklist does not have is refused and nothing is stored. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchorUnknownItem_ThrowsChecklistItemNotFound`.
+
+**ThreadService_StartThreadAsync_CheckAnchorWithoutChecklist_ThrowsChecklistNotFound**: A review without a checklist has
+no check to discuss and is refused. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchorWithoutChecklist_ThrowsChecklistNotFound`.
+
+**ThreadService_StartThreadAsync_MixedFileAndCheckAnchor_ThrowsThreadAnchorInvalid**: An anchor that names both a file
+and a check is refused. This scenario is tested by
+`ThreadService_StartThreadAsync_MixedFileAndCheckAnchor_ThrowsThreadAnchorInvalid`.
+
+**ThreadService_StartThreadAsync_CheckAnchorWithLinesOrBaselineSide_ThrowsThreadAnchorInvalid**: A check anchor with
+lines or the baseline side, and one that names no check, are refused. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchorWithLinesOrBaselineSide_ThrowsThreadAnchorInvalid`.
+
+**ThreadService_ReplyAsync_ResolveAsync_ReopenAsync_OnCheckThread_Work**: A check thread takes a reply, is resolved with
+a note when it is a Finding, and is reopened like any thread. This scenario is tested by
+`ThreadService_ReplyAsync_ResolveAsync_ReopenAsync_OnCheckThread_Work`.
+
+**ThreadService_StartThreadAsync_CheckAnchorByAuditorOrPlainContributor_ThrowsActorNotAllowed**: An auditor and a plain
+contributor who holds no slot and does not lead the review are refused with `ActorNotAllowed`. This scenario is tested
+by `ThreadService_StartThreadAsync_CheckAnchorByAuditorOrPlainContributor_ThrowsActorNotAllowed`.
+
+**ThreadService_StartThreadAsync_CheckAnchor_SlotOwnerNeedsSubmittedBallotWhenSeveralSlots**: The lead, an
+administrator, and the only reviewer with a draft may start a check thread; a reviewer of one of several slots needs
+the own ballot submitted. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchor_SlotOwnerNeedsSubmittedBallotWhenSeveralSlots`.
+
+**ThreadService_StartThreadAsync_CheckAnchorWhenConcluded_ThrowsReviewLocked**: A concluded review refuses a new check
+thread. This scenario is tested by `ThreadService_StartThreadAsync_CheckAnchorWhenConcluded_ThrowsReviewLocked`.
+
+**ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement**: A check thread whose
+starting comment is included makes a current signature out of date and needs the acknowledgement; a chat check thread
+does not. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement`.
+
+**ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck**: The entry `thread.started` names the thread,
+the check, and the hash of the text but not the text. This scenario is tested by
+`ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck`.
+
+**CheckThreadRules_CanStart_SubmittedSlotOwner_IsAllowed**: A slot owner whose ballot is submitted may start a check
+thread whatever the number of slots. This scenario is tested by
+`CheckThreadRules_CanStart_SubmittedSlotOwner_IsAllowed`.
+
+**CheckThreadRules_CanStart_DraftOrNoBallotSlotOwner_IsRefusedWhenSeveralSlots**: A slot owner with a draft or no
+ballot is refused when the review has several slots. This scenario is tested by
+`CheckThreadRules_CanStart_DraftOrNoBallotSlotOwner_IsRefusedWhenSeveralSlots`.
+
+**CheckThreadRules_CanStart_SoleSlotOwnerWithDraft_IsAllowed**: The only reviewer of a review may start a check thread
+with a draft or no ballot. This scenario is tested by `CheckThreadRules_CanStart_SoleSlotOwnerWithDraft_IsAllowed`.
+
+**CheckThreadRules_CanStart_LeadCreatorProjectAdminAndSystemAdmin_AreAllowed**: The lead and a system administrator
+may start a check thread, and a person with no role may not. This scenario is tested by
+`CheckThreadRules_CanStart_LeadCreatorProjectAdminAndSystemAdmin_AreAllowed`.
 
 **ThreadService_NoOpReportMutations_RecordNothing**: A promote, a demote, a toggle, and a resolve that change nothing
 record no audit entry. This scenario is tested by `ThreadService_NoOpReportMutations_RecordNothing`.

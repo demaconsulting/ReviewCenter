@@ -224,6 +224,35 @@ public class NewReviewPageFollowUpTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the preview says how many check discussions of the earlier review are not carried, whether they are
+    ///     open or resolved, and that they are not counted among the carried open threads.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_FollowUp_CheckThreads_PreviewCountsThemAsNotCarried()
+    {
+        // Arrange: the earlier review has a check discussion besides its file threads
+        var projectId = await ArrangeSourceAsync();
+        await Threads.StartThreadAsync(
+            projectId,
+            "REV-1",
+            ThreadAnchor.ForCheck(DefaultChecklist.Current.Sections[0].Items[0].Id),
+            TestActors.Bob,
+            "Is this check right?",
+            TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-2");
+        await SelectFilesAsync(cut, "a.txt", "b.txt");
+
+        // Act: choose the earlier review
+        await cut.Find("[data-testid='follow-source-select']").ChangeAsync("REV-1");
+
+        // Assert: the check discussion is counted as left out and not as a carried thread
+        var preview = TextOf(cut, "follow-preview");
+        Assert.Contains("2 open threads", preview, StringComparison.Ordinal);
+        Assert.Contains("1 check discussion is not carried", preview, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a title the creator typed is kept when an earlier review is chosen.
     /// </summary>
     [Fact]

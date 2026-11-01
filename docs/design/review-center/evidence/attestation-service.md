@@ -55,6 +55,9 @@ it was carried from (`CarriedFromReviewId` of the representative row or of the t
 a review that follows nothing, and then the document is the same as before. The review identifiers are not personal
 data, so the reviewer names switch does not affect them.
 
+The thread section names the anchor of a thread about a check as `Check {id}` (the identifier of the check) in place of
+a file path and lines, so no empty file name is printed; a thread on a file is worded as before.
+
 The document also carries the reopen history of the approval (`ReviewApproval.Reopens`, read by `SigningService`): for
 every time an administrator reopened the review after an approval, when, by whom (written as "display name (user name)"
 with the reviewer names switch on and as a participant label with it off, like every other person), the reason, and the

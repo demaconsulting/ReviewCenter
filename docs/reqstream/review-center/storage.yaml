@@ -73,6 +73,7 @@ sections:
         children:
           - ReviewCenter-ReviewStore-Threads
           - ReviewCenter-DbContext-Threads
+          - ReviewCenter-ReviewStore-CheckThreads
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
 

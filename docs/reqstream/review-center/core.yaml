@@ -214,6 +214,9 @@ sections:
           - ReviewCenter-ThreadService-ResolutionNote
           - ReviewCenter-ThreadService-Promote
           - ReviewCenter-ThreadService-CommentToggle
+          - ReviewCenter-ThreadService-CheckThreads
+          - ReviewCenter-ThreadService-CheckThreadStart
+          - ReviewCenter-RecordDigest-CheckThread
         tests:
           - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder
 
@@ -376,6 +379,7 @@ sections:
           - ReviewCenter-ThreadService-ApprovalLock
           - ReviewCenter-ThreadService-ConcludedRefusal
           - ReviewCenter-SigningService-OpenThreadRule
+          - ReviewCenter-SigningService-OpenCheckThread
           - ReviewCenter-ChecklistService-ApprovalLock
           - ReviewCenter-RecordDigest-ReopenCount
         tests:
@@ -477,6 +481,7 @@ sections:
           - ReviewCenter-ReviewService-Audit
           - ReviewCenter-ThreadService-Audit
           - ReviewCenter-ThreadService-ReportAudit
+          - ReviewCenter-ThreadService-CheckThreadAudit
           - ReviewCenter-ChecklistService-Audit
           - ReviewCenter-SigningService-Audit
           - ReviewCenter-UserService-Audit
@@ -699,6 +704,7 @@ sections:
           - ReviewCenter-ReviewService-FollowUp
           - ReviewCenter-ReviewService-FollowUpCarry
           - ReviewCenter-ReviewService-FollowUpPreview
+          - ReviewCenter-ReviewService-FollowUpCheckThreads
           - ReviewCenter-ChecklistService-CarriedMarking
           - ReviewCenter-SigningService-CarriedRecord
           - ReviewCenter-RecordDigest-FollowUp

@@ -181,6 +181,14 @@
                                     and @FollowPreview.CarriedThreads open @(FollowPreview.CarriedThreads == 1 ? "thread" : "threads").
                                     @FollowPreview.ResolvedThreadsNotCarried resolved
                                     @(FollowPreview.ResolvedThreadsNotCarried == 1 ? "thread is" : "threads are") not carried.
+                                    @if (FollowPreview.CheckThreadsLeftOut > 0)
+                                    {
+                                        <text>
+                                            @FollowPreview.CheckThreadsLeftOut check
+                                            @(FollowPreview.CheckThreadsLeftOut == 1 ? "discussion is" : "discussions are")
+                                            not carried.
+                                        </text>
+                                    }
                                 </p>
                             }
                             else
