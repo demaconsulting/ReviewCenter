@@ -96,30 +96,37 @@ sections:
       - id: ReviewCenter-SigningService-Blockers
         title: >-
           The SigningService class shall refuse to sign a review while a check in a section that applies is
-          unanswered in the consolidated ballots, a check is agreed as Fail, or a thread is open (chat or included in
-          the report), shall list each of these as a blocker, and shall not count a check answered Fail in a section
-          that does not apply.
+          unanswered or disputed in the consolidated ballots, a thread is open (chat or included in the report), or
+          the review concludes as Rejected without a conclusion text, shall list each of these as a blocker, and shall
+          not treat a check answered Fail as a blocker, in a section that applies or not.
         justification: |
-          A signature says the reviewer approves the record, and the record covers the consolidation of the submitted
-          ballots. That is not true while checks are unanswered, a check has failed, or a discussion is still open,
-          and a failed check in a section that was excluded is not part of what is being approved.
+          A signature records the outcome that the signer reached about the record, and the record covers the
+          consolidation of the submitted ballots. That is not possible while checks are unanswered or disputed, or a
+          discussion is still open, and a rejection that states no reasons is of no use to the author. A failed check
+          is a finding, and the outcome that follows from it is a rejection, not a refusal to sign.
         tests:
           - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
           - SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock
           - SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence
           - SigningService_SignAsync_OpenChatThread_ThrowsSigningNotAllowed
+          - SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth
 
       - id: ReviewCenter-SigningService-Sign
         title: >-
           The SigningService class shall store a signature for a primary reviewer or an alternate of a slot that
           records the slot, the user, the display name at that time, the role, the time, the digest of the record (which
-          covers the consolidation of the submitted ballots), and the fixed meaning text, and shall never change or
+          covers the consolidation of the submitted ballots), the agreed outcome (Approved, or Rejected when the
+          ballots agree on at least one Fail), and the fixed meaning text of that outcome, and shall never change or
           remove a signature that has been stored.
         justification: |
-          The signature is the evidence of who approved which record and when. Keeping every signature unchanged
-          means the history of approvals stays reliable after the record changes and is signed again.
+          The signature is the evidence of who approved or rejected which record and when. The meaning text says what
+          the signer stated, so an approval and a rejection can never be mistaken for each other. Keeping every
+          signature unchanged means the history of signatures stays reliable after the record changes and is signed
+          again.
         tests:
           - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+          - SigningService_SignAsync_Approved_StoresApprovedSignature
+          - SigningService_SignAsync_RejectedWithText_StoresRejectedSignature
           - SigningService_SignAsync_Alternate_RecordsAlternateRole
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
           - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
@@ -167,7 +174,8 @@ sections:
         title: >-
           The SigningService class shall give for a review the digest of its record, for each slot whether it is
           not signed, signed with a current signature (naming the signer and time), or out of date because it was
-          signed only for an earlier record, whether the review is approved (see the Concluded requirement), the
+          signed only for an earlier record, whether the review is approved or concluded (see the Concluded
+          requirement), the
           blockers, and one sentence naming the next step, and shall give nothing for a review that does not exist.
           The status shall also say for the primary and for the alternate reviewer of each slot whether that user is
           still a member of the project, and shall keep the slot assigned to a user who has been removed from the
@@ -195,7 +203,7 @@ sections:
           The SigningService class shall record adding, changing, and removing a slot and adding a signature in the
           audit trail, together with the change, so that a change is never saved without its entry and an entry is never
           saved without its change, naming the actor, the slot (by its number on the review page, counted from 1, not
-          by its database identifier), the reviewers, and for a signature the role and the
+          by its database identifier), the reviewers, and for a signature the role, the outcome, and the
           record digest, and shall record nothing for a change that is refused.
         justification: |
           The approval of a review is the most important event of its history, and the history must show who
@@ -268,8 +276,9 @@ sections:
 
       - id: ReviewCenter-SigningService-ApprovalLock
         title: >-
-          The SigningService class shall treat a review that is concluded (every slot, at least one, has a signature
-          of the current record, and no thread is open; see the Concluded requirement for the ballots) as locked,
+          The SigningService class shall treat a review that is concluded, as Approved or as Rejected (every slot, at
+          least one, has a signature of the current record with the same outcome, and no thread is open; see the
+          Concluded requirement for the ballots) as locked,
           shall refuse to add, change, or remove a slot and
           shall refuse to sign while the review is locked, with the ReviewLocked rule and a message that says the
           review is concluded and has to be reopened first, and shall compute the lock from the signatures, the
@@ -314,6 +323,7 @@ sections:
           - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
           - SigningService_ReopenReviewAsync_AllSignedButThreadOpen_ThrowsReviewNotLocked
           - SigningService_ReopenReviewAsync_BallotsStaySubmitted
+          - SigningService_ReopenReviewAsync_Rejected_ReopensTheReview
 
       - id: ReviewCenter-SigningService-OpenThreadRule
         title: >-
@@ -442,7 +452,8 @@ sections:
       - id: ReviewCenter-SigningService-ProgressCounts
         title: >-
           The SigningService class shall return with the approval status of a review, besides the sentences that say
-          what blocks the approval, the number of open threads, of unanswered checks, of checks answered Fail, and of
+          what blocks the approval, the number of open threads, of unanswered checks, of checks answered Fail (for
+          information only, as a Fail does not block), and of
           checks on which the submitted ballots disagree, calculated in the same step as the sentences so that each
           count equals the number it states, and shall return for each person of a slot whether the account is
           enabled.
@@ -511,16 +522,17 @@ sections:
 
       - id: ReviewCenter-SigningService-Concluded
         title: >-
-          The SigningService class shall treat a review as concluded, approved, and locked only when every slot has a
-          submitted ballot, no check is pending or disputed in the consolidation, the outcome is Approved (a Rejected
-          outcome is not concluded), every slot has a signature of the current digest, and no thread is open, shall
-          take the one definition of this from ReviewLock, and shall word the next step of a review that has blockers
+          The SigningService class shall treat a review as concluded, and locked, only when every slot has a submitted
+          ballot, no check is pending or disputed in the consolidation, every slot has a signature of the current
+          digest with the same outcome (Approved, or Rejected with a conclusion text), and no thread is open, shall
+          treat it as approved only when that outcome is Approved, shall take the one definition of this from
+          ReviewLock, and shall word the next step of a review that has blockers
           as the hint for them, also when the review has no slot (for example that checks are unanswered).
         justification: |
-          A review is approved only when every reviewer has handed in a ballot, they agree, and each has signed that
-          standing. Using one definition keeps the status, the locks, and the store from disagreeing about what is
-          approved. A review with no slot has no one who can answer its checks, so the open checks are the honest next
-          step.
+          A review is concluded only when every reviewer has handed in a ballot, they agree, and each has signed that
+          standing, whether the agreed outcome is approval or rejection. Using one definition keeps the status, the
+          locks, and the store from disagreeing about what is concluded. A review with no slot has no one who can
+          answer its checks, so the open checks are the honest next step.
         tests:
           - SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved
           - ReviewLock_IsConcluded_UnsubmittedBallot_False
@@ -528,5 +540,37 @@ sections:
           - ReviewLock_IsConcluded_AllSubmittedAgreedSigned_True
           - ReviewLock_IsConcluded_AgreedBallotsOneSlotUnsigned_False
           - ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False
-          - ReviewLock_IsConcluded_RejectedOutcome_False_Until1c3
+          - ReviewLock_IsConcluded_RejectedAllSignedWithText_True
+          - ReviewLock_IsConcluded_RejectedNoText_False
+          - ReviewLock_IsConcluded_RejectedSignedForApproval_False
+          - ReviewLock_IsConcluded_RejectedOneSlotUnsigned_False
+          - ReviewLock_ConcludedOutcome_AllSubmittedAgreedSigned_Approved
+          - ReviewLock_ConcludedOutcome_Disputed_None
+          - SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved
+          - SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate
           - SigningService_NextStep_NoSlots_PointsToTheUnansweredChecks
+
+      - id: ReviewCenter-SigningService-RejectedOutcome
+        title: >-
+          The SigningService class shall record on each signature the outcome that the signer signed, Rejected when the
+          submitted ballots agree on at least one Fail and Approved otherwise, shall require a conclusion text that is
+          not blank before a Rejected outcome is signed, refusing with the ConclusionRequired rule and the message
+          "A rejected review needs a conclusion stating the reasons." when that is the only blocker and otherwise with
+          the SigningNotAllowed rule that lists every blocker, shall lock a review that is concluded as Rejected and
+          let an administrator reopen it as any concluded review, and shall write the outcome into the audit entry of
+          the signature.
+        justification: |
+          A review whose checklist has a failed check is a finished review when the reviewers agree that the work is
+          not acceptable. Recording the outcome on the signature, together with the meaning text of that outcome, lets
+          the history tell an approval from a rejection. A rejection without stated reasons gives the author nothing to
+          act on, so the conclusion is required. Locking and reopening work as for an approval so that a rejected
+          record cannot be changed unnoticed.
+        tests:
+          - SigningService_SignAsync_RejectedWithText_StoresRejectedSignature
+          - SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired
+          - SigningService_SignAsync_RejectedBlankText_ThrowsConclusionRequired
+          - SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth
+          - SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate
+          - SigningService_ReopenReviewAsync_Rejected_ReopensTheReview
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+          - ReviewLock_IsConcluded_RejectedAllSignedWithText_True

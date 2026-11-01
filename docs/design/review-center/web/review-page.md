@@ -7,7 +7,8 @@
 `ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`, which also answers the file, line and thread addresses
 described under Deep links below. Its responsibility is to show one review, with the reader's work first. From the top it
 shows a breadcrumb (muted, with "/" separators, leading to the projects list and the owning project, and ending in the
-review identifier as text instead of a link), the title with an approval badge (Approved or In review) and a History
+review identifier as text instead of a link), the title with an approval badge (Approved, Rejected, or In review) and a
+History
 button, and a one-sentence next step, which is the single hint of the page about what to do next. For an approved
 review a line below the title offers the download of the signed attestation (see Attestation download below). Below it
 is a
@@ -32,9 +33,11 @@ rules. It requires a signed-in user, and every comment, slot change, and signatu
 History button (`history-link`) leads to the history page of the review, where the audit entries of the review are
 listed.
 
-An approved review is locked. The page shows a Locked badge (`review-locked`) next to the approval badge and, above the
-reading, a banner (`review-locked-banner`) that says why: the review is approved, its content, checklist and reviewers
-can no longer change, and a project administrator can reopen it. While the review is locked every control that would
+An approved or rejected (concluded) review is locked. The page shows a Locked badge (`review-locked`) next to the
+approval badge and, above the
+reading, a banner (`review-locked-banner`) that says why: "This review is concluded and locked. Its content, checklist
+and reviewers can no longer change.", and a project administrator can reopen it. While the review is locked every
+control that would
 change reviewed content or the
 reviewer slots is disabled with that explanation (the add-slot selects and button, the slot edit controls, the thread
 resolve and reopen toggle, the line-comment buttons of the diff, through
@@ -92,7 +95,8 @@ user may not do.
 **Checklist**: the `ChecklistState` of the review, or `null` when it has none. The page only reads it for the summary
 strip; the answers are made on `ChecklistPage`.
 
-**Approval**: the `ReviewApproval` of the review from `SigningService.GetApprovalAsync`: whether it is approved, the
+**Approval**: the `ReviewApproval` of the review from `SigningService.GetApprovalAsync`: how it is concluded
+(`Conclusion`: approved, rejected, or none), the outcome a signature given now would attest (`Outcome`), the
 record digest, the slots with their signature state, the blockers that prevent signing, and the next-step sentence.
 It is `null` until loaded. **Candidates**: the members of the project that can be chosen for a slot (`SlotMember` values
 from
@@ -114,13 +118,21 @@ test ids `slot-primary-unavailable-{id}` and `slot-alternate-unavailable-{id}`, 
 stored choice is among the candidates.
 **CurrentUsername**: the user name
 of the signed-in user, from the authentication state, used to tell which slots the user occupies.
-**IsLocked**: whether the review is locked, which is `Approval.IsApproved`; **LockedMarker**: the text `true` or `false`
+**IsLocked**: whether the review is locked, which is `Approval.IsConcluded` (approved or rejected); **ConclusionLabel**
+and **ConclusionBadgeClass**: the text ("Approved", "Rejected", or "In review") and the style of the status badge;
+**SigningOutcome** and **SigningOutcomeLabel**: the outcome a signature given now attests (`Approval.Outcome`, approved
+when there is none) and its words ("APPROVED" or "REJECTED"); **LockedMarker**: the text `true` or `false`
 written to the `data-locked` attribute of the disabled controls, so that tests can tell a locked control.
 **CanSetDueDate**: whether the signed-in user may change the due date, asked with `ReviewService.CanSetDueDateAsync` in
 `RefreshAsync` (a project or system administrator, or the user who created the review, never an API token);
 **CanEditDueDate**: `CanSetDueDate` and not `IsLocked`, which decides whether the form is drawn; **IsOverdue**: the
 answer of `ReviewService.IsOverdue` for the review and `IsLocked`; **DueDateInput**, **DueDateError**: the text of the
 date field (`yyyy-MM-dd`) and the message of a refusal.
+**CanWriteConclusion**: whether the signed-in user may write the review conclusion text, asked with
+`ChecklistService.CanSetReviewConclusionTextAsync` in `RefreshAsync` (a primary or alternate reviewer of a slot, or the
+lead of the review: the creator or a project administrator; never an auditor, a non-member, or an API token);
+**ShowConclusionEditor**: `CanWriteConclusion` and not `ReadOnly` and not `IsLocked`, which decides whether the editor
+is drawn; **ConclusionInput**, **ConclusionError**: the text of the conclusion field and the message of a refusal.
 **RequireIndependent**: the `RequireIndependentReviewers` setting of the project, read with the project
 in `RefreshAsync`; **VisibleCandidates**: `Candidates` without the review author (`Review.CreatedBy`) when
 `RequireIndependent` is on. **RequireNonReopener**: the `RequireNonReopenerSigning` setting of the project, read in
@@ -182,6 +194,9 @@ every thread are not rendered at all (they could never be sent), the `+` and Com
 
 Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-link`, `review-loading`,
 `review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `review-due-section`,
+`review-conclusion`, `review-conclusion-text`, `review-conclusion-empty`, `review-conclusion-form`,
+`review-conclusion-input`,
+`review-conclusion-save`, `review-conclusion-error`, `attestation-rejected-note`,
 `review-due-date`, `review-overdue`, `review-due-none`, `due-date-form`, `review-due-input`, `review-due-save`,
 `review-due-clear`, `review-due-error`, `reopen-form`,
 `reopen-reason`, `reopen-button`, `reopen-error`, `reopen-history`, and `reopen-entry-{n}`, `reopen-by-{n}`,
@@ -193,7 +208,7 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `slot-primary-unavailable-{id}`, `slot-alternate-unavailable-{id}`,
 `slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
 `slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `reopener-cannot-sign-{id}`,
-`sign-form-{id}`, `sign-meaning-{id}`,
+`sign-form-{id}`, `sign-outcome-{id}`, `sign-meaning-{id}`,
 `sign-password-{id}`, `sign-totp-{id}` (only for a user with a second factor), `sign-error-{id}`, `sign-button-{id}`
 (all by slot identity), and for an external user
 `sign-reauth-form-{id}`, `sign-reauth-{id}`, `sign-reauth-hint-{id}`, `sign-reauth-off-{id}`, and `sign-confirmed-{id}`,
@@ -387,7 +402,8 @@ button-styled like the buttons beside it) to the thread's address, and a `thread
 that copies the absolute address, with a `thread-copy-status-{id}` live region for the feedback. The index rows come
 from `ThreadService.BuildIndex` and the next-step line from
 `Approval.NextStep` (which `SigningService` builds with `ThreadService.NextStep`, given the checklist progress and the
-number of checks answered Fail, and words itself for missing slots and signatures), so the page holds no ordering or
+number of checks answered Fail, the number of disputed checks, and whether a conclusion text is needed, and words itself
+for missing slots and signatures), so the page holds no ordering or
 wording rules of its own.
 The summary of the checklist cell is "{answered} of {total} checks answered", or "Checklist complete" when nothing
 is left to answer, and its progress bar shows the answered checks over all checks. The reviewers cell reads "No reviewer
@@ -406,9 +422,13 @@ change as well.
 
 **SignAsync**: Signs the review for one slot. The sign form is drawn for a signed-in user who is the primary or the
 alternate of a slot that is not currently signed (decided from the user name in the authentication state). While the
-review has blockers (no checklist, unanswered or failed checks, open threads), the page draws the list of blockers
-headed "This review cannot be signed yet:" instead of the form. Otherwise the form shows the meaning text of the
-signature (`SigningService.MeaningText`) and a password field. For a local user with a second factor (`CurrentHasTotp`)
+review has blockers (no checklist, unanswered or disputed checks, open threads, or a rejected outcome without a
+conclusion text), the page draws the list of blockers
+headed "This review cannot be signed yet:" instead of the form. A check answered Fail is not a blocker. Otherwise the
+form first states the outcome the signature will attest (`sign-outcome-{id}`: "You are signing: APPROVED" or "You are
+signing: REJECTED", from `Approval.Outcome`) and shows the meaning text of that outcome
+(`SigningService.MeaningFor`, `sign-meaning-{id}`: the approval text, or the rejection text for a rejected outcome) and
+a password field. For a local user with a second factor (`CurrentHasTotp`)
 the form also has a field "Current code from your authenticator app" with the hint "If you just signed in with this
 code, wait for the next one.", because Core refuses a code that was already used in the same time step. For a user who
 signs in with an identity provider
@@ -444,13 +464,29 @@ only held in the component field `SignPasswords` while it is typed (and the code
 block removes both after every
 attempt, whatever the outcome, and increments `PasswordKey`, which is part of the `@key` of the field so that the
 browser builds a new, empty input. It is never rendered as a value, logged, or kept. After the attempt the page calls
-`RefreshAsync`, so a signature shows as signed, locks the slot, and may turn the badge to Approved.
+`RefreshAsync`, so a signature shows as signed, locks the slot, and may turn the badge to Approved or Rejected.
 
 **Due date**: Under the title the page shows the due date as `Due yyyy-MM-dd (UTC)` (`review-due-date`), or `No due
 date` (`review-due-none`); the date is a calendar day in UTC and the page says so. While the date is before today (UTC)
-and the review is not approved (`IsOverdue`) it also shows the Overdue badge `review-overdue`; an approved review keeps
+and the review is not concluded (`IsOverdue`) it also shows the Overdue badge `review-overdue`; a concluded review keeps
 its date, without the badge, as history. The form `due-date-form` (a date input, Save, and Clear) is drawn only when
 `CanEditDueDate` holds, so never for a user who may not change the date and never for a locked review.
+
+**Review conclusion**: A card `review-conclusion` shows the review conclusion text, the reasons that the reviewers
+state, which a rejected review cannot be signed without. The card is always drawn, for everyone who can read the
+review. A person who may write it (`ShowConclusionEditor`: a slot owner or the lead of the review, who may
+change the review, while the review is not locked) gets the form `review-conclusion-form` with a text area
+`review-conclusion-input` (at most `ReviewLimits.MaxConclusionTextLength` characters) and the button
+`review-conclusion-save`; everybody else, and everybody once the review is locked, sees the text read-only in
+`review-conclusion-text`, or, when no text is written, the empty state `review-conclusion-empty` ("No conclusion
+written."). **SaveConclusionAsync** (behind the form) calls `GuardAsync` and then
+`ChecklistService.SetReviewConclusionTextAsync` with the signed-in user and the typed text. A change that would make a
+current signature out of date (the text is part of the record digest) is not stored at once: Core refuses it with
+`SignaturesWouldBecomeOutOfDate`, the page shows the `SignatureWarning` confirmation inside the form with the affected
+slots, and a confirmation repeats the call with the acknowledged slots; cancelling stores nothing. Any other
+`DomainRuleException` is shown in `review-conclusion-error` with the typed text kept; for `RecordChanged` (someone else
+changed the text) and `ReviewLocked` the page also reloads the review so that the stored text and the lock are shown.
+Success reloads through `RefreshAsync`.
 
 **ChangeDueDateAsync** (behind `SaveDueDateAsync` and `ClearDueDateAsync`): after `GuardAsync`, reads the text with
 `ReviewService.ParseDueDate` (an empty text clears the date) and calls `ReviewService.SetDueDateAsync` with the
@@ -489,7 +525,9 @@ certificate from the `CertificateStore` or `File` provider); and otherwise names
 the subject and the start of the thumbprint of the certificate. Each warning of the status (for example that the
 certificate ends soon) follows as a status notice with the test id `attestation-key-warning`. When the key cannot be
 used the page shows "Attestation
-is unavailable:" with the reason of the provider instead of the link. A review that is not approved shows nothing. The
+is unavailable:" with the reason of the provider instead of the link. A review that is not approved shows nothing, except
+that a review concluded as rejected shows the note `attestation-rejected-note`: "The review was rejected. A signed
+attestation of a rejected review is not available yet." The
 page never signs: the download is a plain authenticated `GET` handled by `AttestationEndpoint`, and the page only
 decides whether to offer it.
 

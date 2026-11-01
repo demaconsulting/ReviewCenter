@@ -1170,7 +1170,8 @@ button:disabled {
     margin-top: 0.75rem;
 }
 
-.badge.failed {
+.badge.failed,
+.badge.rejected {
     border-color: var(--error-border);
     background: var(--error-background);
     color: var(--error-text);

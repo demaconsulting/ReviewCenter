@@ -158,7 +158,7 @@ public class ProjectPageOverviewTests : PageTestBase
         Assert.Equal("0/2", cut.Find("[data-testid='review-progress-REV-B']").TextContent);
         Assert.Equal("1 out of date", cut.Find("[data-testid='review-outofdate-REV-B']").TextContent);
         Assert.Equal("Ann, Bob", cut.Find("[data-testid='review-waiting-REV-B']").TextContent);
-        Assert.Equal("1 open thread, 1 Fail", cut.Find("[data-testid='review-blockers-REV-B']").TextContent);
+        Assert.Equal("1 open thread, conclusion needed", cut.Find("[data-testid='review-blockers-REV-B']").TextContent);
         Assert.Equal("2025-03-03", cut.Find("[data-testid='review-due-REV-B']").TextContent);
         Assert.Equal("Overdue", cut.Find("[data-testid='review-overdue-REV-B']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='review-overdue-REV-A']"));
@@ -246,6 +246,104 @@ public class ProjectPageOverviewTests : PageTestBase
         Assert.Equal("No checklist", text);
         Assert.Equal("-", other);
         Assert.Equal(["REV-NONE"], blocked);
+    }
+
+    /// <summary>
+    ///     Test that a review concluded as rejected shows the Rejected stage with the rejected badge, is found by the
+    ///     rejected stage filter only, is counted in the summary strip, and shows no Fail among its blockers.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_RejectedReview_ShowsStageFilterBadgeAndNoFailBlocker()
+    {
+        // Arrange: a rejected, concluded review and an unsigned one that has a Fail answer without a conclusion text
+        var token = TestContext.Current.CancellationToken;
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, token);
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        await Store.AddMembershipAsync(ann.Id, project.Id, token);
+        foreach (var id in new[] { "REV-X", "REV-Y" })
+        {
+            await Reviews.CreateDraftAsync(project.Id, id, "Review " + id, [new("a.txt", TestContent.A)], token);
+            var slot = await Signing.AddSlotAsync(TestActors.Ann, project.Id, id, ann.Id, null, token);
+            var first = true;
+            foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+            {
+                await Checklists.SetAnswerAsync(
+                    project.Id, id, item.Id, first ? ChecklistOutcome.Fail : ChecklistOutcome.Pass, first ? "Wrong." : null, TestActors.Ann, token);
+                first = false;
+            }
+
+            await Checklists.SubmitBallotAsync(project.Id, id, TestActors.Ann, token);
+            if (id == "REV-X")
+            {
+                await Checklists.SetReviewConclusionTextAsync(project.Id, id, "Not ready.", TestActors.Ann, token);
+                var approval = await Signing.GetApprovalAsync(project.Id, id, token);
+                await Signing.SignAsync(TestActors.Ann, project.Id, id, slot.Id, approval!.Digest, Password, token);
+            }
+        }
+
+        // Act: render all rows and read the cells at once, then the rejected rows
+        var cut = RenderAt(project.Id);
+        var stage = cut.Find("[data-testid='review-approval-REV-X']");
+        var stageText = stage.TextContent;
+        var stageClass = stage.ClassName;
+        var summary = cut.Find("[data-testid='project-summary-rejected']").TextContent;
+        var rejectedBlockers = cut.Find("[data-testid='review-blockers-REV-X']").TextContent;
+        var openBlockers = cut.Find("[data-testid='review-blockers-REV-Y']").TextContent;
+        var rejected = RowsAt(project.Id, "?stage=rejected");
+
+        // Assert: the stage, the badge, the filter, the summary and the blockers
+        Assert.Equal("Rejected", stageText);
+        Assert.Contains("rejected", stageClass, StringComparison.Ordinal);
+        Assert.Equal(["REV-X"], rejected);
+        Assert.Equal("1 rejected", summary);
+        Assert.Equal("-", rejectedBlockers);
+        Assert.Equal("conclusion needed", openBlockers);
+    }
+
+    /// <summary>
+    ///     Test that a review whose only blocker is a disputed check (two submitted ballots disagree) shows the count
+    ///     of disputed checks instead of a dash, and is listed by the blocked filter.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_DisputedCheck_ShowsDisputedCountAsBlocker()
+    {
+        // Arrange: two slots whose submitted ballots differ in exactly one check
+        var token = TestContext.Current.CancellationToken;
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, token);
+        var bob = await Users.CreateAsync("bob", "Bob", UserRole.Reviewer, Password, token);
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        await Store.AddMembershipAsync(ann.Id, project.Id, token);
+        await Store.AddMembershipAsync(bob.Id, project.Id, token);
+        await Reviews.CreateDraftAsync(project.Id, "REV-DISP", "Disputed", [new("a.txt", TestContent.A)], token);
+        await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-DISP", ann.Id, null, token);
+        await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-DISP", bob.Id, null, token);
+        var firstItem = true;
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                project.Id, "REV-DISP", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, token);
+            await Checklists.SetAnswerAsync(
+                project.Id,
+                "REV-DISP",
+                item.Id,
+                firstItem ? ChecklistOutcome.Fail : ChecklistOutcome.Pass,
+                firstItem ? "Wrong." : null,
+                TestActors.Bob,
+                token);
+            firstItem = false;
+        }
+
+        await Checklists.SubmitBallotAsync(project.Id, "REV-DISP", TestActors.Ann, token);
+        await Checklists.SubmitBallotAsync(project.Id, "REV-DISP", TestActors.Bob, token);
+
+        // Act
+        var cut = RenderAt(project.Id);
+        var text = cut.Find("[data-testid='review-blockers-REV-DISP']").TextContent;
+        var blocked = RowsAt(project.Id, "?blocked=1");
+
+        // Assert: the blocker is worded, not a dash, and the review is blocked
+        Assert.Equal("1 disputed", text);
+        Assert.Equal(["REV-DISP"], blocked);
     }
 
     /// <summary>

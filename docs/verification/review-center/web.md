@@ -37,10 +37,14 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   and the project page, with the signer and the record digest on the review page; when the record changes
   afterwards (an administrator reopens the review), both pages present it as In review and the review page shows the
   signature as out of date.
-- An approved review is presented as locked by the review page (badge, banner, disabled controls) and the checklist
+- An approved or rejected review is presented as locked by the review page (badge, banner, disabled controls) and the
+  checklist
   page; an administrator can reopen it from the review page, which then lists the reopen history. The project page
   presents the "Review rules" switch to an administrator, and a change of it changes which users the review page offers
   as reviewers.
+- A review concluded as rejected is presented as Rejected by the review page and the project page, without an
+  attestation, and the review page offers the conclusion card where a slot owner writes the reasons; these are verified
+  by the unit tests of `ReviewPage` and `ProjectPage`.
 - The `Web` subsystem's pages are presented to a signed-in user; the sign-in itself is verified in the `Identity`
   subsystem.
 - When the sign-in state of an open page ends, the page is replaced by the "Session ended" message and offers no
@@ -306,7 +310,8 @@ all three for a review that is not approved are verified by the `ReviewPage` uni
 `ReviewPage_Sign_CorrectPassword_OffersAttestationDownload`), the address by
 `ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress`, and the help topic by
 `HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`. The download itself, over HTTP, is verified in the
-`Evidence` subsystem.
+`Evidence` subsystem. A review concluded as rejected offers no download and shows a note instead, which is verified by
+`ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndNoAttestation`.
 
 **Personal access tokens on the account page**: The token card, the creation that shows the value once, and the
 revocation are verified by the `AccountPage` unit tests, which render the page with the component test host and the real
@@ -337,8 +342,8 @@ the project page are verified by `ProjectPage_Render_ProjectAdmin_ShowsChecklist
 
 **Review due date**: The unit tests of `ProjectPage` (the form for a new review), `PlanPage`, and `ReviewPage` verify the
 subsystem requirement for the optional due date: the date is offered when a review is created or planned and is shown
-with its UTC label, the Overdue badge shows only for a past date on a review that is not approved, and the edit form is
-offered only to an administrator or the creator and never for an approved review. They are tested by
+with its UTC label, the Overdue badge shows only for a past date on a review that is not concluded, and the edit form is
+offered only to an administrator or the creator and never for a concluded review. They are tested by
 `NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview`, `PlanPage_Create_DueDates_DefaultAndRowDate`,
 `ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc`, and
 `ReviewPage_DueDate_CreatorMayEditAndOtherMemberMayNot`.

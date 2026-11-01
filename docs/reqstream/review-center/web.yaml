@@ -59,6 +59,7 @@ sections:
           - ReviewCenter-HelpPage-NotFound
           - ReviewCenter-HelpPage-MembersTopic
           - ReviewCenter-HelpPage-SigningTopic
+          - ReviewCenter-HelpPage-ReadingReviewTopic
           - ReviewCenter-HelpPage-EvidenceSettingsTopic
           - ReviewCenter-App-HelpLink
         tests:
@@ -66,6 +67,7 @@ sections:
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
           - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
           - HelpSigningPage_Render_ExplainsTheReopenerRule
+          - HelpPage_ReadingReview_ShowsSlotOwnerNote
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
           - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
 
@@ -259,17 +261,22 @@ sections:
       - id: ReviewCenter-Web-Signatures
         title: >-
           The Web subsystem shall show on the review page a Reviewers card with the reviewer slots and their
-          signature status, where a reviewer who occupies a slot signs the review after confirming the password,
-          the approval status of the review (Approved or In review) next to its title, and the record digest in
+          signature status, where a reviewer who occupies a slot signs the review after confirming the password, as an
+          approval or, when the ballots agree on a Fail, as a rejection with a conclusion text that the slot owners
+          write in a Review conclusion card,
+          the approval status of the review (Approved, Rejected, or In review) next to its title, and the record digest
+          in
           the Details section, and shall show the approval status of each review on the project page.
         justification: |
-          Re-authenticated signatures are what turns a reviewed record into an approved one. The subsystem test
+          Re-authenticated signatures are what turns a reviewed record into an approved or a rejected one. The
+          subsystem test
           covers what the pages show from the database: the sign form, the approval after a signature, and the
           approval going out of date when the record changes; adding slots and signing need a live connection and
           are verified by the component tests of the page units.
         children:
           - ReviewCenter-ReviewPage-Reviewers
           - ReviewCenter-ReviewPage-Sign
+          - ReviewCenter-ReviewPage-ConclusionCard
           - ReviewCenter-ReviewPage-Digest
           - ReviewCenter-ProjectPage-Approval
           - ReviewCenter-ReviewPage-SignatureWarning
@@ -279,7 +286,8 @@ sections:
 
       - id: ReviewCenter-Web-ReviewLock
         title: >-
-          The Web subsystem shall show a review that is approved as locked on the review page and on the checklist page,
+          The Web subsystem shall show a review that is concluded, approved or rejected, as locked on the review page
+          and on the checklist page,
           with the controls that change the review disabled and the reason given, let an administrator of the project
           or a system administrator reopen the review on the review page with a reason, show the reopenings in a
           history, and show the user who created the review that a different project member has to review and sign

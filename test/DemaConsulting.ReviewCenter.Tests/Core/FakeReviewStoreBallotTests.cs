@@ -92,6 +92,85 @@ public class FakeReviewStoreBallotTests
     }
 
     /// <summary>
+    ///     Test that the fake refuses a signature whose outcome is not the outcome of the record, as the real store does,
+    ///     and accepts one that matches.
+    /// </summary>
+    /// <param name="answer">The answer of the one submitted ballot.</param>
+    /// <param name="signed">The outcome the signature claims.</param>
+    /// <param name="refused"><c>true</c> when the signature is refused.</param>
+    [Theory]
+    [InlineData(ChecklistOutcome.Fail, ReviewOutcome.Approved, true)]
+    [InlineData(ChecklistOutcome.Pass, ReviewOutcome.Rejected, true)]
+    [InlineData(ChecklistOutcome.Fail, ReviewOutcome.Rejected, false)]
+    [InlineData(ChecklistOutcome.Pass, ReviewOutcome.Approved, false)]
+    public async Task FakeReviewStore_AddSignatureAsync_OutcomeVersusRecord_RefusesMismatch(
+        ChecklistOutcome answer,
+        ReviewOutcome signed,
+        bool refused)
+    {
+        // Arrange: a review with a one-check checklist and one handed-in ballot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var project = await store.AddProjectAsync(new Project { Name = "P", Created = _time }, cancellationToken);
+        var definition = new ChecklistDefinition(
+            "one-check",
+            [new ChecklistSection("s", "Section", string.Empty, [new ChecklistItem("s-01", "Check")])]);
+        await store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = project.Id,
+                Id = "REV-1",
+                Title = "Title",
+                State = ReviewState.Draft,
+                Created = _time,
+                ContentFingerprint = TestContent.FingerprintA,
+                Checklist = new ReviewChecklist
+                {
+                    ProjectId = project.Id,
+                    ReviewId = "REV-1",
+                    Version = "one-check",
+                    Definition = definition.ToJson()
+                }
+            },
+            cancellationToken);
+        var slot = await store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = project.Id, ReviewId = "REV-1", PrimaryUserId = 1 }, cancellationToken);
+        await store.SetBallotAnswerAsync(
+            NewAnswer(project.Id, slot.Id, answer, "ann", "s-01"), AuditTestExtensions.Draft(), null, cancellationToken);
+        await store.SubmitBallotAsync(
+            project.Id, "REV-1", slot.Id, _time, "ann", AuditTestExtensions.Draft(), _ => true, cancellationToken);
+        var record = await store.GetRecordAsync(project.Id, "REV-1", cancellationToken);
+        var signature = new ReviewSignature
+        {
+            ProjectId = project.Id,
+            ReviewId = "REV-1",
+            SlotId = slot.Id,
+            UserId = 1,
+            DisplayName = "Ann",
+            Role = SlotRole.Primary,
+            SignedAt = _time,
+            RecordDigest = RecordDigest.Compute(record!),
+            Outcome = signed,
+            Meaning = SigningService.MeaningFor(signed)
+        };
+
+        // Act
+        var attempt = () => store.AddSignatureAsync(signature, AuditTestExtensions.Draft(), cancellationToken);
+
+        // Assert
+        if (refused)
+        {
+            var exception = await Assert.ThrowsAsync<DomainRuleException>(attempt);
+            Assert.Equal(DomainRule.RecordChanged, exception.Rule);
+            Assert.Empty(await store.ListSignaturesAsync(project.Id, "REV-1", cancellationToken));
+        }
+        else
+        {
+            Assert.Equal(signed, (await attempt()).Outcome);
+        }
+    }
+
+    /// <summary>
     ///     Test that the fake keeps one row per check and slot, lists them in the ballot of their slot and keeps them out
     ///     of the review-level rows.
     /// </summary>

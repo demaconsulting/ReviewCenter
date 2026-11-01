@@ -84,7 +84,9 @@ application; the rest of the system sees only the Core store interfaces.
   promoting or demoting a thread sets the flag of its starting comment and its resolution comments in one transaction,
   and setting the flag of one reply does the same for that comment, each with its audit entry and only when the stored
   value changes. A signature is refused with `SigningNotAllowed` when any thread of the review is open, checked in the
-  signing transaction after the digest check. The due date of a review (`DueDate`, a nullable
+  signing transaction after the digest check. A signature is stored with the `Outcome` it attests (approved or
+  rejected), a new column of the `Signatures` table with no migration, so a development database that was created
+  before it is recreated. The due date of a review (`DueDate`, a nullable
   date column of the `Reviews` table) is changed by a compare-and-set (`UpdateDueDateAsync`) that stores the new date
   together with the audit entry `review.due-date-changed` in one transaction, after the same transaction re-checked
   that the review is not concluded (`ReviewLocked` otherwise), and otherwise changes nothing and returns `false`. A
@@ -301,7 +303,8 @@ and would need an equivalent for another provider.
 
 **Approval lock in the transaction**: `ReviewStore` repeats the Core lock rule inside the write transactions that change
 reviewed content or reviewer slots (and inside the reopen). It loads the slots, the record, and the signatures in the
-same serialized transaction and calls the Core `ReviewLock.IsConcluded`, so the store and the services share one
+same serialized transaction and calls the Core `ReviewLock.ConcludedOutcome` (through `IsConcluded`), so the store and
+the services share one
 definition of "concluded". Because the write lock is taken when the transaction begins, a final signature cannot commit
 between the check and the change; this closes the gap that the service-level check, which runs earlier, leaves open.
 This is SQLite specific in the same way as the signing transaction.

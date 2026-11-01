@@ -78,7 +78,17 @@ public sealed class ReviewSignature
     public string RecordDigest { get; init; } = string.Empty;
 
     /// <summary>
-    ///     Gets the statement the signer made (see <see cref="SigningService.MeaningText"/>).
+    ///     Gets the outcome the signer attested: approved or rejected.
+    /// </summary>
+    /// <remarks>
+    ///     It is the agreed outcome of the consolidated ballots of the record the signature points to (the digest
+    ///     covers it, so a signature of the current digest always attests the outcome the record has now). Approved is
+    ///     the default, which is also the value of a review without a checklist.
+    /// </remarks>
+    public ReviewOutcome Outcome { get; init; } = ReviewOutcome.Approved;
+
+    /// <summary>
+    ///     Gets the statement the signer made (see <see cref="SigningService.MeaningFor"/>).
     /// </summary>
     public string Meaning { get; init; } = string.Empty;
 }

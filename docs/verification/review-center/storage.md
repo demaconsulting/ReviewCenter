@@ -38,7 +38,8 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - The checklist snapshot of a review, its answers, and its section decisions, written through the services, are
   still present after the database is closed and opened again.
 - A reviewer slot and the signature made for it, written through the services, are still present after the database
-  is closed and opened again, and the signature is still current, so the review is still approved.
+  is closed and opened again, and the signature is still current, so the review is still approved. The outcome of a
+  signature is kept too: a rejection is still a rejection, and the review is still concluded as rejected and locked.
 - A review for a project that does not exist is refused, by the services and by the database itself, and the stored
   data is unchanged.
 - A registered repository of a project, with its token flag and its disabled state, written through the service, is
@@ -109,6 +110,12 @@ signature is current for the unchanged record. This scenario is tested by
 `StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`. The set-based read of the snapshots of several reviews
 (`ReviewCenter-ReviewStore-SnapshotBatch`) is verified at the unit level, by the scenarios of
 `ReviewStoreSnapshotBatchTests.cs` in the verification of `ReviewStore`.
+
+**StorageSubsystem_Signatures_OutcomePersistsAcrossReopen**: Over a new database, a review has one reviewer slot, every
+check is answered Pass except the first, which is a Fail, the conclusion text is written, and the reviewer signs. The
+database is closed and opened again. The signature still has the rejected outcome, the approval is concluded as
+rejected and is not approved, and adding a thread through the services is refused with `ReviewLocked`. This scenario is
+tested by `StorageSubsystem_Signatures_OutcomePersistsAcrossReopen`.
 
 **StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction**: Over a new database, a review created by
 one user is answered completely and signed by a second user through the services, so that it is approved. The store

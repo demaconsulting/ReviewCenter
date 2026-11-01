@@ -74,11 +74,13 @@ supporting types, documented with the unit that owns them.
 
 - *Type*: In-process .NET class.
 - *Role*: Provider.
-- *Contract*: Give, for every review of a project, its stage (Setup, In review, or Approved, derived from the approval
+- *Contract*: Give, for every review of a project, its stage (Setup, In review, Approved, or Rejected, derived from the
+  approval
   status and not from the stored state), the number of reviewer slots, valid signatures, and out-of-date signatures,
   the names of the people it waits on (a disabled account is marked), the number of open threads, unanswered checks
   (the pending checks of the consolidated checklist), Fail answers, and checks on which the ballots disagree (the
-  counts that `SigningService` also states in the blocker sentences, so the two cannot disagree),
+  counts that `SigningService` also states in the blocker sentences, so the two cannot disagree; a Fail answer is
+  informational and does not block),
   the time of its last activity (the newest audit entry of the review, from one grouped read of the audit trail), and
   its due date and overdue state by the rule of `ReviewService`. It reads the project with a constant number of
   queries, and answers every actor who may see the project (and a project that the actor may not see as one that does
@@ -131,8 +133,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   entered again, or, for a user of an identity provider, with a single-use proof of a fresh confirmation at the
   provider (members only), tell whether such a proof exists without spending it, read the
   approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
-  project, who can be chosen for a slot. A concluded review (every slot has handed in its ballot, the ballots agree and
-  approve, every slot signed for the current record, and no thread
+  project, who can be chosen for a slot. A concluded review (every slot has handed in its ballot, the ballots agree on
+  an outcome, approved or rejected, every slot signed that outcome for the current record, a rejected outcome has a
+  review conclusion text, and no thread
   open) is locked: every change of its threads, checklist answers,
   section applicability, or reviewer slots, and any further signature, is refused with `ReviewLocked`, until a project
   admin or system administrator reopens it with a reason (`ReopenReviewAsync`; never with an API token), which keeps the
@@ -146,9 +149,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   it (`ReopenWouldStrandSlot`, decided by the pure `ReopenRules`). A review has an optional due date, a UTC calendar day
   (`DateOnly`): it can be given when the review is created (`CreateDraftAsync`, `CreateFromRepositoryAsync`, and the
   planner) and is changed or cleared by `SetDueDateAsync` (a project admin, a system administrator, or the user who
-  created the review; never with an API token; refused with `ReviewLocked` when the review is approved; audited as
+  created the review; never with an API token; refused with `ReviewLocked` when the review is concluded; audited as
   `review.due-date-changed`). `IsOverdue` tells whether the due date lies before `TodayUtc`, the current UTC day, and
-  the review is not approved, and an invalid due date is refused with `DueDateInvalid`. A review can be created as a
+  the review is not concluded, and an invalid due date is refused with `DueDateInvalid`. A review can be created as a
   follow-up of an earlier review of the same project (the optional `followsReviewId` of `CreateDraftAsync` and
   `CreateFromRepositoryAsync`): the Pass and N/A answers of checks that are unchanged (as the submitted ballots of the
   earlier review agree on them), the not-applicable sections
@@ -486,7 +489,8 @@ message and keep the entered values, and there is a single, easily tested path f
 | `SlotSigned` | A slot that has any signature is changed or removed |
 | `ActorNotAllowed` | The user is gone, disabled, or not a member where needed, is not in the slot, or signs by token |
 | `RepositoryNameTaken` | A repository with that name (without regard to case) exists in the project |
-| `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
+| `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, disputes, threads) |
+| `ConclusionRequired` | A rejected outcome is signed while the review has no conclusion text and nothing else blocks |
 | `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
 | `RecordChanged` | The record changed after the signer saw it (digest differs), or a setting was changed first |
 | `ReviewLocked` | The review is concluded (locked) and a content, thread, slot, due date, or signature changes |
@@ -538,11 +542,16 @@ that do not apply, and the comments that are included in the report) and is curr
 unchanged. Chat is not in the digest. Slots
 and signatures are never edited into a
 different meaning: a signed slot cannot be changed or removed, a signature is never changed or deleted, and the
-status of a review (Approved or In review) is computed from the record and the signatures each time and never stored.
+status of a review (Approved, Rejected, or In review) is computed from the record and the signatures each time and never
+stored. Every signature records the outcome it attests (`ReviewSignature.Outcome`, approved or rejected). A check
+that the ballots agree on as Fail does not block signing: it makes the outcome rejected, and a rejected outcome is
+signed like an approval but needs a review conclusion text that states the reasons.
 
-An approved review is also locked, and that too is computed, not stored: `ReviewLock.IsConcluded` is the one definition
-(at least one slot, every slot has a submitted ballot, the ballots agree on every check with the approved outcome, every
-slot holds a signature of the current digest, and no thread is open), used by the approval
+A concluded (approved or rejected) review is also locked, and that too is computed, not stored:
+`ReviewLock.ConcludedOutcome` is the one definition (`ReviewLock.IsConcluded` is derived from it:
+at least one slot, every slot has a submitted ballot, the ballots agree on every check with one outcome, every
+slot holds a signature of the current digest that attests that outcome, a rejected outcome has a conclusion text, and
+no thread is open), used by the approval
 status, by the
 `ReviewLocked` check that `ThreadService`, `ChecklistService`, and `SigningService` make before every change, and by the
 `Storage` subsystem inside its write transactions. Reopening is the only way out: an audited action of a project or

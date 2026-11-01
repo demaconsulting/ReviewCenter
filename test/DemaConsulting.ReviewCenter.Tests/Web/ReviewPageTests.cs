@@ -2570,7 +2570,7 @@ public partial class ReviewPageTests : PageTestBase
 
         // Assert: the badge and the explanation
         Assert.Equal("Locked", cut.Find("[data-testid='review-locked']").TextContent);
-        Assert.Contains("approved and locked", cut.Find("[data-testid='review-locked-banner']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("concluded and locked", cut.Find("[data-testid='review-locked-banner']").TextContent, StringComparison.Ordinal);
         Assert.NotNull(cut.Find("[data-testid='slots-locked-hint']"));
 
         // Assert: the controls that change the review are disabled

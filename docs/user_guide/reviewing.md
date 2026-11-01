@@ -1,8 +1,8 @@
 # Reviewing
 
 This chapter describes the daily work of a review: projects and their reviews, planning, comments, the checklist,
-the signatures, the lock of an approved review and how an administrator reopens it, and the signed attestation that
-proves an approval.
+the signatures, the lock of a concluded (approved or rejected) review and how an administrator reopens it, and the
+signed attestation that proves an approval.
 
 ## Projects and Reviews
 
@@ -60,12 +60,13 @@ in **UTC**, not a moment in your time zone: the day changes at midnight UTC, and
   and at most two years ahead; otherwise the review is not created and the page says that the due date is not valid.
   On the plan page a date that is not valid fails only that review.
 - **On the review page**: the header shows "Due YYYY-MM-DD (UTC)" or "No due date". When the date is before today and
-  the review is not approved, an **Overdue** badge is shown next to it.
+  the review is not concluded, an **Overdue** badge is shown next to it.
 - **Changing it**: a project administrator, a system administrator, or the person who created the review can change the
   date in the header (a date input with **Save**, and **Clear** to remove it). A date in the past is accepted when you
   change it, so you can record that a review is late; it is then shown as overdue. Other members see the date and the
   badge but no form. A personal access token cannot change the date.
-- **Approved reviews**: an approved review is locked, so its date cannot be changed (the form is not shown) until an
+- **Concluded reviews**: an approved or rejected review is locked, so its date cannot be changed (the form is not
+  shown) until an
   administrator reopens it. It keeps its date as history and is never shown as overdue.
 - The date is not part of the signed record: changing it does not make a signature out of date. Every change is
   recorded in the audit trail as `review.due-date-changed` with the old and the new date, and the creation entry names
@@ -265,12 +266,15 @@ author of the review. Someone who only wrote a comment in another person's revie
 | To sign | A slot of yours that is unsigned or out of date | "Not signed", "Out of date, sign again" |
 | Replies waiting | An open thread whose latest comment is by someone else | "N waiting" |
 | Failed checks | Checks of your own review that the submitted ballots agree to be Fail | "N failed" |
-| Updates | A review that someone else approved or reopened since you last looked | "Approved" or "Reopened" |
+| Updates | A review someone else concluded or reopened since you last looked | "Approved", "Rejected", "Reopened" |
 
-Only the first three groups need your action. They also show the due date of the review, marked "Overdue" when it is
+Only the first three groups need your action. A failed-checks entry reads "A Fail the reviewers agree on makes the
+review reject; a Fail only one reviewer gave is a disagreement to resolve." The three groups also show the due date of
+the review, marked "Overdue" when it is
 past, and the home page card and the summary line at the top of the inbox count the distinct reviews
 in them. The Updates group is for information: it is not counted, and a row goes away once you open the review.
-An approved review needs no one's action any more, so it appears only as an update for the others. Auditors, who may
+A concluded review needs no one's action any more, so it appears only as an update for the others (a "Rejected" update
+for a review that you rejected-concluded). Auditors, who may
 only read, are shown no signature to give and no reply waiting. An empty inbox says that nothing needs your action.
 
 The **Inbox** tab in the page header shows a small badge with the same number as the home page card, the number of
@@ -320,14 +324,15 @@ an empty file can be commented on as a whole only. A line number must be a whole
 first line must not be after the last line. Leading and trailing spaces of the text are removed. A
 problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
 
-When a review already has a current signature but is not yet approved, the comments you post here are **chat**: a new
+When a review already has a current signature but is not yet concluded, the comments you post here are **chat**: a new
 thread, a reply, a resolve, and a reopen of a thread do not change what the signatures cover, so they never make a
 signature out of date and the page asks for no confirmation. A comment is part of the signed record only when it is
 included in the report, which this version of the pages does not offer; the open threads still block signing and the
 approval (see [Review Signatures](#review-signatures)).
 
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
-changes. While a review is approved it is locked: the comment forms and reply fields are not shown, the line buttons are
+changes. While a review is concluded (approved or rejected) it is locked: the comment forms and reply fields are not
+shown, the line buttons are
 disabled, and no thread can be started, answered, resolved, or reopened (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)). Comments posted by other people appear when you reload
 the page or take an action on it. Comment text is
@@ -403,7 +408,7 @@ ballots differ on a check, the check is disputed and blocks signing until the re
 1. Open a section and choose Pass, Fail, or N/A for each check. A Pass is saved at once. For Fail and N/A a
    justification (up to 2000 characters) is required: type it in the box that appears and press Save. A missing
    justification is reported next to the box, and nothing is saved until it is given. You can change an answer at any
-   time until the review is approved; an approved review is locked and its checklist is read-only (see
+   time until the review is concluded; an approved or rejected review is locked and its checklist is read-only (see
    [Locked Reviews and Reopening](#locked-reviews-and-reopening)). Each answer is stored under your user, together
    with the UTC time, and shown as "Answered by" with your
    display name. If you created the review and the project does not let authors answer (the default; see Review Rules
@@ -417,8 +422,11 @@ ballots differ on a check, the check is disputed and blocks signing until the re
    Switch it on again to answer its checks; the reason is then cleared.
 
 The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it
-counts as answered, and its justification records the finding. A review with a Fail cannot be signed, and the files
-of a review never change, so the usual way on is a new review of the fixed revision (see When a Check Fails in the
+counts as answered, and its justification records the finding. A Fail does not block signing: when the submitted
+ballots agree on a Fail, the review is signed as **Rejected**, with a written conclusion (see
+[Review Conclusion Text](#review-conclusion-text)). The files
+of a review never change, so the usual way on after a rejection is a new review of the fixed revision (see When a Check
+Fails in the
 Review Practices chapter). Any later change to the agreed standing of the submitted ballots, such as a disagreement on a
 check, makes the
 signatures given so far out of date, so answer first and sign last (see Sign Last in the same chapter). When handing in
@@ -434,26 +442,49 @@ page is made for narrow screens too.
 
 ### Review Conclusion Text
 
-A review record can also hold a **review conclusion text**: a short plain-text summary of what the review found
-(up to 4000 characters, line breaks allowed, no formatting). It is written by a primary or alternate reviewer of any
-slot or by the lead of the review (the creator, a project administrator, or a system administrator), and only while
+A review record can also hold a **review conclusion text**: a short plain-text summary of what the review found, the
+reasons for its outcome
+(up to 4000 characters, line breaks allowed, no formatting). It is written in the **Review conclusion** card of the
+review page, by a primary or alternate reviewer of any slot or by the lead of the review (the creator, a project
+administrator, or a system administrator), and only while
 the review is not concluded; a concluded review is locked and refuses the change (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)). An auditor, a member who is not a reviewer of the
-review, and a personal access token cannot write it. Leaving the text blank clears it.
+review, and a personal access token cannot write it. Leaving the text blank clears it. The card shows the saved text
+to everyone who can see the review; the form appears only for the people who may write it, and only while the review
+is not locked.
 
-The text is part of the record that signatures approve, so a change of it makes the signatures given so far out of
-date, and the change first needs the same confirmation as a changed checklist answer, which names every affected slot
-and signer. If someone else changed the text while you worked on it, your change is refused ("record changed") and
+The text is part of the record that signatures cover, so a change of it makes the signatures given so far out of
+date. When signatures exist, **Save** first shows the same confirmation as a changed checklist answer, which names
+every affected slot and signer; **Confirm change** stores the text and **Cancel** stores nothing. If someone else
+changed the text while you worked on it, your change is refused ("record changed") and
 nothing is overwritten. The audit trail records `review.conclusion-changed` with the old and new length of the text,
 never the text itself. A follow-up review starts without a conclusion text; it is not carried over.
 
-This text is not the approved or rejected conclusion of a ballot. In this release there is no page, API call, or
-attestation field for it yet; they follow in a later change, which also plans a rule that a rejected review needs a
-conclusion text before it can be signed.
+### Concluding a Review as Rejected
+
+When the submitted ballots agree on at least one Fail, the review heads for a **Rejected** outcome. A Fail does not
+block signing, but a rejection must state its reasons:
+
+1. Answer the checklist and settle every disagreement between the ballots, so that the ballots agree.
+2. Resolve every open thread.
+3. A reviewer of a slot, or the lead (the creator, a project administrator, or a system administrator), writes the
+   reasons in the **Review conclusion** card and presses **Save**. Until
+   then the slots show "A rejected review needs a conclusion stating the reasons" instead of the sign form, and the
+   project page shows "conclusion needed" as the blocker.
+4. Every slot signs. The sign form says "You are signing: REJECTED" and shows the statement "I have reviewed this record
+   and reject it.".
+
+When every slot has signed the rejection for the current record, the review is concluded as **Rejected**: the review
+page and the project page show a **Rejected** badge, and the review is locked. If the conclusion text is changed after
+signatures exist, the signatures are out of date and are signed again. An administrator can reopen a Rejected review
+like an Approved one. The signed attestation PDF and the evidence index are for Approved reviews only; see
+[Signed Attestation](#signed-attestation). The API field `isApproved` is true for approved reviews only, so a rejected
+review is concluded but not approved (see the Automation chapter).
 
 ## Follow-up Reviews
 
-When a check failed, the files of the review cannot change, so the fix is reviewed in a new review. A **follow-up
+When a check failed, the files of the review cannot change, so the fix is reviewed in a new review (the failed review
+itself can be concluded as Rejected). A **follow-up
 review** is a new review that names the earlier one and takes over what still holds, so the reviewers do not repeat
 their work.
 
@@ -489,13 +520,14 @@ applicable instead.
 
 **What is not carried over.** Fail answers, resolved threads, reviewer slots, signatures, and reopenings. A check that
 failed shows "Failed in review X" with the earlier justification, read-only, until it is answered again here. A carried
-open thread blocks approval until it is resolved, like any other open thread.
+open thread blocks the conclusion until it is resolved, like any other open thread.
 
 **Signing is unchanged.** The follow-up is signed like any review: every check answered in the submitted ballots, no
-Fail, no open thread, and
+open thread, and
 the independence rules apply. Carrying an answer does not make you the answerer of it: the answer still names the
 person who gave it in the earlier review, so the person who creates the follow-up gets no credit for it and no
-exemption from the rules. The earlier review is not changed and stays In review; its attestation is not affected. The
+exemption from the rules. The earlier review is not changed and stays In review (or keeps its own outcome); its
+attestation is not affected. The
 attestation of the follow-up names the review it follows.
 
 **A carried Pass is only as good as the unchanged content.** A Pass is carried when the wording of the check is
@@ -504,11 +536,13 @@ mind, and answer again a check that the fix may affect, because the changes of t
 
 ## Review Signatures
 
-A review is approved when every reviewer slot has handed in its ballot, the ballots agree, every slot has signed the
-current record, and no comment thread is open (the exact rule is in *Out of date and Approved* below). The review page
-shows an **Approved** or **In review** badge
+A review is concluded when every reviewer slot has handed in its ballot, the ballots agree, every slot has signed the
+current record, and no comment thread is open (the exact rule is in *Out of date and Approved* below). It is concluded
+as **Approved** when the ballots agree on an approved outcome and every slot signed approval, and as **Rejected** when
+the ballots agree on at least one Fail and every slot signed rejection. The review page shows an
+**Approved**, **Rejected**, or **In review** badge
 next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the stage of each
-review (see [The Project Page Overview](#the-project-page-overview)). An Approved review is also locked (see
+review (see [The Project Page Overview](#the-project-page-overview)). An Approved or Rejected review is also locked (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
 
 **Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
@@ -521,8 +555,8 @@ a review, and the primary and the alternate must be different users. A slot that
 changed or removed, even if its signature is out of date; to change the reviewers, add a new slot. A reviewer who is
 taken out of a slot that holds a ballot takes the own answers back, and that can change what the signatures of the other
 slots cover; the page then names the affected slots and signers in a warning and asks you to confirm, like for a
-changed answer. The slots of an
-approved review cannot be changed at all (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
+changed answer. The slots of a
+concluded review cannot be changed at all (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
 
 **Independent reviewers.** In a project that requires independent reviewers (the default; see Review Rules in the
 Administration chapter), the person who created the review cannot be the primary or the alternate reviewer of any
@@ -563,8 +597,9 @@ switch the rule off."
 
 **Signing.** The reviewer of a slot sees a signing form on the slot, if the review can be signed. Signing needs
 membership of the project and being the assigned reviewer; a system administrator who is not a member cannot sign. The
-form shows
-the statement of the signature, "I have reviewed this record and approve it.", and asks you to confirm your password.
+form shows which outcome you are signing ("You are signing: APPROVED" or "You are signing: REJECTED") and the
+statement of that signature: "I have reviewed this record and approve it." for approval, and "I have reviewed this
+record and reject it." for rejection. It asks you to confirm your password.
 Enter your password and press **Sign**. A reviewer who has turned on the second factor also types a current code of
 the authenticator app (see Two-Factor Sign-in in the Users and Sign-in chapter). The password is checked like at
 sign-in, so
@@ -572,20 +607,26 @@ wrong passwords count toward the
 same lockout, and it is never stored or shown. A reviewer whose account is at an identity provider has no password; the
 slot offers **Confirm identity with** the provider instead, which sends the person to the provider to sign in again,
 and after that the slot offers **Sign** (see
-Sign In with an OpenID Connect Provider in the Users and Sign-in chapter). A review can be signed only when:
+Sign In with an OpenID Connect Provider in the Users and Sign-in chapter). The outcome is not your choice: it follows
+from the agreed ballots. It is **Rejected** when the submitted ballots agree on at least one Fail, and **Approved**
+otherwise. A review can be signed only when:
 
 - it has a checklist, and every check of an applicable section is answered;
 - your own ballot is submitted (in a review with one slot the answer that completes it does that, or **Submit ballot**
   for a complete draft that no answer produced; the other reviewers may still be
   at work, which allows early signing, and a later disagreement then makes your signature out of date);
 - no check of an applicable section is disputed between the submitted ballots;
-- no check of an applicable section is answered Fail (the files of a review never change, so after a Fail the usual
-  way on is a new review of the fixed revision; see When a Check Fails in the Review Practices chapter); and
-- no thread is open.
+- no thread is open; and
+- for a Rejected outcome, the review has a written conclusion text (see
+  [Review Conclusion Text](#review-conclusion-text)).
+
+A Fail answer does not hold back the signature: it decides the outcome. The number of failed checks is shown for
+information only.
 
 While one of these holds back the signature, the slot lists what is left instead of the form (for example "2 threads
-are open"). Each signature records your name, your role in the slot (primary or alternate), the UTC time, and the
-statement.
+are open"). When the only thing missing is the conclusion text, the slot says "A rejected review needs a conclusion
+stating the reasons". Each signature records your name, your role in the slot (primary or alternate), the UTC time, the
+outcome you signed (Approved or Rejected), and the statement.
 
 ![The signing form of a reviewer slot with the statement and password confirmation.](images/signature-confirmation.png)
 
@@ -607,17 +648,23 @@ signatures given so far out of date. Chat, and whether a thread is open or resol
 they never do; an open thread blocks signing instead. If the record
 changes while you are signing, the signature is refused and you are asked to review it and try again.
 
-**Out of date and Approved.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the current
+**Out of date, Approved, and Rejected.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the
+current
 record, "Signature out of date" when it has signatures but the record has changed since (for example a changed
 answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot, every slot has submitted
-its ballot, the ballots agree on every check, every slot is
-signed for the current record, and no thread is open. A review whose slots are all signed but that has an open thread
-is not approved and not locked; the thread must be resolved first. While some slots are still unsigned, a change to the
+its ballot, the ballots agree on every check with no Fail, every slot is
+signed as approved for the current record, and no thread is open. It is **Rejected** when the ballots agree on at least
+one Fail, every slot is signed as rejected for the current record, no thread is open, and the review has a conclusion
+text. The outcome is part of the record: when a change of the answers turns an approval into a rejection (or the
+other way), the signatures given so far are out of date and are signed again. A review whose slots are all signed but
+that has an open thread
+is neither approved nor rejected and not locked; the thread must be resolved first. While some slots are still
+unsigned, a change to the
 record makes the signatures given
 so far out of date, and the reviewers sign the new record again; the earlier signatures stay as history. Before the
 page stores such a change it names the affected slots and signers in a warning and asks you to confirm it; see
 *What Makes a Signature Out of Date* in the Review Practices chapter. Once the
-review is Approved it is locked and cannot change any more, unless an administrator reopens it (see
+review is Approved or Rejected it is locked and cannot change any more, unless an administrator reopens it (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)); it then goes back to In review.
 
 ![The Reviewers and signing card of an approved review, with both slots signed.](images/review-signatures.png)
@@ -627,46 +674,51 @@ default), and the page is replaced by the Session ended message. Until then the 
 not re-checked, such as answering checks and adding comments and threads. Signing and changing reviewer slots check
 the account again on every action and are refused for a disabled user at once.
 
-Approved is computed each time from the record, the signatures, and the open threads; it is not a stored state of the
-review, and neither
-is the lock that follows from it: a review is locked exactly while it is Approved. Every
+Approved and Rejected are computed each time from the record, the signatures, and the open threads; they are not stored
+states of the review, and neither
+is the lock that follows from them: a review is locked exactly while it is Approved or Rejected. Every
 signature is also recorded in the audit trail, which is described in Audit Trail in the Administration chapter. An
 Approved
 review can be downloaded as a digitally signed PDF; see the section Signed Attestation.
 
 ## Locked Reviews and Reopening
 
-An approved review is **locked**. The lock is not a separate state: a review is locked while it has at least one
-reviewer slot, every slot has a submitted ballot and the ballots agree, every slot holds a signature of the current
-record, and no comment thread is open, which is the same
-condition as **Approved**.
-The review page then shows a **Locked** badge next to the Approved badge and a notice: "This review is approved and
-locked. Its content, checklist and reviewers can no longer change. A project administrator can reopen it; the
-signatures are then kept as history and the review must be signed again." The checklist page shows a similar notice.
+A concluded review is **locked**: a review that is Approved or Rejected. The lock is not a separate state: a review is
+locked while it has at least one
+reviewer slot, every slot has a submitted ballot and the ballots agree, every slot holds a signature of the same
+outcome (approved or rejected) for the current record, and no comment thread is open (a rejected review also needs its
+conclusion text), which is the same
+condition as **Approved** or **Rejected**.
+The review page then shows a **Locked** badge next to the Approved or Rejected badge and a notice: "This review is
+concluded and locked. Its content, checklist and reviewers can no longer change. A project administrator can reopen
+it; the signatures are then kept as history and the review must be signed again." The checklist page shows a similar
+notice: "This review is concluded (approved or rejected) and locked, so the checklist is read-only.".
 
-**What is refused.** While a review is locked, ReviewCenter refuses every change of what was approved, whoever asks
+**What is refused.** While a review is locked, ReviewCenter refuses every change of what was concluded, whoever asks
 and from wherever:
 
 - starting a comment thread, replying to a thread, resolving a thread, and reopening a thread;
 - answering a check, and switching a checklist section between applicable and not applicable (with its reason);
-- adding, changing, and removing a reviewer slot; and
+- adding, changing, and removing a reviewer slot;
+- writing or changing the review conclusion text; and
 - signing (there is nothing left to sign).
 
 The buttons and fields that do this are disabled on the review page, the checklist page and the line comment buttons
 of the diff, with an explanation, and a request that gets through anyway (for example from a page that was opened
-before the review was approved) is refused with the message "This review is concluded and locked. A project
-administrator must reopen it before it can change." Signing an approved review is refused with the same message. The
+before the review was concluded) is refused with the message "This review is concluded and locked. A project
+administrator must reopen it before it can change." Signing a concluded review is refused with the same message. The
 files and the selection of a review are fixed when it is created, so there is nothing to lock there. Everything that
 only reads keeps working on a locked review: reading the files, the diff, the threads and the checklist, copying
-links, the signed attestation PDF, and the evidence index. Project settings and project members are not part of a
-review and are not locked.
+links, the signed attestation PDF of an Approved review, and the evidence index. Project settings and project members
+are not part of a review and are not locked.
 
 A review in which only some of the slots are signed is **not** locked: it can still change, and a change makes the
 signatures that were given out of date (see [Review Signatures](#review-signatures)). The lock begins with the last
 signature.
 
-**Reopening.** The only way out of the lock is an explicit, recorded action. A project administrator or a system
-administrator opens the locked review and, in the locked notice at the top of the page, enters a **Reason for
+**Reopening.** The only way out of the lock is an explicit, recorded action, and it works the same for an Approved and a
+Rejected review. A project administrator or a system administrator opens the locked review and, in the locked notice at
+the top of the page, enters a **Reason for
 reopening** (required, 1 to 250 characters) and presses **Reopen review**. Other users do not see the form. An API
 token cannot reopen a review: it is a step of the web pages, and a request with a token is refused. A reopen of a
 review that is not locked is refused with "The review is not locked, so there is nothing to reopen.", and an empty or
@@ -677,7 +729,7 @@ reopened cannot sign again above).
 
 **What a reopen does.**
 
-- The review is In review again and can change: threads, checklist and reviewers work as before.
+- The review is In review again and can change: threads, checklist, reviewers, and the conclusion text work as before.
 - The signatures that were given stay in the record as history, but they are **out of date** for good. A reopen
   changes the record digest (the number of reopens is part of it), so no earlier signature can become current again,
   not even when the content is changed back to what it was. The slots show "Signature out of date". The reviewers
@@ -692,7 +744,7 @@ reopened cannot sign again above).
   reopened has no such section. The name of the person who reopened follows the reviewer names setting of the project
   (see Evidence Settings in the Administration chapter).
 
-The review can be approved and locked again by new signatures, and reopened again; each reopen is one more entry of
+The review can be concluded and locked again by new signatures, and reopened again; each reopen is one more entry of
 the history. A review that was reopened is not in the evidence index until it is approved again.
 
 **The project page shows who is holding a review up.** Every review row of the project page is described in
@@ -708,32 +760,36 @@ the **+ New review** and **Plan reviews** controls, with a read-only notice, and
 project is told that the
 project does not exist.
 
-- **Summary.** Above the table, four counts: reviews in setup, in review, approved, and overdue.
+- **Summary.** Above the table, the counts of reviews in setup, in review, approved ("N approved"), rejected
+  ("N rejected"), and overdue.
 - **Columns.** *Review* (the identifier, the title, and the creation date; the identifier links to the review, and a
   follow-up names the review it follows), *Stage*, *Signatures*, *Blockers*, *Waiting on*, *Last activity*, and *Due*.
 - **Stage.** **Setup** is a review without a reviewer slot. **In review** has slots that are not all signed, or a
-  signature that went out of date. **Approved** has every slot signed on the current record and nothing that blocks it
-  (every slot has also handed in its ballot).
-  A review that an administrator reopened also shows a **Reopened** badge. The stage is worked out from the
-  signatures, not stored.
+  signature that went out of date. **Approved** has every slot signed as approved on the current record and nothing
+  that blocks it (every slot has also handed in its ballot). **Rejected** has every slot signed as rejected on the
+  current record, no open thread, and a written conclusion; it carries a **Rejected** badge. A review that an
+  administrator reopened also shows a **Reopened** badge. The stage is worked out from the signatures, not stored.
 - **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature became out of date
   (the record changed after it was given), `1 out of date`. A review without slots shows a dash.
-- **Blockers.** What prevents approval: a missing checklist ("No checklist"), the open comment threads, the
-  unanswered checklist checks, the checks that the submitted ballots disagree on (disputed), and the checks that they
-  agree to be Fail. The checks are counted from the consolidated checklist of the submitted ballots; the draft of a
-  reviewer never changes them (in a review with one slot the answers count before the hand-in). A dash means nothing
-  blocks the review.
+- **Blockers.** What prevents the review from being concluded: a missing checklist ("No checklist"), the open comment
+  threads, the unanswered checklist checks, the checks that the submitted ballots disagree on (disputed, such as
+  `1 disputed`), and "conclusion needed" when the ballots agree on a Fail and the review has no conclusion text yet.
+  The checks are counted from the consolidated checklist of the submitted ballots; the draft of a reviewer never
+  changes them (in a review with one slot the answers count before the hand-in). A dash means nothing blocks the
+  review. A Fail answer is not a blocker; it leads to a rejected review.
 - **Waiting on.** The people who still have to sign: the primary reviewer, and a different alternate, of each slot that
-  is not signed or is out of date. A disabled account is shown with "(disabled)". An approved review waits on nobody.
+  is not signed or is out of date. A disabled account is shown with "(disabled)". A concluded review waits on nobody.
 - **Last activity.** The time (UTC) of the newest entry of the audit trail of the review, or its creation time.
-- **Due.** The due date, with the **Overdue** badge when it is before today in UTC and the review is not approved (see
+- **Due.** The due date, with the **Overdue** badge when it is before today in UTC and the review is not concluded (see
   [Due Dates](#due-dates)).
 
-Above the table a filter bar narrows the list by **stage**, **Overdue only**, **Blocked only**, and a text that is
+Above the table a filter bar narrows the list by **stage** (setup, in review, approved, or rejected), **Overdue only**,
+**Blocked only**, and a text that is
 searched in the identifier and the title; **Clear filters** removes them. The headers *Review*, *Stage*,
 *Signatures*, *Last activity*, and *Due* sort the table; selecting the sorted header again reverses the order. The table
 shows 25 reviews to a page with **Previous** and **Next**. The filters, the sort, and the page are kept in the address
-(`?stage=in-review&overdue=1&blocked=1&q=text&sort=due&dir=desc&page=2`), so you can bookmark a view or send it to
+(`?stage=in-review&overdue=1&blocked=1&q=text&sort=due&dir=desc&page=2`; `?stage=rejected` lists the rejected reviews),
+so you can bookmark a view or send it to
 someone.
 
 ## Signed Attestation
@@ -764,6 +820,12 @@ one exception is the API route of the PDF in a project whose administrators turn
 (see Evidence Settings in the Administration chapter): anyone can then download it without signing in, and the
 download is
 recorded as `attestation.generated` by `anonymous`.
+
+**A rejected review has no attestation yet.** The signed attestation is for Approved reviews only. The page of a
+**Rejected** review shows the note "The review was rejected. A signed attestation of a rejected review is not available
+yet." instead of the button. A request for its `attestation.pdf` is refused with that sentence (status 409), and an
+anonymous caller gets 404, as for any review that is not complete. The same holds for the evidence index (see the
+Automation chapter): a rejected review is never listed in it.
 
 ![An approved review with the Download attestation (PDF) button and the signing key note.](images/review-signed.png)
 

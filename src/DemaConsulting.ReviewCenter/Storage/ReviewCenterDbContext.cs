@@ -45,8 +45,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     indexes of the reviewer slots and of the creator of reviews (and for the case-insensitive collation of the
 ///     creator column) and of the audit trail (the project, actor and action indexes and the fixed-width UTC text
 ///     form of the entry timestamp) and for the <c>LastSignInUtc</c> column of users, and for the <c>IncludeInReport</c>
-///     and <c>Kind</c> columns of comments and for the <c>ReviewConclusionText</c> column of reviews: a database from
-///     before them
+///     and <c>Kind</c> columns of comments and for the <c>ReviewConclusionText</c> column of reviews and for the
+///     <c>Outcome</c> column of signatures: a database from before them
 ///     must be deleted and recreated. Instances are
 ///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
@@ -535,6 +535,8 @@ internal sealed class ReviewCenterDbContext : DbContext
             signature.Property(s => s.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             signature.Property(s => s.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
             signature.Property(s => s.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
+            // The outcome is stored as its number, which ReviewOutcome promises never to renumber
+            signature.Property(s => s.Outcome).IsRequired().HasConversion<int>();
             signature.Property(s => s.RecordDigest).IsRequired().HasMaxLength(Sha256HexColumnLength);
             signature.Property(s => s.Meaning).IsRequired().HasMaxLength(SignatureMeaningColumnLength);
             signature.HasIndex(s => new { s.SlotId, s.RecordDigest }).IsUnique();

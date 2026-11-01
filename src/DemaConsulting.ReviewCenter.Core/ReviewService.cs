@@ -572,14 +572,14 @@ public sealed class ReviewService
     public DateOnly TodayUtc => DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime);
 
     /// <summary>
-    ///     Tells whether a review is overdue: it has a due date before today (UTC) and is not approved.
+    ///     Tells whether a review is overdue: it has a due date before today (UTC) and is not concluded.
     /// </summary>
     /// <param name="review">The review. Must not be null.</param>
     /// <param name="isApproved">
-    ///     Whether the review is approved now (see <see cref="ReviewLock.IsConcluded"/>). An approved review is never
-    ///     overdue; its date is kept as history.
+    ///     Whether the review is concluded now, as approved or as rejected (see <see cref="ReviewLock.IsConcluded"/>).
+    ///     A concluded review is never overdue; its date is kept as history.
     /// </param>
-    /// <returns><c>true</c> when the review has a due date that lies before today (UTC) and is not approved.</returns>
+    /// <returns><c>true</c> when the review has a due date that lies before today (UTC) and is not concluded.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="review"/> is null.</exception>
     public bool IsOverdue(Review review, bool isApproved)
     {
@@ -724,7 +724,7 @@ public sealed class ReviewService
     ///     are stored in one transaction, as a compare-and-set on the value this method read, so the entry always names
     ///     the value that was really replaced. The date is not part of the record digest, so no signature is affected.
     ///     A past date is allowed (a lead may record that something was due last week); one that is more than
-    ///     <see cref="MaxDueDateYearsAhead"/> years ahead is not. An approved review is locked and refuses the change;
+    ///     <see cref="MaxDueDateYearsAhead"/> years ahead is not. A concluded (approved or rejected) review is locked and refuses the change;
     ///     after a reopen the date can be changed again.
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
@@ -733,7 +733,7 @@ public sealed class ReviewService
     ///     <see cref="DomainRule.ReviewNotFound"/> when the review does not exist,
     ///     <see cref="DomainRule.ActorNotAllowed"/> for an API token or a member who is neither administrator nor creator,
     ///     <see cref="DomainRule.DueDateInvalid"/> for a date too far ahead, <see cref="DomainRule.ReviewLocked"/> when the
-    ///     review is approved, and <see cref="DomainRule.RecordChanged"/> when someone else changed the date at the same
+    ///     review is concluded, and <see cref="DomainRule.RecordChanged"/> when someone else changed the date at the same
     ///     moment; nothing is stored then.
     /// </exception>
     public async Task<bool> SetDueDateAsync(

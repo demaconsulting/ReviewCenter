@@ -1,6 +1,6 @@
 @* ProjectPage: one project with its reviews, at "/projects/{id}". The reviews are the whole page: a progress table
    (review id with title and creation date, stage, signatures such as 2/3 with a note for out-of-date ones, blockers
-   (open threads, unanswered checks, Fail answers), who a review is waiting on, last activity and due date with an
+   (open threads, unanswered checks, disputed checks), who a review is waiting on, last activity and due date with an
    Overdue badge), each row a link to the review. Above the table sit a summary strip (reviews per stage and overdue)
    and a filter bar (stage, overdue only, blocked only, text search); the column headers sort; 25 reviews make a page.
    All of that lives in the query string (?stage=&overdue=1&blocked=1&sort=&dir=&q=&page=), so each view has an address.
@@ -118,6 +118,7 @@
                 <span class="badge" data-testid="project-summary-setup">@summary.Setup in setup</span>
                 <span class="badge" data-testid="project-summary-in-review">@summary.InReview in review</span>
                 <span class="badge approved" data-testid="project-summary-approved">@summary.Approved approved</span>
+                <span class="badge rejected" data-testid="project-summary-rejected">@summary.Rejected rejected</span>
                 <span class="badge @(summary.Overdue > 0 ? "failed" : null)" data-testid="project-summary-overdue">@summary.Overdue overdue</span>
             </p>
 
@@ -129,6 +130,7 @@
                         <option value="setup" selected="@(StageFilter == ReviewStage.Setup)">Setup</option>
                         <option value="in-review" selected="@(StageFilter == ReviewStage.InReview)">In review</option>
                         <option value="approved" selected="@(StageFilter == ReviewStage.Approved)">Approved</option>
+                        <option value="rejected" selected="@(StageFilter == ReviewStage.Rejected)">Rejected</option>
                     </select>
                 </label>
                 <label class="switch">
@@ -190,7 +192,7 @@
                                         <time class="muted" datetime="@review.Created.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" data-testid="review-created-@review.ReviewId">@review.Created.UtcDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)</time>
                                     </td>
                                     <td>
-                                        <span class="badge @(review.IsApproved ? "approved" : null)" data-testid="review-approval-@review.ReviewId">@StageLabel(review.Stage)</span>
+                                        <span class="badge @StageBadgeClass(review.Stage)" data-testid="review-approval-@review.ReviewId">@StageLabel(review.Stage)</span>
                                         @if (review.Reopened)
                                         {
                                             <span class="badge pending" data-testid="review-reopened-@review.ReviewId">Reopened</span>

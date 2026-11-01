@@ -38,10 +38,10 @@ are assigned in posting order and never reused, so one integer per review tells 
   unknown name), a user who must change a temporary password, and a user who may see no project.
 - *Algorithm*: Find the user from the actor. List the projects the user may see (through `IProjectAccess`) and the
   reviews in which the user is a reviewer or the creator (`IInboxStore.ListInvolvedReviewsAsync`), keep those of visible
-  projects, and read the read-state rows of the user. For each such review load one snapshot, because the approval
-  depends on the record digest, on the ballots, and on the open threads (a review is concluded, and so approved, only
-  when every slot has handed in its ballot, the ballots agree on an approved outcome, every slot is signed for the
-  current record and no thread is open; `ReviewLock.IsConcluded`), and add rows by these rules:
+  projects, and read the read-state rows of the user. For each such review load one snapshot, because the conclusion
+  depends on the record digest, on the ballots, and on the open threads (a review is concluded, as approved or as
+  rejected, only when every slot has handed in its ballot, the ballots agree on the outcome, every slot is signed for
+  the current record with that outcome and no thread is open; `ReviewLock.IsConcluded`), and add rows by these rules:
   - *To sign*: the user may contribute and is a member, the review is not concluded, and a slot of the user (primary
     or alternate) is not signed. The row does not wait for the ballot of the slot: it is listed whether or not the
     slot has handed its ballot in, and the review page says what blocks the signature. The chip is "Not signed", or
@@ -55,9 +55,14 @@ are assigned in posting order and never reused, so one integer per review tells 
   - *Failed checks*: the user created the review, it is not concluded, and its consolidated checklist (the standing
     of the submitted ballots, see `BallotProjection`) has checks that the ballots agree are Fail in a section that
     applies. A check that the ballots dispute is not a failed check, a draft ballot counts for nothing, and the one
-    ballot of a review with a single slot counts even before the hand-in, as everywhere else. The chip gives the number.
+    ballot of a review with a single slot counts even before the hand-in, as everywhere else. The chip gives the number,
+    and the detail sentence is "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is
+    a disagreement to resolve." because a Fail answer no longer blocks signing but, when the ballots agree on it, leads
+    to a rejected outcome. A concluded review has no failed-checks row and no to-sign row.
   - *Updates*: the review is concluded and its completing signature (the latest of the current digest) is by someone
-    else and newer than `LastSeenAt`, or it was reopened by someone else after that time. A signature of the user's
+    else and newer than `LastSeenAt`, or it was reopened by someone else after that time. The chip is "Approved"
+    (`ApprovedChip`) for an approved review and "Rejected" (`RejectedChip`) for a review concluded as rejected, so a
+    rejection is shown as an update and never as an action. A signature of the user's
     own is no news. Updates are always unread, carry no due mark, and are not counted as action.
 
   The due date is shown on the action rows, as overdue when it is past and the review is not concluded.
@@ -106,8 +111,8 @@ enters the record digest.
 - **IProjectAccess** — decides which projects the user may see and whether the user may contribute.
 - **IUserStore** — finds the user of an actor.
 - **RecordDigest**, **ReviewLock** and **BallotProjection** — the current digest and the conclusion
-  (`ReviewLock.IsConcluded`) of a review, and the consolidated checklist that the failed-checks row reads, so the inbox
-  and the review page never disagree.
+  (`ReviewLock.ConcludedOutcome`) of a review, and the consolidated checklist that the failed-checks row reads, so the
+  inbox and the review page never disagree.
 - **TimeProvider** — the read times and the due dates.
 
 #### Callers

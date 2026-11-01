@@ -6,33 +6,38 @@
 
 `ReviewProgressService` answers one question for the project overview and the API list: where does every review of this
 project stand, and who is holding it up? For each review it reports the stage, how many signatures there are of the
-number needed (and how many are out of date), the people the review waits on, what blocks its approval (open threads,
-unanswered checks, checks answered Fail, checks on which the ballots disagree), when it last changed, its due date and
-whether it is overdue. The unit also
+number needed (and how many are out of date), the people the review waits on, what blocks its conclusion (open threads,
+unanswered checks, checks on which the ballots disagree, a missing conclusion text of a rejected review), how many
+checks are answered Fail (informational), when it last changed, its due date and whether it is overdue. The unit also
 owns the `ReviewStage` and `ReviewProgress` types that carry the answer. It computes everything on demand from what is
 already stored and keeps no state of its own, so the overview cannot disagree with the review page. Who may see a project
 is decided by `ProjectAccess`; this unit only asks.
 
 #### Data Model
 
-**ReviewStage**: `Setup` (no reviewer slot yet), `InReview` (at least one slot, not approved), and `Approved`. The stage
+**ReviewStage**: `Setup` (no reviewer slot yet), `InReview` (at least one slot, not concluded), `Approved`, and
+`Rejected` (concluded with every signature attesting the outcome rejected). The stage
 is derived and is never the stored state of the review, which only says whether a review is open: a review that was
-reopened after its approval is open again, so it is `InReview`.
+reopened after it was concluded is open again, so it is `InReview`.
 
 **ReviewProgress**: an immutable record with `ReviewId`, `Title`, `Stage`, `SlotsRequired`, `SlotsSigned`,
 `SlotsOutOfDate`, `WaitingOn` (display names), `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `NoChecklist`,
-`Created`, `LastActivity`, `DueDate`, `IsOverdue`, `IsApproved`, `Reopened`, `IsBlocked`, and `FollowsReviewId`.
-`IsBlocked` is true for a review that is not approved and has no checklist, or has any open thread, unanswered check,
-Fail answer, or disputed check.
+`Created`, `LastActivity`, `DueDate`, `IsOverdue`, `Conclusion` (a `ReviewConclusion`), `Reopened`, `IsBlocked`,
+`FollowsReviewId`, `ConclusionRequired`, and `DisputedChecks` (the checks on which the submitted ballots disagree, so
+a review blocked only by a dispute can say so). `IsApproved` (conclusion approved) and `IsConcluded` (approved or
+rejected) are derived from `Conclusion`. `FailedChecks` is informational: a Fail answer does not block.
+`IsBlocked` is true for a review that is not concluded and has no checklist, or has any open thread, unanswered or
+disputed check, or a rejected outcome that still needs its conclusion text (`ConclusionRequired`).
 
-**Blocker counts**: the counts and the flag are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`,
-`FailedChecks`, `DisputedChecks`, `MissingChecklist`; the flag is copied to `NoChecklist`). The check counts are those
+**Blocker counts**: the counts and the flags are fields of `ReviewApproval` (`OpenThreads`, `UnansweredChecks`,
+`FailedChecks`, `DisputedChecks`, `MissingChecklist`, `ConclusionRequired`; the missing-checklist flag is copied to
+`NoChecklist`). The check counts are those
 of the consolidated checklist (see *Ballot Consolidation Design*), which reads only the submitted ballots, so a draft
 ballot does not change them (a review with a single slot is the exception: its one ballot counts before the hand-in).
 `UnansweredChecks` is the number of pending checks (a check that not every submitted ballot has answered, which is also
 every check while no ballot is submitted), `FailedChecks` the checks on which the submitted ballots agree on Fail, and
-`DisputedChecks` the checks that the submitted ballots answered differently. The progress record has no field for the
-disputed count: a review with a disputed check is only marked blocked (the blocker sentence on the review page names
+`DisputedChecks` the checks that the submitted ballots answered differently. The progress record carries
+`DisputedChecks` too, so a review blocked only by a dispute can say so (the blocker sentence on the review page names
 the number). `SigningService` calculates them in the one
 step that also writes the blocker sentences (`BuildApproval`), so the numbers, the flag, and the sentences cannot
 disagree: `MissingChecklist` is true exactly when "This review has no checklist." is a blocker. This unit only copies
@@ -84,17 +89,19 @@ reopened), and one read of the last activity. A review
 that is removed between the first two reads is left out. The page that lists the reviews of a project used to ask for the
 approval of each review on its own; it now uses this one call.
 
-**Stage**: no slot gives `Setup`; otherwise an approved review gives `Approved` and every other `InReview`. A review
-whose slots are all signed but that has an open thread, a pending or disputed check, or a ballot that is not handed in is
-not approved, so it is `InReview` (the blockers of the first kind are counted and block it until they are settled).
+**Stage**: no slot gives `Setup`; otherwise an approved review gives `Approved`, a rejected review gives `Rejected`, and
+every other `InReview`. A review whose slots are all signed but that has an open thread, a pending or disputed check, or
+a ballot that is not handed in is not concluded, so it is `InReview` (the blockers of the first kind are counted and
+block it until they are settled).
 
-**WaitingOn**: for an unapproved review, the primary reviewer and, when it is another person, the alternate reviewer of
+**WaitingOn**: for a review that is not concluded, the primary reviewer and, when it is another person, the alternate
+reviewer of
 every slot that is not signed or whose signature is out of date, each person once, in slot order. A person whose account
-is disabled is shown with `DisabledSuffix`, because the slot has to be reassigned and not waited for. An approved review
+is disabled is shown with `DisabledSuffix`, because the slot has to be reassigned and not waited for. A concluded review
 waits on nobody.
 
 **Overdue**: decided by `ReviewService.IsOverdue`, the rule of the review page (the day after the due date, until the
-review is approved), so the overview and the review page agree.
+review is concluded), so the overview and the review page agree.
 
 #### Error Handling
 

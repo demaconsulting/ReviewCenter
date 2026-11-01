@@ -89,7 +89,7 @@ the Users and Sign-in chapter).
 | Read and export the audit trail of the project       | no     | yes     | yes           | yes          |
 | Change evidence settings of a project                | no     | no      | yes           | yes          |
 | Change the review rules of a project                 | no     | no      | yes           | yes          |
-| Reopen an approved (locked) review                   | no     | no      | yes           | yes          |
+| Reopen a concluded (locked) review                   | no     | no      | yes           | yes          |
 
 **Hidden means missing.** A project you cannot see looks exactly like a project that does not exist. The project
 pages say "Project N does not exist.", and the API and the PDF routes answer **404**, never 403, so a refused request
@@ -171,7 +171,7 @@ account is created, or a role is changed; each change is recorded as `project.me
 or `project.member-role-changed` with the role name. An Auditor is a read-only member (see the table in
 [Access and Visibility](#access-and-visibility)), is not offered as a reviewer, and cannot sign. A member who still
 owes work cannot be made an Auditor: while the member is the primary or alternate reviewer of a slot that is not signed
-or whose signature is out of date, on a review that is not approved, the change is refused and the message lists the
+or whose signature is out of date, on a review that is not concluded, the change is refused and the message lists the
 reviews. To resolve it, reassign or remove the slot (a member who can work in the project, on the review page), or
 let the member
 sign, and then change the role again. A new account never has such a slot (a removed member who comes back as an
@@ -472,9 +472,10 @@ with the project and the detail `RequireNonAuthorChecklistAnswers on->off` or `R
 `off->on`). The same rules apply as for the first switch: only a project administrator or a system administrator
 changes them, and a personal access token cannot. Over the API, a refusal for one of these rules is a 409 problem.
 
-## Reopening an Approved Review
+## Reopening a Concluded Review
 
-An approved review is locked: ReviewCenter refuses every change of its threads, checklist, and reviewer slots (see
+An approved or rejected review is locked: ReviewCenter refuses every change of its threads, checklist, and reviewer
+slots (see
 Locked Reviews and Reopening in the Reviewing chapter). A project administrator or a system administrator can reopen it.
 Open the review; in the locked notice, enter a **Reason for reopening** (required, 1 to 250 characters) and press
 **Reopen review**. Ordinary members do not see the form, and a personal access token cannot reopen a review.
@@ -486,7 +487,7 @@ Open the review; in the locked notice, enter a **Reason for reopening** (require
   `previous digest <digest>; reason: <reason>`. The review page lists the reopens in its **Reopen history**, and the
   attestation PDF of a review that was reopened and approved again has a **Reopen history** section.
 - A reopen of a review that is not locked is refused: "The review is not locked, so there is nothing to reopen.".
-- Reopen only when the approval must really be undone: it makes every signature of the review worthless for the
+- Reopen only when the conclusion must really be undone: it makes every signature of the review worthless for the
   current record, and nothing takes the reopen back.
 
 ## Inbox and Read State

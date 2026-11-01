@@ -44,8 +44,9 @@ are of the change itself.
 `UpdateDueDateAsync`, and `UpdateReviewConclusionTextAsync` call
 the private `EnsureNotLockedAsync` first, inside the same serialized transaction as the change. It loads the slots, the
 record (with its reopen count), and the signatures with the same code as `AddSignatureAsync`, and asks the Core
-`ReviewLock.IsConcluded`, the one definition of "concluded" (every slot has a submitted ballot, the ballots agree with
-the approved outcome, every slot signed for the current record, and no thread
+`ReviewLock.ConcludedOutcome` (through `IsConcluded`), the one definition of "concluded" (every slot has a submitted
+ballot, the ballots agree on an outcome, approved or rejected, every slot signed that outcome for the current record, a
+rejected outcome has a conclusion text, and no thread
 open), so the store and the services cannot disagree. When the review
 is concluded it raises `DomainRuleException` with `ReviewLocked` (the message of `ReviewLock.LockedMessage`), and the
 transaction rolls back: nothing is stored and no audit entry is written. A review without slots is never concluded, and
@@ -402,7 +403,8 @@ The store offers no update and no delete of a signature: signatures are append-o
 **AddSignatureAsync**: Stores a signature if and only if its digest is the digest of the record as stored at that
 moment.
 
-- *Parameters*: `ReviewSignature signature` — the signature to store, carrying the digest the signer saw.
+- *Parameters*: `ReviewSignature signature` — the signature to store, carrying the digest the signer saw and the
+  `Outcome` (approved or rejected) and meaning text it attests.
 - *Returns*: The stored signature, with the identity assigned by the database.
 - *Preconditions*: `signature` is not null.
 - *Postconditions*: Either one signature is stored, or nothing is and a `DomainRuleException` is raised.
@@ -413,7 +415,13 @@ transaction as an immediate write transaction, so the database write lock is tak
 can change the record until the transaction ends. The method reloads the record with the shared loader, recomputes
 the digest with the Core `RecordDigest.Compute` (the same code the service used to compute the digest the signer
 saw), and compares it with the digest of the signature. It then checks that the slot exists in the stated review,
-inserts a fresh entity copied from the argument (so the database assigns the identity), saves, and commits. The test
+checks that the `Outcome` of the signature equals the outcome of the record (the agreed outcome of the consolidated
+ballots; Approved for a review without a checklist) and throws `RecordChanged`, storing nothing, when they differ (an
+approval of a rejected record or the reverse; while checks are still pending or disputed the record has no outcome yet,
+the service refuses to sign then, and the store compares nothing),
+inserts a fresh entity copied from the argument (so the database assigns the identity; the copy includes the `Outcome`,
+so a rejected signature is stored as rejected and read back as such, and a signature of an earlier version of the
+record is never reinterpreted), saves, and commits. The test
 `ReviewStore_SerializableTransaction_TakesWriteLockAtBegin` shows the lock behavior: while one connection has only
 begun a `Serializable` transaction, a write from a second connection fails with SQLITE_BUSY.
 

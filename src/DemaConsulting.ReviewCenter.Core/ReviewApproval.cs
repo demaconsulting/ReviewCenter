@@ -86,10 +86,12 @@ public sealed record SlotStatus(
 ///     The status is computed on demand from the stored record, slots and signatures and is never stored, so it
 ///     cannot disagree with them. It is an immutable value holder and is safe to share between threads.
 /// </remarks>
-/// <param name="IsApproved">
-///     <c>true</c> when the review is concluded: it has at least one slot, every slot has a current signature and no
-///     thread is open (see <see cref="ReviewLock.IsConcluded"/>). A concluded review is
-///     also locked (see <see cref="ReviewLock"/>); there is no separate locked flag, so the two can never differ.
+/// <param name="Conclusion">
+///     How the review is concluded: <see cref="ReviewConclusion.Approved"/> or <see cref="ReviewConclusion.Rejected"/>
+///     when it has at least one slot, every slot has a current signature that attests the outcome the record has now
+///     and no thread is open (see <see cref="ReviewLock.ConcludedOutcome"/>), and <see cref="ReviewConclusion.None"/>
+///     while it is in review. A concluded review is also locked (see <see cref="ReviewLock"/>); there is no separate
+///     locked flag, so the two can never differ.
 /// </param>
 /// <param name="Digest">The digest of the review record as it is now.</param>
 /// <param name="Slots">The slots in creation order.</param>
@@ -105,8 +107,8 @@ public sealed record SlotStatus(
 ///     blocker. Zero for a review without a checklist.
 /// </param>
 /// <param name="FailedChecks">
-///     The number of checks of applicable sections answered Fail; the count behind the "checks are answered Fail"
-///     blocker. Zero for a review without a checklist.
+///     The number of checks of applicable sections the submitted ballots agree on as Fail; informational, because an
+///     agreed Fail does not block signing (it leads to a rejected outcome). Zero for a review without a checklist.
 /// </param>
 /// <param name="MissingChecklist">
 ///     <c>true</c> when the review has no checklist; the structured form of the "This review has no checklist."
@@ -122,8 +124,18 @@ public sealed record SlotStatus(
 ///     with the last answer, but a complete single-slot draft that needs no answer (for example because all checks
 ///     were carried over) is not handed in automatically, so it still counts one until it is submitted.
 /// </param>
+/// <param name="Outcome">
+///     The outcome the signatures attest now: the agreed outcome of the consolidated ballots, which a slot that signs
+///     now attests; <c>null</c> while a check is pending or disputed, no ballot is handed in, or the review has no
+///     checklist.
+/// </param>
+/// <param name="ConclusionRequired">
+///     <c>true</c> when the outcome is rejected and the review has no conclusion text yet; the structured form of the
+///     "A rejected review needs a conclusion" blocker, so it is <c>true</c> exactly when that sentence is among
+///     <paramref name="Blockers"/>.
+/// </param>
 public sealed record ReviewApproval(
-    bool IsApproved,
+    ReviewConclusion Conclusion,
     string Digest,
     IReadOnlyList<SlotStatus> Slots,
     IReadOnlyList<string> Blockers,
@@ -134,4 +146,18 @@ public sealed record ReviewApproval(
     int FailedChecks = 0,
     bool MissingChecklist = false,
     int DisputedChecks = 0,
-    int UnsubmittedBallots = 0);
+    int UnsubmittedBallots = 0,
+    ReviewOutcome? Outcome = null,
+    bool ConclusionRequired = false)
+{
+    /// <summary>
+    ///     Gets a value indicating whether the review is concluded as approved.
+    /// </summary>
+    public bool IsApproved => Conclusion == ReviewConclusion.Approved;
+
+    /// <summary>
+    ///     Gets a value indicating whether the review is concluded, as approved or as rejected; a concluded review is
+    ///     locked.
+    /// </summary>
+    public bool IsConcluded => Conclusion != ReviewConclusion.None;
+}

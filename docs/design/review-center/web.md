@@ -91,7 +91,8 @@ all domain behavior and never access the database.
 - *Role*: Provider.
 - *Contract*: Shows the reviews that wait for the user in the groups To sign, Replies waiting, Failed checks, and
   Updates, each row with a link to the review, a chip, a New badge when it is unread, and the due date, and a summary
-  line with the number of reviews that need action. The button marks every listed review as seen.
+  line with the number of reviews that need action. The button marks every listed review as seen. A review concluded as
+  rejected by someone else is listed as an update with a Rejected chip, never as an action.
 - *Constraints*: Needs a signed-in user; a request without a sign-in is challenged. Only reviews of projects the user
   can see are listed.
 
@@ -133,8 +134,9 @@ template.
   and creates the ticked ones; the review route shows a summary of the checklist progress, the reviewers, and the
   threads, then
   the review, its fingerprint, its files, the content of a selected file, its reviewer
-  slots with their signature status, an Approved or In review badge (and a Locked badge with a banner while the review
-  is approved), and lets a reviewer sign and, to whoever administers the project, reopen a locked review with a reason;
+  slots with their signature status, an Approved, Rejected or In review badge (and a Locked badge with a banner while
+  the review is concluded), a Review conclusion card in which a slot owner writes the conclusion text, and lets a
+  reviewer sign and, to whoever administers the project, reopen a locked review with a reason;
   the project route also has a Review rules card for whoever administers the project (the switch "Require independent
   reviewers");
   the project route also shows, in that card, the checklist that new reviews start with;
@@ -509,10 +511,14 @@ state, the checklist progress with the link to the checklist, the reviewer slots
 thread count) comes before the files and the viewer, because reading them is the main work; the form that adds a slot
 is collapsed until asked for. The page contains no signing rules:
 the approval status, the blockers, the record digest, and every refusal come from `SigningService` in Core. The
-page's part is to ask for the approval and display it (the Approved or In review badge next to the title, the status
+page's part is to ask for the approval and display it (the Approved, Rejected or In review badge next to the title, the
+status
 of each slot, and the digest in the Details section), to offer the controls that fit the signed-in user (slot
 changes only for a slot without a signature; the sign form only to a user who occupies a slot that is not currently
-signed, or the list of blockers while the review cannot be signed), and to pass the user's input to Core.
+signed, or the list of blockers while the review cannot be signed), to pass the user's input to Core, and to show the
+outcome a signature attests (Approved, or Rejected when the agreed ballots contain a Fail) with its meaning text. A
+rejected outcome can be signed only with a review conclusion text, which a slot owner or the review creator writes in
+the Review conclusion card through `ChecklistService`; the page only shows the blocker that Core reports.
 Signing re-authenticates the user: the form asks for the password, which the page holds only in a component field
 while it is typed, passes to `SigningService.SignWithCredentialsAsync`, and clears in a `finally` block after every
 attempt; it is never rendered back into the page. The page also passes the record digest it displayed, so a
@@ -525,7 +531,8 @@ an identity provider there is no password: the page offers a button that posts t
 it signs. The project page shows the
 approval status of every listed review, one lookup per review.
 
-An approved review is locked, and the pages show it without holding a rule. `ReviewPage` shows the approval from
+An approved or rejected (concluded) review is locked, and the pages show it without holding a rule. `ReviewPage` shows
+the approval from
 `SigningService` as a Locked badge and a banner, disables every control that would change the discussion, the
 checklist answers, or the reviewer slots (the `DiffView` component through its `CommentsDisabled` parameter), and, to
 whoever administers the project, offers a form that reopens the review with a required reason through
@@ -546,7 +553,8 @@ and the
 evidence index are unaffected by the lock.
 
 `ReviewPage` shows the due date of a review in the details, with an Overdue badge while `ReviewService.IsOverdue` says
-so (the page holds no date rule). A user who may change it (a project admin, a system administrator, or the creator of
+so for a review that is not concluded (the page holds no date rule). A user who may change it (a project admin, a
+system administrator, or the creator of
 the review) gets a small form that sets or clears it through `ReviewService.SetDueDateAsync`; the form is not offered
 while the review is locked, and any refusal (`ReviewLocked`, `RecordChanged`, `DueDateInvalid`) is shown as text.
 
@@ -562,7 +570,8 @@ not offered.
 
 #### Signed attestation
 
-An approved review offers the download of its signed PDF attestation. The page only decides whether to offer it: it asks
+An approved review offers the download of its signed PDF attestation (a review concluded as rejected shows a note that
+a signed attestation of a rejected review is not available yet). The page only decides whether to offer it: it asks
 `IAttestationKeyProvider.Describe` for the state of the signing key and shows the download link with a note on the key
 (a self-signed key is labelled as not an organization key, as generated by the server for the `SelfSigned` provider and
 as supplied by the administrator for any other provider; an organization key is named by its

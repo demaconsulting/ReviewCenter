@@ -131,13 +131,23 @@ N/A - standard test environment.
   topic; a key
   that cannot be used shows the reason as an alert instead of the download; a review that is not approved shows
   nothing about the attestation; and the download appears as soon as the last signature is made through the page.
-- An approved review is shown as locked: a Locked badge next to the Approved badge, and a banner that says that the
+- An approved or rejected review is shown as locked: a Locked badge next to the Approved or Rejected badge, and a banner
+  that says that the
   content, checklist, and reviewers can no longer change and that an administrator can reopen the review; the controls
   that would change it by one click (line comments, resolve, reopen thread, add, edit, and remove slot) are
   disabled and marked `data-locked="true"`, while the forms that could never be sent (the whole-file new-thread form,
   the form under a diff row, and the reply box of a thread) are not rendered; reading, copying a link, and the
-  attestation download keep working; a
-  review that is not approved shows no badge and no banner.
+  attestation download of an approved review keep working; a
+  review that is not concluded shows no badge and no banner.
+- A review concluded as rejected shows the Rejected badge and, instead of the attestation download, a note that there is
+  no attestation of a rejection.
+- The Review conclusion card shows the conclusion text, or says that none is written. A slot owner (and the creator of
+  the review) sees an editor while the review is not locked; saving stores the text and shows it in the card, and a
+  change that would make a signature out of date asks for a confirmation that names the slot first. A member who owns
+  no slot, and every user of a concluded review, sees the text without an editor.
+- When the checks of the ballots agree on a Fail, the sign form of a slot owner shows the outcome (Rejected) and the
+  matching meaning text; without a conclusion text the blocker names the conclusion, and no sign form is offered. Signing
+  the rejection with the right password concludes and locks the review.
 - A thread started on a review with a current signature is stored by the page as chat that is not part of the report,
   without a warning, and the signature stays current; the page resolves a thread without a resolution note, and a
   refusal for another reason is shown as the normal error message.
@@ -162,9 +172,9 @@ N/A - standard test environment.
   nothing, and empties both fields; a code used within its step is refused until the next code.
 
 - A review that has no due date says so; a review with one shows the date as a UTC calendar day, with an Overdue badge
-  when the date has passed and the review is not approved. An administrator or the creator can set (also to a date in
+  when the date has passed and the review is not concluded. An administrator or the creator can set (also to a date in
   the past) and clear the date, a text that is not a date is refused with a message and stores nothing, another member
-  sees no edit form, and an approved review keeps its date without a badge and without a form.
+  sees no edit form, and a concluded review keeps its date without a badge and without a form.
 - A viewer who opens a review for the first time sees the comments of others marked as new in the summary, the index,
   and the thread; the viewer's own comments are never marked; once the page is live the read state is stored, so the
   next visit shows no markers; a change of the address to another review loads the baseline of that review; and a user
@@ -519,6 +529,40 @@ A review that is not approved shows none of these and has `data-locked="false"` 
 **ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox**: An approved review with a thread is rendered; the thread
 is shown with its comments and neither a reply field nor a reply button. This scenario is tested by
 `ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox`.
+
+**ReviewPage_Render_RejectedOutcomeBlankConclusion_ShowsBlockerAndNoSignForm**: The ballots of every slot owner answer
+the first check Fail and the others Pass, and no conclusion text is written. The primary sees the conclusion as the
+blocker and no sign form, and sees the conclusion editor. This scenario is tested by
+`ReviewPage_Render_RejectedOutcomeBlankConclusion_ShowsBlockerAndNoSignForm`.
+
+**ReviewPage_ConclusionCard_SlotOwnerSavesText_ShowsInCard**: The slot owner types the conclusion text and saves it
+through the card; the text is stored and shown in the card, the blocker is gone, and the sign form for the rejection is
+offered. This scenario is tested by `ReviewPage_ConclusionCard_SlotOwnerSavesText_ShowsInCard`.
+
+**ReviewPage_ConclusionCard_ChangeAfterSignature_AsksForConfirmation**: A slot has signed and the conclusion text is
+changed through the card; the page asks for a confirmation that names the slot and stores nothing, and the confirmation
+stores the text. This scenario is tested by `ReviewPage_ConclusionCard_ChangeAfterSignature_AsksForConfirmation`.
+
+**ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor**: A project member who owns no slot opens the page; the
+conclusion text is shown and there is no editor. This scenario is tested by
+`ReviewPage_ConclusionCard_ReadOnlyUser_SeesTextWithoutEditor`.
+
+**ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState**: A project member who owns no slot opens the page of
+a review whose conclusion text is blank; the card is shown with "No conclusion written.", and neither an editor nor a
+text. This scenario is tested by `ReviewPage_ConclusionCard_ReadOnlyUserBlankText_ShowsEmptyState`.
+
+**ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes**: The sign form of a rejection shows the outcome and
+the rejection meaning text; signing with the right password concludes the review as rejected, and the review is locked
+without an attestation. This scenario is tested by `ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes`.
+
+**ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndNoAttestation**: A review concluded as rejected
+shows the Rejected badge, the Locked badge and banner, and the note that there is no attestation of a rejection, and no
+attestation download. This scenario is tested by
+`ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndNoAttestation`.
+
+**ReviewPage_Render_ConcludedReview_ConclusionCardIsReadOnly**: The conclusion card of a concluded review shows the
+text, even to the slot owner who wrote it, without the form. This scenario is tested by
+`ReviewPage_Render_ConcludedReview_ConclusionCardIsReadOnly`.
 
 **ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked**: A diff is rendered with `CommentsDisabled`; the hint
 reads "This review is locked; comments are read-only." and every `+` button is disabled. This scenario is tested by

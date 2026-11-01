@@ -690,14 +690,30 @@ public sealed class ThreadService
     ///     then depends on the threads alone).
     /// </param>
     /// <param name="failedChecks">
-    ///     The number of checks answered Fail; each one blocks signing, so it is named in the sentence. Ignored
-    ///     without a checklist. Zero (the default) leaves the wording as it was before signing existed.
+    ///     The number of checks answered Fail; named in the sentence so the reader knows the review will be rejected
+    ///     (a Fail does not block signing by itself). Ignored without a checklist. Zero (the default) leaves the
+    ///     wording as it was before signing existed.
+    /// </param>
+    /// <param name="disputedChecks">
+    ///     The number of checks on which the submitted ballots disagree; each one blocks signing, so it is named in the
+    ///     sentence and the checklist is not complete while one remains. Ignored without a checklist. Zero (the
+    ///     default) leaves the wording unchanged.
+    /// </param>
+    /// <param name="conclusionRequired">
+    ///     <c>true</c> when the review is to be rejected and has no conclusion text yet, so the sentence asks for it.
+    ///     Ignored without a checklist. <c>false</c> (the default) leaves the wording unchanged.
     /// </param>
     /// <returns>
-    ///     One short sentence: the number of unanswered checks, failed checks and open threads, that the checklist
-    ///     is complete, that all threads are resolved, or (without a checklist and without threads) to start a discussion.
+    ///     One short sentence: the number of unanswered checks, disputed checks, failed checks and open threads, the
+    ///     need for the conclusion, that the checklist is complete, that all threads are resolved, or (without a
+    ///     checklist and without threads) to start a discussion.
     /// </returns>
-    public static string NextStep(IEnumerable<ReviewThread> threads, ChecklistProgress? checklist = null, int failedChecks = 0)
+    public static string NextStep(
+        IEnumerable<ReviewThread> threads,
+        ChecklistProgress? checklist = null,
+        int failedChecks = 0,
+        int disputedChecks = 0,
+        bool conclusionRequired = false)
     {
         ArgumentNullException.ThrowIfNull(threads);
 
@@ -710,12 +726,18 @@ public sealed class ThreadService
             return ThreadsOnlyStep(all.Count, open);
         }
 
-        // With a checklist the unanswered checks come first, then failed checks, then the open threads
+        // With a checklist the unanswered checks come first, then disputed and failed checks, then the open threads
+        // and, last, the conclusion a rejected review needs
         var unanswered = checklist.Value.Unanswered;
         var parts = new List<string>();
         if (unanswered > 0)
         {
             parts.Add(Counted(unanswered, "checklist check unanswered", "checklist checks unanswered"));
+        }
+
+        if (disputedChecks > 0)
+        {
+            parts.Add(Counted(disputedChecks, "check disputed between the ballots", "checks disputed between the ballots"));
         }
 
         if (failedChecks > 0)
@@ -728,10 +750,15 @@ public sealed class ThreadService
             parts.Add(Counted(open, "open thread to resolve", "open threads to resolve"));
         }
 
+        if (conclusionRequired)
+        {
+            parts.Add("a conclusion stating the reasons is needed");
+        }
+
         if (parts.Count > 0)
         {
             var sentence = string.Join(", ", parts);
-            return unanswered > 0 ? $"{sentence}." : $"Checklist complete; {sentence}.";
+            return unanswered > 0 || disputedChecks > 0 ? $"{sentence}." : $"Checklist complete; {sentence}.";
         }
 
         return all.Count > 0 ? "Checklist complete and all threads resolved." : "Checklist complete.";

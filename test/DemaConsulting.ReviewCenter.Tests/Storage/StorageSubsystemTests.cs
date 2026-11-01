@@ -379,6 +379,65 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the outcome of a signature is stored: a rejection signed through the services is still a
+    ///     rejection after the database is closed and opened again, the review is concluded as rejected and locked
+    ///     there, and a write is refused.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_Signatures_OutcomePersistsAcrossReopen()
+    {
+        // Arrange: a new database file
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        int projectId;
+
+        // Act: create a review whose only reviewer answers a Fail, writes the conclusion text and signs, then close
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var users = NewUserService(first.Provider);
+            var bob = await users.CreateAsync("bob", "Bob", false, "correct horse battery", cancellationToken);
+            var project = await first.Projects.CreateAsync("Apollo", null, cancellationToken);
+            projectId = project.Id;
+            await first.Store.AddMembershipAsync(bob.Id, projectId, cancellationToken);
+            await first.Reviews.CreateDraftAsync(projectId, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
+            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now), NewUserStore(first.Provider));
+            var slot = await signing.AddSlotAsync(TestActors.Bob, projectId, "rev-1", bob.Id, null, cancellationToken);
+            var outcome = ChecklistOutcome.Fail;
+            foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+            {
+                await checklists.SetAnswerAsync(
+                    projectId, "rev-1", item.Id, outcome, outcome == ChecklistOutcome.Fail ? "Wrong." : null, TestActors.Bob, cancellationToken);
+                outcome = ChecklistOutcome.Pass;
+            }
+
+            await checklists.SetReviewConclusionTextAsync(projectId, "rev-1", "Not ready.", TestActors.Bob, cancellationToken);
+            var digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+            await signing.SignAsync(TestActors.Bob, projectId, "rev-1", slot.Id, digest, "correct horse battery", cancellationToken);
+        }
+
+        // Act: open it again and read the approval, the signature and a write
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var signing = TestServices.Signing(second.Store, NewUserService(second.Provider), new FixedTimeProvider(_now));
+            var threads = TestServices.Threads(second.Store, new FixedTimeProvider(_now));
+            var approval = await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken);
+            var signature = Assert.Single(await second.Store.ListSignaturesAsync(projectId, "rev-1", cancellationToken));
+            var locked = await Assert.ThrowsAsync<DomainRuleException>(() => threads.StartThreadAsync(
+                projectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Bob, "Late", cancellationToken));
+
+            // Assert: the outcome survived, the review is rejected, not approved, and locked
+            Assert.Equal(ReviewOutcome.Rejected, signature.Outcome);
+            Assert.NotNull(approval);
+            Assert.Equal(ReviewConclusion.Rejected, approval.Conclusion);
+            Assert.False(approval.IsApproved);
+            Assert.Equal(DomainRule.ReviewLocked, locked.Rule);
+        }
+    }
+
+    /// <summary>
     ///     Test that the approval lock, the reopen with its history and the independence setting are stored: an
     ///     approved review is still locked after the database is closed and opened again, a change is refused
     ///     there, the reopen survives with its reason and previous digest, and the old signature is kept.

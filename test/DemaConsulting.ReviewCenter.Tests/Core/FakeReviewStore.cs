@@ -1508,6 +1508,13 @@ internal sealed class FakeReviewStore : IReviewStore
         return Task.FromResult(list);
     }
 
+    /// <summary>
+    ///     Gets or sets a value indicating whether <see cref="AddSignatureAsync"/> refuses a signature whose outcome is not
+    ///     the outcome of the record (as the real store does). A test that needs to seed an inconsistent signature, to
+    ///     show how a reader treats it, sets this to <c>false</c>.
+    /// </summary>
+    public bool ValidateSignatureOutcome { get; set; } = true;
+
     /// <inheritdoc />
     public async Task<ReviewSignature> AddSignatureAsync(
         ReviewSignature signature,
@@ -1536,6 +1543,19 @@ internal sealed class FakeReviewStore : IReviewStore
                 "Your ballot has not been handed in; submit it before signing.");
         }
 
+        // The outcome of the signature must be the one the record has now (as in the real store): an approval of a
+        // rejected record or the reverse is refused; a record without a checklist is approved, and a record with
+        // pending or disputed checks has no outcome yet, so nothing is compared
+        var recordOutcome = record.Checklist is null
+            ? ReviewOutcome.Approved
+            : BallotConsolidation.Consolidate(record.Checklist.Parse(), record.Ballots).Outcome;
+        if (ValidateSignatureOutcome && recordOutcome is { } expected && expected != signature.Outcome)
+        {
+            throw new DomainRuleException(
+                DomainRule.RecordChanged,
+                "The outcome of the record changed while you were signing. Review it and try again.");
+        }
+
         if (_signatures.Any(s => s.SlotId == signature.SlotId && s.RecordDigest == signature.RecordDigest))
         {
             throw new DomainRuleException(DomainRule.SigningNotAllowed, "This slot already has a signature of the current record.");
@@ -1552,6 +1572,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Role = signature.Role,
             SignedAt = signature.SignedAt,
             RecordDigest = signature.RecordDigest,
+            Outcome = signature.Outcome,
             Meaning = signature.Meaning
         };
         _signatures.Add(stored);

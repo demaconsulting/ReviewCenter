@@ -851,6 +851,137 @@ public class ReviewStoreBallotTests
     }
 
     /// <summary>
+    ///     Adds a project with a review whose checklist has one section and one check, one slot, and a submitted
+    ///     ballot of that slot that answers the check.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="outcome">The answer of the ballot.</param>
+    /// <returns>The project identity and the slot identity.</returns>
+    private static async Task<(int ProjectId, int SlotId)> AddAnsweredOneCheckReviewAsync(
+        TestStore db,
+        ChecklistOutcome outcome)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var project = await db.Store.AddProjectAsync(new Project { Name = "P", Created = _time }, cancellationToken);
+        var definition = new ChecklistDefinition(
+            "one-check",
+            [new ChecklistSection("s", "Section", string.Empty, [new ChecklistItem("s-01", "Check")])]);
+        var checklist = new ReviewChecklist
+        {
+            ProjectId = project.Id,
+            ReviewId = "REV-1",
+            Version = "one-check",
+            Definition = definition.ToJson()
+        };
+        await db.Store.AddReviewAsync(NewReview(project.Id, "REV-1", checklist: checklist), cancellationToken);
+        var slotId = await AddSlotAsync(db, project.Id);
+        await SetAsync(db, NewAnswer(project.Id, slotId, "s-01", outcome));
+        await SubmitAsync(db, project.Id, slotId);
+        return (project.Id, slotId);
+    }
+
+    /// <summary>
+    ///     Builds a signature of the current record of <c>REV-1</c> with the given outcome.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <param name="outcome">The outcome the signature attests.</param>
+    /// <returns>The signature.</returns>
+    private static async Task<ReviewSignature> SignatureOfAsync(
+        TestStore db,
+        int projectId,
+        int slotId,
+        ReviewOutcome outcome)
+    {
+        var record = await db.Store.GetRecordAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        return new ReviewSignature
+        {
+            ProjectId = projectId,
+            ReviewId = "REV-1",
+            SlotId = slotId,
+            UserId = 1,
+            DisplayName = "Ann",
+            Role = SlotRole.Primary,
+            SignedAt = _time,
+            RecordDigest = RecordDigest.Compute(record!),
+            Outcome = outcome,
+            Meaning = SigningService.MeaningFor(outcome)
+        };
+    }
+
+    /// <summary>
+    ///     Test that the outcome of a signature is stored and read back when it is the outcome of the record: a
+    ///     rejection of a record whose ballots agree on a Fail stays a rejection.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome()
+    {
+        // Arrange: one submitted ballot that answers the only check with Fail, so the record is rejected
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var (projectId, slotId) = await AddAnsweredOneCheckReviewAsync(db, ChecklistOutcome.Fail);
+
+        // Act
+        await db.Store.AddSignatureAsync(await SignatureOfAsync(db, projectId, slotId, ReviewOutcome.Rejected), cancellationToken);
+        var read = (await db.Store.ListSignaturesAsync(projectId, "REV-1", cancellationToken)).Single();
+
+        // Assert
+        Assert.Equal(ReviewOutcome.Rejected, read.Outcome);
+        Assert.Equal(SigningService.MeaningRejectedText, read.Meaning);
+    }
+
+    /// <summary>
+    ///     Test that the store refuses, inside its transaction, a signature whose outcome is not the outcome of the
+    ///     consolidated record (an approval of a rejected record and a rejection of an approved record), and stores
+    ///     nothing.
+    /// </summary>
+    /// <param name="answer">The answer of the only ballot.</param>
+    /// <param name="signed">The outcome the signature claims.</param>
+    [Theory]
+    [InlineData(ChecklistOutcome.Fail, ReviewOutcome.Approved)]
+    [InlineData(ChecklistOutcome.Pass, ReviewOutcome.Rejected)]
+    public async Task ReviewStore_AddSignatureAsync_OutcomeDiffersFromRecord_ThrowsRecordChangedAndStoresNothing(
+        ChecklistOutcome answer,
+        ReviewOutcome signed)
+    {
+        // Arrange: a record whose ballots agree on the answer
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var (projectId, slotId) = await AddAnsweredOneCheckReviewAsync(db, answer);
+        var signature = await SignatureOfAsync(db, projectId, slotId, signed);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.AddSignatureAsync(signature, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.RecordChanged, exception.Rule);
+        Assert.Empty(await db.Store.ListSignaturesAsync(projectId, "REV-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a review without a checklist is approved by its signatures alone, so a rejecting signature is
+    ///     refused there.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddSignatureAsync_RejectedSignatureWithoutChecklist_ThrowsRecordChanged()
+    {
+        // Arrange: a review without a checklist and one slot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var slotId = await AddSlotAsync(db, projectId);
+        var signature = await SignatureOfAsync(db, projectId, slotId, ReviewOutcome.Rejected);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.AddSignatureAsync(signature, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.RecordChanged, exception.Rule);
+        Assert.Empty(await db.Store.ListSignaturesAsync(projectId, "REV-1", cancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a slot that has no ballot yet reads as no ballot at all, and so does a slot that does not exist.
     /// </summary>
     [Fact]

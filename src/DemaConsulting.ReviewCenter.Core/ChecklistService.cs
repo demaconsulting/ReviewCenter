@@ -34,8 +34,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <see cref="DomainRule.NoReviewerSlot"/>, and the ballot counts in the record once it is handed in (see
 ///     <see cref="SubmitBallotAsync"/>; a review with one slot hands it in with the last answer). <see cref="GetAsync"/>
 ///     shows a reviewer the own ballot and everybody else the consolidated standing, never the ballot of another slot.
-///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is approved (see
-///     <see cref="ReviewLock"/>).
+///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is concluded (approved
+///     or rejected, see <see cref="ReviewLock"/>).
 ///     When the project requires it (on by default, also for projects that existed before the rule was enforced), the
 ///     person who created the review cannot answer its checks or set the applicability of its sections: the change is
 ///     refused with <see cref="DomainRule.AuthorCannotAnswer"/>. Comment threads are not part of that rule.
@@ -195,7 +195,7 @@ public sealed class ChecklistService
         // A section that applies has no reason; one that does not apply must say why
         var trimmedReason = applicable ? null : ValidateJustification(reason, required: true, "reason");
 
-        // An approved review is locked: the checklist is part of what the signatures cover
+        // A concluded (approved or rejected) review is locked: the checklist is part of what the signatures cover
         var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
         // The answer goes into the ballot of the slot of the actor; nobody else has a ballot to answer on
@@ -295,7 +295,7 @@ public sealed class ChecklistService
         // Only a pass can go without a justification; an empty optional one is stored as none
         var trimmed = ValidateJustification(justification, outcome != ChecklistOutcome.Pass, "justification");
 
-        // An approved review is locked: the checklist is part of what the signatures cover
+        // A concluded (approved or rejected) review is locked: the checklist is part of what the signatures cover
         var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
         // The answer goes into the ballot of the slot of the actor; nobody else has a ballot to answer on

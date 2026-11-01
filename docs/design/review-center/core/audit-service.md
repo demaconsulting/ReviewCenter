@@ -97,7 +97,7 @@ administrator is not throttled but is a trusted actor).
 | `review.due-date-changed` | `none -> 2030-01-31` (old and new due date, `none` for no date; review in its own field) |
 | `review.conclusion-changed` | `length 0 -> 42` (old and new length of the review conclusion text, never the text) |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {number}: primary ada, alternate bob` (`none` for no alternate) |
-| `signature.added` | `slot {number}, role {Primary or Alternate}, record digest <64 hex>` |
+| `signature.added` | `slot {n}, role {Primary or Alternate}, outcome {Approved or Rejected}, record digest <64 hex>` |
 | `ballot.submitted` | `slot {number}: ballot submitted (N answers, M section states)` |
 | `ballot.reopened` | `slot {number}: ballot reverted to draft by an edit` (not `review.reopened`) |
 | `ballot.reassigned` | `slot {n}: ballot reverted to draft after a reassignment (answer and section counts)` |

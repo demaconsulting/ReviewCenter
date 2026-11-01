@@ -24,13 +24,14 @@
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open.
 
-   An approved review is locked: a Locked badge and a banner explain it, and every control that would change the
+   A concluded (approved or rejected) review is locked: a Locked badge and a banner explain it, and every control that
+   would change the
    review (new thread, reply, resolve, line comments, reviewer slots) is disabled. A project or system administrator
    sees a reopen form (a reason of up to 250 characters is required); the reopen history is listed. When the project
    requires independent reviewers the author of the review is not offered as a reviewer and is told so.
 
    An optional due date (a UTC calendar day) is shown under the title with an Overdue badge when it lies before today
-   (UTC) and the review is not approved. A project administrator or the creator of the review can set, change or
+   (UTC) and the review is not concluded. A project administrator or the creator of the review can set, change or
    clear it while the review is not locked; the service checks the same rule again. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/files/{**FilePath}"
@@ -67,7 +68,7 @@
             <h1 data-testid="review-title">@Review.Title</h1>
             @if (Approval is not null)
             {
-                <span class="badge @(Approval.IsApproved ? "approved" : null)" data-testid="review-approval">@(Approval.IsApproved ? "Approved" : "In review")</span>
+                <span class="badge @ConclusionBadgeClass" data-testid="review-approval">@ConclusionLabel</span>
                 @if (IsLocked)
                 {
                     <span class="badge locked" data-testid="review-locked">Locked</span>
@@ -83,7 +84,7 @@
             </p>
         }
 
-        @* The due date is a UTC calendar day. Overdue means "before today (UTC) and not approved"; an approved review
+        @* The due date is a UTC calendar day. Overdue means "before today (UTC) and not concluded"; a concluded review
            keeps its date as history. Only a project administrator or the creator sees the edit form, and only while
            the review is not locked *@
         <section class="due-date" data-testid="review-due-section">
@@ -146,7 +147,7 @@
         {
             <section class="card" data-testid="review-locked-banner">
                 <p class="notice" role="status">
-                    This review is approved and locked. Its content, checklist and reviewers can no longer change.
+                    This review is concluded and locked. Its content, checklist and reviewers can no longer change.
                     A project administrator can reopen it; the signatures are then kept as history and the review
                     must be signed again.
                 </p>
@@ -209,8 +210,50 @@
                 }
             </p>
         }
+        else if (Approval?.Conclusion == ReviewConclusion.Rejected)
+        {
+            @* A rejected review is concluded, but the signed attestation of a rejection is not available yet *@
+            <p class="status muted" data-testid="attestation-rejected-note">
+                The review was rejected. A signed attestation of a rejected review is not available yet.
+            </p>
+        }
 
         <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@Approval?.NextStep</span></p>
+
+        @* The review conclusion: the reasons the reviewers state. A rejected review cannot be signed without it. It is
+           shown to everyone who can read the review (with an explicit empty state when none is written) and edited only
+           by who may write it, while the review is not locked *@
+        <section class="card" data-testid="review-conclusion">
+            <h2>Review conclusion</h2>
+            @if (ShowConclusionEditor)
+            {
+                <form data-testid="review-conclusion-form" novalidate @onsubmit="SaveConclusionAsync">
+                    <div class="field">
+                        <label for="review-conclusion-input">Conclusion (the reasons, in plain text)</label>
+                        <textarea id="review-conclusion-input" rows="4" maxlength="@ReviewLimits.MaxConclusionTextLength"
+                                  data-testid="review-conclusion-input" value="@ConclusionInput"
+                                  @oninput="e => ConclusionInput = e.Value?.ToString() ?? string.Empty"></textarea>
+                    </div>
+                    @if (Warning?.Key == ConclusionWarningKey)
+                    {
+                        <SignatureWarning Slots="Warning.Slots" OnConfirm="ConfirmWarningAsync" OnCancel="CancelWarning" />
+                    }
+                    <button type="submit" data-testid="review-conclusion-save">Save</button>
+                </form>
+            }
+            else if (string.IsNullOrWhiteSpace(Review.ReviewConclusionText))
+            {
+                <p class="muted" data-testid="review-conclusion-empty">No conclusion written.</p>
+            }
+            else
+            {
+                <p class="conclusion-text" data-testid="review-conclusion-text">@Review.ReviewConclusionText</p>
+            }
+            @if (ConclusionError is not null)
+            {
+                <p class="error" role="alert" data-testid="review-conclusion-error">@ConclusionError</p>
+            }
+        </section>
 
         @if (UnreadCount > 0)
         {
@@ -361,7 +404,8 @@
                                     <input type="hidden" name="reviewId" value="@ReviewId" />
                                     <input type="hidden" name="slotId" value="@slotId" />
                                     <input type="hidden" name="returnUrl" value="@ReviewAddress" />
-                                    <p class="muted" data-testid="sign-meaning-@slotId">@SigningService.MeaningText</p>
+                                    <p data-testid="sign-outcome-@slotId"><strong>You are signing: @SigningOutcomeLabel</strong></p>
+                                    <p class="muted" data-testid="sign-meaning-@slotId">@SigningService.MeaningFor(SigningOutcome)</p>
                                     @if (!Oidc.Value.Enabled)
                                     {
                                         <p class="muted" role="status" data-testid="sign-reauth-off-@slotId">
@@ -388,7 +432,8 @@
                             else
                             {
                                 <form data-testid="sign-form-@slotId" novalidate @onsubmit="() => SignAsync(slotId)">
-                                    <p class="muted" data-testid="sign-meaning-@slotId">@SigningService.MeaningText</p>
+                                    <p data-testid="sign-outcome-@slotId"><strong>You are signing: @SigningOutcomeLabel</strong></p>
+                                    <p class="muted" data-testid="sign-meaning-@slotId">@SigningService.MeaningFor(SigningOutcome)</p>
                                     @if (CurrentIsExternal)
                                     {
                                         <p class="notice" role="status" data-testid="sign-confirmed-@slotId">

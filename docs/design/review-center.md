@@ -489,9 +489,11 @@ version), and gives every file, line and thread a stable link (the address bar a
 for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
-and a review is Approved only while every slot has handed in its ballot, the ballots agree, and every slot has a
-current signature. A review without a slot is In review. An
-Approved review is locked: its comments, checklist, and reviewer slots can no longer change, and only a project
+and a review is concluded only while every slot has handed in its ballot, the ballots agree, and every slot has a
+current signature of the agreed outcome: Approved, or Rejected when the ballots agree on a Fail answer (a Fail
+answer does not block signing, but a rejection is signed only with a review conclusion text that states the reasons).
+A review without a slot is In review. An
+Approved or Rejected review is locked: its comments, checklist, and reviewer slots can no longer change, and only a project
 administrator or a system administrator can reopen it, with a recorded reason; the earlier signatures then stay as
 history, are out of date, and the review needs new signatures. While the project rule "Require independent reviewers"
 is on (the default), the person who created the review in ReviewCenter cannot be one of its reviewers and cannot sign
@@ -504,9 +506,9 @@ again, and an administrator cannot reopen a review in a way that leaves a slot w
 can have an optional due date, a UTC
 calendar day that cannot
 be before today (UTC) or more than 2 years ahead when the review is created (the planner can give a default date). A
-review that is not approved and whose due date has passed is shown as Overdue. The date can be set or cleared later,
+review that is not concluded and whose due date has passed is shown as Overdue. The date can be set or cleared later,
 also to a past day, by a project administrator, a system administrator, or the creator of the review, never with an API
-token, and not while the review is Approved (locked). The change is audited, and the date is not part of the record
+token, and not while the review is concluded (locked). The change is audited, and the date is not part of the record
 digest, so it does not make a signature out of date. A review can be created as a follow-up of an earlier review of the
 same project (typically after a review had a Fail): the Pass and N/A answers of checks whose wording is unchanged, the
 not-applicable sections with the same title, and the open threads on files that are in the new review are carried over
@@ -946,8 +948,9 @@ result or the reason of a failure is reported through `Context`.
   by issuer and subject, a name of a local account never links to them, and their signature needs a fresh, single-use
   sign-in at the provider instead.
 - Signatures: a signature is bound to the digest of the review record and is never changed or removed; the approval
-  of a review is computed from the record and the signatures each time and is never stored. The lock of an approved
-  review is that computed approval, so it is not stored either; a reopen is stored as a row of its own and changes the
+  of a review is computed from the record and the signatures each time and is never stored. The lock of a concluded
+  (approved or rejected) review is that computed conclusion, so it is not stored either; a reopen is stored as a row of
+  its own and changes the
   digest, which retires the signatures without deleting them. The service checks the lock before each change and the
   store checks it again inside its write transactions.
 - Access tokens: only the SHA-256 hash of a token is stored and the value is shown once, when it is created; a token

@@ -96,7 +96,8 @@ sections:
           JSON of the right shape, with a status of 400 (415 for a content type that is not JSON) and a problem document
           that names the field where there is one, and shall answer a domain rule that refuses the request with the
           status of that rule, including 409 for the removal of the last project administrator, 429 for too many
-          attempts, 403 for an account that has to change its password, and 400 for a checklist definition that is
+          attempts, 403 for an account that has to change its password or for a rejection that has no conclusion
+          text, and 400 for a checklist definition that is
           not valid.
         justification: |
           A script cannot read a page, so the cause of a refusal must be in the answer. Naming the field tells the
@@ -213,13 +214,15 @@ sections:
 
       - id: ReviewCenter-ApiEndpoints-LockedReview
         title: >-
-          The ApiEndpoints unit shall answer a request that a service refuses because the review is approved and
+          The ApiEndpoints unit shall answer a request that a service refuses because the review is concluded
+          (approved or rejected) and
           locked (ReviewLocked), or because it is not locked (ReviewNotLocked), with status 409 and a problem document
-          that carries the message of the rule, and shall keep a locked review readable, with its attestation and its
-          evidence index entry, and offer no route that reopens a review.
+          that carries the message of the rule, and shall keep a locked review readable, whether approved or rejected,
+          and, for an approved review only, with its attestation and its evidence index entry (a rejected review has
+          neither), and offer no route that reopens a review.
         justification: |
           A script that meets the lock must be able to tell it from a mistake in its request, which status 409 does,
-          and must be able to keep reading the approved review and its evidence. Reopening is a decision of a person
+          and must be able to keep reading the concluded review and its evidence. Reopening is a decision of a person
           who administers the project, so the API has no way to do it with a token.
         tests:
           - ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409
@@ -230,7 +233,7 @@ sections:
           current signature out of date and has not been acknowledged (SignaturesWouldBecomeOutOfDate) with status
           409 and a problem document that carries the message of the rule, which names the affected slots.
         justification: |
-          A script that changes an approved-in-part review must be able to tell the refusal from a mistake in its
+          A script that changes a review that is signed in part must be able to tell the refusal from a mistake in its
           request, and learn whose signatures it would withdraw, in a form it can act on.
         tests:
           - ApiProblems_StatusOf_SignaturesWouldBecomeOutOfDate_Is409

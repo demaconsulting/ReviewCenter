@@ -478,6 +478,59 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that a failed check tells the author that a Fail the reviewers agree on makes the review reject and that
+    ///     a Fail only one reviewer gave is a disagreement to resolve, without promising a rejection.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_FailedChecks_TextSaysAgreedFailRejectsAndSingleFailIsDisagreement()
+    {
+        // Arrange: bob answers a check of the review of the author as Fail
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.FailCheckAsync("r1", "bob");
+
+        // Act
+        var row = Assert.Single(await world.RowsAsync("author", InboxSection.FailedChecks));
+
+        // Assert: the text names the outcome the agreed Fail leads to, not a blocker and not a certain rejection
+        Assert.Equal(
+            "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is a disagreement to resolve.",
+            row.Detail);
+    }
+
+    /// <summary>
+    ///     Test that a review rejected by every slot is shown to the other reviewer as an update with the rejected
+    ///     chip, which is no work, and that the review then has no failed-checks or to-sign rows.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction()
+    {
+        // Arrange: both slots reject, ann writes the conclusion text, ann signs first and bob concludes later
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann");
+        var second = await world.AddSlotAsync("r1", "bob");
+        await world.FailCheckAsync("r1", "ann");
+        await world.FailCheckAsync("r1", "bob");
+        await world.Checklists.SetReviewConclusionTextAsync(world.ProjectId, "r1", "Not ready.", InboxTestWorld.ActorOf("ann"), Ct);
+        await world.SignAsync("r1", first.Id, "ann");
+        world.Clock.Advance(TimeSpan.FromMinutes(5));
+        await world.SignAsync("r1", second.Id, "bob");
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+
+        // Assert: one information row with the rejected chip, no work
+        var row = Assert.Single(view.Items);
+        Assert.Equal(InboxSection.Updates, row.Section);
+        Assert.Equal(InboxService.RejectedChip, row.Chip);
+        Assert.Equal(0, view.ActionCount);
+        Assert.Empty(await world.RowsAsync("author", InboxSection.FailedChecks));
+        Assert.Empty(await world.RowsAsync("bob", InboxSection.ToSign));
+    }
+
+    /// <summary>
     ///     Test that a review approved by someone else after the user last looked is shown as an update, which
     ///     is not counted as work, and that it goes away once the user has seen it.
     /// </summary>

@@ -502,9 +502,30 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private bool CanEditDueDate => CanSetDueDate && !IsLocked;
 
     /// <summary>
-    ///     Gets a value indicating whether the review is overdue: its due date is before today (UTC) and it is not approved.
+    ///     Gets a value indicating whether the review is overdue: its due date is before today (UTC) and it is not concluded.
     /// </summary>
     private bool IsOverdue => Review is not null && ReviewService.IsOverdue(Review, IsLocked);
+
+    /// <summary>
+    ///     The key of the confirmation for a change of the review conclusion text.
+    /// </summary>
+    private const string ConclusionWarningKey = "conclusion";
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the signed-in user may write the review conclusion text (a reviewer of
+    ///     the review, or its lead).
+    /// </summary>
+    private bool CanWriteConclusion { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the text of the conclusion editor.
+    /// </summary>
+    private string ConclusionInput { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the message shown when the conclusion could not be saved, or <c>null</c>.
+    /// </summary>
+    private string? ConclusionError { get; set; }
 
     /// <summary>
     ///     Writes a due date for display and for the date input.
@@ -514,9 +535,45 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private static string FormatDueDate(DateOnly dueDate) => dueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     /// <summary>
-    ///     Gets a value indicating whether the review is approved and therefore locked.
+    ///     Gets a value indicating whether the review is concluded (approved or rejected) and therefore locked.
     /// </summary>
-    private bool IsLocked => Approval?.IsApproved == true;
+    private bool IsLocked => Approval?.IsConcluded == true;
+
+    /// <summary>
+    ///     Gets the label of the status badge: "Approved", "Rejected" or "In review".
+    /// </summary>
+    private string ConclusionLabel => Approval?.Conclusion switch
+    {
+        ReviewConclusion.Approved => "Approved",
+        ReviewConclusion.Rejected => "Rejected",
+        _ => "In review"
+    };
+
+    /// <summary>
+    ///     Gets the extra CSS class of the status badge, or <c>null</c> while the review is in review.
+    /// </summary>
+    private string? ConclusionBadgeClass => Approval?.Conclusion switch
+    {
+        ReviewConclusion.Approved => "approved",
+        ReviewConclusion.Rejected => "rejected",
+        _ => null
+    };
+
+    /// <summary>
+    ///     Gets the outcome a signature given now attests: the agreed outcome of the ballots, approved when there is none.
+    /// </summary>
+    private ReviewOutcome SigningOutcome => Approval?.Outcome ?? ReviewOutcome.Approved;
+
+    /// <summary>
+    ///     Gets the words of the outcome a signature given now attests, shown above the signing form.
+    /// </summary>
+    private string SigningOutcomeLabel => SigningOutcome == ReviewOutcome.Rejected ? "REJECTED" : "APPROVED";
+
+    /// <summary>
+    ///     Gets a value indicating whether the conclusion editor is shown: the user may write the text, may change the
+    ///     review, and the review is not locked.
+    /// </summary>
+    private bool ShowConclusionEditor => CanWriteConclusion && !ReadOnly && !IsLocked;
 
     /// <summary>
     ///     Gets the value of the <c>data-locked</c> attribute of a control that is disabled by the lock.
@@ -743,6 +800,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         RequireNonReopener = project?.RequireNonReopenerSigning == true;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         DueDateInput = Review?.DueDate is { } due ? FormatDueDate(due) : string.Empty;
+        ConclusionInput = Review?.ReviewConclusionText ?? string.Empty;
         FollowUps = Review is null
             ? []
             : (await ReviewService.ListAsync(ProjectId))
@@ -863,6 +921,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
         CanSetDueDate = false;
         DueDateInput = string.Empty;
         DueDateError = null;
+        CanWriteConclusion = false;
+        ConclusionInput = string.Empty;
+        ConclusionError = null;
         NewSlotPrimary = string.Empty;
         NewSlotAlternate = string.Empty;
         NewSlotError = null;
@@ -1081,6 +1142,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
                 ClearNewThreadForm();
             }
             CanSetDueDate = await ReviewService.CanSetDueDateAsync(actor, Review);
+            CanWriteConclusion = await ChecklistService.CanSetReviewConclusionTextAsync(actor, ProjectId, ReviewId);
             try
             {
                 Candidates = actor is null ? [] : await SigningService.ListCandidatesAsync(actor, ProjectId);
@@ -2139,6 +2201,69 @@ public partial class ReviewPage : ComponentBase, IDisposable
         DueDateError = null;
         Review = await ReviewService.GetAsync(ProjectId, ReviewId);
         DueDateInput = Review?.DueDate is { } stored ? FormatDueDate(stored) : string.Empty;
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Saves the typed review conclusion text, or asks for confirmation when that would make signatures out of date.
+    /// </summary>
+    /// <returns>A task that completes when the text is stored or the warning or problem is shown.</returns>
+    /// <remarks>
+    ///     The service checks who may write the text and refuses a locked review. After a refusal the typed text stays so
+    ///     it can be fixed; after a change by someone else or a lock the stored review is loaded and shown with the
+    ///     message.
+    /// </remarks>
+    private async Task SaveConclusionAsync()
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        await SubmitConclusionAsync(ConclusionInput, null);
+    }
+
+    /// <summary>
+    ///     Stores the review conclusion text, or asks for confirmation when that would make signatures out of date.
+    /// </summary>
+    /// <param name="text">The text, as it was when the person submitted the form.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <returns>A task that completes when the text is stored or the warning or problem is shown.</returns>
+    private async Task SubmitConclusionAsync(string text, IReadOnlyList<AffectedSignature>? confirmed)
+    {
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            await ChecklistService.SetReviewConclusionTextAsync(
+                ProjectId, ReviewId, text, actor, acknowledgedSlotIds: SlotIds(confirmed));
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            ConclusionError = null;
+            Warning = PendingSignatureWarning.Create(
+                ConclusionWarningKey, confirmed, ex, slots => SubmitConclusionAsync(text, slots));
+            return;
+        }
+        catch (DomainRuleException ex)
+        {
+            Warning = null;
+            ConclusionError = ex.Message;
+
+            // Someone else changed the text, or the review got locked: show what is stored now
+            if (ex.Rule is DomainRule.RecordChanged or DomainRule.ReviewLocked)
+            {
+                Review = await ReviewService.GetAsync(ProjectId, ReviewId);
+                ConclusionInput = Review?.ReviewConclusionText ?? string.Empty;
+                await RefreshAsync();
+            }
+
+            return;
+        }
+
+        Warning = null;
+        ConclusionError = null;
+        Review = await ReviewService.GetAsync(ProjectId, ReviewId);
+        ConclusionInput = Review?.ReviewConclusionText ?? string.Empty;
         await RefreshAsync();
     }
 

@@ -239,13 +239,13 @@ public enum DomainRule
     TotpSecretUnreadable,
 
     /// <summary>
-    ///     The review is approved (every reviewer slot has a signature of the current record and no thread is open) and
-    ///     therefore locked:
+    ///     The review is concluded (approved or rejected: every reviewer slot has a signature of the current record and
+    ///     no thread is open) and therefore locked:
     ///     its threads, checklist answers and reviewer slots can not change until an administrator reopens it.
     /// </summary>
     ReviewLocked,
 
-    /// <summary>The review is not approved, so it is not locked and there is nothing to reopen.</summary>
+    /// <summary>The review is not concluded, so it is not locked and there is nothing to reopen.</summary>
     ReviewNotLocked,
 
     /// <summary>The reason given for reopening a review is missing or longer than <see cref="ReviewLimits.MaxReopenReasonLength"/>.</summary>
@@ -342,7 +342,13 @@ public enum DomainRule
     ///     The signer has not handed in the ballot of the slot, so the signature would bind to answers that are not final;
     ///     nothing is stored.
     /// </summary>
-    BallotNotSubmitted
+    BallotNotSubmitted,
+
+    /// <summary>
+    ///     The agreed outcome of the review is rejected and the review has no conclusion text, so a signature would reject
+    ///     the review without the reasons; nothing is stored.
+    /// </summary>
+    ConclusionRequired
 }
 
 /// <summary>

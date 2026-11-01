@@ -26,8 +26,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <remarks>
 ///     While a project does not let the person who reopened a review sign it again, a reopen blocks the person
 ///     reopening, and every earlier reopener stays blocked. A slot whose primary and alternate (if any) are all blocked
-///     could never get a fresh signature, so the review could never be approved again. Every slot counts, because a
-///     reopen needs an approved review, so every slot has a signature and no thread is open, and a slot with a
+///     could never get a fresh signature, so the review could never be concluded again. Every slot counts, because a
+///     reopen needs a concluded review, so every slot has a signature and no thread is open, and a slot with a
 ///     signature can not be changed.
 ///     The rules work on values only, so they are tested without any store. The class has no state and is safe to call
 ///     from several threads.

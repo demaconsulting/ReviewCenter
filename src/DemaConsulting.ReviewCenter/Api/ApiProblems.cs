@@ -82,6 +82,7 @@ internal static class ApiProblems
                 or DomainRule.SigningNotAllowed
                 or DomainRule.NoReviewerSlot
                 or DomainRule.BallotNotSubmitted
+                or DomainRule.ConclusionRequired
                 or DomainRule.PasswordChangeRequired => StatusCodes.Status403Forbidden,
             DomainRule.CredentialsUnreadable => StatusCodes.Status500InternalServerError,
             _ => StatusCodes.Status400BadRequest

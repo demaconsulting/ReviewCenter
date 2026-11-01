@@ -83,6 +83,26 @@ public class EvidenceIndexServiceTests
     }
 
     /// <summary>
+    ///     Test that a review concluded as rejected is never listed: the index lists approved reviews only.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceIndexService_Build_RejectedConcludedReview_IsNeverListed()
+    {
+        // Arrange: a review with a set id, concluded as rejected, and an approved one of another set
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        await EvidenceTestSupport.AddReviewAsync(fixture.Store, fixture.Clock, fixture.ProjectId, "set-1", "Core-Logic", TestContent.A);
+        await EvidenceTestSupport.CompleteRejectedAsync(
+            fixture.Checklists, fixture.Signing, fixture.ProjectId, "set-1", await UserIdAsync(fixture, "ann"), AttestationFixture.Password);
+        await AddCompleteAsync(fixture, "set-2", "Other-Set", TestContent.A);
+
+        // Act: build the index
+        var entries = await CreateService(fixture).BuildAsync(fixture.ProjectId, TestContext.Current.CancellationToken);
+
+        // Assert: only the approved review is listed
+        Assert.Equal("Other-Set", Assert.Single(entries).Id);
+    }
+
+    /// <summary>
     ///     Test that a review with a slot that has not signed is not listed.
     /// </summary>
     [Fact]

@@ -41,9 +41,9 @@ internal sealed record ProjectDto(int Id, string Name, string Description, DateT
 /// <param name="CreatedViaApi"><c>true</c> when the review was created with an API token.</param>
 /// <param name="IsFromRepository"><c>true</c> when the review was created from a git repository, <c>false</c> for an upload.</param>
 /// <param name="DueDate">The due date as a UTC calendar day in <c>yyyy-MM-dd</c> form, or <c>null</c> when there is none.</param>
-/// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not approved.</param>
+/// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not concluded (approved or rejected).</param>
 /// <param name="FollowsReviewId">The review this one follows up, or <c>null</c> when it is not a follow-up.</param>
-/// <param name="Approved"><c>true</c> when every reviewer slot holds a current signature and no thread is open (the review is approved and locked).</param>
+/// <param name="Approved"><c>true</c> when the review concluded as approved: every reviewer slot holds a current signature, no thread is open and the outcome is Approved (the review is then locked). For a Rejected review the flag stays <c>false</c>.</param>
 /// <param name="SlotsRequired">The number of reviewer slots, each of which must hold a current signature.</param>
 /// <param name="SlotsSigned">The number of slots that hold a signature of the current record.</param>
 /// <param name="SlotsOutOfDate">The number of slots whose signatures are all of an earlier record.</param>
@@ -119,8 +119,8 @@ internal sealed record ReviewCountsDto(
 /// <param name="Selection">The file selection patterns that were used, or <c>null</c> when none.</param>
 /// <param name="ReviewSetId">The review-set the review was planned from, or <c>null</c>.</param>
 /// <param name="DueDate">The due date as a UTC calendar day in <c>yyyy-MM-dd</c> form, or <c>null</c> when there is none.</param>
-/// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not approved.</param>
-/// <param name="Approved"><c>true</c> when every reviewer slot has signed the current record and no thread is open.</param>
+/// <param name="Overdue"><c>true</c> when the due date is before today (UTC) and the review is not concluded (approved or rejected).</param>
+/// <param name="Approved"><c>true</c> when the review concluded as approved: every reviewer slot has signed the current record, no thread is open and the outcome is Approved. For a Rejected review every slot has signed but the flag stays <c>false</c>.</param>
 /// <param name="ApprovalDigest">The digest of the review record as it is now.</param>
 /// <param name="Slots">The reviewer slots in creation order.</param>
 /// <param name="Counts">The progress counts.</param>

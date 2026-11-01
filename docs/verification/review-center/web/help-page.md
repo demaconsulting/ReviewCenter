@@ -44,6 +44,10 @@ N/A - standard test environment.
 - The Getting started, Reviewers and signing, and API tokens topics each mention the identity provider.
 - The Reviewers and signing topic says that the person who reopened a review cannot sign it again while the project
   rule is on, and that a reopen that would leave a slot without a possible signer is refused.
+- The Reviewers and signing topic says that a Fail answer does not block signing, explains the Rejected outcome and that
+  it needs a conclusion text, and no longer says that a Fail answer blocks signing; the Reading a review topic says that
+  a slot owner writes the conclusion in the Review conclusion card and that a concluded (approved or rejected) review is
+  locked.
 - The Two-factor sign-in topic follows the API tokens topic in the list, has its title, a screenshot with alternative
   text from `/help/`, and describes setting it up, the ten recovery codes shown once, signing in, recovery, signing a
   review (a recovery code cannot sign and a used code needs the next one), turning off, the administrator reset (not for
@@ -92,6 +96,16 @@ scenario is tested by `HelpAttestationPage_Render_ExplainsWhatTheSignatureProves
 while the project rule is on, the person who reopened a review cannot sign it again, and that a reopen that would leave
 a slot without anyone who may sign is refused; no link begins with `#`. This scenario is tested by
 `HelpSigningPage_Render_ExplainsTheReopenerRule`.
+
+**HelpPage_Signing_NoLongerSaysFailBlocks**: The Reviewers and signing page is rendered. The text says that a Fail
+answer does not block signing, names the Rejected outcome, and does not contain the old sentence about an answer of
+Fail that blocks signing. This scenario is tested by `HelpPage_Signing_NoLongerSaysFailBlocks`.
+
+**HelpPage_ReadingReview_ShowsSlotOwnerNote**: The Reading a review page is rendered. The text tells a person who holds
+a reviewer slot that they own a ballot, answer the checks in it, submit it and then sign, and that the review concludes
+when every slot has signed the same, current record; it says that a concluded (approved or rejected) review is locked,
+and tells a person who holds a slot of the review that the conclusion is written in the Review conclusion card. This
+scenario is tested by `HelpPage_ReadingReview_ShowsSlotOwnerNote`.
 
 **HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors**: The API tokens page is rendered; the heading is
 "Automation and API tokens", the screenshot is served from `/help/` with alternative text, and the text names the

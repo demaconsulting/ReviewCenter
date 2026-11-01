@@ -27,15 +27,20 @@ N/A - standard test environment.
   is `InReview` and flagged as reopened.
 - A review is `Approved` only when every slot has a valid signature, nothing blocks it, and no thread is open; a
   review whose slots are all signed but that has an open thread is `InReview` and blocked.
+- A review whose ballots agree on a Fail, with a conclusion text and every slot signed for the rejection, has the stage
+  `Rejected`, a conclusion of Rejected, is not approved, is not blocked, and waits on nobody. A Fail that is agreed is no
+  blocker: the failed count is kept, no blocker names it, and the review is blocked only while the conclusion text is
+  missing (`ConclusionRequired`).
 - The signature counts equal the slots of the approval status; a comment that is included in the report, added after a
   signature, turns that signature from signed into out of date, while chat does not.
-- The open-thread, unanswered-check, and Fail counts equal the numbers in the blocker sentences (the check counts are
-  those of the consolidated checklist of the submitted ballots; a review with a single slot counts its one ballot before
-  the hand-in); a review with any of them, with a disputed check, or without a checklist, that is not approved is
-  blocked, an approved review is not.
+- The open-thread, unanswered-check, and disputed-check counts equal the numbers in the blocker sentences, and the Fail
+  count is the informational count of the status (the check counts are those of the consolidated checklist of the
+  submitted ballots; a review with a single slot counts its one ballot before the hand-in); a review with open threads,
+  unanswered checks, disputed checks, a missing conclusion text, or without a checklist, that is not concluded, is
+  blocked, a concluded review is not.
 - `WaitingOn` names the primary and a different alternate of every slot that is not signed, each person once, leaves out
-  signed slots, shows a disabled person with the suffix, and is empty for an approved review.
-- A review is overdue from the day after its due date and not on it, never without a date, and never when approved.
+  signed slots, shows a disabled person with the suffix, and is empty for a concluded review.
+- A review is overdue from the day after its due date and not on it, never without a date, and never when concluded.
 - The last activity is the time of the newest audit entry of the review, the creation time when there is none, and
   entries of another review, of another project, and without a review do not count.
 - Members, read-only members, project administrators, and system administrators may read the progress; a user outside the
@@ -63,6 +68,21 @@ one ballot counts before a hand-in. The counts are compared with the numbers in 
 status and with the counts of the status, and the review is blocked. An approved review (its slot owner answered every
 check and handed the ballot in, then signed) has no blockers and is not blocked. This
 scenario is tested by `ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers`.
+
+**ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked**: One slot whose ballot is a Fail,
+with the conclusion text, signs the rejection. The stage is Rejected, the conclusion is Rejected, the review is not
+approved and not blocked, nobody is waited on, and one slot is signed. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_RejectedConcluded_StageRejectedNotBlocked`.
+
+**ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired**: One slot whose ballot is a Fail,
+without the conclusion text. The stage is In review, `ConclusionRequired` is set, the review is blocked, the failed count
+is one, the approval blockers hold `SigningService.ConclusionRequiredText`, and no blocker names Fail. This scenario is
+tested by `ReviewProgressService_GetProgressAsync_RejectedBlankText_BlockedConclusionRequired`.
+
+**ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked**: One slot whose ballot is a Fail, with the
+conclusion text, not yet signed. The stage is In review, no conclusion is needed, the review is not blocked, the failed
+count is one, and the approval has no blocker. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_FailOnlyAgreed_NotBlocked`.
 
 **ReviewProgressService_GetProgressAsync_ReviewWithoutChecklist_IsBlocked**: A review is stored without a checklist,
 and another review has a checklist, every check answered, and a slot. The first has `NoChecklist` set, is blocked, is

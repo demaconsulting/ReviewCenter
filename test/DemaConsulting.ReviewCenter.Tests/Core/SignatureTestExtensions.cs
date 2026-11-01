@@ -210,8 +210,9 @@ internal sealed class SignedReviewWorld
     ///     rules of the signing service (a handed-in ballot, no dispute) do not apply.
     /// </summary>
     /// <param name="slotNumber">The number of the slot, 1 to 3.</param>
+    /// <param name="outcome">The outcome the signature attests; approved by default.</param>
     /// <returns>A task that completes when the signature is stored.</returns>
-    public async Task StoreSignatureAsync(int slotNumber)
+    public async Task StoreSignatureAsync(int slotNumber, ReviewOutcome outcome = ReviewOutcome.Approved)
     {
         var slot = Slots[slotNumber - 1];
         var digest = (await Signing.GetApprovalAsync(ProjectId, ReviewId, TestContext.Current.CancellationToken))!.Digest;
@@ -226,7 +227,8 @@ internal sealed class SignedReviewWorld
                 Role = SlotRole.Primary,
                 SignedAt = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero),
                 RecordDigest = digest,
-                Meaning = "Reviewed and approved"
+                Outcome = outcome,
+                Meaning = SigningService.MeaningFor(outcome)
             },
             TestContext.Current.CancellationToken);
     }

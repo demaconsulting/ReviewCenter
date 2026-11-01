@@ -165,7 +165,7 @@ public static class ReviewLimits
     public const int MaxConclusionTextLength = 4000;
 
     /// <summary>
-    ///     The longest accepted reason for reopening an approved review, in characters; it is half of
+    ///     The longest accepted reason for reopening a concluded (approved or rejected) review, in characters; it is half of
     ///     <see cref="AuditText.MaxDetailLength"/> so the reason and the previous digest fit in one audit entry.
     /// </summary>
     public const int MaxReopenReasonLength = 250;

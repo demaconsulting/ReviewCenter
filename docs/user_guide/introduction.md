@@ -8,8 +8,9 @@ verb. The current release lets you sign in, create projects and draft reviews ma
 content fingerprint of each review, lets you discuss the files in threaded comments, gives each review a
 checklist, and lets reviewers sign a review with their password (or by signing in again at an identity provider), with
 every action recorded under the signed-in
-user. A review is Approved when it has at least one reviewer slot and every slot is signed for the current record; it
-is then locked, and a project administrator can reopen it. Every change is also recorded in a hash-chained audit trail
+user. A review is Approved when it has at least one reviewer slot and every slot is signed as approved for the current
+record, and Rejected when the reviewers agree on a Fail and every slot is signed as rejected; it is then locked, and a
+project administrator can reopen it. Every change is also recorded in a hash-chained audit trail
 that can be read and verified. Project roles include a read-only Auditor, who can read a project and its audit trail
 and change nothing.
 The web interface has a built-in Help with short
@@ -50,7 +51,6 @@ Each chapter of this guide serves a group of readers:
 
 These items are planned but not yet implemented:
 
-- Further review states (for example a signed "rejected" outcome); today a review is In review or Approved and locked
 - External anchoring, export, and retention of the audit trail
 - Self-service password reset (an administrator can already set a new password), a required second factor (enforced for
   system administrators, or by a policy of a project), a QR code for the setup, and a connection to several identity

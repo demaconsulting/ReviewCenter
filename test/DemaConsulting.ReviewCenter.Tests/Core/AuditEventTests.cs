@@ -314,7 +314,7 @@ public class AuditEventTests
         Assert.Equal("slot 1: primary ann, alternate bob", drafts[0].Detail);
         Assert.Equal("slot 1: primary bob, alternate none", drafts[1].Detail);
         Assert.Equal("slot 1: primary ann, alternate bob", drafts[2].Detail);
-        Assert.Equal($"slot 1, role Primary, record digest {digest}", drafts[3].Detail);
+        Assert.Equal($"slot 1, role Primary, outcome Approved, record digest {digest}", drafts[3].Detail);
         Assert.Equal("Ann (ann)", drafts[3].ActorName);
         Assert.DoesNotContain(drafts, d => d.Detail.Contains(Password, StringComparison.Ordinal));
     }

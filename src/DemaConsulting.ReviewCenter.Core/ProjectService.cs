@@ -774,7 +774,7 @@ public sealed class ProjectService
             throw new DomainRuleException(
                 DomainRule.MemberHasOpenReviewWork,
                 $"{user.DisplayName} still has reviewer work to do in {names}, so cannot become an auditor yet. " +
-                "Sign it, change the reviewer of the slot, or wait until the review is approved, then try again.");
+                "Sign it, change the reviewer of the slot, or wait until the review is concluded, then try again.");
         }
     }
 
