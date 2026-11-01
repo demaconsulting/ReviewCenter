@@ -92,7 +92,9 @@ the signature that can alter the record: a ballot handed in, taken back or given
 conclusion, a Finding or a reply that goes in the report, a Finding resolved with its note, and a comment put in the
 report or taken out. It is an explanation, not a proof: ReviewCenter decides whether a signature still fits by
 comparing the record itself, and a listed change may have left the record as it was, for example when a reply was
-not part of the report. A reviewer who has not handed in a ballot sees only that something changed.
+not part of the report. A reviewer who has not handed in a ballot still sees each change with its time and who made it,
+but the details of hidden answers, comments and discussions about checks are replaced by one sentence, "Something in the
+report changed (details are hidden until you hand in your own ballot)", until the ballot is handed in.
 
 ## Answering the Checklist
 

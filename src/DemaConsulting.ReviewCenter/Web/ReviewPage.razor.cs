@@ -1205,7 +1205,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
                 : await ThreadService.GetCapabilitiesAsync(actor, ProjectId, ReviewId);
             Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: actor?.Username);
             Approval = await SigningService.GetApprovalAsync(actor, ProjectId, ReviewId);
-            StatusView = await StatusService.GetStatusAsync(actor, ProjectId, ReviewId);
+            StatusView = Approval is null
+                ? null
+                : await StatusService.GetStatusAsync(actor, ProjectId, ReviewId, Approval, Threads, Capabilities);
             if (IsLocked)
             {
                 // A locked review accepts no change, so nothing is left to confirm
@@ -2352,7 +2354,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
             if (Warning?.Key == DiscussWarningKey(itemId))
             {
-                RenderWarning(builder, Warning.Slots);
+                // Its own region, so its sequence numbers cannot collide with the ones of the composer above
+                builder.AddContent(30, WarningFragment());
             }
         };
     }

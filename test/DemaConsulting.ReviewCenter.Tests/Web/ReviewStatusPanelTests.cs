@@ -103,6 +103,53 @@ public class ReviewStatusPanelTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Creates a review in which ann and bob handed in ballots that differ on the first check, and bob had signed
+    ///     the report as it was. The signature is stored directly: a disagreement blocks signing, and a signature
+    ///     given before the disagreement would already be stale and give no warning.
+    /// </summary>
+    /// <returns>The project identity and the slot identity of bob.</returns>
+    private async Task<(int ProjectId, int SlotId)> ArrangeSignedThenDisputedAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob", ChecklistOutcome.Fail);
+        var slotId = (await SlotIdsAsync(projectId))[1];
+        var bob = await UserStore.GetByUsernameAsync("bob", cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, ReviewKey, cancellationToken);
+        await Store.AddSignatureAsync(
+            new ReviewSignature
+            {
+                ProjectId = projectId,
+                ReviewId = ReviewKey,
+                SlotId = slotId,
+                UserId = bob!.Id,
+                DisplayName = "Bob",
+                Role = SlotRole.Primary,
+                SignedAt = new DateTimeOffset(2025, 3, 3, 5, 6, 7, TimeSpan.Zero),
+                RecordDigest = approval!.Digest,
+                Meaning = "Reviewed and approved"
+            },
+            cancellationToken);
+        return (projectId, slotId);
+    }
+
+    /// <summary>
+    ///     Opens the Discuss form of the first disputed check in the status panel, types a text and chooses the Finding
+    ///     kind, so that starting the discussion changes the report, and starts it.
+    /// </summary>
+    /// <param name="cut">The rendered review page.</param>
+    /// <returns>A task that completes when the discussion was asked to start.</returns>
+    private static async Task StartFindingDiscussionAsync(IRenderedComponent<ReviewPage> cut)
+    {
+        await cut.Find($"[data-testid='status-discuss-{FirstItemTestId}']").ClickAsync();
+        await cut.Find($"[data-testid='discuss-text-{FirstItemTestId}']").InputAsync("This check needs a fix");
+        await cut.Find($"[data-testid='discuss-kind-{FirstItemTestId}-finding']")
+            .ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "finding" });
+        await cut.Find($"[data-testid='discuss-start-{FirstItemTestId}']").ClickAsync();
+    }
+
+    /// <summary>
     ///     Test that the panel shows every reviewer with the state of the ballot (Not started, Draft, Handed in) and
     ///     of the signature, and marks the viewer.
     /// </summary>
@@ -153,6 +200,62 @@ public class ReviewStatusPanelTests : BallotPageTestBase
         Assert.Empty(cut.FindAll($"[data-testid='status-discuss-{FirstItemTestId}']"));
         Assert.Empty(cut.FindAll($"[data-testid='discuss-form-{FirstItemTestId}']"));
         Assert.NotNull(cut.Find("[data-testid='check-discussions']"));
+    }
+
+    /// <summary>
+    ///     Test that a Discuss from the status panel that adds a finding to the report, after a reviewer signed, shows
+    ///     the signature warning in the form, stores nothing until it is confirmed, and then stores the discussion and
+    ///     makes the signature stale.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm()
+    {
+        // Arrange: bob signed the report as it was, and the viewer ann sees the dispute
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (projectId, slotId) = await ArrangeSignedThenDisputedAsync();
+        var cut = RenderReview(projectId);
+
+        // Act: start a discussion that goes in the report
+        await StartFindingDiscussionAsync(cut);
+
+        // Assert: the warning names bob, nothing is stored, and the form stays open with the typed text
+        Assert.Contains("Bob", cut.Find("[data-testid='signature-warning-slots']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(await Threads.ListAsync(projectId, ReviewKey, cancellationToken));
+        Assert.Equal("This check needs a fix", cut.Find($"[data-testid='discuss-text-{FirstItemTestId}']").GetAttribute("value"));
+
+        // Act: confirm
+        await cut.Find("[data-testid='signature-warning-confirm']").ClickAsync();
+
+        // Assert: one finding about the check, no warning and no form, and bob's signature is stale
+        var thread = Assert.Single(await Threads.ListAsync(projectId, ReviewKey, cancellationToken));
+        Assert.Equal(FirstItemId, thread.CheckItemId);
+        Assert.Equal(ThreadKind.Finding, thread.Kind);
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Empty(cut.FindAll($"[data-testid='discuss-form-{FirstItemTestId}']"));
+        Assert.Equal(
+            "Signed, then the review changed", cut.Find($"[data-testid='status-signature-{slotId}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that canceling the signature warning of a Discuss from the status panel stores nothing, removes the
+    ///     warning and keeps the form with the typed text.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_DisputedCheck_DiscussWarningCancel_StoresNothing()
+    {
+        // Arrange: bob signed the report as it was, and the viewer ann started a finding discussion
+        var (projectId, _) = await ArrangeSignedThenDisputedAsync();
+        var cut = RenderReview(projectId);
+        await StartFindingDiscussionAsync(cut);
+        Assert.NotNull(cut.Find("[data-testid='signature-warning']"));
+
+        // Act
+        await cut.Find("[data-testid='signature-warning-cancel']").ClickAsync();
+
+        // Assert: nothing is stored, the warning is gone and the form still holds the text
+        Assert.Empty(await Threads.ListAsync(projectId, ReviewKey, TestContext.Current.CancellationToken));
+        Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+        Assert.Equal("This check needs a fix", cut.Find($"[data-testid='discuss-text-{FirstItemTestId}']").GetAttribute("value"));
     }
 
     /// <summary>

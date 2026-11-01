@@ -101,7 +101,9 @@ button always agree with Core.
   row, so the panel stays coherent there.
 - **Disputed checks** (`status-disputed`): each check the handed-in ballots answered differently, with a Discuss button
   (`status-discuss-{id}`) that opens the same `ThreadComposer` as the checklist page for the check thread. A viewer who
-  may not see them (`BallotVisibility`) gets the notice "hidden until you submit your ballot" and no count.
+  may not see them (`BallotVisibility`) gets the notice "hidden until you submit your ballot" and no count. When
+  starting the discussion would make a signature stale, the signature warning is shown in its own render region next to
+  the form, which keeps the text typed and stores nothing until the person confirms.
 - **Open threads**: the open Questions and Findings from `ThreadCounts`, drawn like `ThreadKindBadge` with icon and text.
 - **Next step** (`next-action`): exactly one primary button; the target is a link to the checklist, a check, a thread,
   or the signing form, or a plain sentence when the viewer has nothing to do.
@@ -325,8 +327,9 @@ the previous review, its file content, or a half-typed comment. Each file's `Vie
 **RefreshAsync**: Reloads everything the record depends on: the threads (without the discussions about checks for a
 viewer who may not see the answers of the other reviewers, see *BallotVisibility*), the checklist (for such a viewer a
 note "Hidden until you answer" in place of the standing, and the conclusion area replaced by a note that the conclusion
-stays hidden until the own ballot is handed in), the approval (with the reopen
-history), the candidates for a slot, the review rule and the administrator right for the reopen form, and the user name
+stays hidden until the own ballot is handed in), the approval (with the reopen history), the status panel (built from
+the threads, the thread capabilities and the approval just loaded, so they are not read a second time), the candidates
+for a slot, the review rule and the administrator right for the reopen form, and the user name
 of the signed-in user. The user name is read straight from the authentication
 state, not through `GetActorAsync`, so that a reload that meets an ended sign-in state does not fail; the page is replaced
 by the session-ended message instead. It runs when the page loads and after every change

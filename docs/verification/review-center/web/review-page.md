@@ -1065,6 +1065,15 @@ panel lists each reviewer with the words for the ballot and the signature, shows
 icon and text, renders exactly one `next-action` element, and a Discuss button on a disputed check starts the check
 thread. These scenarios are tested by the tests of the same names.
 
+**ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm**: A Discuss from the panel
+that adds a finding to the report after bob signed shows the signature warning that names bob, stores nothing and keeps
+the form with its text; Confirm then stores one Finding about the check and makes the signature stale. This scenario is
+tested by `ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm`.
+
+**ReviewStatusPanel_DisputedCheck_DiscussWarningCancel_StoresNothing**: Cancel on that warning stores nothing, removes
+the warning and keeps the form with its text. This scenario is tested by
+`ReviewStatusPanel_DisputedCheck_DiscussWarningCancel_StoresNothing`.
+
 **ReviewStatusPanel_MaskedViewer_HidesDisputes**: A viewer who has not handed in the own ballot sees the notice
 "hidden until you submit your ballot", no disputed check, and no discuss button. This scenario is tested by
 `ReviewStatusPanel_MaskedViewer_HidesDisputes`.

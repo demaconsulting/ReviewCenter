@@ -119,6 +119,41 @@ public class ReviewStatusServiceTests
     }
 
     /// <summary>
+    ///     Signs the review in a slot as a user, after looking at the current record.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <param name="username">The user name of the signer, who holds the slot.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <returns>A task that completes when the signature is stored.</returns>
+    private static async Task SignAsync(BallotMaskingWorld world, string username, int slotId)
+    {
+        var actor = BallotMaskingWorld.ActorOf(username);
+        var approval = await world.Signing.GetApprovalAsync(actor, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        await world.Signing.SignAsync(
+            actor,
+            world.ProjectId,
+            BallotMaskingWorld.ReviewId,
+            slotId,
+            approval!.Digest,
+            BallotMaskingWorld.Password,
+            Token);
+    }
+
+    /// <summary>
+    ///     Describes a status as one text, because the records of a status do not compare their lists.
+    /// </summary>
+    /// <param name="status">The status.</param>
+    /// <returns>The text; two statuses with the same content give the same text.</returns>
+    private static string Describe(ReviewStatus status)
+    {
+        var reviewers = string.Join(",", status.Reviewers.Select(r => $"{r.Number}:{r.Name}:{r.Ballot}:{r.Signature}:{r.IsYou}"));
+        var disputes = string.Join(",", status.DisputedChecks.Select(d => $"{d.ItemId}:{d.CanDiscuss}"));
+        var changes = string.Join(",", status.ChangesSinceSigning.Select(s => $"{s.Number}:{s.Changes.Count}"));
+        return $"{status.IsMasked}|{status.IsConcluded}|{status.HasChecklist}|{reviewers}|{disputes}|{status.OpenQuestions}"
+               + $"|{status.OpenFindings}|{status.NextAction.Kind}|{status.NextAction.Label}|{changes}";
+    }
+
+    /// <summary>
     ///     Test that every slot is listed in order with the state of its ballot and its signature, and that the viewer is
     ///     marked.
     /// </summary>
@@ -403,6 +438,189 @@ public class ReviewStatusServiceTests
             maskedChanges.Select(c => c.Reason));
         Assert.DoesNotContain(maskedChanges, c => c.Reason.Contains("check", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("Started a finding that goes in the report", Assert.Single(open.ChangesSinceSigning).Changes.Select(c => c.Reason));
+    }
+
+    /// <summary>
+    ///     Test that a change after the signature is still listed when the trail is far longer than any fixed limit: the
+    ///     whole trail is read, so the newest entry is not dropped.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries()
+    {
+        // Arrange: ann signed and the review changed; then more than 20,000 entries that alter nothing, and the
+        // newest entry of all changes the conclusion
+        var world = await BallotMaskingWorld.CreateAsync();
+        await ArrangeSignedThenChangedAsync(world);
+        var filler = AuditDraft.By(
+            BallotMaskingWorld.ActorOf("lead"), "slot.added", "slot 3", world.ProjectId, BallotMaskingWorld.ReviewId);
+        for (var i = 0; i < 20_050; i++)
+        {
+            await world.AuditStore.AppendAsync(filler, Token);
+        }
+
+        await AppendAsync(world, "lead", "review.conclusion-changed", "length 0 -> 12");
+
+        // Act
+        var status = await StatusAsync(world, "ann");
+
+        // Assert
+        var changes = Assert.Single(status.ChangesSinceSigning).Changes;
+        Assert.Equal("Changed the review conclusion", changes[^1].Reason);
+        Assert.Equal(["Took a ballot back to change it", "Handed in a ballot", "Changed the review conclusion"],
+            changes.Select(c => c.Reason));
+        Assert.True(world.AuditStore.MatchingReads > 100);
+    }
+
+    /// <summary>
+    ///     Test that the reviewer who reopened a review is not offered the signing form while the project does not let a
+    ///     reopener sign again, and is offered it, with the words for a signature that is out of date, when the project
+    ///     lets a reopener sign.
+    /// </summary>
+    /// <param name="ruleOn">Whether the project forbids the reopener to sign again.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule(bool ruleOn)
+    {
+        // Arrange: padm (with ann as alternate) and bob signed, and padm reopened the review
+        var world = await BallotMaskingWorld.CreateAsync();
+        var first = await world.Signing.AddSlotAsync(
+            BallotMaskingWorld.ActorOf("lead"), world.ProjectId, BallotMaskingWorld.ReviewId, world.Ids["padm"], world.Ids["ann"], Token);
+        var second = await world.SeatAsync("bob");
+        foreach (var name in new[] { "padm", "bob" })
+        {
+            await world.AnswerAsync(name);
+            await world.SubmitAsync(name);
+        }
+
+        await SignAsync(world, "padm", first.Id);
+        await SignAsync(world, "bob", second.Id);
+        await world.Signing.ReopenReviewAsync(
+            BallotMaskingWorld.ActorOf("padm"), world.ProjectId, BallotMaskingWorld.ReviewId, "Look again.", Token);
+        if (!ruleOn)
+        {
+            await TestServices.Projects(world.Store, world.Clock).SetReviewRuleOffAsync(
+                world.ProjectId, ReviewRule.NonReopenerSigning, Token);
+        }
+
+        // Act
+        var reopener = await StatusAsync(world, "padm");
+        var other = await StatusAsync(world, "bob");
+
+        // Assert
+        Assert.Equal(SlotSignatureState.OutOfDate, reopener.Reviewers[0].Signature);
+        Assert.Equal(ruleOn ? NextActionKind.WaitForOthers : NextActionKind.Sign, reopener.NextAction.Kind);
+        if (!ruleOn)
+        {
+            Assert.Equal("Look at the changes and sign again", reopener.NextAction.Label);
+        }
+
+        Assert.Equal(NextActionKind.Sign, other.NextAction.Kind);
+        Assert.Equal("Look at the changes and sign again", other.NextAction.Label);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who reopened a review and holds a slot that was never signed is offered the signing form
+    ///     only when the project lets a reopener sign.
+    /// </summary>
+    /// <param name="ruleOn">Whether the project forbids the reopener to sign again.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule(bool ruleOn)
+    {
+        // Arrange: ann and bob signed, padm reopened the review and then took a new slot, handed in and has not signed
+        var world = await BallotMaskingWorld.CreateAsync();
+        var first = await world.SeatAsync("ann");
+        var second = await world.SeatAsync("bob");
+        foreach (var name in new[] { "ann", "bob" })
+        {
+            await world.AnswerAsync(name);
+            await world.SubmitAsync(name);
+        }
+
+        await SignAsync(world, "ann", first.Id);
+        await SignAsync(world, "bob", second.Id);
+        await world.Signing.ReopenReviewAsync(
+            BallotMaskingWorld.ActorOf("padm"), world.ProjectId, BallotMaskingWorld.ReviewId, "Look again.", Token);
+        await world.SeatAsync("padm");
+        await world.AnswerAsync("padm");
+        await world.SubmitAsync("padm");
+        if (!ruleOn)
+        {
+            await TestServices.Projects(world.Store, world.Clock).SetReviewRuleOffAsync(
+                world.ProjectId, ReviewRule.NonReopenerSigning, Token);
+        }
+
+        // Act
+        var reopener = await StatusAsync(world, "padm");
+
+        // Assert
+        Assert.Equal(SlotSignatureState.NotSigned, reopener.Reviewers[2].Signature);
+        Assert.Equal(ruleOn ? NextActionKind.WaitForOthers : NextActionKind.Sign, reopener.NextAction.Kind);
+        if (!ruleOn)
+        {
+            Assert.Equal("Sign the review", reopener.NextAction.Label);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the status built from the approval, the threads and the capabilities a caller passes in equals the
+    ///     status the service reads itself, and that the passed in capabilities are the ones used.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_PassedInValues_AreUsedInsteadOfReread()
+    {
+        // Arrange: ann says Pass, bob says Fail on the first check
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        await world.SeatAsync("cyd");
+
+        // Act / Assert: the same values the service would read give the same status, for every kind of viewer
+        foreach (var name in new[] { "ann", "bob", "lead", "cyd" })
+        {
+            var actor = BallotMaskingWorld.ActorOf(name);
+            var read = await StatusAsync(world, name);
+            var approval = await world.Signing.GetApprovalAsync(actor, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+            var threads = await world.Threads.ListAsync(actor, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+            var capabilities = await world.Threads.GetCapabilitiesAsync(actor, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+            var passed = await world.Status.GetStatusAsync(
+                actor, world.ProjectId, BallotMaskingWorld.ReviewId, approval!, threads, capabilities, Token);
+            Assert.NotNull(passed);
+            Assert.Equal(Describe(read), Describe(passed));
+        }
+
+        // Act / Assert: capabilities that allow nothing are used as given, so ann can no longer discuss the dispute
+        var ann = BallotMaskingWorld.ActorOf("ann");
+        var annApproval = await world.Signing.GetApprovalAsync(ann, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var none = await world.Status.GetStatusAsync(
+            ann, world.ProjectId, BallotMaskingWorld.ReviewId, annApproval!, [], ThreadCapabilities.None, Token);
+        Assert.NotNull(none);
+        Assert.True(Assert.Single((await StatusAsync(world, "ann")).DisputedChecks).CanDiscuss);
+        Assert.False(Assert.Single(none.DisputedChecks).CanDiscuss);
+    }
+
+    /// <summary>
+    ///     Test that the overload with values passed in still refuses a person who may not see the project, and still
+    ///     has no status for a review that does not exist.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_PassedInValues_OutsiderIsStillRefused()
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+        var lead = BallotMaskingWorld.ActorOf("lead");
+        var approval = await world.Signing.GetApprovalAsync(lead, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Act
+        var refusal = await Assert.ThrowsAsync<DomainRuleException>(() => world.Status.GetStatusAsync(
+            BallotMaskingWorld.ActorOf("out"), world.ProjectId, BallotMaskingWorld.ReviewId, approval!, [], ThreadCapabilities.None, Token));
+        var missing = await world.Status.GetStatusAsync(
+            lead, world.ProjectId, "nope", approval!, [], ThreadCapabilities.None, Token);
+
+        // Assert
+        Assert.Equal(DomainRule.ProjectNotFound, refusal.Rule);
+        Assert.Null(missing);
     }
 
     /// <summary>

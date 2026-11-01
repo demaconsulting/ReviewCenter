@@ -52,8 +52,22 @@ place to go to; otherwise the label is only a sentence).
 - *Returns*: `ReviewStatus?`, `null` when the review does not exist.
 - *Algorithm*:
   - Require that the viewer may see the project.
-  - Read the snapshot, the review, the approval as the viewer may see it, the ballot view, the threads the viewer may
-    see, and what the viewer may start. The viewer is masked when the approval or the ballot view says so.
+  - Read the approval as the viewer may see it, the threads the viewer may see, and what the viewer may start, then
+    build the status from them as described for the overload below.
+- *Preconditions*: The viewer may see the project; otherwise `ProjectNotFound` is raised.
+
+**ReviewStatusService.GetStatusAsync (with values passed in)**: Builds the status for a viewer from values the caller
+has already read, so the review page does not read them a second time.
+
+- *Parameters*: `Actor? actor`, `int projectId`, `string reviewId`, the `ReviewApproval`, the list of `ReviewThread`
+  and the `ThreadCapabilities` of the same viewer, and a cancellation token.
+- *Returns*: `ReviewStatus?`, `null` when the review does not exist.
+- *Algorithm*:
+  - Require that the viewer may see the project.
+  - Use the values passed in instead of reading them again, and continue in the builder that the other overload also
+    uses.
+  - Read the snapshot, the review and the ballot view. The viewer is masked when the approval or the ballot view says
+    so.
   - List the reviewers in slot order with the state of the ballot and the signature; a review without a checklist has no
     ballot to hand in, so its slots count as handed in.
   - List the disputed checks from the ballot view, in checklist order, with `CanDiscuss` set when the viewer may start a
@@ -61,7 +75,8 @@ place to go to; otherwise the label is only a sentence).
   - Count the open questions and findings with `ThreadCounts`.
   - Decide the next action with `ReviewNextAction.Decide` and the facts about the viewer.
   - Derive the changes since signing for every slot whose signature is out of date.
-- *Preconditions*: The viewer may see the project; otherwise `ProjectNotFound` is raised.
+- *Preconditions*: The viewer may see the project; otherwise `ProjectNotFound` is raised. The values passed in were
+  read for the same viewer.
 
 **ReviewNextAction.Decide**: The rule. It is pure and gives exactly one action.
 
@@ -97,7 +112,7 @@ place to go to; otherwise the label is only a sentence).
 
 A viewer who may not see the project is refused with the `ProjectNotFound` rule, so that the existence of a project is
 not revealed. A review that does not exist gives `null`. Null arguments of the types raise `ArgumentNullException`. The
-audit trail is read in batches up to a fixed limit, which is far above the size of a review.
+audit trail is read in batches to the end of the trail, however long it is, because the change rules replay every entry.
 
 #### Dependencies
 

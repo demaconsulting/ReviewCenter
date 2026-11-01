@@ -28,6 +28,12 @@ N/A - standard test environment.
   in the changes since a signature.
 - The changes since a signature list only the entries after the signature that can alter the report, a reply or a
   comment only when it is in the report, and nothing when the signature still matches.
+- The audit trail of a long review is read to its end, so the newest entries are listed however many entries precede
+  them.
+- A reviewer who reopened a review is offered the signing form only when the project lets a reopener sign again, with
+  the words for a signature that lapsed or for a first signature as it applies.
+- A status built from the approval, the threads and the capabilities that a caller passes in equals the status the
+  service reads itself, uses the values passed in, and still refuses a viewer who may not see the project.
 
 #### Test Scenarios
 
@@ -86,13 +92,35 @@ signature are not. This scenario is tested by `ReviewStatus_ChangesSinceSigning_
 **ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches**: A signature that still matches has no list of
 changes. This scenario is tested by `ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches`.
 
-**ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer**: A viewer who may not see the others reads the neutral
-sentence for the entries that the audit masking hides. This scenario is tested by
-`ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer`.
+**ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer**: A viewer who may not see the others still reads the time, the
+person and the general reason of each change, and reads the neutral sentence for the entries whose details the audit
+masking hides. This scenario is tested by `ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer`.
+
+**ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries**: More than 20,000 entries that alter nothing are
+followed by a change of the conclusion; the status still lists that newest change, because the trail is read to its end.
+This scenario is tested by `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries`.
 
 **ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries**: A resolution note counts only for a Finding, which the
 rule learns from the entries that start a thread or change its kind, also those before the signature. This scenario is
 tested by `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`.
+
+**ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule**: A reviewer who reopened an approved review
+and whose signature no longer matches is told to wait while the project forbids a reopener to sign again, and to look at
+the changes and sign again when it does not; a reviewer who did not reopen is always asked to sign again. This scenario
+is tested by `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`.
+
+**ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule**: A reviewer who reopened a review and then
+took a new slot, which has no signature, is told to wait while the project forbids a reopener to sign again, and to sign
+the review when it does not. This scenario is tested by
+`ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule`.
+
+**ReviewStatus_PassedInValues_AreUsedInsteadOfReread**: For every kind of viewer, the status built from the approval,
+the threads and the capabilities passed in equals the status the service reads itself, and capabilities that allow
+nothing are used as given. This scenario is tested by `ReviewStatus_PassedInValues_AreUsedInsteadOfReread`.
+
+**ReviewStatus_PassedInValues_OutsiderIsStillRefused**: The overload with values passed in refuses a viewer outside the
+project and gives nothing for a missing review. This scenario is tested by
+`ReviewStatus_PassedInValues_OutsiderIsStillRefused`.
 
 #### Requirements Coverage
 
@@ -104,10 +132,14 @@ tested by `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`.
 - **ReviewCenter-ReviewStatusService-Status**: `ReviewStatus_Reviewers_ShowBallotAndSignatureState`,
   `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`, `ReviewStatus_Auditor_SeesDisputesButCannotDiscuss`,
   `ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull`, `ReviewStatus_NoSlots_LeadIsAskedToAddReviewers`,
-  `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`
+  `ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer`, `ReviewStatus_PassedInValues_AreUsedInsteadOfReread`,
+  `ReviewStatus_PassedInValues_OutsiderIsStillRefused`,
+  `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`,
+  `ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule`
 - **ReviewCenter-ReviewStatusService-MaskedViewer**: `ReviewStatus_MaskedViewer_NoDisputedChecks`,
   `ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer`
 - **ReviewCenter-ReviewStatusService-ChangesSinceSigning**:
   `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`,
   `ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches`,
-  `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`
+  `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`,
+  `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries`

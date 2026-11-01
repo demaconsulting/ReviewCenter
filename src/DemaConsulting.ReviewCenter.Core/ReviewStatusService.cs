@@ -47,11 +47,6 @@ public sealed class ReviewStatusService
     private const int BatchSize = 200;
 
     /// <summary>
-    ///     The largest number of audit entries of one review that are read; a review has far fewer.
-    /// </summary>
-    private const int MaxEntries = 20_000;
-
-    /// <summary>
     ///     The store of reviews, slots, ballots and signatures.
     /// </summary>
     private readonly IReviewStore _store;
@@ -141,10 +136,76 @@ public sealed class ReviewStatusService
         CancellationToken cancellationToken = default)
     {
         await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        var approval = await _signing.GetApprovalAsync(actor, projectId, reviewId, cancellationToken);
+        if (approval is null)
+        {
+            return null;
+        }
+
+        var threads = await _threads.ListAsync(actor, projectId, reviewId, cancellationToken);
+        var capabilities = await _threads.GetCapabilitiesAsync(actor, projectId, reviewId, cancellationToken);
+        return await BuildStatusAsync(actor, projectId, reviewId, approval, threads, capabilities, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Gets the "Where are we?" status of a review for a viewer from values the caller has already read.
+    /// </summary>
+    /// <remarks>
+    ///     The values passed in are used instead of being read again, so a page that has just loaded them does not read
+    ///     them a second time. They must have been read for the same viewer, or the status would show what that viewer
+    ///     may not see.
+    /// </remarks>
+    /// <param name="actor">The signed-in user who looks; must be allowed to see the project.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="approval">The approval status of the review as the viewer may see it.</param>
+    /// <param name="threads">The threads of the review the viewer may see.</param>
+    /// <param name="capabilities">What the viewer may start in the review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The status, or <c>null</c> when the review does not exist.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="approval"/> or <paramref name="threads"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project (or it does not
+    ///     exist).
+    /// </exception>
+    public async Task<ReviewStatus?> GetStatusAsync(
+        Actor? actor,
+        int projectId,
+        string reviewId,
+        ReviewApproval approval,
+        IReadOnlyList<ReviewThread> threads,
+        ThreadCapabilities capabilities,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(approval);
+        ArgumentNullException.ThrowIfNull(threads);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        return await BuildStatusAsync(actor, projectId, reviewId, approval, threads, capabilities, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Builds the status of a review from the approval, the threads and the capabilities of a viewer.
+    /// </summary>
+    /// <param name="actor">The viewer.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="approval">The approval status as the viewer may see it.</param>
+    /// <param name="threads">The threads the viewer may see.</param>
+    /// <param name="capabilities">What the viewer may start.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The status, or <c>null</c> when the review does not exist.</returns>
+    private async Task<ReviewStatus?> BuildStatusAsync(
+        Actor? actor,
+        int projectId,
+        string reviewId,
+        ReviewApproval approval,
+        IReadOnlyList<ReviewThread> threads,
+        ThreadCapabilities capabilities,
+        CancellationToken cancellationToken)
+    {
         var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
         var review = snapshot is null ? null : await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
-        var approval = snapshot is null ? null : await _signing.GetApprovalAsync(actor, projectId, reviewId, cancellationToken);
-        if (snapshot is null || review is null || approval is null)
+        if (snapshot is null || review is null)
         {
             return null;
         }
@@ -153,8 +214,6 @@ public sealed class ReviewStatusService
         var user = actor is null ? null : await _users.GetByUsernameAsync(actor.Username, cancellationToken);
         var ballotView = await _checklists.GetBallotViewAsync(actor, projectId, reviewId, cancellationToken);
         var masked = approval.IsMasked || ballotView?.IsMasked == true;
-        var threads = await _threads.ListAsync(actor, projectId, reviewId, cancellationToken);
-        var capabilities = await _threads.GetCapabilitiesAsync(actor, projectId, reviewId, cancellationToken);
         var counts = ThreadCounts.From(threads.Where(thread => thread.State == ReviewThreadState.Open));
 
         var ownSlot = ReviewActorRoles.FindOwnSlot(user?.Id, snapshot.Slots);
@@ -379,22 +438,23 @@ public sealed class ReviewStatusService
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The entries of the review, at most <see cref="MaxEntries"/>.</returns>
+    /// <returns>Every entry of the review, oldest first.</returns>
     private async Task<List<AuditEntry>> ReadEntriesAsync(int projectId, string reviewId, CancellationToken cancellationToken)
     {
+        // The rules replay the whole trail, so it is read to its end in batches, however long it is
         var filter = new AuditFilter(ProjectId: projectId, ReviewId: reviewId);
         var upTo = await _audit.LatestSequenceAsync(cancellationToken);
         var entries = new List<AuditEntry>();
         var after = 0L;
-        while (entries.Count < MaxEntries)
+        while (true)
         {
             var batch = await _audit.ReadMatchingAsync(filter, after, upTo, BatchSize, cancellationToken);
-            if (batch.Count == 0)
+            entries.AddRange(batch);
+            if (batch.Count < BatchSize)
             {
                 break;
             }
 
-            entries.AddRange(batch);
             after = batch[^1].Sequence;
         }
 

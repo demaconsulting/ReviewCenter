@@ -312,7 +312,9 @@ It shows:
   reviewer. It lists the changes after the signature that can alter the signed report, such as a ballot handed in
   again, a conclusion edited, a Finding added, or a Finding resolved with its note, with who did it and when. It
   explains; it does not prove. Whether a signature still fits is decided by comparing the record itself, so a change in
-  the list may have left the record as it was, and a reply that was not put in the report is not listed.
+  the list may have left the record as it was, and a reply that was not put in the report is not listed. A reviewer who
+  has not handed in a ballot still sees each change with its time and who made it, but the details of hidden answers,
+  comments and discussions about checks are replaced by one neutral sentence until the ballot is handed in.
 
 ## Review Comments
 

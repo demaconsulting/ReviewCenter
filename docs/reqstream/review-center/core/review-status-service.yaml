@@ -52,6 +52,10 @@ sections:
           - ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull
           - ReviewStatus_NoSlots_LeadIsAskedToAddReviewers
           - ReviewStatus_SingleSlot_IsNotMaskedAndAsksTheReviewer
+          - ReviewStatus_PassedInValues_AreUsedInsteadOfReread
+          - ReviewStatus_PassedInValues_OutsiderIsStillRefused
+          - ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule
+          - ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule
 
       - id: ReviewCenter-ReviewStatusService-MaskedViewer
         title: >-
@@ -73,8 +77,9 @@ sections:
           audit entries after the signature that can change the report (a ballot handed in, reopened or reassigned,
           the conclusion text, a thread in the report that was started, answered, made a Finding or a Question,
           added to the report or taken out, and a Finding resolved with a note), each with the time, the person and a
-          reason in plain words, shall leave out every other entry, shall list nothing for a signature that still
-          matches, and shall give the details of an entry only as the audit masking allows the viewer.
+          reason in plain words, shall leave out every other entry, shall read the whole audit trail of the review,
+          however long, shall list nothing for a signature that still matches, and shall give the details of an entry
+          only as the audit masking allows the viewer.
         justification: |
           A signed reviewer who is told to look again wants to know what happened. The list is derived from the audit
           trail by a fixed set of actions; it explains and does not prove: the signature check itself compares the
@@ -84,3 +89,4 @@ sections:
           - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
           - ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches
           - ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries
+          - ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries

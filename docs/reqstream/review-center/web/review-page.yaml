@@ -889,7 +889,9 @@ sections:
           The ReviewPage unit shall show at the top of the page a "Where are we?" panel that lists each reviewer with
           the state of the ballot (Not started, Draft, or Handed in) and of the signature (Signed, Not signed, or
           Signed, then the review changed), lists the checks that the reviewers answered differently with a Discuss
-          button that starts a discussion about the check, shows the number of open questions and of open findings as
+          button that starts a discussion about the check (and, when that would make a signature stale, first shows the
+          signature warning and stores nothing until it is confirmed), shows the number of open questions and of open
+          findings as
           an icon and text, shows exactly one primary next-action button or sentence for the viewer, and shows a
           viewer who may not see the others yet a notice that the rest stays hidden until the own ballot is handed in,
           with no disputed check and no check thread.
@@ -900,6 +902,8 @@ sections:
         tests:
           - ReviewStatusPanel_ShowsReviewerBallotAndSignedStates
           - ReviewStatusPanel_DisputedCheck_DiscussStartsThread
+          - ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm
+          - ReviewStatusPanel_DisputedCheck_DiscussWarningCancel_StoresNothing
           - ReviewStatusPanel_ShowsQuestionAndFindingCounts
           - ReviewStatusPanel_ShowsExactlyOneNextActionButton
           - ReviewStatusPanel_MaskedViewer_HidesDisputes

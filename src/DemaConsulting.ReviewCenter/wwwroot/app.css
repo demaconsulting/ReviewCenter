@@ -1367,6 +1367,9 @@ a.action:active {
 
 .status-dispute-list li > :not(.badge):not(button):not(span) {
     flex: 1 1 100%;
+}
+
+.status-dispute-list li > :not(.badge):not(button):not(span):not(.error) {
     color: var(--text);
 }
 
