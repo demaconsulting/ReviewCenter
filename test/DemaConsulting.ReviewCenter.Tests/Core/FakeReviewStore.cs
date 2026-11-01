@@ -1425,7 +1425,8 @@ internal sealed class FakeReviewStore : IReviewStore
         };
         Audits.Add(audit);
 
-        // Reviewers who leave the slot take their own rows with them (carried rows stay) and the ballot is a draft again
+        // Reviewers who leave the slot take their own rows with them; carried rows stay even when they still name a
+        // departing reviewer (they keep the user name of the earlier author), and the ballot is a draft again
         var departing = new[] { old.PrimaryUserId, old.AlternateUserId }
             .OfType<int>()
             .Where(id => id != primaryUserId && id != alternateUserId)

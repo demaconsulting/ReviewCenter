@@ -783,6 +783,35 @@ public class ReviewServiceFollowUpTests
     }
 
     /// <summary>
+    ///     Test that a follow-up with no reviewer slot (so no submitted ballot) still hands what it carried on to the next
+    ///     follow-up of the chain: the original answerer, the section that does not apply, and the marker of the immediate
+    ///     source.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_FollowUp_ChainThroughReviewWithoutSlot_CarriesOnward()
+    {
+        // Arrange: Bob passed two checks and marked section b not applicable; rev-2 follows rev-1 and nobody takes a slot
+        var w = await CreateAsync();
+        await UploadAsync(w, "rev-1");
+        await AnswerAsync(w, "rev-1", "a-01");
+        await AnswerAsync(w, "rev-1", "a-02");
+        await NotApplicableAsync(w, "rev-1", "b");
+        await UploadAsync(w, "rev-2", follows: "rev-1");
+        Assert.Empty(await w.Store.ListSlotsAsync(w.ProjectId, "rev-2", TestContext.Current.CancellationToken));
+
+        // Act
+        var review = await UploadAsync(w, "rev-3", follows: "rev-2");
+
+        // Assert: rev-3 carries both answers and the section from rev-2's baseline, still answered by Bob
+        var answers = await CarriedAnswersAsync(w, "rev-3");
+        Assert.Equal(["a-01", "a-02"], answers.Select(a => a.ItemId).Order());
+        Assert.All(answers, a => Assert.Equal(("bob", "rev-2"), (a.AnsweredByUsername, a.CarriedFromReviewId)));
+        var state = Assert.Single(await CarriedSectionsAsync(w, "rev-3"));
+        Assert.Equal(("b", "rev-2"), (state.SectionId, state.CarriedFromReviewId));
+        Assert.Equal(2, review.CarriedAnswerCount);
+    }
+
+    /// <summary>
     ///     Test that the review-set rule is applied: reviews planned from the same set fit whatever their files, and
     ///     reviews planned from different sets do not.
     /// </summary>

@@ -357,7 +357,9 @@ not found.
 - *Blocker counts*: `ReviewApproval` also carries `OpenThreads`, `UnansweredChecks`, `FailedChecks`, `DisputedChecks`,
   `UnsubmittedBallots`, and the flag
   `MissingChecklist`. They are counted in the one place that writes the blocker sentences (`BuildApproval`, one additive
-  region), so each number equals the one in its sentence and the flag is true exactly when the "no checklist" sentence
+  region), so each number but one equals the one in its sentence (`UnsubmittedBallots` has no sentence: the ballots of
+  other slots do not block a signature, so a draft is only a wait state before the conclusion) and the flag is true
+  exactly when the "no checklist" sentence
   is present; the sentences are unchanged. `ReviewProgressService` and any later list of work use
   the counts and do not repeat the rule. `SlotMember.Enabled` tells whether the account of a person in a slot is enabled
   (true by default).

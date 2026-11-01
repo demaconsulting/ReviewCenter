@@ -160,8 +160,9 @@ with nothing stored:
    in common"). The state of the earlier review does not matter: a review that is in review and one that is approved
    (both are the one stored state `Draft`) can be followed, and so can a follow-up (a chain). The new review always
    points to its immediate source; what it carried from older reviews keeps the mark of the immediate source.
-3. `IReviewStore.GetRecordAsync` reads the record of the earlier review and `FollowUpCarry.Compute` works out what is
-   carried (below).
+3. `IReviewStore.GetRecordAsync` reads the record of the earlier review, `IReviewStore.ListChecklistAnswersAsync` and
+   `ListChecklistSectionStatesAsync` read its review-level baseline rows (slot 0, what the earlier review itself carried),
+   and `FollowUpCarry.Compute` works out what is carried (below).
 4. Open threads of the earlier review whose file is not in the new review are never carried. Unless
    `acknowledgeDroppedThreads` is true they refuse the creation with the message from `FollowUpCarry.DroppedMessage`,
    which lists the files (at most 10, then "and N more"). When it is true they are dropped and counted in the audit
@@ -179,15 +180,25 @@ its files, the new review's files and checklist, and the creation time, and retu
   without a slot count, so a lone draft never counts), never a single person's ballot and never a draft. A check that
   the submitted ballots dispute or that no submitted ballot answered has no consolidated answer, so it is not carried
   and stays open in the new review; a review whose ballots are all drafts carries no answers and no sections.
-- *Answers*: every agreed Pass and N/A answer of the earlier review whose check identifier is in the checklist of the
-  new review with the same text (an ordinal comparison; the earlier review's frozen checklist is used). The row that
-  is carried is the representative row of the agreed check (the one of the lowest slot that answered it), so outcome,
-  justification, answerer name, user name and time are those of that row, and the answer is marked
-  `CarriedFromReviewId` with the earlier review. Fail answers are not carried (they are the reason for the follow-up
-  and are answered again). When the earlier review has no checklist nothing is carried.
-- *Section states*: every not-applicable section that the submitted ballots agree on, whose section identifier is in
-  the new checklist with the same title, with its reason, setter and time (those of the lowest submitted slot that
-  marked it), marked in the same way.
+- *Answers*: every Pass and N/A answer that the submitted ballots of the earlier review agree on (the row of the lowest
+  slot that gave it, so outcome, justification, answerer name, user name and time are those of that row; a draft
+  ballot, a pending check and a disputed check carry nothing) whose check identifier is in the checklist of the new
+  review with the same text (an ordinal comparison; the earlier review's frozen checklist is used). The answer is
+  marked `CarriedFromReviewId` with the earlier review. Fail answers are not carried (they are the reason for the
+  follow-up and are answered again). When the earlier review has no checklist nothing is carried. When the earlier
+  review is itself a follow-up, `Compute` also receives its baseline rows (the optional `baselineAnswers` and
+  `baselineSections` arguments, the slot 0 rows that `PrepareFollowUpAsync` reads from the store) and carries them
+  onward by the same rules, so that a follow-up without a submitted ballot (for example one that has no reviewer slot)
+  does not end the chain. A baseline answer is used only for a check that no submitted ballot has an answer for (a
+  pending, disputed or Fail row of a submitted ballot also counts as an answer here, so the ballots win). A baseline
+  answer is not carried when its section is closed, and a section is closed in two cases: the submitted ballots
+  consolidate it as not applicable or disputed, or the baseline itself marks it not applicable and no submitted ballot
+  has a state for that section. A baseline section that is not applicable therefore does not close the section when a
+  submitted ballot has a state for it (the ballot decides, and the baseline answers of that section are carried).
+- *Section states*: every not-applicable section that the submitted ballots of the earlier review agree on (the reason,
+  setter and time are those of the lowest submitted slot that marked it), and every not-applicable baseline section that
+  no submitted ballot has a state for, whose section identifier is in the new checklist with the same title, marked in
+  the same way.
 - *Storage*: the carried rows are written by the store as review-level baseline rows (slot 0). They seed the draft
   ballot of each reviewer slot of the new review and never count in the record by themselves, so a carried answer does
   not hand a ballot in (see `ChecklistService`).

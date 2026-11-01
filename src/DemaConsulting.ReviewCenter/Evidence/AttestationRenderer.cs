@@ -284,7 +284,8 @@ internal sealed class AttestationRenderer : IAttestationRenderer
     }
 
     /// <summary>
-    ///     Writes one check with its outcome, the reviewer's comment and who answered it and when.
+    ///     Writes one check with its outcome (the agreed answer of the submitted ballots; a pending or disputed check shows as
+    ///     <c>Not answered</c>), the reviewer's comment and who gave the answer shown and when.
     /// </summary>
     /// <param name="writer">The writer.</param>
     /// <param name="item">The check.</param>
@@ -319,7 +320,7 @@ internal sealed class AttestationRenderer : IAttestationRenderer
     }
 
     /// <summary>
-    ///     Builds the line that says who answered a check and when.
+    ///     Builds the line that says who gave the agreed answer shown for a check and when.
     /// </summary>
     /// <param name="item">The check.</param>
     /// <returns>The line, or <c>null</c> when the check has neither an answerer nor an answer time.</returns>

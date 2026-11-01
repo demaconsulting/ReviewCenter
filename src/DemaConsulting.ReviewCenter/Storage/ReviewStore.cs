@@ -2170,8 +2170,9 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     ///     The <c>ballot.reassigned</c> draft when a row was removed or the status changed; otherwise <c>null</c>.
     /// </returns>
     /// <remarks>
-    ///     Rows carried from an earlier review stay, because their author is a third party, not the departing reviewer.
-    ///     The entry names the slot number and counts only.
+    ///     Rows carried from an earlier review stay: they keep the user name of the earlier author, so a departing reviewer
+    ///     may still be named on one although the reviewer did not give it in this review; <c>BallotEdits.Reassign</c> applies
+    ///     the same exemption. The entry names the slot number and counts only.
     /// </remarks>
     private static async Task<AuditDraft?> ReassignBallotAsync(
         ReviewCenterDbContext context,
@@ -2188,7 +2189,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .Select(u => u.Username)
             .ToListAsync(cancellationToken);
 
-        // Only rows the departing reviewers gave themselves go; carried rows are not theirs
+        // Only rows the departing reviewers gave themselves in this review go; a carried row is kept even when it still
+        // names a departing reviewer, because it keeps the user name of its earlier author
         var answerIds = (await context.ChecklistAnswers.AsNoTracking()
                 .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == slotId && a.CarriedFromReviewId == null)
                 .ToListAsync(cancellationToken))

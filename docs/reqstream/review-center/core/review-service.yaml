@@ -357,15 +357,15 @@ sections:
       - id: ReviewCenter-ReviewService-FollowUpCarry
         title: >-
           The ReviewService class shall, for a follow-up review, work out what it takes over with a pure function and
-          store it together with the review in one call: from the consolidated standing of the submitted ballots of
-          the earlier review only (never a draft, and nothing when no ballot is submitted), the agreed Pass and N/A
-          answers of checks that are in the checklist of the new review with the same wording, with their outcome,
-          justification, answerer and time, but not the Fail answers and not a check that the submitted ballots
-          dispute or leave open; the not-applicable sections that the submitted ballots agree on and that are in
-          the new checklist with the same title, with their reasons; and the open threads whose file is in the new
-          review, with every comment unchanged, the kind of the thread and the report flag of every comment kept (a
-          carried Finding stays a Finding and carried chat stays chat), and the thread open. A thread keeps its line
-          anchor only when the file has the same content on the side it is anchored to,
+          store it together with the review in one call: the Pass and N/A answers that the submitted ballots of the
+          earlier review agree on, and, for a check that no submitted ballot answered, the ones that the earlier review
+          itself carried (its review-level baseline rows, so that a follow-up without a submitted ballot still passes
+          them on), of checks that are in the checklist of the new review with the same wording, with their outcome,
+          justification, answerer and time, but not the Fail answers and never a draft; the not-applicable sections that
+          are in the new checklist with the same title, with their reasons, taken in the same way; and the open threads
+          whose file is in the new review, with every comment unchanged, the kind of the thread and the report flag of
+          every comment kept (a carried Finding stays a Finding and carried chat stays chat), and the thread open. A
+          thread keeps its line anchor only when the file has the same content on the side it is anchored to,
           and otherwise refers to the whole file, with a note from the system, added after the comments and not
           included in the report, that gives the
           original anchor. Resolved threads, reviewer slots, signatures and reopenings are not carried, the person who
@@ -382,7 +382,9 @@ sections:
           signatures belong to the record that was signed, and the person who creates the review must not look like
           the one who answered. A failed carry must not leave a half-built review, so all rows are stored together.
           The review conclusion text is the free text the reviewers wrote about the earlier record, so it is not
-          carried either: the follow-up starts without one.
+          carried either: the follow-up starts without one. A follow-up whose reviewers have not handed in a ballot (or
+          that has no reviewer slot) still holds what it carried, and a chain of follow-ups must not lose that, so the
+          carried rows are passed on where no submitted ballot has a row of its own.
         tests:
           - FollowUpCarry_Compute_PassAndNotApplicableAnswers_AreCarriedWithOriginalAnswerer
           - FollowUpCarry_Compute_ConsolidatedSource_CarriesAgreedPassOnly
@@ -392,6 +394,9 @@ sections:
           - FollowUpCarry_Compute_FailChangedAndMissingChecks_AreNotCarried
           - FollowUpCarry_Compute_SourceWithoutChecklist_CarriesNoChecklistRows
           - FollowUpCarry_Compute_NotApplicableSections_AreCarriedOnlyWhenTheSectionIsTheSame
+          - FollowUpCarry_Compute_SourceWithOnlyBaselineRows_CarriesTheBaselineOnward
+          - FollowUpCarry_Compute_SubmittedBallotWinsOverBaseline
+          - ReviewService_FollowUp_ChainThroughReviewWithoutSlot_CarriesOnward
           - FollowUpCarry_Compute_OpenThread_IsCarriedWithAllCommentsVerbatim
           - FollowUpCarry_CarryThreads_CarriedFinding_KeepsKindFlagsAndResolutionComments
           - FollowUpCarry_CarryThreads_CarriedChat_StaysChat
