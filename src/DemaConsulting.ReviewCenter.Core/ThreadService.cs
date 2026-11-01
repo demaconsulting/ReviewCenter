@@ -695,7 +695,8 @@ public sealed class ThreadService
         var review = snapshot is null ? null : await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
         if (snapshot is null || review is null)
         {
-            return threads;
+            // The review vanished between the two reads: nothing is known about who may see what, so fail closed
+            return threads.Where(thread => !thread.IsCheckThread).ToList();
         }
 
         var seesAll = await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);

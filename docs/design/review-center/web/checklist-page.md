@@ -236,9 +236,11 @@ reading them, which is the second confirmation. When the record changes between 
 signature, the store refuses the digest (`RecordChanged`), so a changed record is never signed by this step. A refusal
 of the signature leaves the ballot handed in and shows `sign-error` with a link to the review page; success shows
 `sign-notice`. For an
-account of an identity provider the ballot is handed in and the page shows `submit-sign-reauth-hint` with the button
-that starts the confirmation at the provider. The kind of account is read before the hand-in, because the reload that
-follows it no longer offers the combined step.
+account of an identity provider the ballot is handed in first and the page then runs the same check on the reloaded
+view: when it shows a difference (or is masked) the page shows the same `sign-error` and offers no confirmation at the
+provider, because the viewer has just learned of a record they should read before signing; otherwise the page shows
+`submit-sign-reauth-hint` with the button that starts the confirmation at the provider. The kind of account is read
+before the hand-in, because the reload that follows it no longer offers the combined step.
 
 **AssignMeAsync**: Adds a new reviewer slot with the viewer as primary reviewer through `SigningService.AddSlotAsync`
 and reloads; a refusal of the rules is shown as `assign-error`.

@@ -75,8 +75,10 @@ sections:
           - SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome
           - SigningService_GetApproval_NullViewerAndSingleSlot_FailsClosedOnlyForSeveralSlots
           - SigningService_GetApprovals_MaskedViewer_MatchesSingleRead
+          - SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch
           - ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts
           - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
+          - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer
           - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
 
       - id: ReviewCenter-BallotVisibility-Discussions
@@ -91,6 +93,7 @@ sections:
           button only to those whom the service would let start one.
         tests:
           - ThreadService_List_MaskedViewer_LeavesOutCheckThreads
+          - ThreadService_List_ReviewVanishesBetweenReads_LeavesOutCheckThreads
           - ThreadService_GetCapabilities_CanStartCheckThread_MatchesCheckThreadRules
 
       - id: ReviewCenter-BallotVisibility-AuditMasking

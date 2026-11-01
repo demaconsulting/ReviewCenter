@@ -327,6 +327,12 @@ scenario is tested by `ChecklistPage_SingleSlot_OffersNoSubmitAndSign`.
 identity provider presses the button; the ballot is handed in and the page asks for the confirmation at the provider.
 This scenario is tested by `ChecklistPage_SubmitAndSign_ProviderUser_SubmitsThenAsksToConfirmIdentity`.
 
+**ChecklistPage_SubmitAndSign_ProviderUser_DifferingBallotRevealed_ExplainsAndSkipsConfirmation**: A reviewer of an
+identity provider presses the button while the other reviewer changes an answer so that the ballots differ right after
+the hand-in. The ballot is handed in, no signature is stored, no confirmation at the provider is offered, and the page
+says that something changed and that the ballot is not signed. This scenario is tested by
+`ChecklistPage_SubmitAndSign_ProviderUser_DifferingBallotRevealed_ExplainsAndSkipsConfirmation`.
+
 **ChecklistPage_SubmitAndSign_OtherReviewerChangesAnswerAfterHandIn_SignsNothingAndExplains**: A reviewer presses
 Submit and sign while the other reviewer changes an answer so that the ballots differ right after the hand-in. The
 ballot is handed in, no signature is stored, the page says that something changed and that the ballot is not signed,

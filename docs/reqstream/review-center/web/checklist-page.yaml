@@ -283,6 +283,7 @@ sections:
           - ChecklistPage_SubmitBallotAlone_DoesNotSign
           - ChecklistPage_SingleSlot_OffersNoSubmitAndSign
           - ChecklistPage_SubmitAndSign_ProviderUser_SubmitsThenAsksToConfirmIdentity
+          - ChecklistPage_SubmitAndSign_ProviderUser_DifferingBallotRevealed_ExplainsAndSkipsConfirmation
 
       - id: ReviewCenter-ChecklistPage-SignConfirm
         title: >-

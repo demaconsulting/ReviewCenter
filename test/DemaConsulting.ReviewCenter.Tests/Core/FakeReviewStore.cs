@@ -429,8 +429,15 @@ internal sealed class FakeReviewStore : IReviewStore
         int projectId,
         CancellationToken cancellationToken = default)
     {
+        MembershipReads++;
         return Task.FromResult(_memberships.FirstOrDefault(m => m.UserId == userId && m.ProjectId == projectId));
     }
+
+    /// <summary>
+    ///     Gets the number of single membership reads (<see cref="GetMembershipAsync"/>) made so far; tests use it to
+    ///     show that a batch read does not look the role up once per review.
+    /// </summary>
+    public int MembershipReads { get; private set; }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<ProjectMembership>> ListMembershipsAsync(
@@ -929,7 +936,24 @@ internal sealed class FakeReviewStore : IReviewStore
             .Where(t => t.ProjectId == projectId && t.ReviewId == reviewId)
             .OrderBy(t => t.Id)
             .ToList();
+        AfterListThreads?.Invoke();
         return Task.FromResult(list);
+    }
+
+    /// <summary>
+    ///     Gets or sets an action run after the threads were read; a test uses it to make the review vanish between the
+    ///     thread read and the next read.
+    /// </summary>
+    public Action? AfterListThreads { get; set; }
+
+    /// <summary>
+    ///     Removes a review without a trace, as when it vanishes between two reads.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    public void VanishReview(int projectId, string reviewId)
+    {
+        _reviews.RemoveAll(r => r.ProjectId == projectId && r.Id == reviewId);
     }
 
     /// <inheritdoc />

@@ -131,12 +131,20 @@ review with several slots and sees everything in a review with one slot. This sc
 **SigningService_GetApprovals_MaskedViewer_MatchesSingleRead**: The list read gives the same masked texts as a single
 read. This scenario is tested by `SigningService_GetApprovals_MaskedViewer_MatchesSingleRead`.
 
+**SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch**: A list read of three reviews of the lead makes
+the same number of membership reads as a list read of one, the creator sees all of each review, and an API token of the
+creator sees none of it. This scenario is tested by `SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch`.
+
 **ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts**: The progress of a masked viewer shows
 no disputed or failed count. This scenario is tested by
 `ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts`.
 
 **InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText**: The inbox of a masked viewer shows no dispute or
 failure text. This scenario is tested by `InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText`.
+
+**InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer**: Two reviewers handed in the same Fail. The creator
+signed in with a password gets the failed-checks row; an API token of the same user does not, because a token is never
+the lead. This scenario is tested by `InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer`.
 
 **InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer**: A reviewer with a draft and a reviewer
 who handed in have both seen the review; the lead then starts a discussion about a check. The To sign row of the
@@ -146,6 +154,10 @@ who handed in is unread. This scenario is tested by
 
 **ThreadService_List_MaskedViewer_LeavesOutCheckThreads**: A masked viewer gets no discussion about a check in the
 list. This scenario is tested by `ThreadService_List_MaskedViewer_LeavesOutCheckThreads`.
+
+**ThreadService_List_ReviewVanishesBetweenReads_LeavesOutCheckThreads**: The review vanishes between the thread read
+and the visibility check. The list keeps the discussion about a file and leaves out the one about a check (fail
+closed). This scenario is tested by `ThreadService_List_ReviewVanishesBetweenReads_LeavesOutCheckThreads`.
 
 **ThreadService_GetCapabilities_CanStartCheckThread_MatchesCheckThreadRules**: The capability to start a discussion
 about a check follows the rules of the lead, the administrator, the slot owner, and the single slot. This scenario is

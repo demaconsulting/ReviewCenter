@@ -350,6 +350,7 @@ public sealed class SigningService
 
         // Resolved lazily: a project in which nothing has to be masked costs no role lookup at all
         bool? seesAllInProject = null;
+        bool? canContribute = null;
         IReadOnlyList<Review>? reviews = null;
         var viewerId = viewer is null
             ? null
@@ -366,13 +367,19 @@ public sealed class SigningService
 
             seesAllInProject ??= await BallotVisibility.SeesAllInProjectAsync(_access, viewer, projectId, cancellationToken);
             var seesAll = seesAllInProject.Value;
-            if (!seesAll && viewer is not null)
+            if (!seesAll && viewer is { ViaApiToken: false })
             {
-                // Only the lead is left to find out, which needs the creator of the review
+                // Only the lead is left to find out. An administrator is already covered above, so the lead right is
+                // the creator of the review who can still contribute: the project role is looked up once for the whole
+                // batch and the creator comes from the reviews read once, not one membership lookup per review
                 reviews ??= await _store.ListReviewsAsync(projectId, cancellationToken);
                 var review = reviews.FirstOrDefault(r => r.Id == reviewId);
-                seesAll = review is not null
-                          && await ReviewActorRoles.IsLeadAsync(_access, viewer, review, cancellationToken);
+                if (review?.CreatedBy is not null
+                    && string.Equals(review.CreatedBy, viewer.Username, StringComparison.OrdinalIgnoreCase))
+                {
+                    canContribute ??= await _access.CanContributeAsync(viewer, projectId, cancellationToken);
+                    seesAll = canContribute.Value;
+                }
             }
 
             approvals[reviewId] = BallotVisibility.CanSeeOthers(seesAll, snapshot, viewerId) ? approval : approval.Masked();

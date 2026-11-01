@@ -80,14 +80,18 @@ stay unmasked until the slice that masks them (PR 5).
 **SigningService.GetApprovalAsync** and **GetApprovalsAsync** (with the viewer): For a masked viewer, leave out the
 counts of disputed and failed checks, the outcome, and the conclusion text from the blockers and the state, set
 `IsMasked`, and give one fixed sentence that the standing stays hidden until the viewer hands in their own ballot. The
-list gives the same result as a single read. A viewer that is not known is masked in a review with several slots.
+list gives the same result as a single read, and the viewer's role is looked up once for the whole list: the creator of
+a review is recognized from the loaded reviews, and an API token is never the creator. A viewer that is not known is
+masked in a review with several slots.
 
 **ReviewProgressService** and **InboxService**: Apply the same rule, so that no progress line, blocker, or inbox row
 carries a count of disputed or failed checks. The inbox also leaves the discussions about checks out of the waiting
 threads and out of the count of news in the row of a masked viewer, so that a new hidden discussion does not make the
-row unread.
+row unread. An API token is never the lead, so the creator's full view of the inbox is for a person only.
 
 **ThreadService.ListAsync** (with the viewer): For a masked viewer, leave the discussions about checks out of the list.
+When the review vanishes between the thread read and the visibility check, the list fails closed: the discussions
+about checks are left out.
 **ThreadService.GetCapabilitiesAsync**: Gives `ThreadCapabilities` for a viewer: any thread may be started by a
 contributor, and a discussion about a check by the lead, a system administrator, a slot owner who has handed in, and
 the owner of the only slot.

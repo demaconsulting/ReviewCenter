@@ -292,6 +292,48 @@ public class BallotMaskingServiceTests
     }
 
     /// <summary>
+    ///     Test that the batch read looks the viewer's role up a constant number of times, however many reviews it
+    ///     covers, that the creator of a review sees all of it, and that an API token of the creator does not.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch()
+    {
+        // Arrange: three reviews of the lead, each with two slots, so each one hides the answers from a viewer
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        var ids = new List<string> { BallotMaskingWorld.ReviewId };
+        foreach (var id in new[] { "rev-2", "rev-3" })
+        {
+            await world.Reviews.CreateDraftAsync(
+                world.ProjectId, id, id, [new UploadedFile("a.txt", [1, 2, 3])], BallotMaskingWorld.ActorOf("lead"), Token);
+            foreach (var user in new[] { "ann", "bob" })
+            {
+                await world.Signing.AddSlotAsync(BallotMaskingWorld.ActorOf("lead"), world.ProjectId, id, world.Ids[user], null, Token);
+            }
+
+            ids.Add(id);
+        }
+
+        // Act
+        var before = world.Store.MembershipReads;
+        var one = await world.Signing.GetApprovalsAsync(BallotMaskingWorld.ActorOf("lead"), world.ProjectId, ids.Take(1).ToList(), Token);
+        var readsForOne = world.Store.MembershipReads - before;
+        before = world.Store.MembershipReads;
+        var three = await world.Signing.GetApprovalsAsync(BallotMaskingWorld.ActorOf("lead"), world.ProjectId, ids, Token);
+        var readsForThree = world.Store.MembershipReads - before;
+        var token = new Actor("lead", "lead") { ApiTokenId = "tok-1" };
+        var viaToken = await world.Signing.GetApprovalsAsync(token, world.ProjectId, ids, Token);
+
+        // Assert
+        Assert.Equal(readsForOne, readsForThree);
+        Assert.Single(one);
+        Assert.Equal(3, three.Count);
+        Assert.All(three.Values, approval => Assert.False(approval.IsMasked));
+        Assert.All(viaToken.Values, approval => Assert.True(approval.IsMasked));
+    }
+
+    /// <summary>
     ///     Test that the progress overview gives no count of disputed or failed checks to a masked viewer, and gives it
     ///     to a reviewer who handed in.
     /// </summary>
@@ -335,6 +377,34 @@ public class BallotMaskingServiceTests
             Assert.DoesNotContain("dispute", item.Chip + item.Detail, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("failed", item.Chip + item.Detail, StringComparison.OrdinalIgnoreCase);
         });
+    }
+
+    /// <summary>
+    ///     Test that an API token of the creator of a review never gets the creator's full view of the inbox: the
+    ///     failed-checks row is shown to the creator signed in with a password and not to the same user's token.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer()
+    {
+        // Arrange: ann and bob handed in the same Fail, so the creator has a failed-checks row
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        foreach (var user in new[] { "ann", "bob" })
+        {
+            await world.AnswerAsync(user, ChecklistOutcome.Fail);
+            await world.SubmitAsync(user);
+        }
+
+        var token = new Actor("lead", "lead") { ApiTokenId = "tok-1" };
+
+        // Act
+        var person = await world.Inbox.GetInboxAsync(BallotMaskingWorld.ActorOf("lead"), Token);
+        var viaToken = await world.Inbox.GetInboxAsync(token, Token);
+
+        // Assert
+        Assert.Contains(person.Items, item => item.Section == InboxSection.FailedChecks);
+        Assert.DoesNotContain(viaToken.Items, item => item.Section == InboxSection.FailedChecks);
     }
 
     /// <summary>
@@ -413,6 +483,33 @@ public class BallotMaskingServiceTests
         Assert.Single(ann);
         Assert.Single(lead);
         Assert.Single(root);
+    }
+
+    /// <summary>
+    ///     Test that the thread list fails closed when the review vanishes between the thread read and the visibility
+    ///     check: the threads about a check are left out, the others stay.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_List_ReviewVanishesBetweenReads_LeavesOutCheckThreads()
+    {
+        // Arrange: one discussion about a check and one about the review as a whole
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync(bobSubmitted: false);
+        await world.StartCheckThreadAsync("lead");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, BallotMaskingWorld.ReviewId, new ThreadAnchor("a.txt"), BallotMaskingWorld.ActorOf("lead"), "General", Token);
+        world.Store.AfterListThreads = () =>
+        {
+            world.Store.AfterListThreads = null;
+            world.Store.VanishReview(world.ProjectId, BallotMaskingWorld.ReviewId);
+        };
+
+        // Act
+        var list = await world.Threads.ListAsync(BallotMaskingWorld.ActorOf("lead"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        Assert.Single(list);
+        Assert.False(list[0].IsCheckThread);
     }
 
     /// <summary>

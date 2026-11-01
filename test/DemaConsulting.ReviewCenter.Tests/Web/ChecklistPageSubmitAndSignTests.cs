@@ -252,4 +252,41 @@ public class ChecklistPageSubmitAndSignTests : BallotPageTestBase
         Assert.Contains("Provider", cut.Find("[data-testid='submit-sign-reauth']").TextContent, StringComparison.Ordinal);
         Assert.Contains("Your ballot is in", cut.Find("[data-testid='submit-sign-reauth-hint']").TextContent, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    ///     Test that a person who signs in with an identity provider is not sent to confirm their identity when the
+    ///     answers revealed by the hand-in differ: the ballot is in, nothing is signed, the page says that something
+    ///     changed, and no re-authentication form is offered.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_SubmitAndSign_ProviderUser_DifferingBallotRevealed_ExplainsAndSkipsConfirmation()
+    {
+        // Arrange: the other reviewer hands in a differing answer right after the provider user's hand-in
+        Services.Configure<OidcOptions>(options =>
+        {
+            options.Enabled = true;
+            options.DisplayName = "Provider";
+        });
+        var external = (await Users.SignInExternalAsync(
+            "https://idp.example.com/", "sub-2", "yan", "Yan", TestContext.Current.CancellationToken)).User!;
+        var projectId = await CreateReviewAsync("ann", external.Username);
+        await AnswerAsync(projectId, "ann", submit: false);
+        await AnswerAsync(projectId, external.Username, submit: false);
+        Store.AfterSubmitBallot = async () =>
+        {
+            await AnswerAsync(projectId, "ann", ChecklistOutcome.Fail);
+        };
+        SignInAs(external.Username, "Yan", false);
+        var cut = RenderPage(projectId);
+
+        // Act
+        await cut.Find("[data-testid='submit-sign-form']").SubmitAsync();
+
+        // Assert
+        Assert.Equal(SlotSignatureState.NotSigned, await SignatureOfAsync(projectId, external.Username));
+        Assert.Empty(cut.FindAll("[data-testid='submit-sign-reauth-form']"));
+        var error = cut.Find("[data-testid='sign-error']").TextContent;
+        Assert.Contains("something changed", error, StringComparison.Ordinal);
+        Assert.Contains("not signed", error, StringComparison.Ordinal);
+    }
 }

@@ -380,8 +380,8 @@ public sealed class InboxService
         bool contribute,
         CancellationToken cancellationToken)
     {
-        // The creator leads the review while they can still work in the project
-        if (contribute && InboxRules.SameUser(candidate.CreatedBy, user.Username))
+        // The creator leads the review while they can still work in the project; an API token is never the lead
+        if (contribute && actor is { ViaApiToken: false } && InboxRules.SameUser(candidate.CreatedBy, user.Username))
         {
             return true;
         }

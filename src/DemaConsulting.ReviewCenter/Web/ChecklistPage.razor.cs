@@ -812,6 +812,14 @@ public partial class ChecklistPage : ComponentBase
     }
 
     /// <summary>
+    ///     What the page says when the ballot is in but the standing that the viewer now sees differs, so nothing is
+    ///     signed.
+    /// </summary>
+    private const string ChangedStandingMessage =
+        "Your ballot is in, but you have not signed: something changed while it was handed in, " +
+        "and the answers of the other reviewers are shown now. Review them, then sign from the review page.";
+
+    /// <summary>
     ///     Hands in the own ballot and signs the review in one go.
     /// </summary>
     /// <param name="credentials">What the viewer typed to confirm the signature; empty for an identity-provider user.</param>
@@ -844,6 +852,15 @@ public partial class ChecklistPage : ComponentBase
 
         if (external)
         {
+            // The viewer now sees the other ballots (the hand-in reloaded the page): when they differ, the person is not
+            // sent to confirm their identity for a signature on a record they have just learned about
+            await ReloadAsync();
+            if (Ballots is null || Ballots.IsMasked || Ballots.Differing.Count > 0)
+            {
+                SignError = ChangedStandingMessage;
+                return;
+            }
+
             ReauthPending = true;
             _sendReauthForm = true;
             return;
@@ -860,8 +877,7 @@ public partial class ChecklistPage : ComponentBase
             await ReloadAsync();
             if (approval is null || approval.IsMasked || Ballots is null || Ballots.IsMasked || Ballots.Differing.Count > 0)
             {
-                SignError = "Your ballot is in, but you have not signed: something changed while it was handed in, " +
-                            "and the answers of the other reviewers are shown now. Review them, then sign from the review page.";
+                SignError = ChangedStandingMessage;
                 return;
             }
 
