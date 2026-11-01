@@ -325,7 +325,12 @@ public enum DomainRule
     ///     acceptable: it is longer than <see cref="ReviewLimits.MaxConclusionTextLength"/> characters or contains
     ///     control characters other than line breaks and tabs.
     /// </summary>
-    ConclusionTextInvalid
+    ConclusionTextInvalid,
+
+    /// <summary>
+    ///     A ballot cannot be handed in while a check that applies has no answer; nothing is stored.
+    /// </summary>
+    BallotIncomplete
 }
 
 /// <summary>

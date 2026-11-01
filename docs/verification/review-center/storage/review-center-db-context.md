@@ -47,6 +47,8 @@ be loadable on the test platform.
 - The `DueDate` column of a review is created as nullable text holding the calendar day: a review without a date reads
   back with none and a date reads back as the same day.
 - The `ReviewConclusionText` column of a review is created as optional text limited to 4000 characters.
+- The answers and section states have the slot in their key, and the ballot status table has one row for each slot that
+  started a ballot, which is deleted with its review or slot.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
@@ -224,6 +226,13 @@ and the codes by cascade, which is tested by `TotpStore_DeletingTheUser_DeletesT
 described with the `TotpStore` unit.
 
 **The follow-up columns** are verified through the real store in `ReviewFollowUpStoreTests.cs`.
+
+**Ballot tables**: The answers and section states are stored per reviewer slot (the slot in the key, 0 for the
+review-level rows) and the ballot status row has its own table, which is deleted with its slot. This is verified through
+the real store by `ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot` (one row per slot for the same
+check), `ReviewStore_SetBallotSectionStateAsync_PerSlotRows_RoundTrip` (every column of the rows round-trips), and
+`ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows` (the status row goes with its slot), all defined in
+`ReviewStoreBallotTests.cs` and described with the `ReviewStore` unit.
 
 **ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview**: The model has an index on the project and the
 followed review of a review, and the carried rows that a review holds only while it is created are not mapped. This

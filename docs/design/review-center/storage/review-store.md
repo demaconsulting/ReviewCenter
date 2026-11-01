@@ -25,7 +25,8 @@ commits (see the `AuditStore` unit).
 `UpdateReviewRuleAsync`, `AddReviewAsync`,
 `AddThreadAsync`, `AddCommentAsync`,
 `ReopenThreadAsync`, `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
-`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
+`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `SetBallotAnswerAsync`, `SetBallotSectionStateAsync`,
+`SubmitBallotAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
 `RemoveSlotAsync`, `UpdateDueDateAsync`, `UpdateReviewConclusionTextAsync`, `AddSignatureAsync`, and
 `ReopenReviewAsync` take the audit draft of the
 change (or a function that builds it from the stored entity, when the draft names an identity that the database
@@ -38,7 +39,8 @@ are of the change itself.
 
 **Approval lock inside the transaction**: `AddThreadAsync`, `AddCommentAsync`, `ReopenThreadAsync`,
 `ResolveThreadAsync`, `SetThreadKindAsync`, `SetCommentReportAsync`,
-`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`,
+`SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `SetBallotAnswerAsync`, `SetBallotSectionStateAsync`,
+`SubmitBallotAsync`, `AddSlotAsync`, `UpdateSlotAsync`, `RemoveSlotAsync`,
 `UpdateDueDateAsync`, and `UpdateReviewConclusionTextAsync` call
 the private `EnsureNotLockedAsync` first, inside the same serialized transaction as the change. It loads the slots, the
 record (with its reopen count), and the signatures with the same code as `AddSignatureAsync`, and asks the Core
@@ -280,12 +282,46 @@ returns or zero bytes.
 answers of a review, with display names, user names, and UTC times as saved.
 
 **SetChecklistSectionStateAsync** and **SetChecklistAnswerAsync**: Replace the state of a section or the answer to
-a check, including the display name and the user name of the person who made the change. Each first tries to
+a check, including the display name and the user name of the person who made the change. These two methods keep the
+review-level rows only (slot identity 0, `ChecklistAnswer.BaselineSlotId`), the rows that the record and its digest are
+built from; an entity with another slot identity is refused with an `ArgumentException`. The review-level listings and
+`GetRecordAsync` read slot 0 only. Each first tries to
 overwrite the existing row with one update statement and adds a row only when there
 was none; if two requests add the same row at the same moment, the loser of the race overwrites instead, so
 there is always exactly one row and neither request fails. The row that is written never carries a follow-up marker:
 the update and the new row both set `CarriedFromReviewId` to the value of the incoming entity, which the services
 always leave null, so answering a carried check again, or setting a carried section again, replaces the marker.
+
+**Ballots**: A ballot is the set of answers and section states that one reviewer slot gave, with a status row
+(`ChecklistBallot`: draft or submitted, and for a submitted one the time and the user name of the hand-in). Slot
+identity 0 is the baseline, the review-level rows that the legacy methods above read and write; it is never a ballot, and
+no status row exists for it. The ballot methods are dormant in this change: no service calls them yet, and the record,
+the digest, the attestation, the inbox and the evidence keep reading the review-level rows.
+
+- **ListBallotsAsync** and **GetBallotAsync** read the ballots of a review (ordered by slot identity) or of one slot inside
+  one read transaction, with the rows of each slot only; a slot without a status row has no ballot (null).
+- **SetBallotAnswerAsync** and **SetBallotSectionStateAsync** refuse the identity 0 (`ArgumentOutOfRangeException`), then
+  in one transaction check the approval lock (`ReviewLocked`), check that the slot belongs to the review
+  (`SlotNotFound`), replace the row of the slot, make the ballot a draft (a submitted ballot is reopened by the edit),
+  and, when the review has exactly one slot and the caller's completeness test accepts the rows of the transaction, hand
+  the ballot in at once with the time and user name of the edit. The audit draft of the edit is stored first; when the
+  status changed in the net, a second entry follows: `ballot.reopened` or `ballot.submitted`. The second entry is saved
+  before the transaction ends and the last entry is the audit of the transaction, so the chain stays intact.
+- **SubmitBallotAsync** is a compare-and-set from draft to submitted: a ballot that is already submitted is returned
+  as it is, with no write and no entry; otherwise the completeness test is asked about the rows of the same
+  transaction, an
+  incomplete ballot raises `BallotIncomplete` and stores nothing, and a complete one is stored with the time and user
+  name and the audit draft of the caller. A slot without any row counts as an empty ballot.
+- **AddSlotAsync** copies the carried review-level rows (those with `CarriedFromReviewId`) of a follow-up review into rows
+  of the new slot and stores a draft ballot for it; a review without carried rows gets no ballot. A carried answer never
+  submits the ballot, and no extra entry is written.
+- **UpdateSlotAsync** works out which reviewers leave the slot (old primary or alternate that is neither of the new
+  ones; a role swap or an added alternate leaves nobody). Their own rows (not the carried ones) are deleted, a submitted
+  ballot becomes a draft (a draft stays a draft, also when the slots drop to one), and `ballot.reassigned` is the
+  audit of the transaction when a row was removed or the status changed.
+- **RemoveSlotAsync** deletes the answers and the section states of the slot explicitly, because their key holds the slot
+  identity without a foreign key, and the status row by cascade; a signed slot is still refused by the database, which
+  rolls the deletes back.
 
 **GetRecordAsync**: Reads the record that a signature covers (`ReviewRecord`): the content fingerprint, the checklist
 snapshot, the section states, the answers, the threads with their comments, and the source (`ReviewSource`: `Upload`,

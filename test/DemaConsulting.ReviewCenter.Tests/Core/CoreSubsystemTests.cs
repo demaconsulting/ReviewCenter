@@ -119,7 +119,16 @@ public class CoreSubsystemTests
     ///     fails the test instead of going unnoticed. The rules that only the git content source reports are
     ///     excluded here; the content sources subsystem and git tests cover them.
     /// </summary>
-    public static TheoryData<DomainRule> AllRules => [.. Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule))];
+    public static TheoryData<DomainRule> AllRules => [.. Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule) && !StoreOnlyRules.Contains(rule))];
+
+    /// <summary>
+    ///     The rules that only the store reports until a service enforces them; the ballot service of a later change
+    ///     adds the scenario and removes the rule from this list.
+    /// </summary>
+    private static readonly DomainRule[] StoreOnlyRules =
+    [
+        DomainRule.BallotIncomplete
+    ];
 
     /// <summary>
     ///     The rules reported only by the git content source (a revision that does not exist, git missing, a failed

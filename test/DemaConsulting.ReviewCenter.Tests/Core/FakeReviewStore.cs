@@ -73,6 +73,12 @@ internal sealed class FakeReviewStore : IReviewStore
     private readonly List<ChecklistAnswer> _answers = [];
 
     /// <summary>
+    ///     The stored ballot status rows; the rows of a slot's ballot are the entries of <c>_answers</c> and
+    ///     <c>_sectionStates</c> with the slot's identity.
+    /// </summary>
+    private readonly List<ChecklistBallot> _ballots = [];
+
+    /// <summary>
     ///     The stored reviewer slots.
     /// </summary>
     private readonly List<ReviewerSlot> _slots = [];
@@ -921,7 +927,7 @@ internal sealed class FakeReviewStore : IReviewStore
         CancellationToken cancellationToken = default)
     {
         IReadOnlyList<ChecklistSectionState> list = _sectionStates
-            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == ChecklistAnswer.BaselineSlotId)
             .ToList();
         return Task.FromResult(list);
     }
@@ -933,7 +939,7 @@ internal sealed class FakeReviewStore : IReviewStore
         CancellationToken cancellationToken = default)
     {
         IReadOnlyList<ChecklistAnswer> list = _answers
-            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId)
+            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == ChecklistAnswer.BaselineSlotId)
             .ToList();
         return Task.FromResult(list);
     }
@@ -944,7 +950,12 @@ internal sealed class FakeReviewStore : IReviewStore
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
-        _sectionStates.RemoveAll(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId && s.SectionId == state.SectionId);
+        if (state.SlotId != ChecklistAnswer.BaselineSlotId)
+        {
+            throw new ArgumentException("A section state of a ballot is stored with SetBallotSectionStateAsync.", nameof(state));
+        }
+        _sectionStates.RemoveAll(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId
+            && s.SlotId == state.SlotId && s.SectionId == state.SectionId);
         _sectionStates.Add(state);
         Audits.Add(audit);
         return Task.CompletedTask;
@@ -956,11 +967,274 @@ internal sealed class FakeReviewStore : IReviewStore
         AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
-        _answers.RemoveAll(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId && a.ItemId == answer.ItemId);
+        if (answer.SlotId != ChecklistAnswer.BaselineSlotId)
+        {
+            throw new ArgumentException("An answer of a ballot is stored with SetBallotAnswerAsync.", nameof(answer));
+        }
+        _answers.RemoveAll(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId
+            && a.SlotId == answer.SlotId && a.ItemId == answer.ItemId);
         _answers.Add(answer);
         Audits.Add(audit);
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Ballot>> ListBallotsAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<Ballot> list = _ballots
+            .Where(b => b.ProjectId == projectId && b.ReviewId == reviewId)
+            .OrderBy(b => b.SlotId)
+            .Select(b => BuildBallot(b))
+            .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
+    public Task<Ballot?> GetBallotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken = default)
+    {
+        var row = FindBallot(projectId, reviewId, slotId);
+        return Task.FromResult(row is null ? null : BuildBallot(row));
+    }
+
+    /// <inheritdoc />
+    public async Task<Ballot> SetBallotAnswerAsync(
+        ChecklistAnswer answer,
+        AuditDraft audit,
+        Func<Ballot, bool>? completesBallot,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(answer.SlotId, ChecklistAnswer.BaselineSlotId);
+        return await StoreBallotEditAsync(
+            answer.ProjectId,
+            answer.ReviewId,
+            answer.SlotId,
+            answer.AnsweredAt,
+            answer.AnsweredByUsername,
+            audit,
+            completesBallot,
+            () =>
+            {
+                _answers.RemoveAll(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId
+                    && a.SlotId == answer.SlotId && a.ItemId == answer.ItemId);
+                _answers.Add(answer);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Ballot> SetBallotSectionStateAsync(
+        ChecklistSectionState state,
+        AuditDraft audit,
+        Func<Ballot, bool>? completesBallot,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(state.SlotId, ChecklistAnswer.BaselineSlotId);
+        return await StoreBallotEditAsync(
+            state.ProjectId,
+            state.ReviewId,
+            state.SlotId,
+            state.SetAt,
+            state.SetByUsername,
+            audit,
+            completesBallot,
+            () =>
+            {
+                _sectionStates.RemoveAll(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId
+                    && s.SlotId == state.SlotId && s.SectionId == state.SectionId);
+                _sectionStates.Add(state);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Ballot> SubmitBallotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        DateTimeOffset submittedAt,
+        string submittedByUsername,
+        AuditDraft audit,
+        Func<Ballot, bool> isComplete,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(slotId, ChecklistAnswer.BaselineSlotId);
+        await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
+        _ = RequireSlotNumber(projectId, reviewId, slotId);
+        var row = FindBallot(projectId, reviewId, slotId);
+        if (row is { Status: BallotStatus.Submitted })
+        {
+            return BuildBallot(row);
+        }
+
+        var ballot = row is null ? new Ballot(slotId, BallotStatus.Draft, null, null, [], []) : BuildBallot(row);
+        if (!isComplete(ballot))
+        {
+            throw new DomainRuleException(
+                DomainRule.BallotIncomplete,
+                "The ballot cannot be submitted while a check that applies has no answer.");
+        }
+
+        SetBallotStatus(projectId, reviewId, slotId, BallotStatus.Submitted, submittedAt, submittedByUsername);
+        var submitted = BuildBallot(FindBallot(projectId, reviewId, slotId)!);
+        Audits.Add(audit);
+        return submitted;
+    }
+
+    /// <summary>
+    ///     Gets the 1-based number of a slot among the slots of its review and the number of slots, as the real store does.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <returns>The slot number and the slot count.</returns>
+    private (int Number, int Count) RequireSlotNumber(int projectId, string reviewId, int slotId)
+    {
+        var ids = _slots
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .Select(s => s.Id)
+            .Order()
+            .ToList();
+        var index = ids.IndexOf(slotId);
+        if (index < 0)
+        {
+            throw new DomainRuleException(DomainRule.SlotNotFound, $"The slot {slotId} does not exist in this review.");
+        }
+
+        return (index + 1, ids.Count);
+    }
+
+    /// <summary>
+    ///     Finds the status row of a ballot.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <returns>The status row, or <c>null</c> when the slot has none.</returns>
+    private ChecklistBallot? FindBallot(int projectId, string reviewId, int slotId)
+    {
+        return _ballots.FirstOrDefault(b => b.ProjectId == projectId && b.ReviewId == reviewId && b.SlotId == slotId);
+    }
+
+    /// <summary>
+    ///     Builds a ballot from its status row and the stored rows of its slot.
+    /// </summary>
+    /// <param name="row">The status row.</param>
+    /// <returns>The ballot.</returns>
+    private Ballot BuildBallot(ChecklistBallot row)
+    {
+        return new Ballot(
+            row.SlotId,
+            row.Status,
+            row.SubmittedAt,
+            row.SubmittedByUsername,
+            _answers
+                .Where(a => a.ProjectId == row.ProjectId && a.ReviewId == row.ReviewId && a.SlotId == row.SlotId)
+                .OrderBy(a => a.ItemId, StringComparer.Ordinal)
+                .ToList(),
+            _sectionStates
+                .Where(s => s.ProjectId == row.ProjectId && s.ReviewId == row.ReviewId && s.SlotId == row.SlotId)
+                .OrderBy(s => s.SectionId, StringComparer.Ordinal)
+                .ToList());
+    }
+
+    /// <summary>
+    ///     Stores the status of a ballot, replacing the status row when there is one.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <param name="status">The status to store.</param>
+    /// <param name="submittedAt">When the ballot was handed in; <c>null</c> for a draft.</param>
+    /// <param name="submittedByUsername">Who handed the ballot in; <c>null</c> for a draft.</param>
+    private void SetBallotStatus(
+        int projectId,
+        string reviewId,
+        int slotId,
+        BallotStatus status,
+        DateTimeOffset? submittedAt,
+        string? submittedByUsername)
+    {
+        _ballots.RemoveAll(b => b.ProjectId == projectId && b.ReviewId == reviewId && b.SlotId == slotId);
+        _ballots.Add(new ChecklistBallot
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            SlotId = slotId,
+            Status = status,
+            SubmittedAt = submittedAt,
+            SubmittedByUsername = submittedByUsername
+        });
+    }
+
+    /// <summary>
+    ///     Stores one edit of a ballot and settles its status, as the real store does.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <param name="editedAt">When the row was written.</param>
+    /// <param name="editedByUsername">Who wrote the row.</param>
+    /// <param name="audit">The audit draft of the edit.</param>
+    /// <param name="completesBallot">The completeness test for the single-slot automatic submit, or <c>null</c>.</param>
+    /// <param name="storeRow">Stores the answer or section state row.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ballot as stored.</returns>
+    private async Task<Ballot> StoreBallotEditAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        DateTimeOffset editedAt,
+        string editedByUsername,
+        AuditDraft audit,
+        Func<Ballot, bool>? completesBallot,
+        Action storeRow,
+        CancellationToken cancellationToken)
+    {
+        await EnsureNotConcludedAsync(projectId, reviewId, cancellationToken);
+        var (slotNumber, slotCount) = RequireSlotNumber(projectId, reviewId, slotId);
+        var wasSubmitted = FindBallot(projectId, reviewId, slotId) is { Status: BallotStatus.Submitted };
+
+        // An edit makes the ballot a draft; a single-slot review submits a complete ballot at once
+        storeRow();
+        SetBallotStatus(projectId, reviewId, slotId, BallotStatus.Draft, null, null);
+        if (slotCount == 1 && completesBallot is not null && completesBallot(BuildBallot(FindBallot(projectId, reviewId, slotId)!)))
+        {
+            SetBallotStatus(projectId, reviewId, slotId, BallotStatus.Submitted, editedAt, editedByUsername);
+        }
+
+        var ballot = BuildBallot(FindBallot(projectId, reviewId, slotId)!);
+        Audits.Add(audit);
+        var isSubmitted = ballot.Status == BallotStatus.Submitted;
+        if (wasSubmitted != isSubmitted)
+        {
+            Audits.Add(isSubmitted
+                ? audit with
+                {
+                    Action = "ballot.submitted",
+                    Detail = $"slot {slotNumber}: ballot submitted ({ballot.Answers.Count} answers, {ballot.SectionStates.Count} section states)"
+                }
+                : audit with
+                {
+                    Action = "ballot.reopened",
+                    Detail = $"slot {slotNumber}: ballot reverted to draft by an edit"
+                });
+        }
+
+        return ballot;
+    }
+
+    /// <summary>
+    ///     Gets or sets how the store finds the user name of a user identity, which the reassignment of a slot needs to
+    ///     tell the answers of a departing reviewer from the others; an unknown user has none.
+    /// </summary>
+    public Func<int, string?> UsernameOfUser { get; set; } = _ => null;
 
     /// <inheritdoc />
     public Task<ReviewRecord?> GetRecordAsync(
@@ -977,8 +1251,12 @@ internal sealed class FakeReviewStore : IReviewStore
         var record = new ReviewRecord(
             review.ContentFingerprint,
             review.Checklist,
-            _sectionStates.Where(s => s.ProjectId == projectId && s.ReviewId == reviewId).ToList(),
-            _answers.Where(a => a.ProjectId == projectId && a.ReviewId == reviewId).ToList(),
+            _sectionStates
+                .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == ChecklistAnswer.BaselineSlotId)
+                .ToList(),
+            _answers
+                .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == ChecklistAnswer.BaselineSlotId)
+                .ToList(),
             _threads.Where(t => t.ProjectId == projectId && t.ReviewId == reviewId).OrderBy(t => t.Id).ToList(),
             review.IsFromRepository
                 ? new ReviewSource(
@@ -1103,6 +1381,47 @@ internal sealed class FakeReviewStore : IReviewStore
             AlternateUserId = slot.AlternateUserId
         };
         _slots.Add(stored);
+
+        // A follow-up review carries review-level rows; the new slot starts from them as a draft ballot
+        var carriedAnswers = _answers
+            .Where(a => a.ProjectId == stored.ProjectId && a.ReviewId == stored.ReviewId
+                && a.SlotId == ChecklistAnswer.BaselineSlotId && a.CarriedFromReviewId != null)
+            .ToList();
+        var carriedSections = _sectionStates
+            .Where(s => s.ProjectId == stored.ProjectId && s.ReviewId == stored.ReviewId
+                && s.SlotId == ChecklistAnswer.BaselineSlotId && s.CarriedFromReviewId != null)
+            .ToList();
+        if (carriedAnswers.Count > 0 || carriedSections.Count > 0)
+        {
+            _answers.AddRange(carriedAnswers.Select(a => new ChecklistAnswer
+            {
+                ProjectId = a.ProjectId,
+                ReviewId = a.ReviewId,
+                SlotId = stored.Id,
+                ItemId = a.ItemId,
+                Outcome = a.Outcome,
+                Justification = a.Justification,
+                AnsweredBy = a.AnsweredBy,
+                AnsweredByUsername = a.AnsweredByUsername,
+                AnsweredAt = a.AnsweredAt,
+                CarriedFromReviewId = a.CarriedFromReviewId
+            }));
+            _sectionStates.AddRange(carriedSections.Select(s => new ChecklistSectionState
+            {
+                ProjectId = s.ProjectId,
+                ReviewId = s.ReviewId,
+                SlotId = stored.Id,
+                SectionId = s.SectionId,
+                Applicable = s.Applicable,
+                Reason = s.Reason,
+                SetBy = s.SetBy,
+                SetByUsername = s.SetByUsername,
+                SetAt = s.SetAt,
+                CarriedFromReviewId = s.CarriedFromReviewId
+            }));
+            SetBallotStatus(stored.ProjectId, stored.ReviewId, stored.Id, BallotStatus.Draft, null, null);
+        }
+
         Audits.Add(audit(stored));
         return Task.FromResult(stored);
     }
@@ -1123,6 +1442,7 @@ internal sealed class FakeReviewStore : IReviewStore
             return Task.FromResult(false);
         }
 
+        var old = _slots[index];
         _slots[index] = new ReviewerSlot
         {
             Id = slotId,
@@ -1132,7 +1452,54 @@ internal sealed class FakeReviewStore : IReviewStore
             AlternateUserId = alternateUserId
         };
         Audits.Add(audit);
+
+        // Reviewers who leave the slot take their own rows with them (carried rows stay) and the ballot is a draft again
+        var departing = new[] { old.PrimaryUserId, old.AlternateUserId }
+            .OfType<int>()
+            .Where(id => id != primaryUserId && id != alternateUserId)
+            .Distinct()
+            .ToList();
+        if (departing.Count > 0)
+        {
+            ReassignBallot(old, departing, audit);
+        }
+
         return Task.FromResult(true);
+    }
+
+    /// <summary>
+    ///     Removes the contributions of departing reviewers from the ballot of a slot, as the real store does.
+    /// </summary>
+    /// <param name="slot">The slot before the change.</param>
+    /// <param name="departing">The identities of the reviewers who leave the slot.</param>
+    /// <param name="audit">The audit draft of the slot change.</param>
+    private void ReassignBallot(ReviewerSlot slot, List<int> departing, AuditDraft audit)
+    {
+        var names = departing.Select(id => UsernameOfUser(id)).OfType<string>().ToList();
+        var removedAnswers = _answers.RemoveAll(a => a.ProjectId == slot.ProjectId && a.ReviewId == slot.ReviewId
+            && a.SlotId == slot.Id && a.CarriedFromReviewId == null
+            && names.Contains(a.AnsweredByUsername, StringComparer.OrdinalIgnoreCase));
+        var removedSections = _sectionStates.RemoveAll(s => s.ProjectId == slot.ProjectId && s.ReviewId == slot.ReviewId
+            && s.SlotId == slot.Id && s.CarriedFromReviewId == null
+            && names.Contains(s.SetByUsername, StringComparer.OrdinalIgnoreCase));
+        var reverted = FindBallot(slot.ProjectId, slot.ReviewId, slot.Id) is { Status: BallotStatus.Submitted };
+        if (reverted)
+        {
+            SetBallotStatus(slot.ProjectId, slot.ReviewId, slot.Id, BallotStatus.Draft, null, null);
+        }
+
+        if (removedAnswers == 0 && removedSections == 0 && !reverted)
+        {
+            return;
+        }
+
+        var (slotNumber, _) = RequireSlotNumber(slot.ProjectId, slot.ReviewId, slot.Id);
+        Audits.Add(audit with
+        {
+            Action = "ballot.reassigned",
+            Detail = $"slot {slotNumber}: ballot reverted to draft after a reassignment "
+                + $"({removedAnswers} answers, {removedSections} section states of departed reviewers removed)"
+        });
     }
 
     /// <inheritdoc />
@@ -1146,6 +1513,9 @@ internal sealed class FakeReviewStore : IReviewStore
         var removed = _slots.RemoveAll(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId) > 0;
         if (removed)
         {
+            _answers.RemoveAll(a => a.ProjectId == projectId && a.ReviewId == reviewId && a.SlotId == slotId);
+            _sectionStates.RemoveAll(s => s.ProjectId == projectId && s.ReviewId == reviewId && s.SlotId == slotId);
+            _ballots.RemoveAll(b => b.ProjectId == projectId && b.ReviewId == reviewId && b.SlotId == slotId);
             Audits.Add(audit);
         }
 

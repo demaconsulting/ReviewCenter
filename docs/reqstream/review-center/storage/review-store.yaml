@@ -307,6 +307,81 @@ sections:
           - ReviewStore_UpdateReviewConclusionTextAsync_MissingReview_ReturnsFalse
           - ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked
 
+      - id: ReviewCenter-ReviewStore-Ballots
+        title: >-
+          The ReviewStore class shall store the answers and the section states of a review for each reviewer slot, one
+          row for each check or section and slot, so that the same check answered in two slots is stored twice, shall
+          keep the status of each slot's ballot (draft or submitted, with the time and the user name of the hand-in),
+          list and read the ballots with their own rows only, and refuse a slot that does not belong to the review, the
+          review-level identity 0, and a concluded review with the ReviewLocked rule inside the write transaction. An
+          edit shall make a submitted ballot a draft again, shall hand in a complete ballot at once in a review with
+          exactly one slot, and shall add the audit entry of the status change, naming the slot number only, in the same
+          transaction as the edit, so that the hash chain stays intact. The review-level rows that the record and its
+          digest are built from shall neither list nor change with the rows of a ballot.
+        justification: |
+          Each reviewer needs an answer of their own, so a row can no longer be identified by the review and the check
+          alone. A status that is stored without its entry, or an entry without its status, would leave the history of
+          the ballot untrue, and a record that changed with a draft would break the signatures made for it. The lock
+          check is part of the write, so a signed record cannot change under a signature.
+        tests:
+          - ReviewStore_SetBallotAnswerAsync_FirstAnswer_CreatesDraftBallot
+          - ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot
+          - ReviewStore_SetBallotAnswerAsync_SameSlotAgain_ReplacesTheAnswer
+          - ReviewStore_SetBallotAnswerAsync_UnknownOrForeignSlot_ThrowsSlotNotFound
+          - ReviewStore_SetBallotAnswerAsync_BaselineSlotId_IsRefused
+          - ReviewStore_SetBallotAnswerAsync_ConcludedReview_ThrowsReviewLocked
+          - ReviewStore_SetBallotSectionStateAsync_PerSlotRows_RoundTrip
+          - ReviewStore_SetBallotAnswerAsync_SubmittedBallot_RevertsToDraftWithAudit
+          - ReviewStore_SetBallotAnswerAsync_SingleSlotCompleteBallot_AutoSubmitsWithAudit
+          - ReviewStore_SetBallotAnswerAsync_SingleSlotSubmittedBallotEdited_StaysSubmittedWithoutTransitionAudit
+          - ReviewStore_SetBallotAnswerAsync_TwoSlots_NeverAutoSubmits
+          - ReviewStore_ListBallotsAsync_TwoSlots_ReturnsOwnRowsInSlotOrder
+          - ReviewStore_GetBallotAsync_NotStartedSlot_ReturnsNull
+          - ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows
+          - ReviewStore_GetRecordAsync_BallotRows_DoNotChangeTheRecordOrItsDigest
+          - ReviewStore_BallotTransitions_KeepTheAuditChainIntact
+
+      - id: ReviewCenter-ReviewStore-BallotSubmit
+        title: >-
+          The ReviewStore class shall hand in the ballot of a slot only through an atomic compare-and-set from draft to
+          submitted that asks the caller's completeness test about the rows of the same transaction, stores the time and
+          the user name of the hand-in together with the audit entry of the caller, refuses an incomplete ballot with
+          the BallotIncomplete rule without storing anything, and returns a ballot that is already submitted as it is,
+          without a write and without an entry.
+        justification: |
+          Two reviewers, or one reviewer twice, can hand in at the same moment, and an edit can arrive between the
+          check and the write. Testing the completeness inside the write transaction means that a ballot is never
+          submitted with a check unanswered, and the idempotent second call keeps the first time and user and adds no
+          second entry for one hand-in.
+        tests:
+          - ReviewStore_SubmitBallotAsync_CompleteDraft_SubmitsWithAudit
+          - ReviewStore_SubmitBallotAsync_IncompleteBallot_ThrowsBallotIncompleteAndStoresNothing
+          - ReviewStore_SubmitBallotAsync_AlreadySubmitted_ReturnsBallotWithoutAudit
+          - ReviewStore_SubmitBallotAsync_NoBallotAndNothingToAnswer_StoresSubmittedBallot
+
+      - id: ReviewCenter-ReviewStore-BallotSlotLifecycle
+        title: >-
+          The ReviewStore class shall, in the transaction of the slot change, seed the ballot of a new slot with copies
+          of the rows that a follow-up review carried (and no ballot when there are none), remove the rows that a
+          departing reviewer gave from the ballot of the slot, keep the carried rows, make a submitted ballot a draft
+          again and record a reassignment entry that names the slot number and counts only, leave the ballot alone when
+          the reviewers of a slot only swap roles, and delete the rows and the status of the ballot of a removed slot,
+          while the refusal to remove a signed slot keeps them.
+        justification: |
+          A slot gets a new reviewer, or loses one, while the review is still open. The new reviewer must start from
+          what the review carried, the departed reviewer's answers must not stay under the name of the slot, and a
+          deleted slot must leave no orphan rows that a later slot with the same identity could pick up. All of it
+          happens in one
+          transaction with its entry, so a failure leaves the ballot as it was.
+        tests:
+          - ReviewStore_AddSlotAsync_FollowUpBaseline_SeedsDraftBallotWithCarriedRows
+          - ReviewStore_AddSlotAsync_NoBaseline_CreatesNoBallot
+          - ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft
+          - ReviewStore_UpdateSlotAsync_CarriedRowsOfDepartingUser_AreKept
+          - ReviewStore_UpdateSlotAsync_RoleSwapOnly_KeepsBallot
+          - ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows
+          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedAndKeepsBallotRows
+
       - id: ReviewCenter-ReviewStore-FollowUp
         title: >-
           The ReviewStore class shall store a follow-up review with the review that it follows, the numbers of
