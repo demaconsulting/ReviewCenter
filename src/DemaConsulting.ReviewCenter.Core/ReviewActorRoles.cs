@@ -83,4 +83,32 @@ internal static class ReviewActorRoles
         var user = await users.GetByUsernameAsync(actor.Username, cancellationToken);
         return user is not null && slots.Any(slot => slot.PrimaryUserId == user.Id || slot.AlternateUserId == user.Id);
     }
+
+    /// <summary>
+    ///     Finds the slot a person holds in a review, to look up the status of their ballot.
+    /// </summary>
+    /// <param name="users">The user store used to resolve the user name to an identity. Must not be null.</param>
+    /// <param name="actor">The signed-in user; may be null, which holds no slot.</param>
+    /// <param name="slots">The reviewer slots of the review. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The slot (the one with the lowest identity when the person holds several) of which the person is the primary
+    ///     or the alternate reviewer; <c>null</c> for an unknown user, the command line and a person without a slot.
+    /// </returns>
+    public static async Task<ReviewerSlot?> FindOwnSlotAsync(
+        IUserStore users,
+        Actor? actor,
+        IReadOnlyList<ReviewerSlot> slots,
+        CancellationToken cancellationToken)
+    {
+        if (actor is null || slots.Count == 0)
+        {
+            return null;
+        }
+
+        var user = await users.GetByUsernameAsync(actor.Username, cancellationToken);
+        return user is null
+            ? null
+            : slots.OrderBy(s => s.Id).FirstOrDefault(s => s.PrimaryUserId == user.Id || s.AlternateUserId == user.Id);
+    }
 }

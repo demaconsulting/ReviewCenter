@@ -44,6 +44,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     of every change run in one order: input, the right to contribute, the lock, the thread, the person's
 ///     relation to it, the rules, the acknowledgement, the store.
 ///     Two pure static helpers shape threads for display (<see cref="BuildIndex"/>, <see cref="NextStep"/>).
+///     A thread is anchored to a file or, through <see cref="ThreadAnchor.ForCheck"/>, to one check of the frozen
+///     checklist; who may start the second kind is decided by <see cref="CheckThreadRules"/>, and replying, resolving
+///     and reopening work the same for both kinds.
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
 /// </remarks>
@@ -103,7 +106,9 @@ public sealed class ThreadService
     ///     Where the thread is anchored; must not be null. A line range (both lines set) requires a text file with at
     ///     least that many lines (see <see cref="FileText"/>). The side of the anchor is ignored for a whole-file
     ///     anchor (which is always stored as <see cref="ThreadSide.Head"/>, and rejects
-    ///     <see cref="ThreadSide.Baseline"/>). <see cref="ThreadSide.Baseline"/> needs a repository review with a
+    ///     <see cref="ThreadSide.Baseline"/>). A check anchor (<see cref="ThreadAnchor.ForCheck"/>) names one check of
+    ///     the frozen checklist instead of a file and carries no file, lines or baseline side.
+    ///     <see cref="ThreadSide.Baseline"/> needs a repository review with a
     ///     baseline commit and a file that is <see cref="ChangeKind.Modified"/> or <see cref="ChangeKind.Deleted"/>;
     ///     the range is then checked against the baseline lines. On the head side a <see cref="ChangeKind.Deleted"/>
     ///     file accepts no lines.
@@ -130,7 +135,11 @@ public sealed class ThreadService
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
     ///     <see cref="DomainRule.ReviewLocked"/> when the review is concluded and
     ///     <see cref="DomainRule.SignaturesWouldBecomeOutOfDate"/> when the change alters the digest and a current
-    ///     signature is not acknowledged; nothing is stored then.
+    ///     signature is not acknowledged; nothing is stored then. For a check anchor also
+    ///     <see cref="DomainRule.ThreadAnchorInvalid"/> when the anchor carries a file, lines or the baseline side,
+    ///     <see cref="DomainRule.ChecklistNotFound"/> or <see cref="DomainRule.ChecklistItemNotFound"/> when the review
+    ///     has no checklist or the check is not in it, and <see cref="DomainRule.ActorNotAllowed"/> when the actor
+    ///     is not allowed by <see cref="CheckThreadRules"/>.
     /// </exception>
     public async Task<ReviewThread> StartThreadAsync(
         int projectId,
@@ -146,17 +155,24 @@ public sealed class ThreadService
         ArgumentNullException.ThrowIfNull(anchor);
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireContributeAsync(actor, projectId, cancellationToken);
-        var (filePath, startLine, endLine, side) = anchor;
+        var (filePath, startLine, endLine, side, checkItemId) = anchor;
         if (!Enum.IsDefined(side))
         {
             throw new ArgumentOutOfRangeException(nameof(anchor), side, "The side of the anchor is not a known value.");
         }
 
         var trimmedText = ValidateText(text);
-        ValidateAnchorShape(startLine, endLine);
+        if (checkItemId is not null)
+        {
+            ValidateCheckAnchorShape(filePath, startLine, endLine, side, checkItemId);
+        }
+        else
+        {
+            ValidateAnchorShape(startLine, endLine);
+        }
 
         // A whole-file anchor has no line numbers, so it has no side to choose: it is always stored as Head
-        if (startLine is null && side == ThreadSide.Baseline)
+        if (checkItemId is null && startLine is null && side == ThreadSide.Baseline)
         {
             throw new DomainRuleException(
                 DomainRule.ThreadAnchorInvalid,
@@ -168,23 +184,31 @@ public sealed class ThreadService
         // the anchor says; a review that does not exist has no snapshot and is reported below as before
         var snapshot = await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
-        // The file must exist in the review; the metadata read does not load any file bytes
+        // The file must exist in the review; the metadata read does not load any file bytes. A check anchor has no
+        // file: its check must exist in the frozen checklist and the actor must be one who may start it
         var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
-        var file = review?.Files.FirstOrDefault(f => string.Equals(f.Path, filePath, StringComparison.Ordinal));
-        if (review is null || file is null)
+        if (checkItemId is not null)
         {
-            throw new DomainRuleException(
-                DomainRule.ThreadAnchorInvalid,
-                $"The file '{filePath}' does not exist in this review.");
+            await RequireCheckThreadStartAsync(actor, snapshot, review, checkItemId, cancellationToken);
         }
-
-        // Which side may carry line anchors depends on the kind of change
-        if (startLine is not null)
+        else
         {
-            ValidateSideForFile(review, file, side);
+            var file = review?.Files.FirstOrDefault(f => string.Equals(f.Path, filePath, StringComparison.Ordinal));
+            if (review is null || file is null)
+            {
+                throw new DomainRuleException(
+                    DomainRule.ThreadAnchorInvalid,
+                    $"The file '{filePath}' does not exist in this review.");
+            }
 
-            // Only a line range needs the bytes, to count lines the way the page shows them
-            await ValidateRangeWithinFileAsync(projectId, reviewId, filePath, side, endLine!.Value, cancellationToken);
+            // Which side may carry line anchors depends on the kind of change
+            if (startLine is not null)
+            {
+                ValidateSideForFile(review, file, side);
+
+                // Only a line range needs the bytes, to count lines the way the page shows them
+                await ValidateRangeWithinFileAsync(projectId, reviewId, filePath, side, endLine!.Value, cancellationToken);
+            }
         }
 
         // Only a comment included in the report alters the digest; the acknowledgement is asked for once the request
@@ -195,6 +219,7 @@ public sealed class ThreadService
             ProjectId = projectId,
             ReviewId = reviewId,
             FilePath = filePath,
+            CheckItemId = checkItemId,
             Side = startLine is null ? ThreadSide.Head : side,
             StartLine = startLine,
             EndLine = endLine,
@@ -221,27 +246,6 @@ public sealed class ThreadService
             thread,
             stored =>
             {
-                // A single line reads "line 3", a range "lines 3-5", a whole file "(whole file)"; only the
-                // baseline side is named, because the head is the default and keeps the text unchanged
-                string anchor;
-                if (stored.StartLine is not { } start)
-                {
-                    anchor = "(whole file)";
-                }
-                else if (stored.EndLine == start)
-                {
-                    anchor = $"line {start}";
-                }
-                else
-                {
-                    anchor = $"lines {start}-{stored.EndLine}";
-                }
-
-                if (stored.StartLine is not null && stored.Side == ThreadSide.Baseline)
-                {
-                    anchor += " (baseline)";
-                }
-
                 var first = stored.Comments[0];
 
                 // The comment text itself is never audited; its short digest still identifies it
@@ -249,7 +253,7 @@ public sealed class ThreadService
                 return AuditDraft.By(
                     actor,
                     "thread.started",
-                    $"thread {stored.Id} on {stored.FilePath} {anchor}; comment {first.Id}, text sha256 {AuditText.ShortHash(first.Text)}{inReport}",
+                    $"thread {stored.Id} on {AnchorText(stored)}; comment {first.Id}, text sha256 {AuditText.ShortHash(first.Text)}{inReport}",
                     projectId,
                     reviewId);
             },
@@ -972,6 +976,7 @@ public sealed class ThreadService
             ProjectId = thread.ProjectId,
             ReviewId = thread.ReviewId,
             FilePath = thread.FilePath,
+            CheckItemId = thread.CheckItemId,
             Side = thread.Side,
             StartLine = thread.StartLine,
             EndLine = thread.EndLine,
@@ -1051,6 +1056,130 @@ public sealed class ThreadService
         }
 
         return trimmed;
+    }
+
+    /// <summary>
+    ///     Checks that a check anchor has the one shape the service accepts for a check.
+    /// </summary>
+    /// <param name="filePath">The path of the anchor; must be empty.</param>
+    /// <param name="startLine">The first line of the anchor; must be <c>null</c>.</param>
+    /// <param name="endLine">The last line of the anchor; must be <c>null</c>.</param>
+    /// <param name="side">The side of the anchor; must be <see cref="ThreadSide.Head"/>.</param>
+    /// <param name="checkItemId">The check identifier; must not be empty.</param>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ThreadAnchorInvalid"/> when the anchor mixes a file or lines with a check,
+    ///     or names no check.
+    /// </exception>
+    private static void ValidateCheckAnchorShape(
+        string filePath,
+        int? startLine,
+        int? endLine,
+        ThreadSide side,
+        string checkItemId)
+    {
+        if (checkItemId.Length == 0)
+        {
+            throw new DomainRuleException(DomainRule.ThreadAnchorInvalid, "A check discussion needs a check.");
+        }
+
+        // A thread is anchored to a file or to a check, never to both, and a check has no lines
+        if (filePath.Length > 0 || startLine is not null || endLine is not null || side != ThreadSide.Head)
+        {
+            throw new DomainRuleException(
+                DomainRule.ThreadAnchorInvalid,
+                "A discussion about a check has no file, no lines and no baseline side.");
+        }
+    }
+
+    /// <summary>
+    ///     Checks that the review has the check and that the actor may start a discussion about it.
+    /// </summary>
+    /// <remarks>
+    ///     The facts are gathered here (the frozen checklist, the roles of the actor and the status of their ballot) and
+    ///     <see cref="CheckThreadRules"/> decides. Any check of the frozen checklist qualifies, not only a disputed one.
+    /// </remarks>
+    /// <param name="actor">The signed-in user.</param>
+    /// <param name="snapshot">The snapshot of the review, or <c>null</c> when it does not exist.</param>
+    /// <param name="review">The review, or <c>null</c> when it does not exist.</param>
+    /// <param name="checkItemId">The check identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReviewNotFound"/> when the review does not exist,
+    ///     <see cref="DomainRule.ChecklistNotFound"/> when it has no checklist, <see cref="DomainRule.ChecklistItemNotFound"/>
+    ///     when the checklist has no such check, and <see cref="DomainRule.ActorNotAllowed"/> when the person may not
+    ///     start a check discussion.
+    /// </exception>
+    private async Task RequireCheckThreadStartAsync(
+        Actor actor,
+        ReviewSnapshot? snapshot,
+        Review? review,
+        string checkItemId,
+        CancellationToken cancellationToken)
+    {
+        // The check must exist in the checklist the review was frozen with
+        if (snapshot is null || review is null)
+        {
+            throw new DomainRuleException(DomainRule.ReviewNotFound, "The review does not exist.");
+        }
+
+        var checklist = snapshot.Record.Checklist
+            ?? throw new DomainRuleException(DomainRule.ChecklistNotFound, "This review has no checklist.");
+        if (!checklist.Parse().Sections.SelectMany(section => section.Items).Any(item => item.Id == checkItemId))
+        {
+            throw new DomainRuleException(
+                DomainRule.ChecklistItemNotFound,
+                $"The checklist has no check '{checkItemId}'.");
+        }
+
+        // Gather the facts of the actor; the rule alone decides
+        var isSystemAdmin = await _access.IsSystemAdminAsync(actor, cancellationToken);
+        var isLead = await ReviewActorRoles.IsLeadAsync(_access, actor, review, cancellationToken);
+        var slot = await ReviewActorRoles.FindOwnSlotAsync(_users, actor, snapshot.Slots, cancellationToken);
+        var ballot = slot is null ? null : snapshot.Record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id);
+        if (!CheckThreadRules.CanStart(isSystemAdmin, isLead, slot is not null, ballot?.Status, snapshot.Slots.Count))
+        {
+            throw NotAllowed(
+                "A discussion about a check can be started by the lead of the review or by a reviewer who has " +
+                "submitted their own ballot, so that no one learns how the others voted too early.");
+        }
+    }
+
+    /// <summary>
+    ///     Describes where a thread is anchored, for the audit trail.
+    /// </summary>
+    /// <param name="thread">The stored thread.</param>
+    /// <returns>
+    ///     <c>check {id}</c> for a check thread; otherwise the path followed by "line 3", "lines 3-5" or
+    ///     "(whole file)", with "(baseline)" added for a baseline line (the head is the default and keeps the text
+    ///     unchanged).
+    /// </returns>
+    private static string AnchorText(ReviewThread thread)
+    {
+        if (thread.CheckItemId is not null)
+        {
+            return $"check {thread.CheckItemId}";
+        }
+
+        string anchor;
+        if (thread.StartLine is not { } start)
+        {
+            anchor = "(whole file)";
+        }
+        else if (thread.EndLine == start)
+        {
+            anchor = $"line {start}";
+        }
+        else
+        {
+            anchor = $"lines {start}-{thread.EndLine}";
+        }
+
+        if (thread.StartLine is not null && thread.Side == ThreadSide.Baseline)
+        {
+            anchor += " (baseline)";
+        }
+
+        return $"{thread.FilePath} {anchor}";
     }
 
     /// <summary>

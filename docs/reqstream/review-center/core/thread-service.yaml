@@ -166,6 +166,60 @@ sections:
           - ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly
           - ThreadService_ResolveAsync_MissingThread_RecordsNothing
 
+      - id: ReviewCenter-ThreadService-CheckThreads
+        title: >-
+          The ThreadService class shall start a thread anchored to a check of the frozen checklist of the review
+          instead of a file, stored with the identifier of the check, an empty file, no lines and the Head side,
+          shall reject an anchor that names both a file and a check, a check with lines or the Baseline side, an
+          empty check identifier, a review without a checklist and a check that the checklist does not have, shall
+          store nothing when a rule is violated, and shall let a check thread be replied to, resolved with the
+          resolution-note rule of its kind, and reopened like any other thread.
+        justification: |
+          A discussion can be about the wording or the answer to a check rather than about a file, and the checklist
+          is frozen with the review, so the check must exist there. A thread has one anchor, so an anchor that names
+          two things is a mistake, and a check has no lines or baseline to point at. Once started, the thread is an
+          ordinary thread.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchor_StoresCheckThreadWithEmptyFileAndNoLines
+          - ThreadService_StartThreadAsync_CheckAnchorUnknownItem_ThrowsChecklistItemNotFound
+          - ThreadService_StartThreadAsync_CheckAnchorWithoutChecklist_ThrowsChecklistNotFound
+          - ThreadService_StartThreadAsync_MixedFileAndCheckAnchor_ThrowsThreadAnchorInvalid
+          - ThreadService_StartThreadAsync_CheckAnchorWithLinesOrBaselineSide_ThrowsThreadAnchorInvalid
+          - ThreadService_ReplyAsync_ResolveAsync_ReopenAsync_OnCheckThread_Work
+
+      - id: ReviewCenter-ThreadService-CheckThreadStart
+        title: >-
+          The ThreadService class shall allow starting a check thread only to a system administrator, a project
+          administrator, the creator or lead of the review, and a reviewer who holds a slot of the review and has
+          handed in the own ballot or holds the only slot, shall refuse any other actor, including an auditor and a
+          plain contributor, with the ActorNotAllowed rule, shall refuse a concluded review with the ReviewLocked
+          rule, and shall require the acknowledgement of the signatures that the new open thread would make out of
+          date.
+        justification: |
+          The ballots of the other reviewers stay hidden until they hand in their own, and a thread about a check
+          would reveal what a reviewer thinks of it. A reviewer who has submitted has nothing left to hide, and a
+          reviewer who is alone has no one to hide from. An open thread blocks signing, so starting one is a change
+          like any other that can outdate a signature.
+        tests:
+          - CheckThreadRules_CanStart_SubmittedSlotOwner_IsAllowed
+          - CheckThreadRules_CanStart_DraftOrNoBallotSlotOwner_IsRefusedWhenSeveralSlots
+          - CheckThreadRules_CanStart_SoleSlotOwnerWithDraft_IsAllowed
+          - CheckThreadRules_CanStart_LeadCreatorProjectAdminAndSystemAdmin_AreAllowed
+          - ThreadService_StartThreadAsync_CheckAnchorByAuditorOrPlainContributor_ThrowsActorNotAllowed
+          - ThreadService_StartThreadAsync_CheckAnchor_SlotOwnerNeedsSubmittedBallotWhenSeveralSlots
+          - ThreadService_StartThreadAsync_CheckAnchorWhenConcluded_ThrowsReviewLocked
+          - ThreadService_StartThreadAsync_CheckAnchorWouldOutdateSignature_RequiresAcknowledgement
+
+      - id: ReviewCenter-ThreadService-CheckThreadAudit
+        title: >-
+          The ThreadService class shall record starting a check thread in the audit trail in the same transaction,
+          naming the thread, the check and a short hash of the comment text but never the text itself.
+        justification: |
+          The history must show that a discussion about a check was started and by whom, with the same care as for
+          a thread on a file, and without copying the comment into a record that cannot be edited.
+        tests:
+          - ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck
+
       - id: ReviewCenter-ThreadService-Access
         title: >-
           The ThreadService class shall require, for starting a thread, replying, resolving, reopening, promoting,

@@ -352,6 +352,20 @@ sections:
           - SigningService_ChatThreadAfterPartialSigning_KeepsSignaturesValidAndBlocksOthers
           - SigningService_GetApprovalAsync_OpenThreadAllSigned_IsNotApprovedAndCountsOpenThread
 
+      - id: ReviewCenter-SigningService-OpenCheckThread
+        title: >-
+          The SigningService class shall treat an open thread about a check like any other open thread: it shall
+          refuse a signature with the SigningNotAllowed rule while one is open, shall not conclude a review, or
+          call it approved, while one is open, and shall allow the signature and the conclusion once it is
+          resolved.
+        justification: |
+          A question about a check is as unanswered as a question about a file, and a review must not be concluded
+          while a discussion still waits for an answer, wherever it is anchored.
+        tests:
+          - SigningService_SignAsync_OpenCheckThread_IsRefused
+          - SigningService_SignAsync_ResolvedCheckThread_IsAllowed
+          - SigningService_GetApprovalAsync_OpenCheckThread_BlocksConclusion
+
       - id: ReviewCenter-SigningService-IndependentReviewers
         title: >-
           The SigningService class shall, when the project requires independent reviewers, refuse with the

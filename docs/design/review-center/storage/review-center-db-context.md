@@ -54,9 +54,13 @@ repository registry is the one exception, see `Repositories`).
   binary column (empty for a deleted file); `Sha256` is required, at most 64; `Size`. `ChangeKind` is stored as text,
   at most 32 (an uploaded file is `Added`); `BaselineContent` (binary), `BaselineSize`, and `BaselineSha256` (at most
   64) are null when the file has no baseline. A file belongs to a review and is deleted with it.
-- **Threads** (`ReviewThread`): key `Id`, assigned by the database. `ProjectId`, `ReviewId`, and `FilePath` name
-  the file the thread is about and form a relationship to that file, so the database refuses a thread for a file
-  that does not exist, and a thread is deleted with its file. `Side` is stored as text (`Head` or `Baseline`), at most
+- **Threads** (`ReviewThread`): key `Id`, assigned by the database. `ProjectId` and `ReviewId` relate the thread to its
+  review, so the database refuses a thread for a review that does not exist, and a thread is deleted with its review
+  (together with its comments). A thread is anchored either to a file or to a check of the frozen checklist: `FilePath`
+  names the file (empty for a thread about a check) and `CheckItemId` (at most 32, null for a thread on a file) names
+  the check. There is no relationship from a thread to a file, because a thread about a check has no file row; that a
+  file thread names a file of its review is kept by the store (see `ReviewStore`), and an index on `ProjectId` and
+  `ReviewId` serves the reads. `Side` is stored as text (`Head` or `Baseline`), at most
   32, with `Head` as the default, so a row written without a side reads as a head thread. `StartLine` and `EndLine`
   are null for a thread on the whole file. `State` is stored as text, at most 32; `Created`. A thread carried into a
   follow-up review also has `CarriedFromReviewId` (at most 100) and `CarriedFromThreadId` (a number), plain columns
@@ -196,7 +200,10 @@ a repository, and the one on the slot and digest of a
 signature. The state is stored by name, so
 adding states later does not change the meaning of stored rows. The
 tables of threads and comments are new: a database created before they existed does not have them and is not
-altered, so it must be deleted and created again (see the `Storage` design). The same holds for the three
+altered, so it must be deleted and created again (see the `Storage` design). The same holds for the `CheckItemId`
+column of a thread and for the relationship of a thread, which now points at its review and not at a file: there is no
+migration, so a development database created before check threads must be deleted and created again. The same holds
+for the three
 checklist tables, and for the users table and the user name columns of comments, answers, and section decisions: a
 database created before the identity slice must be deleted and created again, and its data is not migrated. The same
 holds for the tables of reviewer slots and signatures: a database created before the signature slice does not have

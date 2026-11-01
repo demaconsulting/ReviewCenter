@@ -58,19 +58,26 @@ sections:
       - id: ReviewCenter-DbContext-Threads
         title: >-
           The ReviewCenterDbContext class shall map threads and comments to tables in which a thread belongs to
-          an existing file of its review and a comment belongs to a thread, so that the database refuses a
-          thread for a file that does not exist and deletes the comments of a deleted thread, and shall map the side
+          an existing review and a comment belongs to a thread, so that the database refuses a thread for a review
+          that does not exist and deletes the threads of a deleted review and the comments of a deleted thread, shall
+          map the identifier of the check of a thread about a check as an optional column that is empty for a thread
+          on a file and keep the file column empty for a thread about a check, so that such a thread needs no file
+          row (that a thread on a file names a file of its review is kept by the store), and shall map the side
           of a thread as text with Head as the default, and shall map the kind of a comment as text with Comment as the
           default and the report flag of a comment as a column that is false by default; the kind of a thread is not
           stored, it is derived from its starting comment.
         justification: |
-          A thread is about one file of one review. Having the database enforce that relationship keeps the
-          record consistent even when two requests overlap or a programming error occurs. Storing the side by
+          A thread is about one review, and a thread on a file or about a check is stored the same way. Having the
+          database enforce the relationship to the review keeps the record consistent even when two requests overlap
+          or a programming error occurs, and tying the thread to a file row would make a thread about a check
+          impossible. Storing the side by
           name keeps the stored value readable and independent of the order of the enumeration. A comment that was
           stored without the new columns is chat, so nothing becomes part of the signed record by accident.
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
-          - ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase
+          - ReviewStore_AddThreadAsync_FileThreadOnMissingFile_IsRefused
+          - ReviewCenterDbContext_Thread_ReviewForeignKey_RejectsThreadOfUnknownReview
+          - ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId
           - ReviewStore_AddThreadAsync_Side_IsStoredAsText
           - ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment
 

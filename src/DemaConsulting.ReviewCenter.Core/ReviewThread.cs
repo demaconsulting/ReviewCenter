@@ -21,9 +21,13 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
-///     A discussion about one file of a review, anchored to the whole file or to a range of lines.
+///     A discussion about one file of a review, anchored to the whole file or to a range of lines, or about one check
+///     of the frozen checklist of the review.
 /// </summary>
 /// <remarks>
+///     A thread has exactly one kind of anchor: a file anchor (<see cref="FilePath"/> set, <see cref="CheckItemId"/>
+///     <c>null</c>) or a check anchor (<see cref="CheckItemId"/> set, <see cref="FilePath"/> empty, no lines).
+///
 ///     A thread always has at least one comment: the first comment is created together with the
 ///     thread. The comments are immutable in what they say; what changes after creation is the
 ///     <see cref="State"/> and which comments are part of the signed report (<see cref="ReviewComment.IncludeInReport"/>),
@@ -48,9 +52,21 @@ public sealed class ReviewThread
     public string ReviewId { get; init; } = string.Empty;
 
     /// <summary>
-    ///     Gets the path of the file the thread is anchored to (see <see cref="ReviewFile.Path"/>).
+    ///     Gets the path of the file the thread is anchored to (see <see cref="ReviewFile.Path"/>); empty for a
+    ///     check thread (see <see cref="CheckItemId"/>), so no consumer of the path ever meets <c>null</c>.
     /// </summary>
     public string FilePath { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the identifier of the check of the frozen checklist the thread is about, or <c>null</c> for a thread
+    ///     anchored to a file. A check thread has an empty <see cref="FilePath"/>, no lines and the head side.
+    /// </summary>
+    public string? CheckItemId { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the thread is about a check of the checklist rather than a file.
+    /// </summary>
+    public bool IsCheckThread => CheckItemId is not null;
 
     /// <summary>
     ///     Gets the version of the file the line numbers refer to; <see cref="ThreadSide.Head"/> for a whole-file thread.

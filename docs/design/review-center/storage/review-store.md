@@ -218,7 +218,8 @@ is one transaction.
 A follow-up review arrives with `Review.CarryOver` (the carried answers, section states and threads with their
 comments). The store adds those rows to the same context before the one save, so they are part of the same
 transaction as the review and its audit entry: a failure anywhere (for example a carried thread whose file is not a
-file of the review, which the relationship constraint refuses) stores nothing. Carried threads are copied with fresh
+file of the review, or a thread about a check, which are refused before anything is added, because the database has no
+foreign key from a thread to a file) stores nothing. Carried threads are copied with fresh
 entities, as for `AddThreadAsync`, so the database assigns their identities and comments; the carried markers
 (`CarriedFromReviewId`, `CarriedFromThreadId`), the original authors, texts and times are kept as given.
 `FollowsReviewId`, `CarriedAnswerCount` and `CarriedThreadCount` are stored with the review and read back by
@@ -237,11 +238,13 @@ absent or the file has no baseline.
 
 **AddThreadAsync**: Stores a thread together with its first comment in one save, which is one transaction. Fresh
 entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns
-them; the thread keeps its side, and the comment keeps the display name and the user name of its author, its kind,
-and its report flag. A thread for
-a file that does not exist in
-the review is refused by the relationship constraint of the
-database.
+them; the thread keeps its side, its check identifier, and the comment keeps the display name and the user name of its
+author, its kind, and its report flag. A thread has exactly one anchor: a file (`FilePath` set, `CheckItemId` null) or a
+check of the frozen checklist (`CheckItemId` set, empty `FilePath`, no lines, the `Head` side); any other shape is a
+caller error and raises `ArgumentException` before the database is touched. The database has no foreign key from a
+thread to a file, because a thread about a check has no file row, so the store checks inside the transaction that a
+file thread names a file of its review and otherwise raises `InvalidOperationException` and stores nothing. The foreign
+key of a thread points at its review, so a thread for a review that does not exist is refused by the database.
 
 **AddCommentAsync**: Appends a comment to a thread, with the display name, the user name of its author, and its report
 flag. It first
@@ -271,7 +274,8 @@ the transaction, so a resolved Finding always carries its note.
 resolution comments are refused with `CommentNotTogglable`; a thread or comment that does not exist, or a flag that
 already has the value, returns `false` and stores no entry.
 
-**ListThreadsAsync**: Lists the threads of one review, for every file, with their comments. Threads and comments
+**ListThreadsAsync**: Lists the threads of one review, for every file and about every check, with their comments.
+Threads and comments
 are ordered by identity, which grows with the order of creation; the creation time is not used for ordering because
 SQLite cannot order by a `DateTimeOffset`. All threads and comments of the review are read at once: there is no cap
 on their number and no pagination, which is deferred until real volumes are known.

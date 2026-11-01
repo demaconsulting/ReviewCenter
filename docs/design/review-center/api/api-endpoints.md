@@ -118,7 +118,8 @@ approval, blockers, and next step from `SigningService`, the thread counts from 
 counts from `ChecklistService`. The checklist counts follow the screen of a viewer who holds no slot, so they are those
 of the consolidated checklist of the submitted ballots (an agreed check is answered, a disputed or pending one is not;
 the one ballot of a review with a single slot counts before its hand-in), and only the items of applicable sections
-count. A draft ballot of a slot never changes them.
+count. A draft ballot of a slot never changes them. The thread counts include the threads about a check of the checklist
+(open and resolved), as they are counted over every thread of the review; the shape of the answer does not change.
 
 **Download the attestation**: Asks `AttestationService` for the attestation of the review with the actor of the caller
 (`ApiProblems.ActorOrAnonymous`: the actor of the token, or `null` when no token was presented, which the policy lets

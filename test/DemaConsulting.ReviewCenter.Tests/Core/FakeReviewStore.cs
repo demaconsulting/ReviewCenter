@@ -517,6 +517,7 @@ internal sealed class FakeReviewStore : IReviewStore
                     ProjectId = thread.ProjectId,
                     ReviewId = thread.ReviewId,
                     FilePath = thread.FilePath,
+                    CheckItemId = thread.CheckItemId,
                     Side = thread.Side,
                     StartLine = thread.StartLine,
                     EndLine = thread.EndLine,
@@ -712,6 +713,26 @@ internal sealed class FakeReviewStore : IReviewStore
         Func<ReviewThread, AuditDraft> audit,
         CancellationToken cancellationToken = default)
     {
+        var isCheck = thread.CheckItemId is not null;
+        var anchorIsValid = isCheck
+            ? thread.CheckItemId!.Length > 0
+              && thread.FilePath.Length == 0
+              && thread.StartLine is null
+              && thread.EndLine is null
+              && thread.Side == ThreadSide.Head
+            : thread.FilePath.Length > 0;
+        if (!anchorIsValid)
+        {
+            throw new ArgumentException("A thread is anchored to exactly one of a file or a check.", nameof(thread));
+        }
+
+        // Like the real store, a file thread must name a file of its review (when the review is known to the fake)
+        var known = _reviews.FirstOrDefault(review => review.ProjectId == thread.ProjectId && review.Id == thread.ReviewId);
+        if (!isCheck && known is not null && known.Files.All(f => f.Path != thread.FilePath))
+        {
+            throw new InvalidOperationException($"The file '{thread.FilePath}' does not exist in review '{thread.ReviewId}'.");
+        }
+
         var id = _threads.Count + 1;
         var stored = new ReviewThread
         {
@@ -719,6 +740,7 @@ internal sealed class FakeReviewStore : IReviewStore
             ProjectId = thread.ProjectId,
             ReviewId = thread.ReviewId,
             FilePath = thread.FilePath,
+            CheckItemId = thread.CheckItemId,
             Side = thread.Side,
             StartLine = thread.StartLine,
             EndLine = thread.EndLine,
@@ -1628,6 +1650,7 @@ internal sealed class FakeReviewStore : IReviewStore
             ProjectId = old.ProjectId,
             ReviewId = old.ReviewId,
             FilePath = old.FilePath,
+            CheckItemId = old.CheckItemId,
             Side = old.Side,
             StartLine = old.StartLine,
             EndLine = old.EndLine,

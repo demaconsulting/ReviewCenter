@@ -100,7 +100,8 @@ the signatures go out of date by itself, and setting the record back restores th
 touched. Chat and the state of a thread are not in the digest, so they never change a signature; an open thread keeps
 the review from being concluded by a rule that is separate from the digest (the thread state is read from the record,
 not from the digest), so a fully signed review with an open thread is not concluded and not locked, and it is
-concluded when the thread is resolved. The one definition of "concluded" is
+concluded when the thread is resolved. This holds for every thread, whether it is anchored to a file or to a check of
+the checklist (a thread about a check counts as an open thread like any other). The one definition of "concluded" is
 `ReviewLock.ConcludedOutcome(record, slots, signatures)`, which returns `Approved`, `Rejected`, or `None`:
 at least one slot, no open thread, every slot holds a
 signature whose digest equals the current digest and whose `Outcome` equals the outcome the record has now (a

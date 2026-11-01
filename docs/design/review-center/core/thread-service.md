@@ -4,7 +4,8 @@
 
 #### Purpose
 
-`ThreadService` owns the rules for review comments: it starts a thread on a file of a review, appends replies,
+`ThreadService` owns the rules for review comments: it starts a thread on a file of a review or about a check of its
+frozen checklist, appends replies,
 resolves and reopens threads, decides which comments are part of the signed report (promoting and demoting a thread
 and including or excluding a reply), and reads the threads of a review back, and it shapes them for display (last
 activity, an index by state, and a next-step sentence). It is also the home of the comment types
@@ -25,11 +26,15 @@ part of the record.
 #### Data Model
 
 **ReviewThread**: a data class (init-only properties) of `Id` (assigned by the store), `ProjectId`, `ReviewId`,
-`FilePath` (the path of one file of the review), `Side` (which version of the file the lines belong to, default
+`FilePath` (the path of one file of the review; empty for a thread about a check), `CheckItemId` (the identifier of
+the check of the frozen checklist that the thread is about, or null for a thread on a file), `Side` (which version of
+the file the lines belong to, default
 `Head`), `StartLine` and `EndLine` (both null for a thread on the whole
 file, otherwise an inclusive 1-based range), `State`, `Created`, `Comments` (a list of `ReviewComment`), and the
-derived, not stored, `LastActivity` and `Kind` (`ThreadKind.Finding` when the starting comment is included in the
-report, otherwise `ThreadKind.Question`). A thread that was carried over into a follow-up review also has
+derived, not stored, `LastActivity`, `Kind` (`ThreadKind.Finding` when the starting comment is included in the
+report, otherwise `ThreadKind.Question`) and `IsCheckThread`. A thread has exactly one anchor: a file or a check.
+A thread about a check has an empty file path, no lines, and the `Head` side, and it is not carried into a follow-up
+review (see `ReviewService`). A thread that was carried over into a follow-up review also has
 `CarriedFromReviewId` (the earlier review it was carried from) and `CarriedFromThreadId` (its number there); both are
 null for every other thread. The carried comments are copies with their original author, user name, text, time, kind,
 and report flag, so a carried Finding stays a Finding and carried chat stays chat.
@@ -153,6 +158,20 @@ the chosen side is text and the end line is within its line count (`ThreadAnchor
 signature would silently become out of date (`SignaturesWouldBecomeOutOfDate`). Checks that
 need no I/O come first so that a bad request fails cheaply, and file content is read only when a range needs it.
 
+A **check anchor** (`ThreadAnchor.ForCheck(itemId)`, with an empty file path, no lines, and the `Head` side) starts a
+thread about one check of the frozen checklist, with no file. The text is checked first (`CommentTextInvalid`), then
+the shape (`ThreadAnchorInvalid` when the anchor names no check or also names a file, lines, or the baseline side), then
+the lock (`ReviewLocked`), then that the review exists, has a checklist, and has the check (`ReviewNotFound`,
+`ChecklistNotFound`, `ChecklistItemNotFound`; any check qualifies, not only a disputed one), then who is asking
+(`ActorNotAllowed`, decided by the pure `CheckThreadRules.CanStart`), and last the signature impact. The rule lets a
+system administrator, the lead of the review (its creator or an administrator of the project), and a reviewer whose
+own ballot is submitted start such a thread, and also the owner of the only reviewer slot while the ballot is still a
+draft, because the ballots of other reviewers stay hidden until a reviewer has handed in their own and a discussion
+about a check could reveal them. Any other person, such as a contributor who has no slot, is refused. A check thread
+that is not included in the report is chat like any other. Replying to and resolving a check thread follow the same
+rules as for a thread on a file. The audit detail is `thread {id} on check {itemId}; comment {id}, text sha256 {hash}`
+(followed by `; in report` when included).
+
 **ReplyAsync**: Appends a comment to an existing thread of the review.
 
 - *Parameters*: `int projectId`, `string reviewId`, `int threadId`, `Actor actor`, `string? text`, a
@@ -247,7 +266,8 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 - **IUserStore** — resolves the actor to a user to find out whether the actor owns a reviewer slot (injected).
 - **ReviewLock** and **SignatureImpact** (part of the `SigningService` unit) — refuse a change while the review is
   concluded, and refuse one that would change the digest under a current signature without acknowledgement.
-- **ThreadKindRules** and **ReviewActorRoles** — the internal rules for the roles and for the toggling of a comment.
+- **ThreadKindRules**, **CheckThreadRules** and **ReviewActorRoles** — the internal rules for the roles, for the
+  toggling of a comment, and for who may start a check thread.
 - **TimeProvider** — supplies the creation times (injected).
 
 #### Callers

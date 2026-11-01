@@ -108,6 +108,16 @@ sections:
           - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
 
+      - id: ReviewCenter-AttestationService-CheckThreadLabel
+        title: >-
+          The AttestationService class shall name the anchor of a thread about a check in the thread section of the
+          document with the label Check and the identifier of the check, in place of a file and lines.
+        justification: |
+          A thread about a check has no file, so the reader of the document is told which check it belongs to, and
+          the document does not show an empty file name.
+        tests:
+          - AttestationService_SummarizeThread_CheckThread_PrintsCheckLabel
+
       - id: ReviewCenter-AttestationService-ReopenHistory
         title: >-
           The AttestationService class shall still release the attestation of a review that is approved and therefore

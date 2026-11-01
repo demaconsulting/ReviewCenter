@@ -146,6 +146,10 @@ requested. The details show the identity, that it is approved, the approval dige
 slot with its reviewers and who signed; the other is 404. This scenario is tested by
 `ApiEndpoints_GetReview_CompleteReview_ReturnsDetails`.
 
+**ApiEndpoints_ReviewDetail_Counts_IncludeCheckThreads**: A review has an open and a resolved thread about a check. The
+details count them among the open and the resolved threads, and the shape of the answer is unchanged. This scenario is
+tested by `ApiEndpoints_ReviewDetail_Counts_IncludeCheckThreads`.
+
 **ApiEndpoints_Request_NoToken_Answers401**: Each route (the three reads, the creation, and the attestation) is
 requested without a token, while the anonymous evidence settings of the project are off. Each answer is 401. This
 scenario is tested by `ApiEndpoints_Request_NoToken_Answers401`.

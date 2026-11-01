@@ -97,9 +97,18 @@ the database and reported as a duplicate. This scenario is tested by
 by the database and nothing is stored. This scenario is tested by
 `ReviewStore_AddReviewAsync_UnknownProject_IsNotStored`.
 
-**ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase**: A thread for a file that is not in the review is
-refused by the database (the foreign key is enforced) and nothing is stored. This scenario is tested by
-`ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase`.
+**ReviewStore_AddThreadAsync_FileThreadOnMissingFile_IsRefused**: The database has no foreign key from a thread to a
+file, so the store refuses a thread on a file that is not in the review with an `InvalidOperationException` and
+stores nothing. This scenario is tested by `ReviewStore_AddThreadAsync_FileThreadOnMissingFile_IsRefused`.
+
+**ReviewCenterDbContext_Thread_ReviewForeignKey_RejectsThreadOfUnknownReview**: A thread inserted for a review that
+does not exist is refused by the database (the foreign key to the review is enforced), and deleting a review removes
+its file threads, check threads and comments. This scenario is tested by
+`ReviewCenterDbContext_Thread_ReviewForeignKey_RejectsThreadOfUnknownReview`.
+
+**ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId**: The optional check column stores the identifier of
+a thread about a check, which needs no file row, and is empty for a thread on a file. This scenario is tested by
+`ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId`.
 
 **ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments**: Threads with and without a line range are
 stored with their comments and read back unchanged, including the display name and user name of the comment author,

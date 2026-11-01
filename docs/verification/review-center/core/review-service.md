@@ -64,7 +64,8 @@ N/A - standard test environment.
   `FollowUpInvalid`; the audit entry names the carry; a review that follows nothing is unchanged. The preview of a
   follow-up (`PreviewFollowUpAsync`) reports, for a set of files, what the creation would carry and drop, by the same
   rule, writes and audits nothing, refuses an unfit review with `FollowUpInvalid`, and is refused as a missing project
-  for a user who may not see the project.
+  for a user who may not see the project. Threads about a check, open or resolved, are never carried, need no
+  acknowledgement, and are only counted (`CheckThreadsLeftOut`) in the preview.
 
 #### Test Scenarios
 
@@ -566,6 +567,20 @@ with `FollowUpInvalid`; the last message says that there is no file in common. T
 that is too long, or no file at all is refused with the rule of the creation (`DuplicatePath`, `PathInvalid`,
 `NoFiles`) before any path is compared, and the message of the duplicate names the path. This scenario is tested by
 `ReviewService_PreviewFollowUpAsync_InvalidFiles_AreRefusedLikeCreation`.
+
+**FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped**: Open and resolved threads
+about a check are not carried and are counted only as threads left out, neither as resolved threads nor as dropped
+files, while the file threads next to them are handled as before. This scenario is tested by
+`FollowUpCarry_CarryThreads_CheckThreads_AreNotCarriedAndNotCountedAsResolvedOrDropped`.
+
+**FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement**: An open check thread leaves nothing
+to acknowledge, because it is not a thread on a file that left the review. This scenario is tested by
+`FollowUpCarry_CarryThreads_OpenCheckThread_NeedsNoDroppedThreadAcknowledgement`.
+
+**ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut**: The preview and the creation leave
+the check threads out, the preview reports only how many there are, no acknowledgement is needed for them, and the file
+thread next to them is carried. This scenario is tested by
+`ReviewService_CreateFollowUpAsync_WithCheckThreads_ReportsCheckThreadsLeftOut`.
 
 **The access to the preview** is verified with the other operations that take an actor, in
 `ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing` (a user who is no member gets the not-found

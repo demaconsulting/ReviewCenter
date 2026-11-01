@@ -84,8 +84,11 @@ version (every kind but deleted), **HasBaselineVersion** when it has a baseline 
 added file), and **ShowingDiff** when the Diff view is shown
 for a diff that has rows. **NewSide**: the version (`Head` or `Baseline`) the new-thread form anchors to.
 
-**Threads**: all threads of the review, for every file, in creation order. The summary and the per-file counts are
-calculated from this list, and the selected file's threads are the ones with its path.
+**Threads**: all threads of the review, for every file and about every check, in creation order. The summary and the
+per-file counts are
+calculated from this list, and the selected file's threads are the ones with its path. A thread about a check of the
+checklist (`CheckItemId` set, empty `FilePath`) belongs to no file, so it is never among the threads of a selected file;
+the summary, the index, and the unread markers count it like any other thread.
 
 **FollowUps**: the identifiers of the reviews of the project that follow this one (their `FollowsReviewId` is this
 review), oldest first, taken from `ReviewService.ListAsync` when the page loads. The page shows "Follows X" with the
@@ -388,6 +391,14 @@ the acknowledgement and does not show the banner.
 anchor, file, state, comment count, first author, and last activity, so a screen-reader user hears what a sighted
 user sees. **ToggleThreadExpanded**: Expands or collapses a resolved
 thread.
+
+**Check discussions**: when the review has threads about a check, a card with the heading "Check discussions"
+(`check-discussions`) lists them with the same thread card as the threads of a file (the card is one render fragment
+that both places use), with the anchor worded `Check {id}`, the state, and the comments as plain text. Replying and
+resolving work as for any thread, with the same acknowledgement handling. The index row of such a thread shows
+"Check discussion" in place of a file path, and choosing it (or a deep link to it) focuses the thread without selecting
+a file (`SelectThreadAsync` and the address handling skip the file selection for a thread about a check). The page has no
+form to start one yet; the entry comes with the ballot screen. The card is absent when the review has none.
 
 **SelectThreadAsync**: Shows a thread chosen in the index. The thread's file is selected through `SelectFileAsync`
 only when it is not already shown, so text typed in the new-thread form is kept. A file that has a diff is shown in

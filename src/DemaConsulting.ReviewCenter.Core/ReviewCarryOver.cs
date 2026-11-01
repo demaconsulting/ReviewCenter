@@ -38,9 +38,14 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The sorted paths of files that have open threads in the source but are not in the new review; those threads are not
 ///     carried and the creator has to acknowledge that.
 /// </param>
+/// <param name="CheckThreadsLeftOut">
+///     How many threads about a check (open or resolved) the source has; they are never carried, need no
+///     acknowledgement and are only counted. Zero by default.
+/// </param>
 public sealed record ReviewCarryOver(
     IReadOnlyList<ChecklistAnswer> Answers,
     IReadOnlyList<ChecklistSectionState> SectionStates,
     IReadOnlyList<ReviewThread> Threads,
     int ResolvedThreadsNotCarried,
-    IReadOnlyList<string> DroppedThreadFiles);
+    IReadOnlyList<string> DroppedThreadFiles,
+    int CheckThreadsLeftOut = 0);

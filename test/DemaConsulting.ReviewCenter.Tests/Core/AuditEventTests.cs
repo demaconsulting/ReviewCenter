@@ -221,6 +221,30 @@ public class AuditEventTests
     }
 
     /// <summary>
+    ///     Test that starting a thread about a check records the check, a short digest of the text and never the text.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_CheckAnchor_AuditsThreadStartedOnCheck()
+    {
+        // Arrange: Ann created the review and leads it
+        var fixture = await CreateAsync();
+        var firstItem = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        var before = fixture.Reviews.Audits.Count;
+
+        // Act
+        var thread = await fixture.Threads.StartThreadAsync(
+            fixture.ProjectId, "rev-1", ThreadAnchor.ForCheck(firstItem), TestActors.Ann, SecretComment, TestContext.Current.CancellationToken);
+
+        // Assert
+        var draft = Assert.Single(fixture.Reviews.Audits.Skip(before));
+        Assert.Equal("thread.started", draft.Action);
+        Assert.Equal(
+            $"thread {thread.Id} on check {firstItem}; comment {thread.Comments[0].Id}, text sha256 {AuditText.ShortHash(SecretComment)}",
+            draft.Detail);
+        Assert.DoesNotContain("hunter2", draft.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that resolving a thread that does not exist records nothing.
     /// </summary>
     [Fact]

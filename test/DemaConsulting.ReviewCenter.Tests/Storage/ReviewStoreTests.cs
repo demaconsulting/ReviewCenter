@@ -695,25 +695,6 @@ public class ReviewStoreTests
     }
 
     /// <summary>
-    ///     Test that the database refuses a thread for a file that is not in the review (the foreign key is
-    ///     enforced), and stores nothing.
-    /// </summary>
-    [Fact]
-    public async Task ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase()
-    {
-        // Arrange: a review with two files
-        using var db = new TestStore();
-        var projectId = await AddReviewAsync(db);
-
-        // Act: add a thread for a file that does not exist
-        await Assert.ThrowsAsync<DbUpdateException>(() => db.Store.AddThreadAsync(
-            NewThread(projectId, "REV-1", "missing.txt", null, null, "Text"), TestContext.Current.CancellationToken));
-
-        // Assert: no thread exists afterwards
-        Assert.Empty(await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
-    }
-
-    /// <summary>
     ///     Builds a checklist snapshot for a review.
     /// </summary>
     /// <param name="projectId">The owning project.</param>

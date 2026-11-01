@@ -232,6 +232,7 @@ sections:
           - ReviewCenter-ReviewPage-ThreadStart
           - ReviewCenter-ReviewPage-ThreadShow
           - ReviewCenter-ReviewPage-ThreadUpdate
+          - ReviewCenter-ReviewPage-CheckThreads
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
 

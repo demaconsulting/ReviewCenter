@@ -144,8 +144,9 @@ public static class FollowUpCarry
 
         var (answers, sections) = CarryChecklist(
             sourceId, source, projectId, reviewId, newDefinition, baselineAnswers ?? [], baselineSections ?? []);
-        var (threads, resolved, dropped) = CarryThreads(sourceId, source, sourceFiles, projectId, reviewId, newFiles, now);
-        return new ReviewCarryOver(answers, sections, threads, resolved, dropped);
+        var (threads, resolved, dropped, checkLeftOut) =
+            CarryThreads(sourceId, source, sourceFiles, projectId, reviewId, newFiles, now);
+        return new ReviewCarryOver(answers, sections, threads, resolved, dropped, checkLeftOut);
     }
 
     /// <summary>
@@ -298,8 +299,14 @@ public static class FollowUpCarry
     }
 
     /// <summary>
-    ///     Carries the open threads whose file is in the new review.
+    ///     Carries the open threads whose file is in the new review; a thread about a check is never carried.
     /// </summary>
+    /// <remarks>
+    ///     A check thread belongs to the discussion of the review it was started in (the checklist of the new review is
+    ///     answered afresh), so it is left out before any other rule: it is neither counted as a resolved thread nor
+    ///     reported as a dropped file, and it never needs the creator's acknowledgement. Its count is reported
+    ///     separately.
+    /// </remarks>
     /// <param name="sourceId">The identifier of the earlier review.</param>
     /// <param name="source">The record of the earlier review.</param>
     /// <param name="sourceFiles">The files of the earlier review.</param>
@@ -307,8 +314,11 @@ public static class FollowUpCarry
     /// <param name="reviewId">The identifier of the new review.</param>
     /// <param name="newFiles">The files of the new review.</param>
     /// <param name="now">The creation time of the new review.</param>
-    /// <returns>The carried threads, the number of resolved threads left out, and the sorted files of dropped open threads.</returns>
-    private static (List<ReviewThread> Threads, int Resolved, List<string> Dropped) CarryThreads(
+    /// <returns>
+    ///     The carried threads, the number of resolved threads left out, the sorted files of dropped open threads and
+    ///     the number of check threads (open or resolved) left out.
+    /// </returns>
+    private static (List<ReviewThread> Threads, int Resolved, List<string> Dropped, int CheckLeftOut) CarryThreads(
         string sourceId,
         ReviewRecord source,
         IReadOnlyList<ReviewFile> sourceFiles,
@@ -322,8 +332,16 @@ public static class FollowUpCarry
         var threads = new List<ReviewThread>();
         var dropped = new SortedSet<string>(StringComparer.Ordinal);
         var resolved = 0;
+        var checkLeftOut = 0;
         foreach (var thread in source.Threads.OrderBy(t => t.Id))
         {
+            // A check thread has no file to follow: count it and move on
+            if (thread.IsCheckThread)
+            {
+                checkLeftOut++;
+                continue;
+            }
+
             if (thread.State != ReviewThreadState.Open)
             {
                 resolved++;
@@ -339,7 +357,7 @@ public static class FollowUpCarry
             threads.Add(CarryThread(sourceId, thread, oldByPath.GetValueOrDefault(thread.FilePath), newFile, projectId, reviewId, now));
         }
 
-        return (threads, resolved, dropped.ToList());
+        return (threads, resolved, dropped.ToList(), checkLeftOut);
     }
 
     /// <summary>

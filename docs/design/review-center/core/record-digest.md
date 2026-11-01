@@ -51,7 +51,7 @@ text. Hashing is the only use of the text; it is never stored.
    marked as the starting comment (`claim`, a Finding), a reply (`comment`), or a resolution note (`resolution`). A
    line of a thread means a line of the text of its side, so a head thread and a baseline thread on the same
    numbers are different discussions and give different digests. A thread that has no included comment is not in the
-   digest at all.
+   digest at all. A thread about a check of the checklist has no file: its anchor is the check identifier alone.
 9. The number of times an administrator reopened the review, but only when it is above zero (see below). A reopen is
    therefore part of what a signature approves: an earlier approval can never be current after a reopen.
 
@@ -110,6 +110,7 @@ outcome none|approved|rejected                             the outcome of the co
 conclusion-text {S:text}                                   only when the review has a review conclusion text
 report
 thread file {S:path} {S:side} {start} {end}                one block per thread with an included comment: this line,
+thread check {S:itemId}                                    or, for a thread about a check, this line instead of it,
 claim {S:author} {S:username} {S:text} {ticks}             the starting comment, if it is included,
 comment {S:author} {S:username} {S:text} {ticks}           each included reply, in posting order,
 resolution {S:author} {S:username} {S:text} {ticks}        each included resolution note, in posting order
@@ -130,6 +131,12 @@ applicable or disputed, never for one that applies.
 The `report` line is always present; a review without an included comment has the line alone and no block, so there is
 no `report 0` line. The lines of a block are one per included comment in posting order, each with the label that fits
 the comment (`claim` for the starting comment, `resolution` for a resolution note, otherwise `comment`).
+
+The block of a thread about a check starts with `thread check {S:itemId}` in place of the `thread file` line: the
+length-prefixed identifier of the check and nothing else, because such a thread has no file, no lines, no side, and is
+never carried. Its comment lines are those of any block. A record whose threads all are about files gives the same text
+as before, so the version stays `v2` and no signature is made out of date. In the ordinal sort a `thread check` block
+comes before a `thread file` block.
 
 The `conclusion-text` line is written only when the review has a review conclusion text, straight after the `outcome`
 line and before `report`; with no text there is no such line, so every record without a text keeps the digest it had.

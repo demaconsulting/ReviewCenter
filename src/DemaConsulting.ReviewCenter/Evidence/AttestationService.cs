@@ -547,8 +547,10 @@ internal sealed class AttestationService
         var text = first is null
             ? "(no comments)"
             : $"{people.Name(first.Author, first.AuthorUsername, false)}: {first.Text}";
+        // A check thread has no file: it is labeled with its check, so no empty path is ever printed
+        var anchorText = thread.CheckItemId is not null ? $"Check {thread.CheckItemId}" : thread.FilePath + lines;
         return new AttestationThread(
-            thread.FilePath + lines,
+            anchorText,
             text.Length <= SummaryLength ? text : text[..SummaryLength] + "...",
             thread.Comments.Count,
             thread.CarriedFromReviewId);

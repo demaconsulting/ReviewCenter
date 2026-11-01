@@ -974,7 +974,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
             {
                 DeepLinkMessage = $"Thread #{threadId} doesn't exist in this review.";
             }
-            else if (!Review.Files.Any(f => f.Path == thread.FilePath))
+            else if (!thread.IsCheckThread && !Review.Files.Any(f => f.Path == thread.FilePath))
             {
                 DeepLinkMessage = $"Thread #{threadId} belongs to '{thread.FilePath}', which is not a file of this review.";
             }
@@ -1636,7 +1636,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
     }
 
     /// <summary>
-    ///     Shows a thread chosen in the index: selects its file, highlights its lines and scrolls to it.
+    ///     Shows a thread chosen in the index: selects its file, highlights its lines and scrolls to it. A thread about
+    ///     a check selects no file; the page scrolls to its card in the check discussions instead.
     /// </summary>
     /// <param name="thread">The thread chosen.</param>
     /// <returns>A task that completes when the file is shown.</returns>
@@ -1653,6 +1654,20 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         HighlightLine = null;
         DeepLinkMessage = null;
+        if (thread.IsCheckThread)
+        {
+            // A check thread has no file: nothing is selected or loaded, and the page scrolls to its own card
+            FocusedThreadId = thread.Id;
+            if (thread.State == ReviewThreadState.Resolved)
+            {
+                ExpandedThreads.Add(thread.Id);
+            }
+
+            _scrollTarget = $"thread-{thread.Id}";
+            _scrollBlock = ScrollCenter;
+            return;
+        }
+
         if (thread.FilePath != SelectedPath)
         {
             await SelectFileAsync(Review.Files.ToList().FindIndex(file => file.Path == thread.FilePath));
@@ -2527,11 +2542,17 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </summary>
     /// <param name="thread">The thread.</param>
     /// <returns>
-    ///     "Whole file"; "Line 4" or "Lines 4-9" for a file shown as one text; "Before: line 4" or "After: lines 4-9"
-    ///     for a file that can be compared, where the same number could mean either version.
+    ///     "Check 1.2" for a thread about a check; "Whole file"; "Line 4" or "Lines 4-9" for a file shown as one text;
+    ///     "Before: line 4" or "After: lines 4-9" for a file that can be compared, where the same number could mean
+    ///     either version.
     /// </returns>
     private string AnchorLabel(ReviewThread thread)
     {
+        if (thread.CheckItemId is not null)
+        {
+            return $"Check {thread.CheckItemId}";
+        }
+
         if (thread.StartLine is null)
         {
             return "Whole file";
@@ -2564,8 +2585,27 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>For example "Show Line 4 of src/a.cs, Open, 2 comments, first by Ann, last activity 2026-01-02 03:04 UTC".</returns>
     private string IndexRowLabel(ReviewThread thread)
     {
-        return $"Show {AnchorLabel(thread)} of {thread.FilePath}, {thread.State}, {CommentCountLabel(thread)}, " +
+        return $"Show {AnchorLabel(thread)} of {IndexPathLabel(thread)}, {thread.State}, {CommentCountLabel(thread)}, " +
                $"first by {thread.Comments.FirstOrDefault()?.Author}, last activity {FormatTime(thread.LastActivity)}";
+    }
+
+    /// <summary>
+    ///     Words the place cell of a thread index row: the file path, or a fixed label for a thread about a check.
+    /// </summary>
+    /// <param name="thread">The thread of the row.</param>
+    /// <returns>The file path, or "Check discussion" for a thread about a check (which has no file).</returns>
+    private static string IndexPathLabel(ReviewThread thread)
+    {
+        return thread.CheckItemId is null ? thread.FilePath : "Check discussion";
+    }
+
+    /// <summary>
+    ///     Gets the threads about a check of the checklist, in creation order.
+    /// </summary>
+    /// <returns>The check threads; empty when the review has none.</returns>
+    private IReadOnlyList<ReviewThread> CheckThreads()
+    {
+        return Threads.Where(t => t.IsCheckThread).ToList();
     }
 
     /// <summary>

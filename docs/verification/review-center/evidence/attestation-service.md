@@ -159,6 +159,11 @@ while the project allows it. The PDF is returned and says that the request was a
 actor `anonymous`. This scenario is tested by
 `AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous`.
 
+**AttestationService_SummarizeThread_CheckThread_PrintsCheckLabel**: A review has a resolved thread about a check and a
+resolved thread on `a.txt` line 1, and is signed. The document names the first as `Check {id}` and the second with its
+path and line, and prints no empty file path. This scenario is tested by
+`AttestationService_SummarizeThread_CheckThread_PrintsCheckLabel`.
+
 **AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound**: A request without an actor is made for a
 project that does not exist while another project allows anonymous PDFs. The status is `NotFound`. This scenario is
 tested by `AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound`.

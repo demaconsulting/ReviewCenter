@@ -62,8 +62,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               one is unchanged. It is unrelated to the review conclusion (approved or rejected) of the ballot;</item>
 ///         <item>the report: a <c>report</c> marker line, then one block for every thread that has at least one comment
 ///               included in the report (see <see cref="ReviewComment.IncludeInReport"/>). A block is a
-///               <c>thread file</c> line (the anchor: path, side, first and last line, so the anchor slot can later
-///               name a check instead of a file), then, in posting order, only the included comments with author
+///               <c>thread file</c> line (the anchor: path, side, first and last line) or, for a thread about a check
+///               of the checklist, a <c>thread check {id}</c> line (the check identifier only); then, in posting
+///               order, only the included comments with author
 ///               display name, author user name, text and time: <c>claim</c> for the starting comment (a Finding),
 ///               <c>comment</c> for an included reply and <c>resolution</c> for an included resolution note. Chat is
 ///               not covered, and neither are the thread state (whether a thread is open is the separate rule of
@@ -287,16 +288,18 @@ public static class RecordDigest
     /// </summary>
     /// <param name="thread">The thread; it has at least one comment included in the report.</param>
     /// <returns>
-    ///     The block; the first line is the anchor (<c>thread file</c>, with the carried marker when the thread was
-    ///     carried over), each following line is one included comment in posting order.
+    ///     The block; the first line is the anchor (<c>thread file</c> with the carried marker when the thread was
+    ///     carried over, or <c>thread check</c> for a thread about a check), each following line is one included
+    ///     comment in posting order.
     /// </returns>
     private static string ThreadBlock(ReviewThread thread)
     {
-        var lines = new List<string>
-        {
-            $"thread file {Text(thread.FilePath)} {Text(thread.Side.ToString())} {Number(thread.StartLine)} {Number(thread.EndLine)}" +
-            Carried(thread.CarriedFromReviewId)
-        };
+        // A check thread is anchored to a check, not to a file: no side, no lines, and it is never carried over
+        var anchor = thread.CheckItemId is not null
+            ? $"thread check {Text(thread.CheckItemId)}"
+            : $"thread file {Text(thread.FilePath)} {Text(thread.Side.ToString())} {Number(thread.StartLine)} {Number(thread.EndLine)}" +
+              Carried(thread.CarriedFromReviewId);
+        var lines = new List<string> { anchor };
 
         // Comment order is meaningful, so it is kept exactly as stored (the store orders by identity). The starting
         // comment is the claim of a Finding; a resolution note is named as such; chat is left out

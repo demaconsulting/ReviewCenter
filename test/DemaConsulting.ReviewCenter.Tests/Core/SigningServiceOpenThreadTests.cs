@@ -337,6 +337,80 @@ public class SigningServiceOpenThreadTests
     }
 
     /// <summary>
+    ///     Test that an open thread about a check blocks a slot from signing, like any open thread.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_OpenCheckThread_IsRefused()
+    {
+        // Arrange: slot 1 signed, then a thread about a check is opened
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, ThreadAnchor.ForCheck(SignedReviewWorld.FirstItemId), TestActors.Bob, "Question", cancellationToken);
+        var digest = (await world.ApprovalAsync()).Digest;
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            new Actor("sam", "Sam"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[1].Id, digest, "correct horse battery", cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.SigningNotAllowed, ex.Rule);
+        Assert.Equal([world.Slots[0].Id], await world.SignedSlotIdsAsync());
+    }
+
+    /// <summary>
+    ///     Test that a resolved thread about a check does not block signing and that resolving the last open one frees it.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_ResolvedCheckThread_IsAllowed()
+    {
+        // Arrange: a thread about a check is opened and resolved
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var thread = await world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, ThreadAnchor.ForCheck(SignedReviewWorld.FirstItemId), TestActors.Bob, "Question", cancellationToken);
+        await world.Threads.ResolveAsync(world.ProjectId, SignedReviewWorld.ReviewId, thread.Id, TestActors.Bob, cancellationToken);
+
+        // Act
+        await world.SignAsync(1);
+        await world.SignAsync(2);
+        await world.SignAsync(3);
+
+        // Assert
+        Assert.True((await world.ApprovalAsync()).IsApproved);
+    }
+
+    /// <summary>
+    ///     Test that a review with every slot signed and a thread about a check open is not concluded, so the
+    ///     approval counts the thread and names it as a blocker, and that resolving it concludes the review.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_OpenCheckThread_BlocksConclusion()
+    {
+        // Arrange: slots 1 and 2 signed, a thread about a check opened, the unsigned slot 3 removed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.SignAsync(2);
+        var thread = await world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, ThreadAnchor.ForCheck(SignedReviewWorld.FirstItemId), TestActors.Ann, "Question", cancellationToken);
+        await world.Signing.RemoveSlotAsync(_rita, world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[2].Id, cancellationToken);
+
+        // Act
+        var blocked = await world.ApprovalAsync();
+        await world.Threads.ResolveAsync(world.ProjectId, SignedReviewWorld.ReviewId, thread.Id, TestActors.Ann, cancellationToken);
+        var resolved = await world.ApprovalAsync();
+
+        // Assert
+        Assert.All(blocked.Slots, slot => Assert.Equal(SlotSignatureState.Signed, slot.State));
+        Assert.False(blocked.IsApproved);
+        Assert.Equal(1, blocked.OpenThreads);
+        Assert.Contains("1 thread is open", blocked.Blockers);
+        Assert.True(resolved.IsApproved);
+    }
+
+    /// <summary>
     ///     Arranges the signed-review world with slots 1 and 2 signed, a chat thread open and the unsigned slot 3
     ///     removed, so that every remaining slot is signed.
     /// </summary>

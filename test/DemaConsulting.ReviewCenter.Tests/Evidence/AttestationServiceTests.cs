@@ -540,6 +540,38 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that a resolved thread about a check is listed by its check, as <c>Check {id}</c>, and that no empty
+    ///     file path is printed for it, next to a resolved file thread that keeps its path and line.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_SummarizeThread_CheckThread_PrintsCheckLabel()
+    {
+        // Arrange: a review with a resolved thread about a check and one on a.txt, then signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        var itemId = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        var threads = TestServices.Threads(fixture.Store, fixture.Clock);
+        var check = await threads.StartThreadAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, ThreadAnchor.ForCheck(itemId), TestActors.Ann, "Unclear check", cancellationToken);
+        await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, check.Id, TestActors.Ann, cancellationToken);
+        var file = await threads.StartThreadAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "Typo", cancellationToken);
+        await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, file.Id, TestActors.Ann, cancellationToken);
+        await fixture.SignAsync();
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+
+        // Act
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
+
+        // Assert: the check label for the check thread and the path and line for the file thread
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        var text = string.Join("\n", new PdfInspector(result.Content!).TextLines);
+        Assert.Contains($"Check {itemId}", text, StringComparison.Ordinal);
+        Assert.Contains("a.txt, line 1", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the creation is recorded in the audit trail with the digest, the chain head, the hash of the
     ///     PDF and the key, under the name of the user who asked.
     /// </summary>

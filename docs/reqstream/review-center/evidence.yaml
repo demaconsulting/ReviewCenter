@@ -37,6 +37,7 @@ sections:
           - ReviewCenter-AttestationRenderer-SignOffs
           - ReviewCenter-AttestationRenderer-Output
           - ReviewCenter-AttestationService-ReopenHistory
+          - ReviewCenter-AttestationService-CheckThreadLabel
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 

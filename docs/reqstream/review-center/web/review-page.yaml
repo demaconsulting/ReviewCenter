@@ -363,6 +363,23 @@ sections:
           - ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen
           - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
 
+      - id: ReviewCenter-ReviewPage-CheckThreads
+        title: >-
+          The ReviewPage unit shall list the threads about a check of the checklist in the index of threads with the
+          label Check and the identifier of the check in place of a file path, show them in a card of check
+          discussions, apart from the threads of the selected file, with their anchor, state, and comments as plain
+          text, let a reader reply to and resolve such a thread like any other, open one from a deep link without
+          selecting a file, and offer no way to start one yet.
+        justification: |
+          A discussion about a check has no file, so it must not be hidden among the threads of a file or make the
+          page select one. Replying and resolving must work, because an open check thread blocks the signature and
+          the conclusion. The way to start one comes with the ballot screen, so this page only shows what exists.
+        tests:
+          - ReviewPage_CheckThread_ListedInIndexWithCheckLabel
+          - ReviewPage_CheckThread_ReplyAndResolve_Work
+          - ReviewPage_CheckThreadDeepLink_ShowsCheckCard
+          - ReviewPage_CheckThread_DoesNotSelectFile
+
       - id: ReviewCenter-ReviewPage-SignatureWarning
         title: >-
           The ReviewPage unit shall post a new thread, a reply, and the resolving and reopening of a thread as chat
