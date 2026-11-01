@@ -182,6 +182,7 @@ public class ReviewLockBallotTests
     {
         // Arrange: the ballots agree on a rejection, but every signature says approved
         var world = await RejectedWorldAsync(withText: true);
+        world.Store.ValidateSignatureOutcome = false;
         await StoreAllSignaturesAsync(world, ReviewOutcome.Approved);
 
         // Act and assert

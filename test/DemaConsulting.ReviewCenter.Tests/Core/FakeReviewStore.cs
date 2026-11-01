@@ -1508,6 +1508,13 @@ internal sealed class FakeReviewStore : IReviewStore
         return Task.FromResult(list);
     }
 
+    /// <summary>
+    ///     Gets or sets a value indicating whether <see cref="AddSignatureAsync"/> refuses a signature whose outcome is not
+    ///     the outcome of the record (as the real store does). A test that needs to seed an inconsistent signature, to
+    ///     show how a reader treats it, sets this to <c>false</c>.
+    /// </summary>
+    public bool ValidateSignatureOutcome { get; set; } = true;
+
     /// <inheritdoc />
     public async Task<ReviewSignature> AddSignatureAsync(
         ReviewSignature signature,
@@ -1542,7 +1549,7 @@ internal sealed class FakeReviewStore : IReviewStore
         var recordOutcome = record.Checklist is null
             ? ReviewOutcome.Approved
             : BallotConsolidation.Consolidate(record.Checklist.Parse(), record.Ballots).Outcome;
-        if (recordOutcome is { } expected && expected != signature.Outcome)
+        if (ValidateSignatureOutcome && recordOutcome is { } expected && expected != signature.Outcome)
         {
             throw new DomainRuleException(
                 DomainRule.RecordChanged,
