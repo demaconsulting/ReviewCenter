@@ -71,15 +71,17 @@ sections:
 
       - id: ReviewCenter-AttestationService-Document
         title: >-
-          The AttestationService class shall return a signed PDF of the review, with its content, checklist (with who
-          answered and when), threads,
+          The AttestationService class shall return a signed PDF of the review, with its content, the consolidated
+          checklist of the submitted ballots (each agreed check with who answered it in the lowest agreeing slot and
+          when, and never a draft), threads,
           sign-offs, audit head, and key, as far as the evidence settings of the project include them, and a file name
           that keeps only safe characters, and shall sign the document after the settings were applied so that the
           signature stays valid.
         justification: |
           The caller needs the finished document and a name that is safe to put in a download header. A project that
           keeps parts of a review out of its PDFs must get a document whose signature still verifies, because the
-          signature covers the bytes that were released.
+          signature covers the bytes that were released. The document states what the reviewers agreed and handed in,
+          which is the standing that the signatures cover, and so a reader never sees an answer that was still a draft.
         tests:
           - AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview
           - AttestationService_GenerateAsync_ReAnsweredLaterWithSameValue_ShowsAnswerTimeAndKeepsDigestAndApproval
@@ -93,7 +95,8 @@ sections:
       - id: ReviewCenter-AttestationService-Labels
         title: >-
           The AttestationService class shall, when the evidence settings keep the names of people out of PDFs, give the
-          renderer the labels Reviewer N (primary) and Reviewer N (alternate) for the people of the reviewer slots,
+          renderer the labels Reviewer N (primary) and Reviewer N (alternate) for the people of the reviewer slots (the
+          answerer of a check is one of them, because a person answers in the ballot of the own slot),
           Participant N for anybody else, in the order they are first named, and the labels a signed-in user or an
           anonymous request for the requester, use one label for one person everywhere in the document, and leave the
           text that people typed into comments and justifications as it is.

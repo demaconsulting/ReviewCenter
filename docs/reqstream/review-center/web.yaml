@@ -238,9 +238,10 @@ sections:
       - id: ReviewCenter-Web-Checklist
         title: >-
           The Web subsystem shall show on the review page the progress of the review's checklist with a link to
-          a checklist page at /projects/{project}/reviews/{review}/checklist, where a user can see what is left
-          to do, answer each check as the signed-in user, mark sections as not applicable, and be led to the next
-          unanswered check.
+          a checklist page at /projects/{project}/reviews/{review}/checklist, where a reviewer can see what is left
+          to do, answer each check in the ballot of the own reviewer slot as the signed-in user, mark sections as not
+          applicable, hand the ballot in, and be led to the next unanswered check, and where a user without a slot sees
+          the consolidated standing and is told how to join.
         justification: |
           The checklist is worked through on its own page, and the review page shows how far it has got. The
           subsystem test covers the pages served from the database; answering needs a live connection and is
@@ -249,6 +250,8 @@ sections:
           - ReviewCenter-ReviewPage-Checklist
           - ReviewCenter-ChecklistPage-Show
           - ReviewCenter-ChecklistPage-Answer
+          - ReviewCenter-ChecklistPage-SubmitBallot
+          - ReviewCenter-ChecklistPage-NoSlot
           - ReviewCenter-ChecklistPage-Applicability
           - ReviewCenter-ChecklistPage-NextUnanswered
           - ReviewCenter-ChecklistPage-Interactive

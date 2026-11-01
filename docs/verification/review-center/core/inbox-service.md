@@ -6,7 +6,8 @@
 use the real `InboxService`, `ProjectAccess`, `RecordDigest`, and `SigningService` with the in-memory stand-ins for the
 stores (`FakeReviewStore`, `FakeUserStore`, and `FakeInboxStore`, which share the review data of the test), and a fixed
 clock that the test can move. The helper `InboxTestWorld` builds a project with members, reviews, slots, threads,
-answers, signatures, and reopenings, so each test states only the facts that matter. The signing service is used to give
+answers (a person answers into the ballot of the own slot, and the helper hands it in), signatures, and reopenings,
+so each test states only the facts that matter. The signing service is used to give
 real signatures, so a signature goes out of date the way it does in the product. The rules class is verified directly,
 with plain values, so each rule can be checked without a store. The database side is verified by the tests of the
 `InboxStore` unit, and the cooperation of the real services by the `Core` subsystem test.
@@ -22,9 +23,9 @@ N/A - standard test environment.
   chip "Not signed" or "Out of date, sign again", and a signed slot gives no row.
 - A thread in which the user wrote, or of the user's own review, whose latest comment is by someone else (the system
   counts) is a reply waiting; a thread whose latest comment is the user's own, and a resolved thread, are not.
-- The author finds the failed checks of the review with the number and the detail "A Fail the reviewers agree on makes
-  the review reject; a Fail only one reviewer gave is a disagreement to resolve.", and a Fail in a section that does
-  not apply is ignored.
+- The author finds the failed checks of the review (the checks that the submitted ballots agree are Fail) with the
+  number and the detail "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is a
+  disagreement to resolve.", and a Fail in a section that does not apply is ignored.
 - An approval or a rejection by someone else, or a reopening by someone else, after the user last saw the review is an
   update (with the chip "Approved", "Rejected" or "Reopened"); it is not counted as action, and an own signature or an
   own reopening is no update. A review concluded as rejected has no failed-checks and no to-sign rows.
@@ -101,8 +102,10 @@ of someone else that nobody answered. This scenario is tested by
 **InboxService_GetInboxAsync_SystemCommentLast_CountsAsOther**: A comment of the system as the latest comment counts as
 a comment of someone else. This scenario is tested by `InboxService_GetInboxAsync_SystemCommentLast_CountsAsOther`.
 
-**InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount**: The author sees the failed
-checks of the review with the number, and the failures are new to the author. This scenario is tested by
+**InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount**: Bob, seated in a slot of the
+review, answers two checks Fail and hands the ballot in (the helper does both); the author sees the failed checks of the
+review with the number, the failures are new to the author, and bob sees no such row. The number is the one of the
+consolidated standing. This scenario is tested by
 `InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount`.
 
 **InboxService_GetInboxAsync_FailedChecks_TextSaysAgreedFailRejectsAndSingleFailIsDisagreement**: Bob answers a check of
@@ -215,4 +218,5 @@ current digest, with the higher identity winning a tie, and there is none withou
 `InboxRules_CompletingSignature_LatestOfCurrentDigest_IsFound`.
 
 **InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound**: Only the checks answered Fail in sections that apply
-are found. This scenario is tested by `InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound`.
+are found, read from the consolidated standing with the slot count of the review. This scenario is tested by
+`InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound`.

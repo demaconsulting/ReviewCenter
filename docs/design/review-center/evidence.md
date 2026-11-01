@@ -98,7 +98,8 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 
 **What the attestation is for**: Approval inside the tool is of little use to someone who has no access to it. The
 attestation is a portable record of the approval: it states what was reviewed (the content fingerprint, the revisions,
-the files), what the reviewers answered (and who answered each check and when) and discussed, who signed which slot and
+the files), what the reviewers agreed in their submitted ballots (and who answered each check and when) and discussed,
+who signed which slot and
 when, the reopen history of the review
 (when it was reopened after an approval, by whom, and why; only for a review that was reopened), what a follow-up
 review took over from the review it follows (only for a follow-up), and the head of

@@ -10,7 +10,8 @@ to your own process.
 Know the hard rules first, because the practices build on them. A review can be signed only when:
 
 - every check of an applicable checklist section is answered;
-- the submitted ballots do not disagree on a check;
+- the signer's own ballot is handed in (see *Ballots and Early Signing*);
+- no check is disputed between the submitted ballots;
 - no comment thread is open; and
 - for a rejection, the review has a written conclusion that states the reasons.
 
@@ -22,9 +23,10 @@ and a signature covers the whole record as it was at that moment, with the outco
 are signed, a change to the
 record, such as a changed answer, makes the signatures given so far out of date; the page warns you
 and asks for a confirmation first (see *What Makes a Signature Out of Date*). Chat does not: a comment that is not
-included in the report is never part of the record. When every slot is signed for the same outcome and no thread is
-open, the review is concluded, as Approved or as Rejected, and **locked**: ReviewCenter then refuses every change of its
-threads, checklist, and reviewers until a project administrator reopens it (see *Concluded Reviews Are Locked* below).
+included in the report is never part of the record. When every slot has handed in its ballot and signed for the same
+outcome, and no thread is open, the review is concluded, as Approved or as Rejected, and **locked**: ReviewCenter then
+refuses every change of its threads, checklist, and reviewers until a project administrator reopens it (see *Concluded
+Reviews Are Locked* below).
 
 The product also constrains the reviewers: a slot holds only enabled members of the project, a person can be in only
 one slot, and only the primary or the alternate of a slot can sign it. In addition, a project requires independent
@@ -45,7 +47,8 @@ who resolves it, and how it is worded.
 While the project requires it (the default), the person who created the review in ReviewCenter cannot answer its
 checks or change which sections apply; another member of the project has to. The checklist page tells the author so and
 disables the controls. The author can still start, answer, and resolve comment threads, because the discussion is
-where the author explains the change. Only a reviewer of a slot of the review can answer, so add the slots first. Plan
+where the author explains the change. Only a reviewer of a slot of the review can answer (an administrator who holds no
+slot cannot either), so add the slots first. Plan
 for it: create the review, then ask a second member to go through the
 checklist, or let a reviewer do it. A project where one person has to do everything switches the rule off on the
 project page; every change of the rule is audited.
@@ -97,6 +100,27 @@ the second), and in the attestation PDF (to the second). A lead or an auditor ca
 answered within a few seconds, and can ask the reviewer
 about them or spot-check some of those checks. The time comes from the clock of the server and is not part of the
 record that the signatures bind to.
+
+## Ballots and Early Signing
+
+Every slot answers the checklist in its own ballot, so a review with two or more slots collects independent opinions:
+the primary and the alternate of a slot share one ballot, and a reviewer sees the own ballot while it is a draft, but
+only the submitted ballots of the others (as the consolidated standing). A ballot counts only after its reviewer presses
+**Submit ballot**; changing it afterward makes it a draft again until it is handed in again. Practices that follow:
+
+- **Answer on your own.** Do not copy another slot's draft; you cannot see it anyway. The value of a second slot is
+  that it reaches its own conclusion.
+- **Settle a disagreement, do not overwrite it.** Where two submitted ballots give a check different answers, the
+  check is disputed and blocks signing. Talk to the other reviewer in a thread; the reviewer who changes the mind
+  changes the own answer and hands the ballot in again. Use the thread to record why.
+- **Hand in when you are done.** A ballot that stays a draft never counts, so the review waits. The checklist page tells
+  you whether your own ballot is a draft or submitted; ask the other reviewers about theirs.
+- **Early signing is allowed, with a price.** You may sign as soon as your own ballot is submitted and nothing blocks
+  the review, even when other slots have not handed in theirs. If another ballot later disagrees with an agreed
+  check, your signature goes out of date and you sign again. A late ballot that agrees changes nothing.
+- **One slot is simple.** In a review with a single slot nothing changes: the answers count at once, and the answer
+  that completes the ballot hands it in (a complete draft that no answer produced, such as a follow-up whose checks are
+  all carried, still shows **Submit ballot**). The review can be Approved as soon as that slot has signed.
 
 ## Sign Last
 
@@ -209,8 +233,9 @@ project's review rules setting.
 
 ## Concluded Reviews Are Locked
 
-An Approved or Rejected review is **Locked**: every slot has signed the same outcome for the current record, no thread
-is open (and a rejected review has its conclusion text), and the review page shows a Locked badge.
+An Approved or Rejected review is **Locked**: every slot has handed in its ballot and signed the same outcome for the
+current record, no thread is open (and a rejected review has its conclusion text), and the review page shows a Locked
+badge.
 The lock is not a separate state; it lasts exactly while the review is Approved or Rejected. A project administrator or
 a system administrator can **Reopen** it in the locked notice of the review page, with a reason of 1 to 250 characters.
 A reopen

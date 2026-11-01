@@ -160,22 +160,24 @@ the due date and nothing is created. A token cannot change the date later: that 
 administrator or the creator (see Due Dates in the Reviewing chapter).
 
 An optional `followsReviewId` makes the review a **follow-up** of an earlier review of the same project: the answers
-that passed or were not applicable, the sections that were not applicable, and the open threads of the earlier review
-are carried into the new one, and answers that failed and threads that are resolved are not. Omitted, `null`, or blank
-means that the review follows nothing. The earlier review must be in the same project and must have at least one file
-path in common with the new one; both must come from the same review-set when both have one, otherwise from the same
-repository (or both be uploads). The earlier review may be in review, approved, or rejected. The answer is a **400**
+that the submitted ballots of the earlier review agree to be Pass or not applicable, the sections that they agree to be
+not applicable, and the open threads of the earlier review are carried into the new one. Draft ballots, answers on
+which the ballots disagree or that are still open, answers that failed, and threads that are resolved are not. Omitted,
+`null`, or blank means that the review follows nothing. The earlier review must be in the same project and must have at
+least one file path in common with the new one; both must come from the same review-set when both have one, otherwise
+from the same repository (or both be uploads). The earlier review may be in review, approved, or rejected. The answer is
+a **400**
 that names `FollowUpInvalid` and nothing is created when the earlier review does not exist in the project (the answer
-does not say
-whether it exists in another project) or does not fit, or when an open thread of the earlier review is on a file that
-the new review does not have. In the last case, repeat the request with `"acknowledgeDroppedThreads": true` to confirm
-that those threads are dropped. A carried answer keeps its author and time, and a carried thread keeps its comments; a
+does not say whether it exists in another project) or does not fit, or when an open thread of the earlier review is on a
+file that the new review does not have. In the last case, repeat the request with `"acknowledgeDroppedThreads": true` to
+confirm that those threads are dropped. A carried answer keeps its author and time (it seeds the draft ballot of every
+reviewer slot that is added later), and a carried thread keeps its comments; a
 thread whose file has other content in the new review is moved to the whole file, with a note that names the original
 lines. The author of the new review is still the creator, so the independence rule applies to the creator as usual.
 The same rules as on the web pages apply: the identifier and title rules, the upload limits, and the repository rules
-(see Projects and Reviews and Reviews from a Repository in the Reviewing chapter). The API refuses more than 200 `files`,
-or a `contentBase64` longer than the Base64 text of 2 MiB, with a **400** that names `files` or `files[i].contentBase64`,
-before it decodes anything.
+(see Projects and Reviews and Reviews from a Repository in the Reviewing chapter). The API refuses more than 200
+`files`, or a `contentBase64` longer than the Base64 text of 2 MiB, with a **400** that names `files` or
+`files[i].contentBase64`, before it decodes anything.
 
 ```bash
 curl -X POST -H "Authorization: Bearer rcpat_YOUR_TOKEN" -H "Content-Type: application/json" \
@@ -195,9 +197,12 @@ Reviewing chapter).
 
 **`state` and `approved`.** The review data has both a `state` and an `approved` field. `state` is the stored
 life-cycle value, and in this release it is always `Draft`, even after the review is signed; it is kept so that clients
-that read it keep working. Use `approved` (`true` while every reviewer slot has signed approval for the current record,
-and the review is locked) to find out whether a review is approved. It is `true` for an approved review only: a review
-that was concluded as **Rejected** is locked but `approved` is `false`. The shape of the data has not changed.
+that read it keep working. Use `approved` (`true` while the review is concluded as approved: it has at least one slot,
+every slot has handed in
+its ballot and has signed the current record as approved, the submitted ballots agree on an approved outcome with no
+check pending, disputed or answered Fail, and no thread is open; the review is then locked) to find
+out whether a review is approved. It is `true` for an approved review only: a review that was concluded as **Rejected**
+is locked but `approved` is `false`. The shape of the data has not changed.
 
 **`dueDate` and `overdue`.** The review data of the list and of one review has `dueDate` (`yyyy-MM-dd`, or `null` when
 the review has none) and `overdue` (`true` when the date is before today in UTC and the review is not concluded; an
@@ -216,8 +221,8 @@ follows none).
 
 ## Errors, Refusals, and the Throttle
 
-- A request without a token, or with a token that is wrong, malformed, expired, or revoked, or whose owner is disabled or
-  locked, always gets the same **401 Unauthorized** problem document with `WWW-Authenticate` headers for `Bearer` and
+- A request without a token, or with a token that is wrong, malformed, expired, or revoked, or whose owner is disabled
+  or locked, always gets the same **401 Unauthorized** problem document with `WWW-Authenticate` headers for `Bearer` and
   `Basic`. The answer never says which of these it was, so it does not reveal which tokens exist. The reason is
   recorded in the audit trail.
 - Refused attempts are counted per client address with the address limit of the sign-in (20 attempts in 300 seconds by
@@ -238,16 +243,16 @@ follows none).
   **502**, **503**, or **504**.
 - A **locked review** stays readable. `GET` of the review shows `approved: true` for an approved review (`false` for a
   rejected one), and the attestation PDF of an approved review and the
-  evidence index keep working; the wire format has not changed. The API has no route that changes a thread, a checklist
-  answer, or a reviewer slot, so a token does not meet the lock today. If a refusal because of the lock is reported, it
-  is a **409** problem document whose detail is "This review is concluded and locked. A project administrator must
-  reopen it before it can change.". There is no reopen route in the API. The same holds for the review rules of the
-  project
-  (authors cannot answer the checklist, the person who reopened cannot sign again): the API has no route that answers a
-  check, signs, or reopens, so a refusal for one of them would also be a **409** problem document, and the rules are on
-  by default for ALL existing projects. A refusal because a rejected review has no conclusion text yet (the rule
-  ConclusionRequired) would be a **403** problem document whose detail is "A rejected review needs a conclusion stating
-  the reasons.".
+  evidence index keep working; the wire format has not changed. The API has no route that changes a thread, answers a
+  check, hands in a ballot, or changes a reviewer slot (an answer needs a reviewer slot of the review, which a token
+  never holds), so a token does not meet the lock today. If a refusal because of the lock is reported, it is a **409**
+  problem document whose detail is "This review is concluded and locked. A project administrator must reopen it before
+  it can change.". There is no reopen route in the API. The same holds for the review rules of the project (authors
+  cannot answer the checklist, the person who reopened cannot sign again): the API has no route that answers a check,
+  hands in a ballot, signs, or reopens, so a refusal for one of them would also be a **409** problem document, and the
+  rules are on by default for ALL existing projects. A refusal because a rejected review has no conclusion text yet
+  (the rule ConclusionRequired) would be a **403** problem document whose detail is "A rejected review needs a
+  conclusion stating the reasons.".
 - Any other address under `/api` is answered with a JSON **404**, with or without a token, for every standard HTTP
   method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`).
 - The server behind a reverse proxy needs the setting described in Secure Cookie Behind a Reverse Proxy (in the

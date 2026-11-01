@@ -140,7 +140,8 @@ template.
   the project route also has a Review rules card for whoever administers the project (the switch "Require independent
   reviewers");
   the project route also shows, in that card, the checklist that new reviews start with;
-  the checklist route shows the checklist, where each check is answered. A project that
+  the checklist route shows the checklist, where a reviewer answers each check in the ballot of the own slot and hands
+  the ballot in (everybody else sees the consolidated standing). A project that
   does not exist, and equally a project the user may not see, is reported on the page itself with the same
   message, "Project N does not exist.", with HTTP status 200, so that a user who is no member cannot tell a hidden
   project from a missing one; a review that does not exist is reported on the page itself.

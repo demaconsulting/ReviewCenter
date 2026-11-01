@@ -53,18 +53,50 @@ sections:
         title: >-
           The ChecklistPage unit shall offer Pass, Fail, and N/A buttons for each check of the open section, store
           a Pass at once, ask for a justification, marked as required, only for Fail and N/A and store those when
-          the reviewer saves, show the display name and UTC time of the answer, record the signed-in user as the
-          person who answered without any field for a name, and show a violated rule as a message next to the
-          check.
+          the reviewer saves, store each answer in the ballot of the reviewer slot of the signed-in user, show the
+          display name and UTC time of the answer, record the signed-in user as the person who answered without any
+          field for a name, and show a violated rule as a message next to the check.
         justification: |
           One click per check keeps the work fast, and the justification is only asked for where it is needed.
           A message beside the check tells the reviewer exactly what to fix. The person is the signed-in user, so
-          it cannot be chosen or faked.
+          it cannot be chosen or faked, and the answer belongs to the ballot of that person's slot, so that nobody
+          answers in the name of another reviewer.
         tests:
           - ChecklistPage_Answer_Pass_SavesImmediately
           - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
           - ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy
           - ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot
+        title: >-
+          The ChecklistPage unit shall show a reviewer who holds a reviewer slot the state of the own ballot (not
+          answered yet, a draft that does not count until it is submitted, or submitted and counting), shall offer a
+          Submit ballot button only while that ballot is a draft that answers every check it requires and the controls
+          are not disabled, and shall hand the ballot in when the button is pressed, so that the button is not offered
+          for an incomplete ballot or after a hand-in, and, in a review with a single slot, where an answer or an edit
+          that completes the ballot hands it in, only for a complete draft that no such answer produced (a follow-up
+          whose checks are all carried, or a checklist without checks).
+        justification: |
+          A ballot counts in the record only after the reviewer hands it in, so the reviewer has to see whether the
+          answers already count and has to have a visible way to hand them in. Offering the button only when the
+          service would accept the hand-in avoids a refusal that the page could have prevented, and a review with
+          one slot has nobody to agree with, so it keeps its single step of answering.
+        tests:
+          - ChecklistPage_SubmitButton_ShownWhenDraftComplete
+          - ChecklistPage_SubmitButton_HiddenWhenIncompleteOrSingleSlot
+
+      - id: ReviewCenter-ChecklistPage-NoSlot
+        title: >-
+          The ChecklistPage unit shall tell a signed-in user who holds no reviewer slot of the review, and who is not
+          read-only, that they see the consolidated standing of the submitted ballots but cannot answer until they
+          add themselves as a reviewer slot, with neither a ballot status nor a Submit ballot button, and with the
+          answer controls disabled.
+        justification: |
+          Only a reviewer answers a checklist, so a project member without a slot would otherwise meet controls that
+          the service refuses. The notice says why and what to do, and the standing they still see is the one that every
+          other reader sees.
+        tests:
+          - ChecklistPage_NoSlot_ShowsHint
 
       - id: ReviewCenter-ChecklistPage-Applicability
         title: >-
@@ -85,16 +117,21 @@ sections:
 
       - id: ReviewCenter-ChecklistPage-SignatureWarning
         title: >-
-          The ChecklistPage unit shall, when an answer or a change of the applicability of a section would make a
-          current signature out of date, store nothing and show a warning next to the control that was used that
-          names every affected slot and its signer, repeat the change with those slots acknowledged only when the
-          reviewer confirms, show the warning again with every affected slot when another signature appeared
-          meanwhile, and leave the signatures and the record unchanged, and keep the unsaved choice and reason, when
-          the reviewer cancels.
+          The ChecklistPage unit shall, when handing the own ballot in, or saving an answer or a change of the
+          applicability of a section that changes the consolidated standing, would make a current signature of another
+          reviewer out of date, store nothing and show a warning next to the control that was used that names every
+          affected slot and its signer, repeat the change with those slots acknowledged only when the reviewer
+          confirms, show the warning again with every affected slot when another signature appeared meanwhile, and
+          leave the signatures and the record unchanged, and keep the unsaved choice and reason, when the reviewer
+          cancels, and shall show no warning for a save that leaves the digest unchanged, such as an answer in a draft
+          ballot.
         justification: |
-          A changed answer after a signature silently voids the signature. The reviewer has to see whose signature
-          is affected and decide, so that nobody learns afterwards that a reviewer has to sign again. A signature
-          that appears while the warning is open must be shown before it is voided.
+          A ballot changes the record only while it counts, so saving answers into a draft is free and handing the
+          ballot in is the moment that can void a signature, as can taking back a dissent that was submitted. The
+          reviewer has to see whose signature is affected and decide, so that nobody learns afterwards that a reviewer
+          has to sign again. A signature that appears while the warning is open must be shown before it is voided. The
+          test names are kept from the single-checklist model; each now follows a draft, a hand-in or the taking back
+          of a counted dissent, as the scenarios describe.
         tests:
           - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
           - ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores
@@ -136,10 +173,11 @@ sections:
 
       - id: ReviewCenter-ChecklistPage-Locked
         title: >-
-          The ChecklistPage unit shall show a notice that the review is concluded, approved or rejected, and locked,
-          and disable the answer
-          buttons, the justification fields, the save buttons, and the applicability switches of the sections, while
-          the review is locked, and shall keep the checklist readable and the navigation available.
+          The ChecklistPage unit shall show a notice that the review is concluded, approved or rejected, and locked, and
+          disable the answer
+          buttons, the justification fields, the save buttons, and the applicability switches of the sections, and not
+          offer the Submit ballot button, while the review is locked, and shall keep the checklist readable and the
+          navigation available.
         justification: |
           The answers are part of what the signatures approved. A user who cannot change them must see why. The
           lock itself is enforced by the checklist service, which refuses the change with the message of the rule if a

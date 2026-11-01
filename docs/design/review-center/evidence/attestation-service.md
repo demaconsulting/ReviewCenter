@@ -31,16 +31,29 @@ signer of the slot gets the label of the member who signed), `Participant N` for
 which they are first named, and `a signed-in user` for who asked. A person is recognized by user name, or by display
 name when only that is known. Only the structured name fields (the author of a comment, who answered a check, the
 signer, the slot members, who reopened the review, who asked) are replaced; names that people typed into a comment
-or a justification are the author's own text and stay.
+or a justification are the author's own text and stay. Because a person answers into the ballot of the own slot, the
+answerer of a check is a member of that slot and gets the slot label (for example `Reviewer 1 (primary)`); the label
+`Participant N` is left for people who hold no slot, such as someone who only commented.
 
-The check rows carry the time of the stored answer (`AnsweredAt`), which the names switch does not hide, because it is
-not personal data; it is outside the record digest, so it never affects the approval of the signatures.
+The checklist in the document is the **consolidated** checklist of the submitted ballots
+(`BallotProjection.Consolidate`, see *Ballot Consolidation Design*), the same standing that the digest covers and not
+any single ballot: a draft ballot never appears. A check on which the submitted ballots agree is printed with the agreed
+outcome, and the "Answered by" line names the person who answered it in the lowest numbered slot that agrees (the
+representative row, with its justification and time). A section that the submitted ballots agree is not applicable is
+printed as not applicable with the reason of the lowest slot that marked it, and a check that is disputed or still
+pending has no answer row, so it is printed "Not answered"; a review is complete only when no check is disputed or
+pending, so in a released document that case does not occur for an applicable section. The carried marker of a
+not-applicable section is the one of the representative section row.
+
+The check rows carry the time of the representative answer (`AnsweredAt`), which the names switch does not hide, because
+it is not personal data. The digest does not cover the answerer, the justification, or the time (it covers only the
+agreed outcomes), so the time never affects the approval of the signatures.
 
 The document also carries what a follow-up review took over: `FollowsReviewId` and the two counts from the review
 (`CarriedAnswerCount`, `CarriedThreadCount`), and for every answer, not-applicable section, and listed thread the review
-it was carried from (`CarriedFromReviewId` of the record rows). They are all absent or zero for a review that follows
-nothing, and then the document is the same as before. The review identifiers are not personal data, so the reviewer
-names switch does not affect them.
+it was carried from (`CarriedFromReviewId` of the representative row or of the thread). They are all absent or zero for
+a review that follows nothing, and then the document is the same as before. The review identifiers are not personal
+data, so the reviewer names switch does not affect them.
 
 The document also carries the reopen history of the approval (`ReviewApproval.Reopens`, read by `SigningService`): for
 every time an administrator reopened the review after an approval, when, by whom (written as "display name (user name)"

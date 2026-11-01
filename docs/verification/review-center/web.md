@@ -32,7 +32,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - Threads created through the Core service are presented by the review page: the next-step line, the thread index,
   the summary, and the per-file open count are correct, and the Details section is collapsed.
 - The review page links the checklist page and shows its progress; the checklist page presents the answers stored
-  through the Core service, also when requested again.
+  through the Core service in the ballot of a reviewer slot, also when requested again.
 - A review with a reviewer slot that was signed through the Core service is presented as Approved by the review page
   and the project page, with the signer and the record digest on the review page; when the record changes
   afterwards (an administrator reopens the review), both pages present it as In review and the review page shows the
@@ -163,14 +163,17 @@ is `/login?ReturnUrl=` followed by the whole address escaped once more, and no r
 tested by `Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery`.
 
 **WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers**: A review is created by ann through the Core services
-of the real pipeline. The checklist page is requested as ann and as bob. The page of ann shows the notice
+of the real pipeline, and bob is seated in a reviewer slot of it (an answer needs a slot). The checklist page is
+requested as ann and as bob. The page of ann shows the notice
 `author-answer-blocked` and disabled answer buttons; the page of bob shows neither the notice nor disabled buttons. This
 scenario is tested by `WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers`.
 
 **WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload**: A review is created by a second user through the Core
-services of the real pipeline (its author may not answer it) and two checks are answered, one Pass and one Fail with a
-justification. The checklist page is
-requested twice and the review page once. Both loads of the checklist page say "56 checks unanswered.", show the
+services of the real pipeline (its author may not answer it), ann is seated in the only reviewer slot, and two checks
+are answered into the ballot of that slot, one Pass and one Fail with a justification. The review has a single slot, so
+its one ballot counts before a hand-in. The checklist page is
+requested twice (as ann, who sees the own ballot) and the review page once. Both loads of the checklist page say "56
+checks unanswered.", show the
 section progress "2 of 8", the pressed Pass button, and the saved justification; the review page shows "2 of 58
 checks answered", a link to the checklist page, and "56 checklist checks unanswered, 1 check answered Fail." as the
 next step. This

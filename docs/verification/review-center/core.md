@@ -186,7 +186,8 @@ changed with the current one and the new one works. Demoting the only administra
 This scenario is tested by `CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin`.
 
 **CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord**: A review has one slot of two users. Its
-status is blocked while the checks are unanswered; after all checks are answered it has no blockers. Signing with a
+status is blocked while the checks are unanswered; after the primary of the slot has answered all checks in the own
+ballot (the last answer hands in the one ballot of a single-slot review) it has no blockers. Signing with a
 wrong password is refused with `ReauthenticationFailed`; signing with the right one approves the review. An
 administrator then reopens the approved review with a reason, which changes the record: the slot is out of date, the
 review is not approved, and the digest differs. The alternate signs the new record, and the review is approved again
@@ -248,7 +249,8 @@ independence rule is still on. This scenario is tested by `CoreSubsystem_ReviewR
 
 **CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff**: With both rules at their default, the author's answer to a
 check is refused with `AuthorCannotAnswer` and stores nothing; once the rule is switched off the same answer is
-stored. The only person who may sign the single slot signs, and reopening the review by that person is refused with
+refused only for the missing reviewer slot (`NoReviewerSlot`). The reviewer of the single slot answers every check,
+and the review is signed by that person, and reopening the review by that person is refused with
 `ReopenWouldStrandSlot` and leaves the review approved; once the second rule is switched off the person reopens the
 review and signs it again. This scenario is tested by `CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff`.
 

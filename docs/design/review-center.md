@@ -513,9 +513,11 @@ digest, so it does not make a signature out of date. A review can be created as 
 same project (typically after a review had a Fail): the Pass and N/A answers of checks whose wording is unchanged, the
 not-applicable sections with the same title, and the open threads on files that are in the new review are carried over
 and marked with the review they came from, while Fail answers, resolved threads, reviewer slots, signatures and reopenings
-are not; the person who creates the follow-up does not become the answerer of what was carried over, so the
-independence rules are unchanged, and a carried open thread blocks approval until it is resolved. The record digest
-binds to which review is followed and which rows were carried (and is unchanged for every review that is not a
+are not (only what the submitted ballots of the earlier review agree on is carried, never a draft or a disputed check);
+the person who creates the follow-up does not become the answerer of what was carried over, so the
+independence rules are unchanged, a carried answer only seeds the draft ballot of each reviewer slot (it counts when a
+reviewer hands in the ballot), and a carried open thread blocks approval until it is resolved. The record digest
+binds to which review is followed and to which threads were carried (and is unchanged for every review that is not a
 follow-up). The form for a new review offers the choice of the earlier review with a preview of what is carried, and the
 checklist and review pages mark what was carried and from which review. An Approved review
 can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
