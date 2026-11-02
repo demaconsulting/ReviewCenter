@@ -25,7 +25,9 @@ N/A - standard test environment.
   always counts the handed-in ballots, and offers Assign me and Submit and sign only when the service would accept
   them.
 - A viewer who may not see the others reads no disputed or failed count, no outcome, and no conclusion text in the
-  approval, the progress, or the inbox, and a list read equals a single read.
+  approval, the progress, or the inbox, and a list read equals a single read. The ballot progress (how many ballots are
+  in, who has not handed in, the state of each ballot) is not a verdict and stays visible, and the inbox section of a
+  reviewer agrees with the next action of the status panel.
 - A viewer who is not known is treated as one who has not handed in, in a review with several slots only.
 - The discussions about checks are left out of the list for a viewer who may not see the others, and the capabilities
   follow the rules for starting them.
@@ -147,10 +149,27 @@ signed in with a password gets the failed-checks row; an API token of the same u
 the lead. This scenario is tested by `InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer`.
 
 **InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer**: A reviewer with a draft and a reviewer
-who handed in have both seen the review; the lead then starts a discussion about a check. The To sign row of the
-reviewer with the draft stays read, because the hidden discussion is not counted as news, while the row of the reviewer
-who handed in is unread. This scenario is tested by
+who handed in have both seen the review; the lead then starts a discussion about a check. The To answer row of the
+reviewer with the draft stays read, because the hidden discussion is not counted as news, and that reviewer gets no
+Ready to sign row; the reviewer who handed in waits for the other. This scenario is tested by
 `InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer`.
+
+**ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked**: The progress of a masked viewer shows
+how many ballots are handed in out of how many, the names of the people who have not handed in, and `IsMasked`, with
+no disputed count. This scenario is tested by `ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked`.
+
+**SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState**: The approval of a masked viewer keeps the state of
+the ballot of each slot, which is progress and not a verdict. This scenario is tested by
+`SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState`.
+
+**InboxService_GetInboxAsync_SectionMatchesReviewStatusNextAction_ForAllStandings**: For a reviewer who has not started,
+for two handed-in ballots, for a dispute, and for a signed slot, the inbox section of each reviewer matches the next
+action of the status panel of the review (`ReviewNextAction`), so the two never disagree and neither shows a verdict
+early. This scenario is tested by `InboxService_GetInboxAsync_SectionMatchesReviewStatusNextAction_ForAllStandings`.
+
+**InboxRules_AuthorBlocked_ParityWithChecklistService**: The author rule of the inbox equals the one of the checklist
+service. This scenario is tested by `InboxRules_AuthorBlocked_ParityWithChecklistService`, defined in
+`InboxRulesTests.cs`.
 
 **ThreadService_List_MaskedViewer_LeavesOutCheckThreads**: A masked viewer gets no discussion about a check in the
 list. This scenario is tested by `ThreadService_List_MaskedViewer_LeavesOutCheckThreads`.

@@ -730,3 +730,11 @@ afterwards it is not concluded, the conclusion is None, and the reopen is listed
 every ballot turns to a Fail with the signature acknowledged. The signature of rita is out of date, the review is not
 concluded, and the outcome is Rejected. This scenario is tested by
 `SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate`.
+
+**SigningService_GetApprovalAsync_ReportsBallotStatePerSlot**: A review with three slots, one without a ballot, one with
+a draft and one handed in, reports `NotStarted`, `Draft` and `Submitted` on the slots; a review without a checklist
+reports no ballot state. This scenario is tested by `SigningService_GetApprovalAsync_ReportsBallotStatePerSlot`.
+
+**SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState**: The approval of a viewer who may not see the other
+ballots still reports the ballot state of each slot, because it is progress and not a verdict. This scenario is tested by
+`SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState`, defined in `BallotMaskingServiceTests.cs`.

@@ -70,6 +70,11 @@ public enum SlotSignatureState
 /// <param name="State">Whether the slot has a current signature.</param>
 /// <param name="SignerName">The display name of the signer of the current signature; <c>null</c> unless <see cref="State"/> is <see cref="SlotSignatureState.Signed"/>.</param>
 /// <param name="SignedAt">The time of the current signature; <c>null</c> unless <see cref="State"/> is <see cref="SlotSignatureState.Signed"/>.</param>
+/// <param name="Ballot">
+///     The state of the ballot of the slot (not started, a draft, or handed in); <c>null</c> when the review has no
+///     checklist, because it has no ballots then. Whether a ballot is handed in is progress, not a verdict, so a
+///     masked status keeps it.
+/// </param>
 public sealed record SlotStatus(
     int SlotId,
     int Number,
@@ -77,7 +82,8 @@ public sealed record SlotStatus(
     SlotMember? Alternate,
     SlotSignatureState State,
     string? SignerName,
-    DateTimeOffset? SignedAt);
+    DateTimeOffset? SignedAt,
+    BallotState? Ballot = null);
 
 /// <summary>
 ///     The approval status of a review: its slots, the current record digest and what blocks signing.

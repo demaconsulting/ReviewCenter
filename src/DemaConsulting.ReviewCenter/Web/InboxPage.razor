@@ -1,13 +1,17 @@
 @* InboxPage: the work waiting for the signed-in user, at "/inbox". The inbox is also the notification list: every row
    is computed from the review data when the page opens, so there is nothing to clear except the "New" markers.
 
-   Four groups, in this order: "To sign" (a reviewer slot of the user without a current signature), "Replies waiting"
-   (someone answered in a thread of the user, or on the user's own review), "Failed checks" (the user's own review has
-   checks answered Fail) and "Updates" (a review of the user was approved, rejected or reopened by someone else since the user
-   last looked; for information only and not counted as work). A review can appear in several groups. Each row links
-   to the review, shows why it is listed as a chip, a "New" marker when the reason happened after the user last saw
-   the review, and the due date (marked when overdue) for the groups that need action. "Mark all as read" marks
-   every listed review as seen.
+   Seven groups, in this order: "To answer" (the user holds a reviewer slot and has not handed in the ballot),
+   "Disputed" (the user handed in the ballot and the ballots differ on some checks; never listed for a user who may not
+   see the other ballots yet), "Ready to sign" (the ballot is in, nothing blocks the signature and a slot of the user has
+   no current signature), "Replies waiting" (someone answered in a thread of the user, or on the user's own review),
+   "Failed checks" (the user's own review has checks answered Fail), "Waiting for others" (the user did their part and the
+   review waits for other people or open items; for information and not counted as work) and "Updates" (a review of the
+   user was approved, rejected or reopened by someone else since the user last looked; for information only and not
+   counted as work). A review can appear in several groups, but never in "To answer" and "Ready to sign" at once. Each
+   row links to the review (to the checklist for "To answer" and "Disputed"), shows why it is listed as a chip, a "New"
+   marker when the reason happened after the user last saw the review, and the due date (marked when overdue) for the
+   groups that need action. "Mark all as read" marks every listed review as seen.
 
    Presentation only; state lives in InboxPage.razor.cs. Every interactive element and every key value carries a
    stable kebab-case data-testid (row-level ids carry the 1-based position of the row), and the data-interactive
@@ -56,7 +60,7 @@
                 var n = Items.IndexOf(item) + 1;
                 <li class="row-card" data-testid="inbox-row-@n">
                     <div class="row-main">
-                        <a class="row-title" href="/projects/@item.ProjectId/reviews/@item.ReviewId" data-testid="inbox-link-@n">@item.Title</a>
+                        <a class="row-title" href="@ItemLink(item)" data-testid="inbox-link-@n">@item.Title</a>
                         <p class="muted" data-testid="inbox-review-@n">@item.ProjectName / @item.ReviewId</p>
                         @if (item.Detail is { } detail)
                         {

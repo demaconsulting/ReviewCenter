@@ -29,7 +29,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         another reviewer, the number of checks the ballots disagree on, the provisional outcome, the conclusion text
 ///         or the audit detail of an answer until their own ballot is handed in. That keeps a reviewer from being
 ///         swayed by an answer that is not yet final. Who has handed in or signed stays visible, because it is
-///         progress and not a verdict.
+///         progress and not a verdict: the number of ballots handed in out of the total and the names of the people
+///         who have not handed in one show in the inbox ("Waiting for others") and in the project overview to everyone
+///         who can see the project, while the disputes, the failed checks and the outcome stay masked.
 ///     </para>
 ///     <para>
 ///         Everyone sees everything when the review has a single slot (nobody else answers), when the review is

@@ -492,6 +492,19 @@ sections:
         tests:
           - SigningService_SignAsync_OwnBallotDraft_ThrowsBallotNotSubmitted
 
+      - id: ReviewCenter-SigningService-SlotBallotState
+        title: >-
+          The SigningService class shall return with the approval status of a review the state of the ballot of every
+          slot (not started, draft or handed in; none for a review without a checklist), and shall keep it when the
+          status is masked for a viewer who may not see the others, as it says who has handed in and nothing of what
+          was answered.
+        justification: |
+          The inbox, the project overview and the review page need to say who has handed in and who has not, and they
+          must read it from the same place as the blockers so that they cannot disagree.
+        tests:
+          - SigningService_GetApprovalAsync_ReportsBallotStatePerSlot
+          - SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState
+
       - id: ReviewCenter-SigningService-EarlySigning
         title: >-
           The SigningService class shall let a slot sign as soon as its own ballot is submitted and nothing blocks the

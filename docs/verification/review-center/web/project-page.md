@@ -144,13 +144,23 @@ N/A - standard test environment.
   stored with the review, a date outside that range is refused with a message about the due date and creates nothing,
   and an empty field means no date.
 - A viewer who may not see the answers of the other reviewers sees no count of disputed checks in the blockers of a
-  review.
+  review, and a note that some details are hidden until the own ballot is handed in.
+- The overview shows for a review with several reviewers how many ballots are handed in out of how many and, in a
+  muted line, the names of the people who have not handed in; for a review with fewer than two ballots it shows a dash.
 
 #### Test Scenarios
 
 **ProjectPage_HiddenViewer_ShowsNoDisputedCountAsBlocker**: A reviewer with a draft opens the overview of a project
 whose review has disputed checks; the row shows no disputed count in its blockers. This scenario is tested by
 `ProjectPage_HiddenViewer_ShowsNoDisputedCountAsBlocker`.
+
+**ProjectPage_Render_Ballots_ShowsSubmittedOfTotalAndNames**: A review with three slots and one handed-in ballot shows
+"1/3" and the names of the two people who have not handed in; a review with one slot shows a dash. This scenario is
+tested by `ProjectPage_Render_Ballots_ShowsSubmittedOfTotalAndNames`.
+
+**ProjectPage_HiddenViewer_ShowsBallotCountsAndMaskedNote**: A viewer with a draft sees the ballot counts and the names,
+no disputed count, and the note that some details are hidden. This scenario is tested by
+`ProjectPage_HiddenViewer_ShowsBallotCountsAndMaskedNote`.
 
 **Reviews from a repository** are verified in `NewReviewPageRepositoryTests.cs`, with the fake git provider of the
 `Web` tests (`FakeGitRepositoryProvider`) behind the real `RepositoryService` and `ReviewService`.

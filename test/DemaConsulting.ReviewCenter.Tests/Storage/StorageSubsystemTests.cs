@@ -768,7 +768,7 @@ public class StorageSubsystemTests
             var inbox = NewInboxService(first.Provider, first.Store);
             var view = await inbox.GetInboxAsync(bob, cancellationToken);
             var item = Assert.Single(view.Items);
-            Assert.Equal((InboxSection.ToSign, "rev-1", true), (item.Section, item.ReviewId, item.IsUnread));
+            Assert.Equal((InboxSection.ToAnswer, "rev-1", true), (item.Section, item.ReviewId, item.IsUnread));
             Assert.True(await inbox.MarkSeenAsync(bob, projectId, "rev-1", 0, null, cancellationToken));
         }
 
@@ -779,9 +779,9 @@ public class StorageSubsystemTests
             var inbox = NewInboxService(second.Provider, second.Store);
             var view = await inbox.GetInboxAsync(bob, cancellationToken);
 
-            // Assert: the review is still listed, now as seen, and still needs the signature
+            // Assert: the review is still listed, now as seen, and still needs the answers of the ballot
             var item = Assert.Single(view.Items);
-            Assert.Equal((InboxSection.ToSign, "rev-1", false), (item.Section, item.ReviewId, item.IsUnread));
+            Assert.Equal((InboxSection.ToAnswer, "rev-1", false), (item.Section, item.ReviewId, item.IsUnread));
             Assert.Equal(1, view.ActionCount);
             Assert.Equal(1, await inbox.CountAsync(bob, cancellationToken));
         }

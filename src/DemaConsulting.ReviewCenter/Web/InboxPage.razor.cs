@@ -41,9 +41,12 @@ public partial class InboxPage : ComponentBase
     /// </summary>
     private static readonly InboxSection[] AllSections =
     [
+        InboxSection.ToAnswer,
+        InboxSection.Disputed,
         InboxSection.ToSign,
         InboxSection.RepliesWaiting,
         InboxSection.FailedChecks,
+        InboxSection.WaitingForOthers,
         InboxSection.Updates
     ];
 
@@ -88,9 +91,12 @@ public partial class InboxPage : ComponentBase
         get
         {
             var updates = Items.Count(item => item.Section == InboxSection.Updates);
+            var waiting = Items.Count(item => item.Section == InboxSection.WaitingForOthers);
             var action = ActionCount == 1 ? "1 needs your action" : $"{ActionCount} need your action";
             var update = updates == 1 ? "1 update" : $"{updates} updates";
-            return $"{action}, {update}";
+
+            // The waiting part only appears when something waits, so the usual sentence stays the same
+            return waiting > 0 ? $"{action}, {update}, {waiting} waiting for others" : $"{action}, {update}";
         }
     }
 
@@ -112,9 +118,12 @@ public partial class InboxPage : ComponentBase
     {
         return section switch
         {
+            InboxSection.ToAnswer => "to-answer",
+            InboxSection.Disputed => "disputed",
             InboxSection.ToSign => "to-sign",
             InboxSection.RepliesWaiting => "replies-waiting",
             InboxSection.FailedChecks => "failed-checks",
+            InboxSection.WaitingForOthers => "waiting-for-others",
             _ => "updates"
         };
     }
@@ -128,11 +137,25 @@ public partial class InboxPage : ComponentBase
     {
         return section switch
         {
-            InboxSection.ToSign => "To sign",
+            InboxSection.ToAnswer => "To answer",
+            InboxSection.Disputed => "Disputed",
+            InboxSection.ToSign => "Ready to sign",
             InboxSection.RepliesWaiting => "Replies waiting",
             InboxSection.FailedChecks => "Failed checks",
+            InboxSection.WaitingForOthers => "Waiting for others",
             _ => "Updates"
         };
+    }
+
+    /// <summary>
+    ///     Gets the address a row links to: the checklist where the user has to answer or discuss, the review otherwise.
+    /// </summary>
+    /// <param name="item">The row.</param>
+    /// <returns>The relative address of the page.</returns>
+    private static string ItemLink(InboxItem item)
+    {
+        var review = $"/projects/{item.ProjectId}/reviews/{item.ReviewId}";
+        return item.Section is InboxSection.ToAnswer or InboxSection.Disputed ? review + "/checklist" : review;
     }
 
     /// <summary>
@@ -141,14 +164,15 @@ public partial class InboxPage : ComponentBase
     /// <param name="item">The row.</param>
     /// <returns>
     ///     A class name; failed checks use the warning style, approvals the success style and a rejection the failure
-    ///     style.
+    ///     style; a review that waits for others has no special style.
     /// </returns>
     private static string? ChipClass(InboxItem item)
     {
         return item.Section switch
         {
-            InboxSection.ToSign or InboxSection.RepliesWaiting => "pending",
+            InboxSection.ToAnswer or InboxSection.Disputed or InboxSection.ToSign or InboxSection.RepliesWaiting => "pending",
             InboxSection.FailedChecks => "failed",
+            InboxSection.WaitingForOthers => null,
             _ => UpdateChipClass(item.Chip)
         };
     }
