@@ -110,7 +110,7 @@ The server provides these routes:
 - `/projects/{id}/reviews/{reviewId}` - one review, with its files, their content, and comment threads.
 - `/projects/{id}/reviews/{reviewId}/checklist` - the checklist of a review.
 - `/projects/{id}/reviews/{reviewId}/history` - the history of a review.
-- `/projects/{id}/reviews/{reviewId}/attestation.pdf` - the signed PDF attestation of an approved review; see
+- `/projects/{id}/reviews/{reviewId}/attestation.pdf` - the signed PDF attestation of a concluded review; see
   Signed Attestation in the Reviewing chapter.
 - `/api/...` - the JSON API; see the Automation and API Tokens chapter. Two of its routes, the
   evidence index and the attestation PDF of a project, can be opened to callers without a token by the evidence
@@ -151,7 +151,7 @@ Each topic is a page of its own with links to the previous and the next topic:
 - **Checklist** (`/help/checklist`): answer each check Pass, Fail, or N/A.
 - **Reviewers and signing** (`/help/reviewers-and-signing`): reviewer slots, signing with your password or at your
   identity provider, and approval.
-- **Signed attestation** (`/help/signed-attestation`): download a digitally signed PDF of an approved review.
+- **Signed attestation** (`/help/signed-attestation`): download a digitally signed PDF of a concluded review.
 - **Audit trail** (`/help/audit-trail`): every action is recorded in a tamper-evident chain.
 - **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
 - **Automation and API tokens** (`/help/api-tokens`): use a personal access token to read reviews and create drafts

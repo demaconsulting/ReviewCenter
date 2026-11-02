@@ -120,8 +120,15 @@ public class AttestationRendererTests
                     ]),
                 new AttestationSection("security", "Security", false, "No external input", [])
             ],
-            2,
-            [new AttestationThread("src/a.txt, lines 3-5", "Bob: please rename this", 3)],
+            [
+                new AttestationFinding(
+                    "src/a.txt, lines 3-5",
+                    [
+                        new AttestationFindingComment("Finding", "Bob", Answered(20), "Please rename this"),
+                        new AttestationFindingComment("Resolution", "Ann", Answered(30), "Renamed")
+                    ],
+                    true)
+            ],
             [
                 new AttestationSlot(
                     1,
@@ -298,7 +305,7 @@ public class AttestationRendererTests
                 },
                 plain.Sections[1] with { CarriedFrom = "rev-0" }
             ],
-            ResolvedThreads = [plain.ResolvedThreads[0] with { CarriedFrom = "rev-0" }]
+            Findings = [plain.Findings[0] with { CarriedFrom = "rev-0" }]
         };
 
         // Act
@@ -313,22 +320,26 @@ public class AttestationRendererTests
     }
 
     /// <summary>
-    ///     Test that the thread summary gives the open and resolved counts and describes resolved threads.
+    ///     Test that the findings section prints the location of each finding and its included comments in full.
     /// </summary>
     [Fact]
-    public void AttestationRenderer_Render_Document_SummarizesThreads()
+    public void AttestationRenderer_Render_Document_PrintsFindingsWithTheirComments()
     {
-        // Arrange: a sample document with two open threads and one resolved
+        // Arrange: a sample document with one resolved finding of two included comments
 
         // Act: render
         var lines = Render(Sample()).TextLines;
-        var text = string.Join("\n", lines);
 
-        // Assert: counts and the resolved thread
-        Assert.Contains("Open\n2\n", text, StringComparison.Ordinal);
-        Assert.Contains("Resolved\n1\n", text, StringComparison.Ordinal);
-        Assert.Contains("src/a.txt, lines 3-5 (3 comments)", lines);
-        Assert.Contains("Bob: please rename this", lines);
+        // Assert: the heading, the location, each comment with author and time, and the closing note
+        Assert.Contains("Findings and comments in this report", lines);
+        Assert.Contains("src/a.txt, lines 3-5", lines);
+        Assert.Contains("Finding by Bob, 2025-03-04 05:01:20 UTC", lines);
+        Assert.Contains("Please rename this", lines);
+        Assert.Contains("Resolution by Ann, 2025-03-04 05:01:30 UTC", lines);
+        Assert.Contains("Renamed", lines);
+        Assert.Contains("Status: Resolved", lines);
+        Assert.DoesNotContain(lines, l => l.StartsWith("Discussion on", StringComparison.Ordinal));
+        Assert.DoesNotContain("Comment threads", lines);
     }
 
     /// <summary>
@@ -370,45 +381,23 @@ public class AttestationRendererTests
     }
 
     /// <summary>
-    ///     Test that more than the cap of resolved threads gives exact counts, lists only the cap, and says how many
-    ///     were left out.
+    ///     Test that every finding is listed, however many there are: the report is evidence and has no cap.
     /// </summary>
     [Fact]
-    public void AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest()
+    public void AttestationRenderer_Render_ManyFindings_ListsEveryFinding()
     {
-        // Arrange: the sample with 130 resolved threads
-        var document = Sample() with { ResolvedThreads = Threads(130) };
-
-        // Act: render
-        var lines = Render(document).TextLines;
-        var text = string.Join("\n", lines);
-
-        // Assert: exact counts, the first 100 listed in order, the rest summarized in one line
-        Assert.Equal(100, AttestationRenderer.MaxListedResolvedThreads);
-        Assert.Contains("Open\n2\n", text, StringComparison.Ordinal);
-        Assert.Contains("Resolved\n130\n", text, StringComparison.Ordinal);
-        Assert.Equal(100, lines.Count(line => line.StartsWith("src/f", StringComparison.Ordinal)));
-        Assert.Contains("src/f000.txt, lines 1-2 (1 comments)", lines);
-        Assert.Contains("src/f099.txt, lines 1-2 (1 comments)", lines);
-        Assert.DoesNotContain("src/f100.txt, lines 1-2 (1 comments)", lines);
-        Assert.Contains("and 30 more resolved threads (see the review record)", lines);
-    }
-
-    /// <summary>
-    ///     Test that exactly the cap of resolved threads are all listed and no line about further threads appears.
-    /// </summary>
-    [Fact]
-    public void AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine()
-    {
-        // Arrange: the sample with 100 resolved threads
-        var document = Sample() with { ResolvedThreads = Threads(100) };
+        // Arrange: the sample with 130 resolved findings
+        var document = Sample() with { Findings = Threads(130) };
 
         // Act: render
         var lines = Render(document).TextLines;
 
-        // Assert: all 100 listed and no "more" line
-        Assert.Equal(100, lines.Count(line => line.StartsWith("src/f", StringComparison.Ordinal)));
-        Assert.DoesNotContain(lines, line => line.Contains("more resolved threads", StringComparison.Ordinal));
+        // Assert: all 130 listed in order and no line about omitted findings
+        Assert.Equal(130, lines.Count(line => line.StartsWith("src/f", StringComparison.Ordinal)));
+        Assert.Contains("Finding by Bob, 2025-03-04 05:01:20 UTC", lines);
+        Assert.Contains("remark 000", lines);
+        Assert.Contains("remark 129", lines);
+        Assert.DoesNotContain(lines, line => line.Contains("more resolved", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -460,14 +449,17 @@ public class AttestationRendererTests
     }
 
     /// <summary>
-    ///     Builds resolved threads with numbered locations.
+    ///     Builds resolved findings with numbered locations.
     /// </summary>
-    /// <param name="count">The number of threads.</param>
-    /// <returns>The threads in order.</returns>
-    private static List<AttestationThread> Threads(int count)
+    /// <param name="count">The number of findings.</param>
+    /// <returns>The findings in order.</returns>
+    private static List<AttestationFinding> Threads(int count)
     {
         return Enumerable.Range(0, count)
-            .Select(i => new AttestationThread($"src/f{i:D3}.txt, lines 1-2", $"Bob: remark {i:D3}", 1))
+            .Select(i => new AttestationFinding(
+                $"src/f{i:D3}.txt, lines 1-2",
+                [new AttestationFindingComment("Finding", "Bob", Answered(20), $"remark {i:D3}")],
+                true))
             .ToList();
     }
 
@@ -718,7 +710,7 @@ public class AttestationRendererTests
         Assert.Contains(
             "The record digest covers the complete record, including the parts left out of this document.",
             lines);
-        Assert.Contains("Comment threads", lines);
+        Assert.Contains("Findings and comments in this report", lines);
         Assert.Contains("Files (2)", lines);
     }
 
@@ -753,8 +745,10 @@ public class AttestationRendererTests
         var lines = Render(document).TextLines;
 
         // Assert
+        Assert.Contains("Findings and comments in this report", lines);
+        Assert.Contains(lines, l => l.Contains("Not included by project setting", StringComparison.Ordinal));
         Assert.DoesNotContain("Comment threads", lines);
-        Assert.DoesNotContain(lines, l => l.Contains("please rename this", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains("Please rename this", StringComparison.Ordinal));
         Assert.Contains("Left out of this document: Review discussion threads.", lines);
         Assert.Contains("Omitted", lines);
         Assert.Contains("Files (2)", lines);

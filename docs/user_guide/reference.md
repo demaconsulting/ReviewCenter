@@ -312,8 +312,8 @@ The messages that the user sees:
 - "A rejected review needs a conclusion stating the reasons" as the blocker of a signature, and as the refusal of a
   signature (rule ConclusionRequired, status 403), when the ballots agree on a Fail and the review has no conclusion
   text.
-- "The review was rejected. A signed attestation of a rejected review is not available yet." for the attestation
-  of a rejected review.
+- "The review is not complete: not every reviewer slot has signed the current record, or a thread is open." for the
+  attestation of a review that is not concluded (status 409; 404 without signing in).
 - "A reason of at most 250 characters is required to reopen a review." for a reopen with no reason or a longer one.
 - "You created this review, so you cannot be a reviewer of it. A different project member must review and sign it, or
   a project administrator can switch off 'Require independent reviewers'." when the author tries to sign.

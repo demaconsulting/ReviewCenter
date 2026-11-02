@@ -250,7 +250,7 @@ public class ReviewPageRejectedTests : PageTestBase
 
     /// <summary>
     ///     Test that the sign form of a rejection says what is signed, that signing it with the password concludes the
-    ///     review as rejected, and that the review is then locked without an attestation.
+    ///     review as rejected, and that the review is then locked and offers the signed attestation.
     /// </summary>
     [Fact]
     public async Task ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes()
@@ -273,15 +273,15 @@ public class ReviewPageRejectedTests : PageTestBase
         Assert.Equal("Rejected", cut.Find("[data-testid='review-approval']").TextContent);
         Assert.Equal("Rejected. Every reviewer slot has a current signature.", cut.Find("[data-testid='next-step']").TextContent);
         Assert.NotNull(cut.Find("[data-testid='review-locked-banner']"));
-        Assert.Empty(cut.FindAll("[data-testid='attestation-download-button']"));
+        Assert.NotNull(cut.Find("[data-testid='attestation-download-button']"));
     }
 
     /// <summary>
-    ///     Test that a review concluded as rejected shows the Rejected badge, the Locked badge and banner and the note
-    ///     that there is no attestation of a rejection, and offers no attestation download.
+    ///     Test that a review concluded as rejected shows the Rejected badge, the Locked badge and banner and offers
+    ///     the signed attestation download, without the former note that there is none.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndNoAttestation()
+    public async Task ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload()
     {
         // Arrange: a concluded, rejected review
         var (projectId, slotId) = await CreateRejectedAsync(withText: true);
@@ -295,9 +295,9 @@ public class ReviewPageRejectedTests : PageTestBase
         Assert.Contains("rejected", cut.Find("[data-testid='review-approval']").ClassName, StringComparison.Ordinal);
         Assert.Equal("Locked", cut.Find("[data-testid='review-locked']").TextContent);
         Assert.Contains("concluded and locked", cut.Find("[data-testid='review-locked-banner']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("rejected", cut.Find("[data-testid='attestation-rejected-note']").TextContent, StringComparison.Ordinal);
-        Assert.Empty(cut.FindAll("[data-testid='attestation']"));
-        Assert.Empty(cut.FindAll("[data-testid='attestation-download-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='attestation-rejected-note']"));
+        Assert.NotNull(cut.Find("[data-testid='attestation']"));
+        Assert.NotNull(cut.Find("[data-testid='attestation-download-button']"));
     }
 
     /// <summary>

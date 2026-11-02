@@ -235,14 +235,15 @@ follows none).
 - A request that is not valid is answered **400** with the fields at fault (a stored checklist definition that cannot be
   read is also **400**); a project, review, or repository that does
   not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
-  repository, an attestation of a review that is not complete (a rejected review included), or a change that is
+  repository, an attestation of a review that is not concluded, or a change that is
   refused because the review is
   concluded and locked (or a reopen of a review that is not locked, or a change that a project review rule refuses)
   **409** (a request without a token, possible on the
-  anonymous attestation route, gets **404** instead); and a git repository that is not reachable
+  anonymous attestation route, gets **404** instead, and so does a request without a token for a rejected review); and
+  a git repository that is not reachable
   **502**, **503**, or **504**.
 - A **locked review** stays readable. `GET` of the review shows `approved: true` for an approved review (`false` for a
-  rejected one), and the attestation PDF of an approved review and the
+  rejected one), and the attestation PDF of a concluded review (an approved or a rejected one) and the
   evidence index keep working; the wire format has not changed. The API has no route that changes a thread, answers a
   check, hands in a ballot, or changes a reviewer slot (an answer needs a reviewer slot of the review, which a token
   never holds), so a token does not meet the lock today. If a refusal because of the lock is reported, it is a **409**

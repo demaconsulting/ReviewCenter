@@ -189,19 +189,16 @@ public class AttestationServiceTests
     }
 
     /// <summary>
-    ///     Test that a review concluded as rejected has no attestation: a signed-in caller is told that it was rejected
-    ///     and that no attestation of a rejection is available yet, the key is not asked for and nothing is recorded.
+    ///     Test that a review concluded as rejected has a signed attestation that says so: the document is delivered,
+    ///     signed, headed as rejected and carries the conclusion text; the creation is recorded in the audit trail.
     /// </summary>
     [Fact]
-    public async Task AttestationService_GenerateAsync_RejectedConcluded_ReturnsNotApprovedWithRejectedMessageWithoutKey()
+    public async Task AttestationService_GenerateAsync_RejectedConcluded_ReturnsSignedRejectedAttestation()
     {
         // Arrange: every ballot is a Fail, the conclusion text is written and the slot signed the rejection
         var cancellationToken = TestContext.Current.CancellationToken;
         var fixture = await AttestationFixture.CreateAsync(signed: false);
-        await fixture.AnswerAllAsync(ChecklistOutcome.Fail);
-        await fixture.Checklists.SetReviewConclusionTextAsync(
-            fixture.ProjectId, AttestationFixture.ReviewId, "Not ready.", TestActors.Ann, cancellationToken);
-        await fixture.SignAsync();
+        await fixture.RejectAsync("Not ready.");
         using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
         var service = fixture.CreateService(keys);
 
@@ -209,11 +206,13 @@ public class AttestationServiceTests
         var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, cancellationToken);
 
         // Assert
-        Assert.Equal(AttestationStatus.NotApproved, result.Status);
-        Assert.Null(result.Content);
-        Assert.Contains("rejected", result.Message, StringComparison.Ordinal);
-        Assert.Empty(await AttestationAuditAsync(fixture));
-        Assert.Equal(0, keys.Requests);
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        var pdf = new PdfInspector(result.Content!);
+        Assert.NotNull(pdf.VerifySignature());
+        Assert.Contains("Review attestation - REJECTED", pdf.TextLines);
+        Assert.Contains("Not ready.", pdf.TextLines);
+        var entry = Assert.Single(await AttestationAuditAsync(fixture));
+        Assert.Contains("outcome rejected", entry.Detail, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -540,23 +539,47 @@ public class AttestationServiceTests
     }
 
     /// <summary>
-    ///     Test that a resolved thread about a check is listed by its check, as <c>Check {id}</c>, and that no empty
-    ///     file path is printed for it, next to a resolved file thread that keeps its path and line.
+    ///     Test that a resolved finding about a check is listed by its check, as <c>Check {id}</c>, and that no empty
+    ///     file path is printed for it, next to a resolved file finding that keeps its path and line.
     /// </summary>
     [Fact]
-    public async Task AttestationService_SummarizeThread_CheckThread_PrintsCheckLabel()
+    public async Task AttestationService_BuildFindings_CheckFinding_PrintsCheckLabel()
     {
-        // Arrange: a review with a resolved thread about a check and one on a.txt, then signed
+        // Arrange: a review with a resolved finding about a check and one on a.txt, then signed
         var cancellationToken = TestContext.Current.CancellationToken;
         var fixture = await AttestationFixture.CreateAsync(signed: false);
         var itemId = DefaultChecklist.Current.Sections[0].Items[0].Id;
         var threads = TestServices.Threads(fixture.Store, fixture.Clock);
         var check = await threads.StartThreadAsync(
-            fixture.ProjectId, AttestationFixture.ReviewId, ThreadAnchor.ForCheck(itemId), TestActors.Ann, "Unclear check", cancellationToken);
-        await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, check.Id, TestActors.Ann, cancellationToken);
+            fixture.ProjectId,
+            AttestationFixture.ReviewId,
+            ThreadAnchor.ForCheck(itemId),
+            TestActors.Ann,
+            "Unclear check",
+            cancellationToken,
+            includeInReport: true);
+        await threads.ResolveAsync(
+            fixture.ProjectId,
+            AttestationFixture.ReviewId,
+            check.Id,
+            TestActors.Ann,
+            cancellationToken,
+            resolutionNote: "Clarified");
         var file = await threads.StartThreadAsync(
-            fixture.ProjectId, AttestationFixture.ReviewId, new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "Typo", cancellationToken);
-        await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, file.Id, TestActors.Ann, cancellationToken);
+            fixture.ProjectId,
+            AttestationFixture.ReviewId,
+            new ThreadAnchor("a.txt", 1, 1),
+            TestActors.Ann,
+            "Typo",
+            cancellationToken,
+            includeInReport: true);
+        await threads.ResolveAsync(
+            fixture.ProjectId,
+            AttestationFixture.ReviewId,
+            file.Id,
+            TestActors.Ann,
+            cancellationToken,
+            resolutionNote: "Fixed");
         await fixture.SignAsync();
         using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
         var service = fixture.CreateService(keys);

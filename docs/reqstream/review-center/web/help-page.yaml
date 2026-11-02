@@ -65,13 +65,16 @@ sections:
           attestation is unavailable when a certificate stops being valid while the server runs), that the signature
           certifies the document with no changes allowed, and that a code-signing-only certificate is used with a
           note and a start-up warning while the server does not check the chain or revocation, that the PDF lists
-          who answered each check and when, with a
+          who answered each check and when, that a concluded review, approved or rejected, has an attestation, that a
+          rejection is marked on its first page, what the findings, conclusion and ballots appendix of the document
+          hold and that only the findings and included comments are in it, with a
           screenshot of the download of an approved review.
         justification: |
           The attestation is easy to take for more than it is. The place the user is sent from the review page must
           say plainly what the document proves and how to make it carry weight.
         tests:
           - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+          - HelpAttestationPage_Render_ExplainsRejectedAttestationFindingsConclusionAndBallotsAppendix
 
       - id: ReviewCenter-HelpPage-SigningTopic
         title: >-

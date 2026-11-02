@@ -258,7 +258,7 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `review-due-section`,
 `review-conclusion`, `review-conclusion-text`, `review-conclusion-empty`, `review-conclusion-form`,
 `review-conclusion-input`,
-`review-conclusion-save`, `review-conclusion-error`, `attestation-rejected-note`,
+`review-conclusion-save`, `review-conclusion-error`,
 `review-due-date`, `review-overdue`, `review-due-none`, `due-date-form`, `review-due-input`, `review-due-save`,
 `review-due-clear`, `review-due-error`, `reopen-form`,
 `reopen-reason`, `reopen-button`, `reopen-error`, `reopen-history`, and `reopen-entry-{n}`, `reopen-by-{n}`,
@@ -603,7 +603,8 @@ slot learns about the lock at its next reload or change, and is refused, not cor
 **ShortDigest**: Shortens the record digest to its first 16 characters; the Details section shows the short value
 with the full 64 characters in the `title` attribute.
 
-**Attestation download**: Below the status of an approved review the page asks `AttestationKeys.Describe()` for the
+**Attestation download**: Below the status of a concluded (approved or rejected) review the page asks
+`AttestationKeys.Describe()` for the
 state of the signing key. When the key is available it draws the link "Download attestation (PDF)" (an anchor whose
 address is `ReviewLinks.ForAttestation`, with the file name from `AttestationService.FileNameFor`, so that the browser
 downloads it instead of navigating), a note, and a link to the help topic `signed-attestation`. The note says "Signed
@@ -614,9 +615,9 @@ certificate from the `CertificateStore` or `File` provider); and otherwise names
 the subject and the start of the thumbprint of the certificate. Each warning of the status (for example that the
 certificate ends soon) follows as a status notice with the test id `attestation-key-warning`. When the key cannot be
 used the page shows "Attestation
-is unavailable:" with the reason of the provider instead of the link. A review that is not approved shows nothing, except
-that a review concluded as rejected shows the note `attestation-rejected-note`: "The review was rejected. A signed
-attestation of a rejected review is not available yet." The
+is unavailable:" with the reason of the provider instead of the link. A review that is not concluded shows nothing; a
+review concluded as rejected offers the download like an approved one (the PDF carries the rejection on its first page).
+The
 page never signs: the download is a plain authenticated `GET` handled by `AttestationEndpoint`, and the page only
 decides whether to offer it.
 

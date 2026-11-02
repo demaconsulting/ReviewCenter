@@ -30,6 +30,9 @@ N/A - standard test environment.
   `Attestation:RequireTrustedKey` (refusal to start for a self-signed key or a
   certificate without a signing key usage, and the review page reason for a certificate that stops being valid while
   the server runs).
+- The Signed attestation topic also explains that a rejected review has a signed attestation headed REJECTED, with the
+  findings and included comments, the conclusion, and the ballots appendix, and that comments that were not included
+  are never printed.
 - The API tokens topic describes how to create a token on the account page, that the value is shown once, the expiry
   choices and the limit, a curl example with the bearer header, the endpoints and the OpenAPI document, that a token
   never signs, that a review made through the API is a Draft marked as created via API, and the 401 and 429 answers.
@@ -92,6 +95,15 @@ document with no changes allowed, that a certificate for code signing only is us
 a note in the PDF and a start-up warning, that the PDF lists who answered each check and when, and that the server
 does not check the certificate chain or revocation. This
 scenario is tested by `HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`.
+
+**HelpAttestationPage_Render_ExplainsRejectedAttestationFindingsConclusionAndBallotsAppendix**: The Signed attestation
+page is rendered. The text explains that a review concluded as rejected has a signed attestation too, headed REJECTED,
+and names the sections "Findings and comments in this report", "Conclusion" and "Ballots appendix"; it says that the
+report holds the findings and included comments (a reply included on a Question appears as a discussion thread, not as
+a finding) and that comments that were not included are never printed, and it no longer says that a rejected review has
+no
+attestation. This scenario is tested by
+`HelpAttestationPage_Render_ExplainsRejectedAttestationFindingsConclusionAndBallotsAppendix`.
 
 **HelpSigningPage_Render_ExplainsTheReopenerRule**: The Reviewers and signing page is rendered. The text says that,
 while the project rule is on, the person who reopened a review cannot sign it again, and that a reopen that would leave

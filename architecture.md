@@ -334,6 +334,8 @@ The architecture above is the target design. Only the first slices are implement
   `AttestationRenderer`, `AttestationSigner`, `AttestationKeyProvider`, `AttestationService`, `AttestationEndpoint`)
   makes a signed PDF of an Approved review at `/projects/{id}/reviews/{reviewId}/attestation.pdf`, signed with a
   self-signed key (development and test) or a certificate from a certificate store, and records `attestation.generated`.
+  A later slice also attests a Rejected review (marked REJECTED), with the findings and included comments, the
+  conclusion and a ballots appendix; a comment that was not included is never printed.
   Azure Key Vault and an RFC 3161 time stamp authority are planned, not implemented.
 - **Implemented, slice 9a (personal access tokens and /api)**: any signed-in user creates, lists and revokes personal
   access tokens on the account page (a name, 30, 90 or 365 days, at most 20 active tokens, the value shown once, only its

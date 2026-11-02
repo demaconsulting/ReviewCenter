@@ -13,6 +13,10 @@ The effect of the evidence settings is verified with tests defined in `Attestati
 the same fixture, set the settings through the real `EvidenceSettingsService`, call the service with an actor or
 without one, read the text of the signed PDF with `PdfInspector`, and verify its signature.
 
+The attestation of a concluded review (an approval or a rejection, with findings, the conclusion and the ballots
+appendix) and what it must never print are verified with tests defined in `AttestationServiceRejectedTests.cs`, with
+the same fixture, which concludes a review as rejected with `RejectAsync`.
+
 #### Test Environment
 
 N/A - standard test environment (everything runs in memory).
@@ -44,9 +48,17 @@ N/A - standard test environment (everything runs in memory).
   event then names the actor `anonymous`.
 - A request without an actor for a review that is not complete gets `NotFound`, the same answer as for a review that
   does not exist, while an actor gets `NotApproved`.
-- A review concluded as rejected has no attestation: an actor gets `NotApproved` with the message "The review was
-  rejected. A signed attestation of a rejected review is not available yet.", without the key being asked for and with
-  nothing recorded, and a request without an actor gets `NotFound`, so the outcome is not disclosed.
+- A review that is concluded as rejected has a signed attestation: an actor gets `Ok` with a PDF whose title and first
+  page say that it is rejected, whose conclusion has the reasons, whose threads are those with an included comment (the
+  same set that the record digest binds, with only their included comments), and whose ballots appendix has the final
+  ballot of every slot with a
+  fingerprint that equals the fingerprint of the stored record; a comment that was not included is
+  not printed. The audit event names the outcome. A request without an actor gets `NotFound`, so a rejection is never
+  served anonymously, while an approved review is.
+- A review that is not concluded reveals no ballot, justification, or outcome of any slot to a member, and the key
+  is not asked for.
+- With the reviewer names off the appendix and the findings use labels; with the checklist wording off the appendix
+  prints identifiers and outcomes only; with the threads off no finding is printed and the document says so.
 - A review that is approved is locked, and the attestation is still produced for it. A review that was reopened by an
   administrator and signed again gives a PDF with a "Reopen history" section (time, who, reason, and the previous
   digest of each reopen), and a review that was never reopened gives a PDF without that section. When the reviewer
@@ -138,9 +150,10 @@ off. No user name or display name appears in the PDF; the people of the slot are
 verifies over the reduced PDF. This scenario is tested by
 `AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies`.
 
-**AttestationService_GenerateAsync_ThreadsOff_OmitsThreadSectionAndStillVerifies**: The threads are turned off. The
-thread section and the comment text are missing, and the signature verifies. This scenario is tested by
-`AttestationService_GenerateAsync_ThreadsOff_OmitsThreadSectionAndStillVerifies`.
+**AttestationService_GenerateAsync_ThreadsOff_OmitsFindingsAndStillVerifies**: The threads are turned off. The
+findings and the comment text are missing, the document says that they are not included by project setting, and the
+signature verifies. This scenario is tested by
+`AttestationService_GenerateAsync_ThreadsOff_OmitsFindingsAndStillVerifies`.
 
 **AttestationService_GenerateAsync_FilesOff_OmitsFileListAndStillVerifies**: The files are turned off. The list of files
 and hashes is missing, and the signature verifies. This scenario is tested by
@@ -159,10 +172,10 @@ while the project allows it. The PDF is returned and says that the request was a
 actor `anonymous`. This scenario is tested by
 `AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous`.
 
-**AttestationService_SummarizeThread_CheckThread_PrintsCheckLabel**: A review has a resolved thread about a check and a
-resolved thread on `a.txt` line 1, and is signed. The document names the first as `Check {id}` and the second with its
-path and line, and prints no empty file path. This scenario is tested by
-`AttestationService_SummarizeThread_CheckThread_PrintsCheckLabel`.
+**AttestationService_BuildFindings_CheckFinding_PrintsCheckLabel**: A review has a resolved finding about a check and a
+resolved finding on `a.txt` line 1, both included in the report with a resolution note, and is signed. The document
+names the first as `Check {id}` and the second with its path and line, and prints no empty file path. This scenario is
+tested by `AttestationService_BuildFindings_CheckFinding_PrintsCheckLabel`.
 
 **AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound**: A request without an actor is made for a
 project that does not exist while another project allows anonymous PDFs. The status is `NotFound`. This scenario is
@@ -196,15 +209,76 @@ display name appear nowhere in the PDF, which names a participant label instead.
 `Ok` with a signed PDF, so the lock does not stop the attestation. This scenario is tested by
 `AttestationService_GenerateAsync_LockedReview_StillRenders`.
 
-**AttestationService_GenerateAsync_RejectedConcluded_ReturnsNotApprovedWithRejectedMessageWithoutKey**: Every ballot is
-a Fail, the conclusion text is written, and the slot signs the rejection. A signed-in caller gets `NotApproved` with a
-message that says the review was rejected, there is no content, nothing is recorded in the audit trail, and the key
-provider was not called. This scenario is tested by
-`AttestationService_GenerateAsync_RejectedConcluded_ReturnsNotApprovedWithRejectedMessageWithoutKey`.
+**AttestationService_GenerateAsync_RejectedConcluded_ReturnsSignedRejectedAttestation**: Every ballot is a Fail, the
+conclusion text is written, and the slot signs the rejection. A signed-in caller gets `Ok` with a PDF whose signature
+verifies and that says it is rejected, and the audit trail has one `attestation.generated` event whose detail starts
+with `outcome rejected`. This scenario is tested by
+`AttestationService_GenerateAsync_RejectedConcluded_ReturnsSignedRejectedAttestation`.
 
 **AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound**: The same rejected, concluded review is
 in a project that allows anonymous attestation PDFs. A request without an actor gets `NotFound`, the answer for a review
 that does not exist. This scenario is tested by `AttestationService_GenerateAsync_RejectedConcludedAnonymous_ReturnsNotFound`.
+
+**AttestationService_GenerateAsync_RejectedWithFindings_PrintsConclusionFindingsAndAppendixOnly**: A rejected review has
+an included finding that was resolved with a note, a reply that was not included, and a chat thread. The PDF prints the
+conclusion with its reasons, the finding with its resolution note, and the ballots appendix with the slot's final ballot
+and the fingerprint, and neither the chat thread nor the reply that was not included. This scenario is tested by
+`AttestationService_GenerateAsync_RejectedWithFindings_PrintsConclusionFindingsAndAppendixOnly`.
+
+**AttestationService_GenerateAsync_Rejected_BallotFingerprintMatchesRecord**: The fingerprint printed in the appendix of
+a rejected review equals `RecordDigest.ComputeBallotFingerprint` of the record in the store. This scenario is tested by
+`AttestationService_GenerateAsync_Rejected_BallotFingerprintMatchesRecord`.
+
+**AttestationService_GenerateAsync_Approved_PrintsConclusionAndBallotsAppendixWithoutRejectedMark**: An approved review
+is asked for. The PDF has the conclusion and the ballots appendix and no rejected title or banner. This scenario is
+tested by `AttestationService_GenerateAsync_Approved_PrintsConclusionAndBallotsAppendixWithoutRejectedMark`.
+
+**AttestationService_GenerateAsync_OpenReviewWithBallots_RevealsNoBallotDetail**: A review whose ballots were handed in
+with failing answers but that is not concluded (no signature) is asked for by a member. The status is `NotApproved`,
+there is no content, the message names no answer, justification or outcome of a slot, and the key provider was not
+called. A request without an actor for an open review is covered by
+`AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing`. This scenario is tested by
+`AttestationService_GenerateAsync_OpenReviewWithBallots_RevealsNoBallotDetail`.
+
+**AttestationService_GenerateAsync_RejectedNamesOff_AppendixAndFindingsUseLabels**: The reviewer names are off for a
+rejected review. The appendix and the findings name people as labels and no user name or display name is printed. This
+scenario is tested by `AttestationService_GenerateAsync_RejectedNamesOff_AppendixAndFindingsUseLabels`.
+
+**AttestationService_GenerateAsync_RejectedWordingOff_AppendixPrintsIdentifiersOnly**: The checklist wording is off for
+a rejected review. The appendix prints identifiers and outcomes, with neither the question text nor the section title.
+This scenario is tested by `AttestationService_GenerateAsync_RejectedWordingOff_AppendixPrintsIdentifiersOnly`.
+
+**AttestationService_GenerateAsync_RejectedThreadsOff_PrintsNoFindings**: The threads are off for a rejected review. No
+finding is printed and the document says that it left them out. This scenario is tested by
+`AttestationService_GenerateAsync_RejectedThreadsOff_PrintsNoFindings`.
+
+**AttestationService_GenerateAsync_AnonymousApprovedAndRejected_OnlyApprovedIsServed**: Two projects allow anonymous
+attestation PDFs; one has an approved review and the other a rejected one. A request without an actor gets the PDF of
+the approved one and `NotFound` for the rejected one, with no key request. This scenario is tested by
+`AttestationService_GenerateAsync_AnonymousApprovedAndRejected_OnlyApprovedIsServed`.
+
+**AttestationService_GenerateAsync_QuestionThreadWithIncludedReply_PrintsDiscussionWithOnlyIncludedComments**: A
+Question (whose starting comment is not included) has a reply by Bob that is included in the report and a reply by Ann
+that is not; the thread is resolved and the review approved. The PDF has the line "Discussion on a.txt, line 1", the
+included reply as a "Reply by Bob" with its text, neither the starting comment nor the reply that was not included,
+no "Finding by" line and no finding heading for the location, and the signature verifies. This scenario is tested by
+`AttestationService_GenerateAsync_QuestionThreadWithIncludedReply_PrintsDiscussionWithOnlyIncludedComments`.
+
+**AttestationService_GenerateAsync_MixedThreads_PrintsExactlyTheCommentsTheDigestCovers**: A review has a finding with
+an included reply, a hidden reply and a resolution note, a Question with an included reply, a Question with only hidden
+replies, a chat-only thread, and a finding about a check, all resolved, and is approved. The set of expected texts is
+derived with the predicate of `RecordDigest.Canonicalize` (a thread with an included comment, and within it the
+included comments). Every expected text is in the PDF, no text of a comment that was not included is, the number of
+"Finding by", "Reply by" and "Resolution by" lines equals the number of expected comments, and the number of status
+lines equals the number of threads with an included comment. This scenario is tested by
+`AttestationService_GenerateAsync_MixedThreads_PrintsExactlyTheCommentsTheDigestCovers`.
+
+**AttestationService_GenerateAsync_RejectedTwoSlots_AppendixPrintsBothBallotsWithTheirOwnJustifications**: A review has
+two slots whose ballots both answer Fail but word the justification differently (so the outcomes agree and nothing is
+disputed), and both slots sign the rejection. The ballots appendix has exactly the two lines "Slot 1: Ann (ann)" and
+"Slot 2: Cyd (cyd)" in that order, each slot's own justification, and the fingerprint of the stored record. This
+scenario is tested by
+`AttestationService_GenerateAsync_RejectedTwoSlots_AppendixPrintsBothBallotsWithTheirOwnJustifications`.
 
 **AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers**: An approved review and an
 approved follow-up that carried every Pass answer are asked for. The follow-up's attestation names the followed review

@@ -4,10 +4,11 @@
 
 #### Purpose
 
-`AttestationRenderer` lays out the record of a completed review as the unsigned attestation PDF. Its single
-responsibility is the content and the wording of the document: what the review is, what it contained, what the
-reviewers answered and discussed, who signed, which key will sign the document, and what that signature proves and does
-not prove. It does not decide whether a review is complete and does not sign.
+`AttestationRenderer` lays out the record of a concluded review (approved or rejected) as the unsigned attestation PDF.
+Its single responsibility is the content and the wording of the document: what the review is, what it contained, what
+the reviewers answered and which findings they put in the report, how the review concluded, who signed, which key will
+sign the document, and what that signature proves and does not prove. It does not decide whether a review is concluded
+and does not sign.
 
 #### Data Model
 
@@ -15,8 +16,11 @@ The input is an `AttestationDocument`, built by `AttestationService` from the re
 and has no access to the database. It holds the project and the review (identifier and title, and for a repository
 review the repository, the baseline and head commits, and the review-set), the content fingerprint, the record digest and
 its version, the files (path, status, SHA-256, and size), the checklist sections with their items, answers, comments,
-and the time of each answer (`AttestationCheck.AnsweredAt`), the count of open threads and the summaries of the
-resolved ones, the reviewer slots with their signatures
+and the time of each answer (`AttestationCheck.AnsweredAt`), the threads of the report (`AttestationFinding`: location,
+whether resolved, the review it was carried from, whether it is a discussion thread, and its included comments as
+`AttestationFindingComment` with kind, author,
+time, and text), the outcome and the conclusion text, optionally the ballots appendix (`AttestationBallot`,
+`AttestationBallotSection`, `AttestationBallotAnswer`) and its fingerprint, the reviewer slots with their signatures
 (signer, role, time, the digest signed, and its meaning), the reopen history of the review (time, who, reason, and the
 digest of the record that was reopened; none when the review was never reopened), the head of the audit chain with
 its length and whether it is intact, the version of the tool, the time of the creation, who asked for it (a name,
@@ -25,11 +29,12 @@ request was anonymous), the description of the key
 (`AttestationKeyInfo`), the evidence settings that were in effect (`Content`), and whether the request was anonymous.
 The person fields of the input are already the final text: `AttestationService` replaces names with labels when the
 settings keep names out, so the renderer never sees a name that it has to hide. The output is the
-bytes of a PDF. Two public constants hold the standing statements: `SelfSignedNotice` ("SELF-SIGNED KEY - NOT AN
-ORGANIZATION KEY. Dev/test only; do not rely on it as organizational evidence.") and `ProvesStatement`. The document has
-these sections in order: the review, the content scope, the files, the checklist, the threads, the sign-offs, the reopen
-history, the audit anchor, and the signature. The files and the threads are left out when their switch is off, and the
-reopen history only appears when the review was reopened at least once.
+bytes of a PDF. Three public constants hold the standing statements: `SelfSignedNotice` ("SELF-SIGNED KEY - NOT AN
+ORGANIZATION KEY. Dev/test only; do not rely on it as organizational evidence."), `RejectedBanner`, and
+`ProvesStatement`. The document has these sections in order: the review, the content scope, the files, the checklist,
+the findings and comments in this report, the conclusion, the sign-offs, the reopen history, the ballots appendix, the
+audit anchor, and the signature. The files and the findings are left out when their switch is off, the reopen history
+only appears when the review was reopened at least once, and the ballots appendix only appears when the input holds one.
 
 #### Key Methods
 
@@ -39,20 +44,44 @@ reopen history only appears when the review was reopened at least once.
 - *Returns*: `byte[]` — the PDF written with `PdfDocumentWriter`.
 - *Preconditions*: `document` is not null.
 - *Postconditions*: The document properties carry the fingerprint and the review identifier. The same document gives the
-  same bytes. A large review continues on further pages. Checklist comments are printed in full and are never cut: a
-  comment is the reviewer's own words and part of the signed evidence, and a long one is wrapped and runs over pages.
-  The only caps are on the list of resolved threads, listed below. The counts of open and resolved threads are always
-  exact. The content switches of the document apply to every PDF:
-  - *Discussion threads* off: the threads section (the counts and the list of resolved threads) is left out.
+  same bytes. A large review continues on further pages. Checklist comments and the included comments of a finding are
+  printed in full and are never cut: a comment is the reviewer's own words and part of the signed evidence, and a long
+  one is wrapped and runs over pages. Every finding is listed, with no cap. The content switches of the document apply to
+  every PDF:
+  - *Discussion threads* off: the findings section prints one line that the findings are not included by project
+    setting (see the content scope), and no finding.
   - *Files* off: the list of files with their status, hashes, and sizes is left out. The number of files is still
     printed in the content scope, and the content fingerprint, which covers them, stays in the review section.
   - *Checklist wording* off: a section is printed by its identifier instead of its title and a check by identifier and
-    outcome without its text, with a line that says so; the justifications and comments (the reviewers' own words) stay.
+    outcome without its text, with a line that says so, in the checklist and in the ballots appendix; the
+    justifications and comments (the reviewers' own words) stay.
   - *Git context* off: for a review of a repository, the repository name, the head and baseline revisions are replaced
     by one line that says the git context is omitted; the line "Files uploaded to ReviewCenter" of an uploaded review is
     not git context and stays.
   - *Reviewer names* off: nothing is hidden by the renderer, because the labels are already in the input; the switch is
     only reported in the content scope.
+
+**Rejection mark**: A rejected review has the title "Review attestation - REJECTED" (and the document title property to
+match) and, at the head of the first page, the `RejectedBanner` text between two rules (the writer has no box, so the
+banner is framed by rules). An approved review has the title "Review attestation" and no banner.
+
+**Findings**: The section "Findings and comments in this report" lists every thread in the order given: a bold line
+with the location (for a discussion thread, `AttestationFinding.IsDiscussion`, whose starting comment was not included,
+"Discussion on {location}" followed by a line that says it is a discussion thread, not a finding), a small italic line
+`Status: Resolved` or `Status: Open` (the status is informational and is not covered by the record digest), and for
+every included comment a line "Finding by X, time", "Reply by X, time" or "Resolution by X,
+time" and the text in full, then the "Carried from review X" line when it was carried. A review with no finding says
+that no finding or comment was included in the report, and the section ends with the standing sentence that comments
+that were not included are not printed. Comments that were not included, and threads without an included comment, are
+never in the input, so they can never be printed.
+
+**Conclusion**: The section "Conclusion" prints the outcome (`Conclusion: Approved` or `Rejected`) and the conclusion
+text, headed "Reasons for rejection" for a rejection, in full.
+
+**Ballots appendix**: When the input holds ballots, the section "Ballots appendix" prints for every slot "Slot N: name",
+the time the ballot was submitted, for each section the section title (or identifier) and either the reason it is not
+applicable or each check with the outcome, the justification, and who answered and when, and at the end the ballot
+fingerprint with its format header (`RecordDigest.BallotsHeader`). A review without a ballot has no appendix section.
 
 **Answer time**: Below a check that has an answer, a small italic line reads `Answered by X, yyyy-MM-dd HH:mm:ss UTC`,
 with the time in UTC to the second, formatted like every other time of the document. An answer without a time prints
@@ -64,10 +93,8 @@ switch does not hide it. It is not part of the record digest (see below), so sho
 with the text `X (N answers and M threads carried)` (the followed review and the numbers of carried answers and open
 threads at creation), and a review that follows nothing has no such row, so its document is unchanged. In the checklist
 a not-applicable section, and a check whose answer was carried over, gets a small italic line "Carried from review X"
-below it, and a listed thread that was carried gets the same line, so the document always says which statements were
-given in this review and which were taken over (the answerer shown is the person who gave the answer originally). Open
-threads are only counted; a thread is listed only when it is resolved, and a carried open thread that was resolved in
-the follow-up is listed with the same "Carried from review X" line.
+below it, and a listed finding that was carried gets the same line, so the document always says which statements were
+given in this review and which were taken over (the answerer shown is the person who gave the answer originally).
 
 **Reopen history**: A review that was reopened by an administrator after an approval has a section "Reopen history"
 after the sign-offs and before the audit anchor, and a review that never was has none, so its document is unchanged.
@@ -87,15 +114,10 @@ reader never has to guess whether a part is missing on purpose. The wording is b
 data, so a document with an omitted section and one without can never read the same.
 
 **Caps**: Each remaining cap is stated here, because anything cut is a place where the document says less than the
-record.
+record. There are none that cut text:
 
-- *Resolved-thread list*: at most `MaxListedResolvedThreads` (100) resolved threads are listed, in the order of the
-  document (the order in which the threads were created, which is the order of their identity in the store). When there
-  are more, one line says `and N more resolved threads (see the review record)`. This bounds the size of the PDF and the
-  time to make it; the count printed under "Resolved" stays exact.
-- *Summary of a resolved thread*: `AttestationService` keeps at most 300 characters of the author and the first comment
-  of a resolved thread, and ends a cut summary with an ellipsis; the renderer prints the summary as it receives it. It
-  is an overview of a thread that was closed, and the complete thread is in the review record.
+- *Findings*: every finding is listed and every included comment is printed in full. The number of findings is bounded
+  only by the number of threads that the reviewers chose to include in the report.
 - *Nothing else is cut*: not the checklist comments (justifications), the checklist item text, the file paths, the names,
   or the signatures, unless the evidence settings of the project turn that part off, in which case the content scope
   says so. A line that is wider than the page is wrapped by the writer (a single word wider than a line is
@@ -120,7 +142,9 @@ the time an answer was given (`AnsweredAt`), the review title, the project name,
 name, the reviewer slots, and the audit chain head, which the PDF may also show. The PDF does print the time of every
 answer (see the checklist rendering above), so a burst of answers within seconds is visible to a reader, and the time is
 protected by the PDF signature, not by the reviewers' own signatures; it is the clock of the server, not a trusted
-timestamp. The reopen history (who reopened the
+timestamp. The ballots appendix is likewise not bound by the record digest (the digest covers the agreed standing, not
+the justification or the slot of an answer); its own fingerprint (`RecordDigest.ComputeBallotFingerprint`) lets a reader
+compare it with the record, and the PDF signature protects the printed text. The reopen history (who reopened the
 review, when, and why) is shown by the PDF but only its count is bound by the digest. The signature over the PDF covers
 every byte of the PDF, so these extra items are protected by the PDF signature (and, for what the audit event holds,
 by the audit chain); they are not bound by the reviewers' own signatures on the record.

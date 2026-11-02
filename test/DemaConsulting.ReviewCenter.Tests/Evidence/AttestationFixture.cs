@@ -107,6 +107,11 @@ internal sealed class AttestationFixture
     public int SlotId { get; private set; }
 
     /// <summary>
+    ///     Gets the identity of the second slot (cyd), once <see cref="AddSecondSlotWithBallotAsync"/> has added it.
+    /// </summary>
+    public int SecondSlotId { get; private set; }
+
+    /// <summary>
     ///     Gets the identity of the user cyd, who is in no slot at first.
     /// </summary>
     public int CydUserId { get; private set; }
@@ -165,7 +170,8 @@ internal sealed class AttestationFixture
 
         await TestServices.Reviews(fixture.Store, fixture.Clock).CreateDraftAsync(
             project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], cancellationToken);
-        var slot = await fixture.Signing.AddSlotAsync(new Actor("cyd", "Cyd"), project.Id, ReviewId, ids["ann"], ids["bob"], cancellationToken);
+        var slot = await fixture.Signing.AddSlotAsync(
+            new Actor("cyd", "Cyd"), project.Id, ReviewId, ids["ann"], ids["bob"], cancellationToken);
         fixture.SlotId = slot.Id;
         await fixture.AnswerAllAsync(ChecklistOutcome.Pass);
         if (signed)
@@ -253,6 +259,20 @@ internal sealed class AttestationFixture
     }
 
     /// <summary>
+    ///     Answers every check with a Fail, writes the conclusion text and signs the slot, which concludes the review as
+    ///     rejected.
+    /// </summary>
+    /// <param name="conclusionText">The reasons for the rejection.</param>
+    /// <returns>A task that completes when the rejection is signed.</returns>
+    public async Task RejectAsync(string conclusionText)
+    {
+        await AnswerAllAsync(ChecklistOutcome.Fail);
+        await Checklists.SetReviewConclusionTextAsync(
+            ProjectId, ReviewId, conclusionText, TestActors.Ann, TestContext.Current.CancellationToken);
+        await SignAsync();
+    }
+
+    /// <summary>
     ///     Signs the slot as ann with the current record.
     /// </summary>
     /// <returns>A task that completes when the slot is signed.</returns>
@@ -295,5 +315,39 @@ internal sealed class AttestationFixture
         await EvidenceTestSupport.AnswerAllPassAsync(Checklists, ProjectId, ReviewId, cyd);
         var approval = await Signing.GetApprovalAsync(ProjectId, ReviewId, cancellationToken);
         await Signing.SignAsync(cyd, ProjectId, ReviewId, slot.Id, approval!.Digest, Password, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Adds a second slot for cyd, has cyd answer every check with the given outcome and justification, and hands
+    ///     cyd's ballot in. The slot is not signed.
+    /// </summary>
+    /// <param name="outcome">The outcome cyd gives to every check.</param>
+    /// <param name="justification">The justification cyd gives to every check.</param>
+    /// <returns>A task that completes when the ballot of the second slot is handed in.</returns>
+    public async Task AddSecondSlotWithBallotAsync(ChecklistOutcome outcome, string justification)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var cyd = new Actor("cyd", "Cyd");
+        var slot = await AddUnsignedSlotAsync(cancellationToken);
+        SecondSlotId = slot.Id;
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                ProjectId, ReviewId, item.Id, outcome, justification, cyd, cancellationToken);
+        }
+
+        await Checklists.SubmitBallotAsync(ProjectId, ReviewId, cyd, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Signs the second slot as cyd with the current record.
+    /// </summary>
+    /// <returns>A task that completes when the slot is signed.</returns>
+    public async Task SignSecondSlotAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var approval = await Signing.GetApprovalAsync(ProjectId, ReviewId, cancellationToken);
+        await Signing.SignAsync(
+            new Actor("cyd", "Cyd"), ProjectId, ReviewId, SecondSlotId, approval!.Digest, Password, cancellationToken);
     }
 }

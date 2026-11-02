@@ -5,8 +5,8 @@
 ### Overview
 
 The `Evidence` subsystem turns the approval of a review into a document that can leave the tool: a PDF attestation of a
-completed review that the server signs digitally, and a list of the completed reviews of a project in the form that
-ReviewMark
+completed review that the server signs digitally (approved or rejected), and a list of the completed reviews of a
+project in the form that ReviewMark
 reads. It holds no domain rule. Whether a review is complete is decided by `SigningService` of `Core`, and the subsystem
 only
 asks. It contains seven units: `PdfDocumentWriter`, a small writer of
@@ -27,13 +27,13 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 
 - *Type*: HTTP endpoint, `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf`.
 - *Role*: Provider.
-- *Contract*: A signed-in user who may view the project (a member, or a system administrator) gets the signed PDF
+- *Contract*: A signed-in user who may view the project (a member, or a system administrator) gets the signed PDF of a
+  concluded review, approved or rejected
   (`application/pdf`, file name
   `attestation-{projectId}-{reviewId}.pdf`, `Cache-Control: no-store`). The statuses are 200 for the document, 404 (empty
   on this route) for a review that does not exist and for a project that the user may not view, 409 (a problem
   description, "The review is not complete") for a review that is not
-  approved (a review concluded as rejected gets the message "The review was rejected. A signed attestation of a rejected
-  review is not available yet.") and 409 ("The review changed during generation") for a review that changed while the
+  concluded, and 409 ("The review changed during generation") for a review that changed while the
   document was being
   prepared, and 500 (a problem description, "Attestation signing key unavailable", with the reason) when the key cannot
   be used. A visitor who is not signed in is redirected to the sign-in page by the authentication scheme; anonymous
@@ -174,7 +174,11 @@ anonymous request from the API) is allowed only when the project switch `Anonymo
 allowed gets exactly the answer for a review that does not exist, so that the answer does not tell a
 non-member whether the project or the review exists. Then it asks `SigningService` for the approval, so a missing
 review is
-reported as not found and a review that is not complete is refused without the key being touched. Then it gets the key
+reported as not found and a review that is not concluded is refused without the key being touched, and before any
+ballot or finding is read. A review concluded as rejected is attested like an approved one (the document says so on its
+first page and in its conclusion), except to an anonymous request, which gets the answer for a review that does not
+exist, because the anonymous routes publish evidence that a file set passed and a rejection carries the reasons of the
+reviewers. Then it gets the key
 (a key problem is reported, and nothing is recorded), reads the review, checks again that the record digest is the one
 that was approved, verifies the audit chain to get its head, renders the document, reads the review and the project
 settings again and
@@ -187,9 +191,14 @@ written strictly: if the trail cannot be written, nothing is released. The event
 follows the signing, so the chain head in the document precedes its own event. The head is found by verifying the chain,
 which reads every entry on every request; this is intentional integrity evidence and is acceptable because an
 attestation is rare. A change that happens between the second check and the audit event is not seen; that window is
-tiny and the event states the digest that was attested. The user interface offers the download only
-for an approved review, but the endpoint decides again, so the rule does not depend on the page. The document prints
-every checklist comment in full; the only caps are on the list of resolved threads (see `AttestationRenderer`).
+tiny and the event states the digest that was attested and the outcome. The user interface offers the download only
+for a concluded review, but the endpoint decides again, so the rule does not depend on the page. The document prints
+every checklist comment and every included comment in full; nothing is capped. **What the report discloses**:
+the findings and included comments (every thread with an included comment, the same threads that the record digest
+binds, and of each only the included comments; never a comment that was not included); and the conclusion text and the
+ballots appendix (the final submitted ballot of every slot with a fingerprint
+of the ballots, `RecordDigest.ComputeBallotFingerprint`) only for a concluded review, which no longer changes, so the
+document never shows a viewer the ballot or the dispute of a slot while the review is open.
 
 **Approval lock, reopen, and the evidence**: A concluded review is locked in `Core`, so the record that an attestation
 describes cannot change after the approval, and the "changed during generation" window that this subsystem checks is

@@ -27,9 +27,11 @@ sections:
       - id: ReviewCenter-AttestationRenderer-Findings
         title: >-
           The AttestationRenderer class shall show every checklist answer with its comment in full, never truncated, say
-          so when the review has no checklist, and summarize the comment threads with exact counts of open and
-          resolved threads, as far as the evidence settings of the project include the checklist wording and the
-          threads.
+          so when the review has no checklist, and list the findings and included comments that the reviewers put in
+          the report, each thread with its location, its status (Resolved or Open) and its included comments in full,
+          with none of them cut or counted away, list a thread whose starting comment is not included as a discussion
+          thread, not as a finding, as far as the evidence settings of the project include the checklist wording and
+          the threads.
         justification: |
           The approval is based on what the reviewers found and answered. An attestation that left it out would prove
           that someone signed, but not what they were signing, and a comment that is cut is a reviewer answer that the
@@ -39,7 +41,11 @@ sections:
           - AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull
           - AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss
           - AttestationRenderer_Render_NoChecklist_SaysSo
-          - AttestationRenderer_Render_Document_SummarizesThreads
+          - AttestationRenderer_Render_Document_PrintsFindingsWithTheirComments
+          - AttestationRenderer_Render_NoFindings_SaysNoneWereIncluded
+          - AttestationRenderer_Render_LongFindingComment_IsPrintedInFull
+          - AttestationRenderer_Render_FindingStatus_PrintsResolvedAndOpen
+          - AttestationRenderer_Render_DiscussionThread_IsNotPresentedAsFinding
 
       - id: ReviewCenter-AttestationRenderer-AnswerTimes
         title: >-
@@ -53,18 +59,42 @@ sections:
           - AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments
           - AttestationRenderer_Render_Document_ShowsAnswerTimeOfEachAnswerInUtc
 
-      - id: ReviewCenter-AttestationRenderer-ThreadLimit
+      - id: ReviewCenter-AttestationRenderer-FindingList
         title: >-
-          The AttestationRenderer class shall list at most 100 resolved threads, in the order of the document, and
-          when there are more shall add one line saying how many more resolved threads there are, while the printed
-          counts of open and resolved threads stay exact.
+          The AttestationRenderer class shall list every finding it is given, however many there are, in the order of
+          the document, and continue onto further pages.
         justification: |
-          A review can hold any number of resolved threads, and the document is made in memory for every request, so
-          its size must be bounded. Only this list is capped; checklist comments are never cut. The line and the exact
-          count tell the reader what the list leaves out.
+          A finding is a reviewer's reason and is part of the record that was signed, so it must not be dropped for
+          the sake of size. The document is made in memory for a review that has a bounded number of threads, and
+          the pages grow with it.
         tests:
-          - AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest
-          - AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine
+          - AttestationRenderer_Render_ManyFindings_ListsEveryFinding
+
+      - id: ReviewCenter-AttestationRenderer-Conclusion
+        title: >-
+          The AttestationRenderer class shall print the outcome and the conclusion text of the review in a Conclusion
+          section, shall title the document Review attestation - REJECTED and print a banner framed by rules at the
+          head of the first page for a rejection only, and shall print no banner for an approval.
+        justification: |
+          A reader of a rejection must see at once that it is a rejection and why, and a document that states an
+          approval must not carry any rejection mark.
+        tests:
+          - AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection
+          - AttestationRenderer_Render_Conclusion_PrintsOutcomeAndText
+
+      - id: ReviewCenter-AttestationRenderer-BallotAppendix
+        title: >-
+          The AttestationRenderer class shall print a Ballots appendix, when it is given one, with every reviewer slot,
+          its signer, each of its answers with the outcome, the justification and the time, the answers of its sections
+          and the fingerprint of the ballots, with the question text left out and the identifiers kept when the
+          checklist wording is off, and shall print no appendix when it is given none.
+        justification: |
+          The appendix shows the final ballots of the slots of a concluded review. Its fingerprint is the one that the
+          record digest module computes, so a reader can tie the appendix to the record.
+        tests:
+          - AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint
+          - AttestationRenderer_Render_NoBallotAppendix_OmitsTheSection
+          - AttestationRenderer_Render_BallotAppendixWordingOff_PrintsIdentifiersOnly
 
       - id: ReviewCenter-AttestationRenderer-SignOffs
         title: >-
@@ -99,10 +129,10 @@ sections:
       - id: ReviewCenter-AttestationRenderer-ContentSwitches
         title: >-
           The AttestationRenderer class shall, for a switch that is off in the evidence settings, leave out the whole
-          thread section, replace the repository and revisions by a statement that the git context is omitted, leave
-          out the text of the checklist questions and print the identifiers, outcomes and justifications only, or
-          leave out the list of files while the file count and the fingerprint stay, and shall keep the parts that
-          are always included.
+          findings section and say so, replace the repository and revisions by a statement that the git context is
+          omitted, leave out the text of the checklist questions and print the identifiers, outcomes and
+          justifications only, or leave out the list of files while the file count and the fingerprint stay, and shall
+          keep the parts that are always included.
         justification: |
           A project decides how much of its review may leave the server. Each switch must remove what it says and no
           more, and what proves the approval, the outcomes, the signatures, the fingerprint and the audit head, must

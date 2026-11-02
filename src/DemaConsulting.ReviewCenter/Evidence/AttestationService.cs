@@ -25,26 +25,26 @@ using DemaConsulting.ReviewCenter.Core;
 namespace DemaConsulting.ReviewCenter.Evidence;
 
 /// <summary>
-///     Creates the signed PDF attestation of a completed review, on demand.
+///     Creates the signed PDF attestation of a concluded review, on demand.
 /// </summary>
 /// <remarks>
-///     An attestation is available only when the review is complete: every reviewer slot has a signature of the
-///     record as it is now and no thread is open (the existing completion rule of <see cref="SigningService"/>).
-///     Nothing is stored; the
+///     An attestation is available only when the review is concluded: every reviewer slot has a signature of the
+///     record as it is now that attests the agreed outcome, and no thread is open (the existing conclusion rule of
+///     <see cref="SigningService"/>). The review is then either approved or rejected, and the document says which:
+///     a rejected review gets an attestation that states the rejection and its reasons prominently, and is never
+///     usable as evidence that the content passed. A concluded review is locked, so everything the document prints,
+///     including the submitted ballot of every slot and the findings, is final and the viewer-dependent hiding of
+///     ballots (see <see cref="BallotVisibility"/>) has nothing left to hide; the service nevertheless checks that
+///     the review is concluded before it reads a single ballot, so no code path can print the ballots of a review
+///     that is still open. A comment that was not included in the report is never printed. Nothing is stored; the
 ///     PDF is built, signed and returned each time, and each creation is recorded in the audit trail. A key problem
 ///     never produces an unsigned or partly signed document and is not recorded as an attestation. Because reading,
 ///     verifying the audit chain, and rendering take time, the review is read again after rendering and before
-///     signing; when it is no longer complete or no longer the same, nothing is signed or recorded. The service is
-///     thread-safe.
+///     signing; when it is no longer concluded with the same outcome or no longer the same, nothing is signed or
+///     recorded. The service is thread-safe.
 /// </remarks>
 internal sealed class AttestationService
 {
-    /// <summary>
-    ///     The longest first comment, in characters, that the summary of a resolved thread keeps; the summary ends with
-    ///     an ellipsis when it was cut. It applies only to resolved-thread summaries, never to checklist comments.
-    /// </summary>
-    private const int SummaryLength = 300;
-
     /// <summary>
     ///     The name of the audit event that records the creation of an attestation.
     /// </summary>
@@ -156,16 +156,19 @@ internal sealed class AttestationService
     ///     read again before signing, and a change in between gives <see cref="AttestationStatus.Changed"/>, so a
     ///     document never mixes two settings. A request without an actor is allowed only when the project allows
     ///     anonymous attestation PDFs; otherwise it gets the answer for a review that does not exist. An anonymous
-    ///     request for a review that is not complete gets that same answer, so it cannot be used to list review
-    ///     identifiers or their state; a signed-in caller gets <see cref="AttestationStatus.NotApproved"/>. The caller
-    ///     (the route) has already decided whether an anonymous request may reach this method.
+    ///     request for a review that is not concluded gets that same answer, so it cannot be used to list review
+    ///     identifiers or their state; a signed-in caller gets <see cref="AttestationStatus.NotApproved"/>. A
+    ///     rejected review is concluded, so a signed-in caller gets its attestation; an anonymous caller does not:
+    ///     the anonymous routes exist for evidence that a file set passed, a rejected attestation prints the reasons
+    ///     for the rejection, and the caller gets the answer for a review that does not exist. The caller (the route)
+    ///     has already decided whether an anonymous request may reach this method.
     /// </remarks>
     /// <param name="projectId">The project number.</param>
     /// <param name="reviewId">The review identifier. Must not be null.</param>
     /// <param name="actor">The user who asks for it, or <c>null</c> for a request without signing in.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>
-    ///     The result: the signed PDF when the review is complete and the key is usable; otherwise why not
+    ///     The result: the signed PDF when the review is concluded and the key is usable; otherwise why not
     ///     (including <see cref="AttestationStatus.Changed"/> when the review changed while the document was being
     ///     prepared, and <see cref="AttestationStatus.NotFound"/> instead of
     ///     <see cref="AttestationStatus.NotApproved"/> for a request without an actor). Only the success is
@@ -189,24 +192,34 @@ internal sealed class AttestationService
         }
 
         var settings = project.Evidence;
-        // Availability first: the review must exist and be complete
+        // Availability first: the review must exist and be concluded
         var approval = await _signing.GetApprovalAsync(projectId, reviewId, cancellationToken);
         if (approval is null)
         {
             return NotFoundResult();
         }
 
-        // An anonymous caller must not learn which review identifiers exist or whether they are complete, so an
-        // incomplete review looks like a missing one; people who are signed in get the informative answer
-        if (!approval.IsApproved)
+        // Nothing below this point reads a ballot or a finding of a review that is still open: until the review is
+        // concluded the ballots of the other reviewers are hidden from most viewers, and the document would print them.
+        // An anonymous caller must not learn which review identifiers exist or whether they are concluded, so an open
+        // review looks like a missing one; people who are signed in get the informative answer
+        if (!approval.IsConcluded)
         {
-            // A rejected review is concluded, but its signed attestation is not available yet; say so plainly
-            var message = approval.IsConcluded
-                ? "The review was rejected. A signed attestation of a rejected review is not available yet."
-                : "The review is not complete: not every reviewer slot has signed the current record, or a thread is open.";
             return actor is null
                 ? NotFoundResult()
-                : new AttestationResult(AttestationStatus.NotApproved, null, null, message);
+                : new AttestationResult(
+                    AttestationStatus.NotApproved,
+                    null,
+                    null,
+                    "The review is not complete: not every reviewer slot has signed the current record, "
+                    + "or a thread is open.");
+        }
+
+        // A rejected attestation carries the reasons for the rejection, so it is not offered to a caller who did not
+        // sign in; the anonymous routes exist for evidence that a file set passed
+        if (actor is null && !approval.IsApproved)
+        {
+            return NotFoundResult();
         }
 
         // Then the key: without a usable key there is nothing to produce, and nothing is recorded
@@ -220,7 +233,7 @@ internal sealed class AttestationService
             return new AttestationResult(AttestationStatus.KeyUnavailable, null, null, ex.Message);
         }
 
-        // Read the review once more for the content; the digest must still be the one that was approved
+        // Read the review once more for the content; the digest must still be the one that was concluded
         var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
         var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
         if (snapshot is null || review is null)
@@ -228,8 +241,11 @@ internal sealed class AttestationService
             return NotFoundResult();
         }
 
-        // The approval and the snapshot are two reads: they must describe the same record and the same slots
-        if (RecordDigest.Compute(snapshot.Record) != approval.Digest || !SameSlots(approval, snapshot))
+        // The approval and the snapshot are two reads: they must describe the same record and the same slots, and
+        // every slot of a review with a checklist must have handed in its ballot, as a conclusion requires
+        if (RecordDigest.Compute(snapshot.Record) != approval.Digest
+            || !SameSlots(approval, snapshot)
+            || !AllBallotsSubmitted(snapshot))
         {
             return ChangedResult();
         }
@@ -248,7 +264,8 @@ internal sealed class AttestationService
             await AfterRender(cancellationToken);
         }
 
-        if (!await IsUnchangedAsync(projectId, reviewId, approval.Digest, snapshot, settings, cancellationToken))
+        if (!await IsUnchangedAsync(
+                projectId, reviewId, approval.Conclusion, approval.Digest, snapshot, settings, cancellationToken))
         {
             return ChangedResult();
         }
@@ -257,7 +274,10 @@ internal sealed class AttestationService
         byte[] signed;
         try
         {
-            signed = _signer.Sign(unsigned, key, now, $"Review {reviewId} is complete and signed by all reviewer slots");
+            var reason = approval.IsApproved
+                ? $"Review {reviewId} is complete and signed by all reviewer slots"
+                : $"Review {reviewId} was rejected and is signed by all reviewer slots";
+            signed = _signer.Sign(unsigned, key, now, reason);
         }
         catch (AttestationKeyException ex)
         {
@@ -265,10 +285,12 @@ internal sealed class AttestationService
         }
 
         // The event is recorded strictly: an attestation that cannot be traced is not handed out. It records the
-        // digest that was attested, and who asked: a request without signing in is recorded as "anonymous"
+        // digest that was attested, the outcome, and who asked: a request without signing in is recorded as "anonymous"
         var hash = Convert.ToHexString(SHA256.HashData(signed)).ToLowerInvariant();
         var detail =
-            $"record digest {approval.Digest}, chain head {chain.HeadHash}, pdf sha256 {hash}, key {key.Info.Thumbprint}, selfSigned={key.Info.IsSelfSigned}";
+            $"outcome {approval.Conclusion.ToString().ToLowerInvariant()}, record digest {approval.Digest}, "
+            + $"chain head {chain.HeadHash}, pdf sha256 {hash}, key {key.Info.Thumbprint}, "
+            + $"selfSigned={key.Info.IsSelfSigned}";
         await _audit.RecordAsync(
             actor is null
                 ? new AuditDraft(AuditAction, null, AnonymousActorName, projectId, reviewId, detail)
@@ -317,21 +339,25 @@ internal sealed class AttestationService
     }
 
     /// <summary>
-    ///     Checks, from fresh reads, that the review is still complete and is still exactly what was rendered.
+    ///     Checks, from fresh reads, that the review is still concluded with the same outcome and is still exactly what
+    ///     was rendered.
     /// </summary>
     /// <param name="projectId">The project number.</param>
     /// <param name="reviewId">The review identifier.</param>
-    /// <param name="digest">The record digest that was approved and rendered.</param>
+    /// <param name="conclusion">The outcome the review had when it was rendered.</param>
+    /// <param name="digest">The record digest that was concluded and rendered.</param>
     /// <param name="rendered">The snapshot the document was built from.</param>
     /// <param name="settings">The evidence settings the document was built with.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>
-    ///     <c>true</c> when the review is still approved with the same record digest, and has the same slots and the
-    ///     same signatures that count as the rendered one, and the evidence settings are still the ones rendered.
+    ///     <c>true</c> when the review is still concluded with the same outcome and the same record digest, and has
+    ///     the same slots and the same signatures that count as the rendered one, and the evidence settings are still
+    ///     the ones rendered.
     /// </returns>
     private async Task<bool> IsUnchangedAsync(
         int projectId,
         string reviewId,
+        ReviewConclusion conclusion,
         string digest,
         ReviewSnapshot rendered,
         EvidenceSettings settings,
@@ -343,8 +369,9 @@ internal sealed class AttestationService
             return false;
         }
 
+        // Not "approved": a rejected review is rendered too, and a change of the outcome is a change of the document
         var approval = await _signing.GetApprovalAsync(projectId, reviewId, cancellationToken);
-        if (approval is null || !approval.IsApproved || approval.Digest != digest)
+        if (approval is null || !approval.IsConcluded || approval.Conclusion != conclusion || approval.Digest != digest)
         {
             return false;
         }
@@ -353,6 +380,22 @@ internal sealed class AttestationService
         return current is not null
                && RecordDigest.Compute(current.Record) == digest
                && SlotSignature(current, digest) == SlotSignature(rendered, digest);
+    }
+
+    /// <summary>
+    ///     Checks that every reviewer slot of a review with a checklist has a submitted ballot.
+    /// </summary>
+    /// <remarks>
+    ///     A concluded review always satisfies this (the conclusion needs a submitted ballot from every slot), so a
+    ///     <c>false</c> answer means the two reads of the review disagree and the document must not be built.
+    /// </remarks>
+    /// <param name="snapshot">The snapshot.</param>
+    /// <returns><c>true</c> when the review has no checklist, or each slot has a submitted ballot.</returns>
+    private static bool AllBallotsSubmitted(ReviewSnapshot snapshot)
+    {
+        return snapshot.Record.Checklist is null
+               || snapshot.Slots.All(slot => snapshot.Record.Ballots.Any(
+                   b => b.SlotId == slot.Id && b.Status == BallotStatus.Submitted));
     }
 
     /// <summary>
@@ -411,6 +454,10 @@ internal sealed class AttestationService
     /// <param name="approval">The approval status, which names the slot members.</param>
     /// <param name="context">Who asked, the signing key, the audit chain result and the time of generation.</param>
     /// <returns>The document.</returns>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the review is not concluded: the document prints the submitted ballot of every slot, which is
+    ///     only allowed for a concluded review, so this is a programming error, not a user error.
+    /// </exception>
     private static AttestationDocument BuildDocument(
         Project project,
         Review review,
@@ -418,12 +465,23 @@ internal sealed class AttestationService
         ReviewApproval approval,
         GenerationContext context)
     {
+        // Fail closed: the ballots and the findings are printed for a concluded review only
+        if (!approval.IsConcluded)
+        {
+            throw new InvalidOperationException("An attestation can only be built for a concluded review.");
+        }
+
         var settings = project.Evidence;
         var (actor, key, chain, now) = context;
         var record = snapshot.Record;
         var digestVersion = RecordDigest.Canonicalize(record).Split('\n', 2)[0];
-        var threads = record.Threads.ToList();
         var people = new PersonLabels(settings.IncludeReviewerNames, approval);
+
+        // The labels of people who hold no seat are numbered in the order they are first named, so the parts are built
+        // in the order the document prints them: checklist, findings, ballots appendix
+        var sections = BuildSections(record, people);
+        var findings = settings.IncludeThreads ? BuildFindings(record, people, settings.IncludeChecklistWording) : [];
+        var appendix = BuildAppendix(record, approval, people);
         return new AttestationDocument(
             project.Id,
             project.Name,
@@ -441,12 +499,8 @@ internal sealed class AttestationService
                 .Select(f => new AttestationFile(f.Path, review.IsFromRepository ? f.ChangeKind.ToString() : "Uploaded", f.Sha256, f.Size))
                 .ToList(),
             record.Checklist?.Version,
-            BuildSections(record, people),
-            threads.Count(t => t.State == ReviewThreadState.Open),
-            threads
-                .Where(t => t.State == ReviewThreadState.Resolved)
-                .Select(t => SummarizeThread(t, people))
-                .ToList(),
+            sections,
+            findings,
             BuildSlots(snapshot, approval, digestVersion, people),
             chain.HeadHash,
             chain.Count,
@@ -466,7 +520,11 @@ internal sealed class AttestationService
                 .ToList(),
             record.FollowsReviewId,
             review.CarriedAnswerCount,
-            review.CarriedThreadCount);
+            review.CarriedThreadCount,
+            approval.Conclusion == ReviewConclusion.Rejected ? ReviewOutcome.Rejected : ReviewOutcome.Approved,
+            record.ReviewConclusionText,
+            appendix,
+            appendix.Count == 0 ? null : RecordDigest.ComputeBallotFingerprint(record));
     }
 
     /// <summary>
@@ -528,13 +586,68 @@ internal sealed class AttestationService
     }
 
     /// <summary>
-    ///     Summarizes a resolved thread: where it is and what was first said.
+    ///     Gathers the threads of the report: every thread with at least one comment that was included in the report.
+    /// </summary>
+    /// <remarks>
+    ///     These are the same threads, and the same comments, that the record digest binds, so a signature never
+    ///     covers text that the document does not show. A thread whose starting comment is included is a finding; a
+    ///     thread whose starting comment is not included (for example a question with an included reply) is a
+    ///     discussion thread and only its included comments are printed. A comment that was not included is never
+    ///     printed, and a thread without an included comment is absent; that discussion stays in the review
+    ///     history. A thread
+    ///     about a check is labeled <c>Check {id}</c>, with the wording of the check only when the evidence settings
+    ///     include the checklist wording, so that no wording reaches a document that leaves it out. The findings are
+    ///     ordered by file path, then first line, then creation time (check findings after the file findings, by check
+    ///     identifier), so the same review always gives the same order. Every included comment is printed in full.
+    /// </remarks>
+    /// <param name="record">The review record.</param>
+    /// <param name="people">The labels of the people the document names.</param>
+    /// <param name="wording">Whether the wording of a check may be printed.</param>
+    /// <returns>The findings; empty when there is none.</returns>
+    private static List<AttestationFinding> BuildFindings(ReviewRecord record, PersonLabels people, bool wording)
+    {
+        // The wording of the checks, only when the document may print it
+        var checkText = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (wording && record.Checklist is not null)
+        {
+            foreach (var item in record.Checklist.Parse().Sections.SelectMany(section => section.Items))
+            {
+                checkText.TryAdd(item.Id, item.Text);
+            }
+        }
+
+        return record.Threads
+            .Where(thread => thread.Comments.Any(comment => comment.IncludeInReport))
+            .OrderBy(thread => thread.IsCheckThread)
+            .ThenBy(thread => thread.FilePath, StringComparer.Ordinal)
+            .ThenBy(thread => thread.CheckItemId, StringComparer.Ordinal)
+            .ThenBy(thread => thread.StartLine ?? 0)
+            .ThenBy(thread => thread.Created)
+            .ThenBy(thread => thread.Id)
+            .Select(thread => new AttestationFinding(
+                LocationOf(thread, checkText),
+                IncludedComments(thread, people),
+                thread.State == ReviewThreadState.Resolved,
+                thread.CarriedFromReviewId))
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Names where a thread is: the file and lines, or the check it is about.
     /// </summary>
     /// <param name="thread">The thread.</param>
-    /// <param name="people">The labels of the people the document names.</param>
-    /// <returns>The summary.</returns>
-    private static AttestationThread SummarizeThread(ReviewThread thread, PersonLabels people)
+    /// <param name="checkText">The wording of the checks by identifier; empty when the wording is left out.</param>
+    /// <returns>The location text.</returns>
+    private static string LocationOf(ReviewThread thread, Dictionary<string, string> checkText)
     {
+        // A check thread has no file: it is labeled with its check, so no empty path is ever printed
+        if (thread.CheckItemId is not null)
+        {
+            return checkText.TryGetValue(thread.CheckItemId, out var text)
+                ? $"Check {thread.CheckItemId}: {text}"
+                : $"Check {thread.CheckItemId}";
+        }
+
         var lines = string.Empty;
         if (thread.StartLine is not null)
         {
@@ -543,17 +656,131 @@ internal sealed class AttestationService
                 ? $", lines {start}-{thread.EndLine.Value.ToString(CultureInfo.InvariantCulture)}"
                 : $", line {start}";
         }
-        var first = thread.Comments.OrderBy(c => c.Created).FirstOrDefault();
-        var text = first is null
-            ? "(no comments)"
-            : $"{people.Name(first.Author, first.AuthorUsername, false)}: {first.Text}";
-        // A check thread has no file: it is labeled with its check, so no empty path is ever printed
-        var anchorText = thread.CheckItemId is not null ? $"Check {thread.CheckItemId}" : thread.FilePath + lines;
-        return new AttestationThread(
-            anchorText,
-            text.Length <= SummaryLength ? text : text[..SummaryLength] + "...",
-            thread.Comments.Count,
-            thread.CarriedFromReviewId);
+
+        return thread.FilePath + lines;
+    }
+
+    /// <summary>
+    ///     Gathers the comments of a thread that were included in the report, in posting order.
+    /// </summary>
+    /// <param name="thread">The thread, which has at least one included comment.</param>
+    /// <param name="people">The labels of the people the document names.</param>
+    /// <returns>
+    ///     The included comments: <c>Finding</c> for the starting comment, <c>Resolution</c> for a resolution note and
+    ///     <c>Reply</c> for any other.
+    /// </returns>
+    private static List<AttestationFindingComment> IncludedComments(ReviewThread thread, PersonLabels people)
+    {
+        var result = new List<AttestationFindingComment>();
+        for (var index = 0; index < thread.Comments.Count; index++)
+        {
+            var comment = thread.Comments[index];
+            if (!comment.IncludeInReport)
+            {
+                continue;
+            }
+
+            var kind = "Reply";
+            if (comment.Kind == ReviewCommentKind.Resolution)
+            {
+                kind = "Resolution";
+            }
+            else if (index == 0)
+            {
+                kind = "Finding";
+            }
+
+            result.Add(new AttestationFindingComment(
+                kind,
+                people.Name(comment.Author, comment.AuthorUsername, false),
+                comment.Created,
+                comment.Text));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Gathers the final submitted ballot of every reviewer slot for the ballots appendix.
+    /// </summary>
+    /// <remarks>
+    ///     Called only for a concluded review, which has a submitted ballot for every slot and cannot change any more,
+    ///     so nothing here is hidden from the reader (see <see cref="BallotVisibility"/>). Only the final submitted
+    ///     ballot is printed; the history of earlier edits stays in the audit trail. A section the slot marked not
+    ///     applicable shows its reason and no answers; a check the slot did not answer shows <c>Not answered</c>.
+    /// </remarks>
+    /// <param name="record">The review record.</param>
+    /// <param name="approval">The approval status, whose slots number the ballots and name the members.</param>
+    /// <param name="people">The labels of the people the document names.</param>
+    /// <returns>
+    ///     One ballot per slot with a submitted ballot, in slot order; empty when the review has no checklist.
+    /// </returns>
+    private static List<AttestationBallot> BuildAppendix(
+        ReviewRecord record,
+        ReviewApproval approval,
+        PersonLabels people)
+    {
+        var result = new List<AttestationBallot>();
+        if (record.Checklist is null)
+        {
+            return result;
+        }
+
+        var definition = record.Checklist.Parse();
+        foreach (var status in approval.Slots)
+        {
+            var ballot = record.Ballots.FirstOrDefault(b =>
+                b.SlotId == status.SlotId && b.Status == BallotStatus.Submitted);
+            if (ballot is null)
+            {
+                continue;
+            }
+
+            // The member who handed the ballot in; the primary when the user name is not recorded
+            var member = new[] { status.Primary, status.Alternate }.FirstOrDefault(m =>
+                m is not null
+                && string.Equals(m.Username, ballot.SubmittedByUsername, StringComparison.OrdinalIgnoreCase))
+                ?? (ballot.SubmittedByUsername is null ? status.Primary : null);
+            var reviewer = member is null
+                ? people.Name(ballot.SubmittedByUsername!, ballot.SubmittedByUsername, false)
+                : people.Name(member.DisplayName, member.Username, true);
+            result.Add(new AttestationBallot(
+                status.Number,
+                reviewer,
+                ballot.SubmittedAt,
+                definition.Sections.Select(section => BallotSection(section, ballot, people)).ToList()));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Describes how one ballot answered one section.
+    /// </summary>
+    /// <param name="section">The section of the checklist.</param>
+    /// <param name="ballot">The submitted ballot.</param>
+    /// <param name="people">The labels of the people the document names.</param>
+    /// <returns>The section with the reason it was marked not applicable, or its answers.</returns>
+    private static AttestationBallotSection BallotSection(ChecklistSection section, Ballot ballot, PersonLabels people)
+    {
+        var state = ballot.SectionStates.LastOrDefault(s => s.SectionId == section.Id);
+        if (state is { Applicable: false })
+        {
+            return new AttestationBallotSection(section.Id, section.Title, false, state.Reason, []);
+        }
+
+        var answers = section.Items.Select(item =>
+        {
+            var answer = ballot.Answers.LastOrDefault(a => a.ItemId == item.Id);
+            return new AttestationBallotAnswer(
+                item.Id,
+                item.Text,
+                answer is null ? "Not answered" : OutcomeText(answer.Outcome),
+                answer?.Justification,
+                answer is null ? null : people.Name(answer.AnsweredBy, answer.AnsweredByUsername, false),
+                answer?.AnsweredAt);
+        }).ToList();
+        return new AttestationBallotSection(section.Id, section.Title, true, null, answers);
     }
 
     /// <summary>

@@ -124,7 +124,8 @@ loopback TCP ports.
   (`ReviewCenter-System-RecordImmutability`).
 - A Fail answer does not block signing: when the ballots agree on a Fail, a reviewer may sign the rejected outcome once
   the review conclusion is written, and a review whose every slot holds a current signature of the rejected outcome is
-  concluded as rejected and locked, has no attestation, and is never listed in the evidence index; an administrator can
+  concluded as rejected and locked, has a signed attestation that records the rejection, and is never listed in the
+  evidence index; an administrator can
   reopen it like an approved review.
 - Every change of data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an audit trail whose
   entries are chained by hashes, and the change and its entry are stored together; the entries never contain a password

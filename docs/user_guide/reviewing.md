@@ -577,8 +577,9 @@ block signing, but a rejection must state its reasons:
 When every slot has signed the rejection for the current record, the review is concluded as **Rejected**: the review
 page and the project page show a **Rejected** badge, and the review is locked. If the conclusion text is changed after
 signatures exist, the signers must sign again. An administrator can reopen a Rejected review
-like an Approved one. The signed attestation PDF and the evidence index are for Approved reviews only; see
-[Signed Attestation](#signed-attestation). The API field `isApproved` is true for approved reviews only, so a rejected
+like an Approved one. The signed attestation PDF is available for Rejected reviews too (it is marked as rejected); the
+evidence index lists Approved reviews only; see [Signed Attestation](#signed-attestation). The API field `isApproved`
+is true for approved reviews only, so a rejected
 review is concluded but not approved (see the Automation chapter).
 
 ## Follow-up Reviews
@@ -908,45 +909,58 @@ someone.
 
 ## Signed Attestation
 
-When a review is **Approved**, its page shows **Download attestation (PDF)** on a line of its own below the title, with
-a note about the key that signs the file. The PDF is made when you press the button and is not stored. It contains the
-review (project, review, repository and commits, the content fingerprint and the hash of every file), the checklist
-with the consolidated checklist of the submitted ballots (the agreed answer of every check, who gave it, the UTC time of
-the answer to the second, and the justification in full; a check that the ballots leave open or disputed is shown as
-not answered), the comment threads (a comment is never shortened), the sign-off of every
-reviewer slot with the record digest it was bound to, and the state of the audit trail (the number of entries, whether
-the chain is intact, and the head hash). The counts of open and resolved threads are exact. The first 100 resolved
-threads are listed, each with the start of its first comment (at most 300 characters), and a line says how many more
-there are; the full threads are in the review record. A review that was reopened by an administrator also has a
-**Reopen history** section (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)). The last section
-describes the signing key and what the
-signature proves. A review that is not Approved has no button; a direct request to its `attestation.pdf` address is
-refused with the message "The review is not complete" (status 409). For a caller who is not signed in (the anonymous API
-route, see Evidence Settings in the Administration chapter) a review that is not complete is answered 404, like a
-review that does not exist, so that review identifiers cannot be probed; signed-in members still get the 409. If the
-review changes
-while the PDF is being
-prepared (for example an administrator reopens the review), nothing is signed or recorded and the request is also
-refused with status 409 ("The review changed while the attestation was being prepared; try again."); press the button
-again. Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
-administrators can download the PDF; for anyone else the address answers 404, as for a project that does not exist. The
-one exception is the API route of the PDF in a project whose administrators turned on **Anonymous attestation PDFs**
-(see Evidence Settings in the Administration chapter): anyone can then download it without signing in, and the
-download is
-recorded as `attestation.generated` by `anonymous`.
+When a review is **concluded** (Approved or Rejected), its page shows **Download attestation (PDF)** on a line of its
+own below the title, with a note about the key that signs the file. The PDF is made when you press the button and is
+not stored. It contains the review (project, review, repository and commits, the content fingerprint and the hash of
+every file), the checklist with the consolidated checklist of the submitted ballots (the agreed answer of every check,
+who gave it, the UTC time of the answer to the second, and the justification in full; a check that the ballots leave
+open or disputed is shown as not answered), the **findings and comments in this report**, the **conclusion** (the
+outcome and the conclusion text), the sign-off of every reviewer slot with the record digest it was bound to, a
+**Ballots appendix** (see below), and the state of the audit trail (the number of entries, whether the chain is intact,
+and the head hash). The report lists the findings and included comments: every comment that a reviewer included, with
+the location of its thread (a finding, the replies that were added to the report, and the resolution note). A reply
+that was included on a Question appears as a discussion thread, not as a finding, and only its included comments are
+printed. Each thread shows its status, Resolved or Open. A comment is never shortened and every included comment is
+listed. Comments that were not included in the report are never printed, even when they are in the review record. A
+review that was reopened by an administrator
+also has a **Reopen history** section (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)). The last
+section describes the signing key and what the signature proves.
 
-**A rejected review has no attestation yet.** The signed attestation is for Approved reviews only. The page of a
-**Rejected** review shows the note "The review was rejected. A signed attestation of a rejected review is not available
-yet." instead of the button. A request for its `attestation.pdf` is refused with that sentence (status 409), and an
-anonymous caller gets 404, as for any review that is not complete. The same holds for the evidence index (see the
-Automation chapter): a rejected review is never listed in it.
+A review that is not concluded has no button; a direct request to its `attestation.pdf` address is refused with the
+message "The review is not complete" (status 409), and nothing of the ballots is revealed. For a caller who is not
+signed in (the anonymous API route, see Evidence Settings in the Administration chapter) a review that is not complete
+is answered 404, like a review that does not exist, so that review identifiers cannot be probed; signed-in members
+still get the 409. If the review changes while the PDF is being prepared (for example an administrator reopens the
+review, or a ballot changes), nothing is signed or recorded and the request is also refused with status 409 ("The
+review changed while the attestation was being prepared; try again."); press the button again. Every download is
+recorded in the audit trail as `attestation.generated`, with the outcome (`approved` or `rejected`). Only members of
+the project and system administrators can download the PDF; for anyone else the address answers 404, as for a project
+that does not exist. The one exception is the API route of the PDF in a project whose administrators turned on
+**Anonymous attestation PDFs** (see Evidence Settings in the Administration chapter): anyone can then download the
+attestation of an **Approved** review without signing in, and the download is recorded as `attestation.generated` by
+`anonymous`.
+
+**The attestation of a rejected review.** A review concluded as **Rejected** has a signed attestation too. Its title is
+**Review attestation - REJECTED**, a banner under the title says that the document is not evidence that the content
+passed, and the conclusion section gives the reasons for the rejection. The rejection is a result of the review, not
+an approval, so the evidence index (see the Automation chapter) never lists it. A caller who is not signed in never
+gets the attestation of a rejected review, not even when the project allows anonymous attestation PDFs: the answer is
+404.
+
+**The Ballots appendix.** After the sign-offs, a concluded review's attestation prints the submitted ballot of every
+reviewer slot: the reviewer, the time the ballot was handed in, every answer with its justification and who gave it, and
+the sections that the reviewer marked as not applicable with the reason. The appendix ends with a **ballot
+fingerprint**, a SHA-256 value of those ballots, so that a later change of a ballot is visible. Ballots are shown only
+for a concluded review, because only then every slot has handed in its ballot, and never as a draft. The reviewer names
+and the checklist wording follow the evidence settings (see below).
 
 ![An approved review with the Download attestation (PDF) button and the signing key note.](images/review-signed.png)
 
 **What the PDF contains follows the evidence settings of the project.** Every attestation PDF of a project, whoever
-downloads it, honors the five content switches of the project: the review discussion threads, the reviewer names, the
-checklist wording, the file list with hashes, and the git context. A section that a switch turns off is left out, and
-the names are replaced by neutral labels such as *Reviewer 1 (primary)* and *Participant 1*. A PDF **always** has a
+downloads it, honors the five content switches of the project: the review discussion threads (the findings), the
+reviewer names, the checklist wording (also in the Ballots appendix), the file list with hashes, and the git context. A
+section that a switch turns off is left out, and the names are replaced by neutral labels such as *Reviewer 1
+(primary)* and *Participant 1*. A PDF **always** has a
 **Content scope** section, right after the review section, that states which sections were left out and the settings
 that were in effect when the PDF was made, so a reader always knows what the PDF does not show. These parts are always
 included, whatever the settings: the review and project identifiers, the content fingerprint, the checklist outcomes,

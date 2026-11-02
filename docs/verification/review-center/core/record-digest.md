@@ -5,8 +5,9 @@
 `RecordDigest` is verified with unit tests defined in `RecordDigestTests.cs` (the format and everything outside the
 report), `RecordDigestBallotTests.cs` (the `check`, `applicability`, and `outcome` lines and what the consolidation of
 the ballots does and does not give the digest), `RecordDigestFollowUpTests.cs` (the follow-up lines), and
-`RecordDigestReportTests.cs` (the `report` block), and `RecordDigestCheckThreadTests.cs` (the block of a thread about a
-check). The tests build small `ReviewRecord`
+`RecordDigestReportTests.cs` (the `report` block), `RecordDigestCheckThreadTests.cs` (the block of a thread about a
+check), and `RecordDigestBallotFingerprintTests.cs` (the ballot fingerprint and its canonical text). The tests build
+small `ReviewRecord`
 values, with their submitted and draft ballots, by hand and call the static methods directly. The format is proved
 twice: the exact canonical text of a small record is compared with the text of the design, and the digest of a record
 with no ballots or threads is compared with a known SHA-256 value that was calculated independently of the
@@ -70,6 +71,10 @@ N/A - standard test environment.
   without one keeps its digest; the known digests of a one-line and a two-line text match, and setting, changing or
   clearing the text changes the digest.
 - A null record is rejected with an `ArgumentNullException` by both methods.
+- The ballot fingerprint is separate from the digest: it is the lowercase hexadecimal SHA-256 of a canonical text with
+  the header `ReviewCenter ballots v1`, whose ballots are numbered by the ordinal of their slot; a record with no
+  submitted ballot gives only the header; a changed answer changes the fingerprint while a display name or a draft
+  ballot does not; the last row of a repeated answer counts, and the lines are sorted; and a null record is rejected.
 
 #### Test Scenarios
 
@@ -260,6 +265,38 @@ and one that answers it give the line `applicability 1:b disputed`. This scenari
 `outcome none`, one whose submitted ballot answers every check Pass gives `outcome approved`, and one with a Fail
 gives `outcome rejected`. This scenario is tested by `RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected`, and
 covers `ReviewCenter-RecordDigest-Outcome`.
+
+**RecordDigest_CanonicalizeBallots_NoSubmittedBallot_GivesOnlyTheHeader**: A record with no ballot, and a record with
+only a draft ballot, give the text `ReviewCenter ballots v1` and nothing more. This scenario is tested by
+`RecordDigest_CanonicalizeBallots_NoSubmittedBallot_GivesOnlyTheHeader`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint`.
+
+**RecordDigest_ComputeBallotFingerprint_Record_IsSha256OfCanonicalTextInLowercaseHex**: The fingerprint of a record with
+a submitted ballot equals the SHA-256 of the UTF-8 bytes of `CanonicalizeBallots`, as 64 lowercase hexadecimal
+characters. This scenario is tested by
+`RecordDigest_ComputeBallotFingerprint_Record_IsSha256OfCanonicalTextInLowercaseHex`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint`.
+
+**RecordDigest_CanonicalizeBallots_SlotIdentities_NumbersBallotsByOrdinalInSlotOrder**: Ballots held in the order of
+slots 20 and 10 (the lower slot answering Fail) are written as ballot 1 (the Fail ballot) and ballot 2, and the text and
+the fingerprint equal those of the same record with slot identities 2 and 1. This scenario is tested by
+`RecordDigest_CanonicalizeBallots_SlotIdentities_NumbersBallotsByOrdinalInSlotOrder`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint`.
+
+**RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot**: Changing one answer of
+one slot changes the fingerprint, and changing only the display name of the answerer does not. This scenario is tested
+by `RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint`.
+
+**RecordDigest_CanonicalizeBallots_RepeatedAnswerAndSectionState_LastRowCountsAndLinesAreSorted**: A check that was
+answered twice in a ballot is written once with the last row, the answer lines are sorted by check identifier, and a
+section marked not applicable has a `section` line. This scenario is tested by
+`RecordDigest_CanonicalizeBallots_RepeatedAnswerAndSectionState_LastRowCountsAndLinesAreSorted`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint`.
+
+**RecordDigest_CanonicalizeBallots_NullRecord_Throws**: A null record is passed. `ArgumentNullException` is raised. This
+scenario is tested by `RecordDigest_CanonicalizeBallots_NullRecord_Throws`, and covers
+`ReviewCenter-RecordDigest-BallotFingerprint`.
 
 **RecordDigest_Compute_DraftBallot_DoesNotChangeDigest**: A record with a submitted ballot, and the same record with a
 draft ballot of another slot that answers and marks sections differently, give the same digest. This scenario is

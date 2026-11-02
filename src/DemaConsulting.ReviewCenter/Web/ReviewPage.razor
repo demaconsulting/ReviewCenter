@@ -191,9 +191,10 @@
             </section>
         }
 
-        @if (Approval?.IsApproved == true)
+        @if (Approval?.IsConcluded == true)
         {
-            @* The signed PDF is offered only for a complete review, and only when the signing key can be used *@
+            @* The signed PDF is offered for any concluded review (approved or rejected; a rejected one says so
+               prominently), and only when the signing key can be used *@
             var attestationKey = AttestationKeys.Describe();
             <p class="status" data-testid="attestation">
                 @if (attestationKey.IsAvailable)
@@ -210,13 +211,6 @@
                 {
                     <span class="error" role="alert" data-testid="attestation-key-problem">Attestation is unavailable: @attestationKey.Problem</span>
                 }
-            </p>
-        }
-        else if (Approval?.Conclusion == ReviewConclusion.Rejected)
-        {
-            @* A rejected review is concluded, but the signed attestation of a rejection is not available yet *@
-            <p class="status muted" data-testid="attestation-rejected-note">
-                The review was rejected. A signed attestation of a rejected review is not available yet.
             </p>
         }
 

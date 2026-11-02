@@ -31,8 +31,11 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     review id) and it is complete: at least one reviewer slot, every slot signed with the current record
 ///     digest and no thread open, which is the completion rule of <see cref="AttestationService"/>. A review without a review-set id is
 ///     skipped, because a made-up id could wrongly satisfy a review-set. Only approved reviews are listed: a review
-///     that was rejected (every slot signed the outcome rejected) is concluded and locked but never listed, because
-///     it is no evidence that the file set passed. ReviewMark keeps one entry per (id, fingerprint), so the index has
+///     that was rejected (every slot signed the outcome rejected) is concluded and locked, and has an attestation of
+///     its own, but it is never listed, because it is no evidence that the file set passed. The listing reads the
+///     approval status of each review without a viewer, which is safe because it uses only whether the review is
+///     concluded as approved and the times of the signatures (never an answer, a dispute or a failed check), and
+///     those never depend on who asks. ReviewMark keeps one entry per (id, fingerprint), so the index has
 ///     one entry per pair: the one completed last, and on a tie the lowest review id. The entries are ordered by id,
 ///     then fingerprint (ordinal), so the output is reproducible. The service is stateless and thread-safe.
 /// </remarks>
@@ -125,7 +128,10 @@ internal sealed class EvidenceIndexService
         var best = new Dictionary<(string Id, string Fingerprint), (DateTimeOffset At, string ReviewId)>();
         foreach (var review in planned)
         {
-            if (!approvals.TryGetValue(review.Id, out var approval) || !approval.IsApproved)
+            // Only a concluded review that was approved is evidence that the file set passed. A rejected review is
+            // concluded too, and an open review (one without a conclusion, however many slots signed) is neither:
+            // the explicit IsConcluded test keeps both out even if IsApproved were ever widened
+            if (!approvals.TryGetValue(review.Id, out var approval) || !approval.IsConcluded || !approval.IsApproved)
             {
                 continue;
             }

@@ -81,7 +81,7 @@ the Users and Sign-in chapter).
 | Edit unsigned reviewer slots (not on a locked review)| yes    | no      | yes           | yes          |
 | Answer the checklist as a slot reviewer              | yes    | no      | yes           | if a member  |
 | Sign a review as the assigned reviewer               | yes    | no      | yes           | if a member  |
-| Download the attestation PDF of an approved review   | yes    | yes     | yes           | yes          |
+| Download the attestation PDF of a concluded review   | yes    | yes     | yes           | yes          |
 | Manage the repositories and credentials of a project | no     | no      | yes           | yes          |
 | Add and remove members, change member roles          | no     | no      | yes           | yes          |
 | Create projects                                      | no     | no      | no            | yes          |
@@ -315,6 +315,8 @@ Both work without signing in.
   flood of addresses the counters of the oldest ones are dropped first, so those clients start again with a full
   allowance, but nobody is refused because of it.
 - An anonymous download is recorded in the audit trail as `attestation.generated` with the actor `anonymous`.
+- Anonymous attestation PDFs are served for **Approved** reviews only. The attestation of a **Rejected** review is
+  never served to a request without a sign-in, and the answer is 404.
 
 **Exposure warning.** While an anonymous switch is on, the page shows a warning that anyone who can reach the server can
 read what you opened. It is stronger when the PDFs still contain review discussion threads or reviewer names: anonymous
@@ -328,15 +330,22 @@ All are **on by default**, so a PDF is complete unless a project administrator r
 
 | Switch                        | When off, the PDF...                                                      |
 | ----------------------------- | ------------------------------------------------------------------------- |
-| **Review discussion threads** | leaves out the comment threads                                            |
+| **Review discussion threads** | leaves out the findings and their comments                                |
 | **Reviewer names**            | shows neutral labels (*Reviewer 1 (primary)*, *Participant 1*) for people |
 | **Checklist wording**         | shows the checklist outcomes only, without questions and section titles   |
 | **File list and hashes**      | leaves out the files and their hashes (the fingerprint still covers them) |
 | **Git context**               | leaves out the repository and the baseline and head revisions             |
 
 Always included, whatever the settings: the review and project identifiers, the content fingerprint, the checklist
-outcomes, the sign-offs and signatures, the record digest, and the note about the signing key. Names that somebody
+outcomes, the conclusion, the sign-offs and signatures, the Ballots appendix (with the neutral labels and without the
+wording when those switches are off), the record digest, and the note about the signing key. Names that somebody
 typed into a comment or another free-text field are not removed; only the name fields of the PDF are.
+
+A PDF of a concluded review prints only what the reviewers chose to put in the report: the findings and the comments
+that were included in the report. Comments that were not included are never printed,
+whatever the switches say. The Ballots appendix shows the answers and justifications of every reviewer slot, so it is
+part of every attestation of a concluded review, also when anonymous attestation PDFs are on; consider that before you
+switch them on for a project whose justifications are sensitive.
 
 **Regulatory warnings.** Under every content switch that is off, the page shows a warning that is specific to it, for
 example "Omitting reviewer names may not satisfy your regulatory regime. Confirm with your quality or compliance lead."

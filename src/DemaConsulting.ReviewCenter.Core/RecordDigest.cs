@@ -86,6 +86,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <c>-</c>, so no text can imitate a delimiter; numbers use the invariant culture and times are written as
 ///     UTC ticks. All sorting is ordinal. The class is stateless and thread-safe.
 ///     <para>
+///         Separately from the digest, <see cref="ComputeBallotFingerprint"/> identifies the submitted ballots (how
+///         each slot answered, which the digest deliberately does not cover) with its own header
+///         <c>ReviewCenter ballots v1</c>; it is computed on demand for the ballots appendix of an attestation and is
+///         never stored or signed.
+///     </para>
+///     <para>
 ///         Two preconditions bound the claims above. Order independence assumes that the keys of the sorted
 ///         lists (check id, section id, change path, and the section and check ids inside the checklist definition)
 ///         are unique; the digest does not enforce this. The store's keys guarantee it for answers, section states and
@@ -102,6 +108,11 @@ public static class RecordDigest
     ///     The first line of the canonical text; names the format version.
     /// </summary>
     private const string Header = "ReviewCenter record v2";
+
+    /// <summary>
+    ///     The first line of the canonical text of the ballots; names the format version of the ballot fingerprint.
+    /// </summary>
+    public const string BallotsHeader = "ReviewCenter ballots v1";
 
     /// <summary>
     ///     Builds the canonical text of a record.
@@ -170,6 +181,88 @@ public static class RecordDigest
     public static string Compute(ReviewRecord record)
     {
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Canonicalize(record))));
+    }
+
+    /// <summary>
+    ///     Builds the canonical text of the submitted ballots of a record, the input of
+    ///     <see cref="ComputeBallotFingerprint"/>.
+    /// </summary>
+    /// <remarks>
+    ///     The text lives next to <see cref="Canonicalize"/> so that the digest and the fingerprint cannot drift apart
+    ///     in how they write strings, numbers and times. Where the digest covers only what the reviewers agree on, this
+    ///     text covers how each slot answered: it is the identity of the ballots printed in the ballots appendix of
+    ///     an attestation. It starts with the header <c>ReviewCenter ballots v1</c>. Only submitted ballots take part,
+    ///     in ascending order of the slot (storage identity). The ordinal of a ballot in that order, counted from 1,
+    ///     stands for the slot number, so the text never contains a storage row identity. Per ballot there is a
+    ///     <c>ballot {n} submitted {ticks} by {username}</c> line, then one <c>answer</c> line per answered check
+    ///     sorted by check id (id, outcome, justification, answerer user name, UTC ticks, and the carried-from review
+    ///     or <c>-</c>), then one <c>section</c> line per section state sorted by section id (id, <c>applicable</c> or
+    ///     <c>not-applicable</c>, reason, user name of who set it, UTC ticks, carried-from or <c>-</c>). When a check
+    ///     was answered more than once in a ballot the last row counts, as everywhere else. The record is not changed.
+    ///     The text does not cover display names, because a display name can change while a user name identifies the
+    ///     person; a record without a submitted ballot gives only the header.
+    /// </remarks>
+    /// <param name="record">The record. Must not be null.</param>
+    /// <returns>The canonical text; lines are separated by <c>\n</c>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="record"/> is null.</exception>
+    public static string CanonicalizeBallots(ReviewRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+
+        var lines = new List<string> { BallotsHeader };
+        var number = 0;
+        foreach (var ballot in record.Ballots.Where(b => b.Status == BallotStatus.Submitted).OrderBy(b => b.SlotId))
+        {
+            number++;
+            lines.Add(
+                $"ballot {number.ToString(CultureInfo.InvariantCulture)} submitted " +
+                $"{Ticks(ballot.SubmittedAt)} by {Text(ballot.SubmittedByUsername)}");
+
+            // The last row of an item counts, in the order the ballot holds them; the items are then sorted by id
+            var answers = ballot.Answers
+                .GroupBy(a => a.ItemId, StringComparer.Ordinal)
+                .Select(group => group.Last())
+                .OrderBy(a => a.ItemId, StringComparer.Ordinal);
+            foreach (var answer in answers)
+            {
+                lines.Add(
+                    $"answer {Text(answer.ItemId)} {Text(answer.Outcome.ToString())} " +
+                    $"{Text(answer.Justification)} {Text(answer.AnsweredByUsername)} " +
+                    $"{answer.AnsweredAt.UtcTicks.ToString(CultureInfo.InvariantCulture)} " +
+                    Text(answer.CarriedFromReviewId));
+            }
+
+            foreach (var state in ballot.SectionStates.OrderBy(s => s.SectionId, StringComparer.Ordinal))
+            {
+                lines.Add(
+                    $"section {Text(state.SectionId)} {(state.Applicable ? "applicable" : "not-applicable")} " +
+                    $"{Text(state.Reason)} {Text(state.SetByUsername)} " +
+                    $"{state.SetAt.UtcTicks.ToString(CultureInfo.InvariantCulture)} {Text(state.CarriedFromReviewId)}");
+            }
+        }
+
+        return string.Join('\n', lines);
+    }
+
+    /// <summary>
+    ///     Computes the fingerprint of the submitted ballots of a record: a short identity of how each reviewer slot
+    ///     answered, printed in the ballots appendix of an attestation.
+    /// </summary>
+    /// <remarks>
+    ///     It is not part of <see cref="Compute"/> and is not stored: the digest binds a signature to what the
+    ///     reviewers
+    ///     agree on, and the fingerprint lets a reader of an attestation tell that two copies of the appendix describe
+    ///     the same ballots. A concluded review is locked, so its ballots cannot change and the value can be computed
+    ///     again at any time.
+    /// </remarks>
+    /// <param name="record">The record. Must not be null.</param>
+    /// <returns>
+    ///     The SHA-256 of the UTF-8 bytes of <see cref="CanonicalizeBallots"/>, as 64 lowercase hexadecimal characters.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="record"/> is null.</exception>
+    public static string ComputeBallotFingerprint(ReviewRecord record)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(CanonicalizeBallots(record))));
     }
 
     /// <summary>
@@ -354,6 +447,16 @@ public static class RecordDigest
     private static string Text(string? value)
     {
         return value is null ? "-" : $"{value.Length.ToString(CultureInfo.InvariantCulture)}:{value}";
+    }
+
+    /// <summary>
+    ///     Writes an optional time as UTC ticks, or <c>-</c> for null.
+    /// </summary>
+    /// <param name="value">The time, possibly null.</param>
+    /// <returns>The ticks in the invariant culture.</returns>
+    private static string Ticks(DateTimeOffset? value)
+    {
+        return value is null ? "-" : value.Value.UtcTicks.ToString(CultureInfo.InvariantCulture);
     }
 
     /// <summary>

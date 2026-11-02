@@ -336,6 +336,7 @@ sections:
           - ReviewCenter-RecordDigest-DraftIgnored
           - ReviewCenter-RecordDigest-NoBallotContent
           - ReviewCenter-RecordDigest-Outcome
+          - ReviewCenter-RecordDigest-BallotFingerprint
           - ReviewCenter-SigningService-Slots
           - ReviewCenter-SigningService-SlotUsers
           - ReviewCenter-SigningService-SlotEdit

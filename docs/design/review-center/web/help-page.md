@@ -46,9 +46,12 @@ slug. The text is in cards (`card`), with figures for the screenshots. The scree
 what the picture shows and a caption.
 
 **Signed attestation topic** (`HelpAttestationPage`, slug `signed-attestation`): The topic after Reviewers and signing
-that explains the signed PDF of a complete review. It says when the download is offered (only for an approved review; a
-rejected review has no attestation yet, and the page says so instead of offering the button) and what the PDF lists
-(including who answered each check and when); what the
+that explains the signed PDF of a concluded review. It says when the download is offered (for a review that is concluded,
+approved or rejected; a rejected attestation is headed REJECTED and is not evidence that the content passed, and an
+anonymous request is never served a rejected one) and what the PDF lists
+(including who answered each check and when, the findings and included comments in
+full, never a comment that was not included, the conclusion, and a ballots appendix with the final ballot of every
+slot and a fingerprint); what the
 signature proves (the content has not changed since the signing, and it was produced by the holder of the server key
 named in the document) and what it does not (who the reviewers are, which is shown by the sign-offs in the record, and a
 trusted signing time, because the time is the clock of the server and there is no time stamp authority); that the
