@@ -101,9 +101,10 @@ report changed (details are hidden until you hand in your own ballot)", until th
 - **Pass** when you looked at the files of the review and the check is met. A Pass needs no text and is saved at once,
   so do not use it to move on quickly; an answer is recorded under your name in your ballot, and the agreed answers
   go into the signed record.
-- **Fail** when the check is not met. A justification is required. State what is wrong and where, and point to the
-  thread that holds the details, because checklist answers are not linked to threads by the product. When the ballots
-  agree on a Fail, the review ends as Rejected (see *When a Check Fails*).
+- **Fail** when the check is not met. A justification is required. State what is wrong and where. The answer itself is
+  not a thread, so put the details in a thread on the lines concerned and point to it; where the ballots differ on the
+  check, **Discuss** next to the check starts a thread about the check itself. When the ballots agree on a Fail, the
+  review ends as Rejected (see *When a Check Fails*).
 - **N/A** when the check cannot apply to the files of this review. A justification is required as well. Say why in a
   way a later reader can verify, for example "No database code in this change set", not just "not relevant". If a whole
   section does not apply, clear the switch of the section and give the reason once.
@@ -120,12 +121,16 @@ record that the signatures bind to.
 
 Every slot answers the checklist in its own ballot, so a review with two or more slots collects independent opinions:
 the primary and the alternate of a slot share one ballot, and a reviewer sees the own ballot while it is a draft, and
-nothing of the others until the own ballot is handed in (then the differing answers are shown side by side). A ballot
+nothing of the others until the own ballot is handed in (then the differing answers are shown side by side). This
+hiding applies to a member who holds no slot as well. It does not apply in a review with a single slot, to the lead of
+the review, to the administrators of the project and the system, to the Auditors, or to a concluded review; they see
+everything (see Review Checklist in the Reviewing chapter). A ballot
 counts only after its reviewer presses **Submit ballot**, or **Submit and sign** to hand in and sign in one step;
 changing it afterward makes it a draft again until it is handed in again. Practices that follow:
 
-- **Answer on your own.** Do not copy another slot's draft; you cannot see it anyway, and the others' answers stay
-  hidden until you have handed in yours. The value of a second slot is that it reaches its own conclusion.
+- **Answer on your own.** Do not copy another slot's draft; you cannot see it anyway. Unless you are the lead, an
+  administrator, or an Auditor, the others' handed-in answers stay hidden until you have handed in yours, and even
+  then do not just follow them. The value of a second slot is that it reaches its own conclusion.
 - **Settle a disagreement, do not overwrite it.** Where two submitted ballots give a check different answers, the
   check is disputed and blocks signing. Press **Discuss** next to the check, or talk to the other reviewer in a thread;
   the reviewer who changes the mind
@@ -148,7 +153,7 @@ finish, close the open threads (an open thread blocks the signature), and only t
 reviewer is the one that concludes the review. If a late change
 is needed, the page warns you which signatures it voids; after you confirm, the reviewers who already signed sign the
 new record again. A reviewer may sign as soon as the own ballot is submitted, but then a later disagreement of another
-reviewer then makes that signature no longer fit.
+reviewer makes that signature no longer fit.
 
 ## When a Check Fails
 
@@ -221,9 +226,11 @@ Posted comments cannot be edited or deleted. Think before you post, and correct 
 
 Prefer that the person who raised the thread resolves it, after the author has replied. If the author and the reviewer
 agree on an outcome, the reviewer who agrees with it can resolve it instead. Do not let the author resolve their own
-reviewers' threads without a reply that the reviewer has seen. The product does not enforce any of this: every member of
-the project can resolve or reopen any thread, so it is a convention to agree on in the team. Reopen a thread that was
-resolved too early, before the review is concluded; after that the lock refuses it.
+reviewers' threads without a reply that the reviewer has seen. The product does not enforce any of this: every member
+of the project who may take part can resolve or reopen any thread (an Auditor cannot, and nobody can once the review
+is concluded), so it is a convention to agree on in the team. Resolving a Finding needs a short note; for a Question
+the note is optional. Reopen a thread that was resolved too early, before the review is concluded; after that the lock
+refuses it.
 
 ## Baselines and Scope
 
@@ -260,9 +267,9 @@ a system administrator can **Reopen** it in the locked notice of the review page
 A reopen
 is audited (`review.reopened`, with the reason and the previous digest) and listed in the **Reopen history** of the
 review. It puts the review back In review. The earlier signatures stay as history but no longer count, for good, even
-if the content is changed back, so the reviewers must sign again. Reading, the attestation PDF of an Approved review,
-and the evidence index keep working while the review is locked, and a review that was reopened is not in the evidence
-index until it is approved again.
+if the content is changed back, so the reviewers must sign again. Reading, the attestation PDF of an Approved or
+Rejected review, and the evidence index keep working while the review is locked, and a review that was reopened is not
+in the evidence index until it is approved again.
 
 - **Treat a conclusion as final.** Finish the discussion, the checklist, the conclusion text, and the reviewer slots
   before the last signature, because afterward nothing can change without a reopen.

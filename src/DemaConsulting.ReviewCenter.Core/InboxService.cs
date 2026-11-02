@@ -725,7 +725,8 @@ public sealed class InboxService
     }
 
     /// <summary>
-    ///     Adds the information rows of one review: approved or reopened since the user last looked.
+    ///     Adds the information rows of one review: concluded (approved or rejected) or reopened since the user last
+    ///     looked.
     /// </summary>
     /// <param name="items">The rows collected so far.</param>
     /// <param name="review">What is known of the review.</param>

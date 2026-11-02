@@ -161,6 +161,16 @@ in Signing. The review is Closed only when every required signature carries the 
 review is final; follow-up work is a new review linked to it by a rework-of reference. The state machine is rule
 driven so that future workflows can be added without restructuring it.
 
+Implementation note (ballots): the shipped lifecycle is simpler than this target design. The only stored state is
+`Draft`; there are no Open, Concluding, or Signing states, and the outcome is derived. Each reviewer slot answers the
+checklist in its own ballot, which is a draft until the reviewer submits it. The submitted ballots are consolidated
+into agreed, disputed, and pending checks, and that standing yields a provisional outcome. When every slot has signed
+the current record digest, the review is concluded as Approved or Rejected (the shipped names for Pass and Fail).
+An agreed Fail does not block signing, but a Rejected review needs a written conclusion text; a disputed check or an
+open thread does block it. A concluded review is locked, and a project administrator can reopen it with a reason,
+which is why a concluded Rejected review is not final in the shipped product. Follow-up work is a new review that
+follows the earlier one.
+
 ### Puppet
 
 ReviewCenter.Puppet is a small Playwright-based helper (`puppet start`, then one `puppet <command>` per shell call)
@@ -196,7 +206,10 @@ It is a minimal helper and is kept as small and simple as possible; see
    person's availability.
 9. **The verdict is what is signed**: a Fail verdict is a valid, final record that later rework reviews reference. A
    Pass verdict requires no Fail checklist answers and all threads resolved. Reason: failed reviews are legitimate
-   evidence.
+   evidence. Implementation note (ballots): the shipped outcomes are Approved and Rejected, derived from the agreed
+   ballots. An agreed Fail answer does not block signing; it makes the outcome Rejected, which needs a conclusion
+   text. Unanswered or disputed checks and every open thread block signing, whichever the outcome. A
+   Rejected review can be reopened by a project administrator, so it is not final.
 10. **Per-project checklists**: one checklist per project, authored in the UI and versioned. Each review freezes the
     checklist version it uses. Reason: later edits must never alter past evidence.
 11. **Two content sources behind one abstraction**: upload and git share one interface. Reason: callers should not
@@ -219,7 +232,12 @@ It is a minimal helper and is kept as small and simple as possible; see
       paths. It identifies WHICH files were reviewed and is published in index.json.
     - **Record digest**: SHA-256 over a canonical serialization of the review id, content fingerprint, baseline
       reference, file list (path + hash), checklist version, answers and notes, thread contents and states, verdict,
-      and signature meaning. It is WHAT each signer approved.
+      and signature meaning. It is WHAT each signer approved. Implementation note (ballots): the shipped digest is
+      versioned (`ReviewCenter record v2`; nothing of an earlier version was released). It binds the source and
+      changes, the frozen checklist, the consolidated standing of the submitted ballots, the conclusion text, the
+      comments included in the report, and the reopen count. Drafts, justifications, answerers, and times are not
+      covered, and neither is whether a thread is open. A separate ballots fingerprint
+      (`ReviewCenter ballots v1`) identifies the submitted ballots in the attestation appendix; it is not signed.
     - **Approval condition**: the review is complete only when all signatures carry the current record digest. Any
       change clears all signatures.
 14. **Fingerprint algorithm ownership**: the fingerprint algorithm is duplicated in ReviewCenter and guarded by
@@ -278,7 +296,8 @@ It is a minimal helper and is kept as small and simple as possible; see
 
 ## Implementation Status
 
-The architecture above is the target design. Only the first slices are implemented so far:
+The architecture above is the target design; the slices below are implemented, and where a shipped behavior differs
+from the target design, an implementation note says so:
 
 - **Implemented, slice 1 (platform)**: Hosting (the ASP.NET Core server host and its logging), Web (the Blazor Server
   home page with a health endpoint), the command-line interface (`serve`, `--urls`, and the template options), and
@@ -306,7 +325,7 @@ The architecture above is the target design. Only the first slices are implement
   an optional baseline revision and a head revision of a registered repository and match a selection. The changed
   files (path, change kind, baseline and head content), both resolved commits, and the selection are frozen in the
   database, so nothing is read from the repository afterwards; a selection with no changed file is refused
-  (`NothingToReview`). The fingerprint covers the files at the head; the record digest is now version 2 and binds the
+  (`NothingToReview`). The fingerprint covers the files at the head; the record digest also binds the
   source, the selection, and every change; line comments are refused on deleted files. The project page has an upload
   or repository source choice, and the review page shows the change kind of each file and a Head or Baseline view of a
   modified file (no diff highlighting). The 7a-1 note that reviews do not use the repository registry no longer
@@ -316,7 +335,7 @@ The architecture above is the target design. Only the first slices are implement
   the single new OTS dependency YamlDotNet): a full review, the changes since a given revision, or the changes since the
   last signed review of the same review-set, with a fallback to a full review when that baseline is not an ancestor
   (a new `IsAncestorAsync` on the git session) or the selection changed. A review records its review-set id, and the
-  record digest is now version 3 and binds it. The plan page is slice 7b-2.
+  record digest also binds it. The plan page is slice 7b-2.
 - **Implemented, slice 7b-2 (plan page)**: the Web `PlanPage` at `/projects/{id}/plan` (linked from the project page when
   a repository is enabled) takes a repository, a head revision, and a baseline choice (none, a given revision, or the
   last signed review), shows one summary sentence, the sets that need a review first (ticked), the sets that cannot be
@@ -326,16 +345,17 @@ The architecture above is the target design. Only the first slices are implement
 - **Implemented, slice 7c (diff viewer and deep links)**: the Core `LineDiff` (Myers line diff, bounded by 10,000 lines
   per side and 2,000 changed lines) and `ReviewService.GetDiffAsync` give the review page a side-by-side Diff view for a
   changed file, with unchanged lines collapsed and a plain "too large" fallback. A thread is anchored to the Head or the
-  Baseline side (`ThreadSide`, stored with the thread, shown as "Before" or "After"), and the record digest is now
-  version 4 and binds the side. Links address one file, line (`?line=`, `&side=baseline`), or thread
+  Baseline side (`ThreadSide`, stored with the thread, shown as "Before" or "After"), and the record digest also binds
+  the side. Links address one file, line (`?line=`, `&side=baseline`), or thread
   (`/reviews/{id}/threads/{n}`), survive a sign-in (`ReturnUrl`, open-redirect safe), and the address follows the
   selection (`replaceUrl`). Development databases created before this slice must be recreated.
 - **Implemented, slice 8 (signed PDF attestation)**: the Evidence subsystem (`PdfDocumentWriter`,
   `AttestationRenderer`, `AttestationSigner`, `AttestationKeyProvider`, `AttestationService`, `AttestationEndpoint`)
-  makes a signed PDF of an Approved review at `/projects/{id}/reviews/{reviewId}/attestation.pdf`, signed with a
+  makes a signed PDF of a concluded review (Approved or Rejected; a Rejected one is marked REJECTED) at
+  `/projects/{id}/reviews/{reviewId}/attestation.pdf`, signed with a
   self-signed key (development and test) or a certificate from a certificate store, and records `attestation.generated`.
-  A later slice also attests a Rejected review (marked REJECTED), with the findings and included comments, the
-  conclusion and a ballots appendix; a comment that was not included is never printed.
+  The PDF carries the findings and included comments, the conclusion and a ballots appendix; a comment that was not
+  included is never printed.
   Azure Key Vault and an RFC 3161 time stamp authority are planned, not implemented.
 - **Implemented, slice 9a (personal access tokens and /api)**: any signed-in user creates, lists and revokes personal
   access tokens on the account page (a name, 30, 90 or 365 days, at most 20 active tokens, the value shown once, only its
@@ -373,10 +393,10 @@ The architecture above is the target design. Only the first slices are implement
   enforced inside the store's serializable audit transaction. A project audit trail page (`/projects/{id}/audit`)
   shows the events of that project only, and the review page marks an assignee who is no longer a member. Development
   databases created before this slice must be recreated (no migrations; the new `Users.MustChangePassword` column).
-- **Planned and deferred**: Messaging, the review lifecycle beyond
-  `Draft`, and the rest of Core and
-  Storage. They have no code, requirements,
-  design documents, or verification documents yet (the Api subsystem is implemented), so the
+- **Planned and deferred**: Messaging, database migrations, further database providers, and the rest of Core and
+  Storage that the target design describes. They have no code, requirements,
+  design documents, or verification documents yet (the Api subsystem and the review lifecycle, with ballots, signing,
+  and conclusion, are implemented), so the
   SysML2 model and the design documentation describe the implemented items only and are deliberately partial.
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64
   executables (see decision 21). The Core assembly is bundled into the single-file executable; the native SQLite

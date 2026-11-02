@@ -48,7 +48,7 @@ what the picture shows and a caption.
 **Signed attestation topic** (`HelpAttestationPage`, slug `signed-attestation`): The topic after Reviewers and signing
 that explains the signed PDF of a concluded review. It says when the download is offered (for a review that is concluded,
 approved or rejected; a rejected attestation is headed REJECTED and is not evidence that the content passed, and an
-anonymous request is never served a rejected one) and what the PDF lists
+anonymous request is never served a rejected one, nor does the evidence index ever list one) and what the PDF lists
 (including who answered each check and when, the findings and included comments in
 full, never a comment that was not included, the conclusion, and a ballots appendix with the final ballot of every
 slot and a fingerprint); what the
@@ -95,7 +95,8 @@ one on the Account page (the name, the expiry of 30, 90, or 365 days, that the v
 once,
 the list of tokens, and the limit of 20 active tokens); how to revoke one; how to use one (a `curl` example that sends
 it
-as a bearer token, the list of endpoints including the evidence index and the OpenAPI document, and the use with
+as a bearer token, the list of endpoints including the evidence index and the OpenAPI document (the attestation PDF is
+that of a concluded review, a rejected one only with a token), and the use with
 ReviewMark:
 the token as the password of HTTP Basic credentials in an `evidence-source` of the `.reviewmark.yaml` file); that a
 review created through the API is a
@@ -130,7 +131,15 @@ then sign, and the review concludes when every slot has signed the same, current
 review the + buttons and the
 comment forms are disabled while every file and diff can still be read, tells that a reviewer who holds a slot (and the
 review creator, a project admin or a system administrator) writes the review conclusion in the "Review conclusion"
-card, and links to Reviewers and signing.
+card, and links to Reviewers and signing. It also says that the card lists the Findings in the report, each with its
+resolution note, once the reader may see the other reviewers' ballots, and that with several reviewers the conclusion
+stays hidden until the reader hands in their own ballot (the lead, administrators and Auditors, a single-slot review
+and a concluded review are the exceptions); the outcome shows once the review is concluded.
+Checklist (`HelpChecklistPage`) names the same exceptions for the answers of the other reviewers, says that a Fail
+answer does not block signing but makes the agreed outcome Rejected, which needs a conclusion text, and that the
+Discuss button of a check starts a Question unless the reader chooses Finding.
+The audit trail topic (`HelpAuditPage`) says that, until the own ballot is handed in, the entries of other people's
+checklist answers and check discussions show a neutral sentence instead of the details.
 Managing
 project members (`HelpMembersPage`) has a "Review rules" section that says the Review rules card of the project page is
 also only for a project admin or a system administrator, switches on or off whether the person who created a review may
@@ -143,7 +152,7 @@ created at the first sign-in without any project, and that a project admin has t
 (`HelpSigningPage`) says that a person who signs in with a provider has no password here, presses "Confirm identity" on
 the slot, signs in again at the provider, and returns to press "Sign", and that the confirmation is good for one
 signature and a few minutes; and the API tokens topic, above. The summary of the Reviewers and signing topic in
-`HelpTopics` reads "Reviewer slots, signing with your password or identity provider, and approval."
+`HelpTopics` reads "Reviewer slots, signing with your password or identity provider, and approval or rejection."
 
 **Two-factor topic** (`HelpTwoFactorPage`, slug `two-factor`, title "Two-factor sign-in"): The topic after Automation and
 API tokens and before Evidence settings. It explains, in static text, what the second factor is (a code from an

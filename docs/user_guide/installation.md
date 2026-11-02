@@ -92,6 +92,7 @@ The server provides these routes:
 - `/users/new` - the form that creates a user (system administrators only).
 - `/audit` - the audit trail (system administrators only).
 - `/projects` - the list of the projects you can see.
+- `/inbox` - your inbox: the reviews that wait for you, in sections; see Your Inbox in the Reviewing chapter.
 - `/projects/new` - the form that creates a project (system administrators only).
 - `/projects/{id}` - one project, with its reviews (and, for project and system administrators, its members).
 - `/projects/{id}/members/new` - the form that adds an existing user to the project by the exact user name (project
@@ -129,13 +130,14 @@ Evidence Settings in the Administration chapter.
 Every page has the same header and footer.
 
 - The header shows the **ReviewCenter** brand, which is a link to the home page. When you are signed in, it is
-  followed by **Projects** and, for system administrators, **Audit** and **Users**. On the right it shows
+  followed by **Projects**, **Inbox** (with a badge that counts the reviews that need your action), and, for system
+  administrators, **Audit** and **Users**. On the right it shows
   **Help**, and then either a **Sign in** link (nobody is signed in) or your display name, an **Account** link, and a
   **Logout** button.
 - The footer shows the version of ReviewCenter, the copyright, and a link to the **About** page, which has the full
   version and a link to the project.
 - The home page shows the title and the tagline. When you are signed in it also shows a **Get started** card with links
-  to **Projects** and, for system administrators, **Audit** and **Users**, each with a one-line
+  to **Inbox**, **Projects** and, for system administrators, **Audit** and **Users**, each with a one-line
   description.
 
 ### Built-in Help
@@ -144,20 +146,27 @@ The **Help** link of the header opens `/help`, an index of short guides, open to
 Each topic is a page of its own with links to the previous and the next topic:
 
 - **Getting started** (`/help/getting-started`): sign in, find your project, and open a review.
+- **Your inbox** (`/help/inbox`): the reviews that wait for you, in sections.
 - **Creating a review** (`/help/creating-a-review`): choose the files from a git repository or by uploading them.
 - **Reading a review** (`/help/reading-a-review`): the Diff, Head, and Baseline views and the change kinds.
 - **Comments and threads** (`/help/comments-and-threads`): comment on a line or a file, reply, resolve, and share a
   link.
 - **Checklist** (`/help/checklist`): answer each check Pass, Fail, or N/A.
 - **Reviewers and signing** (`/help/reviewers-and-signing`): reviewer slots, signing with your password or at your
-  identity provider, and approval.
+  identity provider, and approval or rejection.
 - **Signed attestation** (`/help/signed-attestation`): download a digitally signed PDF of a concluded review.
 - **Audit trail** (`/help/audit-trail`): every action is recorded in a tamper-evident chain.
 - **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
+- **Managing project members** (`/help/project-members`): add people to a project, create an account, change a role,
+  or remove a member.
 - **Automation and API tokens** (`/help/api-tokens`): use a personal access token to read reviews and create drafts
   from a script, or to feed ReviewMark with the evidence index.
+- **Two-factor sign-in** (`/help/two-factor`): turn on an authenticator app, sign in with a code, and use recovery
+  codes.
 - **Evidence settings** (`/help/evidence-settings`): open the evidence index and the PDFs to anonymous readers and
   choose what the PDFs contain.
+- **Checklist template** (`/help/checklist-template`): export, import, replace, or reset the checklist that new
+  reviews of a project start with.
 
 The topics are summaries; this guide has the details. An address below `/help` that is not a topic shows a short
 message that the topic does not exist, with a link back to the index.

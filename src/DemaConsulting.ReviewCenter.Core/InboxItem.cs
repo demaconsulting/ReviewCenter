@@ -64,8 +64,8 @@ public enum InboxSection
     WaitingForOthers,
 
     /// <summary>
-    ///     A review of the user was approved or reopened by someone else since the user last looked; this section
-    ///     is for information and is not counted as work.
+    ///     A review of the user was concluded (approved or rejected) or reopened by someone else since the user last
+    ///     looked; this section is for information and is not counted as work.
     /// </summary>
     Updates
 }

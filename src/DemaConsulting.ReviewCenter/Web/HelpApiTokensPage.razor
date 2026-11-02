@@ -42,8 +42,9 @@
                 <em>What a token sees</em> below).</li>
             <li><code>POST /api/projects/{id}/reviews</code>: create a review from uploaded files (Base64) or from a
                 registered git repository.</li>
-            <li><code>GET /api/projects/{id}/reviews/{reviewId}/attestation.pdf</code>: the signed attestation PDF of an
-                approved review.</li>
+            <li><code>GET /api/projects/{id}/reviews/{reviewId}/attestation.pdf</code>: the signed attestation PDF of a
+                concluded review (a rejected one only with a token; without any token, where a project allows it,
+                approved reviews only).</li>
             <li><code>GET /api/projects/{id}/evidence/index.json</code>: the evidence index of a project, for
                 ReviewMark (see below).</li>
             <li><code>GET /api/openapi.json</code>: the OpenAPI document that describes all of this. It is open to

@@ -125,6 +125,37 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("A concluded (approved or rejected) review is locked", text, StringComparison.Ordinal);
         Assert.Contains("If you hold a slot of the review", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Review conclusion</strong> card", text, StringComparison.Ordinal);
+
+        // Assert: the conclusion stays hidden until the own ballot is handed in, with the exceptions, and the card lists the findings
+        Assert.Contains("the conclusion stays hidden until you hand in your own ballot.", text, StringComparison.Ordinal);
+        Assert.Contains("The lead", text, StringComparison.Ordinal);
+        Assert.Contains("Auditors always see it", text, StringComparison.Ordinal);
+        Assert.Contains("Findings in the report, each with its resolution note", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("once the review is concluded. See", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the checklist topic names who sees the other ballots at once, says that a Fail does not block
+    ///     signing but makes the agreed outcome Rejected with a conclusion, and explains the Discuss button.
+    /// </summary>
+    [Fact]
+    public void HelpPage_Checklist_ExplainsExceptionsAndFailOutcome()
+    {
+        // Act: render the topic page
+        var page = Render<HelpChecklistPage>();
+
+        // Assert: the exceptions to the hidden answers of the other reviewers
+        var text = page.Markup;
+        Assert.Contains("only after you hand in your own ballot", text, StringComparison.Ordinal);
+        Assert.Contains("Auditors see the others at once", text, StringComparison.Ordinal);
+        Assert.Contains("single reviewer slot or in a concluded review", text, StringComparison.Ordinal);
+
+        // Assert: a Fail does not block signing, a rejection needs a conclusion, and Discuss starts a Question by default
+        Assert.Contains("A Fail answer does not block signing.", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Rejected</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Discuss</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("The discussion is a <strong>Question</strong>", text, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
     }
 
     /// <summary>

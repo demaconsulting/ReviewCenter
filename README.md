@@ -23,49 +23,37 @@ See the [User Guide][link-guide] for a tour of the screens.
 
 ReviewCenter is a DEMA Consulting ASP.NET Core web service, with a companion command-line interface, for performing
 formal code reviews of file sets against earlier revisions. Reviewers discuss the files in threaded comments, answer
-a project checklist, and sign the review with their credentials. Every action is recorded in a hash-chained audit trail.
+a project checklist in their own ballot, and sign the review with their credentials. Every action is recorded in a
+hash-chained audit trail.
 
 ## Features
 
 - 🔍 **File-Set Reviews** - Review uploaded files or git revision changes
 - 🌿 **Git Sources** - Plan reviews from repository review-sets
-- 📅 **Due Dates** - Optional UTC due date per review, with an Overdue badge
-- 📊 **Progress Overview** - Project page shows each review's stage, signatures, blockers, and who it waits on, with
-  filters and sorting
-- 🔁 **Follow-up Reviews** - A review after a failed one carries over the agreed passed answers and open threads (web and
-  API)
-- 💬 **Questions and Findings** - Discuss files, line ranges, or a check of the checklist; a Question is conversation, a
-  Finding goes into the signed report with its resolution note; an open one blocks signing
-- 🧭 **Where Are We?** - A panel at the top of every review shows each reviewer's ballot and signature, the disputed
-  checks with a Discuss button, the open Questions and Findings, and one next step; it explains what changed since a
-  reviewer signed, and keeps the disputes hidden until you hand in your own ballot
-- 📥 **Inbox** - What waits for you: ballots to answer, disputes, signatures to give, replies, failed checks, and
-  unread comments
-- ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own
-  template), answered per reviewer slot in its own ballot and consolidated into the agreed standing
-- 👥 **Reviewer Slots** - Primary and alternate reviewers share a ballot and sign each slot, early once the ballot is in
-- 🙈 **Independent Ballots** - Other reviewers' answers stay hidden until you hand in your own; then compare side by
-  side, discuss, and submit and sign in one step
-- ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to the agreed record; a change makes it out of
-  date
-- 🔒 **Conclusion Lock** - Concluded (approved or rejected) reviews lock, admins reopen with a reason, authors cannot
-  self-review
-- 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history, filterable by project, actor,
-  action, review, and date, with CSV and JSON export that reports the chain status
-- 📄 **Signed PDF Attestation** - Concluded reviews download as verifiable PDFs with findings and included comments,
-  conclusion, and a ballots
-  appendix; a rejection is marked as such
-- ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access
-- 🛡️ **Access Control** - Project roles (including a read-only Auditor), local accounts, and sign-in lockout
+- 📅 **Due Dates** - Optional due dates with Overdue badge
+- 📊 **Progress Overview** - Stage, signatures, blockers, and who waits
+- 🔁 **Follow-up Reviews** - Carry agreed answers into follow-ups
+- 💬 **Questions and Findings** - Discuss files, lines, or checks
+- 🧭 **Where Are We?** - Shows ballots, disputes, and next step
+- 📥 **Inbox** - What waits for you, by section
+- ✅ **Review Checklist** - Per-reviewer ballots consolidated into agreed answers
+- 👥 **Reviewer Slots** - Primary and alternate reviewers per slot
+- 🙈 **Independent Ballots** - Answers stay hidden until you submit
+- ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off on agreed record
+- 🔒 **Conclusion Lock** - Concluded reviews lock; admins can reopen
+- 🔗 **Tamper-Evident Audit Trail** - Hash-chained history with filtered CSV/JSON export
+- 📄 **Signed PDF Attestation** - Verifiable PDFs for approved or rejected reviews
+- ⚙️ **Evidence Settings** - Control PDF contents and anonymous access
+- 🛡️ **Access Control** - Project roles, including read-only Auditor
 - 🪪 **OpenID Connect Sign-in** - Single sign-on with any provider
-- 🔐 **Two-Factor Sign-in** - Optional authenticator-app codes for local accounts
-- 🔑 **API Tokens** - Personal tokens for REST API and ReviewMark
-- 🌗 **Light and Dark Theme** - Follows system setting or account choice
-- 🤖 **Puppet UI Automation** - Lets AI agents drive and screenshot the UI
-- 📦 **Self-Contained Executable** - Single Windows and Linux executable, no runtime
-- 🗄️ **SQLite Storage** - Everything in one auto-created database file
-- 🔄 **Key Rotation** - `reviewcenter keys reprotect` moves stored secrets to a new Data Protection key
-- 🧪 **Self-Validation** - Built-in tests with TRX and JUnit output
+- 🔐 **Two-Factor Sign-in** - Optional authenticator codes for local accounts
+- 🔑 **API Tokens** - Personal tokens for API and ReviewMark
+- 🌗 **Light and Dark Theme** - Follows system or account setting
+- 🤖 **Puppet UI Automation** - Lets AI agents drive the UI
+- 📦 **Self-Contained Executable** - Single Windows and Linux executable
+- 🗄️ **SQLite Storage** - Everything in one auto-created file
+- 🔄 **Key Rotation** - Move stored secrets to new key
+- 🧪 **Self-Validation** - Built-in tests with TRX or JUnit output
 
 ## Installation
 
@@ -113,7 +101,7 @@ The [User Guide][link-guide] describes everything in detail, including:
 - [Access and Visibility][link-guide-access]: roles, project membership, and who can see and do what
 - [Projects and Reviews][link-guide-projects]: uploads, reviews from a git repository, and review-sets
 - [Planning Reviews][link-guide-planning]: create the reviews of all review-sets of a repository in one go
-- [Review Signatures][link-guide-signatures]: reviewer slots, signing, and approval
+- [Review Signatures][link-guide-signatures]: reviewer slots, ballots, signing, and the outcome
 - [Signed Attestation][link-guide-attestation]: the PDF, its signing key, and what the signature proves
 - [Review Practices][link-guide-practices]: suggested good practices for running a review
 - [Evidence Settings][link-guide-evidence-settings]: anonymous access to the evidence and what the PDFs contain
