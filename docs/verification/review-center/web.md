@@ -36,7 +36,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - A review with a reviewer slot that was signed through the Core service is presented as Approved by the review page
   and the project page, with the signer and the record digest on the review page; when the record changes
   afterwards (an administrator reopens the review), both pages present it as In review and the review page shows the
-  signature as out of date.
+  signature as no longer fitting.
 - An approved or rejected review is presented as locked by the review page (badge, banner, disabled controls) and the
   checklist
   page; an administrator can reopen it from the review page, which then lists the reopen history. The project page
@@ -186,7 +186,7 @@ page shows the badge "In review" and the sign form of the slot. The user signs t
 digest read from the service; the review page then shows "Approved", the Locked badge, the status "Signed by Ann on
 ..." and the full record digest in the title of the Details element, and the project page shows "Approved" for the
 review. An administrator then reopens the review, which changes the record; both pages show "In review" again and
-the review page shows "Signature out of date". This scenario is tested by
+the review page shows "Signed, then the review changed". This scenario is tested by
 `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`.
 
 **WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen**: Through the real pipeline on a temporary database, a

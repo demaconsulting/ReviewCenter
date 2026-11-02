@@ -20,7 +20,7 @@ N/A - standard test environment.
 
 - All tests pass with zero failures.
 - A primary or an alternate reviewer of a slot without a current signature finds the review under To sign, with the
-  chip "Not signed" or "Out of date, sign again", and a signed slot gives no row.
+  chip "Not signed" or "The review changed, sign again", and a signed slot gives no row.
 - A thread in which the user wrote, or of the user's own review, whose latest comment is by someone else (the system
   counts) is a reply waiting; a thread whose latest comment is the user's own, and a resolved thread, are not.
 - The author finds the failed checks of the review (the checks that the submitted ballots agree are Fail) with the
@@ -59,7 +59,7 @@ finds the review under To sign with the chip "Not signed", and the row is unread
 review under To sign. This scenario is tested by `InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem`.
 
 **InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip**: After a signature the record changes (a new
-answer); the signature no longer covers the record and the reviewer finds the chip "Out of date, sign again". This
+answer); the signature no longer covers the record and the reviewer finds the chip "The review changed, sign again". This
 scenario is tested by `InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip`.
 
 **InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem**: A slot with a current signature gives its reviewer no To

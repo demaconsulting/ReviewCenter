@@ -68,7 +68,7 @@ in **UTC**, not a moment in your time zone: the day changes at midnight UTC, and
 - **Concluded reviews**: an approved or rejected review is locked, so its date cannot be changed (the form is not
   shown) until an
   administrator reopens it. It keeps its date as history and is never shown as overdue.
-- The date is not part of the signed record: changing it does not make a signature out of date. Every change is
+- The date is not part of the signed record: changing it does not make anyone sign again. Every change is
   recorded in the audit trail as `review.due-date-changed` with the old and the new date, and the creation entry names
   the date when one was given.
 
@@ -263,7 +263,7 @@ author of the review. Someone who only wrote a comment in another person's revie
 
 | Group | What it lists | Chip |
 | ----- | ------------- | ---- |
-| To sign | A slot of yours that is unsigned or out of date | "Not signed", "Out of date, sign again" |
+| To sign | A slot of yours that is unsigned, or must be signed again | "Not signed", "The review changed, sign again" |
 | Replies waiting | An open thread whose latest comment is by someone else | "N waiting" |
 | Failed checks | Checks of your own review that the submitted ballots agree to be Fail | "N failed" |
 | Updates | A review someone else concluded or reopened since you last looked | "Approved", "Rejected", "Reopened" |
@@ -290,6 +290,31 @@ nothing in a review.
 
 The read state is kept for each user and review, so it is yours alone. It is not part of the signed record of a review
 and not an entry of the audit trail, so looking at a review never changes whether a signature is current.
+
+## Where Are We?
+
+The top of every review page is the **Where are we?** panel, so that nobody has to read every card to know the standing.
+It shows:
+
+- **Reviewers.** One row for each reviewer slot: the person, the state of the ballot (**Not started**, **Draft**, or
+  **Handed in**), and the state of the signature (**Signed**, **Not signed**, or **Signed, then the review changed**).
+  A review with one slot shows the same table with one row.
+- **Disputed checks.** The checks that the handed-in ballots answered differently, each with a **Discuss** button that
+  starts the discussion of that check (see [Discussions About a Check](#discussions-about-a-check)). They are shown
+  only after you have handed in your own ballot; until then the panel says that this stays hidden until you submit your
+  ballot, and it shows no count, no outcome, and no answers of others (see
+  [Review Checklist](#review-checklist)).
+- **Open threads.** How many Questions and how many Findings are still open, each with its icon and its word.
+- **One next step.** A single button that takes you where you are needed, for example to the checklist to hand in your
+  ballot, to a disputed check, to an open thread, or to the signing form. A person who has nothing to do sees what the
+  review waits for instead.
+- **What changed since {name} signed.** For a signature that no longer fits the review, a list that opens under the
+  reviewer. It lists the changes after the signature that can alter the signed report, such as a ballot handed in
+  again, a conclusion edited, a Finding added, or a Finding resolved with its note, with who did it and when. It
+  explains; it does not prove. Whether a signature still fits is decided by comparing the record itself, so a change in
+  the list may have left the record as it was, and a reply that was not put in the report is not listed. A reviewer who
+  has not handed in a ballot still sees each change with its time and who made it, but the details of hidden answers,
+  comments and discussions about checks are replaced by one neutral sentence until the ballot is handed in.
 
 ## Review Comments
 
@@ -347,10 +372,11 @@ problem is shown as a message next to the form (or inside the thread for a reply
 
 When a review already has a current signature but is not yet concluded, the comments you post here are **chat** unless
 they are part of the report: a new Question, a reply that is not added to the report, a resolve, and a reopen of a
-Question do not change what the signatures cover, so they never make a signature out of date and the page asks for no
+Question do not change what the signatures cover, so they never make anyone sign again and the page asks for no
 confirmation. A Finding, a reply added to the report, a promotion or demotion, and the resolution of a Finding with its
-note are part of the signed record: the page then names the signatures that go out of date (demoting a Finding after
-signatures names its signers too) and goes on only when you press **Confirm change**. The open threads of both kinds
+note are part of the signed record: the page then names the signers who would have to sign again (demoting a Finding
+after signatures names its signers too) and goes on only when you press **Confirm change**. The open threads of both
+kinds
 still block signing and the approval (see [Review Signatures](#review-signatures)).
 
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
@@ -494,7 +520,7 @@ of a review never change, so the usual way on after a rejection is a new review 
 Fails in the
 Review Practices chapter). Any later change to the agreed standing of the submitted ballots, such as a disagreement on a
 check, makes the
-signatures given so far out of date, so answer first and sign last (see Sign Last in the same chapter). When handing in
+signatures given so far no longer fit, so answer first and sign last (see Sign Last in the same chapter). When handing in
 a ballot, or an answer in a review with one slot, would do that, the page first shows a warning next to the check or the
 section that names every affected slot and signer. **Confirm change** stores the change; **Cancel** stores nothing, and
 the unsaved choice, justification, and reason stay as you typed them (a section you switched on goes back to not
@@ -541,7 +567,7 @@ block signing, but a rejection must state its reasons:
 
 When every slot has signed the rejection for the current record, the review is concluded as **Rejected**: the review
 page and the project page show a **Rejected** badge, and the review is locked. If the conclusion text is changed after
-signatures exist, the signatures are out of date and are signed again. An administrator can reopen a Rejected review
+signatures exist, the signers must sign again. An administrator can reopen a Rejected review
 like an Approved one. The signed attestation PDF and the evidence index are for Approved reviews only; see
 [Signed Attestation](#signed-attestation). The API field `isApproved` is true for approved reviews only, so a rejected
 review is concluded but not approved (see the Automation chapter).
@@ -604,7 +630,8 @@ mind, and answer again a check that the fix may affect, because the changes of t
 ## Review Signatures
 
 A review is concluded when every reviewer slot has handed in its ballot, the ballots agree, every slot has signed the
-current record, and no comment thread is open (the exact rule is in *Out of date and Approved* below). It is concluded
+current record, and no comment thread is open (the exact rule is in *Signed again, Approved, and Rejected* below). It
+is concluded
 as **Approved** when the ballots agree on an approved outcome and every slot signed approval, and as **Rejected** when
 the ballots agree on at least one Fail and every slot signed rejection. The review page shows an
 **Approved**, **Rejected**, or **In review** badge
@@ -619,7 +646,7 @@ system administrator) can add a slot (open **Add a slot**,
 choose the reviewers and press **Add slot**) and change or remove a slot that is not signed (open **Change
 reviewers**, then **Save** or **Remove**). A user can be in only one slot of
 a review, and the primary and the alternate must be different users. A slot that has been signed can no longer be
-changed or removed, even if its signature is out of date; to change the reviewers, add a new slot. A reviewer who is
+changed or removed, even when the review changed after it; to change the reviewers, add a new slot. A reviewer who is
 taken out of a slot that holds a ballot takes the own answers back, and that can change what the signatures of the other
 slots cover; the page then names the affected slots and signers in a warning and asks you to confirm, like for a
 changed answer. The slots of a
@@ -681,7 +708,7 @@ otherwise. A review can be signed only when:
 - it has a checklist, and every check of an applicable section is answered;
 - your own ballot is submitted (in a review with one slot the answer that completes it does that, or **Submit ballot**
   for a complete draft that no answer produced; the other reviewers may still be
-  at work, which allows early signing, and a later disagreement then makes your signature out of date);
+  at work, which allows early signing, and a later disagreement then means your signature no longer fits);
 - no check of an applicable section is disputed between the submitted ballots;
 - no thread is open; and
 - for a Rejected outcome, the review has a written conclusion text (see
@@ -711,26 +738,27 @@ and head content, so a signature cannot look current for a different selection o
 value is its tooltip) identifies that record. If another reviewer submits the same answer for a check that the
 submitted ballots already agree on, the record does not change and the signatures stay current. In general, a change
 to the agreed standing, such as a first disagreement, or a change to the report, makes the
-signatures given so far out of date. Chat, and whether a thread is open or resolved, are not part of the record, so
+signatures given so far no longer fit. Chat, and whether a thread is open or resolved, are not part of the record, so
 they never do; an open thread blocks signing instead. If the record
 changes while you are signing, the signature is refused and you are asked to review it and try again.
 
-**Out of date, Approved, and Rejected.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the
+**Signed again, Approved, and Rejected.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the
 current
-record, "Signature out of date" when it has signatures but the record has changed since (for example a changed
+record, "Signed, then the review changed" when it has signatures but the record has changed since (for example a
+changed
 answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot, every slot has submitted
 its ballot, the ballots agree on every check with no Fail, every slot is
 signed as approved for the current record, and no thread is open. It is **Rejected** when the ballots agree on at least
 one Fail, every slot is signed as rejected for the current record, no thread is open, and the review has a conclusion
 text. The outcome is part of the record: when a change of the answers turns an approval into a rejection (or the
-other way), the signatures given so far are out of date and are signed again. A review whose slots are all signed but
+other way), the signers must sign again. A review whose slots are all signed but
 that has an open thread
 is neither approved nor rejected and not locked; the thread must be resolved first. While some slots are still
 unsigned, a change to the
 record makes the signatures given
-so far out of date, and the reviewers sign the new record again; the earlier signatures stay as history. Before the
+so far no longer fit, and the reviewers sign the new record again; the earlier signatures stay as history. Before the
 page stores such a change it names the affected slots and signers in a warning and asks you to confirm it; see
-*What Makes a Signature Out of Date* in the Review Practices chapter. Once the
+*When Reviewers Must Sign Again* in the Review Practices chapter. Once the
 review is Approved or Rejected it is locked and cannot change any more, unless an administrator reopens it (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)); it then goes back to In review.
 
@@ -780,7 +808,7 @@ links, the signed attestation PDF of an Approved review, and the evidence index.
 are not part of a review and are not locked.
 
 A review in which only some of the slots are signed is **not** locked: it can still change, and a change makes the
-signatures that were given out of date (see [Review Signatures](#review-signatures)). The lock begins with the last
+signatures that were given no longer fit (see [Review Signatures](#review-signatures)). The lock begins with the last
 signature.
 
 **Reopening.** The only way out of the lock is an explicit, recorded action, and it works the same for an Approved and a
@@ -797,9 +825,10 @@ reopened cannot sign again above).
 **What a reopen does.**
 
 - The review is In review again and can change: threads, checklist, reviewers, and the conclusion text work as before.
-- The signatures that were given stay in the record as history, but they are **out of date** for good. A reopen
+- The signatures that were given stay in the record as history, but they no longer count, for good. A reopen
   changes the record digest (the number of reopens is part of it), so no earlier signature can become current again,
-  not even when the content is changed back to what it was. The slots show "Signature out of date". The reviewers
+  not even when the content is changed back to what it was. The slots show "Signed, then the review changed". The
+  reviewers
   have to review the review again and sign again; the people of the slots stay, and the checklist and the threads must
   be complete as for any signature.
 - The reopen is kept with the review as history, listed on the review page in a **Reopen history** card (who, when in
@@ -832,12 +861,12 @@ project does not exist.
 - **Columns.** *Review* (the identifier, the title, and the creation date; the identifier links to the review, and a
   follow-up names the review it follows), *Stage*, *Signatures*, *Blockers*, *Waiting on*, *Last activity*, and *Due*.
 - **Stage.** **Setup** is a review without a reviewer slot. **In review** has slots that are not all signed, or a
-  signature that went out of date. **Approved** has every slot signed as approved on the current record and nothing
+  signature that no longer fits the review. **Approved** has every slot signed as approved on the current record and nothing
   that blocks it (every slot has also handed in its ballot). **Rejected** has every slot signed as rejected on the
   current record, no open thread, and a written conclusion; it carries a **Rejected** badge. A review that an
   administrator reopened also shows a **Reopened** badge. The stage is worked out from the signatures, not stored.
-- **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature became out of date
-  (the record changed after it was given), `1 out of date`. A review without slots shows a dash.
+- **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature no longer fits because
+  the record changed after it was given, `1 signed, then the review changed`. A review without slots shows a dash.
 - **Blockers.** What prevents the review from being concluded: a missing checklist ("No checklist"), the open comment
   threads, the unanswered checklist checks, the checks that the submitted ballots disagree on (disputed, such as
   `1 disputed`), and "conclusion needed" when the ballots agree on a Fail and the review has no conclusion text yet.
@@ -847,7 +876,8 @@ project does not exist.
   in a review with several slots sees no count of disputed checks and no failed-check or outcome text there, only that
   the standing stays hidden until the own ballot is handed in.
 - **Waiting on.** The people who still have to sign: the primary reviewer, and a different alternate, of each slot that
-  is not signed or is out of date. A disabled account is shown with "(disabled)". A concluded review waits on nobody.
+  is not signed or signed before the review changed. A disabled account is shown with "(disabled)". A concluded review
+  waits on nobody.
 - **Last activity.** The time (UTC) of the newest entry of the audit trail of the review, or its creation time.
 - **Due.** The due date, with the **Overdue** badge when it is before today in UTC and the review is not concluded (see
   [Due Dates](#due-dates)).

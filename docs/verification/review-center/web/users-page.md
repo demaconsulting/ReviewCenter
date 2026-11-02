@@ -161,7 +161,7 @@ and System administrators lists exactly the matching users, and All lists everyb
 project is disabled through the row; the first click only opens the panel, which lists the review and the project as
 links to `/projects/{projectId}/reviews/{reviewId}` and `/projects/{projectId}`, and the user stays enabled; the button
 "Disable anyway" then disables the user and closes the panel. Each open slot is listed with its state in words, "Not
-signed" or "Out of date", never as an enumeration name. This is tested by
+signed" or "Signed, then the review changed", never as an enumeration name. This is tested by
 `UsersPage_Disable_UserWithImpact_ShowsLinksAndChangesNothingUntilConfirmed`. For a user with nothing waiting the panel
 says so and still needs the second click, which is tested by
 `UsersPage_Disable_UserWithoutImpact_SaysNothingIsWaitingAndStillNeedsTheClick`. The button "Cancel" closes the panel

@@ -174,7 +174,8 @@ account is created, or a role is changed; each change is recorded as `project.me
 or `project.member-role-changed` with the role name. An Auditor is a read-only member (see the table in
 [Access and Visibility](#access-and-visibility)), is not offered as a reviewer, and cannot sign. A member who still
 owes work cannot be made an Auditor: while the member is the primary or alternate reviewer of a slot that is not signed
-or whose signature is out of date, on a review that is not concluded, the change is refused and the message lists the
+or whose signature no longer fits the changed review, on a review that is not concluded, the change is refused and the
+message lists the
 reviews. To resolve it, reassign or remove the slot (a member who can work in the project, on the review page), or
 let the member
 sign, and then change the role again. A new account never has such a slot (a removed member who comes back as an
@@ -237,7 +238,7 @@ Follow these steps in order.
    list (or press **Cancel**), and work through the next two steps first.
 3. **Reassign the open slots.** On each review in the list, replace the person as primary or alternate reviewer of
    the slot. This works for a slot that is **Not signed** on a review that is not locked (a project member can edit
-   it). A slot that has been signed, even when its signature is **Out of date**, can no longer be changed or
+   it). A slot that has been signed, even when it says **Signed, then the review changed**, can no longer be changed or
    removed; add a new slot with the new reviewers instead (see Reviewer slots in the Reviewing chapter). A reviewer
    slot keeps its reviewer when the person is removed from the project, and a disabled person cannot sign, so a slot
    that is not reassigned stays open.
@@ -483,7 +484,7 @@ Locked Reviews and Reopening in the Reviewing chapter). A project administrator 
 Open the review; in the locked notice, enter a **Reason for reopening** (required, 1 to 250 characters) and press
 **Reopen review**. Ordinary members do not see the form, and a personal access token cannot reopen a review.
 
-- The review is In review again, and its signatures stay as history but are out of date; they cannot become current
+- The review is In review again, and its signatures stay as history but no longer fit the review; they cannot become current
   again, so the reviewers must sign again. The ballots stay as they were handed in, so the reviewers need not answer
   again; a change of an answer makes the ballot of its slot a draft until it is handed in again.
 - The audit trail records `review.reopened` with the administrator as the actor and the detail
@@ -501,7 +502,7 @@ seen. Nothing needs to be set up, and no setting turns it off.
 
 - The read state (when a user last saw a review, and the highest comment seen) is stored for each user and review. It
   is not an entry of the audit trail and it is not part of the record that a signature binds to, so reading a review
-  never makes a signature out of date and never adds an audit entry.
+  never makes the signers sign again and never adds an audit entry.
 - Administrators cannot read the inbox of another user, and a system administrator who is no member of a project sees
   in the inbox only the reviews in which that person is named as a reviewer or the author.
 - Deleting a user or a review deletes the read state that belongs to it.

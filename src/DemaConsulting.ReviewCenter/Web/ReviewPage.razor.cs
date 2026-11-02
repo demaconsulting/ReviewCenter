@@ -225,6 +225,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private SigningService SigningService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that works out the "Where are we?" status, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private ReviewStatusService StatusService { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the service that reads and changes users, used to tell whether the signed-in user signs in
     ///     with an identity provider, supplied by dependency injection.
     /// </summary>
@@ -798,6 +804,31 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private Dictionary<int, string> ReplyErrors { get; } = [];
 
     /// <summary>
+    ///     Gets or sets the "Where are we?" status of the review for the viewer, or <c>null</c> when it is not loaded.
+    /// </summary>
+    private ReviewStatus? StatusView { get; set; }
+
+    /// <summary>
+    ///     Gets the checks whose Discuss form is open in the status panel.
+    /// </summary>
+    private HashSet<string> DiscussOpen { get; } = [];
+
+    /// <summary>
+    ///     Gets the text typed into the Discuss form of each check, by check identifier.
+    /// </summary>
+    private Dictionary<string, string> DiscussTexts { get; } = [];
+
+    /// <summary>
+    ///     Gets the choice to put the discussion of each check in the report, by check identifier.
+    /// </summary>
+    private Dictionary<string, bool> DiscussReports { get; } = [];
+
+    /// <summary>
+    ///     Gets the message of the last refused discussion of each check, by check identifier.
+    /// </summary>
+    private Dictionary<string, string> DiscussErrors { get; } = [];
+
+    /// <summary>
     ///     Gets the change that waits for the person to confirm that it makes signatures out of date, or
     ///     <c>null</c>; only one such change waits at a time.
     /// </summary>
@@ -970,6 +1001,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
         ReplyTexts.Clear();
         ReplyReports.Clear();
         ReplyErrors.Clear();
+        StatusView = null;
+        DiscussOpen.Clear();
+        DiscussTexts.Clear();
+        DiscussReports.Clear();
+        DiscussErrors.Clear();
         Warning = null;
         IndexFilter = ReviewThreadState.Open;
         IndexKind = null;
@@ -1169,6 +1205,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
                 : await ThreadService.GetCapabilitiesAsync(actor, ProjectId, ReviewId);
             Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: actor?.Username);
             Approval = await SigningService.GetApprovalAsync(actor, ProjectId, ReviewId);
+            StatusView = Approval is null
+                ? null
+                : await StatusService.GetStatusAsync(actor, ProjectId, ReviewId, Approval, Threads, Capabilities);
             if (IsLocked)
             {
                 // A locked review accepts no change, so nothing is left to confirm
@@ -2183,6 +2222,145 @@ public partial class ReviewPage : ComponentBase, IDisposable
     }
 
     /// <summary>
+    ///     Opens or closes the Discuss form of a disputed check in the status panel.
+    /// </summary>
+    /// <param name="itemId">The check identifier.</param>
+    private void ToggleDiscuss(string itemId)
+    {
+        DiscussErrors.Remove(itemId);
+        if (!DiscussOpen.Remove(itemId))
+        {
+            DiscussOpen.Add(itemId);
+        }
+    }
+
+    /// <summary>
+    ///     Starts a discussion about a check with the typed text, or asks for confirmation when that would make
+    ///     signatures out of date.
+    /// </summary>
+    /// <param name="itemId">The check identifier.</param>
+    /// <param name="confirmed">The signatures the person has confirmed to make out of date; <c>null</c> for none.</param>
+    /// <param name="confirmedText">The text as it was at the first attempt; <c>null</c> to take the text typed now.</param>
+    /// <param name="confirmedReport">The kind choice as it was at the first attempt; <c>null</c> to take it as chosen now.</param>
+    /// <returns>A task that completes when the discussion is stored or the warning or problem is shown.</returns>
+    private async Task StartDiscussionAsync(
+        string itemId,
+        IReadOnlyList<AffectedSignature>? confirmed = null,
+        string? confirmedText = null,
+        bool? confirmedReport = null)
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        var text = confirmedText ?? DiscussTexts.GetValueOrDefault(itemId) ?? string.Empty;
+        var report = confirmedReport ?? DiscussReports.GetValueOrDefault(itemId);
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            await ThreadService.StartThreadAsync(
+                ProjectId,
+                ReviewId,
+                ThreadAnchor.ForCheck(itemId),
+                actor,
+                text,
+                acknowledgedSlotIds: SlotIds(confirmed),
+                includeInReport: report);
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.SignaturesWouldBecomeOutOfDate)
+        {
+            DiscussErrors.Remove(itemId);
+            Warning = PendingSignatureWarning.Create(
+                DiscussWarningKey(itemId), confirmed, ex, slots => StartDiscussionAsync(itemId, slots, text, report));
+            return;
+        }
+        catch (DomainRuleException ex)
+        {
+            Warning = null;
+            DiscussErrors[itemId] = ex.Message;
+            return;
+        }
+
+        Warning = null;
+        DiscussErrors.Remove(itemId);
+        DiscussTexts.Remove(itemId);
+        DiscussReports.Remove(itemId);
+        DiscussOpen.Remove(itemId);
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Gets the key of the confirmation for starting a discussion about a check.
+    /// </summary>
+    /// <param name="itemId">The check identifier.</param>
+    /// <returns>The key.</returns>
+    private static string DiscussWarningKey(string itemId)
+    {
+        return $"discuss-{itemId}";
+    }
+
+    /// <summary>
+    ///     Gets the Discuss form that the status panel shows under a disputed check: the composer while the form is
+    ///     open, with the message of a refused discussion and the confirmation that signatures need to be signed again.
+    /// </summary>
+    /// <param name="check">The disputed check.</param>
+    /// <returns>The form, or nothing while the form is closed and nothing waits.</returns>
+    private RenderFragment DiscussFormFor(DisputedCheck check)
+    {
+        var itemId = check.ItemId;
+        var iid = itemId.ToLowerInvariant();
+        return builder =>
+        {
+            if (DiscussOpen.Contains(itemId))
+            {
+                builder.OpenComponent<ThreadComposer>(0);
+                builder.AddComponentParameter(1, nameof(ThreadComposer.Text), DiscussTexts.GetValueOrDefault(itemId) ?? string.Empty);
+                builder.AddComponentParameter(2, nameof(ThreadComposer.TextChanged), EventCallback.Factory.Create<string>(this, text => DiscussTexts[itemId] = text));
+                builder.AddComponentParameter(3, nameof(ThreadComposer.IncludeInReport), DiscussReports.GetValueOrDefault(itemId));
+                builder.AddComponentParameter(4, nameof(ThreadComposer.IncludeInReportChanged), EventCallback.Factory.Create<bool>(this, report => DiscussReports[itemId] = report));
+                builder.AddComponentParameter(5, nameof(ThreadComposer.OnSubmit), EventCallback.Factory.Create(this, () => StartDiscussionAsync(itemId)));
+                builder.AddComponentParameter(6, nameof(ThreadComposer.TextLabel), "What do you want to talk about?");
+                builder.AddComponentParameter(7, nameof(ThreadComposer.SubmitLabel), "Start discussion");
+                builder.AddComponentParameter(8, nameof(ThreadComposer.FormTestId), $"discuss-form-{iid}");
+                builder.AddComponentParameter(9, nameof(ThreadComposer.TextTestId), $"discuss-text-{iid}");
+                builder.AddComponentParameter(10, nameof(ThreadComposer.SubmitTestId), $"discuss-start-{iid}");
+                builder.AddComponentParameter(11, nameof(ThreadComposer.ErrorTestId), $"discuss-composer-error-{iid}");
+                builder.AddComponentParameter(12, nameof(ThreadComposer.HintTestId), $"discuss-submit-hint-{iid}");
+                builder.AddComponentParameter(13, nameof(ThreadComposer.KindTestId), $"discuss-kind-{iid}");
+                builder.AddComponentParameter(14, nameof(ThreadComposer.Actions), (RenderFragment)(actions =>
+                {
+                    actions.OpenElement(0, "button");
+                    actions.AddAttribute(1, "type", "button");
+                    actions.AddAttribute(2, "class", "secondary");
+                    actions.AddAttribute(3, "data-testid", $"discuss-cancel-{iid}");
+                    // cspell:disable-next-line
+                    actions.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, () => ToggleDiscuss(itemId)));
+                    actions.AddContent(5, "Cancel");
+                    actions.CloseElement();
+                }));
+                builder.CloseComponent();
+            }
+
+            if (DiscussErrors.TryGetValue(itemId, out var error))
+            {
+                builder.OpenElement(20, "p");
+                builder.AddAttribute(21, "class", "error");
+                builder.AddAttribute(22, "role", "alert");
+                builder.AddAttribute(23, "data-testid", $"discuss-error-{iid}");
+                builder.AddContent(24, error);
+                builder.CloseElement();
+            }
+
+            if (Warning?.Key == DiscussWarningKey(itemId))
+            {
+                // Its own region, so its sequence numbers cannot collide with the ones of the composer above
+                builder.AddContent(30, WarningFragment());
+            }
+        };
+    }
+
+    /// <summary>
     ///     Gets the slot identities to acknowledge for a confirmation.
     /// </summary>
     /// <param name="confirmed">The confirmed signatures, or <c>null</c> when none are confirmed.</param>
@@ -2724,13 +2902,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     Words the status of a slot.
     /// </summary>
     /// <param name="slot">The slot.</param>
-    /// <returns>"Not signed", "Signed by Ann on 2026-01-02 03:04 UTC" or "Signature out of date".</returns>
+    /// <returns>"Not signed", "Signed by Ann on 2026-01-02 03:04 UTC" or "Signed, then the review changed".</returns>
     private static string SlotStatusLabel(SlotStatus slot)
     {
         return slot.State switch
         {
             SlotSignatureState.Signed => $"Signed by {slot.SignerName} on {FormatTime(slot.SignedAt!.Value)}",
-            SlotSignatureState.OutOfDate => "Signature out of date",
+            SlotSignatureState.OutOfDate => "Signed, then the review changed",
             _ => "Not signed"
         };
     }

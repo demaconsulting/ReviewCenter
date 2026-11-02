@@ -166,7 +166,7 @@ public class ReviewCenterSystemTests
     /// <summary>
     ///     Test that handing in a ballot that changes the record after a signature does not go through silently: the
     ///     page names the signature in a warning, cancelling leaves the signature as it was, and confirming stores the
-    ///     ballot and makes the signature out of date.
+    ///     ballot and shows the signature as signed, then the review changed.
     /// </summary>
     /// <returns>A task that completes when the test has finished.</returns>
     [Fact]
@@ -214,17 +214,17 @@ public class ReviewCenterSystemTests
         await scenario.OpenReviewAsync(reviewer);
         var statusAfterConfirm = await reviewer.TextOfAsync($"slot-status-{slot}");
 
-        // Assert: the warning names the slot and its signer, cancelling left the signature, confirming outdated it
+        // Assert: the warning names the slot and its signer, cancelling left the signature, confirming marked it as changed
         Assert.Contains("Slot 1", warned, StringComparison.Ordinal);
         Assert.Contains("Second Reviewer", warned, StringComparison.Ordinal);
         Assert.Contains("Signed by", statusAfterCancel, StringComparison.Ordinal);
-        Assert.Contains("out of date", statusAfterConfirm, StringComparison.Ordinal);
+        Assert.Contains("Signed, then the review changed", statusAfterConfirm, StringComparison.Ordinal);
     }
 
     /// <summary>
     ///     Test that an approved review is delivered as a signed attestation and listed in the evidence index, that a
     ///     token can read it but never sign or arrange reviewers, that nothing is released without credentials, that a
-    ///     later change (the reopening of the locked review by an administrator) makes the approval out of date without
+    ///     later change (the reopening of the locked review by an administrator) makes the approval stale without
     ///     removing the signature or changing the reviewed content, that no posted comment can be edited, and that a
     ///     link to a thread survives the sign-in.
     /// </summary>
@@ -341,7 +341,7 @@ public class ReviewCenterSystemTests
         Assert.Equal(HttpStatusCode.Conflict, attestationAfter.StatusCode);
         Assert.Equal(0, indexAfter.GetProperty("reviews").GetArrayLength());
         Assert.Equal("0", commentControls);
-        Assert.False(slotCanChangeAfter, "A slot that holds a signature must stay fixed, also when the signature is out of date.");
+        Assert.False(slotCanChangeAfter, "A slot that holds a signature must stay fixed, also when the review changed after it was signed.");
 
         // Assert: the link to the thread survived the sign-in
         Assert.EndsWith($"/threads/{threadPath}", landedOn, StringComparison.Ordinal);
@@ -436,7 +436,7 @@ public class ReviewCenterSystemTests
         Assert.False(lockedAfterReopen);
         Assert.Equal("Puppet Admin", reopenedBy);
         Assert.Contains("Found a problem", reopenReason, StringComparison.Ordinal);
-        Assert.Contains("out of date", slotAfterReopen, StringComparison.Ordinal);
+        Assert.Contains("Signed, then the review changed", slotAfterReopen, StringComparison.Ordinal);
         Assert.True(slotsEnabledAfterReopen);
 
         // Assert: a fresh signature is needed, and it approves and locks the review again
@@ -1184,6 +1184,268 @@ public class ReviewCenterSystemTests
     }
 
     /// <summary>
+    ///     Test the Question flow of two reviewers in a real browser: the second reviewer sees nothing of the answers
+    ///     of the first until the own ballot is handed in, the differing ballots show as a disputed check, Discuss
+    ///     starts a check thread, the thread is resolved, and the "Where are we?" panel shows exactly one next action.
+    ///     The panel, the thread cards, the gutter marker, the thread index and the composer are photographed in the
+    ///     light and the dark theme into the <c>visual-checks</c> folder of the test output (never committed).
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_QuestionFlow_MaskedUntilSubmitThenDiscussAndResolve_ShowsStatusPanelInBothThemes()
+    {
+        // Arrange: Alice (puppet) and Bob (second) are the two reviewers; Alice has handed in a ballot, Bob has not
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var alice = scenario.Browser;
+        await using var bob = await scenario.StartSignedInBrowserAsync("bob", "second");
+        await scenario.SeatAliceAndBobAsync();
+        await AnswerRequirementsAsync(scenario, alice, failCheck: null);
+
+        // Act: Bob looks at the review before the own ballot is in
+        await scenario.OpenReviewAsync(bob);
+        var maskedNote = await bob.ExistsAsync("status-hidden");
+        var maskedDisputes = await bob.ExistsAsync("status-disputed");
+        var maskedAction = await bob.TextOfAsync("next-action");
+        await ShootAsync(bob, "question-1-masked-status", "status-panel");
+
+        // Act: Bob answers differently on the first requirement check and hands the ballot in
+        await AnswerRequirementsAsync(scenario, bob, failCheck: "req-01");
+        await scenario.OpenReviewAsync(bob);
+        await bob.WaitUntilAsync(() => bob.ExistsAsync("status-disputed"), "the disputed check");
+        var disputeAction = await bob.TextOfAsync("next-action");
+        var pathBefore = await bob.EvalAsync("location.pathname");
+        await bob.OkAsync("click", "next-action");
+        var pathAfter = await bob.EvalAsync("location.pathname");
+        var hashAfter = await bob.EvalAsync("location.hash");
+        await ShootAsync(bob, "question-2-disputed-status", "status-panel");
+
+        // Act: Discuss starts a check thread
+        await bob.OkAsync("click", "status-discuss-req-01");
+        await bob.OkAsync("wait", "discuss-form-req-01");
+        await bob.OkAsync("fill", "discuss-text-req-01", "Why did you answer Pass here? I think the requirement cannot be tested.");
+        await ShootAsync(bob, "question-3-discuss-composer", "discuss-form-req-01");
+        await bob.OkAsync("click", "discuss-start-req-01");
+        await bob.WaitUntilAsync(
+            async () => (await bob.TextOfAsync("status-open-questions-text")).Contains("1 open", StringComparison.Ordinal),
+            "the open question in the panel");
+        var checkThread = await bob.EvalAsync(
+            "document.querySelector('[data-testid=\"check-threads-list\"] [data-testid^=\"thread-state-\"]').getAttribute('data-testid').replace('thread-state-', '')");
+
+        // Act: Bob also asks a question about a line of the file, which puts a marker in the gutter
+        var lineThread = await StartLineThreadAsync(bob, "Is the second line still correct?", finding: false);
+        var gutterMarker = await bob.ExistsAsync("line-marker-3");
+        await ShootAsync(bob, "question-4-threads-and-gutter");
+        await ShootAsync(bob, "question-5-thread-index", "thread-index");
+        var questionCount = await bob.TextOfAsync("threads-questions-count");
+
+        // Act: Alice resolves the check thread and looks at where the review stands
+        await scenario.OpenReviewAsync(alice);
+        await alice.OkAsync("click", $"thread-toggle-{checkThread}");
+        await alice.OkAsync("wait", $"resolve-note-confirm-{checkThread}");
+        await alice.OkAsync("click", $"resolve-note-confirm-{checkThread}");
+        await alice.WaitUntilAsync(
+            async () => (await alice.TextOfAsync($"thread-state-{checkThread}")).Contains("Resolved", StringComparison.Ordinal),
+            "the check thread to be resolved");
+        var openAfterResolve = await alice.TextOfAsync("status-open-questions-text");
+        var actionCount = await alice.CountAsync("next-action");
+        var aliceAction = await alice.TextOfAsync("next-action");
+        await ShootAsync(alice, "question-6-resolved-status", "status-panel");
+        await ShootAsync(alice, "question-7-resolved-page");
+
+        // Assert: Bob was masked until the ballot was in, and then saw the dispute and could discuss it
+        Assert.True(maskedNote, "A reviewer without a ballot must be told that the rest stays hidden.");
+        Assert.False(maskedDisputes, "A masked reviewer must not see disputed checks.");
+        Assert.Contains("Answer the checklist", maskedAction, StringComparison.Ordinal);
+        Assert.Contains("Discuss", disputeAction, StringComparison.Ordinal);
+        Assert.Equal(pathBefore, pathAfter);
+        Assert.Equal("#disputed-checks", hashAfter);
+
+        // Assert: the question threads, the marker and the counts
+        Assert.NotEqual(checkThread, lineThread);
+        Assert.True(gutterMarker, "A thread on a line must put a marker in the gutter.");
+        Assert.Equal("2", questionCount);
+
+        // Assert: the check thread is resolved, one question remains, and there is exactly one next action
+        Assert.Contains("1 open", openAfterResolve, StringComparison.Ordinal);
+        Assert.Equal(1, actionCount);
+        Assert.False(string.IsNullOrWhiteSpace(aliceAction));
+    }
+
+    /// <summary>
+    ///     Test the Finding flow in a real browser: a Question about a line is promoted to a Finding, resolved with a
+    ///     note, and the conclusion card then lists the finding with its resolution note. The composer, the thread
+    ///     cards, the gutter marker, the thread index with its counts, the status panel and the conclusion card are
+    ///     photographed in the light and the dark theme into the <c>visual-checks</c> folder of the test output
+    ///     (never committed).
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task ReviewCenter_FindingFlow_PromoteResolveWithNote_ShowsFindingInConclusionCardInBothThemes()
+    {
+        // Arrange: Alice (puppet, the lead) and Bob (second) are the reviewers; nobody has handed in a ballot
+        await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
+        var alice = scenario.Browser;
+        await using var bob = await scenario.StartSignedInBrowserAsync("bob", "second");
+        await scenario.SeatAliceAndBobAsync();
+
+        // Act: Bob asks a question about a line, and makes it a Finding
+        await scenario.OpenReviewAsync(bob);
+        var thread = await StartLineThreadAsync(bob, "The second line contradicts the first one.", finding: false);
+        await ShootAsync(bob, "finding-1-question-card", $"thread-{thread}");
+        await bob.OkAsync("click", $"thread-promote-{thread}");
+        await bob.WaitUntilAsync(
+            async () => (await bob.TextOfAsync($"thread-kind-{thread}")).Contains("Finding", StringComparison.Ordinal),
+            "the thread to become a Finding");
+        await ShootAsync(bob, "finding-2-finding-card", $"thread-{thread}");
+        await ShootAsync(bob, "finding-3-gutter-marker");
+
+        // Act: Alice sees the finding in the panel and the index, and resolves it with a note
+        await scenario.OpenReviewAsync(alice);
+        await alice.WaitUntilAsync(
+            async () => (await alice.TextOfAsync("status-open-findings-text")).Contains("1 open", StringComparison.Ordinal),
+            "the open finding in the panel");
+        await alice.OkAsync("click", "index-kind-finding");
+        var findingsInIndex = await alice.TextOfAsync("threads-findings-count");
+        await ShootAsync(alice, "finding-4-status-and-index-open", "status-panel");
+        await ShootAsync(alice, "finding-5-thread-index", "thread-index");
+        await alice.OkAsync("click", $"index-row-{thread}");
+        await alice.OkAsync("wait", $"thread-toggle-{thread}");
+        await alice.OkAsync("click", $"thread-toggle-{thread}");
+        await alice.OkAsync("wait", $"resolve-note-text-{thread}");
+        await alice.OkAsync("fill", $"resolve-note-text-{thread}", "Fixed: the second line now agrees with the first.");
+        await ShootAsync(alice, "finding-6-resolve-note-dialog", $"resolve-note-{thread}");
+        await alice.OkAsync("click", $"resolve-note-confirm-{thread}");
+        await alice.WaitUntilAsync(
+            async () => (await alice.TextOfAsync($"thread-state-{thread}")).Contains("Resolved", StringComparison.Ordinal),
+            "the finding to be resolved");
+
+        // Act: the conclusion card lists the finding with its note
+        await scenario.OpenReviewAsync(alice);
+        var findingState = await alice.TextOfAsync($"review-conclusion-finding-state-{thread}");
+        var findingNote = await alice.TextOfAsync($"review-conclusion-finding-note-{thread}");
+        var openFindings = await alice.TextOfAsync("status-open-findings-text");
+        await ShootAsync(alice, "finding-7-conclusion-card", "review-conclusion");
+        await ShootAsync(alice, "finding-8-resolved-status", "status-panel");
+
+        // Assert
+        Assert.Equal("1", findingsInIndex);
+        Assert.Contains("Resolved", findingState, StringComparison.Ordinal);
+        Assert.Contains("the second line now agrees", findingNote, StringComparison.Ordinal);
+        Assert.Contains("0 open", openFindings, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Answers the requirements section of the checklist as the user of a browser: every check is passed, except
+    ///     one that may be failed, every other section is marked as not applicable, and the ballot is handed in.
+    /// </summary>
+    /// <param name="scenario">The scenario.</param>
+    /// <param name="browser">The browser of the reviewer.</param>
+    /// <param name="failCheck">The lower-case identifier of the check to fail, or <c>null</c> to pass all.</param>
+    /// <returns>A task that completes when the ballot is handed in.</returns>
+    private static async Task AnswerRequirementsAsync(Scenario scenario, Browser browser, string? failCheck)
+    {
+        await scenario.MarkAllSectionsNotApplicableAsync(browser, "Not relevant to this system test.", except: "req");
+        await Scenario.OpenSectionAsync(browser, "req");
+        for (var number = 1; number <= 8; number++)
+        {
+            var check = $"req-0{number}";
+            if (check == failCheck)
+            {
+                await browser.OkAsync("click", $"check-fail-{check}");
+                await browser.OkAsync("fill", $"check-justification-{check}", "The requirement cannot be tested as written.");
+                await browser.OkAsync("click", $"check-save-{check}");
+                await browser.WaitUntilAsync(() => browser.ExistsAsync($"check-answered-by-{check}"), $"the answer of {check}");
+            }
+            else
+            {
+                await AnswerPassAsync(browser, check);
+            }
+        }
+
+        await browser.OkAsync("click", "submit-ballot");
+        await browser.WaitUntilAsync(async () => !await browser.ExistsAsync("submit-ballot"), "the ballot to be handed in");
+    }
+
+    /// <summary>
+    ///     Starts a thread on the third line of the guide in the head view of the file.
+    /// </summary>
+    /// <param name="browser">The browser, showing the review page.</param>
+    /// <param name="text">The first comment.</param>
+    /// <param name="finding">Whether to start a Finding instead of a Question.</param>
+    /// <returns>The identifier of the new thread, as used in test identifiers.</returns>
+    private static async Task<string> StartLineThreadAsync(Browser browser, string text, bool finding)
+    {
+        await ClickFileAsync(browser, "guide.md");
+        if (await browser.ExistsAsync("view-head-button"))
+        {
+            await browser.OkAsync("click", "view-head-button");
+        }
+
+        await browser.OkAsync("wait", "thread-start-line-input");
+        await browser.OkAsync("fill", "thread-start-line-input", "3");
+        await browser.OkAsync("fill", "thread-text-input", text);
+        if (finding)
+        {
+            await browser.OkAsync("click", "thread-kind-choice-finding");
+        }
+
+        await ShootAsync(browser, finding ? "composer-finding" : "composer-question", "new-thread-form");
+        var before = await NewestThreadIdAsync(browser);
+        await browser.OkAsync("click", "start-thread-button");
+        await browser.WaitUntilAsync(
+            async () => await NewestThreadIdAsync(browser) != before,
+            "the new thread to appear");
+        return await NewestThreadIdAsync(browser);
+    }
+
+    /// <summary>
+    ///     Reads the highest thread number that is currently shown on the page (threads are numbered upwards).
+    /// </summary>
+    /// <param name="browser">The browser, showing the review page.</param>
+    /// <returns>The number as text, or <c>0</c> when no thread is shown.</returns>
+    private static async Task<string> NewestThreadIdAsync(Browser browser)
+    {
+        return await browser.EvalAsync(
+            "String(Math.max(0, ...Array.from(document.querySelectorAll('[data-testid^=\"thread-state-\"]'))" +
+            ".map(e => parseInt(e.getAttribute('data-testid').replace('thread-state-', ''), 10) || 0)))");
+    }
+
+    /// <summary>
+    ///     Takes one picture in each theme into the <c>visual-checks</c> folder of the test output and leaves the
+    ///     light theme on. The pictures are for people to look at (see the visual polish loop of the Puppet guide) and
+    ///     are never committed.
+    /// </summary>
+    /// <param name="browser">The browser.</param>
+    /// <param name="name">The name of the picture, without theme or extension.</param>
+    /// <param name="selector">A test identifier to photograph only, or <c>null</c> for the whole page.</param>
+    /// <returns>A task that completes when both pictures are written.</returns>
+    private static async Task ShootAsync(Browser browser, string name, string? selector = null)
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "visual-checks");
+        Directory.CreateDirectory(folder);
+        foreach (var theme in new[] { "light", "dark" })
+        {
+            await browser.OkAsync("eval", $"window.reviewCenter.setTheme('{theme}')");
+
+            // The theme colors fade over a short transition: wait it out so the picture shows the final colors
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            var file = Path.Combine(folder, $"{name}-{theme}.png");
+            if (selector is null)
+            {
+                await browser.OkAsync("screenshot", file, "--full");
+            }
+            else
+            {
+                await browser.OkAsync("screenshot", file, "--selector", selector);
+            }
+
+            Assert.True(new FileInfo(file).Length > 1000, $"The picture {file} must not be empty.");
+        }
+
+        await browser.OkAsync("eval", "window.reviewCenter.setTheme('light')");
+    }
+
+    /// <summary>
     ///     Answers a check as Pass and waits until the answer is stored.
     /// </summary>
     /// <param name="browser">The browser, showing the checklist with the section of the check open.</param>
@@ -1558,6 +1820,18 @@ public class ReviewCenterSystemTests
             await Browser.WaitUntilAsync(async () => await Browser.CountAsync("slot-status-") > before, "the new slot");
             return await Browser.EvalAsync(
                 "document.querySelector('[data-testid^=\"slot-status-\"]').getAttribute('data-testid').replace('slot-status-', '')");
+        }
+
+        /// <summary>
+        ///     Switches the independence rule off and seats puppet (Alice) and second (Bob) as the two reviewers.
+        /// </summary>
+        /// <returns>A task that completes when both slots exist.</returns>
+        public async Task SeatAliceAndBobAsync()
+        {
+            await SetIndependentReviewersAsync(required: false);
+            await OpenReviewAsync();
+            await AddSlotAsync("Puppet Admin (puppet)", alternate: null);
+            await AddSlotAsync("Second Reviewer (second)", alternate: null);
         }
 
         /// <summary>

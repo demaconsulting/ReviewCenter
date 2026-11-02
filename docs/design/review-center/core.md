@@ -40,7 +40,8 @@ of notifications) and the read state that marks what is new;
 (the reviewer slots that still wait for the user and the projects the user alone administers);
 `BallotConsolidation`, the agreed standing of the submitted ballots of a review and the outcome it leads to; and
 `BallotVisibility`, who may see the answers of the other reviewers of a review before the own ballot is handed in, with
-the masking of what would reveal them. The
+the masking of what would reveal them; and `ReviewStatusService`, where a review stands for one viewer, the one next
+action, and what changed since a reviewer signed. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
@@ -323,6 +324,18 @@ show their results.
   handed in sees the differing answers side by side.
 - *Constraints*: Masking applies to what a viewer reads, never to what is stored: the record, the signatures, the audit
   chain, and its export are untouched, and the signing rules still use the true standing. The unknown viewer is masked.
+
+**ReviewStatusService**: Where a review stands for one viewer. It is consumed by the review page.
+
+- *Type*: In-process .NET class with the records `ReviewStatus`, `ReviewerStatus`, `DisputedCheck`, `SignatureChanges`,
+  and `ReviewChange`, and the rule `ReviewNextAction`.
+- *Role*: Provider.
+- *Contract*: Give a viewer who may see the project the ballot and signature state of every reviewer (never the content
+  of a ballot), the checks the reviewers answered differently with whether a discussion can be started, the number of
+  open questions and findings, exactly one next action in plain words, and, per signature that no longer matches the
+  report, what changed since it was given.
+- *Constraints*: Reads only and stores nothing. It uses the masked reads of the other services, so a viewer who may not
+  see the others yet gets no dispute, no count of discussions about checks, and no answer in a change.
 
 **IInboxStore**: The store interface the subsystem requires for the read state and for finding the reviews of a user.
 

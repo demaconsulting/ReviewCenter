@@ -60,6 +60,7 @@ internal sealed class BallotMaskingWorld
         Threads = new ThreadService(Store, Access, UserStore, Clock);
         Signing = new SigningService(Store, Users, Access, Clock);
         Progress = new ReviewProgressService(Reviews, Signing, AuditStore, Access);
+        Status = new ReviewStatusService(Store, UserStore, Access, Signing, Checklists, Threads, AuditStore);
         Inbox = new InboxService(new FakeInboxStore(Store), Store, Access, UserStore, Clock);
     }
 
@@ -117,6 +118,11 @@ internal sealed class BallotMaskingWorld
     ///     Gets the review progress service.
     /// </summary>
     public ReviewProgressService Progress { get; }
+
+    /// <summary>
+    ///     Gets the review status service.
+    /// </summary>
+    public ReviewStatusService Status { get; }
 
     /// <summary>
     ///     Gets the inbox service.

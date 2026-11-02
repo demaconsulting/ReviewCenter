@@ -6,7 +6,7 @@
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
 #   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, ProjectChecklistService, InboxService,
-#   UserImpactService, BallotConsolidation, and BallotVisibility
+#   UserImpactService, BallotConsolidation, BallotVisibility, and ReviewStatusService
 #   units, with the
 #   domain types they share
 #   (project, evidence settings, review,
@@ -704,6 +704,27 @@ sections:
           - SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome
           - ChecklistService_GetBallotView_SubmittedViewer_ListsDifferingChecksInSlotOrder
           - AuditMasking_ForViewer_OtherAnswer_HidesDetailKeepsActorAndHash
+
+      - id: ReviewCenter-Core-ReviewStatus
+        title: >-
+          The Core subsystem shall tell a viewer of a review where the review stands: who has handed in a ballot and who
+          has signed, which checks the reviewers answered differently (only while the viewer may see them), how many
+          questions and findings are open, the one thing the viewer should do next, and, for a reviewer who signed and
+          then saw the report change, what changed since the signature, without ever giving away what a hidden ballot
+          holds.
+        justification: |
+          A review has several people, several kinds of open work, and a signature that can lapse. One status that is
+          built from the same services as the pages, for the same viewer, lets every reviewer see what to do next
+          without learning more than they may.
+        children:
+          - ReviewCenter-ReviewStatusService-NextAction
+          - ReviewCenter-ReviewStatusService-Status
+          - ReviewCenter-ReviewStatusService-MaskedViewer
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning
+        tests:
+          - ReviewNextAction_OneActionPerViewer
+          - ReviewStatus_MaskedViewer_NoDisputedChecks
+          - ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly
 
       - id: ReviewCenter-Core-FollowUp
         title: >-

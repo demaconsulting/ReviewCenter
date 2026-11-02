@@ -438,10 +438,10 @@ public partial class UsersPage : ComponentBase
     ///     Words the reason why a review slot still waits, for the impact list.
     /// </summary>
     /// <param name="state">The signature state of the slot.</param>
-    /// <returns><c>Not signed</c> or <c>Out of date</c>.</returns>
+    /// <returns><c>Not signed</c> or <c>Signed, then the review changed</c>.</returns>
     private static string SlotStateText(SlotSignatureState state)
     {
-        return state == SlotSignatureState.OutOfDate ? "Out of date" : "Not signed";
+        return state == SlotSignatureState.OutOfDate ? "Signed, then the review changed" : "Not signed";
     }
 
     /// <summary>

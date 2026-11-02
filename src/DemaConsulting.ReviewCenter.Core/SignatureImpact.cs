@@ -123,7 +123,7 @@ internal static class SignatureImpact
         var names = string.Join(", ", remaining.Select(s => $"slot {s.SlotNumber} ({s.SignerDisplayName})"));
         throw new DomainRuleException(
             DomainRule.SignaturesWouldBecomeOutOfDate,
-            $"This change makes signatures out of date: {names}. Acknowledge them to continue.",
+            $"Signed reviewers will need to look again and sign again, because the report changes: {names}. Acknowledge this to continue.",
             remaining);
     }
 }

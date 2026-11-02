@@ -210,7 +210,7 @@ approved or rejected review is never overdue, and keeps its date).
 
 **Progress fields.** Each review of the list also has `approved` (the same as above), `slotsRequired` (the number of
 reviewer slots), `slotsSigned` (the slots with a valid signature on the current record), `slotsOutOfDate` (the slots
-whose signature went out of date), and `lastActivity` (the time of the newest audit entry of the review, or its
+whose signature no longer fits the review), and `lastActivity` (the time of the newest audit entry of the review, or its
 creation time). They are the numbers that the project page shows, so a script that watches a project sees what a
 person sees.
 

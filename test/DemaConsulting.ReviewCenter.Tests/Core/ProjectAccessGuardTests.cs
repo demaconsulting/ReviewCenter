@@ -250,6 +250,7 @@ public class ProjectAccessGuardTests
         "ReviewProgressService.GetProgressAsync",
         "ReviewService.CanSetDueDateAsync",
         "ReviewService.PreviewFollowUpAsync",
+        "ReviewStatusService.GetStatusAsync",
         "SigningService.GetApprovalAsync",
         "SigningService.GetApprovalsAsync",
         "SigningService.HasReauthProofAsync",
@@ -457,7 +458,7 @@ public class ProjectAccessGuardTests
         {
             typeof(ChecklistService), typeof(ThreadService), typeof(ReviewService), typeof(ReviewPlanner),
             typeof(SigningService), typeof(RepositoryService), typeof(ProjectService), typeof(ProjectChecklistService),
-            typeof(EvidenceSettingsService), typeof(ReviewProgressService)
+            typeof(EvidenceSettingsService), typeof(ReviewProgressService), typeof(ReviewStatusService)
         };
 
         // Act

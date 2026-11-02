@@ -195,3 +195,14 @@ sections:
           A person who sees a number on the home page looks for what it counts and for what clears it.
         tests:
           - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead
+
+      - id: ReviewCenter-HelpPage-PlainLanguage
+        title: >-
+          The HelpPage unit shall explain in the topics on signing, comments and the inbox, in plain words and without
+          the phrase "out of date", that a signature needs to be given again after the review changed, what the "Where
+          are we?" panel on the review page shows, and what the list of changes since a signature does and does not
+          tell.
+        justification: |
+          The help must use the words that the pages use, or a person who reads it cannot match it to the screen.
+        tests:
+          - HelpPage_SigningCommentsInbox_UsePlainLanguageAndExplainWhereAreWe

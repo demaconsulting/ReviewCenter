@@ -1757,7 +1757,7 @@ public partial class ReviewPageTests : PageTestBase
         var reopened = RenderPage(projectId);
 
         // Assert: out of date and In review, the slot is still locked, and signing again is offered
-        Assert.Equal("Signature out of date", reopened.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+        Assert.Equal("Signed, then the review changed", reopened.Find($"[data-testid='slot-status-{slotId}']").TextContent);
         Assert.Equal("In review", reopened.Find("[data-testid='review-approval']").TextContent);
         Assert.Empty(reopened.FindAll($"[data-testid='slot-save-{slotId}']"));
         Assert.NotNull(reopened.Find($"[data-testid='sign-form-{slotId}']"));
@@ -2663,7 +2663,7 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Equal("Root", cut.Find("[data-testid='reopen-by-0']").TextContent);
         Assert.Equal("Found a missing file", cut.Find("[data-testid='reopen-reason-0']").TextContent);
         Assert.NotEmpty(cut.Find("[data-testid='reopen-digest-0']").TextContent);
-        Assert.Equal("Signature out of date", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+        Assert.Equal("Signed, then the review changed", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
         Assert.Single(await Store.ListReopensAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
     }
 

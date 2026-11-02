@@ -45,7 +45,7 @@ public sealed class InboxService
     /// <summary>
     ///     The chip of a slot whose signature no longer covers the record.
     /// </summary>
-    public const string SignAgainChip = "Out of date, sign again";
+    public const string SignAgainChip = "The review changed, sign again";
 
     /// <summary>
     ///     The chip of an approved review.

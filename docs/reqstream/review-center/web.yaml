@@ -724,9 +724,9 @@ sections:
 
       - id: ReviewCenter-Web-Progress
         title: >-
-          The Web subsystem shall show on the project page, for every review, its stage, its signatures with the
-          out-of-date ones, what blocks it, the people it waits on, its last activity, and its due date with the
-          Overdue badge, a summary of the reviews by stage and the overdue ones, filters by stage, overdue, blocked,
+          The Web subsystem shall show on the project page, for every review, its stage, its signatures, including those
+          that need to be given again, what blocks it, the people it waits on, its last activity, and its due date with
+          the Overdue badge, a summary of the reviews by stage and the overdue ones, filters by stage, overdue, blocked,
           and text, sortable columns, and 25 reviews to a page, keep all of it in the query string, and show the same
           to a read-only auditor of the project and nothing to a user outside it.
         justification: |
@@ -857,3 +857,23 @@ sections:
         tests:
           - InboxPage_Render_ToSignAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
           - WebSubsystem_InboxPage_Unauthenticated_IsChallenged
+
+      - id: ReviewCenter-Web-WhereAreWe
+        title: >-
+          The Web subsystem shall show on the review page a panel that says where the review stands and what to do
+          next, with each reviewer's ballot and signature, the checks answered differently with a way to discuss them,
+          and the open questions and findings, shall explain to a reviewer whose signature no longer matches the report
+          what changed since the signature and that signing again is the way forward, shall use plain words for this
+          everywhere in the pages and the help topics, and shall keep it all hidden from a reviewer who has not handed
+          in their own ballot.
+        justification: |
+          People who review together must know the standing without reading every card, and "out of date" is the
+          language of the implementation, not of the reviewer. The behavior needs a live connection, so it is verified
+          by the component tests of the units.
+        children:
+          - ReviewCenter-ReviewPage-StatusPanel
+          - ReviewCenter-ReviewPage-ChangesSinceSigning
+          - ReviewCenter-HelpPage-PlainLanguage
+        tests:
+          - ReviewStatusPanel_ShowsExactlyOneNextActionButton
+          - ReviewPage_SignedThenChanged_ExplainsWhatChanged

@@ -401,8 +401,8 @@ sections:
         title: >-
           The ReviewPage unit shall show a Reviewers card that lists the reviewer slots of the review as "Slot N"
           with the primary reviewer, the alternate reviewer ("None" when there is none), and the signature status
-          ("Not signed", "Signed by {name} on {UTC time}", or "Signature out of date"); let a signed-in user add a
-          slot by choosing enabled users as primary and alternate, and change or remove a slot that has no
+          ("Not signed", "Signed by {name} on {UTC time}", or "Signed, then the review changed"); let a signed-in user
+          add a slot by choosing enabled users as primary and alternate, and change or remove a slot that has no
           signature, showing the reason next to the control when a change is refused, and naming the signers of
           other slots whose signature the change would make out of date and storing the change only after the user
           confirms; offer no change or removal
@@ -883,3 +883,45 @@ sections:
           - ReviewPage_ConclusionCard_Approved_ShowsApprovedOutcomeWithoutFindings
           - ReviewPage_ConclusionCard_InProgress_ShowsEmptyStateAndOpenFindings
           - ReviewPage_ConclusionCard_MaskedViewer_ShowsNoticeOnly
+
+      - id: ReviewCenter-ReviewPage-StatusPanel
+        title: >-
+          The ReviewPage unit shall show at the top of the page a "Where are we?" panel that lists each reviewer with
+          the state of the ballot (Not started, Draft, or Handed in) and of the signature (Signed, Not signed, or
+          Signed, then the review changed), lists the checks that the reviewers answered differently with a Discuss
+          button that starts a discussion about the check (and, when that would make a signature stale, first shows the
+          signature warning and stores nothing until it is confirmed), shows the number of open questions and of open
+          findings as
+          an icon and text, shows exactly one primary next-action button or sentence for the viewer, and shows a
+          viewer who may not see the others yet a notice that the rest stays hidden until the own ballot is handed in,
+          with no disputed check and no check thread.
+        justification: |
+          A reviewer opens the page to learn what to do. One panel that answers who is done, what is disputed, what
+          is open, and what to do next replaces reading several cards, and the notice keeps independent judgment
+          intact.
+        tests:
+          - ReviewStatusPanel_ShowsReviewerBallotAndSignedStates
+          - ReviewStatusPanel_DisputedCheck_DiscussStartsThread
+          - ReviewStatusPanel_DisputedCheck_DiscussAsFindingAfterSignature_WarnsThenStoresOnConfirm
+          - ReviewStatusPanel_DisputedCheck_DiscussWarningCancel_StoresNothing
+          - ReviewStatusPanel_ShowsQuestionAndFindingCounts
+          - ReviewStatusPanel_ShowsExactlyOneNextActionButton
+          - ReviewStatusPanel_MaskedViewer_HidesDisputes
+          - ReviewCenter_QuestionFlow_MaskedUntilSubmitThenDiscussAndResolve_ShowsStatusPanelInBothThemes
+          - ReviewCenter_FindingFlow_PromoteResolveWithNote_ShowsFindingInConclusionCardInBothThemes
+
+      - id: ReviewCenter-ReviewPage-ChangesSinceSigning
+        title: >-
+          The ReviewPage unit shall show a reviewer whose signature no longer matches the report the words "Signed,
+          then the review changed" and an expandable list, "What changed since {name} signed", of the changes that
+          can alter the report, with the time, the person and a reason in plain words, with a note that the list
+          explains what happened and the signature check decides, and shall say in the warning before a change that
+          alters the report that the signed reviewers will need to look again and sign again.
+        justification: |
+          "Out of date" tells nobody what to do. Saying what changed, and that signing again is the way forward,
+          lets a reviewer act without help, and the note keeps the list honest: it is derived from the audit trail,
+          not from the signature check.
+        tests:
+          - ReviewPage_SignedThenChanged_ExplainsWhatChanged
+          - ReviewPage_NoJargonOutOfDateText
+          - SignatureWarning_UsesPlainLanguage

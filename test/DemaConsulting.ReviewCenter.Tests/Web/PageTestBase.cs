@@ -110,13 +110,16 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Audit);
         Services.AddSingleton(pageProjects);
         Services.AddSingleton(pageReviews);
-        Services.AddSingleton(new ThreadService(store, Access, userStore, clock));
-        Services.AddSingleton(new ChecklistService(store, Access, userStore, clock));
+        var pageThreads = new ThreadService(store, Access, userStore, clock);
+        var pageChecklists = new ChecklistService(store, Access, userStore, clock);
+        Services.AddSingleton(pageThreads);
+        Services.AddSingleton(pageChecklists);
         Services.AddSingleton(Users);
         Services.AddSingleton(new UserImpactService(store, userStore, Access));
         Services.AddSingleton(pageRepositories);
         Services.AddSingleton(pageSigning);
         Services.AddSingleton(new ReviewProgressService(pageReviews, pageSigning, AuditStore, Access));
+        Services.AddSingleton(new ReviewStatusService(store, userStore, Access, pageSigning, pageChecklists, pageThreads, AuditStore));
         Services.AddSingleton(new ReviewPlanner(store, pageReviews, pageRepositories, Git, pageSigning, SetParser, Access));
 
         // The inbox page, the home page and the review page enforce the real access rules for the signed-in user;

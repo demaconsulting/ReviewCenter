@@ -21,8 +21,9 @@ A Fail answer does not block signing. When the agreed ballots contain a Fail, th
 Signing asks the signer to confirm their identity again (the password, or a fresh sign-in at the identity provider),
 and a signature covers the whole record as it was at that moment, with the outcome it records. While only some slots
 are signed, a change to the
-record, such as a changed answer, makes the signatures given so far out of date; the page warns you
-and asks for a confirmation first (see *What Makes a Signature Out of Date*). Chat does not: a comment that is not
+record, such as a changed answer, means that the signatures given so far no longer fit and the signers must sign
+again; the page warns you
+and asks for a confirmation first (see *When Reviewers Must Sign Again*). Chat does not: a comment that is not
 included in the report is never part of the record. When every slot has handed in its ballot and signed for the same
 outcome, and no thread is open, the review is concluded, as Approved or as Rejected, and **locked**: ReviewCenter then
 refuses every change of its threads, checklist, and reviewers until a project administrator reopens it (see *Concluded
@@ -53,10 +54,11 @@ for it: create the review, then ask a second member to go through the
 checklist, or let a reviewer do it. A project where one person has to do everything switches the rule off on the
 project page; every change of the rule is audited.
 
-## What Makes a Signature Out of Date
+## When Reviewers Must Sign Again
 
-A signature stays current only while the record is the one that was signed. These changes alter the record, so each one
-makes the current signatures out of date: a change of the agreed standing of the submitted ballots (a check or a section
+A signature stays current only while the record is the one that was signed. These changes alter the record, so after
+each one the current signatures no longer fit and the signers must sign again: a change of the agreed standing of the
+submitted ballots (a check or a section
 on which the ballots agreed that becomes disputed or changes its agreed answer, or a check that becomes agreed or open),
 and a change to the report, which is the set of comments that
 are included in it (an included comment, a reply that is included, including or removing a comment, promoting or
@@ -67,21 +69,32 @@ agree on, do not.
 Ordinary discussion does not alter the record. A comment is **chat** unless it is included in the report, and chat,
 replies to it, and the state of a thread (resolved or open) are not part of what a signature covers. A **Question** and
 its replies are chat; a **Finding** (and any reply you tick **Add to report** for) is in the report. So starting or
-resolving a Question, replying, and reopening a Question never make a signature out of date, while starting a Finding,
+resolving a Question, replying, and reopening a Question never make the signers sign again, while starting a Finding,
 adding a reply to the report, making a Question a Finding or back, and resolving a Finding with its note do. An open
 thread of either kind still blocks signing, and a review that has an open thread is not concluded even when every slot
 is signed. The due date of a review is planning information and is not part of the record, so changing it leaves the
 signatures current.
 
-ReviewCenter does not let such a change go through silently. When the change would make a current signature out of
-date, the page stores nothing and shows a warning where you worked. It names every affected slot and its signer, for
-example "Slot 1 (Ann)". **Confirm change** makes the change and the named signatures go out of date; **Cancel** removes
+ReviewCenter does not let such a change go through silently. When the change would make a current signature no
+longer fit, the page stores nothing and shows a warning where you worked: "Signed reviewers will need to look again and
+sign again, because the report changes". It names every affected slot and its signer, for
+example "Slot 1 (Ann)". **Confirm change** makes the change and the named signers have to sign again; **Cancel** removes
 the warning and changes nothing, and what you typed stays in its field so that you can still use it. If another
 reviewer signs while the warning is open, the first **Confirm change** is answered with a new warning that names every
 signature, so you only confirm what you have seen. The signers then sign the new record again.
 
 The warning is the moment to ask whether the change is needed now. Most of the time it is better to cancel, wait until
 the signers are done, or agree with them first (see *Sign Last* below).
+
+A signer whose signature no longer fits sees "Signed, then the review changed" on the slot, and can open **What changed
+since {name} signed** in the **Where are we?** panel at the top of the review page. The list names the changes since
+the signature that can alter the record: a ballot handed in, taken back or given to another reviewer, a changed
+conclusion, a Finding or a reply that goes in the report, a Finding resolved with its note, and a comment put in the
+report or taken out. It is an explanation, not a proof: ReviewCenter decides whether a signature still fits by
+comparing the record itself, and a listed change may have left the record as it was, for example when a reply was
+not part of the report. A reviewer who has not handed in a ballot still sees each change with its time and who made it,
+but the details of hidden answers, comments and discussions about checks are replaced by one sentence, "Something in the
+report changed (details are hidden until you hand in your own ballot)", until the ballot is handed in.
 
 ## Answering the Checklist
 
@@ -121,7 +134,7 @@ changing it afterward makes it a draft again until it is handed in again. Practi
   you whether your own ballot is a draft or submitted; ask the other reviewers about theirs.
 - **Early signing is allowed, with a price.** You may sign as soon as your own ballot is submitted and nothing blocks
   the review, even when other slots have not handed in theirs. If another ballot later disagrees with an agreed
-  check, your signature goes out of date and you sign again. A late ballot that agrees changes nothing.
+  check, your signature no longer fits and you sign again. A late ballot that agrees changes nothing.
 - **One slot is simple.** In a review with a single slot nothing changes: the answers count at once, and the answer
   that completes the ballot hands it in (a complete draft that no answer produced, such as a follow-up whose checks are
   all carried, still shows **Submit ballot**). The review can be Approved as soon as that slot has signed.
@@ -130,12 +143,12 @@ changing it afterward makes it a draft again until it is handed in again. Practi
 
 Any change to the agreed standing of the submitted ballots (such as a reviewer disagreeing with an agreed check) or a
 change to the
-report makes the signatures given so far out of date. So agree who is still to answer, let them
+report means the signers must sign again. So agree who is still to answer, let them
 finish, close the open threads (an open thread blocks the signature), and only then sign; the signature of the last
 reviewer is the one that concludes the review. If a late change
 is needed, the page warns you which signatures it voids; after you confirm, the reviewers who already signed sign the
 new record again. A reviewer may sign as soon as the own ballot is submitted, but then a later disagreement of another
-reviewer makes that signature out of date.
+reviewer then makes that signature no longer fit.
 
 ## When a Check Fails
 
@@ -183,7 +196,7 @@ state of the thread. Resolving a **Finding** needs a short note, such as "fixed 
 issue", which is part of the report. Write
 the reason in the note, or as a reply first, then resolve. A reply can also be added to a resolved thread (expand it
 first), and it does not reopen it.
-Resolving or replying to a Question does not make a signature out of date, but close every thread
+Resolving or replying to a Question does not make anyone sign again, but close every thread
 before the last signature anyway: an open thread blocks signing, and once the review is concluded and locked it refuses
 both.
 Say what was done and who decided, for example "Declined by the author after discussion with Alex: ...", because a
@@ -246,7 +259,7 @@ The lock is not a separate state; it lasts exactly while the review is Approved 
 a system administrator can **Reopen** it in the locked notice of the review page, with a reason of 1 to 250 characters.
 A reopen
 is audited (`review.reopened`, with the reason and the previous digest) and listed in the **Reopen history** of the
-review. It puts the review back In review. The earlier signatures stay as history but are out of date for good, even
+review. It puts the review back In review. The earlier signatures stay as history but no longer count, for good, even
 if the content is changed back, so the reviewers must sign again. Reading, the attestation PDF of an Approved review,
 and the evidence index keep working while the review is locked, and a review that was reopened is not in the evidence
 index until it is approved again.
@@ -277,7 +290,8 @@ index until it is approved again.
   date; when you are the last signer, the review locks and the record cannot change without an administrator's reopen.
 - **Check the outcome.** The sign form says "You are signing: APPROVED" or "You are signing: REJECTED". Read it before
   you enter your password, because it states the statement that you confirm.
-- **A stale signature means review again.** When a slot says "Signature out of date", read what changed (the thread
+- **A stale signature means review again.** When a slot says "Signed, then the review changed", read what changed
+  (open **What changed since {name} signed**, the thread
   list and the **History** of the review show it) before you sign the new record. Do not sign only because the
   button is there.
 - **Never share an account.** The signature is bound to the person who confirmed their identity, and the audit trail
