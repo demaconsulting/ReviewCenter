@@ -419,11 +419,15 @@ repository: the server reads
 the changed files between an optional baseline and a head revision through `GitSource`, filtered by a selection, and
 freezes them in the review.
 
-The `Evidence` subsystem turns a complete review into evidence that can be kept outside the system: a signed PDF
+The `Evidence` subsystem turns a concluded review (approved or rejected) into evidence that can be kept outside the
+system: a signed PDF
 attestation. `AttestationEndpoint` serves the download to a signed-in user who may see the project (anyone else gets an
 empty 404, as for a project that does not exist); `AttestationService` checks that the user may view the project and
 that the review
-is approved, builds the document description from the record, has `AttestationRenderer` lay it out (with
+is concluded, builds the document description from the record (the findings and included comments of the report, the
+conclusion, and for a concluded review a ballots appendix; never a comment that was not included or the ballot of a
+review that
+is still open), has `AttestationRenderer` lay it out (with
 `PdfDocumentWriter` as the PDF writer), has `AttestationSigner` add a detached CMS signature that covers the document
 with the key from `AttestationKeyProvider`, and records the generation in the audit trail. The key is a self-signed key
 of the server by default, a certificate of a certificate store whose private key is never exported, or a certificate
@@ -641,8 +645,8 @@ is running.
   git repositories. `GET /audit` returns the whole audit trail with the button that
   verifies its hash chain (system administrators only). `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf`
   returns
-  the signed PDF attestation of a complete review as a download (HTTP status 200 with `application/pdf`; an empty 404
-  when the review does not exist or the user may not see the project, 409 when it is not complete, 500 when the signing
+  the signed PDF attestation of a concluded review as a download (HTTP status 200 with `application/pdf`; an empty 404
+  when the review does not exist or the user may not see the project, 409 when it is not concluded, 500 when the signing
   key cannot be used; a signed-out request is
   redirected to `/login`).
   Any other page request returns HTTP status 404 with the not-found page of the user interface, an HTML document with
@@ -684,8 +688,8 @@ is running.
   `GET /api/projects/{projectId}/reviews/{reviewId}` one review with its reviewer slots, counts, and approval state.
   `POST /api/projects/{projectId}/reviews` creates a draft review from either a list of files (Base64 contents) or a
   repository (name, revisions, selection) and answers 201 with a `Location` header and the review.
-  `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns the signed PDF attestation of a complete
-  review
+  `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns the signed PDF attestation of a concluded
+  review (an approved one; a rejected one answers a request without a token with the 404 of a missing review)
   (200 with `application/pdf`). `GET /api/openapi.json` returns the OpenAPI description of these endpoints and needs no
   token. Errors are `application/problem+json` documents: 400 for a rejected request (with the field that is wrong), 401
   for a missing or refused token (always the same answer, with `WWW-Authenticate` headers for `Bearer` and `Basic`),
@@ -693,7 +697,7 @@ is running.
   password), 404 for an unknown project, review, or address (a project that the owner of the
   token may not see answers exactly like an unknown project), 409 for a conflict (including the removal or demotion of
   the last administrator of a project) or an
-  attestation of a review that is not complete (a request without a token gets the 404 of a missing review instead),
+  attestation of a review that is not concluded (a request without a token gets the 404 of a missing review instead),
   429 when too many tokens were refused from one address (with a `Retry-After` header) or too many
   member additions failed, and 5xx for
   repository or key failures.
@@ -905,7 +909,7 @@ user may see, and from the read state that `InboxStore` keeps (the inbox is also
 separate notification record); `ReviewPage` reads and stores the same state to mark new comments. A request for the
 attestation of a review is
 answered by `AttestationEndpoint` after the same authorization: `AttestationService` checks through `SigningService`
-that the review is approved, reads the record, has `AttestationRenderer` and `PdfDocumentWriter` produce the PDF, has
+that the review is concluded, reads the record, has `AttestationRenderer` and `PdfDocumentWriter` produce the PDF, has
 `AttestationSigner` sign it with the key from `AttestationKeyProvider`, records the generation through `AuditService`,
 and the endpoint returns the signed bytes. A request under `/api` takes another way: the `ReviewCenterToken`
 scheme of `ApiTokenAuthentication` reads the token (a bearer token, or the password of HTTP Basic credentials),

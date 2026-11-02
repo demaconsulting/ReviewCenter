@@ -2,7 +2,8 @@
 
 #### Verification Approach
 
-`AttestationRenderer` is verified with tests defined in `AttestationRendererTests.cs`. The tests build an
+`AttestationRenderer` is verified with tests defined in `AttestationRendererTests.cs` and, for the rejection mark, the
+conclusion, the findings and the ballots appendix, `AttestationRendererReportTests.cs`. The tests build an
 `AttestationDocument` with plain objects, so no database and no key is needed, render it with the real renderer and the
 real `PdfDocumentWriter`, and read the text of the result back with `PdfInspector` (a helper of the tests). The wording
 that the document must contain, in particular the statement of what the signature proves and the notice about a
@@ -15,10 +16,15 @@ N/A - standard test environment (everything runs in memory).
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- The document shows the review, its fingerprint, files, checklist, threads, sign-offs, audit head, and tool version, as
-  far as the evidence settings include them (see the criteria for the Content scope below).
-- A checklist comment is printed in full, however long, and runs over pages without loss; only the list of resolved
-  threads is capped (100), with exact counts and a line that says how many are left out.
+- The document shows the review, its fingerprint, files, checklist, findings, conclusion, sign-offs, ballots appendix,
+  audit head, and tool version, as far as the evidence settings include them (see the criteria for the Content scope
+  below).
+- A checklist comment and a comment of a finding are printed in full, however long, and run over pages without loss;
+  every finding is listed, with no cap; each thread shows its status, and a thread whose starting comment is not
+  included is shown as a discussion thread, not as a finding.
+- A rejected document has the title "Review attestation - REJECTED" and a banner; an approved one has neither.
+- The conclusion section prints the outcome and its text; the ballots appendix prints every slot's answers and the
+  fingerprint, with identifiers only when the wording is off, and is absent when the input holds none.
 - Every checklist answer shows who gave the agreed answer and the time of the answer, in UTC to the second like the
   other times of the document; an answer without a time shows no time, and a check that is pending or disputed shows as
   "Not answered".
@@ -65,18 +71,59 @@ scenario is tested by `AttestationRenderer_Render_LongChecklistComment_IsPrinted
 (about 54,000 characters) is rendered. The document has many more pages than the sample, and every word is in the text,
 in order. This scenario is tested by `AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss`.
 
-**AttestationRenderer_Render_Document_SummarizesThreads**: A review with open and resolved threads is rendered. The text
-gives the count of open threads and a summary of each resolved one. This scenario is tested by
-`AttestationRenderer_Render_Document_SummarizesThreads`.
+**AttestationRenderer_Render_Document_PrintsFindingsWithTheirComments**: A review with one resolved finding of two
+included comments (the finding and its resolution) is rendered. The text has the heading "Findings and comments in this
+report", the location `src/a.txt, lines 3-5`, each comment as "Finding by Bob, time" and "Resolution by Ann, time" with
+its text, the line "Status: Resolved", no "Discussion on" heading, and no "Comment threads" heading. This scenario is
+tested by
+`AttestationRenderer_Render_Document_PrintsFindingsWithTheirComments`.
 
-**AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest**: A review with 130 resolved
-threads is rendered. The counts say 2 open and 130 resolved, the first 100 threads are listed in order (the first and the
-hundredth are present, the 101st is not), and one line says "and 30 more resolved threads (see the review record)". This
-scenario is tested by `AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest`.
+**AttestationRenderer_Render_ManyFindings_ListsEveryFinding**: A review with 130 findings is rendered. All 130 are
+listed, in order, from the first remark to the last, and there is no line about findings that were left out. This
+scenario is tested by `AttestationRenderer_Render_ManyFindings_ListsEveryFinding`.
 
-**AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine**: A review with exactly 100 resolved
-threads is rendered. All 100 are listed and there is no line about further threads. This scenario is tested by
-`AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine`.
+**AttestationRenderer_Render_NoFindings_SaysNoneWereIncluded**: A document without a finding is rendered. The findings
+section says that no finding or comment was included in the report. This scenario is tested by
+`AttestationRenderer_Render_NoFindings_SaysNoneWereIncluded`.
+
+**AttestationRenderer_Render_LongFindingComment_IsPrintedInFull**: A finding with a comment of several hundred numbered
+words is rendered. Every word is in the text, in order, and no line holds an ellipsis. This scenario is tested by
+`AttestationRenderer_Render_LongFindingComment_IsPrintedInFull`.
+
+**AttestationRenderer_Render_FindingStatus_PrintsResolvedAndOpen**: A document has a resolved finding and an open one.
+The text has one line "Status: Resolved" right after the location of the first and one line "Status: Open" right
+after the location of the second. This scenario is tested by
+`AttestationRenderer_Render_FindingStatus_PrintsResolvedAndOpen`.
+
+**AttestationRenderer_Render_DiscussionThread_IsNotPresentedAsFinding**: A document has a thread whose only included
+comment is a reply (its starting comment was not included). The text has the line "Discussion on" followed by the
+location, a line that starts "Discussion thread, not a finding", the line "Reply by Bob, time" with the text of the
+reply, no line that starts "Finding by", and no heading with the bare location. This scenario is tested by
+`AttestationRenderer_Render_DiscussionThread_IsNotPresentedAsFinding`.
+
+**AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection**: A rejected and an approved document are
+rendered. The rejected one has the title "Review attestation - REJECTED" (also in the document title property) and the
+banner text; the approved one has neither. This scenario is tested by
+`AttestationRenderer_Render_Rejected_ShowsTitleAndBannerOnlyForRejection`.
+
+**AttestationRenderer_Render_Conclusion_PrintsOutcomeAndText**: Documents with a rejection, an approval, and a blank
+conclusion text are rendered. The section prints the outcome, the reasons for a rejection or the conclusion of an
+approval in full, and no text for a blank one. This scenario is tested by
+`AttestationRenderer_Render_Conclusion_PrintsOutcomeAndText`.
+
+**AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint**: A rejected document with a ballots
+appendix of two slots is rendered. Each slot is named with its reviewer and the submission time, each answer has its
+outcome, justification and answerer, a section that a slot marked not applicable shows its reason, and the fingerprint is
+printed with the version header of the ballots. This scenario is tested by
+`AttestationRenderer_Render_BallotAppendix_ShowsSlotsAnswersAndFingerprint`.
+
+**AttestationRenderer_Render_NoBallotAppendix_OmitsTheSection**: A document without a ballots appendix (for example a
+review without a checklist) is rendered. There is no appendix section and no fingerprint. This scenario is tested by
+`AttestationRenderer_Render_NoBallotAppendix_OmitsTheSection`.
+
+**AttestationRenderer_Render_BallotAppendixWordingOff_PrintsIdentifiersOnly**: A document with the checklist wording off
+is rendered. The appendix prints identifiers and outcomes, with neither the question text nor the section title. This
+scenario is tested by `AttestationRenderer_Render_BallotAppendixWordingOff_PrintsIdentifiersOnly`.
 
 **AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests**: Slots with signatures are rendered. Each
 slot shows its signer, the time, and the digest it covers. This scenario is tested by
@@ -138,7 +185,8 @@ rendered. The Content scope section says that the request was made without signi
 `AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo`.
 
 **AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo**: A document with the threads turned off is rendered. The
-thread section and the thread text are missing, and the Content scope section names the omission. This scenario is
+findings and their text are missing, the section says that they are not included by project setting, and the Content
+scope section names the omission. This scenario is
 tested by `AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo`.
 
 **AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint**: A document with the files turned off is

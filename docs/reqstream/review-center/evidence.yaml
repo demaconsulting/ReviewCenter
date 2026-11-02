@@ -14,17 +14,19 @@ sections:
     requirements:
       - id: ReviewCenter-Evidence-Document
         title: >-
-          The Evidence subsystem shall produce, for a completed review, a PDF document that states the review, its
-          content fingerprint, its files, its checklist (the consolidated standing of the submitted ballots, with who
-          answered each agreed check and when), its threads, its reviewer
-          sign-offs, the head of the
-          audit trail, and the key that signed it, in the same bytes for the same input, with the files, checklist
-          wording, threads, reviewer names, and git context left out as the evidence settings of the project say, and,
-          for a review that was reopened after an approval, the history of the reopenings.
+          The Evidence subsystem shall produce, for a concluded review (approved or rejected), a PDF document that
+          states the review, its content fingerprint, its files, its checklist (the consolidated standing of the
+          submitted ballots, with who answered each agreed check and when), the findings and included comments (never a
+          comment that was not included), its conclusion, its reviewer sign-offs, a ballots
+          appendix with the final ballot of every slot and its fingerprint, the head of the audit trail, and the key
+          that signed it, in the same bytes for the same input, with the files, checklist wording, findings, reviewer
+          names, and git context left out as the evidence settings of the project say, a rejection marked as such on
+          its first page, and, for a review that was reopened after an approval, the history of the reopenings.
         justification: |
-          The approval of a review must be portable. A document that holds what was reviewed and who signed, and that
+          The conclusion of a review must be portable. A document that holds what was reviewed and who signed, and that
           is the same when it is made again, can be filed, printed, and checked outside the tool. A reader must also
-          be able to see that an approval followed one that was reopened.
+          be able to see that an approval followed one that was reopened, and a rejection must be recognizable at a
+          glance.
         children:
           - ReviewCenter-PdfDocumentWriter-Structure
           - ReviewCenter-PdfDocumentWriter-Deterministic
@@ -33,11 +35,14 @@ sections:
           - ReviewCenter-AttestationRenderer-Review
           - ReviewCenter-AttestationRenderer-Findings
           - ReviewCenter-AttestationRenderer-AnswerTimes
-          - ReviewCenter-AttestationRenderer-ThreadLimit
+          - ReviewCenter-AttestationRenderer-FindingList
+          - ReviewCenter-AttestationRenderer-Conclusion
+          - ReviewCenter-AttestationRenderer-BallotAppendix
           - ReviewCenter-AttestationRenderer-SignOffs
           - ReviewCenter-AttestationRenderer-Output
           - ReviewCenter-AttestationService-ReopenHistory
           - ReviewCenter-AttestationService-CheckThreadLabel
+          - ReviewCenter-AttestationService-Report
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 
@@ -106,8 +111,8 @@ sections:
 
       - id: ReviewCenter-Evidence-Release
         title: >-
-          The Evidence subsystem shall release the attestation only of a completed review, to a signed-in user or, for
-          the API route, when the project allows it, to a request without a user, on
+          The Evidence subsystem shall release the attestation only of a concluded review, to a signed-in user or, for
+          the API route, when the project allows it and the review was approved, to a request without a user, on
           demand and without keeping it, shall record each release in the audit trail, and shall refuse an incomplete
           review and an unusable key with a status that tells them apart.
         justification: |
@@ -151,8 +156,8 @@ sections:
           project of the review, and shall answer any other actor as it answers for a project or review that does not
           exist; a request without an actor shall be served only when the project has switched on the anonymous
           evidence index or the anonymous attestation PDFs for that kind of document, and otherwise answered in the
-          same way; such a request for a review that is not complete shall be answered as for a review that does not
-          exist.
+          same way; such a request for a review that is not complete or was rejected shall be answered as for a review
+          that does not exist.
         justification: |
           An attestation and an index disclose the content and the approvals of a project. Answering a non-member
           differently from a missing project would also tell the non-member which projects exist. Publishing the

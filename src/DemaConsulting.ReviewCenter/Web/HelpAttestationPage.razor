@@ -4,19 +4,28 @@
 <HelpTopicFrame Slug="signed-attestation">
     <section class="card">
         <ul>
-            <li>When every slot of a review is signed for its current state (the review is <strong>Approved</strong>),
-                the review page offers <strong>Download attestation (PDF)</strong>. Until then the button is not shown.
-                A rejected review has no attestation yet: the page says so instead of offering the button.</li>
+            <li>When every slot of a review is signed for its current state, the review is <strong>concluded</strong>
+                (<strong>Approved</strong> or <strong>Rejected</strong>) and the review page offers
+                <strong>Download attestation (PDF)</strong>. Until then the button is not shown. The attestation of a
+                rejected review is headed <strong>REJECTED</strong> and says that it is not evidence that the content
+                passed; it carries the <strong>Conclusion</strong> with the reasons for the rejection.</li>
             <li>The PDF is created when you ask for it; ReviewCenter does not store it. It lists the project, the review,
                 the repository revisions and the content fingerprint, every file with its status, the checklist with
                 the consolidated agreed answer of the submitted ballots for each check (a check that is still pending
                 or disputed shows as <em>Not answered</em>), its comment, the name and time of that answer, the
-                comment threads, who signed each reviewer slot
-                and when, and the audit trail
+                <strong>Findings and comments in this report</strong> (the findings and included comments, in full:
+                a reply that a reviewer included on a Question appears as a discussion thread, not as a finding;
+                comments that were not included are never printed),
+                the <strong>Conclusion</strong>, who signed each reviewer slot and when, a
+                <strong>Ballots appendix</strong> with the final submitted ballot of every slot (what each reviewer
+                answered and why) and a fingerprint of those ballots, and the audit trail
                 anchor at that moment. A project admin can leave some of this out (the discussion threads, the names,
                 the checklist wording, the file list, the git context); every PDF then has a <strong>Content
                 scope</strong> section that says what was omitted. See
                 <a href="/help/evidence-settings">Evidence settings</a>.</li>
+            <li>An attestation exists only for a concluded review, so the PDF never shows the answers of reviewers that
+                are still hidden from you while a review is open. Requests without signing in (where a project allows
+                them) get the attestation of an approved review only.</li>
             <li>The PDF carries a <strong>digital signature</strong> that PDF readers such as Adobe Acrobat show and
                 verify. The signature certifies the document with no changes allowed, so the reader reports any change
                 to the file after it was signed.</li>

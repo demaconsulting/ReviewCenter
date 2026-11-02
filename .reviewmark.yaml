@@ -1116,6 +1116,7 @@ reviews:
       - "test/**/Core/RecordDigestTests.cs"
       - "test/**/Core/RecordDigestFollowUpTests.cs"
       - "test/**/Core/RecordDigestReportTests.cs"
+      - "test/**/Core/RecordDigestBallotFingerprintTests.cs"
       - "test/**/Core/RecordDigestBallotTests.cs"
       - "test/**/Core/RecordDigestCheckThreadTests.cs"
 
@@ -1736,6 +1737,7 @@ reviews:
       - "src/**/Evidence/IAttestationRenderer.cs"
       - "src/**/Evidence/AttestationDocument.cs"
       - "test/**/Evidence/AttestationRendererTests.cs"
+      - "test/**/Evidence/AttestationRendererReportTests.cs"
 
   - id: ReviewCenter-Evidence-AttestationSigner
     title: Review of ReviewCenter AttestationSigner unit implementation
@@ -1796,6 +1798,7 @@ reviews:
       - "src/**/Evidence/AttestationService.cs"
       - "src/**/Evidence/AttestationResult.cs"
       - "test/**/Evidence/AttestationServiceTests.cs"
+      - "test/**/Evidence/AttestationServiceRejectedTests.cs"
       - "test/**/Evidence/AttestationContentSettingsTests.cs"
 
   - id: ReviewCenter-Evidence-AttestationEndpoint

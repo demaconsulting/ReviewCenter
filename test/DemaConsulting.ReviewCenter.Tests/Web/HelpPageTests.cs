@@ -174,6 +174,28 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the attestation topic describes the attestation of a rejected review, the findings that reach the
+    ///     report, the conclusion and the ballots appendix, and no longer says that a rejection has no attestation.
+    /// </summary>
+    [Fact]
+    public void HelpAttestationPage_Render_ExplainsRejectedAttestationFindingsConclusionAndBallotsAppendix()
+    {
+        // Act: render the topic page
+        var page = Render<HelpAttestationPage>();
+
+        // Assert
+        var text = page.Markup;
+        Assert.Contains("<strong>Rejected</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("headed <strong>REJECTED</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Findings and comments in this report</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("findings and included comments", text, StringComparison.Ordinal);
+        Assert.Contains("comments that were not included are never printed", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Conclusion</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Ballots appendix</strong>", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("has no attestation yet", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the signing topic explains the rule that the person who reopened a review cannot sign it again
     ///     and that a reopen that would leave a slot without a signer is refused.
     /// </summary>

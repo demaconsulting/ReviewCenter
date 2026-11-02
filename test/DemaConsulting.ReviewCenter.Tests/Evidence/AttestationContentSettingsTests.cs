@@ -37,7 +37,8 @@ public class AttestationContentSettingsTests
         Assert.Contains("Ann (ann)", lines);
         Assert.Contains(lines, l => l.Contains("Cyd", StringComparison.Ordinal));
         Assert.Contains(lines, l => l.Contains("a.txt", StringComparison.Ordinal));
-        Assert.Contains("Comment threads", lines);
+        Assert.Contains("Findings and comments in this report", lines);
+        Assert.Contains(lines, l => l.Contains(SampleData.ThreadText, StringComparison.Ordinal));
         Assert.True(pdf.ByteRangeCoversEverythingButContents());
         Assert.NotNull(pdf.VerifySignature());
     }
@@ -63,7 +64,7 @@ public class AttestationContentSettingsTests
         // Assert: the labels, and the always-included parts
         Assert.Contains("Reviewer 1 (primary)", lines);
         Assert.Contains("Reviewer 1 (alternate)", lines);
-        Assert.Contains(lines, l => l.StartsWith("Participant 1", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("Finding by Participant 1,", StringComparison.Ordinal));
         Assert.Contains(
             lines,
             l => l.StartsWith("Answered by Reviewer 1 (primary)", StringComparison.Ordinal) && l.EndsWith(" UTC", StringComparison.Ordinal));
@@ -77,10 +78,11 @@ public class AttestationContentSettingsTests
     }
 
     /// <summary>
-    ///     Test that turning the threads off removes the thread section and the comment text, and the signature verifies.
+    ///     Test that turning the threads off removes the findings and the comment text, says so, and the signature
+    ///     verifies.
     /// </summary>
     [Fact]
-    public async Task AttestationService_GenerateAsync_ThreadsOff_OmitsThreadSectionAndStillVerifies()
+    public async Task AttestationService_GenerateAsync_ThreadsOff_OmitsFindingsAndStillVerifies()
     {
         // Arrange
         var world = await WorldAsync(EvidenceSettings.Default with { IncludeThreads = false });
@@ -90,8 +92,9 @@ public class AttestationContentSettingsTests
 
         // Assert
         var lines = pdf.TextLines;
-        Assert.DoesNotContain("Comment threads", lines);
+        Assert.DoesNotContain(lines, l => l.StartsWith("Finding by", StringComparison.Ordinal));
         Assert.DoesNotContain(lines, l => l.Contains(SampleData.ThreadText, StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.Contains("Not included by project setting", StringComparison.Ordinal));
         Assert.Contains("Left out of this document: Review discussion threads.", lines);
         Assert.NotNull(pdf.VerifySignature());
     }
@@ -250,8 +253,20 @@ public class AttestationContentSettingsTests
         var cyd = new Actor("cyd", "Cyd");
         var threads = TestServices.Threads(fixture.Store, fixture.Clock);
         var thread = await threads.StartThreadAsync(
-            fixture.ProjectId, AttestationFixture.ReviewId, new ThreadAnchor("a.txt", null, null, ThreadSide.Head), cyd, SampleData.ThreadText, cancellationToken);
-        await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, thread.Id, cyd, cancellationToken);
+            fixture.ProjectId,
+            AttestationFixture.ReviewId,
+            new ThreadAnchor("a.txt", null, null, ThreadSide.Head),
+            cyd,
+            SampleData.ThreadText,
+            cancellationToken,
+            includeInReport: true);
+        await threads.ResolveAsync(
+            fixture.ProjectId,
+            AttestationFixture.ReviewId,
+            thread.Id,
+            cyd,
+            cancellationToken,
+            resolutionNote: "Bound checked");
         await fixture.SignAsync();
         if (settings is not null)
         {

@@ -4,11 +4,11 @@
 
 #### Purpose
 
-`AttestationService` releases the signed attestation of a review. Its single responsibility is the sequence that makes
-the release safe: check that the asker may see the project (or that the project allows anonymous PDFs) and that the
-review is complete, get the key, build the
+`AttestationService` releases the signed attestation of a concluded review (approved or rejected). Its single
+responsibility is the sequence that makes the release safe: check that the asker may see the project (or that the
+project allows anonymous PDFs) and that the review is concluded, get the key, build the
 document from the record under the evidence settings of the project, sign it, and record
-the release in the audit trail. It makes no decision about what a complete review is (that is `SigningService`), none
+the release in the audit trail. It makes no decision about what a concluded review is (that is `SigningService`), none
 about who may see a project (that is `IProjectAccess`), none about which settings a project has (that is
 `EvidenceSettingsService` and the project), and
 no decision about how the document looks (that is `AttestationRenderer`).
@@ -55,8 +55,32 @@ it was carried from (`CarriedFromReviewId` of the representative row or of the t
 a review that follows nothing, and then the document is the same as before. The review identifiers are not personal
 data, so the reviewer names switch does not affect them.
 
-The thread section names the anchor of a thread about a check as `Check {id}` (the identifier of the check) in place of
-a file path and lines, so no empty file name is printed; a thread on a file is worded as before.
+The thread section is replaced by the **findings** section. `BuildFindings` takes every thread with at least one
+comment that has `IncludeInReport` set, which is the same predicate as `RecordDigest.Canonicalize`, so the attestation
+prints exactly the threads and comments that the record digest binds. A thread whose starting comment was included is a
+finding; a thread whose starting comment was not included (for example a Question with an included reply) is a
+discussion thread (`AttestationFinding.IsDiscussion`), and the renderer does not present it as a finding. The threads
+come in the order file threads first (by path and line) and check threads after them (by check identifier), then by
+creation time and identifier. Each carries its location, its state (resolved or open), the review it was carried from,
+and only its comments that have `IncludeInReport` set, in posting order and in full: the starting comment (`Finding`),
+the replies that were included (`Reply`), and the resolution note (`Resolution`). A comment that was not included, and
+the text of a chat reply, never reach the document, and a thread without an included comment is absent. A thread about
+a check is located as `Check {id}` (and `: {text}`
+when the checklist wording may be printed) in place of a file path and lines, so no empty file name is printed; a
+thread on a file is `{path}, line {n}` or `{path}, lines {a}-{b}`. With the threads switch off the list stays empty and
+the renderer says that the findings were not included.
+
+The document also carries the **conclusion** of the review: the outcome (`Approved` or `Rejected`) and the conclusion
+text, and, for a rejection, the renderer marks the title and the first page. For a concluded review it also carries the
+**ballots appendix** (`BuildAppendix`): the final submitted ballot of every reviewer slot, in slot order, with the member
+who handed it in, the time, and for every section either the reason it was marked not applicable or the answer to every
+check (outcome, justification, who answered and when, or `Not answered`), and the **ballot fingerprint**
+(`RecordDigest.ComputeBallotFingerprint`). The wording of the checks is left out of the appendix when the wording switch
+is off. The appendix is built only for a concluded review, which has a submitted ballot in every slot and can no longer
+change, so it reveals nothing that a viewer could not already see once the review is concluded; for a review that is not
+concluded the service returns before it reads any ballot or finding, so an open review never leaks a slot's ballot or a
+dispute. `BuildDocument` builds the checklist sections first, then the findings, then the appendix, so the person labels
+are numbered in the order in which the document first names the people.
 
 The document also carries the reopen history of the approval (`ReviewApproval.Reopens`, read by `SigningService`): for
 every time an administrator reopened the review after an approval, when, by whom (written as "display name (user name)"
@@ -81,26 +105,28 @@ request) in that time.
   missing review), before
   anything else is read or recorded. The evidence settings are taken from the project at this point and used for the
   whole call. The approval is read from `SigningService`; a missing
-  review gives `NotFound` and a
-  review that is not complete gives `NotApproved`, in both cases without asking for the key. A review that was concluded
-  as rejected is not approved either: for an actor it gives `NotApproved` with the message "The review was rejected. A
-  signed attestation of a rejected review is not available yet." (also without asking for the key), and an anonymous
-  request still gets `NotFound`. A request without an actor
-  gets `NotFound` ("The review was not found.", the same as for a missing review) for a review that is not complete, so
-  that an anonymous caller cannot list review identifiers or their state; `NotApproved` is for an actor. Then the key is
+  review gives `NotFound`. A review that is not concluded gives `NotApproved` to an actor (and `NotFound` to an
+  anonymous request, so that an anonymous caller cannot list review identifiers or their state), in both cases without
+  asking for the key and **before any ballot or finding is read**. A review that was concluded as rejected is released
+  like an approved one, with the outcome `Rejected`, to an actor; an anonymous request for a rejected review still gets
+  `NotFound` (the anonymous routes publish evidence that a file set passed, and a rejection carries the reasons of the
+  reviewers). Then the key is
   requested;
   a failure gives `KeyUnavailable` and records nothing. The snapshot and the review are read (the first
   snapshot) and the digest of the record is computed again and compared with the approved one, and the slots of the
-  approval are compared with the slots and signatures of the snapshot; a difference gives `Changed`. The audit chain is
+  approval are compared with the slots and signatures of the snapshot, and every slot of a review with a checklist must
+  have a submitted ballot; a difference gives `Changed`. The audit chain is
   verified to get its head, and the document is rendered from the record, with the settings, the labels for the people,
   and the actor (or the statement that the request was anonymous). Then the project settings and the review are **read
   again and revalidated**: the settings must be equal to the ones used, the
-  approval must still be complete with the same digest, and the snapshot must have the same digest and the same slots,
+  approval must still be concluded with the same outcome and digest, and the snapshot must have the same digest, the
+  same ballot fingerprint (the digest does not cover the justifications, the answerers, the times, or the state of the
+  sections that the appendix prints), and the same slots,
   signers, and signature digests as the rendered one. If anything differs the result is `Changed` ("The review changed
   while the attestation was being prepared; try again."), nothing is signed, and **no audit event is written**. Only
   then is the document signed (a failure of the signer gives `KeyUnavailable` and records nothing). Last, an
   `attestation.generated` event is recorded with the actor (the actor text `anonymous` and no user for a request
-  without an actor), the project, and the review, and the detail `record digest
+  without an actor), the project, and the review, and the detail `outcome {approved or rejected}, record digest
   {digest}, chain head {head}, pdf sha256 {hash}, key {thumbprint}, selfSigned={true or false}`; the digest in the
   event is the digest that was attested. The event is written strictly: when it cannot be written, the exception reaches
   the caller and no document is released.
@@ -125,7 +151,8 @@ review is no longer complete or no longer the same. The check is not a lock: a c
 read and before the signing and the audit event is not seen. That window is tiny (a signature computation and one
 audit write, with no I/O of the review between them), and the audit event states the record digest that was attested,
 so such a document can be recognized against the record afterwards. The second read compares the approval, the record
-digest, and the slots with their counting signatures, and the evidence settings of the project; it does not compare
+digest, the ballot fingerprint, and the slots with their counting signatures, and the evidence settings of the project;
+it does not compare
 the review, project, or repository names, so a rename in that window would be rendered under the old name (the names
 are not part of the record digest, see the renderer design). A change of the settings inside the window is the one
 case that is seen, because a document that mixed two settings would state a content scope that was never true. A

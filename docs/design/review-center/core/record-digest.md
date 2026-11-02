@@ -14,6 +14,9 @@ The digest format is private to ReviewCenter: no other tool is expected to repro
 `v2`; nothing of an earlier version was released, so there is no earlier history to describe. The version grows when a
 later release changes the format.
 
+The unit also computes a second, separate value, the **ballot fingerprint** (see `ComputeBallotFingerprint`), that is
+not part of the digest. It identifies how each slot answered and is printed by an attestation; no signature binds to it.
+
 #### Data Model
 
 The digest is the SHA-256 hash, written as 64 lowercase hexadecimal characters, of the UTF-8 bytes of a canonical
@@ -362,6 +365,30 @@ digest; and that a second ballot that agrees leaves the digest as it was while t
   order of the included comments inside a thread. The order independence assumes unique sort keys (see the
   preconditions above).
 
+**CanonicalizeBallots**: Builds the canonical text of the submitted ballots of a record.
+
+- *Parameters*: `ReviewRecord record` — the record.
+- *Returns*: `string` — the header `ReviewCenter ballots v1` (the constant `BallotsHeader`), and for each submitted
+  ballot, in the order of the slot (the storage identity of the slot decides the order, but only its ordinal counted from
+  1 is written), the line `ballot {n} submitted {ticks} by {username}`, then one `answer` line per answered check sorted
+  by check identifier (identifier, outcome, justification, user name of the answerer, UTC ticks, and the review it was
+  carried from or `-`), and one `section` line per section state sorted by section identifier (identifier, `applicable`
+  or `not-applicable`, reason, user name of who set it, UTC ticks, carried-from or `-`). Strings are written with the same
+  escaping as the digest, so a delimiter inside a text cannot be mistaken for the separator. When a check was answered
+  more than once in a ballot, the last row counts. A record with no submitted ballot gives only the header. A draft ballot
+  never takes part, and display names are not written.
+- *Preconditions*: The record is not null.
+
+**ComputeBallotFingerprint**: Calculates the fingerprint of the submitted ballots.
+
+- *Parameters*: `ReviewRecord record` — the record.
+- *Returns*: `string` — the SHA-256 of the UTF-8 bytes of `CanonicalizeBallots(record)`, as 64 lowercase hexadecimal
+  characters. It is **not** part of `Compute` and is stored nowhere: it identifies how each slot answered (which the
+  digest, which binds only the agreed standing, does not), is printed in the ballots appendix of an attestation, and lets
+  a reader tell that two copies describe the same ballots. A concluded review is locked, so the value can be computed
+  again at any time.
+- *Preconditions*: The record is not null.
+
 **Compute**: Calculates the digest of a record.
 
 - *Parameters*: `ReviewRecord record` — the record.
@@ -388,6 +415,7 @@ not hidden. Whether a record is signable is not decided here (see `SigningServic
 
 #### Callers
 
+- **AttestationService** — computes the ballot fingerprint that the attestation prints in its ballots appendix.
 - **SigningService** — computes the digest to show, to compare with the digest the signer saw, and to find the
   current signatures; `ReviewLock.IsConcluded` (part of the same unit) computes it to decide whether a review is
   concluded and so locked.

@@ -309,9 +309,10 @@ all three for a review that is not approved are verified by the `ReviewPage` uni
 `ReviewPage_Render_ReviewApprovedWithKeyProblem_ShowsProblemInsteadOfDownload`, and
 `ReviewPage_Sign_CorrectPassword_OffersAttestationDownload`), the address by
 `ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress`, and the help topic by
-`HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`. The download itself, over HTTP, is verified in the
-`Evidence` subsystem. A review concluded as rejected offers no download and shows a note instead, which is verified by
-`ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndNoAttestation`.
+`HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey` and
+`HelpAttestationPage_Render_ExplainsRejectedAttestationFindingsConclusionAndBallotsAppendix`. The download itself, over
+HTTP, is verified in the `Evidence` subsystem. A review concluded as rejected offers the same download, which is
+verified by `ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload`.
 
 **Personal access tokens on the account page**: The token card, the creation that shows the value once, and the
 revocation are verified by the `AccountPage` unit tests, which render the page with the component test host and the real

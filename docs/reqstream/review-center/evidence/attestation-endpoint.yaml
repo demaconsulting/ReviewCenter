@@ -33,7 +33,8 @@ sections:
 
       - id: ReviewCenter-AttestationEndpoint-Download
         title: >-
-          The AttestationEndpoint class shall answer a signed-in user's request for a completed review with the signed
+          The AttestationEndpoint class shall answer a signed-in user's request for a concluded review, approved or
+          rejected, with the signed
           PDF as a download with the content type application/pdf and a response that no cache keeps, and shall record
           who asked for it in the audit trail.
         justification: |
@@ -46,7 +47,7 @@ sections:
       - id: ReviewCenter-AttestationEndpoint-Statuses
         title: >-
           The AttestationEndpoint class shall answer 404 for a review that does not exist, 409 with a problem
-          description that says the review is not complete for a review that is not approved, 409 with a problem
+          description that says the review is not complete for a review that is not concluded, 409 with a problem
           description that says the review changed during generation when it changed while the document was being
           prepared, and 500 with a problem description that says the signing key is unavailable when the key cannot
           be used, and in the last two cases record nothing in the audit trail.

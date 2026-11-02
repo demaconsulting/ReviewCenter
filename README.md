@@ -52,7 +52,9 @@ a project checklist, and sign the review with their credentials. Every action is
   self-review
 - 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history, filterable by project, actor,
   action, review, and date, with CSV and JSON export that reports the chain status
-- 📄 **Signed PDF Attestation** - Approved reviews download as verifiable PDFs
+- 📄 **Signed PDF Attestation** - Concluded reviews download as verifiable PDFs with findings and included comments,
+  conclusion, and a ballots
+  appendix; a rejection is marked as such
 - ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access
 - 🛡️ **Access Control** - Project roles (including a read-only Auditor), local accounts, and sign-in lockout
 - 🪪 **OpenID Connect Sign-in** - Single sign-on with any provider

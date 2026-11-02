@@ -176,8 +176,8 @@ The rejected review stays as the record of what was found: its threads, answers,
 audit trail of the review); the follow-up names it, and its attestation says which review it follows. If the failed
 answer was a mistake, a project administrator can reopen the rejected review like any locked review (see *Concluded
 Reviews Are Locked*) and the reviewers correct the answer.
-There is no attestation PDF for a rejected review yet, and the evidence index never lists one, so the review record and
-its history are the evidence of the rejection.
+The rejected review has a signed attestation PDF, marked REJECTED, with its findings, its conclusion and the ballot of
+every slot, and the evidence index never lists it.
 
 ## Handling Minor Findings Without Blocking
 

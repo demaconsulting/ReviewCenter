@@ -331,3 +331,23 @@ sections:
           the text easy to read and makes the three possible values different texts.
         tests:
           - RecordDigest_Canonicalize_OutcomeLine_NoneApprovedRejected
+
+      - id: ReviewCenter-RecordDigest-BallotFingerprint
+        title: >-
+          The RecordDigest class shall compute the ballot fingerprint of a record, separate from the record digest, as
+          the SHA-256 of a canonical text in lowercase hexadecimal that begins with a version line and lists the final
+          submitted ballots by the ordinal of the slot, with every answer, its outcome, and its justification, and
+          every section state, in a sorted order, so that the same ballots always give the same fingerprint, and a
+          change of an answer changes it while a change of a display name does not.
+        justification: |
+          The ballots appendix of an attestation shows what each slot handed in, including the justification that the
+          record digest leaves out. The fingerprint ties the appendix to the record and lets two copies be compared,
+          without changing the digest that the signatures cover. Slot ordinals replace identities so that the
+          fingerprint does not depend on who held a slot.
+        tests:
+          - RecordDigest_CanonicalizeBallots_NoSubmittedBallot_GivesOnlyTheHeader
+          - RecordDigest_ComputeBallotFingerprint_Record_IsSha256OfCanonicalTextInLowercaseHex
+          - RecordDigest_CanonicalizeBallots_SlotIdentities_NumbersBallotsByOrdinalInSlotOrder
+          - RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot
+          - RecordDigest_CanonicalizeBallots_RepeatedAnswerAndSectionState_LastRowCountsAndLinesAreSorted
+          - RecordDigest_CanonicalizeBallots_NullRecord_Throws

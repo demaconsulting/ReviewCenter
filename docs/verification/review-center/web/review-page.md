@@ -139,8 +139,8 @@ N/A - standard test environment.
   the form under a diff row, and the reply box of a thread) are not rendered; reading, copying a link, and the
   attestation download of an approved review keep working; a
   review that is not concluded shows no badge and no banner.
-- A review concluded as rejected shows the Rejected badge and, instead of the attestation download, a note that there is
-  no attestation of a rejection.
+- A review concluded as rejected shows the Rejected badge and the same attestation download as an approved one (the
+  document is marked as a rejection).
 - The Review conclusion card shows the conclusion text, or says that none is written. A slot owner (and the creator of
   the review) sees an editor while the review is not locked; saving stores the text and shows it in the card, and a
   change that would make a signature out of date asks for a confirmation that names the slot first. A member who owns
@@ -593,12 +593,13 @@ text. This scenario is tested by `ReviewPage_ConclusionCard_ReadOnlyUserBlankTex
 
 **ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes**: The sign form of a rejection shows the outcome and
 the rejection meaning text; signing with the right password concludes the review as rejected, and the review is locked
-without an attestation. This scenario is tested by `ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes`.
+and offers the attestation download. This scenario is tested by
+`ReviewPage_Sign_RejectedOutcome_ShowsRejectMeaningAndConcludes`.
 
-**ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndNoAttestation**: A review concluded as rejected
-shows the Rejected badge, the Locked badge and banner, and the note that there is no attestation of a rejection, and no
-attestation download. This scenario is tested by
-`ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndNoAttestation`.
+**ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload**: A review concluded as
+rejected shows the Rejected badge, the Locked badge and banner, and the attestation download button, and no note that an
+attestation is missing. This scenario is tested by
+`ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload`.
 
 **ReviewPage_Render_ConcludedReview_ConclusionCardIsReadOnly**: The conclusion card of a concluded review shows the
 text, even to the slot owner who wrote it, without the form. This scenario is tested by

@@ -122,7 +122,6 @@ internal static class AttestationPdfCheck
                     null,
                     [new AttestationCheck("C-1", "Does it work?", "Pass", null, "Self Test")])
             ],
-            0,
             [],
             [
                 new AttestationSlot(
