@@ -80,7 +80,8 @@ test and system path that no page and no endpoint uses.
 and returns the consolidation of the submitted ballots when the viewer may see the others, and the masked state
 (`NoSlot` and `IsMasked`, no answers) otherwise, which is the case for an API token whose owner has not handed in a
 ballot in a review with several slots that is not concluded, since a token is never the lead, an administrator or an
-auditor. It never gives the own ballot of a slot owner, so the API shows the same standing to a token as a person
+auditor. A review that disappears between the snapshot read and the read of the review itself also gives the masked
+state. It never gives the own ballot of a slot owner, so the API shows the same standing to a token as a person
 sees in the consolidated view. It returns `null` when the review or its checklist does not exist. There is no
 unmasked checklist read left.
 

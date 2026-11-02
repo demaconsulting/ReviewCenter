@@ -212,10 +212,13 @@ and comments are not affected by the rule.
 - *Returns*: `Task<ChecklistState?>` — null when the review or its checklist does not exist.
 - *Preconditions*: The viewer is not null (`ArgumentNullException`) and may see the project (the project access check,
   which answers a project that does not exist like one that may not be seen).
-- *Postconditions*: When the viewer may see the others (`BallotVisibility.CanSeeOthers` with the audit right of the
-  viewer, which an API token never has) the result is the consolidation of the submitted ballots, never the own ballot
-  of a slot; otherwise it is an empty state with `NoSlot` and `IsMasked` set and no answers. The review and its
-  checklist are read from one snapshot, so a change between reads cannot leak.
+- *Postconditions*: When the viewer may see the others (`BallotVisibility.CanSeeOthers`: the viewer's own ballot is
+  submitted, the review has a single slot or is concluded, or `BallotVisibility.SeesAllInReviewAsync` is true, which
+  covers the lead, an administrator, and the audit right, and never an API token) the result is the consolidation of
+  the submitted ballots, never the own ballot of a slot; otherwise it is an empty state with `NoSlot` and `IsMasked`
+  set and no answers. The method makes two reads: the checklist and the slots come from one snapshot
+  (`_store.GetSnapshotAsync`), and the review comes from `_store.GetReviewAsync`, which the lead and the audit check
+  need. A review that has disappeared between the two reads gives the masked state (fail closed), never the standing.
 
 **SetSectionApplicabilityAsync**: Records whether a section applies in the ballot of the slot of the actor.
 
