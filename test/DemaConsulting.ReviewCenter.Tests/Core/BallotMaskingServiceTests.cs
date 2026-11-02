@@ -174,6 +174,130 @@ public class BallotMaskingServiceTests
     }
 
     /// <summary>
+    ///     Test that every viewer who may view the project is told which other reviewers have not handed in, by name and
+    ///     in slot order, whether the answers of the others are hidden or not, that the own slot is left out, and that a
+    ///     stranger gets no names.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetBallotView_OtherBallotMissing_NamesThemForViewersOfTheProject()
+    {
+        // Arrange: ann handed in; bob has a draft; cyd holds no slot; "out" is no member
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync(bobSubmitted: false);
+
+        // Act
+        var ann = await world.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("ann"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var bob = await world.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("bob"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var cyd = await world.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("cyd"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var stranger = await world.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("out"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert: names only, and never the own slot
+        Assert.Equal(["bob"], ann!.MissingNames);
+        Assert.Empty(bob!.MissingNames);
+        Assert.Equal(["bob"], cyd!.MissingNames);
+        Assert.Empty(stranger!.MissingNames);
+        Assert.True(bob.IsMasked);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who handed in gets the other reviewer's reason and their own slot number, and that the
+    ///     number of agreed failed checks is the number of checks all submitted ballots failed.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount()
+    {
+        // Arrange: ann Pass, bob Fail with a reason; then a second world where both fail
+        var disputed = await BallotMaskingWorld.CreateAsync();
+        await disputed.ArrangeDisputeAsync();
+        var agreed = await BallotMaskingWorld.CreateAsync();
+        await agreed.SeatAsync("ann");
+        await agreed.SeatAsync("bob");
+        await agreed.AnswerAsync("ann", ChecklistOutcome.Fail);
+        await agreed.SubmitAsync("ann");
+        await agreed.AnswerAsync("bob", ChecklistOutcome.Fail);
+        await agreed.SubmitAsync("bob");
+
+        // Act
+        var ann = await disputed.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("ann"), disputed.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var bothFailed = await agreed.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("ann"), agreed.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        var answers = Assert.Single(ann!.Differing).Value;
+        Assert.Null(answers[0].Justification);
+        Assert.Equal("A reason", answers[1].Justification);
+        Assert.Equal(1, ann.OwnSlotNumber);
+        Assert.Equal(0, ann.FailedChecks);
+        Assert.Empty(ann.MissingNames);
+        Assert.Equal(1, bothFailed!.FailedChecks);
+        Assert.Empty(bothFailed.Differing);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who has not handed in, an API token, a member without a slot and a stranger learn no reason
+    ///     of another reviewer, no disputed check and no failed check from the view.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck()
+    {
+        // Arrange: ann failed the first check with a reason and handed in; bob answered Fail too, as a draft
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.AnswerAsync("ann", ChecklistOutcome.Fail);
+        await world.SubmitAsync("ann");
+        await world.AnswerAsync("bob", ChecklistOutcome.Fail);
+        var viewers = new[]
+        {
+            BallotMaskingWorld.ActorOf("bob"),
+            BallotMaskingWorld.ActorOf("cyd"),
+            new Actor("cyd", "cyd") { ApiTokenId = "tok-1" },
+            BallotMaskingWorld.ActorOf("out")
+        };
+
+        foreach (var viewer in viewers)
+        {
+            // Act
+            var view = await world.Checklists.GetBallotViewAsync(viewer, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+            // Assert: nothing about the answers of ann, whoever looks
+            Assert.NotNull(view);
+            Assert.Empty(view.Differing);
+            Assert.Equal(0, view.FailedChecks);
+            Assert.DoesNotContain("A reason", System.Text.Json.JsonSerializer.Serialize(view), StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a stranger gets no differing answers and no failed count even where the ballots are open to every
+    ///     viewer (a review with a single slot).
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers()
+    {
+        // Arrange: ann is the only reviewer and failed the first check
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.AnswerAsync("ann", ChecklistOutcome.Fail);
+
+        // Act
+        var ann = await world.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("ann"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var stranger = await world.Checklists.GetBallotViewAsync(
+            BallotMaskingWorld.ActorOf("out"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        Assert.Equal(1, ann!.FailedChecks);
+        Assert.Equal(0, stranger!.FailedChecks);
+        Assert.Empty(stranger.Differing);
+    }
+
+    /// <summary>
     ///     Test that a review without a checklist has no ballot view.
     /// </summary>
     [Fact]
@@ -244,6 +368,108 @@ public class BallotMaskingServiceTests
         Assert.Equal(1, reviewer.DisputedChecks);
         Assert.Contains(reviewer.Blockers, b => b.Contains("disputed", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(1, lead!.DisputedChecks);
+    }
+
+    /// <summary>
+    ///     Test that the failed check identifiers, the rejection note and the next step never name a provisional
+    ///     rejection to a viewer who has not handed in a ballot (a member without one, a reviewer with a draft, a user
+    ///     without membership, an unknown viewer and an API token of the lead or of a member), through the single
+    ///     and the batch read, while the lead and a reviewer who handed in see them.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote()
+    {
+        // Arrange: bob handed in a Fail on the first check, ann answered Fail but has only a draft
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.AnswerAsync("ann", ChecklistOutcome.Fail);
+        await world.AnswerAsync("bob", ChecklistOutcome.Fail);
+        await world.SubmitAsync("bob");
+        var id = BallotMaskingWorld.FirstItemId;
+        var hidden = new List<(string Name, Actor? Viewer)>
+        {
+            ("member without ballot", BallotMaskingWorld.ActorOf("cyd")),
+            ("reviewer with a draft", BallotMaskingWorld.ActorOf("ann")),
+            ("user without membership", BallotMaskingWorld.ActorOf("out")),
+            ("unknown viewer", null),
+            ("token of the lead", new Actor("lead", "lead") { ApiTokenId = "tok-1" }),
+            ("token of a member", new Actor("cyd", "cyd") { ApiTokenId = "tok-2" })
+        };
+
+        // Act
+        var lead = await world.Signing.GetApprovalAsync(BallotMaskingWorld.ActorOf("lead"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var reviewer = await world.Signing.GetApprovalAsync(BallotMaskingWorld.ActorOf("bob"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert: the lead and the reviewer who handed in see it, worded for the ballot that is still out
+        var note = $"The reviewers who handed in a ballot failed {id}, so this review will be Rejected.";
+        Assert.Equal([id], lead!.FailedCheckIds);
+        Assert.Equal(note, lead.RejectionNote);
+        Assert.Equal(note, reviewer!.RejectionNote);
+        foreach (var (name, viewer) in hidden)
+        {
+            var single = await world.Signing.GetApprovalAsync(viewer, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+            Assert.True(single!.IsMasked, name);
+            AssertNoRejection(single, id, name);
+            if (viewer is not null)
+            {
+                var batch = (await world.Signing.GetApprovalsAsync(viewer, world.ProjectId, [BallotMaskingWorld.ReviewId], Token))[BallotMaskingWorld.ReviewId];
+                AssertNoRejection(batch, id, name + " (batch)");
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Asserts that a status carries nothing about a failed check or a provisional rejection.
+    /// </summary>
+    /// <param name="approval">The status of the viewer.</param>
+    /// <param name="itemId">The identifier of the failed check.</param>
+    /// <param name="who">Who the viewer is, for the failure message.</param>
+    private static void AssertNoRejection(ReviewApproval approval, string itemId, string who)
+    {
+        Assert.True(approval.FailedCheckIds is null or { Count: 0 }, who);
+        Assert.Equal(0, approval.FailedChecks);
+        Assert.Null(approval.RejectionNote);
+        Assert.Null(approval.Outcome);
+        Assert.DoesNotContain(itemId, approval.NextStep, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rejected", approval.NextStep, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("failed", approval.NextStep, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(approval.Blockers, b => b.Contains(itemId, StringComparison.Ordinal));
+        Assert.StartsWith("Hand in your ballot to see the other reviewers' answers.", approval.NextStep, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who has not handed in a ballot gets the signature-aware next step as progress only: the
+    ///     masked next step is the same whether or not another reviewer has signed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApproval_MaskedViewer_NextStepDoesNotDependOnSignatures()
+    {
+        // Arrange: ann and bob agree on Pass and have handed in; cyd looks, then ann signs
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.SeatAsync("cyd");
+        await world.AnswerAsync("ann");
+        await world.SubmitAsync("ann");
+        await world.AnswerAsync("bob");
+        await world.SubmitAsync("bob");
+        var before = await world.Signing.GetApprovalAsync(
+            BallotMaskingWorld.ActorOf("cyd"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Act: ann signs; cyd looks again
+        await world.Signing.SignAsync(
+            BallotMaskingWorld.ActorOf("ann"), world.ProjectId, BallotMaskingWorld.ReviewId,
+            (await world.Signing.GetApprovalAsync(world.ProjectId, BallotMaskingWorld.ReviewId, Token))!.Slots[0].SlotId,
+            (await world.Signing.GetApprovalAsync(world.ProjectId, BallotMaskingWorld.ReviewId, Token))!.Digest,
+            BallotMaskingWorld.Password, Token);
+        var after = await world.Signing.GetApprovalAsync(
+            BallotMaskingWorld.ActorOf("cyd"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        Assert.True(before!.IsMasked);
+        Assert.True(after!.IsMasked);
+        Assert.Equal(before.NextStep, after.NextStep);
     }
 
     /// <summary>

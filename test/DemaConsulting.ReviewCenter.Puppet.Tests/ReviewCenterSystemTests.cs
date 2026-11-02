@@ -371,9 +371,10 @@ public class ReviewCenterSystemTests
         await scenario.OpenReviewAsync();
         var approvalLocked = await browser.TextOfAsync("review-approval");
         var lockedBadge = await browser.TextOfAsync("review-locked");
-        var slotsDisabled = await browser.IsDisabledAsync("new-slot-primary-select")
-                            && await browser.IsDisabledAsync("new-slot-alternate-select")
-                            && await browser.IsDisabledAsync("new-slot-add-button");
+        var slotsDisabled = await browser.ExistsAsync("slots-locked-hint")
+                            && !await browser.ExistsAsync("new-slot-add-button")
+                            && !await browser.ExistsAsync("new-slot-primary-select")
+                            && !await browser.ExistsAsync("new-slot-alternate-select");
         await browser.OkAsync("click", "file-select-0");
         await browser.OkAsync("wait", "selected-file-path");
         var commentDisabled = await browser.EvalAsync(
@@ -405,7 +406,8 @@ public class ReviewCenterSystemTests
         var reopenedBy = await browser.TextOfAsync("reopen-by-0");
         var reopenReason = await browser.TextOfAsync("reopen-reason-0");
         var slotAfterReopen = await browser.TextOfAsync($"slot-status-{slot}");
-        var slotsEnabledAfterReopen = !await browser.IsDisabledAsync("new-slot-add-button");
+        var slotsEnabledAfterReopen = await browser.ExistsAsync("new-slot-add-button")
+                                      && !await browser.IsDisabledAsync("new-slot-add-button");
 
         // Act: the reviewer needs a fresh signature, and the review is approved and locked again with it
         await scenario.OpenReviewAsync(reviewer);

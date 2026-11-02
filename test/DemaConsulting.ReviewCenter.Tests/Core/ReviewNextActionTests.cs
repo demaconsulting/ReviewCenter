@@ -214,6 +214,64 @@ public class ReviewNextActionTests
     }
 
     /// <summary>
+    ///     Test that the person who asked every open question waits for the answer, that the other party is still told to
+    ///     answer, that findings still come first, and that unknown facts keep the older rule.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_OwnQuestion_WaitsForTheOtherParty()
+    {
+        // Arrange: three open questions, all asked by the viewer; the same questions seen by the other reviewer
+        var asker = Reviewer(f => f with { OpenQuestions = 1, OpenQuestionsAwaitingYou = 0, OtherReviewers = ["Bob"] });
+        var many = Reviewer(f => f with { OpenQuestions = 1, OpenQuestionsAwaitingYou = 0, OtherReviewers = ["Bob", "Cyd", "Dee"] });
+        var other = Reviewer(f => f with { OpenQuestions = 1, OpenQuestionsAwaitingYou = 1, OtherReviewers = ["Ann"] });
+        var unknown = Reviewer(f => f with { OpenQuestions = 1 });
+        var findings = Reviewer(f => f with { OpenFindings = 1, OpenQuestions = 1, OpenQuestionsAwaitingYou = 0 });
+
+        // Act
+        var waiting = ReviewNextAction.Decide(asker);
+        var crowd = ReviewNextAction.Decide(many);
+        var answer = ReviewNextAction.Decide(other);
+        var older = ReviewNextAction.Decide(unknown);
+        var resolve = ReviewNextAction.Decide(findings);
+
+        // Assert: the asker has a sentence without a button; everybody else is as before
+        Assert.Equal(NextActionKind.WaitForOthers, waiting.Kind);
+        Assert.False(waiting.IsActionable);
+        Assert.Equal("Waiting for Bob to answer your question.", waiting.Label);
+        Assert.Equal("Waiting for an answer to your question.", crowd.Label);
+        Assert.Equal(NextActionKind.AnswerQuestions, answer.Kind);
+        Assert.Equal("Answer the open questions", answer.Label);
+        Assert.Equal(NextActionKind.AnswerQuestions, older.Kind);
+        Assert.Equal(NextActionKind.ResolveFindings, resolve.Kind);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who signed is told whom the review waits for, and that a reviewer whose signature no
+    ///     longer counts, and who cannot sign again yet, is told so.
+    /// </summary>
+    [Fact]
+    public void ReviewNextAction_AfterSigning_NamesWhoIsMissing()
+    {
+        // Arrange
+        var named = Reviewer(f => f with { OwnSignature = SlotSignatureState.Signed, OthersToSign = ["Bob"] });
+        var unnamed = Reviewer(f => f with { OwnSignature = SlotSignatureState.Signed });
+        var lost = Reviewer(f => f with { OwnSignature = SlotSignatureState.OutOfDate, CanSign = false });
+
+        // Act
+        var afterSigning = ReviewNextAction.Decide(named);
+        var fallback = ReviewNextAction.Decide(unnamed);
+        var lostAction = ReviewNextAction.Decide(lost);
+
+        // Assert
+        Assert.Equal("You have signed. Waiting for Bob to sign.", afterSigning.Label);
+        Assert.False(afterSigning.IsActionable);
+        Assert.Equal("You have signed. Wait for the other reviewers.", fallback.Label);
+        Assert.Equal(NextActionKind.WaitForOthers, lostAction.Kind);
+        Assert.False(lostAction.IsActionable);
+        Assert.Contains("sign again", lostAction.Label, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that every combination of the facts gives exactly one action with words, and that an action with a
     ///     target always has a button label.
     /// </summary>

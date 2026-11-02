@@ -69,7 +69,8 @@ a review that was never reopened; it is read only when the record's reopen count
 there is no separate stored or computed "locked" flag.
 It also carries the counts behind the blockers (`OpenThreads`, `UnansweredChecks`, `MissingChecklist`),
 `FailedChecks`, the number of checks that the submitted ballots agree on as Fail (informational only: it is not a
-blocker), `DisputedChecks`, the number of checks and sections on which the submitted ballots disagree, and
+blocker), `FailedCheckIds`, the identifiers of those checks (empty when masked; see "Failed check identifiers and the
+rejection note"), `DisputedChecks`, the number of checks and sections on which the submitted ballots disagree, and
 `UnsubmittedBallots`, the number of slots whose ballot has not been handed in (zero for a review without a
 checklist). `Outcome` is the outcome that a signature made now would attest (`null` while a check is pending or
 disputed, a ballot is not handed in, or there is no checklist), and `ConclusionRequired` is true exactly when the
@@ -78,8 +79,11 @@ outcome is `Rejected` and the review has no conclusion text, which is when the c
 A `SlotStatus` holds the slot identity, its
 number, the primary and alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state,
 the state of the ballot of the slot (`Ballot`: `NotStarted`, `Draft` or `Submitted`; null for a review without a
-checklist; it is progress, not a verdict, so a masked status keeps it), and, for a signed slot, the name
-of the signer and the signing time. `IsMember` is `false` when the user is no longer a member of the project (a slot
+checklist; it is progress, not a verdict, so a masked status keeps it), for a signed slot the name
+of the signer and the signing time, and, for an out-of-date slot, `LapsedSignerName`: the display name of the person
+who gave the newest signature of the slot (the alternate when the alternate signed it, not always the primary), null
+otherwise; it is the name a sentence about a signature that no longer counts uses, and, being no ballot data, a masked
+status keeps it. `IsMember` is `false` when the user is no longer a member of the project (a slot
 keeps its assignee after a removal, so the status says who can no longer sign; step 1 of signing refuses such a user);
 the candidates of `ListCandidatesAsync` are members by definition. A member whose role is `Auditor` is never a
 reviewer: `AddSlotAsync` and `UpdateSlotAsync` refuse such a user as primary or alternate with `SlotUserInvalid`, and
@@ -273,9 +277,33 @@ reviewer slot has a current signature." when it is rejected; otherwise, when
 there are blockers, the sentence of `ThreadService.NextStep` for the threads, the checklist progress, the number of
 failed checks, the number of disputed checks, and whether a conclusion text is still needed (so a review without a
 slot, whose checks nobody can answer, points to the unanswered checks,
-for example "58 checklist checks unanswered."); otherwise "Add a reviewer slot." when there is no slot, "Ready for
-signatures (rejected outcome)." when there is a slot and the ballots agree on the rejected outcome, and "Ready for
-signatures." when there is a slot otherwise.
+for example "58 checklist checks unanswered."). A check on which the ballots disagree is named once, as disputed, and
+never as unanswered: the unanswered count is the pending count of the consolidation (`unanswered` of
+`ThreadService.NextStep`), not the progress of the checklist, which counts a disputed check as not answered. When the
+only blocker is the conclusion and the outcome is `Rejected`, the sentence names the provisional rejection in plain
+words (`ReviewApproval.RejectionNote`, for example "Both reviewers failed REQ-01, so this review will be Rejected.") and
+then says what is left ("Resolve 1 open question, write the review conclusion, then sign." or "Write the review
+conclusion, then sign."). Otherwise "Add a reviewer slot." when there is no slot. When nothing blocks and a slot has
+signed, the sentence is signature-aware and agrees with the status panel: "Signed by Rita. Waiting for the signatures of
+Sam and Tess." (or "the signature of Tess" for one), and, for a signature that went out of date, "Rita's signature no
+longer counts because the review changed. Waiting for Rita, Sam and Tess." ("The signatures of A and B no longer
+count ..." for several); the names of the lapsed signatures are those of the people who signed
+(`SlotStatus.LapsedSignerName`), so a slot signed by its alternate names the alternate, while the awaited people are the
+primaries of the slots that have no current signature. When nobody has signed: "Ready for signatures.", or
+"{rejection note} Ready for signatures." when the ballots agree on the rejected outcome.
+
+**Failed check identifiers and the rejection note**: `ReviewApproval.FailedCheckIds` lists the checks that the submitted
+ballots agree on as Fail, in checklist order (null or empty when there is none). `ReviewApproval.RejectionNote` is a
+computed sentence naming the provisional rejection: it is non-null only when the status is not masked, the review is
+not concluded, the outcome is `Rejected` and `FailedCheckIds` is not empty. The wording is "The reviewer failed X, so
+this review will be Rejected." for one slot, "Both reviewers failed ..." for two, "All N reviewers failed ..." for more,
+and "The reviewers who handed in a ballot failed ..." while a ballot is missing; the identifiers are listed as "A", "A
+and B", "A, B and C", and at most five are named, followed by "and N more". **`ReviewApproval.Masked()` always empties
+`FailedCheckIds`**, so a masked status (a viewer who has not handed in a ballot, an API token, a stranger, or a
+viewer-less system read where the policy masks) never carries a failed check, the provisional rejection or the note.
+The masked next step starts with "Hand in your ballot to see the other reviewers' answers." and the sentence about the open
+threads (if any) follows it. `ReviewApproval.MissingBallotsText(names)` is the one wording of "{names} has/have not
+handed in a ballot yet. If you sign now, you may have to sign again.", shared by the readers of the status.
 
 **Signing** takes the actor (the signed-in user, never a form value), the slot, the digest the signer was looking at
 (`expectedDigest`), and the password. It checks, in this order, and stops at the first failure:

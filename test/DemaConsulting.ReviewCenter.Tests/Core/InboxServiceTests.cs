@@ -1282,7 +1282,7 @@ public class InboxServiceTests
         var row = Assert.Single(view.Items);
         Assert.Equal(InboxSection.Disputed, row.Section);
         Assert.Equal("1 disputed", row.Chip);
-        Assert.Equal("Change your answer or discuss it.", row.Detail);
+        Assert.Equal("Change your answer to REQ-01 or discuss it.", row.Detail);
         Assert.Equal(1, view.ActionCount);
     }
 
@@ -1300,7 +1300,7 @@ public class InboxServiceTests
 
         // Assert
         Assert.Equal("1 disputed", row.Chip);
-        Assert.Equal("The reviewers answered differently. Discuss it with them.", row.Detail);
+        Assert.Equal("The reviewers answered REQ-01 differently. Discuss it with them.", row.Detail);
     }
 
     /// <summary>
@@ -1385,12 +1385,12 @@ public class InboxServiceTests
         // Act
         var view = await world.InboxOfAsync("ann");
 
-        // Assert
-        var row = Assert.Single(view.Items);
-        Assert.Equal(InboxSection.WaitingForOthers, row.Section);
+        // Assert: the waiting row is no work; bob's open question is the only action
+        var row = Assert.Single(view.Items, item => item.Section == InboxSection.WaitingForOthers);
         Assert.Equal("Open items remain", row.Chip);
         Assert.StartsWith("Open items remain:", row.Detail, StringComparison.Ordinal);
-        Assert.Equal(0, view.ActionCount);
+        Assert.Equal(InboxService.QuestionChip, Assert.Single(view.Items, item => item.Section == InboxSection.ToAnswer).Chip);
+        Assert.Equal(1, view.ActionCount);
     }
 
     /// <summary>
@@ -1412,9 +1412,8 @@ public class InboxServiceTests
         // Act
         var view = await world.InboxOfAsync("ann");
 
-        // Assert: the only row is a waiting row without a due date or overdue marker
-        var row = Assert.Single(view.Items);
-        Assert.Equal(InboxSection.WaitingForOthers, row.Section);
+        // Assert: the waiting row has no due date or overdue marker
+        var row = Assert.Single(view.Items, item => item.Section == InboxSection.WaitingForOthers);
         Assert.Null(row.DueDate);
         Assert.False(row.IsOverdue);
     }
@@ -1504,5 +1503,360 @@ public class InboxServiceTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => world.Inbox.GetReviewUnreadAsync(null!, world.ProjectId, "r1", Ct));
         await Assert.ThrowsAsync<ArgumentNullException>(() => world.Inbox.MarkSeenAsync(null!, world.ProjectId, "r1", 0, null, Ct));
         await Assert.ThrowsAsync<ArgumentNullException>(() => world.Inbox.MarkAllReadAsync(null!, Ct));
+    }
+
+    /// <summary>
+    ///     Test that a slot holder who has not written in a question that someone else started finds a Question for you
+    ///     row under To answer that opens the review, is unread and counts as work; the row names the asker and tells
+    ///     nothing else.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow()
+    {
+        // Arrange: ann holds a slot and bob asks a question
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.StartThreadAsync("r1", "bob", "Why is this here?");
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+
+        // Assert: the row is a To answer row that opens the review, and does not quote the question
+        var row = Assert.Single(view.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.Equal(InboxSection.ToAnswer, row.Section);
+        Assert.True(row.OpensReview);
+        Assert.True(row.IsUnread);
+        Assert.Contains("Bob", row.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Why is this here?", row.Detail, StringComparison.Ordinal);
+        Assert.True(view.ActionCount >= 1);
+        Assert.Equal(
+            1,
+            await world.Inbox.CountAsync(InboxTestWorld.ActorOf("ann"), Ct));
+    }
+
+    /// <summary>
+    ///     Test that the Question for you row goes away when the user writes in the thread, and that the asker and the
+    ///     author never get the row for their own question.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow()
+    {
+        // Arrange: bob asks, ann holds a slot
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        var thread = await world.StartThreadAsync("r1", "bob");
+
+        // Assert: the asker and the author do not get the row
+        Assert.DoesNotContain((await world.InboxOfAsync("bob")).Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.DoesNotContain((await world.InboxOfAsync("author")).Items, item => item.Chip == InboxService.QuestionChip);
+
+        // Act: ann writes in the thread
+        await world.ReplyAsync("r1", thread.Id, "ann");
+
+        // Assert
+        Assert.DoesNotContain((await world.InboxOfAsync("ann")).Items, item => item.Chip == InboxService.QuestionChip);
+    }
+
+    /// <summary>
+    ///     Test that a stranger, an auditor and a user in a project they may not see get no Question for you row and no
+    ///     count.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_QuestionForStranger_ShowsNothing()
+    {
+        // Arrange: a question in a review the stranger and the auditor are not part of
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.StartThreadAsync("r1", "bob");
+
+        // Act
+        var stranger = await world.InboxOfAsync("out");
+        var auditor = await world.InboxOfAsync("aud");
+
+        // Assert
+        Assert.Empty(stranger.Items);
+        Assert.Equal(0, stranger.ActionCount);
+        Assert.DoesNotContain(auditor.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.Equal(0, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("out"), Ct));
+    }
+
+    /// <summary>
+    ///     Test that a slot holder who may not contribute (a read-only auditor) and a slot holder who is no member (a
+    ///     system administrator) get no Question for you row and no count, although the question of another slot is open
+    ///     and they have not written in it.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_QuestionForSlotHolderWhoMayNotContribute_ShowsNoRowAndNoCount()
+    {
+        // Arrange: bob asks a question; the auditor and the system administrator hold a slot (arranged in the store,
+        // because the services refuse them as reviewers) and have not written in the thread
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "bob");
+        foreach (var name in new[] { "aud", "root" })
+        {
+            await world.Store.AddSlotAsync(
+                new ReviewerSlot { ProjectId = world.ProjectId, ReviewId = "r1", PrimaryUserId = world.Ids[name] },
+                _ => AuditTestExtensions.Draft(),
+                Ct);
+        }
+
+        await world.StartThreadAsync("r1", "bob", "Why is this here?");
+        await world.AddSlotAsync("r1", "ann");
+
+        // Act
+        var auditor = await world.InboxOfAsync("aud");
+        var administrator = await world.InboxOfAsync("root");
+        var holder = await world.InboxOfAsync("ann");
+
+        // Assert: the question is open for a slot holder who may work, and for nobody else
+        Assert.Single(holder.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.DoesNotContain(auditor.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.DoesNotContain(administrator.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.Equal(0, auditor.ActionCount);
+        Assert.Equal(0, administrator.ActionCount);
+        Assert.Equal(0, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("aud"), Ct));
+        Assert.Equal(0, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("root"), Ct));
+    }
+
+    /// <summary>
+    ///     Test that the Question for you row tells a reviewer who has not handed in nothing about the ballots: a
+    ///     question on a check is not shown at all, and the inbox is the same whether the others disagree or not.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData()
+    {
+        // Arrange: cyd has not handed in; ann and bob disagree in one world, agree in the other
+        var agreed = await ThreeReviewersAsync(false);
+        var disagreed = await ThreeReviewersAsync(true);
+        var checkId = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        var baseline = await disagreed.InboxOfAsync("cyd");
+
+        // Act: ann asks a question on a check, and a plain question on a file
+        await disagreed.Threads.StartThreadAsync(
+            disagreed.ProjectId, "r1", ThreadAnchor.ForCheck(checkId), InboxTestWorld.ActorOf("ann"), "Why Fail?", Ct);
+        await agreed.Threads.StartThreadAsync(
+            agreed.ProjectId, "r1", ThreadAnchor.ForCheck(checkId), InboxTestWorld.ActorOf("ann"), "Why Fail?", Ct);
+        var withCheck = await disagreed.InboxOfAsync("cyd");
+        var withCheckAgreed = await agreed.InboxOfAsync("cyd");
+
+        // Assert: the check question changes nothing for cyd, and gives no ballot data
+        Assert.Equal(
+            baseline.Items.Select(item => (item.Section, item.Chip, item.Detail)),
+            withCheck.Items.Select(item => (item.Section, item.Chip, item.Detail)));
+        Assert.DoesNotContain(withCheck.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.Equal(
+            withCheckAgreed.Items.Select(item => (item.Section, item.Chip, item.Detail)),
+            withCheck.Items.Select(item => (item.Section, item.Chip, item.Detail)));
+
+        // Act: a plain question on a file shows the row, which says nothing about the ballots
+        await disagreed.StartThreadAsync("r1", "ann", "Why Fail?");
+        var plain = await disagreed.InboxOfAsync("cyd");
+
+        // Assert
+        var row = Assert.Single(plain.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.DoesNotContain(checkId, row.Detail + row.Chip, StringComparison.Ordinal);
+        Assert.DoesNotContain("Fail", row.Detail + row.Chip, StringComparison.Ordinal);
+        Assert.DoesNotContain("dispute", row.Detail + row.Chip, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(plain.Items, item => item.Section == InboxSection.Disputed);
+    }
+
+    /// <summary>
+    ///     Test that a signer whose signature no longer counts, and who cannot sign again yet because an item is open,
+    ///     finds a Your signature no longer counts row that counts as work, and that the other signer is told.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow()
+    {
+        // Arrange: two slots, ann signs, then bob opens a finding: ann's signature no longer counts
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.SignAsync("r1", first.Id, "ann");
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        var thread = await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+
+        // Act
+        var forAnn = await world.InboxOfAsync("ann");
+        var forBob = await world.InboxOfAsync("bob");
+
+        // Assert: the row, its text, and that it counts as work
+        var row = Assert.Single(forAnn.Items, item => item.Section == InboxSection.SignatureLost);
+        Assert.Equal(InboxService.SignatureLostChip, row.Chip);
+        Assert.StartsWith("You cannot sign again yet", row.Detail, StringComparison.Ordinal);
+        Assert.Contains("open items remain", row.Detail, StringComparison.Ordinal);
+        Assert.True(row.IsUnread);
+        Assert.DoesNotContain(forAnn.Items, item => item.Section == InboxSection.ToSign);
+        Assert.DoesNotContain(forAnn.Items, item => item.Section == InboxSection.WaitingForOthers);
+        Assert.Equal(forAnn.ActionCount, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("ann"), Ct));
+        Assert.True(forAnn.ActionCount >= 1);
+
+        // Assert: bob is told that the signature of ann no longer counts
+        var waiting = Assert.Single(forBob.Items, item => item.Section == InboxSection.WaitingForOthers);
+        Assert.Contains("signature no longer counts", waiting.Detail, StringComparison.Ordinal);
+        Assert.Contains("Ann", waiting.Detail, StringComparison.Ordinal);
+
+        // Act: the finding is settled, so ann can sign again
+        await world.Threads.ResolveAsync(
+            world.ProjectId, "r1", thread.Id, InboxTestWorld.ActorOf("bob"), Ct, acknowledged, "Fixed");
+        var after = await world.InboxOfAsync("ann");
+
+        // Assert: the row turns into the sign-again row, with the plain sentence
+        Assert.DoesNotContain(after.Items, item => item.Section == InboxSection.SignatureLost);
+        var sign = Assert.Single(after.Items, item => item.Section == InboxSection.ToSign);
+        Assert.Equal(InboxService.SignAgainChip, sign.Chip);
+        Assert.Equal(InboxRules.SignAgainText, sign.Detail);
+    }
+
+    /// <summary>
+    ///     Test that the Waiting for others row names the person who actually signed a slot that went out of date: the
+    ///     alternate when the alternate signed, the primary when the primary signed.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner()
+    {
+        // Arrange: slot 1 has the primary ann and the alternate cyd; cyd signs it; slot 2 is bob's; slot 3 is dee's and
+        // dee signs it; bob then opens a finding, which puts both signatures out of date
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann", "cyd");
+        await world.AddSlotAsync("r1", "bob");
+        var third = await world.AddSlotAsync("r1", "dee");
+        await world.SignAsync("r1", first.Id, "cyd");
+        await world.SignAsync("r1", third.Id, "dee");
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+
+        // Act
+        var forBob = await world.InboxOfAsync("bob");
+
+        // Assert: the sentence about the withdrawn signatures names Cyd (who signed) and Dee, and never Ann
+        var waiting = Assert.Single(forBob.Items, item => item.Section == InboxSection.WaitingForOthers);
+        Assert.Contains(
+            "The signatures of Cyd and Dee no longer count, so they must sign again.",
+            waiting.Detail,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Ann's signature", waiting.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a single lapsed signature of an alternate is named by the alternate in the Waiting for others row.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate()
+    {
+        // Arrange: cyd, the alternate of ann's slot, signs; bob then opens a finding
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann", "cyd");
+        await world.AddSlotAsync("r1", "bob");
+        await world.SignAsync("r1", first.Id, "cyd");
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+
+        // Act
+        var forBob = await world.InboxOfAsync("bob");
+
+        // Assert: the people awaited are Ann and Cyd, the signature that lapsed is Cyd's
+        var waiting = Assert.Single(forBob.Items, item => item.Section == InboxSection.WaitingForOthers);
+        Assert.Equal(
+            InboxRules.WaitingForText(["Ann", "Cyd"], ["Cyd"]),
+            waiting.Detail);
+        Assert.Contains("Cyd's signature no longer counts, so Cyd must sign again.", waiting.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ann's signature", waiting.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a stranger and a user who never signed get no Your signature no longer counts row.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SignatureLost_NotShownToOthers()
+    {
+        // Arrange: ann signed and lost the signature
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.SignAsync("r1", first.Id, "ann");
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+
+        // Act, Assert
+        foreach (var user in new[] { "bob", "author", "out", "aud" })
+        {
+            Assert.DoesNotContain((await world.InboxOfAsync(user)).Items, item => item.Section == InboxSection.SignatureLost);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the Ready to sign row names the reviewers who have not handed in a ballot, and does not once all
+    ///     ballots are in.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn()
+    {
+        // Arrange: ann and bob handed in the same answers, cyd did not
+        var world = await ThreeReviewersAsync(false);
+
+        // Act
+        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+
+        // Assert: the caution is the shared sentence
+        Assert.Equal(ReviewApproval.MissingBallotsText(["Cyd"]), row.Detail);
+
+        // Act: cyd hands in
+        await world.SubmitBallotAsync("r1", "cyd");
+        var after = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+
+        // Assert: nothing to warn about
+        Assert.Null(after.Detail);
+    }
+
+    /// <summary>
+    ///     Test that the Disputed row names the check for a viewer who handed in, and that a viewer who has not handed
+    ///     in never gets a Disputed row, a check name or a word about rejection.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_DisputedNamesCheck_OnlyForViewerWhoHandedIn()
+    {
+        // Arrange
+        var world = await ThreeReviewersAsync(true);
+        var checkId = DefaultChecklist.Current.Sections[0].Items[0].Id;
+
+        // Act
+        var forAnn = await world.InboxOfAsync("ann");
+        var forCyd = await world.InboxOfAsync("cyd");
+        var forStranger = await world.InboxOfAsync("out");
+
+        // Assert: ann sees the check name
+        Assert.Contains(checkId, Assert.Single(forAnn.Items, item => item.Section == InboxSection.Disputed).Detail, StringComparison.Ordinal);
+
+        // Assert: cyd sees no dispute, no check name and no rejection wording
+        Assert.DoesNotContain(forCyd.Items, item => item.Section == InboxSection.Disputed);
+        foreach (var item in forCyd.Items)
+        {
+            var text = item.Chip + " " + item.Detail;
+            Assert.DoesNotContain(checkId, text, StringComparison.Ordinal);
+            Assert.DoesNotContain("reject", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("differ", text, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Assert: the stranger gets nothing
+        Assert.Empty(forStranger.Items);
     }
 }

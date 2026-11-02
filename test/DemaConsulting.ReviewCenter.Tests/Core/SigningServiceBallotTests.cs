@@ -254,6 +254,200 @@ public class SigningServiceBallotTests
     }
 
     /// <summary>
+    ///     Test that a disputed check is named once, as disputed, in the next step, and not also as unanswered, while
+    ///     every check is answered.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered()
+    {
+        // Arrange: every check is answered by every slot; sam disagrees on the first check
+        var world = await SignedReviewWorld.CreateAsync();
+        await DissentAsync(world, "sam");
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert: one dispute, nothing unanswered, in the structure and in the sentence
+        Assert.Equal(1, approval.DisputedChecks);
+        Assert.Equal(0, approval.UnansweredChecks);
+        Assert.Equal("1 check disputed between the ballots.", approval.NextStep);
+        Assert.DoesNotContain("unanswered", approval.NextStep, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the next step says who has signed and whose signature is awaited once nothing blocks signing, and
+    ///     is unchanged while nobody has signed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots()
+    {
+        // Arrange, Act, Assert: nobody, then one, then two have signed
+        var world = await SignedReviewWorld.CreateAsync();
+        Assert.Equal("Ready for signatures.", (await world.ApprovalAsync()).NextStep);
+        await world.SignAsync(1);
+        Assert.Equal("Signed by Rita. Waiting for the signatures of Sam and Tess.", (await world.ApprovalAsync()).NextStep);
+        await world.SignAsync(2);
+        Assert.Equal("Signed by Rita and Sam. Waiting for the signature of Tess.", (await world.ApprovalAsync()).NextStep);
+    }
+
+    /// <summary>
+    ///     Test that a signature that no longer counts is named in the next step, with everybody who is awaited.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt()
+    {
+        // Arrange: rita signs, then the conclusion text changes the record, acknowledging her signature
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [world.Slots[0].Id]);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert
+        Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots[0].State);
+        Assert.Empty(approval.Blockers);
+        Assert.Equal(
+            "Rita's signature no longer counts because the review changed. Waiting for Rita, Sam and Tess.",
+            approval.NextStep);
+        Assert.Equal("Rita", approval.Slots[0].LapsedSignerName);
+    }
+
+    /// <summary>
+    ///     Test that a slot that was signed by its alternate names the alternate, not the primary, in the next step
+    ///     when that signature no longer counts.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate()
+    {
+        // Arrange: alex, the alternate of slot 1, signs, then the conclusion text changes the record, acknowledging it
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1, alternate: true);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [world.Slots[0].Id]);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert: the lapsed signature is Alex's; the awaited people are still the primaries of the slots
+        Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots[0].State);
+        Assert.Equal("Alex", approval.Slots[0].LapsedSignerName);
+        Assert.Equal(
+            "Alex's signature no longer counts because the review changed. Waiting for Rita, Sam and Tess.",
+            approval.NextStep);
+    }
+
+    /// <summary>
+    ///     Test that the next step names the actual signers when the signatures of several slots no longer count and
+    ///     one slot was signed by its alternate.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners()
+    {
+        // Arrange: alex signs slot 1 and sam signs slot 2, then the conclusion text changes, acknowledging both
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1, alternate: true);
+        await world.SignAsync(2);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken,
+            [world.Slots[0].Id, world.Slots[1].Id]);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert: Alex and Sam, never Rita, are named as the signers whose signatures lapsed
+        Assert.Equal(
+            "The signatures of Alex and Sam no longer count because the review changed. Waiting for Rita, Sam and Tess.",
+            approval.NextStep);
+    }
+
+    /// <summary>
+    ///     Test that the newest signature of a slot decides who is named when the signature no longer counts, and that
+    ///     a signed or unsigned slot and a masked status carry the name correctly.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner()
+    {
+        // Arrange: rita signs slot 1, the record changes, alex signs the new record, the record changes again; sam signs
+        // slot 2 at the final record
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var slotOne = world.Slots[0].Id;
+        await world.SignAsync(1);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [slotOne]);
+        await world.SignAsync(1, alternate: true);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "Another note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [slotOne]);
+        await world.SignAsync(2);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+        var masked = approval.Masked();
+
+        // Assert: slot 1 names the newest signer; the signed and the unsigned slot name nobody; masking keeps the name
+        Assert.Equal("Alex", approval.Slots[0].LapsedSignerName);
+        Assert.Null(approval.Slots[1].LapsedSignerName);
+        Assert.Null(approval.Slots[2].LapsedSignerName);
+        Assert.Equal("Alex", masked.Slots[0].LapsedSignerName);
+    }
+
+    /// <summary>
+    ///     Test that a masked status never carries the signature-aware sentence of the full status, only the sentence
+    ///     built from the counts that stay visible, so the masked next step is the same whoever has signed.
+    /// </summary>
+    [Fact]
+    public void ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome()
+    {
+        // Arrange: a status with no open thread and one with an open question
+        var none = new ReviewApproval(ReviewConclusion.None, "d", [], [], "Signed by Rita. Waiting for the signature of Sam.");
+        var open = none with { OpenThreads = 1, OpenQuestions = 1 };
+
+        // Act
+        var maskedNone = none.Masked();
+        var maskedOpen = open.Masked();
+
+        // Assert: the hand-in sentence comes first; the open threads are added only when there are some
+        Assert.Equal("Hand in your ballot to see the other reviewers' answers.", maskedNone.NextStep);
+        Assert.Equal(
+            "Hand in your ballot to see the other reviewers' answers. Resolve the open threads. " + ReviewApproval.HiddenNotice,
+            maskedOpen.NextStep);
+    }
+
+    /// <summary>
+    ///     Test the sentence that warns a signer about ballots that are not handed in: singular, plural, a longer list
+    ///     and no names.
+    /// </summary>
+    /// <param name="names">The names, separated by a vertical bar.</param>
+    /// <param name="expected">The expected sentence.</param>
+    [Theory]
+    [InlineData("Bob", "Bob has not handed in a ballot yet. If you sign now, you may have to sign again.")]
+    [InlineData("Bob|Carol", "Bob and Carol have not handed in a ballot yet. If you sign now, you may have to sign again.")]
+    [InlineData("Bob|Carol|Dave", "Bob, Carol and Dave have not handed in a ballot yet. If you sign now, you may have to sign again.")]
+    [InlineData("", "")]
+    public void ReviewApproval_MissingBallotsText_WordsTheNames(string names, string expected)
+    {
+        // Arrange
+        var list = names.Length == 0 ? [] : names.Split('|');
+
+        // Act, Assert
+        Assert.Equal(expected, ReviewApproval.MissingBallotsText(list));
+    }
+
+    /// <summary>
+    ///     Test that the missing-ballots sentence refuses a missing list.
+    /// </summary>
+    [Fact]
+    public void ReviewApproval_MissingBallotsText_NullNames_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => ReviewApproval.MissingBallotsText(null!));
+    }
+
+    /// <summary>
     ///     Test that a review without a slot has no submitted ballot, so its next step is the open checklist.
     /// </summary>
     [Fact]

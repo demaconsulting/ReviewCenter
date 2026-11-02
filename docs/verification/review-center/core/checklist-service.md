@@ -45,7 +45,10 @@ N/A - standard test environment.
 - A viewer who holds a slot gets the own ballot with its draft and nothing of another slot's draft; a viewer without a
   slot gets the consolidated standing of the submitted ballots, marked as without a slot, in a review with a single slot
   or a concluded review (a review with several slots that is not concluded gives such a viewer a masked state, see the
-  verification of *BallotVisibility*); the API reads the consolidated standing with `GetConsolidatedAsync`, which
+  verification of *BallotVisibility*); the ballot view names, for every viewer of the project, the other reviewers who
+  have not handed in, and gives the justifications of the others, the differing checks and the failed count only to a
+  viewer who may see the others and may view the project (never to a viewer who has not handed in, an API token or a
+  stranger); the API reads the consolidated standing with `GetConsolidatedAsync`, which
   requires a viewer and masks for an API token.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
@@ -214,6 +217,28 @@ Pass. This scenario is tested by `ChecklistService_GetAsync_Viewer_SeesOwnDraftO
 answer, a read as a member without a slot gives the consolidated standing (the review has a single slot, so nothing is
 hidden), marked `NoSlot`, with no own ballot and no answer to that check, because the draft does not count. This
 scenario is tested by `ChecklistService_GetAsync_NoSlot_Consolidated`.
+
+**ChecklistService_GetBallotView_OtherBallotMissing_NamesThemForViewersOfTheProject**: Ann has handed in, bob has a
+draft, and cyd is a member without a slot. The ballot view of ann and that of cyd name bob as not handed in; the view of
+bob, who is masked because his ballot is a draft, names nobody (ann is in, and his own slot is never named); a user
+outside the project gets an empty list. This scenario is tested by
+`ChecklistService_GetBallotView_OtherBallotMissing_NamesThemForViewersOfTheProject`.
+
+**ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount**: Ann passes and bob fails a check
+with a reason, both handed in. The ballot view of ann holds the check as differing with the reason of bob and none of
+ann, her own slot number 1, and no failed check, because a differing check is not a failed one. In a second review
+where both fail the check, the view has no differing check and counts one failed check. This scenario is tested by
+`ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount`.
+
+**ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck**: Ann handed in a Fail with a reason
+and bob has a draft Fail. The ballot view for bob, for a member without a slot, for that member through an API token and
+for a user outside the project has no differing check and no failed check, and its serialized form does not contain the
+reason. This scenario is tested by `ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck`.
+
+**ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers**: In a review with a single slot
+that ann failed, the view for ann counts one failed check and the view for a user outside the project counts none and
+has no differing check, though the ballots of such a review are open to every viewer of the project. This scenario is
+tested by `ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers`.
 
 **ChecklistService_SubmitBallotAsync_DigestChanging_RequiresAcknowledgementOfOtherSlots**: Three submitted ballots
 agree and slot 1 has signed. A reviewer of another slot changes an answer to Fail; the edit is stored and the signature

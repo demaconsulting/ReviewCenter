@@ -71,7 +71,7 @@ described below.
 - *Algorithm*: Run `git merge-base --is-ancestor <ancestor> <descendant>` against the mirror, without credentials, and
   read the exit code: 0 is yes, 1 is no, and any other code (an unknown commit, a damaged mirror) is a failure
   reported like every other git failure (`GitAccessFailed`, without paths). The planner uses it to find out whether
-  the head of the last signed review can be the baseline of a new review.
+  the head of the last approved review can be the baseline of a new review.
 
 **GetBlobSizeAsync** (session): Reads the size of a blob.
 

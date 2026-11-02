@@ -198,7 +198,10 @@ Reviewing chapter).
 
 **`state` and `approved`.** The review data has both a `state` and an `approved` field. `state` is the stored
 life-cycle value, and in this release it is always `Draft`, even after the review is signed; it is kept so that clients
-that read it keep working. Use `approved` (`true` while the review is concluded as approved: it has at least one slot,
+that read it keep working. It does not tell you whether the review is approved or rejected, and it does not change when
+a reviewer signs; use `approved`, `outcome` (`Approved` or `Rejected` once the review is concluded, otherwise `null`)
+and `slots` to follow the life cycle. Use `approved` (`true` while the review is concluded as approved: it has at least
+one slot,
 every slot has handed in
 its ballot and has signed the current record as approved, the submitted ballots agree on an approved outcome with no
 check pending, disputed or answered Fail, and no thread is open; the review is then locked) to find

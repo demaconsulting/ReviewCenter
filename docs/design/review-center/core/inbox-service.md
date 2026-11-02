@@ -4,7 +4,7 @@
 
 #### Purpose
 
-`InboxService` builds the inbox of a user: the reviews that wait for the user, in seven groups, and the number of
+`InboxService` builds the inbox of a user: the reviews that wait for the user, in eight groups, and the number of
 reviews that need action. It also keeps what the user has seen of each review, which marks new comments and new
 changes. The inbox is also the notification list. There is no notification record: every row is computed from the
 review data when the inbox is read, and the single `ReviewUserState` row of a user and a review says what is new. The
@@ -18,13 +18,15 @@ helper `InboxRules`, so they can be tested without a store. The unit also holds 
 The unit holds no state of its own beyond its injected stores, the access rules, and the clock. It is safe for
 concurrent use as long as the stores are.
 
-**InboxSection**: `ToAnswer`, `Disputed`, `ToSign`, `RepliesWaiting`, `FailedChecks` (these five need action and are
-counted), `WaitingForOthers` and `Updates` (information only), in the order in which the page shows them. The helper
-`InboxSections.IsAction` is the one place that says which sections are action, so the badge and the page agree.
+**InboxSection**: `ToAnswer`, `Disputed`, `ToSign`, `SignatureLost`, `RepliesWaiting`, `FailedChecks` (these six need
+action and are counted), `WaitingForOthers` and `Updates` (information only), in the order in which the page shows
+them. The helper `InboxSections.IsAction` is the one place that says which sections are action, so the badge and the
+page agree.
 
 **InboxItem**: Section, project, project name, review identifier, title, a short chip, an unread flag, the due date, an
-overdue flag, and an optional detail sentence. **InboxView**: the items ordered by section, then project name, then
-review identifier, and `ActionCount`, the number of distinct reviews in the five action groups.
+overdue flag, an optional detail sentence, and `OpensReview`, which is true for a row whose link opens the review page
+and not the checklist (the Question for you row). **InboxView**: the items ordered by section, then project name, then
+review identifier, and `ActionCount`, the number of distinct reviews in the six action groups.
 
 **ReviewUserState**: user, project, review, `LastSeenCommentId` (the highest comment identity the user has seen; zero
 for none), and `LastSeenAt`, the time read before the review was loaded when the user last saw it. Comment identities
@@ -43,8 +45,9 @@ are assigned in posting order and never reused, so one integer per review tells 
   depends on the record digest, on the ballots, and on the open threads (a review is concluded, as approved or as
   rejected, only when every slot has handed in its ballot, the ballots agree on the outcome, every slot is signed for
   the current record with that outcome and no thread is open; `ReviewLock.IsConcluded`), and add rows by these rules.
-  A review that is not concluded gets at most one of the four *standing* rows (To answer, Disputed, Ready to sign,
-  Waiting for others) for the user, decided by `InboxRules.ReviewerStanding`, which mirrors `ReviewNextAction.Decide`,
+  A review that is not concluded gets at most one of the five *standing* rows (To answer, Disputed, Ready to sign,
+  Your signature no longer counts, Waiting for others) for the user, decided by `InboxRules.ReviewerStanding`, which
+  mirrors `ReviewNextAction.Decide`,
   so the inbox and the status panel of the review say the same. A user who may not contribute, or a slot holder who is
   not a member, gets no standing row.
   - *To answer*: the user holds a slot, the review has a checklist, the project does not forbid the author to answer
@@ -52,16 +55,44 @@ are assigned in posting order and never reused, so one integer per review tells 
     is "Not started" or "Draft" and the detail sentence tells how many checks are answered. The row uses nothing of
     the other reviewers, so it is the same whatever they answered. The ballot is the one of the slot of the user with
     the lowest identity. A slot holder who is blocked as author gets no row.
+  - *Question for you* (also `ToAnswer`, chip `QuestionChip`): the user may contribute, the review is not concluded,
+    the user is not the author, and a slot holder is a member. `InboxRules.QuestionsForYou` takes the open Question
+    threads (not Findings) that someone else started and in which the user wrote no comment. A thread has no addressee,
+    so this is a heuristic and in a review of three or more people the question is shown to every other slot holder; a
+    structured addressee is a follow-up. The threads come from the masked thread list, so a viewer who
+    may not see the other ballots never reads a thread on a check. The detail sentence names the asker of a single
+    question or counts several ("2 open questions from others. You can answer them.") and never quotes the text or
+    names a ballot answer. The row has `OpensReview`, so it links to the review page, where the thread is. It is unread
+    without a read-state row or while a comment of someone else is newer than `LastSeenCommentId`. The author is
+    left out, because Replies waiting already lists every open thread whose last comment is by someone else.
   - *Disputed*: the user has handed in the ballot, may see the other ballots (see `BallotVisibility`), and some
-    checks or sections are disputed. The chip is "{n} disputed". A viewer who may not see the other ballots is never
-    in this standing and the dispute count is not even read for such a viewer, so no dispute can leak.
+    checks or sections are disputed. The chip is "{n} disputed". The detail names the disputed checks (their
+    identifiers in checklist order, then the disputed sections as `section "Title"`; up to five, then "and n more"),
+    for example "Change your answer to REQ-01 or discuss it." for a slot holder and "The reviewers answered REQ-01
+    differently. Discuss it with them." for the author (`InboxRules.DisputedText`). The names are read from the
+    consolidated checklist, which is not built for a viewer who may not see the other ballots, so a viewer who may
+    not see them is never in this standing and no dispute, check name or rejection wording can leak.
   - *Ready to sign* (`ToSign`): the user holds a slot without a current signature, has handed in the ballot, and
     nothing blocks the signature (`SigningService.CanSignAfter`, including no open thread and no dispute). The chip
     is "Not signed", or "The review changed, sign again" when every such slot has a
     signature that no longer covers the record. The state of a slot is the one the approval of the review uses.
+    The detail sentence is "The review changed, your signature no longer counts. Look at the changes and sign again."
+    when a slot of the user is out of date, followed by `ReviewApproval.MissingBallotsText` naming the other slot
+    holders who have not handed in a ballot (who has handed in is progress, not a verdict, so the names are visible);
+    it is empty when all ballots are in.
+  - *Your signature no longer counts* (`SignatureLost`): the user has handed in the ballot, holds a slot whose
+    signature no longer covers the record, and cannot sign again yet (otherwise the row is Ready to sign). It is
+    shown even while the review is not signable, which Ready to sign never is. The chip is `SignatureLostChip` and the
+    detail sentence is `InboxRules.SignatureLostText`: "You cannot sign again yet: {why}. When nothing blocks it, look
+    at the changes and sign again.", where the reason lists the open visible threads, a rejected outcome without a
+    conclusion, the people still waited for, or else that some checks are still open. The row is counted. The status
+    panel of the review (`ReviewNextAction`) is changed to say the same.
   - *Waiting for others*: the user holds a slot, has done their part (handed in the ballot, and cannot sign yet or has
     signed). The chip is "Waiting for 1 reviewer", "Waiting for n reviewers" or "Open items remain", and the detail
-    sentence names the people whose slots are not signed ("Waiting for Alice, Bob."), or says that open items remain,
+    sentence names the people whose slots are not signed ("Waiting for Alice, Bob."), then says whose signature no
+    longer counts ("Alice's signature no longer counts, so Alice must sign again."; the name is that of the person who
+    gave the newest signature of the slot, so a slot signed by its alternate names the alternate), or says that open
+    items remain,
     or that nothing is left to do. Who has not handed in is progress and not a verdict, so the names are shown to every
     viewer. The row is information: it is never unread and never counted.
   - *Replies waiting*: the user may contribute, the review is not concluded, and there is an open thread whose last
@@ -89,6 +120,8 @@ are assigned in posting order and never reused, so one integer per review tells 
 - *Unread*: a row is unread when the user has no read-state row, or the reason is newer than the row. A To answer row
   is unread only without a read-state row. A Disputed row is unread without a read-state row or when another
   reviewer handed in a ballot after `LastSeenAt`; comments do not count. A Waiting for others row is never unread. A
+  Question for you row is unread without a read-state row or for a comment of someone else with a higher identity than
+  `LastSeenCommentId`; a Your signature no longer counts row follows the Ready to sign rule. A
   Replies waiting or Failed checks row is unread for a comment of
   someone else with a higher identity than `LastSeenCommentId`, a signature or a reopening after `LastSeenAt`, or a
   Fail answered by someone else after `LastSeenAt` (the answerer of the representative row of the agreed Fail). A

@@ -246,7 +246,10 @@ public sealed class ChecklistService
     ///     lists no differing check, so nothing can be learned from it. "Submit and sign" is offered for a complete draft
     ///     of a review with several slots when nothing blocks signing once it is handed in; a viewer who may not see the
     ///     disputes yet is judged by the blockers that viewer may see, so the offer itself never reveals a dispute. A
-    ///     review with one slot offers neither, because its ballot is handed in with the last answer.
+    ///     review with one slot offers neither, because its ballot is handed in with the last answer. The names of the
+    ///     other reviewers who have not handed in are listed for every viewer who may view the project (progress, never
+    ///     an answer); the differing answers and the number of agreed Fail checks are given only while the view is not
+    ///     masked and the viewer may view the project.
     /// </remarks>
     public async Task<BallotView?> GetBallotViewAsync(
         Actor? viewer,
@@ -270,7 +273,12 @@ public sealed class ChecklistService
         var canSee = BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id);
         var concluded = ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures);
         var consolidated = BallotProjection.Consolidate(snapshot.Record, snapshot.Slots.Count)!;
-        var differing = canSee
+
+        // Names of who has not handed in, the number of failed checks and the differing answers (with their reasons)
+        // are only told to a person who may view the project: a stranger learns nothing beyond what this view always
+        // held (the counts of the ballots)
+        var canView = await _access.CanViewAsync(viewer, projectId, cancellationToken);
+        var differing = canSee && canView
             ? await DifferingChecksAsync(snapshot, consolidated.Result, cancellationToken)
             : new Dictionary<string, IReadOnlyList<BallotAnswerView>>();
 
@@ -289,13 +297,48 @@ public sealed class ChecklistService
         var canAssignMe = canWork && user is { Enabled: true } && own is null && !independent
                           && await _store.GetMembershipAsync(user.Id, projectId, cancellationToken)
                               is { Role: ProjectRole.User or ProjectRole.ProjectAdmin };
+        var ordered = snapshot.Slots.OrderBy(slot => slot.Id).ToList();
         return new BallotView(
             !canSee,
             differing,
             consolidated.Result.BallotsSubmitted,
             snapshot.Slots.Count,
             canSubmitAndSign,
-            canAssignMe);
+            canAssignMe,
+            canView ? await MissingBallotNamesAsync(snapshot, own, ordered, cancellationToken) : [],
+            canView && canSee ? consolidated.Result.Failed : 0,
+            own is null ? null : ordered.IndexOf(own) + 1);
+    }
+
+    /// <summary>
+    ///     Lists the primary reviewers of the other slots whose ballot is not handed in.
+    /// </summary>
+    /// <param name="snapshot">The snapshot of the review.</param>
+    /// <param name="own">The slot of the viewer, who is left out, or <c>null</c>.</param>
+    /// <param name="ordered">The slots in slot order.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The display names in slot order; empty when every other ballot is in.</returns>
+    /// <remarks>
+    ///     Who has handed in is progress, not a verdict, so the names are given to every viewer who may view the project;
+    ///     no answer is read.
+    /// </remarks>
+    private async Task<IReadOnlyList<string>> MissingBallotNamesAsync(
+        ReviewSnapshot snapshot,
+        ReviewerSlot? own,
+        List<ReviewerSlot> ordered,
+        CancellationToken cancellationToken)
+    {
+        var missing = ordered
+            .Where(slot => slot.Id != own?.Id
+                           && snapshot.Record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State != BallotState.Submitted)
+            .ToList();
+        if (missing.Count == 0)
+        {
+            return [];
+        }
+
+        var names = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id, user => user.DisplayName);
+        return missing.Select(slot => names.GetValueOrDefault(slot.PrimaryUserId, $"user {slot.PrimaryUserId}")).ToList();
     }
 
     /// <summary>

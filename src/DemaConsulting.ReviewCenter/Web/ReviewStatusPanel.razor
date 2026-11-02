@@ -9,8 +9,11 @@
    discussion is counted for them.
 
    Presentation only. The status is computed by ReviewStatusService and handed in; the Discuss form and the handling of
-   the signature warning belong to the page, which passes the form for a check as a fragment. Every interactive
-   element and every key value carries a stable kebab-case data-testid. *@
+   the signature warning belong to the page, which passes the form for a check as a fragment. A disputed check also
+   lists who answered what, and the justification of each other reviewer (only for a viewer who may see the answers;
+   the status holds none otherwise). A provisional rejection is named in a sentence, a reviewer whose signature no
+   longer counts is told so, and a caution under the button names the reviewers who have not handed in a ballot when the
+   viewer is about to sign. Every interactive element and every key value carries a stable kebab-case data-testid. *@
 @if (Status is not null)
 {
     <section class="card status-panel" id="status-panel" aria-labelledby="status-panel-heading" data-testid="status-panel">
@@ -76,6 +79,14 @@
                         <li data-testid="status-disputed-@iid">
                             <span class="badge" data-testid="status-disputed-badge-@iid"><span aria-hidden="true">&#9888; </span>Different answers</span>
                             <span data-testid="status-disputed-text-@iid">@check.Text</span>
+                            @if (check.Answers.Count > 0)
+                            {
+                                <span class="muted status-dispute-answers" data-testid="status-disputed-answers-@iid">@AnswersLine(check)</span>
+                                @foreach (var answer in check.Answers.Where(HasReasonOfOther))
+                                {
+                                    <span class="status-dispute-why" data-testid="status-disputed-why-@iid-@answer.SlotNumber">@answer.ReviewerName: &ldquo;@answer.Justification&rdquo;</span>
+                                }
+                            }
                             @if (check.CanDiscuss && !ReadOnly)
                             {
                                 <button type="button" class="secondary" data-testid="status-discuss-@iid"
@@ -98,6 +109,11 @@
                 <span data-testid="status-open-findings-text">@Status.OpenFindings open</span>
             </span>
         </p>
+
+        @if (Status.OutcomeNote is not null)
+        {
+            <p class="notice warning" role="status" data-testid="status-outcome">@Status.OutcomeNote</p>
+        }
 
         @foreach (var signed in Status.ChangesSinceSigning)
         {
@@ -130,6 +146,11 @@
             </details>
         }
 
+        @if (OwnSignatureLost)
+        {
+            <p class="notice warning" role="status" data-testid="status-signature-lost">@ReviewNextAction.SignatureLostText</p>
+        }
+
         @if (Status.NextAction.IsActionable)
         {
             <p class="status-next">
@@ -139,6 +160,11 @@
         else
         {
             <p class="status-next idle" data-testid="next-action">@Status.NextAction.Label</p>
+        }
+
+        @if (Status.Caution is not null)
+        {
+            <p class="notice" role="status" data-testid="status-caution">@Status.Caution</p>
         }
     </section>
 }

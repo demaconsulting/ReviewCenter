@@ -59,12 +59,15 @@ most five suffixes are tried when a create is refused as a duplicate.
      loaded, so only one change list (up to the size limit of a listing) is held at a time. The rows keep the order
      of the file.
 - *Baseline choice*: With `None` there is no baseline, and with `Explicit` it is the given commit, for every set. With
-  `LastReviewed` the planner looks, among the reviews of the same repository and set, for the signed ones (as
-  `SigningService` decides) and takes the one that was signed last (ties go to the later creation). Without a signed
-  review the set gets a full review with a note. Otherwise the head of that review is the baseline only when it is the
-  new head (nothing to review), or is an ancestor of the new head (`IsAncestorAsync`), and the selection of the set is
-  the same as that of the review. A head that is not an ancestor, an ancestor check that fails, and a changed selection
-  each give a full review with a note that says so.
+  `LastReviewed` the planner looks, among the reviews of the same repository and set, for the approved ones and takes
+  the one signed last (latest signature time; ties go to the later creation). A review is approved when
+  `SigningService` reports it concluded with the Approved outcome: every ballot is submitted, every signature is
+  current, nothing is disputed, pending, or failing, and no thread is open. A review that concluded as rejected is not
+  approved and is skipped, like one that is only partly signed. Without an approved review the set gets a full review
+  with a note. Otherwise the head of that review is the baseline only when it is the new head (nothing to review), or
+  is an ancestor of the new head (`IsAncestorAsync`), and the selection of the set is the same as that of the review.
+  A head that is not an ancestor, an ancestor check that fails, and a changed selection each give a full review with a
+  note that says so.
 
 **CreateAsync**: Creates the reviews that a user picked from a plan.
 
@@ -109,14 +112,15 @@ keep their fixed messages. Any other exception that
 is not a cancellation, for example a database error, becomes a `Failed` result of that request with a generic message
 that carries no exception text; nothing is created for that request, and the results of the other requests stay.
 A cancellation propagates. A null argument is `ArgumentNullException`, a baseline mode that is not defined is
-`ArgumentOutOfRangeException` (checked before anything is read, so it can never be taken for the last-signed mode), and
+`ArgumentOutOfRangeException` (checked before anything is read, so it can never be taken for the last-reviewed mode), and
 a batch with too many requests is `ArgumentException`.
 
 #### Limitations
 
-The last-signed baseline asks the signing service for the approval of every review of a set to find the latest signed
-one. The lookups are bounded by the reviews of each set, not by the sets times all reviews of the project, so a plan
-stays cheap for the project sizes this release targets; there is no cache.
+The last-approved baseline asks the signing service for the approval of every review of a set to find the latest
+approved one (a review that concluded with the Approved outcome; a concluded rejected review does not count). The
+lookups are bounded by the reviews of each set, not by the sets times all reviews of the project, so a plan stays
+cheap for the project sizes this release targets; there is no cache.
 
 That read has no viewer and is a verdict-free system read: the planner uses only whether a review is approved and the
 signature times, and never the per-slot ballot verdicts, the dispute counts, or the failed counts. The HTTP API reads

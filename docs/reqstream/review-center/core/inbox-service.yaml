@@ -1,7 +1,7 @@
 ---
 # Software Unit Requirements for the InboxService Class
 #
-# The InboxService class builds the inbox of a user: the reviews that wait for the user, in seven groups, and the
+# The InboxService class builds the inbox of a user: the reviews that wait for the user, in eight groups, and the
 # count of the reviews that need action. It also keeps what a user has seen of a review, so that new comments and
 # changes can be marked. It holds the rules in the pure InboxRules helper, reads the reviews through the stores and
 # decides who may see what through ProjectAccess. It never shows a user who has not handed in the own ballot what
@@ -37,7 +37,8 @@ sections:
         title: >-
           The InboxService class shall list as disputed every review that is not concluded and in which the ballots
           that were handed in differ on some checks, to a user who has handed in the own ballot or who may see the
-          other ballots anyway (the creator of the review), with a chip that gives the number of disputed checks,
+          other ballots anyway (the creator of the review), with a chip that gives the number of disputed checks and a
+          sentence that names the disputed checks (up to five),
           shall mark the row as unread only when another reviewer
           handed in a ballot after the user last saw the review, shall drop the row when the dispute is settled, and
           shall list no disputed row, count or text to a user who has not handed in the own ballot.
@@ -54,6 +55,52 @@ sections:
           - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
           - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
           - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer
+          - InboxService_GetInboxAsync_DisputedNamesCheck_OnlyForViewerWhoHandedIn
+          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-QuestionForYou
+        title: >-
+          The InboxService class shall list as to answer, with the chip Question for you and a link to the review page,
+          every review that is not concluded in which an open question (not a finding) was started by someone else and
+          the user, a holder of a slot who may work in the project, has not written, shall name only the
+          person who asked, shall read the threads of the review through the list that a user who may not see the
+          other ballots does not get check threads from, shall list nothing for the author, the asker, a user who
+          answered, an auditor, a stranger or an API token, and shall count the review as action.
+        justification: |
+          A question that nobody answers stops a review, and a person who does not open the review never learns that
+          it was asked. A thread has no addressee, so the row is a heuristic: every other slot holder sees
+          it. The row never quotes the question and never reads a ballot, so it cannot show what the others answered.
+        tests:
+          - InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow
+          - InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow
+          - InboxService_GetInboxAsync_QuestionForStranger_ShowsNothing
+          - InboxService_GetInboxAsync_QuestionForSlotHolderWhoMayNotContribute_ShowsNoRowAndNoCount
+          - InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData
+          - InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView
+          - InboxRules_QuestionsForYou_OpenQuestionOfOthers_OnlyThoseNotAnswered
+          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
+
+      - id: ReviewCenter-InboxService-SignatureLost
+        title: >-
+          The InboxService class shall list as signature lost, with the chip The review changed, your signature no
+          longer counts, every review that is not concluded in which a slot of the user has a signature that no longer
+          covers the record and a new signature is not possible yet, also while the review cannot be signed, with a
+          sentence that says what blocks it and that the user shall look at the changes and sign again afterwards,
+          shall turn the row into ready to sign when nothing blocks the signature, shall tell the other signers in
+          their row that waits for others that the signature no longer counts (naming the person who actually signed,
+          which is the alternate when the alternate signed the slot), shall count the row as action, and
+          shall list it to nobody else.
+        justification: |
+          A signer whose signature was withdrawn because the review changed must learn it, also while the review is
+          still blocked, or the review waits for a signature that nobody knows is missing.
+        tests:
+          - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
+          - InboxService_GetInboxAsync_SignatureLost_NotShownToOthers
+          - InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner
+          - InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate
+          - InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection
+          - InboxRules_ReviewerStanding_SignatureLostConcludedOrNoSlot_IsNone
+          - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
 
       - id: ReviewCenter-InboxService-ToSign
         title: >-
@@ -64,7 +111,11 @@ sections:
           again when the signature no longer covers the record, shall list nothing for a slot that is signed or for a
           user whose ballot is not in, shall keep a review whose slots are all signed but that still has an open thread
           out of the concluded reviews, and shall give the item the due date, and the Overdue mark when the date is
-          past, while the review is not concluded.
+          past, while the review is not concluded, shall tell in the row, when other reviewers have not handed in a
+          ballot,
+          that they have not and who they
+          are (the sentence of the review approval, so that signing early may mean signing again), and shall give the
+          sentence that the review changed and the signature no longer counts when a slot is out of date.
         justification: |
           A reviewer must find the signatures that are theirs to give, and a signature that went out of date because
           the review changed is as much work as one that was never given. The state of a slot is decided as the
@@ -79,6 +130,7 @@ sections:
           - InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign
           - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
           - InboxService_GetInboxAsync_SectionMatchesReviewStatusNextAction_ForAllStandings
+          - InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn
           - InboxRules_SlotState_MatchesSigningServiceApproval
           - InboxRules_IsAssigned_PrimaryAndAlternate_AreAssigned
           - ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations
@@ -188,7 +240,8 @@ sections:
       - id: ReviewCenter-InboxService-Count
         title: >-
           The InboxService class shall count the reviews that need the action of the user as the number of distinct
-          reviews in the groups to answer, disputed, ready to sign, replies waiting and failed checks, so that a review
+          reviews in the groups to answer, disputed, ready to sign, signature lost, replies waiting and failed checks,
+          so that a review
           in several groups counts once and neither an update nor a review that waits for others is counted, and shall
           show a review that is in several groups in each of them.
         justification: |

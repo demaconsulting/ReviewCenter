@@ -54,6 +54,8 @@ sections:
           - ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields
           - ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged
           - ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail
+          - ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote
+          - ApiEndpoints_GetReview_OneSigned_NextStepNamesSignerForVisibleStandingOnly
 
       - id: ReviewCenter-ApiEndpoints-ProjectAccess
         title: >-

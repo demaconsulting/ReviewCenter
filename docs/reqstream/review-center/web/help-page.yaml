@@ -194,14 +194,28 @@ sections:
 
       - id: ReviewCenter-HelpPage-InboxTopic
         title: >-
-          The HelpPage unit shall offer a topic on the inbox that explains its seven groups (to answer, disputed, ready
-          to sign, replies waiting, failed checks, waiting for others and updates), the New badge, and how to
+          The HelpPage unit shall offer a topic on the inbox that explains its eight groups (to answer, with the
+          question for you and its limit, disputed, ready to sign, signature no longer counts, replies waiting, failed
+          checks,
+          waiting for others and updates), the New badge, and how to
           mark everything as read, that notes that a reviewer who has not handed in the own ballot never sees how the
           others answered, and that notes that what a user has seen is not part of the signed record.
         justification: |
           A person who sees a number on the home page looks for what it counts and for what clears it.
         tests:
           - HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead
+
+      - id: ReviewCenter-HelpPage-PlanningTopic
+        title: >-
+          The HelpPage unit shall state in the Planning reviews topic that the default baseline of the plan is the last
+          approved review of each set, that a review counts as approved only when it concluded with the Approved outcome
+          (every ballot submitted, current signatures, nothing disputed, pending or failing, no open thread), so a
+          Rejected review is not approved, and that a set without an approved review is planned as a full review.
+        justification: |
+          A person who plans reviews must know which earlier review a delta is measured from, or a change of a review
+          that was never approved could be taken for reviewed.
+        tests:
+          - HelpPage_Planning_NamesTheLastApprovedReviewBaseline
 
       - id: ReviewCenter-HelpPage-PlainLanguage
         title: >-

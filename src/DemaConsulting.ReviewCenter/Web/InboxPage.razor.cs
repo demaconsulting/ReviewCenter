@@ -44,6 +44,7 @@ public partial class InboxPage : ComponentBase
         InboxSection.ToAnswer,
         InboxSection.Disputed,
         InboxSection.ToSign,
+        InboxSection.SignatureLost,
         InboxSection.RepliesWaiting,
         InboxSection.FailedChecks,
         InboxSection.WaitingForOthers,
@@ -121,6 +122,7 @@ public partial class InboxPage : ComponentBase
             InboxSection.ToAnswer => "to-answer",
             InboxSection.Disputed => "disputed",
             InboxSection.ToSign => "to-sign",
+            InboxSection.SignatureLost => "signature-lost",
             InboxSection.RepliesWaiting => "replies-waiting",
             InboxSection.FailedChecks => "failed-checks",
             InboxSection.WaitingForOthers => "waiting-for-others",
@@ -140,6 +142,7 @@ public partial class InboxPage : ComponentBase
             InboxSection.ToAnswer => "To answer",
             InboxSection.Disputed => "Disputed",
             InboxSection.ToSign => "Ready to sign",
+            InboxSection.SignatureLost => "Your signature no longer counts",
             InboxSection.RepliesWaiting => "Replies waiting",
             InboxSection.FailedChecks => "Failed checks",
             InboxSection.WaitingForOthers => "Waiting for others",
@@ -148,14 +151,17 @@ public partial class InboxPage : ComponentBase
     }
 
     /// <summary>
-    ///     Gets the address a row links to: the checklist where the user has to answer or discuss, the review otherwise.
+    ///     Gets the address a row links to: the checklist where the user has to answer or discuss, the review otherwise
+    ///     (and for a row that asks for something on the review itself, such as a question for the user).
     /// </summary>
     /// <param name="item">The row.</param>
     /// <returns>The relative address of the page.</returns>
     private static string ItemLink(InboxItem item)
     {
         var review = $"/projects/{item.ProjectId}/reviews/{item.ReviewId}";
-        return item.Section is InboxSection.ToAnswer or InboxSection.Disputed ? review + "/checklist" : review;
+        return !item.OpensReview && (item.Section is InboxSection.ToAnswer or InboxSection.Disputed)
+            ? review + "/checklist"
+            : review;
     }
 
     /// <summary>
@@ -170,7 +176,8 @@ public partial class InboxPage : ComponentBase
     {
         return item.Section switch
         {
-            InboxSection.ToAnswer or InboxSection.Disputed or InboxSection.ToSign or InboxSection.RepliesWaiting => "pending",
+            InboxSection.ToAnswer or InboxSection.Disputed or InboxSection.ToSign or InboxSection.SignatureLost
+                or InboxSection.RepliesWaiting => "pending",
             InboxSection.FailedChecks => "failed",
             InboxSection.WaitingForOthers => null,
             _ => UpdateChipClass(item.Chip)

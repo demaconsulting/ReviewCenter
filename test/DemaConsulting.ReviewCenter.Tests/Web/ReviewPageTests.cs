@@ -2561,6 +2561,74 @@ public partial class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a concluded review lists all its threads first, rather than "No open threads.", and that the
+    ///     controls that change the reviewers are not offered.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll()
+    {
+        // Arrange: a resolved thread, then the review is signed and so approved
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var thread = await Threads.StartThreadAsync(
+            projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestActors.Ann, TestContext.Current.CancellationToken);
+        await SignSlotAsync(projectId, slotId);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert: All is chosen and the settled thread is listed
+        Assert.Equal("true", cut.Find("[data-testid='index-filter-all']").GetAttribute("aria-pressed"));
+        Assert.Empty(cut.FindAll("[data-testid='thread-index-empty']"));
+        Assert.NotNull(cut.Find($"[data-testid='index-state-{thread.Id}']"));
+        Assert.Empty(cut.FindAll("[data-testid='slot-add-form']"));
+        Assert.Empty(cut.FindAll("[data-testid^='slot-edit-hint-']"));
+    }
+
+    /// <summary>
+    ///     Test that a review with no open threads but a resolved one lists all threads first, and that a review with
+    ///     an open thread keeps the Open filter.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_OnlyResolvedThreads_ThreadsDefaultToAll()
+    {
+        // Arrange: one resolved thread
+        var (projectId, _, _) = await CreateSignableAsync();
+        var resolved = await Threads.StartThreadAsync(
+            projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Done", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", resolved.Id, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Act
+        var allOnly = RenderPage(projectId);
+        await Threads.StartThreadAsync(
+            projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Open one", TestContext.Current.CancellationToken);
+        var withOpen = RenderPage(projectId);
+
+        // Assert
+        Assert.Equal("true", allOnly.Find("[data-testid='index-filter-all']").GetAttribute("aria-pressed"));
+        Assert.Equal("true", withOpen.Find("[data-testid='index-filter-open']").GetAttribute("aria-pressed"));
+    }
+
+    /// <summary>
+    ///     Test that the slot controls of a review that is not locked say that removing or replacing a reviewer also
+    ///     removes the ballot they handed in.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_UnlockedSlot_NotesThatRemovingTakesTheBallot()
+    {
+        // Arrange
+        var (projectId, slotId, _) = await CreateSignableAsync();
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        var hint = cut.Find($"[data-testid='slot-edit-hint-{slotId}']").TextContent;
+        Assert.Contains("ballot", hint, StringComparison.Ordinal);
+        Assert.NotNull(cut.Find($"[data-testid='slot-remove-{slotId}']"));
+    }
+
+    /// <summary>
     ///     Test that an approved review shows the Locked badge and the explanation, and that every control that
     ///     would change the review is disabled.
     /// </summary>
@@ -2579,15 +2647,19 @@ public partial class ReviewPageTests : PageTestBase
         Assert.Contains("concluded and locked", cut.Find("[data-testid='review-locked-banner']").TextContent, StringComparison.Ordinal);
         Assert.NotNull(cut.Find("[data-testid='slots-locked-hint']"));
 
-        // Assert: the controls that change the review are disabled
+        // Assert: the controls that change the reviewers are not offered at all, rather than shown disabled
         foreach (var testId in new[]
         {
-            "new-slot-primary-select", "new-slot-alternate-select", "new-slot-add-button"
+            "new-slot-primary-select", "new-slot-alternate-select", "new-slot-add-button", "slot-add-form"
         })
         {
-            Assert.True(cut.Find($"[data-testid='{testId}']").HasAttribute("disabled"), testId);
+            Assert.Empty(cut.FindAll($"[data-testid='{testId}']"));
         }
 
+        Assert.Empty(cut.FindAll("[data-testid^='slot-primary-select-']"));
+        Assert.Empty(cut.FindAll("[data-testid^='slot-save-']"));
+        Assert.Empty(cut.FindAll("[data-testid^='slot-remove-']"));
+        Assert.Empty(cut.FindAll("[data-testid^='slot-edit-hint-']"));
         // Assert: the whole-file comment form is not offered at all, rather than shown disabled
         Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
         Assert.Empty(cut.FindAll("[data-testid='thread-text-input']"));

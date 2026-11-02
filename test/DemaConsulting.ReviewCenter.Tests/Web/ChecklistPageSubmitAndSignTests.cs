@@ -75,6 +75,35 @@ public class ChecklistPageSubmitAndSignTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Test that "Submit and sign" warns, above the form, that the other reviewers named have not handed in, and that
+    ///     the warning is gone when every other ballot is in.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_SubmitAndSign_WarnsWhenOtherBallotsAreMissing()
+    {
+        // Arrange: ann has not started, cyd has a draft, bob (the viewer) has a complete draft
+        var projectId = await CreateReviewAsync("ann", "bob", "cyd");
+        await AnswerAsync(projectId, "bob", submit: false);
+        await AnswerAsync(projectId, "cyd", submit: false);
+        var allIn = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(allIn, "ann");
+        await AnswerAsync(allIn, "bob", submit: false);
+        SignInAs("bob", "Bob", false);
+
+        // Act
+        var warned = RenderPage(projectId);
+        var clear = RenderPage(allIn);
+
+        // Assert: the text is the wording of the inbox and the review page
+        Assert.Equal(
+            ReviewApproval.MissingBallotsText(["Ann", "Cyd"]),
+            warned.Find("[data-testid='submit-and-sign-caution']").TextContent);
+        Assert.NotNull(warned.Find("[data-testid='submit-sign-form']"));
+        Assert.Empty(clear.FindAll("[data-testid='submit-and-sign-caution']"));
+        Assert.NotNull(clear.Find("[data-testid='submit-sign-form']"));
+    }
+
+    /// <summary>
     ///     Test that an incomplete draft offers neither of the two buttons.
     /// </summary>
     [Fact]

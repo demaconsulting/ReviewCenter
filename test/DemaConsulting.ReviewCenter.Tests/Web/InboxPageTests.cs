@@ -314,4 +314,69 @@ public class InboxPageTests : InboxWebTestBase
         Assert.NotEmpty(cut.FindAll("[data-testid='inbox-empty']"));
         Assert.Equal("0 need your action, 0 updates", cut.Find("[data-testid='inbox-summary']").TextContent);
     }
+
+    /// <summary>
+    ///     Test that the Question for you row is listed under To answer, is counted, names the asker, does not quote
+    ///     the question, and links to the review page and not to the checklist.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview()
+    {
+        // Arrange: ann handed in her ballot and bob asked a question she has not answered
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        await AnswerAllAsync("r1", "ann");
+        await Threads.StartThreadAsync(ProjectId, "r1", new ThreadAnchor("a.txt"), ActorOf("bob"), "Secret words", Ct);
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the row is under To answer with its chip, text and a link to the review
+        Assert.Equal("To answer", cut.Find("[data-testid='inbox-section-to-answer']").TextContent);
+        var chip = cut.FindAll("[data-testid^='inbox-chip-']").Single(element => element.TextContent == InboxService.QuestionChip);
+        var number = chip.GetAttribute("data-testid")!["inbox-chip-".Length..];
+        Assert.Equal(
+            $"/projects/{ProjectId}/reviews/r1",
+            cut.Find($"[data-testid='inbox-link-{number}']").GetAttribute("href"));
+        var detail = cut.Find($"[data-testid='inbox-detail-{number}']").TextContent;
+        Assert.Contains("Bob", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Secret words", detail, StringComparison.Ordinal);
+        Assert.Equal(
+            "1 needs your action, 0 updates, 1 waiting for others",
+            cut.Find("[data-testid='inbox-summary']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a signer whose signature no longer counts finds a titled section with the chip and the reason, that
+    ///     it counts as work, and that it links to the review.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_SignatureLost_ShowsSectionChipAndReason()
+    {
+        // Arrange: ann signed, then bob opened a finding, so her signature no longer counts and she cannot sign yet
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        var annSlot = await AddSlotAsync("r1", "ann");
+        await AddSlotAsync("r1", "bob");
+        await AnswerAllAsync("r1", "ann");
+        await AnswerAllAsync("r1", "bob");
+        await SignSlotAsync("r1", annSlot.Id, "ann");
+        var approval = await Signing.GetApprovalAsync(ProjectId, "r1", Ct);
+        var signed = approval!.Slots.Where(slot => slot.State == SlotSignatureState.Signed).Select(slot => slot.SlotId).ToList();
+        await Threads.StartThreadAsync(
+            ProjectId, "r1", new ThreadAnchor("a.txt"), ActorOf("bob"), "Please look", Ct, signed, true);
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert
+        Assert.Equal("Your signature no longer counts", cut.Find("[data-testid='inbox-section-signature-lost']").TextContent);
+        Assert.Equal(InboxService.SignatureLostChip, cut.Find("[data-testid='inbox-chip-1']").TextContent);
+        Assert.Contains("You cannot sign again yet", cut.Find("[data-testid='inbox-detail-1']").TextContent, StringComparison.Ordinal);
+        Assert.Equal($"/projects/{ProjectId}/reviews/r1", cut.Find("[data-testid='inbox-link-1']").GetAttribute("href"));
+        Assert.Equal("1 needs your action, 0 updates", cut.Find("[data-testid='inbox-summary']").TextContent);
+    }
 }

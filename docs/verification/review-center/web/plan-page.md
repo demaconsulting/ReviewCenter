@@ -46,7 +46,8 @@ N/A - standard test environment.
 #### Test Scenarios
 
 **PlanPage_Render_OneRepository_ShowsFormWithDefaults**: One repository of the project is enabled; the form has the repository
-preselected, an empty head, the Last reviewed baseline chosen, and no baseline text box. This scenario is tested by
+preselected, an empty head, the Last reviewed baseline chosen (labeled "Changes since the last approved review of each
+set"), and no baseline text box. This scenario is tested by
 `PlanPage_Render_OneRepository_ShowsFormWithDefaults`.
 
 **PlanPage_Render_UnknownProject_ShowsNotFound**: The page is rendered for an unknown project; the message names the

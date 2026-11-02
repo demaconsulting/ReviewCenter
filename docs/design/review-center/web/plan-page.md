@@ -72,7 +72,8 @@ review-set identifier.
 
 The form asks for the repository (a drop-down of enabled repositories by name), the head revision, and the baseline: **None**
 (every selected file counts as added), **Explicit revision** (a text box appears), or **Last reviewed** (the changes
-since the last signed review of each set, the default).
+since the last approved review of each set, the default; its label reads "Changes since the last approved review of
+each set", and a set without an approved review is planned in full).
 
 #### Key Methods
 

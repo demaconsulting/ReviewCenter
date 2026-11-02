@@ -122,7 +122,7 @@ public class PlanPageTests : PageTestBase
 
     /// <summary>
     ///     Test that the page shows the form with the repository preselected when there is only one, the
-    ///     last-signed-review baseline chosen, and no baseline text box.
+    ///     last-approved-review baseline chosen, and no baseline text box.
     /// </summary>
     [Fact]
     public async Task PlanPage_Render_OneRepository_ShowsFormWithDefaults()
@@ -144,6 +144,7 @@ public class PlanPageTests : PageTestBase
             cut.Find("[data-testid='plan-repository-select']").GetAttribute("value"));
         Assert.Equal(string.Empty, cut.Find("[data-testid='plan-head-input']").GetAttribute("value") ?? string.Empty);
         Assert.True(cut.Find("[data-testid='plan-baseline-last']").HasAttribute("checked"));
+        Assert.Contains("Changes since the last approved review of each set", cut.Find("[data-testid='plan-baseline']").TextContent);
         Assert.False(cut.Find("[data-testid='plan-baseline-none']").HasAttribute("checked"));
         Assert.False(Has(cut, "plan-baseline-input"));
         Assert.Equal("Show plan", TextOf(cut, "plan-load-button"));
@@ -308,13 +309,13 @@ public class PlanPageTests : PageTestBase
         Assert.Equal("2 sets need review, 1 has nothing to review.", TextOf(cut, "plan-summary"));
         Assert.Equal("status", cut.Find("[data-testid='plan-summary']").GetAttribute("role"));
         Assert.Equal(
-            "Repository main-repo, head main (ccccccc). Baseline: changes since the last signed review of each set.",
+            "Repository main-repo, head main (ccccccc). Baseline: changes since the last approved review of each set.",
             TextOf(cut, "plan-facts"));
         Assert.StartsWith("Clear the tick of the sets you do not want", TextOf(cut, "plan-next-step"), StringComparison.Ordinal);
 
         // Assert: the actionable rows come first, are ticked and say what they will review
         Assert.Equal("Core", TextOf(cut, "plan-row-title-core"));
-        Assert.Equal("Full review: no signed review of this set yet", TextOf(cut, "plan-row-note-core"));
+        Assert.Equal("Full review: no approved review of this set yet", TextOf(cut, "plan-row-note-core"));
         Assert.Equal("2 files", TextOf(cut, "plan-row-counts-core"));
         Assert.Equal("1 file", TextOf(cut, "plan-row-counts-docs"));
         Assert.True(cut.Find("[data-testid='plan-row-check-core']").HasAttribute("checked"));

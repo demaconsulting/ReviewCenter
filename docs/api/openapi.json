@@ -1108,7 +1108,7 @@
           },
           "state": {
             "type": "string",
-            "description": "The life-cycle state of the review, for example `Draft`."
+            "description": "The stored state of the review. It is always `Draft` for now and does not change when the review is signed, approved or rejected; use `approved`, `outcome` and `slots` to follow the life cycle."
           },
           "created": {
             "type": "string",
@@ -1208,7 +1208,7 @@
           },
           "nextStep": {
             "type": "string",
-            "description": "One short sentence that words what to do next."
+            "description": "One short sentence that words what to do next; once nothing blocks signing it also says who has signed and whose signature is awaited. In a masked review it never names a failed or disputed check."
           },
           "followsReviewId": {
             "type": [
@@ -1284,7 +1284,7 @@
           },
           "state": {
             "type": "string",
-            "description": "The life-cycle state of the review, for example `Draft`."
+            "description": "The stored state of the review. It is always `Draft` for now and does not change when the review is signed, approved or rejected; use `approved`, `outcome` and `slots` to follow the life cycle."
           },
           "created": {
             "type": "string",

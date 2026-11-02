@@ -98,7 +98,7 @@ N/A - standard test environment.
   the record digest differs when the source, the selection, or any change differs; and a later change of the
   repository does not change the stored review (see the unit tests of `ReviewService` and `RecordDigest`).
 - The reviews that a head revision needs are planned from the review-sets in the configuration file of the repository,
-  one for each set, as a full review or as the changes since a given or since the last signed revision of that set;
+  one for each set, as a full review or as the changes since a given or since the last approved revision of that set;
   a baseline that cannot be trusted gives a full review with a note, sets already filed or without a change are told
   apart, and the picked reviews are created each in its own transaction, with the review-set recorded in the review
   (see the unit tests of `ReviewPlanner`, and the real-git tests of the planner in the `ContentSources` subsystem tests).

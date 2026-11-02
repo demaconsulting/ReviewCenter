@@ -104,6 +104,68 @@ public partial class ReviewStatusPanel : ComponentBase
     }
 
     /// <summary>
+    ///     Gets a value indicating whether the viewer holds a slot whose signature was given before the review changed,
+    ///     so it no longer counts.
+    /// </summary>
+    private bool OwnSignatureLost =>
+        Status!.Reviewers.Any(reviewer => reviewer.IsYou && reviewer.Signature == SlotSignatureState.OutOfDate);
+
+    /// <summary>
+    ///     Words who answered what to a disputed check.
+    /// </summary>
+    /// <param name="check">The disputed check.</param>
+    /// <returns>For example "Alice: Pass / Bob (you): Fail".</returns>
+    private string AnswersLine(DisputedCheck check)
+    {
+        return string.Join(" / ", check.Answers.Select(answer => $"{answer.ReviewerName}{YouMark(answer)}: {OutcomeText(answer.Outcome)}"));
+    }
+
+    /// <summary>
+    ///     Tells whether an answer has a justification that another reviewer wrote (the viewer's own is not repeated).
+    /// </summary>
+    /// <param name="answer">The answer.</param>
+    /// <returns><c>true</c> when the justification is not blank and the answer is not the viewer's.</returns>
+    private bool HasReasonOfOther(BallotAnswerView answer)
+    {
+        return !string.IsNullOrWhiteSpace(answer.Justification) && !IsYou(answer);
+    }
+
+    /// <summary>
+    ///     Tells whether an answer is the viewer's own.
+    /// </summary>
+    /// <param name="answer">The answer.</param>
+    /// <returns><c>true</c> when the viewer holds the slot of the answer.</returns>
+    private bool IsYou(BallotAnswerView answer)
+    {
+        return Status!.Reviewers.Any(reviewer => reviewer.IsYou && reviewer.Number == answer.SlotNumber);
+    }
+
+    /// <summary>
+    ///     Marks the answer of the viewer.
+    /// </summary>
+    /// <param name="answer">The answer.</param>
+    /// <returns>" (you)" for the viewer's own answer, otherwise an empty string.</returns>
+    private string YouMark(BallotAnswerView answer)
+    {
+        return IsYou(answer) ? " (you)" : string.Empty;
+    }
+
+    /// <summary>
+    ///     Words an outcome for people.
+    /// </summary>
+    /// <param name="outcome">The outcome.</param>
+    /// <returns>"Pass", "Fail" or "N/A".</returns>
+    private static string OutcomeText(ChecklistOutcome outcome)
+    {
+        return outcome switch
+        {
+            ChecklistOutcome.Pass => "Pass",
+            ChecklistOutcome.Fail => "Fail",
+            _ => "N/A"
+        };
+    }
+
+    /// <summary>
     ///     Words the ballot of a reviewer.
     /// </summary>
     /// <param name="reviewer">The reviewer.</param>

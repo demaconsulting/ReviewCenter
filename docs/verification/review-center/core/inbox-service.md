@@ -47,9 +47,23 @@ N/A - standard test environment.
 - An auditor, a non-member, a removed member, a disabled user, a user with a temporary password, no actor, the command
   line, and an unknown name get no standing or reply rows or an empty inbox without an error; a system administrator who
   is no member gets only what is their own.
-- The action count is the number of distinct reviews in the five action groups (To answer, Disputed, Ready to sign,
-  Replies waiting, Failed checks; not Waiting for others and not Updates), and a review with several reasons is
+- The action count is the number of distinct reviews in the six action groups (To answer, Disputed, Ready to sign,
+  Signature lost, Replies waiting, Failed checks; not Waiting for others and not Updates), and a review with several
+  reasons is
   listed once in each group.
+- A slot holder or author who has not written in an open question that someone else started finds the review under To
+  answer with the chip "Question for you", a link to the review page and a sentence that names the asker and quotes
+  nothing; it is counted as action and unread until the review is seen. The author, the asker, a user who answered, an
+  auditor, a stranger and an API token get none, and a reviewer who may not see the other ballots does not read check
+  threads, so the inbox of that reviewer is the same whatever the others answered.
+- A signer whose signature no longer counts finds the review under Signature lost, also while the review cannot be
+  signed, with the reason, counted as action; once nothing blocks it the row is Ready to sign with the sentence "The
+  review changed, your signature no longer counts. Look at the changes and sign again."; the other signers read in
+  their Waiting for others row that the signature of that person no longer counts; nobody else gets the row.
+- A Ready to sign row names the reviewers who have not handed in a ballot with the sentence of the review approval, and
+  has no such sentence when all ballots are in.
+- A Disputed row names the disputed checks for a viewer who handed in or may see the ballots anyway, and a viewer who
+  has not handed in never gets a Disputed row, a check name, or a word about rejection.
 - A comment is unread only when it is by someone else (without regard to case) and newer than the last seen one; a user
   without a state row finds all comments of others unread.
 - Marking never moves the state back, stores nothing for a user who may not see the review, and marking all stores a
@@ -174,8 +188,64 @@ blocking, finds the review under Ready to sign with the chip "Not signed". This 
 `InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign`.
 
 **InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign**: A reviewer who handed in and has an open thread
-waits for others and does not find the review under Ready to sign. This scenario is tested by
+waits for others and does not find the review under Ready to sign; the open question of another user is, as well, a
+Question for you row, which is the only action. This scenario is tested by
 `InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign`.
+
+**InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow**: A slot holder who has not written in a question
+that bob started finds a To answer row with the chip "Question for you", `OpensReview`, unread, with the name of bob and
+without the text of the question, counted as action. This scenario is tested by
+`InboxService_GetInboxAsync_QuestionFromOther_ShowsQuestionForYouRow`.
+
+**InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow**: The asker and the author get no Question
+for you row, and the slot holder loses it by writing in the thread. This scenario is tested by
+`InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow`.
+
+**InboxService_GetInboxAsync_QuestionForStranger_ShowsNothing**: A stranger gets an empty inbox and a count of zero, and
+an auditor gets no Question for you row. This scenario is tested by
+`InboxService_GetInboxAsync_QuestionForStranger_ShowsNothing`.
+
+**InboxService_GetInboxAsync_QuestionForSlotHolderWhoMayNotContribute_ShowsNoRowAndNoCount**: A slot holder who may not
+contribute (a read-only auditor) and a slot holder who is no member (a system administrator) get no Question for you
+row and no count, although the question of another slot is open and they have not written in it; a slot holder who may
+work gets the row. This scenario is tested by
+`InboxService_GetInboxAsync_QuestionForSlotHolderWhoMayNotContribute_ShowsNoRowAndNoCount`.
+
+**InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData**: A reviewer who has not handed in
+gets no row for a question on a check, and the inbox is the same whether the others agree or not; a question on a file
+gives a row that holds no check name, no answer and no word about disputes. This scenario is tested by
+`InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData`.
+
+**InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow**: Ann signs and bob then opens a finding;
+ann finds a Signature lost row with the chip, the reason "open items remain", unread and counted, and no Ready to sign
+or Waiting for others row; bob reads in his waiting row that the signature of ann no longer counts; when the finding is
+settled the row becomes Ready to sign with the chip "The review changed, sign again" and the sentence of the inbox. This
+scenario is tested by `InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow`.
+
+**InboxService_GetInboxAsync_SignatureLost_NotShownToOthers**: Bob, the author, a stranger and an auditor get no
+Signature lost row for the signature of ann. This scenario is tested by
+`InboxService_GetInboxAsync_SignatureLost_NotShownToOthers`.
+
+**InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner**: Slot 1 has the primary ann and the
+alternate cyd, slot 2 is bob's and slot 3 is dee's. Cyd signs slot 1 and dee signs slot 3, then bob opens a finding. The
+Waiting for others row of bob says "The signatures of Cyd and Dee no longer count, so they must sign again." and never
+names Ann's signature: the alternate who signed is named, and so is the primary who signed. This scenario is tested by
+`InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner`.
+
+**InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate**: Cyd, the alternate of the slot of
+ann, signs and bob then opens a finding. The Waiting for others row of bob is the sentence of `InboxRules.WaitingForText`
+with Ann and Cyd awaited and only Cyd's signature lapsed ("Cyd's signature no longer counts, so Cyd must sign again.").
+This scenario is tested by `InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate`.
+
+**InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn**: With the ballots of ann and
+bob in and the one of cyd missing, the Ready to sign row of ann holds the sentence of `ReviewApproval.MissingBallotsText`
+for cyd, and holds none once cyd has handed in. This scenario is tested by
+`InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn`.
+
+**InboxService_GetInboxAsync_DisputedNamesCheck_OnlyForViewerWhoHandedIn**: The Disputed row of ann names the disputed
+check; cyd, who has not handed in, gets no Disputed row and no text with the check name or the words reject or differ,
+and a stranger gets nothing. This scenario is tested by
+`InboxService_GetInboxAsync_DisputedNamesCheck_OnlyForViewerWhoHandedIn`.
 
 **InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames**: A reviewer who signed finds the review
 under Waiting for others with the chip and the names of the people who have not signed; the row is never unread and is
@@ -306,6 +376,25 @@ are found, read from the consolidated standing with the slot count of the review
 author, no checklist, a blocked author, an unsubmitted ballot, a hidden viewer, a dispute, a block on the signature,
 nothing to sign) gives the standing To answer, Disputed, Ready to sign, Waiting for others, or none. This scenario is
 tested by `InboxRules_ReviewerStanding_Facts_DecideTheSection`.
+
+**InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection**: A signer whose signature no longer counts is asked to
+sign when nothing blocks and otherwise gets the standing Signature lost, also while the review cannot be signed and
+also for a hidden viewer; a signer who lost nothing only waits, and an unsubmitted ballot still comes first. This
+scenario is tested by `InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection`.
+
+**InboxRules_ReviewerStanding_SignatureLostConcludedOrNoSlot_IsNone**: A concluded review gives no standing, and a user
+without a slot never gets the Signature lost standing. This scenario is tested by
+`InboxRules_ReviewerStanding_SignatureLostConcludedOrNoSlot_IsNone`.
+
+**InboxRules_QuestionsForYou_OpenQuestionOfOthers_OnlyThoseNotAnswered**: Of an open question of another user, one the
+user started, one the user answered (without regard to case), a resolved one, a finding, and a thread without comments,
+only the open question of another user without a comment of the user is found. This scenario is tested by
+`InboxRules_QuestionsForYou_OpenQuestionOfOthers_OnlyThoseNotAnswered`.
+
+**InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded**: The sentences of the Question for you row (one
+asker, several, none named), of the lost signature, of the waiting row that says whose signature no longer counts, and
+of the Disputed row that names one, two or more than five checks, for a slot holder and for the author, are worded as in
+the help. This scenario is tested by `InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded`.
 
 **InboxRules_AuthorBlocked_ParityWithChecklistService**: The rule that forbids the author to answer gives the same
 answer as `ChecklistService` for a project with and without the rule, for the creator, for another user and for a

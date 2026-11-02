@@ -6,7 +6,11 @@
         <ul>
             <li>The top of every review page, <strong>Where are we?</strong>, shows each reviewer's ballot (Not
                 started, Draft or Handed in) and whether they have signed, the checks the reviewers answered
-                differently, the open questions and findings, and one button for the next thing you should do.</li>
+                differently, the open questions and findings, and one button for the next thing you should do. When
+                there is nothing for you to do, it says what the review waits for, for example <em>You have signed.
+                Waiting for Bob to sign.</em> or, for the person who asked an open question, <em>Waiting for Bob to
+                answer your question.</em> The <strong>Next step</strong> line on the review page names what the
+                review needs next.</li>
             <li>A review has reviewer <strong>slots</strong>. Each slot has a primary reviewer and, if you like, an
                 alternate; either of them can sign the slot. Only members of the project can be reviewers, and only a
                 member can sign.</li>
@@ -22,7 +26,12 @@
                 thread is open. A Fail answer does not block signing: it makes the agreed outcome
                 <strong>Rejected</strong>, and the signing form tells you which outcome you sign. To sign a rejected
                 review, the review needs a written conclusion with the reasons (the <strong>Review conclusion</strong>
-                card on the review page).</li>
+                card on the review page). Once you may see the other ballots and they agree on a Fail, the panel names
+                the checks, for example <em>Both reviewers failed REQ-01, so this review will be Rejected.</em></li>
+            <li>When you can sign while another reviewer has not handed in a ballot yet, a caution names that reviewer
+                (<em>Bob has not handed in a ballot yet. If you sign now, you may have to sign again.</em>), because a
+                ballot that comes later can change what the signatures cover. It is shown by the panel, by the
+                checklist above <strong>Submit and sign</strong>, and in your inbox.</li>
             <li>On the checklist, <strong>Submit and sign</strong> hands in your ballot and signs in one step, when your
                 ballot is complete and nothing else blocks signing. With a password you confirm it there; with an
                 identity provider you are sent to sign in again and come back to the review. <strong>Submit
@@ -33,7 +42,9 @@
             <li>A later change to what the signatures cover, such as a disagreement on a check that was agreed, means
                 the reviewers who signed earlier must look again and sign again. The review page then shows
                 <strong>Signed, then the review changed</strong> on their slot and explains what changed since they
-                signed. Before the change is made, ReviewCenter shows a warning that names the affected slots and
+                signed. If it no longer fits, your inbox lists the review under <strong>Your signature no longer
+                counts</strong> until nothing blocks a new signature, and the panel says so too.
+                Before the change is made, ReviewCenter shows a warning that names the affected slots and
                 signers, and you choose <strong>Confirm change</strong> or <strong>Cancel</strong>.
                 A Question is chat: it does not change what was signed. A Finding, or a reply added to the report,
                 does, because the report is part of what is signed. An open thread of either kind
@@ -44,7 +55,7 @@
                 that outcome and the conclusion text is written.</li>
             <li>An approved or rejected review is <strong>locked</strong>: nobody can add comments, change answers,
                 change the
-                files or the reviewers. A project admin or a system administrator can <strong>reopen</strong> it with
+                files or the reviewers (the review page then shows no buttons to add, change or remove a reviewer). A project admin or a system administrator can <strong>reopen</strong> it with
                 a reason; this is recorded in the audit trail, the old signatures are kept as history, and the
                 reviewers must sign again.</li>
             <li>When the project requires independent reviewers (the default), the person who created a review cannot

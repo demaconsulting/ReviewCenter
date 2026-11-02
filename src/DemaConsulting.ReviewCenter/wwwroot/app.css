@@ -1285,6 +1285,13 @@ a.action:active {
     margin-right: 0.5rem;
 }
 
+/* The reason another reviewer gave for a differing answer: one quoted line per reviewer under the answers */
+.ballot-others .ballot-why {
+    display: block;
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
 /* The note that says the answers of the others are still hidden */
 .masked-note {
     margin: 0.5rem 0;
@@ -1371,6 +1378,16 @@ a.action:active {
 
 .status-dispute-list li > :not(.badge):not(button):not(span):not(.error) {
     color: var(--text);
+}
+
+.status-dispute-list li > .status-dispute-answers,
+.status-dispute-list li > .status-dispute-why {
+    flex: 1 1 100%;
+    color: var(--text);
+}
+
+.status-dispute-list li > .status-dispute-why {
+    font-style: italic;
 }
 
 .status-counts {

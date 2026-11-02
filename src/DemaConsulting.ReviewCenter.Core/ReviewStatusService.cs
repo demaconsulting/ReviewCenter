@@ -32,10 +32,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         signed. Nothing is stored, so the panel cannot disagree with the rest of the page.
 ///     </para>
 ///     <para>
-///         The status never holds the content of a ballot. While the viewer may not see the answers of the other
-///         reviewers (see <see cref="BallotVisibility"/>), it holds no dispute, counts no discussion about a check, and
+///         The status never holds the content of a ballot the viewer may not see. While the viewer may not see the
+///         answers of the other reviewers (see <see cref="BallotVisibility"/>), it holds no dispute (so no answer and no
+///         justification), no provisional outcome, counts no discussion about a check, and
 ///         words the audit entries that the audit masking hides with one neutral sentence (see
-///         <see cref="AuditMasking"/>). Reading is open to everyone who may see the project. The service holds no
+///         <see cref="AuditMasking"/>). Names and who has handed in or signed are progress, not a verdict, and stay.
+///         Reading is open to everyone who may see the project. The service holds no
 ///         state and is safe for concurrent use when the services it uses are.
 ///     </para>
 /// </remarks>
@@ -220,7 +222,7 @@ public sealed class ReviewStatusService
         var reviewers = BuildReviewers(snapshot, approval, ownSlot);
         var disputes = BuildDisputes(snapshot, ballotView, threads, capabilities);
         var nextAction = ReviewNextAction.Decide(
-            await BuildFactsAsync(actor, review, snapshot, approval, ballotView, ownSlot, disputes, counts, cancellationToken));
+            await BuildFactsAsync(actor, review, snapshot, approval, ballotView, ownSlot, disputes, counts, threads, cancellationToken));
         var changes = await BuildChangesAsync(actor, user, masked, review, snapshot, approval, cancellationToken);
         return new ReviewStatus(
             masked,
@@ -231,7 +233,33 @@ public sealed class ReviewStatusService
             counts.OpenQuestions,
             counts.OpenFindings,
             nextAction,
-            changes);
+            changes,
+            BuildCaution(nextAction, approval, ownSlot),
+            masked ? null : approval.RejectionNote);
+    }
+
+    /// <summary>
+    ///     Words the warning for a viewer who is offered to sign while other reviewers have not handed in a ballot.
+    /// </summary>
+    /// <param name="nextAction">The next action of the viewer.</param>
+    /// <param name="approval">The approval status as the viewer may see it.</param>
+    /// <param name="ownSlot">The slot of the viewer, or <c>null</c>.</param>
+    /// <returns>
+    ///     The sentence, or <c>null</c> when the viewer is not offered to sign or every other ballot is handed in. It names
+    ///     the slots whose ballot is not handed in (progress, kept by masking), never an answer.
+    /// </returns>
+    private static string? BuildCaution(ReviewNextAction nextAction, ReviewApproval approval, ReviewerSlot? ownSlot)
+    {
+        if (ownSlot is null || nextAction.Kind is not (NextActionKind.Sign or NextActionKind.SubmitAndSign))
+        {
+            return null;
+        }
+
+        var missing = approval.Slots
+            .Where(slot => slot.SlotId != ownSlot.Id && slot.Ballot is { } ballot && ballot != BallotState.Submitted)
+            .Select(slot => slot.Primary.DisplayName)
+            .ToList();
+        return missing.Count == 0 ? null : ReviewApproval.MissingBallotsText(missing);
     }
 
     /// <summary>
@@ -293,7 +321,11 @@ public sealed class ReviewStatusService
                 item.Id,
                 item.Text,
                 capabilities.CanStartCheckThread
-                && !threads.Any(thread => thread.CheckItemId == item.Id && thread.State == ReviewThreadState.Open)))
+                && !threads.Any(thread => thread.CheckItemId == item.Id && thread.State == ReviewThreadState.Open))
+            {
+                // The answers are in the view only for a viewer who may see them (a masked view returned above)
+                Answers = ballotView.Differing[item.Id]
+            })
             .ToList();
     }
 
@@ -308,6 +340,7 @@ public sealed class ReviewStatusService
     /// <param name="ownSlot">The slot of the viewer, or <c>null</c>.</param>
     /// <param name="disputes">The disputed checks the viewer may see.</param>
     /// <param name="counts">The open threads the viewer may see.</param>
+    /// <param name="threads">The threads the viewer may see.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The facts.</returns>
     private async Task<NextActionFacts> BuildFactsAsync(
@@ -319,6 +352,7 @@ public sealed class ReviewStatusService
         ReviewerSlot? ownSlot,
         List<DisputedCheck> disputes,
         ThreadCounts counts,
+        IReadOnlyList<ReviewThread> threads,
         CancellationToken cancellationToken)
     {
         var projectId = review.ProjectId;
@@ -337,6 +371,7 @@ public sealed class ReviewStatusService
             : approval.Slots.FirstOrDefault(slot => slot.SlotId == ownSlot.Id)?.State ?? SlotSignatureState.NotSigned;
         var conclusionNeeded = approval.ConclusionRequired
                                && await _checklists.CanSetReviewConclusionTextAsync(actor, projectId, review.Id, cancellationToken);
+        var others = approval.Slots.Where(slot => slot.SlotId != ownSlot?.Id).ToList();
 
         return new NextActionFacts(
             approval.IsConcluded,
@@ -353,7 +388,27 @@ public sealed class ReviewStatusService
             counts.OpenFindings,
             counts.OpenQuestions,
             conclusionNeeded,
-            await CanSignAsync(actor, projectId, approval, ownSlot, signature, cancellationToken));
+            await CanSignAsync(actor, projectId, approval, ownSlot, signature, cancellationToken),
+            CountQuestionsAwaiting(threads, actor?.Username),
+            others.Select(slot => slot.Primary.DisplayName).ToList(),
+            others.Where(slot => slot.State != SlotSignatureState.Signed).Select(slot => slot.Primary.DisplayName).ToList());
+    }
+
+    /// <summary>
+    ///     Counts the open questions that wait for a viewer: those whose latest comment is by somebody else, so the
+    ///     viewer is the one to answer. A question the viewer asked and nobody answered does not count.
+    /// </summary>
+    /// <param name="threads">The threads the viewer may see (already without what the viewer may not know of).</param>
+    /// <param name="username">The user name of the viewer, or <c>null</c>.</param>
+    /// <returns>The number of open questions the viewer is to answer.</returns>
+    private static int CountQuestionsAwaiting(IReadOnlyList<ReviewThread> threads, string? username)
+    {
+        return threads.Count(thread =>
+            thread.State == ReviewThreadState.Open
+            && thread.Kind != ThreadKind.Finding
+            && (username is null
+                || thread.Comments.MaxBy(comment => comment.Id) is not { } latest
+                || !string.Equals(latest.AuthorUsername, username, StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <summary>

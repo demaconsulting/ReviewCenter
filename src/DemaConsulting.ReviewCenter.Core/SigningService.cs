@@ -536,7 +536,9 @@ public sealed class SigningService
                 // A review without a checklist has no ballots; with one, a slot without a ballot has not started
                 record.Checklist is null
                     ? null
-                    : record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State ?? BallotState.NotStarted));
+                    : record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State ?? BallotState.NotStarted,
+                // The newest signature of a lapsed slot names who actually signed, which may be the alternate
+                state == SlotSignatureState.OutOfDate ? own.MaxBy(s => s.Id)?.DisplayName : null));
         }
 
         var conclusion = ReviewLock.ConcludedOutcome(record, slots, signatures);
@@ -553,7 +555,7 @@ public sealed class SigningService
             digest,
             statuses,
             blockers,
-            NextStepFor(conclusion, blockers, statuses.Count, record, checklist, failed, assessment.ConclusionRequired, assessment.Outcome),
+            NextStepFor(conclusion, statuses, record, assessment, unsubmitted),
             reopens,
             // The structured counts behind the blocker sentences of Assess, so a list can show them without parsing
             record.Threads.Count(thread => thread.State == ReviewThreadState.Open),
@@ -570,7 +572,8 @@ public sealed class SigningService
             OpenQuestions: openCounts.OpenQuestions,
             OpenFindings: openCounts.OpenFindings,
             OpenCheckQuestions: openCheckCounts.OpenQuestions,
-            OpenCheckFindings: openCheckCounts.OpenFindings);
+            OpenCheckFindings: openCheckCounts.OpenFindings,
+            FailedCheckIds: assessment.FailedCheckIds);
     }
 
     /// <summary>
@@ -1308,6 +1311,14 @@ public sealed class SigningService
 
         var checklist = view?.State;
         var failed = view?.Result.Failed ?? 0;
+
+        // The identifiers come from the same consolidated Fail answers that the count does, in checklist order
+        IReadOnlyList<string> failedCheckIds = view is null
+            ? []
+            : view.Result.Checks
+                .Where(check => check.Outcome == ChecklistOutcome.Fail)
+                .Select(check => check.ItemId)
+                .ToList();
         var outcome = view?.Result.Outcome;
         var conclusionRequired = false;
         if (view is not null)
@@ -1346,7 +1357,7 @@ public sealed class SigningService
             blockers.Add(ConclusionRequiredText);
         }
 
-        return new Assessment(checklist, blockers, failed, outcome, conclusionRequired);
+        return new Assessment(checklist, blockers, failed, outcome, conclusionRequired, failedCheckIds);
     }
 
     /// <summary>
@@ -1396,34 +1407,37 @@ public sealed class SigningService
     /// <param name="Failed">The number of agreed Fail answers in sections that apply.</param>
     /// <param name="Outcome">The outcome the consolidation leads to, or <c>null</c> while it is not known.</param>
     /// <param name="ConclusionRequired">Whether the conclusion blocker is among the blockers.</param>
+    /// <param name="FailedCheckIds">The identifiers of the agreed Fail checks, in checklist order; its length is <paramref name="Failed"/>.</param>
     private sealed record Assessment(
         ChecklistState? Checklist,
         IReadOnlyList<string> Blockers,
         int Failed,
         ReviewOutcome? Outcome,
-        bool ConclusionRequired);
+        bool ConclusionRequired,
+        IReadOnlyList<string> FailedCheckIds);
 
     /// <summary>
     ///     Words the next step for the reader of a review.
     /// </summary>
     /// <param name="conclusion">How the review is concluded.</param>
-    /// <param name="blockers">The blockers of signing.</param>
-    /// <param name="slotCount">The number of slots.</param>
+    /// <param name="statuses">The statuses of the slots, in creation order; they say who has signed.</param>
     /// <param name="record">The record.</param>
-    /// <param name="checklist">The checklist state, or <c>null</c> without a checklist.</param>
-    /// <param name="failed">The number of failed checks.</param>
-    /// <param name="conclusionRequired">Whether a rejected review still needs its conclusion text.</param>
-    /// <param name="outcome">The outcome the consolidation leads to, or <c>null</c> while it is not known.</param>
+    /// <param name="assessment">What blocks signing and what the signatures would attest.</param>
+    /// <param name="unsubmitted">The number of slots whose ballot is not handed in.</param>
     /// <returns>One short sentence.</returns>
+    /// <remarks>
+    ///     The sentence never reads a ballot of a single reviewer: it is built from the consolidation, the threads and
+    ///     the signature state of the slots, which are progress. A masked status words its own next step (see
+    ///     <see cref="ReviewApproval.Masked"/>), so this sentence never reaches a viewer who may not see it. A check
+    ///     on which the ballots disagree is named once, as disputed, and not as unanswered (the pending count of the
+    ///     consolidation is used, not the progress of the checklist, which counts it as unanswered).
+    /// </remarks>
     private static string NextStepFor(
         ReviewConclusion conclusion,
-        IReadOnlyList<string> blockers,
-        int slotCount,
+        IReadOnlyList<SlotStatus> statuses,
         ReviewRecord record,
-        ChecklistState? checklist,
-        int failed,
-        bool conclusionRequired,
-        ReviewOutcome? outcome)
+        Assessment assessment,
+        int unsubmitted)
     {
         if (conclusion == ReviewConclusion.Approved)
         {
@@ -1435,22 +1449,67 @@ public sealed class SigningService
             return "Rejected. Every reviewer slot has a current signature.";
         }
 
-        if (blockers.Count > 0)
+        // A provisional rejection is named when the outcome is known
+        var rejection = assessment.Outcome == ReviewOutcome.Rejected
+            ? ReviewApproval.BuildRejectionNote(assessment.FailedCheckIds, statuses.Count, unsubmitted)
+            : null;
+        if (assessment.Blockers.Count > 0)
         {
+            // The rejection is named in place of the bare counts when only threads and the conclusion are left
+            if (assessment.ConclusionRequired && rejection is not null)
+            {
+                var counts = ThreadCounts.From(record.Threads);
+                return counts.Open > 0
+                    ? $"{rejection} Resolve {counts.OpenText}, write the review conclusion, then sign."
+                    : $"{rejection} Write the review conclusion, then sign.";
+            }
+
+            var checklist = assessment.Checklist;
             return ThreadService.NextStep(
                 record.Threads,
                 checklist?.Overall,
-                failed,
+                assessment.Failed,
                 checklist?.Consolidation?.Disputed ?? 0,
-                conclusionRequired);
+                assessment.ConclusionRequired,
+                checklist?.Consolidation?.Pending);
         }
 
-        if (slotCount == 0)
+        if (statuses.Count == 0)
         {
             return "Add a reviewer slot.";
         }
 
-        return outcome == ReviewOutcome.Rejected ? "Ready for signatures (rejected outcome)." : "Ready for signatures.";
+        // Nothing blocks: say who has signed and who is awaited, so the line agrees with the status of the viewer
+        var signed = statuses.Where(s => s.State == SlotSignatureState.Signed).ToList();
+        var outOfDate = statuses.Where(s => s.State == SlotSignatureState.OutOfDate).ToList();
+        var waiting = statuses.Where(s => s.State != SlotSignatureState.Signed).ToList();
+        if (waiting.Count > 0 && outOfDate.Count > 0)
+        {
+            // The people whose signatures lapsed are the signers, who may be an alternate rather than the primary
+            var names = ReviewApproval.JoinList(outOfDate.Select(s => s.LapsedSignerName ?? s.Primary.DisplayName).ToList());
+            var lead = outOfDate.Count == 1
+                ? $"{names}'s signature no longer counts"
+                : $"The signatures of {names} no longer count";
+            return $"{lead} because the review changed. Waiting for "
+                   + ReviewApproval.JoinList(waiting.Select(s => s.Primary.DisplayName).ToList()) + ".";
+        }
+
+        if (waiting.Count > 0 && signed.Count > 0)
+        {
+            var signers = ReviewApproval.JoinList(signed.Select(s => s.SignerName ?? s.Primary.DisplayName).ToList());
+            var waitingNames = ReviewApproval.JoinList(waiting.Select(s => s.Primary.DisplayName).ToList());
+            return waiting.Count == 1
+                ? $"Signed by {signers}. Waiting for the signature of {waitingNames}."
+                : $"Signed by {signers}. Waiting for the signatures of {waitingNames}.";
+        }
+
+        // Nobody has signed yet
+        if (assessment.Outcome == ReviewOutcome.Rejected)
+        {
+            return rejection is null ? "Ready for signatures (rejected outcome)." : $"{rejection} Ready for signatures.";
+        }
+
+        return "Ready for signatures.";
     }
 
     /// <summary>

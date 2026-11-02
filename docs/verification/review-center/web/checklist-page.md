@@ -61,13 +61,18 @@ N/A - standard test environment.
   `author-answer-blocked` and the same controls disabled (without `data-locked`), no other member sees the notice, the
   notice is not shown when the rule is off, an approved review shows only the lock notice, and a page that was loaded
   before the rule was switched on shows the refusal of the rule when the author clicks, and stores nothing.
-- In a review with several slots, a reviewer who has not handed in sees the count of handed-in ballots and the notice
-  that the others stay hidden, and no standing, no disputed count, and no different-answers badge; a member without a
+- In a review with several slots, a reviewer who has not handed in sees the count of handed-in ballots, who has not
+  handed in, and the notice that the others stay hidden, and no standing, no disputed count, no different-answers
+  badge, no justification of another reviewer, and no failed check ("Checklist complete." only); a member without a
   slot sees the same count and no standing; an administrator sees the differing answers without a ballot; a review
   with one slot shows none of it.
-- A reviewer who has handed in sees the differing answers by name in slot order under the check, with a badge, and
-  Discuss starts a discussion thread about the check, refuses an empty text, and closes on cancel.
-- A complete draft offers Submit and sign as the main action and Submit ballot as the secondary one; an incomplete
+- A reviewer who has handed in sees the differing answers by name in slot order under the check, with a badge and the
+  encoded justification of every other reviewer (not their own), a line at the top that counts the differing checks,
+  and "Checklist complete, N checks failed." when the submitted ballots agree on a failure; a concluded review with
+  several slots points to the history; Discuss starts a discussion thread about the check, refuses an empty text, and
+  closes on cancel.
+- A complete draft offers Submit and sign as the main action and Submit ballot as the secondary one, with a caution
+  that names the reviewers who have not handed in and no caution when everybody has; an incomplete
   draft and a review with one slot offer neither combination; Submit and sign hands in and signs, a wrong password
   leaves the ballot handed in and explains, a change by another reviewer between the hand-in and the signature leaves
   the ballot handed in, signs nothing and says that something changed, Submit ballot alone does not sign, and an
@@ -287,6 +292,36 @@ review and sees the count and the Assign me button, and no standing. This scenar
 Bob: N/A" under the check on which the ballots differ and not under a check on which they agree. This scenario is tested
 by `ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks`.
 
+**ChecklistPage_DisputedCheck_ShowsOtherReviewersReasonEncodedAndNotOwn**: Ann (N/A) and bob (Fail) handed in, each with
+a reason, and bob's reason holds markup. Ann sees "Bob: “…”" with the markup shown as text (no element is created) and
+not her own reason; bob sees ann's reason and not his own. This scenario is tested by
+`ChecklistPage_DisputedCheck_ShowsOtherReviewersReasonEncodedAndNotOwn`.
+
+**ChecklistPage_HiddenViewer_ShowsNoReasonNoDisputeCountNoFailedCheck**: Ann handed in a Fail with a reason and bob has
+a draft Fail. Bob, and a member without a slot, see no reason, no side-by-side line, no line that counts differing
+checks and no word about a failure. This scenario is tested by
+`ChecklistPage_HiddenViewer_ShowsNoReasonNoDisputeCountNoFailedCheck`.
+
+**ChecklistPage_DisputedChecks_SummaryAtTheTopCountsThem**: With one differing check the page says "1 check answered
+differently. Open it to discuss."; with two, "2 checks answered differently. Open them to discuss."; where the ballots
+agree there is no line. This scenario is tested by `ChecklistPage_DisputedChecks_SummaryAtTheTopCountsThem`.
+
+**ChecklistPage_AgreedFailure_StatusLineNamesFailedChecks**: Both reviewers failed one check and handed in: the status
+line reads "Checklist complete, 1 check failed."; where both passed it reads "Checklist complete." This scenario is
+tested by `ChecklistPage_AgreedFailure_StatusLineNamesFailedChecks`.
+
+**ChecklistPage_AgreedFailureHiddenFromDraftViewer_StatusLineSaysOnlyComplete**: Ann handed in a Fail and bob has a
+complete draft with a Fail; bob's status line reads "Checklist complete." This scenario is tested by
+`ChecklistPage_AgreedFailureHiddenFromDraftViewer_StatusLineSaysOnlyComplete`.
+
+**ChecklistPage_BallotsLine_NamesWhoHasNotHandedIn**: In a review with three slots, with ann in, bob (the viewer) a
+draft and cyd not started, the line reads "1 of 3 ballots handed in. Cyd has not handed in yet." and the hidden notice
+stays. This scenario is tested by `ChecklistPage_BallotsLine_NamesWhoHasNotHandedIn`.
+
+**ChecklistPage_ConcludedMultiSlotReview_PointsToTheHistory**: Both reviewers of a review handed in and signed. The page
+shows the pointer to the history with a link that ends in `/history`; the open review does not show it. This scenario is
+tested by `ChecklistPage_ConcludedMultiSlotReview_PointsToTheHistory`.
+
 **ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers**: A system administrator who holds no slot sees the
 differing answers. This scenario is tested by `ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers`.
 
@@ -306,6 +341,11 @@ and no thread is created. This scenario is tested by `ChecklistPage_DiscussWitho
 **ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction**: A reviewer with a complete draft in a review with
 two slots sees Submit and sign as the main action with the password field, and Submit ballot as the secondary one. This
 scenario is tested by `ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction`.
+
+**ChecklistPage_SubmitAndSign_WarnsWhenOtherBallotsAreMissing**: Bob has a complete draft in a review with three slots
+where ann has not started and cyd has a draft: the caution above the Submit and sign form names Ann and Cyd in the
+wording of `ReviewApproval.MissingBallotsText`; in a review where the other ballot is in there is no caution. This
+scenario is tested by `ChecklistPage_SubmitAndSign_WarnsWhenOtherBallotsAreMissing`.
 
 **ChecklistPage_IncompleteDraft_OffersNoSubmitButtons**: An incomplete draft offers neither button. This scenario is
 tested by `ChecklistPage_IncompleteDraft_OffersNoSubmitButtons`.

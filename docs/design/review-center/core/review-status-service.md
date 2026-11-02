@@ -11,9 +11,11 @@ has signed, which checks the reviewers answered differently, how many questions 
 viewer should do next, and, for a reviewer who signed and then saw the report change, what changed since the signature.
 
 The status is computed on demand from what the other services already give the same viewer, and nothing of it is
-stored, so it cannot disagree with the rest of the page. It holds the state of a ballot and never what the ballot says,
-and it never holds more than the viewer may see: while a viewer may not see the answers of the other reviewers yet (see
-*BallotVisibility*) it lists no disputed check, counts no discussion about a check, and names no answer in a change.
+stored, so it cannot disagree with the rest of the page. It holds the state of a ballot, and the content of a ballot
+(the answer and the justification given to a check the reviewers answered differently, the failed checks of a rejected
+review) only for a viewer who may see the answers of the other reviewers (see *BallotVisibility*). While a viewer may
+not see them yet it lists no disputed check, no answer, no failed check and no outcome, counts no discussion about a
+check, and names no answer in a change.
 
 The unit is a small family of types. `ReviewStatusService` builds the status. `ReviewStatus` and the records it holds are
 the result. `ReviewNextAction` is the pure rule that decides the one next action. `ReviewChangeRules` is the internal,
@@ -25,7 +27,11 @@ thread-safe.
 **ReviewStatus** (record): **IsMasked** (`bool`, the viewer may not see the others yet), **IsConcluded**,
 **HasChecklist**, **Reviewers** (`IReadOnlyList<ReviewerStatus>`), **DisputedChecks** (`IReadOnlyList<DisputedCheck>`,
 empty while masked), **OpenQuestions** and **OpenFindings** (`int`, among the threads the viewer may see),
-**NextAction** (`ReviewNextAction`), and **ChangesSinceSigning** (`IReadOnlyList<SignatureChanges>`).
+**NextAction** (`ReviewNextAction`), **ChangesSinceSigning** (`IReadOnlyList<SignatureChanges>`), **Caution**
+(`string?`, the early-signing caution: set only when the next action is to sign and another reviewer has not handed in a
+ballot yet, naming that reviewer, otherwise `null`), and **OutcomeNote** (`string?`, the plain statement that the review
+will be Rejected and which check the reviewers failed, taken from `ReviewApproval.RejectionNote`; `null` while masked,
+when concluded, or when the review is not heading for Rejected).
 
 **ReviewerStatus** (record): **SlotId**, **Number**, **Name**, **Ballot** (`BallotState`: not started, draft, or
 submitted), **Signature** (`SlotSignatureState`: not signed, signed, or signed and then the review changed, which the
@@ -33,8 +39,12 @@ code names `OutOfDate`), and **IsYou**. The ballot state of a reviewer is proces
 a masked viewer too: a draft shows that work has started and says nothing about any answer (the visibility rule hides
 content, not progress).
 
-**DisputedCheck** (record): **ItemId**, **Text**, and **CanDiscuss** (the viewer may start a discussion about the check
-and none is open).
+**DisputedCheck** (record): **ItemId**, **Text**, **CanDiscuss** (the viewer may start a discussion about the check and
+none is open), and **Answers** (`IReadOnlyList<BallotAnswerView>`, never `null`): the answer of every submitted ballot to
+the check in slot order, including the viewer's own, each as `BallotAnswerView(SlotNumber, ReviewerName, Outcome,
+Justification)`, where `Justification` is `null` when none was written. It is the same data as the differing answers of
+the ballot view, so it exists only for a viewer who may see the answers of the others; a masked viewer gets no
+`DisputedCheck` at all.
 
 **SignatureChanges** (record): **SlotId**, **Number**, **SignerName**, **SignedAt**, and **Changes**
 (`IReadOnlyList<ReviewChange>`, oldest first). **ReviewChange** (record): **At**, **By**, and **Reason**, a fixed
@@ -71,9 +81,13 @@ has already read, so the review page does not read them a second time.
   - List the reviewers in slot order with the state of the ballot and the signature; a review without a checklist has no
     ballot to hand in, so its slots count as handed in.
   - List the disputed checks from the ballot view, in checklist order, with `CanDiscuss` set when the viewer may start a
-    check discussion and none is open for the check.
-  - Count the open questions and findings with `ThreadCounts`.
-  - Decide the next action with `ReviewNextAction.Decide` and the facts about the viewer.
+    check discussion and none is open for the check, and with the answers and justifications of the submitted ballots.
+  - Count the open questions and findings with `ThreadCounts`, and count the open questions that wait for the viewer
+    (the latest comment of the question is not by the viewer).
+  - Decide the next action with `ReviewNextAction.Decide` and the facts about the viewer, including the names of the
+    other reviewers and of those who have not signed.
+  - Word the caution for a viewer whose next action is to sign when another reviewer has not handed in a ballot, and take
+    the outcome note from the approval; both are left out for a masked viewer.
   - Derive the changes since signing for every slot whose signature is out of date.
 - *Preconditions*: The viewer may see the project; otherwise `ProjectNotFound` is raised. The values passed in were
   read for the same viewer.
@@ -85,13 +99,19 @@ has already read, so the review page does not read them a second time.
   - The viewer cannot take part (reads only, an Auditor, or an outsider): a sentence that there is nothing to do.
   - A reviewer: answer the checklist while the own ballot is incomplete; hand the ballot in (and sign, when that is
     offered in one step); then, unless already signed, discuss the checks answered differently; resolve open findings;
-    answer open questions; a reviewer who has signed waits for the others; write the conclusion when one is needed; sign
-    (or "look at the changes and sign again" when the signature lapsed); otherwise wait for the others.
+    answer open questions, except that the person who asked every open question waits for the answer ("Waiting for Bob
+    to answer your question.", a sentence without a button) and the other party is still asked to answer; a reviewer who
+    has signed waits for the others, told whom ("You have signed. Waiting for Bob to sign."); write the conclusion when
+    one is needed; sign (or "look at the changes and sign again" when the signature lapsed); a reviewer whose signature
+    lapsed and who cannot sign yet is told that they can sign again when nothing blocks it; otherwise wait for the
+    others.
   - A person without a slot: add the reviewers (the lead) or add yourself when the review has no slot; discuss the
     disputes; resolve findings; answer questions; write the conclusion; add yourself as a reviewer; otherwise wait, or
     say that no reviewer has been added yet.
 - *Postconditions*: One action per viewer. Every fact is already reduced to what the viewer may see, so the rule cannot
-  reveal a dispute or a discussion that the viewer may not see.
+  reveal a dispute or a discussion that the viewer may not see. The facts that tell who asked and who signed are
+  optional; when they are not known the rule keeps the plainer sentences ("Answer the open questions", "Wait for the
+  other reviewers.").
 
 **ReviewChangeRules.Derive**: Explains, from the audit trail, what changed after a signature.
 
@@ -116,8 +136,9 @@ audit trail is read in batches to the end of the trail, however long it is, beca
 
 #### Dependencies
 
-- **SigningService** — the approval as the viewer may see it: the slots, the signature states, the blockers, and whether
-  a conclusion is required.
+- **SigningService** — the approval as the viewer may see it: the slots, the signature states, the blockers, whether
+  a conclusion is required, the failed checks and the rejection note, and the wording of the early-signing caution
+  (`ReviewApproval.MissingBallotsText`).
 - **ChecklistService** — the ballot view (disputes, hand-in counts, and the offers) and whether the viewer may write the
   conclusion.
 - **ThreadService** — the threads the viewer may see and what the viewer may start.

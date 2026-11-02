@@ -82,18 +82,23 @@ sections:
           - ReviewPage_Render_NextStep_FollowsThreadState
           - ReviewPage_Render_NextStep_IncludesChecklistProgress
           - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+          - ReviewStatusPanel_MaskedViewer_HideNoticeAppearsOnce
 
       - id: ReviewCenter-ReviewPage-Checklist
         title: >-
           The ReviewPage unit shall show the progress of the review's checklist as a summary (for example "37 of
-          58 checks answered") with a link to the checklist page, and shall show neither when the review has no
-          checklist.
+          58 checks answered", or "Checklist complete, 1 check failed" when the viewer may see the answers of the
+          others and a check was failed) with a link to the checklist page, and shall show neither when the review
+          has no checklist.
         justification: |
           The checklist is part of the work of the review, so its progress belongs where the reviewer starts,
-          one click from the checklist itself.
+          one click from the checklist itself. The failed count is a content of the ballots, so it is shown only where
+          the ballots may be read.
         tests:
           - ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink
           - ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard
+          - ReviewStatusPanel_BothFailed_NamesTheOutcome
+          - ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution
 
       - id: ReviewCenter-ReviewPage-Summary
         title: >-
@@ -290,8 +295,9 @@ sections:
           The ReviewPage unit shall list the threads of all files in one index showing file, anchor (for a file
           that has a baseline in plain words as "Before: line N" or "After: lines N-M"), state, number of
           comments, author of the first comment and time of last activity, filterable to All, Open (default) and
-          Resolved, where choosing a thread selects its file and highlights and scrolls to its anchored lines, in
-          the Diff view when the file has one.
+          Resolved, where Open is the default unless the review is concluded or has only resolved threads, in which
+          case All is chosen first, and where choosing a thread selects its file and highlights and scrolls to its
+          anchored lines, in the Diff view when the file has one.
         justification: |
           Reviewers need to find the discussion that needs them without opening every file, and to go from a
           thread to the code it is about in one step. A line number alone is ambiguous when a file has two
@@ -304,6 +310,7 @@ sections:
           - ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
           - ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread
           - ReviewPage_ThreadIndex_AddedFileHeadThread_JumpsToTheDiffRow
+          - ReviewPage_Render_OnlyResolvedThreads_ThreadsDefaultToAll
 
       - id: ReviewCenter-ReviewPage-ThreadCollapse
         title: >-
@@ -410,7 +417,9 @@ sections:
           member of the project with the badge "No longer a project member" and, for the slot, the hint that such a
           reviewer cannot sign until added again, and no such marker for assignees who are members; keep a primary or
           alternate reviewer who is disabled or no longer a member as a labeled choice in the change lists instead
-          of a blank one; and show next to the review title a badge that reads Approved or In review.
+          of a blank one; show next to the controls of an unsigned slot a note that removing or replacing a reviewer
+          also removes the ballot that reviewer handed in; and show next to the review title a badge that reads
+          Approved or In review.
         justification: |
           Approval of a review is by named people. The reviewer must see who has to sign, who has signed and
           whether a signature still covers the current record. A slot that carries a signature is part of the
@@ -431,6 +440,7 @@ sections:
           - ReviewPage_EditSlot_DisabledReviewers_KeepCurrentChoiceInTheLists
           - ReviewPage_EditSlot_EnabledReviewers_AddsNoExtraOption
           - ReviewPage_EditSlot_AuthorHoldingSlotUnderIndependence_LabelNamesTheRule
+          - ReviewPage_Render_UnlockedSlot_NotesThatRemovingTakesTheBallot
 
       - id: ReviewCenter-ReviewPage-Sign
         title: >-
@@ -624,8 +634,9 @@ sections:
           badge next to the status and a banner that says that the review is concluded and locked, shall offer no
           form to start a thread or to reply, show the diff hint
           "This review is locked; comments are read-only." instead of the hint to click +, disable the comment
-          controls on lines, resolving and reopening a thread, and adding, changing, and removing a reviewer slot,
-          and say that the reviewers cannot change, and shall keep reading, selecting a file, and following links
+          controls on lines and resolving and reopening a thread, show no control to add, change, or remove a
+          reviewer slot but only the note that the reviewers cannot change, list all threads rather than only the
+          open ones at first, and shall keep reading, selecting a file, and following links
           available.
         justification: |
           A user who sees a disabled control must also see the reason, or the page looks broken. A form that can
@@ -634,6 +645,7 @@ sections:
           page that still sends a change is refused with the message of the rule.
         tests:
           - ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls
+          - ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll
           - ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox
           - ReviewPage_DiffView_CommentsDisabled_HintSaysReviewIsLocked
           - ReviewPage_Render_RejectedConcluded_ShowsRejectedBadgeLockedBannerAndAttestationDownload
@@ -909,6 +921,30 @@ sections:
           - ReviewStatusPanel_MaskedViewer_HidesDisputes
           - ReviewCenter_QuestionFlow_MaskedUntilSubmitThenDiscussAndResolve_ShowsStatusPanelInBothThemes
           - ReviewCenter_FindingFlow_PromoteResolveWithNote_ShowsFindingInConclusionCardInBothThemes
+
+      - id: ReviewCenter-ReviewPage-StatusPanelGuidance
+        title: >-
+          The ReviewPage unit shall show in the "Where are we?" panel, for a viewer who may see the answers of the
+          others, who answered what to each disputed check with the justification of the other reviewer as plain text,
+          the plain statement that the review will be Rejected and which check the reviewers failed, and a caution that
+          names the reviewers who have not handed in a ballot when the viewer is about to sign, shall tell the viewer
+          whose signature no longer counts so in plain words, shall show the person who asked the open question a
+          sentence that says whom they wait for instead of a button while the other reviewer is still asked to answer,
+          and shall show a reviewer who signed whom the review waits for, in the same meaning as the next-step line,
+          and shall show none of the answers, the failed checks, the outcome or the caution to a viewer who has not
+          handed in a ballot.
+        justification: |
+          A reviewer who sees "Different answers" wants to know the other answer and why, and a reviewer who is told to
+          answer their own question, or to wait when they signed, is misled. The answers and the outcome are content of
+          the ballots, so they follow the same visibility rule as the ballots.
+        tests:
+          - ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification
+          - ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution
+          - ReviewStatusPanel_BothFailed_NamesTheOutcome
+          - ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer
+          - ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+          - ReviewStatusPanel_SignatureLost_StatedToTheSigner
+          - ReviewStatusPanel_AfterSigning_PanelAndNextStepAgree
 
       - id: ReviewCenter-ReviewPage-ChangesSinceSigning
         title: >-

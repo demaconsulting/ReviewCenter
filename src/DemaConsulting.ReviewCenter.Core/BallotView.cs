@@ -45,7 +45,8 @@ public sealed record BallotAnswerView(int SlotNumber, string ReviewerName, Check
 /// </param>
 /// <param name="Differing">
 ///     The checks that the submitted ballots answer differently, by check identifier, each with the answer of every
-///     submitted ballot in slot order; empty while <paramref name="IsMasked"/> is <c>true</c>.
+///     submitted ballot in slot order; empty while <paramref name="IsMasked"/> is <c>true</c>, and for a viewer who may not
+///     view the project.
 /// </param>
 /// <param name="BallotsSubmitted">The number of ballots handed in; who has handed in is not hidden.</param>
 /// <param name="BallotsTotal">The number of reviewer slots.</param>
@@ -56,10 +57,34 @@ public sealed record BallotAnswerView(int SlotNumber, string ReviewerName, Check
 /// <param name="CanAssignMe">
 ///     <c>true</c> when the viewer holds no slot but could add themselves as the primary reviewer of a new slot.
 /// </param>
+/// <param name="MissingBallotNames">
+///     The display names of the primary reviewers of the other slots whose ballot is not handed in (a draft, or none
+///     yet), in slot order; empty when every other ballot is in, and for a viewer who may not view the project. Names
+///     only, never an answer: who has handed in is progress, not a verdict, so the list is filled whether or not the
+///     answers of the others are hidden. The slot of the viewer is left out.
+/// </param>
+/// <param name="FailedChecks">
+///     The number of checks of applicable sections the submitted ballots agree on as Fail; always zero while
+///     <paramref name="IsMasked"/> is <c>true</c> (and for a viewer who may not view the project), because the count
+///     reveals how the other reviewers voted.
+/// </param>
+/// <param name="OwnSlotNumber">
+///     The position of the viewer's own slot among the slots of the review, starting at 1 (the numbering of
+///     <see cref="BallotAnswerView.SlotNumber"/>); <c>null</c> when the viewer holds no slot.
+/// </param>
 public sealed record BallotView(
     bool IsMasked,
     IReadOnlyDictionary<string, IReadOnlyList<BallotAnswerView>> Differing,
     int BallotsSubmitted,
     int BallotsTotal,
     bool CanSubmitAndSign,
-    bool CanAssignMe);
+    bool CanAssignMe,
+    IReadOnlyList<string>? MissingBallotNames = null,
+    int FailedChecks = 0,
+    int? OwnSlotNumber = null)
+{
+    /// <summary>
+    ///     Gets the display names of the other reviewers who have not handed in a ballot; never <c>null</c>.
+    /// </summary>
+    public IReadOnlyList<string> MissingNames => MissingBallotNames ?? [];
+}

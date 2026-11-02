@@ -38,11 +38,13 @@ sections:
       - id: ReviewCenter-ReviewPlanner-Baseline
         title: >-
           The ReviewPlanner shall choose the baseline of every review-set as no baseline, as one revision given by the
-          user for all sets, or as the head of the last signed review of the same set, the one signed last, and shall
-          fall back to a full review with a plain note when the set has no signed review, when that head is not an
-          ancestor of the new head or cannot be checked, or when the selection of the set changed since that review.
+          user for all sets, or as the head of the last approved review of the same set, the one signed last, and shall
+          fall back to a full review with a plain note when the set has no approved review yet (the note says "no
+          approved review of this set yet"; a review that concluded as Rejected is not approved), when that head is
+          not an ancestor of the new head or cannot be checked, or when the selection of the set changed since that
+          review.
         justification: |
-          Reviewing only what changed since the last signed review saves effort, but only when that review really is
+          Reviewing only what changed since the last approved review saves effort, but only when that review really is
           part of the history and covered the same files. In every other case the safe choice is a full review, and
           the note tells the user why, so that nothing escapes review without anyone seeing it.
         tests:
@@ -51,6 +53,8 @@ sections:
           - ReviewPlanner_PlanAsync_LastReviewedWithOnlyDraft_FullReview
           - ReviewPlanner_PlanAsync_LastReviewedSignedAncestor_UsesItsHeadAsBaseline
           - ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast
+          - ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote
+          - ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline
           - ReviewPlanner_PlanAsync_LastReviewedNotAncestor_FullReviewWithNote
           - ReviewPlanner_PlanAsync_AncestorCheckFails_FullReviewWithNote
           - ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote

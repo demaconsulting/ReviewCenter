@@ -35,7 +35,11 @@ approvals and the last activity of all reviews of the project at once; the list 
 once and hands that list to `ReviewProgressService.GetProgressAsync` (the overload that takes the list), so the reviews
 are not read a second time; the fields were added and none was changed. The
 details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over, the
-`outcome`, the `conclusionText` and the flag `masked` (see Read a review).
+`outcome`, the `conclusionText` and the flag `masked` (see Read a review). The `state` field is the stored state of the
+review, which is always `Draft` for now (it does not change when the review is signed, approved or rejected); the
+documentation of the field says so and points to `approved`, `outcome` and `slots`. The `nextStep` of the details is the
+sentence of the approval status: signature-aware once nothing blocks signing, and, for a masked review, the request to
+hand in the own ballot, which never names a failed or disputed check (see `SigningService`).
 
 #### Key Methods
 

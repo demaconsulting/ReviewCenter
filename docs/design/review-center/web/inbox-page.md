@@ -5,7 +5,7 @@
 #### Purpose
 
 `InboxPage` is the page at `/inbox`. Its responsibilities are to list the reviews that wait for the signed-in user, in
-seven groups, say in one sentence how much needs action, mark what is new, and let the user mark everything as read. The
+eight groups, say in one sentence how much needs action, mark what is new, and let the user mark everything as read. The
 inbox is also the notification list; nothing is stored for it beyond what the user has seen. The page needs a signed-in
 user, which an anonymous visitor is sent to the login page for. It talks to the domain only through `InboxService`,
 which returns only reviews of projects the user may see, so a user without access gets an empty inbox. It is a Razor
@@ -17,8 +17,10 @@ The page uses the standard page container with a heading row that holds the titl
 "Mark all as read" button. Below the heading a summary line says how many reviews need action and how many updates
 there are, and, only when something waits, how many reviews wait for others. When no review needs action a muted line
 says so. Each group that has rows has a heading and a list of row
-cards (To answer, Disputed, Ready to sign, Replies waiting, Failed checks, Waiting for others, Updates, in this order).
-A row shows the review title as a link (to the checklist for To answer and Disputed, to the review for the others),
+cards (To answer, Disputed, Ready to sign, Your signature no longer counts, Replies waiting, Failed checks, Waiting for
+others, Updates, in this order).
+A row shows the review title as a link (to the checklist for the ballot rows of To answer and for Disputed, to the review
+for the others, and also for the Question for you row of To answer, which carries `OpensReview`),
 the
 project and the review identifier muted, an optional detail sentence, and on the right a "New" badge when the row is
 unread, a chip with the reason (the Updates group includes the Rejected chip for a review concluded as rejected), and,
@@ -35,8 +37,8 @@ the other pages.
 
 Every interactive element and key value has a stable `data-testid`: `inbox-page` (root), `inbox-summary`,
 `inbox-empty`, `inbox-mark-read`, `inbox-section-{key}` and `inbox-list-{key}` (the key is `to-answer`, `disputed`,
-`to-sign`, `replies-waiting`, `failed-checks`, `waiting-for-others`, or `updates`), and for each row, by its position
-in the list, `inbox-row-{n}`,
+`to-sign`, `signature-lost`, `replies-waiting`, `failed-checks`, `waiting-for-others`, or `updates`), and for each row,
+by its position in the list, `inbox-row-{n}`,
 `inbox-link-{n}`, `inbox-review-{n}`, `inbox-detail-{n}`, `inbox-unread-{n}`, `inbox-chip-{n}`, and `inbox-due-{n}`.
 
 #### Key Methods

@@ -742,7 +742,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private string? NewThreadError { get; set; }
 
     /// <summary>
-    ///     Gets the state the thread index is filtered to, or <c>null</c> for all threads; open by default.
+    ///     Gets the state the thread index is filtered to, or <c>null</c> for all threads; open by default, and all
+    ///     threads when the review is concluded or has only resolved threads.
     /// </summary>
     private ReviewThreadState? IndexFilter { get; set; } = ReviewThreadState.Open;
 
@@ -874,6 +875,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
                 .Select(other => other.Id)
                 .ToList();
         await RefreshAsync();
+
+        // A concluded review, or one with nothing open but something resolved, shows all its threads first: the open
+        // filter would say "No open threads." and hide what was settled. The choice is made once per visit
+        if (IsLocked || (Threads.Count > 0 && Threads.All(t => t.State == ReviewThreadState.Resolved)))
+        {
+            IndexFilter = null;
+        }
 
         // What the user had seen before this visit becomes the baseline of the New markers; the new state is stored
         // after the first render on a live circuit (see OnAfterRenderAsync), not here, because this method also runs
@@ -3098,7 +3106,38 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private string ChecklistSummary()
     {
         var overall = Checklist!.Overall;
-        return overall.IsDone ? "Checklist complete" : $"{overall.Answered} of {overall.Total} checks answered";
+        var text = overall.IsDone ? "Checklist complete" : $"{overall.Answered} of {overall.Total} checks answered";
+
+        // The failed checks are named only for a viewer who may see the answers of the others: for everyone else the
+        // approval status carries a count of zero (see ReviewApproval.Masked), so nothing is said
+        if (Approval is not { IsMasked: false, FailedChecks: > 0 } approval)
+        {
+            return text;
+        }
+
+        return approval.FailedChecks == 1 ? text + ", 1 check failed" : text + $", {approval.FailedChecks} checks failed";
+    }
+
+    /// <summary>
+    ///     Gets the "Next step" sentence of the review for the viewer.
+    /// </summary>
+    /// <remarks>
+    ///     It is the next step of the approval status. For a viewer who has not handed in their ballot, the status leads
+    ///     with the sentence that says to hand in, and the notice that the answers stay hidden follows; the panel above
+    ///     says that already, so the notice is left out here and it is said once.
+    /// </remarks>
+    private string? NextStepText
+    {
+        get
+        {
+            var text = Approval?.NextStep;
+            if (text is not null && Approval!.IsMasked && text.EndsWith(ReviewApproval.HiddenNotice, StringComparison.Ordinal))
+            {
+                text = text[..^ReviewApproval.HiddenNotice.Length].TrimEnd();
+            }
+
+            return text;
+        }
     }
 
     /// <summary>

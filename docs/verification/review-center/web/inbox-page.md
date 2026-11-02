@@ -20,8 +20,10 @@ N/A - standard test environment.
 - All component tests pass with zero failures.
 - A visitor who is not signed in sees the session-ended message and no inbox.
 - A user with nothing waiting sees the empty state, a summary of zero, and no Mark all as read button.
-- A ballot to hand in, a dispute to deal with, a signature to give, a reply waiting, and a review that waits for others
-  are shown in their own groups with the review, the chip, and a link to the review (to the checklist for the first two).
+- A ballot to hand in, a dispute to deal with, a signature to give, a signature that no longer counts, a question of
+  another user, a reply waiting, and a review that waits for others
+  are shown in their own groups with the review, the chip, and a link to the review (to the checklist for the ballot
+  and the dispute).
 - The summary counts the reviews that need action and the updates separately, and adds the number of reviews that wait
   for others only when there is one.
 - A row that the user has not seen carries the New marker, and the marker is gone once the review was seen.
@@ -49,6 +51,15 @@ checklist. This scenario is tested by `InboxPage_Render_NewSections_ShowTitlesCh
 **InboxPage_Render_WaitingForOthers_NotCountedInSummary**: A review that waits for others is listed, adds "waiting for
 others" to the summary, and is not counted as action. This scenario is tested by
 `InboxPage_Render_WaitingForOthers_NotCountedInSummary`.
+
+**InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview**: A reviewer who handed in finds, under To answer, a row
+with the chip "Question for you" for an open question that another user started in the review; the row names the asker,
+does not quote the question, counts the review once as action, and links to the review page, not to the checklist. This
+scenario is tested by `InboxPage_Render_QuestionForYou_ShowsRowLinkingToReview`.
+
+**InboxPage_Render_SignatureLost_ShowsSectionChipAndReason**: A signer whose signature no longer counts, while a new
+finding blocks signing, sees the group "Your signature no longer counts" with the chip, the reason, and the link to the
+review, counted as action. This scenario is tested by `InboxPage_Render_SignatureLost_ShowsSectionChipAndReason`.
 
 **InboxPage_Render_UnreadItem_ShowsDot**: A row that the user has not seen carries the New marker (here a To answer row
 with the chip "Not started"), and after the review was seen the marker is gone. This scenario is tested by

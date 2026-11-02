@@ -10,7 +10,8 @@ choice and of the
 classification is reached with exact commits and files, and the number of sessions that git opened can be counted. The
 integration tests in `ReviewPlannerGitTests.cs` use the real `GitSource` and `ReviewMarkConfigParser` over real git
 repositories that the tests create with the installed git (through `GitTestSupport`), and a real SQLite database, so
-that the plan is computed from real history: the baseline since the last signed review, the fallback when that commit is
+that the plan is computed from real history: the baseline since the last approved review, the fallback when that
+commit is
 not an ancestor, the detection of a review that was already filed, and the skipping of a set without changes. The tests
 that need git skip themselves when it is not installed.
 
@@ -27,12 +28,13 @@ N/A - standard test environment (the integration tests need git, and skip themse
   plan with their rule (a project the actor may not see is refused like an unknown one by `IProjectAccess`); an
   unusable set is only a `CannotPlan` row.
 - With no baseline every selected file is reviewed; with an explicit baseline every set uses it; with the last reviewed
-  mode a set uses the head of the review that was signed last when it is an ancestor of the new head and the selection is
+  mode a set uses the head of the review that was approved last (a signed review that concluded as Rejected is not
+  approved) when it is an ancestor of the new head and the selection is
   the same, and otherwise gets a full review with a note that says why.
 - Change lists are loaded once per distinct baseline and one at a time: the earlier list is no longer held when the
   next one is requested, and the rows keep the order of the file.
 - A set with a review of the same head and baseline is `AlreadyFiled`; a set with no changed file, or at the head of its
-  last signed review, is `NothingToReview`.
+  last approved review, is `NothingToReview`.
 - Creation uses one session, creates each review through the review service with its set identifier and the range title,
   reports each request on its own, and lets the others succeed when one fails, also when the failure is an unexpected
   fault, which is reported with a generic reason; a git access failure is reported with a fixed sentence that carries no
@@ -56,7 +58,7 @@ stops the plan with `RevisionNotFound`. This scenario is tested by
 `ReviewPlanner_PlanAsync_UnknownExplicitBaseline_ThrowsRevisionNotFound`.
 
 **ReviewPlanner_PlanAsync_LastReviewedWithOnlyDraft_FullReview**: A set whose only review is not signed gets a full
-review with the note that there is no signed review yet. This scenario is tested by
+review with the note that there is no approved review of the set yet. This scenario is tested by
 `ReviewPlanner_PlanAsync_LastReviewedWithOnlyDraft_FullReview`.
 
 **ReviewPlanner_PlanAsync_LastReviewedSignedAncestor_UsesItsHeadAsBaseline**: A signed review whose head is an ancestor
@@ -66,8 +68,16 @@ gives the changes since that head. This scenario is tested by
 **ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast**: Of two signed reviews of a set the one signed
 last is the baseline. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast`.
 
+**ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote**: A set whose only review is fully signed but
+concluded as Rejected has no approved review, so it gets a full review with the note that there is no approved review of
+the set yet. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote`.
+
+**ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline**: When a review that concluded as
+Rejected was signed after an approved review of the same set, the approved review is still the baseline. This scenario
+is tested by `ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline`.
+
 **ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder**: Four sets alternate between two
-last-signed baselines and the full head; the head and each baseline are listed once, no earlier change list is still
+last-approved baselines and the full head; the head and each baseline are listed once, no earlier change list is still
 alive when the next is requested, and the rows are in the order of the file with the changes of their own baseline. This
 scenario is tested by `ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder`.
 
@@ -80,10 +90,10 @@ is still made, with a full review and a note. This scenario is tested by
 `ReviewPlanner_PlanAsync_AncestorCheckFails_FullReviewWithNote`.
 
 **ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote**: A set whose selection differs from that of its last
-signed review gets a full review and a note. This scenario is tested by
+approved review gets a full review and a note. This scenario is tested by
 `ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote`.
 
-**ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview**: A set whose last signed review has the new head is
+**ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview**: A set whose last approved review has the new head is
 `NothingToReview`. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview`.
 
 **ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled**: A set with a review of the same head and baseline is
@@ -115,7 +125,7 @@ repository, and a disabled repository stop the plan with their own rules. This s
 `ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules`.
 
 **ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading**: A baseline mode value that no
-member has is refused with `ArgumentOutOfRangeException` before anything is read, and is not taken for the last-signed
+member has is refused with `ArgumentOutOfRangeException` before anything is read, and is not taken for the last-reviewed
 mode. This scenario is tested by `ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading`.
 
 **ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession**: The rows of a plan are created; each review
@@ -205,7 +215,7 @@ at the head of a side branch that the main branch does not contain; the real anc
 full review with the note. This scenario is tested by `ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview`.
 
 **ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview**: On a real repository, the paths of a set
-changed after its last signed review, so the set gets a full review with the note, although the old head is an
+changed after its last approved review, so the set gets a full review with the note, although the old head is an
 ancestor. This scenario is tested by `ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview`.
 
 **ReviewPlanner_PlanAsync_RealGit_NoConfigurationOrUnknownHead_ThrowTheirRules**: On a real repository, a head without a

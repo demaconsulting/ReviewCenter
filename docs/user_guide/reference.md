@@ -364,22 +364,30 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 
 | Group | A review is listed when | Needs action |
 | ----- | ----------------------- | ------------ |
-| To answer | You hold a slot of a review with a checklist and have not handed in your ballot; not concluded | Yes |
-| Disputed | You handed in (or are the author with no slot), may see the other ballots, and checks are disputed | Yes |
-| Ready to sign | You handed in, nothing blocks the signature, and a slot of yours needs signing | Yes |
+| To answer | You hold a slot, have not handed in your ballot, and the review is not concluded (see below) | Yes |
+| Disputed | You handed in (or are the author with no slot), may see the ballots, and checks are disputed | Yes |
+| Ready to sign | You handed in, nothing blocks signing, and a slot of yours needs signing | Yes |
+| Your signature no longer counts | The review outgrew your signature and something blocks signing again | Yes |
 | Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
 | Failed checks | You authored the review, it is not concluded, and the ballots agree a check is Fail | Yes |
-| Waiting for others | You hold a slot, did your part, and the review waits for other reviewers or open items | No |
+| Waiting for others | You did your part, and the review waits for other reviewers or open items | No |
 | Updates | Someone else concluded (approved or rejected) or reopened the review after you last saw it | No |
 
-- Only members who may contribute are given the groups for a slot and Replies waiting; an auditor gets none of them. A
+- Only members who may contribute are given the groups for a slot, the Question for you row and Replies waiting; an
+  auditor gets none of them. A
   user who is disabled, has a temporary password, or is not a known user gets an empty inbox.
-- For one review you are in at most one of To answer, Disputed, Ready to sign and Waiting for others, the same as the
-  next step of the review page. A slot holder whom the project forbids to answer as the author of the review gets no
+- A thread has no addressee, so the Question for you row is a guess: an open question started by someone else, with no
+  comment by you, is shown to every slot holder who may take part. The author gets no such row, because the
+  author's replies waiting are already listed. The row opens the review page, names the asker, and never quotes the
+  question. Threads on a check are not read while the other ballots are hidden from you.
+- For one review you are in at most one of To answer (for the ballot), Disputed, Ready to sign, Your signature no longer
+  counts and Waiting for others, the same as the next step of the review page. A slot holder whom the project forbids
+  to answer as the author of the review gets no
   To answer row. A review without a checklist has no ballots and no To answer row.
 - Masking: while you have not handed in your own ballot (and are not the lead, an administrator or an auditor, and the
-  review has several slots) the inbox says nothing about how the others answered: no Disputed row, no count of
-  disputes, no failed-checks row, and no discussions about checks. Who has not handed in is not hidden.
+  review has several slots) the inbox says nothing about how the others answered: no Disputed row, no check names, no
+  count of disputes, no failed-checks row, and no discussions about checks. Who has not
+  handed in is not hidden, so the Ready to sign caution names them.
 - A failed-checks entry reads "Reviewers marked N checks as Fail so far. If that stands, the review will be rejected
   and its reasons must be written down."; the chip of an update is
   "Approved", "Rejected", or "Reopened".
@@ -387,7 +395,7 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
   2 open questions." The counts of the review page and of the progress lists use the same words: a **Question** is
   conversation (chat), a **Finding** goes into the signed report with its resolution note, and a thread of either kind
   that is open blocks signing.
-- The count on the home page is the number of distinct reviews in the first five groups, so a review in two groups
+- The count on the home page is the number of distinct reviews in the first six groups, so a review in two groups
   counts once. Waiting for others and Updates are never counted. The badge of the Inbox tab in the header shows the
   same count, read when a
   page is opened and kept for 30 seconds for each user, so it can be up to 30 seconds behind; it is hidden at zero and

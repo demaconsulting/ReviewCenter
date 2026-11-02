@@ -225,8 +225,9 @@ public partial class WebSubsystemTests
             Assert.Equal("Broken", page.QuerySelector("[data-testid='check-justification-req-02']")?.TextContent);
         }
 
-        // Assert: the review page links the checklist and names the unanswered checks as the next step
-        Assert.Equal("2 of 58 checks answered", reviewPage.QuerySelector("[data-testid='checklist-progress-summary']")?.TextContent);
+        // Assert: the review page links the checklist and names the unanswered checks as the next step; the failed check
+        // is named in the card because the only reviewer of the review may see their own answers
+        Assert.Equal("2 of 58 checks answered, 1 check failed", reviewPage.QuerySelector("[data-testid='checklist-progress-summary']")?.TextContent);
         Assert.Equal(route, reviewPage.QuerySelector("[data-testid='checklist-link']")?.GetAttribute("href"));
         Assert.Equal("56 checklist checks unanswered, 1 check answered Fail.", reviewPage.QuerySelector("[data-testid='next-step']")?.TextContent);
     }
@@ -345,7 +346,8 @@ public partial class WebSubsystemTests
         Assert.NotNull(asAdmin.QuerySelector("[data-testid='review-locked']"));
         Assert.NotNull(asAdmin.QuerySelector("[data-testid='review-locked-banner']"));
         Assert.NotNull(asAdmin.QuerySelector("[data-testid='reopen-form']"));
-        Assert.True(asAdmin.QuerySelector("[data-testid='new-slot-add-button']")?.HasAttribute("disabled"));
+        Assert.Null(asAdmin.QuerySelector("[data-testid='new-slot-add-button']"));
+        Assert.NotNull(asAdmin.QuerySelector("[data-testid='slots-locked-hint']"));
         Assert.NotNull(asMember.QuerySelector("[data-testid='review-locked']"));
         Assert.Null(asMember.QuerySelector("[data-testid='reopen-form']"));
 

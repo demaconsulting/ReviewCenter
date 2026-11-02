@@ -39,9 +39,11 @@ reading, a banner (`review-locked-banner`) that says why: "This review is conclu
 and reviewers can no longer change.", and a project administrator can reopen it. While the review is locked every
 control that would
 change reviewed content or the
-reviewer slots is disabled with that explanation (the add-slot selects and button, the slot edit controls, the thread
+reviewer slots is disabled with that explanation (the thread
 resolve and reopen toggle, the line-comment buttons of the diff, through
-the `CommentsDisabled` parameter of `DiffView`); the forms that could never be sent (the whole-file new-thread form, the
+the `CommentsDisabled` parameter of `DiffView`); the controls that change the reviewers (the add-slot form and the slot
+edit controls) are not drawn at all and a note says that the reviewers cannot change; the forms that could never be
+sent (the whole-file new-thread form, the
 form under a diff row, and the reply box of each thread) are not rendered; reading, the attestation download, and the
 evidence index are not
 affected. For a project administrator or system administrator the banner is followed by the reopen form
@@ -84,7 +86,9 @@ cancel, and repeats the change with the confirmed slots. Core audits the change 
 
 `DiffView` marks the lines with threads with one marker per kind, so a row with both kinds shows a bubble and a flag,
 each with its count. The thread index filters by kind (All, Questions, Findings) and by state (All, Open, Resolved),
-with the count of each choice, and every row shows the kind badge. The summary strip shows the number of open
+with the count of each choice, and every row shows the kind badge. Open is the filter the page starts with, unless the
+review is concluded or has only resolved threads, when All is chosen first (once, when the page opens; a later choice of
+the reader stays). The summary strip shows the number of open
 questions and of open findings from `ThreadCounts`. The conclusion card of a concluded review shows the outcome as an
 icon and text, the conclusion text, the findings that are in the report with their resolution notes, and the signers
 with the time; it shows the empty state while no conclusion is written and only the notice to a viewer who may not see
@@ -99,14 +103,25 @@ button always agree with Core.
 - **Reviewers table** (`status-reviewers`): one row for each slot with the ballot state (Not started, Draft, Handed in)
   and the signature state (Signed, Not signed, or "Signed, then the review changed"). A review with one slot shows one
   row, so the panel stays coherent there.
-- **Disputed checks** (`status-disputed`): each check the handed-in ballots answered differently, with a Discuss button
+- **Disputed checks** (`status-disputed`): each check the handed-in ballots answered differently, with who answered
+  what (`status-disputed-answers-{id}`, for example "Ann (you): Pass / Bob: Fail"), the justification that another
+  reviewer wrote (`status-disputed-why-{id}-{slot}`, plain text, never the viewer's own), and a Discuss button
   (`status-discuss-{id}`) that opens the same `ThreadComposer` as the checklist page for the check thread. A viewer who
-  may not see them (`BallotVisibility`) gets the notice "hidden until you submit your ballot" and no count. When
+  may not see them (`BallotVisibility`) gets the notice "hidden until you submit your ballot" and no count, no answer and
+  no justification. When
   starting the discussion would make a signature stale, the signature warning is shown in its own render region next to
   the form, which keeps the text typed and stores nothing until the person confirms.
+- **Outcome note** (`status-outcome`): the plain statement from `ReviewStatus.OutcomeNote` that the review will be
+  Rejected and which check the reviewers failed; absent while masked.
 - **Open threads**: the open Questions and Findings from `ThreadCounts`, drawn like `ThreadKindBadge` with icon and text.
+- **Signature note** (`status-signature-lost`): shown to a reviewer whose own signature no longer counts: "The review
+  changed, your signature no longer counts." (the words of the inbox, `ReviewNextAction.SignatureLostText`).
 - **Next step** (`next-action`): exactly one primary button; the target is a link to the checklist, a check, a thread,
-  or the signing form, or a plain sentence when the viewer has nothing to do.
+  or the signing form, or a plain sentence when the viewer has nothing to do, including the person who asked every open
+  question ("Waiting for Bob to answer your question.") and a reviewer who signed ("You have signed. Waiting for Bob to
+  sign.").
+- **Caution** (`status-caution`): below the next step, when it is to sign and another reviewer has not handed in a
+  ballot, the sentence that names that reviewer and says that signing now may have to be repeated.
 - **What changed since {name} signed** (`status-changes-{id}`): an expandable list for a signature that no longer fits,
   with a plain-language reason, the person, and the time of each entry. The text says that it explains and does not
   prove, because the record decides whether a signature is current.
@@ -263,7 +278,7 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `review-due-clear`, `review-due-error`, `reopen-form`,
 `reopen-reason`, `reopen-button`, `reopen-error`, `reopen-history`, and `reopen-entry-{n}`, `reopen-by-{n}`,
 `reopen-time-{n}`, `reopen-reason-{n}`, `reopen-digest-{n}` (by the position of the reopen, starting at 0),
-`author-independence-hint`, `slots-locked-hint`, `next-step`, `review-summary` (the summary strip),
+`author-independence-hint`, `slots-locked-hint`, `slot-edit-hint-{id}`, `next-step`, `review-summary` (the summary strip),
 `checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
 `summary-threads`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
 `slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
@@ -495,7 +510,12 @@ number of checks answered Fail, the number of disputed checks, and whether a con
 for missing slots and signatures), so the page holds no ordering or
 wording rules of its own.
 The summary of the checklist cell is "{answered} of {total} checks answered", or "Checklist complete" when nothing
-is left to answer, and its progress bar shows the answered checks over all checks. The reviewers cell reads "No reviewer
+is left to answer, followed by ", 1 check failed" or ", N checks failed" when the approval holds a count of failed checks,
+which it does only for a viewer who may see the answers of the others (the count is zero while masked), and its
+progress bar shows the answered checks over all checks. The next-step line is `Approval.NextStep`; for a viewer who
+has not handed in a ballot the approval appends the notice that the answers of the others stay hidden, which the status
+panel says already, so `NextStepText` leaves that one sentence out and the notice is shown once. The reviewers cell
+reads "No reviewer
 slots yet" when the review has no slot, and otherwise "{signed} of {slots} signed", where a slot counts as signed only
 while its signature is current; the threads cell counts the open and the resolved threads from `Threads`. The strip is
 drawn from the data the page already holds, so it changes after every change made on the page.
@@ -593,10 +613,13 @@ too long reason, a review that is no longer locked, a user who is no administrat
 message that names the slot. Success clears the reason and reloads through `RefreshAsync`, so the badge
 turns to In review, the signatures show as out of date, and the history lists the reopen.
 
-**Locked controls**: When `IsLocked` is true the markup disables the add-slot selects and button and shows the hint
-`slots-locked-hint` with them, and disables the thread toggle, the reply field and button, the new-thread fields and
-button, and the line-comment buttons. The slot edit controls are drawn only for a slot with no signature, and a locked
-review has none. The handlers also stay correct if a stale page still fires one, because Core refuses the change with
+**Locked controls**: When `IsLocked` is true the markup shows no control that changes the reviewers: neither the
+add-slot form nor the slot edit controls are drawn, and only the hint `slots-locked-hint` ("The reviewers cannot change
+while the review is locked.") stands in the Reviewers card. It disables the thread toggle, the reply field and button,
+the new-thread fields and button, and the line-comment buttons. The slot edit controls are drawn only for a slot with no
+signature and, while the review is not locked, they are followed by the hint `slot-edit-hint-{id}` that removing or
+replacing a reviewer also removes the ballot that reviewer handed in. The handlers also stay correct if a stale page
+still fires one, because Core refuses the change with
 `ReviewLocked` and the message is shown in the usual place. A page that was loaded before another user signed the last
 slot learns about the lock at its next reload or change, and is refused, not corrupted, until then.
 

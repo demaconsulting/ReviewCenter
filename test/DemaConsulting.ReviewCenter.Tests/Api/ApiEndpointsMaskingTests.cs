@@ -312,6 +312,77 @@ public class ApiEndpointsMaskingTests
     }
 
     /// <summary>
+    ///     Test that the details of a review whose ballots agree on a Fail never name the failed check or the
+    ///     provisional rejection to the token of a member who has not handed in a ballot, in any text field, while the
+    ///     token of a reviewer who handed in gets the named rejection in the next step; the stored state stays Draft.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote()
+    {
+        // Arrange: both ballots are handed in and fail the first check; no conclusion text yet
+        await using var app = await StartAsync();
+        var projectId = await ArrangeAsync(app, bobSubmitted: true, annFirst: ChecklistOutcome.Fail, bobFirst: ChecklistOutcome.Fail);
+        var firstId = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        var cydToken = await CreateTokenAsync(app, "cyd");
+        var annToken = await CreateTokenAsync(app, "ann");
+        using var cyd = ClientFor(app, cydToken.Value);
+        using var ann = ClientFor(app, annToken.Value);
+
+        // Act
+        var masked = await cyd.GetAsync($"/api/projects/{projectId}/reviews/{ReviewId}", TestContext.Current.CancellationToken);
+        var maskedBody = await masked.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var seen = await JsonAsync(await ann.GetAsync($"/api/projects/{projectId}/reviews/{ReviewId}", TestContext.Current.CancellationToken));
+
+        // Assert: the masked body has neither the id, nor the provisional wording; the state is the stored one
+        Assert.Equal(HttpStatusCode.OK, masked.StatusCode);
+        Assert.DoesNotContain(firstId, maskedBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rejected", maskedBody, StringComparison.Ordinal);
+        using var maskedJson = JsonDocument.Parse(maskedBody);
+        Assert.Equal("Draft", maskedJson.RootElement.GetProperty("state").GetString());
+        Assert.StartsWith(
+            "Hand in your ballot to see the other reviewers' answers.",
+            maskedJson.RootElement.GetProperty("nextStep").GetString(),
+            StringComparison.Ordinal);
+
+        // Assert: the reviewer who handed in sees what the review page shows
+        Assert.False(seen.RootElement.GetProperty("masked").GetBoolean());
+        Assert.Equal("Draft", seen.RootElement.GetProperty("state").GetString());
+        Assert.Equal(
+            $"Both reviewers failed {firstId}, so this review will be Rejected. Write the review conclusion, then sign.",
+            seen.RootElement.GetProperty("nextStep").GetString());
+    }
+
+    /// <summary>
+    ///     Test that the next step of the details says who has signed once a reviewer signed, for a token that may see
+    ///     the standing, and that the masked token keeps the hand-in sentence, so a signature changes nothing there.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_GetReview_OneSigned_NextStepNamesSignerForVisibleStandingOnly()
+    {
+        // Arrange: both ballots agree on Pass; ann signs
+        await using var app = await StartAsync();
+        var projectId = await ArrangeAsync(app, bobSubmitted: true, annFirst: ChecklistOutcome.Pass, bobFirst: ChecklistOutcome.Pass);
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var approval = (await signing.GetApprovalAsync(projectId, ReviewId, TestContext.Current.CancellationToken))!;
+        await signing.SignAsync(
+            new Actor("ann", "ann"), projectId, ReviewId, approval.Slots[0].SlotId, approval.Digest, TestBrowser.Password, TestContext.Current.CancellationToken);
+        var annToken = await CreateTokenAsync(app, "ann");
+        var cydToken = await CreateTokenAsync(app, "cyd");
+        using var ann = ClientFor(app, annToken.Value);
+        using var cyd = ClientFor(app, cydToken.Value);
+
+        // Act
+        using var seen = await JsonAsync(await ann.GetAsync($"/api/projects/{projectId}/reviews/{ReviewId}", TestContext.Current.CancellationToken));
+        using var masked = await JsonAsync(await cyd.GetAsync($"/api/projects/{projectId}/reviews/{ReviewId}", TestContext.Current.CancellationToken));
+
+        // Assert
+        Assert.Equal("Signed by ann. Waiting for the signature of bob.", seen.RootElement.GetProperty("nextStep").GetString());
+        Assert.Equal(
+            "Hand in your ballot to see the other reviewers' answers.",
+            masked.RootElement.GetProperty("nextStep").GetString());
+    }
+
+    /// <summary>
     ///     Test that the review details have no field of the ballots of a single reviewer, no per-reviewer answer and no
     ///     dispute: the names of the fields are exactly the documented ones (an allow-list), so a new field cannot
     ///     leak without a deliberate change of this test and of the API description.

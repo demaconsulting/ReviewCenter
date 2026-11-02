@@ -650,6 +650,61 @@ signature of rita is out of date and the review is not approved. This scenario i
 `SigningNotAllowed`, the message names the disputed check, and the status counts it in `DisputedChecks`. This
 scenario is tested by `SigningService_SignAsync_Disputed_BlocksSigning`.
 
+**SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered**: Two reviewers answer one check
+differently and hand in. The next step names "1 check disputed between the ballots" once and does not count the same check
+as unanswered. This scenario is tested by `SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered`.
+
+**SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots**: Rita has signed while sam and tess
+have not. The next step reads "Signed by Rita. Waiting for the signatures of Sam and Tess." and, after sam signs too, "Signed
+by Rita and Sam. Waiting for the signature of Tess.". This scenario is tested by
+`SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots`.
+
+**SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt**: A signature that went out of date because the
+conclusion text changed is named: "X's signature no longer counts because the review changed. Waiting for ...". This
+scenario is tested by `SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt`. The slot of that test was
+signed by its primary, and `LapsedSignerName` is the primary, "Rita".
+
+**SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate**: Alex, the alternate of slot 1,
+signs it and the conclusion text then changes the record. The next step is "Alex's signature no longer counts because
+the review changed. Waiting for Rita, Sam and Tess." and `LapsedSignerName` of the slot is "Alex"; the primary of the slot
+is not named as the signer of the lapsed signature. This scenario is tested by
+`SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate`.
+
+**SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners**: Alex signs slot 1 and sam signs
+slot 2, then the conclusion text changes the record. The next step is "The signatures of Alex and Sam no longer count
+because the review changed. Waiting for Rita, Sam and Tess.". This scenario is tested by
+`SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners`.
+
+**SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner**: Rita signs slot 1, the record
+changes, alex signs the new record and the record changes again, and sam signs slot 2 at the final record. The lapsed
+signer of slot 1 is the signer of its newest signature ("Alex"), the signed slot 2 and the unsigned slot 3 have no
+lapsed signer, and the masked status keeps the name, because who signed is not ballot data. This scenario is tested by
+`SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner`.
+
+**SigningService_GetApprovalAsync_RejectedAgreed_NamesFailedCheckAndRejection**: Every ballot fails the same check and
+the conclusion is missing. `FailedCheckIds` has the check, and the next step and `RejectionNote` say "... failed {id},
+so this review will be Rejected." followed by "Write the review conclusion, then sign." A viewer who may see the others
+gets it. This scenario is tested by
+`SigningService_GetApprovalAsync_RejectedAgreed_NamesFailedCheckAndRejection`, and with an open thread, by
+`SigningService_GetApprovalAsync_RejectedAgreedWithOpenThread_NamesRejectionAndThread`; the review without a Fail has
+no identifiers and no note
+(`SigningService_GetApprovalAsync_NoFail_HasNoFailedCheckIdsAndNoNote`).
+
+**ReviewApproval_RejectionNote_WordsReviewersAndChecks**: The wording for one, two and several slots, for slots that
+have not handed in, for one, two, three and more than five failed checks. This scenario is tested by
+`ReviewApproval_RejectionNote_WordsReviewersAndChecks` and, for the cases without a note,
+`ReviewApproval_RejectionNote_MaskedConcludedOtherOutcomeOrNoIds_IsNull`. The sentence about missing ballots is tested by
+`ReviewApproval_MissingBallotsText_WordsTheNames` and `ReviewApproval_MissingBallotsText_NullNames_Throws`.
+
+**SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote**: Every ballot fails a check.
+A reviewer who has not handed in, a draft owner, a user without a slot, no viewer and the API token of a lead or of a
+reviewer without a ballot get an approval with no failed check identifier, no rejection note and no word "Rejected" in the
+next step, for the single and the batch read; the lead and a reviewer who handed in get the named rejection. This scenario
+is tested by `SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote`,
+`SigningService_GetApproval_MaskedViewer_NextStepDoesNotDependOnSignatures` (the masked next step does not change when
+a reviewer signs), `ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote` and
+`ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome`.
+
 **SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement**: Sam disagrees, and a signature
 given before that is stored straight into the store. Removing the slot of sam, which holds the only dissent and so
 changes the consolidated standing, is refused with `SignaturesWouldBecomeOutOfDate` and the slot stays; with the

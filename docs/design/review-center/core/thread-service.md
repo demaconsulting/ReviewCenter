@@ -238,9 +238,12 @@ The sort is done in memory because the database cannot order by a time stamp. No
 
 **NextStep**: A static, pure function that words the next action for the threads of a review and, optionally, the
 progress of its checklist (`ChecklistProgress?`), the number of checks answered Fail (`failedChecks`, default 0), the
-number of checks disputed between the ballots (`disputedChecks`, default 0), and whether a rejected review still needs
-its conclusion text (`conclusionRequired`, default false) as one short
-sentence. Without a checklist: "No
+number of checks disputed between the ballots (`disputedChecks`, default 0), whether a rejected review still needs
+its conclusion text (`conclusionRequired`, default false), and the number of checks that no ballot answers
+(`unanswered`, default `null`) as one short
+sentence. When `unanswered` is given it replaces the unanswered count of the progress, so a check that is disputed
+between the ballots is named once, as disputed, and not also as unanswered (`SigningService` passes the pending count of
+the consolidation); `null` keeps the count of the progress. Without a checklist: "No
 discussion yet - select a file and comment on a line." when there are no threads, "{open} to resolve." when some are
 open, where `{open}` is the open threads worded by kind (`ThreadCounts.OpenPhrase`), Findings first, for example
 "1 open finding to resolve.", "1 open question to resolve." or "2 open findings, 1 open question to resolve.", and

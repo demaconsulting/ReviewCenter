@@ -31,7 +31,7 @@ public enum BaselineMode
     /// <summary>One given revision is the baseline of every review.</summary>
     Explicit,
 
-    /// <summary>The head of the last signed review of the same review-set is the baseline of that set's review.</summary>
+    /// <summary>The head of the last approved review of the same review-set is the baseline of that set's review.</summary>
     LastReviewed
 }
 

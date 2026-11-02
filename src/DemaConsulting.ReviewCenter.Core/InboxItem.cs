@@ -24,14 +24,17 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The groups of the inbox, in the order in which the page shows them.
 /// </summary>
 /// <remarks>
-///     <see cref="ToAnswer"/>, <see cref="Disputed"/>, <see cref="ToSign"/>, <see cref="RepliesWaiting"/> and
-///     <see cref="FailedChecks"/> need the user's action and are counted; <see cref="WaitingForOthers"/> and
-///     <see cref="Updates"/> only inform. The numeric values are not stored anywhere; the order is the display order.
+///     <see cref="ToAnswer"/>, <see cref="Disputed"/>, <see cref="ToSign"/>, <see cref="SignatureLost"/>,
+///     <see cref="RepliesWaiting"/> and <see cref="FailedChecks"/> need the user's action and are counted;
+///     <see cref="WaitingForOthers"/> and <see cref="Updates"/> only inform. The numeric values are not stored
+///     anywhere; the order is the display order.
 /// </remarks>
 public enum InboxSection
 {
     /// <summary>
-    ///     The user holds a reviewer slot and has not handed in the ballot of the checklist yet (none or a draft).
+    ///     The user holds a reviewer slot and has not handed in the ballot of the checklist yet (none or a draft), or
+    ///     someone else asked an open question that the user has not written in yet (the row then opens the review, see
+    ///     <see cref="InboxItem.OpensReview"/>).
     /// </summary>
     ToAnswer,
 
@@ -46,6 +49,13 @@ public enum InboxSection
     ///     the signature (shown as "Ready to sign").
     /// </summary>
     ToSign,
+
+    /// <summary>
+    ///     The user signed, the review changed afterwards so the signature no longer counts, and something still
+    ///     blocks a new signature. The user is told at once, not only when the review can be signed again. It is
+    ///     progress, not a verdict, so it is the same for a user who may not see the other ballots.
+    /// </summary>
+    SignatureLost,
 
     /// <summary>
     ///     Someone answered in a thread the user took part in or started, or on the user's own review.
@@ -106,6 +116,10 @@ internal static class InboxSections
 /// <param name="DueDate">The due date of the review, or <c>null</c> when it has none.</param>
 /// <param name="IsOverdue">Whether the due date is past and the review is not approved.</param>
 /// <param name="Detail">An optional sentence with more about the reason, or <c>null</c>.</param>
+/// <param name="OpensReview">
+///     Whether the row has to open the review page, not the checklist page, because what it asks is on the review
+///     (a question for the user is a thread of the review); <c>false</c> for the usual link of the section.
+/// </param>
 public sealed record InboxItem(
     InboxSection Section,
     int ProjectId,
@@ -116,7 +130,8 @@ public sealed record InboxItem(
     bool IsUnread,
     DateOnly? DueDate,
     bool IsOverdue,
-    string? Detail);
+    string? Detail,
+    bool OpensReview = false);
 
 /// <summary>
 ///     The inbox of one user: the rows and the number of reviews that need the user's action.
@@ -127,7 +142,8 @@ public sealed record InboxItem(
 /// <param name="Items">The rows ordered by section, then by project name and review identifier.</param>
 /// <param name="ActionCount">
 ///     The number of distinct reviews with a row in <see cref="InboxSection.ToAnswer"/>,
-///     <see cref="InboxSection.Disputed"/>, <see cref="InboxSection.ToSign"/>, <see cref="InboxSection.RepliesWaiting"/>
+///     <see cref="InboxSection.Disputed"/>, <see cref="InboxSection.ToSign"/>, <see cref="InboxSection.SignatureLost"/>,
+///     <see cref="InboxSection.RepliesWaiting"/>
 ///     or <see cref="InboxSection.FailedChecks"/>; a review in several of them counts once, and
 ///     <see cref="InboxSection.WaitingForOthers"/> and <see cref="InboxSection.Updates"/> never count.
 /// </param>

@@ -13,7 +13,8 @@
    confirms its identity at the provider with a button instead), or sees what blocks signing; an
    unsigned slot can be changed or removed and slots can be added), the
    list of files with size and open-thread count, the thread index of all files
-   (filter All/Open/Resolved, default Open; choosing a row selects the file and highlights the lines), and for
+   (filter All/Open/Resolved, default Open, or All once the review is concluded or has only resolved threads; choosing
+   a row selects the file and highlights the lines), and for
    the selected file: for a file of a repository review with a baseline the diff (see DiffView) with a Diff / Head /
    Baseline selector (Head not for a deleted file, Baseline not for an added file), otherwise the text as numbered lines (or a notice for binary files), a form that starts a thread (under the
    selected line in the diff), and the threads of that file (a resolved thread is a one-line header until expanded;
@@ -28,7 +29,8 @@
 
    A concluded (approved or rejected) review is locked: a Locked badge and a banner explain it, and every control that
    would change the
-   review (new thread, reply, resolve, line comments, reviewer slots) is disabled. A project or system administrator
+   review (new thread, reply, resolve, line comments) is disabled; the controls that change the reviewers (Change
+   reviewers, Remove, Add a slot) are not shown at all, only a note that the reviewers cannot change. A project or system administrator
    sees a reopen form (a reason of up to 250 characters is required); the reopen history is listed. When the project
    requires independent reviewers the author of the review is not offered as a reviewer and is told so.
 
@@ -217,7 +219,7 @@
         <ReviewStatusPanel Status="StatusView" ProjectId="ProjectId" ReviewId="@ReviewId" ReadOnly="ReadOnly || IsLocked"
                            OnDiscuss="@(id => ToggleDiscuss(id))" DiscussForm="DiscussFormFor" />
 
-        <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@Approval?.NextStep</span></p>
+        <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@NextStepText</span></p>
 
         @* The review conclusion: the reasons the reviewers state. A rejected review cannot be signed without it. It is
            shown to everyone who can read the review (with an explicit empty state when none is written) and edited only
@@ -389,10 +391,13 @@
                         }
                         <p><span class="badge @SlotBadgeClass(slot)" data-testid="slot-status-@slotId">@SlotStatusLabel(slot)</span></p>
 
-                        @if (slot.State == SlotSignatureState.NotSigned && !ReadOnly)
+                        @if (slot.State == SlotSignatureState.NotSigned && !ReadOnly && !IsLocked)
                         {
                             <details class="slot-edit">
                                 <summary>Change reviewers</summary>
+                                <p class="muted hint" data-testid="slot-edit-hint-@slotId">
+                                    Removing a reviewer also removes their ballot, and replacing one takes their answers out of it.
+                                </p>
                                 <select aria-label="Primary reviewer of slot @slot.Number" data-testid="slot-primary-select-@slotId"
                                         value="@PrimaryChoice(slot)" @onchange="e => SlotPrimaryChoices[slotId] = e.Value?.ToString() ?? string.Empty">
                                     @foreach (var candidate in VisibleCandidates)
@@ -532,17 +537,16 @@
                     </div>
                 }
 
-                @if (!ReadOnly)
+                @if (!ReadOnly && IsLocked)
+                {
+                    <p class="muted hint" data-testid="slots-locked-hint">The reviewers cannot change while the review is locked.</p>
+                }
+                else if (!ReadOnly)
                 {
                 <form class="slot-add" data-testid="slot-add-form" novalidate @onsubmit="AddSlotAsync">
                     <details open="@(approval.Slots.Count == 0 || NewSlotError is not null)">
                     <summary>Add a slot</summary>
-                    @if (IsLocked)
-                    {
-                        <p class="muted hint" data-testid="slots-locked-hint">The reviewers cannot change while the review is locked.</p>
-                    }
                     <select aria-label="Primary reviewer of the new slot" data-testid="new-slot-primary-select"
-                            disabled="@IsLocked" data-locked="@LockedMarker"
                             value="@NewSlotPrimary" @onchange="e => NewSlotPrimary = e.Value?.ToString() ?? string.Empty">
                         <option value="">Choose a primary reviewer</option>
                         @foreach (var candidate in VisibleCandidates)
@@ -551,7 +555,6 @@
                         }
                     </select>
                     <select aria-label="Alternate reviewer of the new slot" data-testid="new-slot-alternate-select"
-                            disabled="@IsLocked" data-locked="@LockedMarker"
                             value="@NewSlotAlternate" @onchange="e => NewSlotAlternate = e.Value?.ToString() ?? string.Empty">
                         <option value="">No alternate</option>
                         @foreach (var candidate in VisibleCandidates)
@@ -563,7 +566,7 @@
                     {
                         <p class="error" role="alert" data-testid="new-slot-error">@NewSlotError</p>
                     }
-                    <button type="submit" disabled="@IsLocked" data-locked="@LockedMarker" class="@(approval.Slots.Count == 0 ? null : "secondary")" data-testid="new-slot-add-button">Add slot</button>
+                    <button type="submit" class="@(approval.Slots.Count == 0 ? null : "secondary")" data-testid="new-slot-add-button">Add slot</button>
                     </details>
                 </form>
                 }

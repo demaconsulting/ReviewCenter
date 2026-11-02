@@ -303,6 +303,25 @@ sections:
           - ChecklistService_GetAsync_Viewer_SeesOwnDraftOnly
           - ChecklistService_GetAsync_NoSlot_Consolidated
 
+      - id: ReviewCenter-ChecklistService-BallotViewDetails
+        title: >-
+          The ChecklistService class shall, in the ballot view for a viewer who may see the other ballots and may view
+          the project, give the checks the submitted ballots answer differently with the answer and the justification
+          of every slot, the number of checks the submitted ballots agree on as Fail, and the position of the own
+          slot, shall name, for every viewer of the project, the other reviewers whose ballot is not handed in, and
+          shall give a viewer who has not handed in, a user with no access to the project, and an API token no
+          justification, no differing check, and no failed check.
+        justification: |
+          The page can then show why a reviewer answered differently, and who is still to come, without a second read,
+          while a reviewer who has not answered yet is not swayed by the others and a stranger learns nothing. Who has
+          handed in is progress, never an answer, so it stays visible in a masked view. The API reads the consolidated
+          standing, which is unchanged.
+        tests:
+          - ChecklistService_GetBallotView_OtherBallotMissing_NamesThemForViewersOfTheProject
+          - ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount
+          - ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck
+          - ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers
+
       - id: ReviewCenter-ChecklistService-BallotImpact
         title: >-
           The ChecklistService class shall, when a ballot is handed in, compare the record digest after the hand-in

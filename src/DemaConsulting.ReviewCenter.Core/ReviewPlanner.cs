@@ -30,7 +30,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <remarks>
 ///     <para>
 ///         <see cref="PlanAsync"/> only reads: it fetches the repository once, reads the configuration at the head,
-///         chooses a baseline for every set (none, one given revision, or the head of the set's last signed review
+///         chooses a baseline for every set (none, one given revision, or the head of the set's last approved review
 ///         when that is an ancestor of the new head and the set's selection is unchanged) and classifies each set
 ///         as will create, already filed, nothing to review or cannot plan. A fallback to a full review is always
 ///         the safe side, and the row says why in a plain sentence.
@@ -524,18 +524,18 @@ public sealed class ReviewPlanner
                 return;
         }
 
-        // Last reviewed: the most recently signed review of this set is the candidate for the baseline
-        var last = await FindLastSignedAsync(projectId, existing, candidate.Definition.Id, cancellationToken);
+        // Last reviewed: the most recently approved review of this set is the candidate for the baseline
+        var last = await FindLastApprovedAsync(projectId, existing, candidate.Definition.Id, cancellationToken);
         if (last is null)
         {
-            candidate.Note = "Full review: no signed review of this set yet";
+            candidate.Note = "Full review: no approved review of this set yet";
             return;
         }
 
         // A changed selection would let newly selected files escape review in a delta, so it forces a full review
         if (!string.Equals(last.Selection, candidate.SelectionText, StringComparison.Ordinal))
         {
-            candidate.Note = $"Full review: the file selection changed since the last signed review ({last.Id})";
+            candidate.Note = $"Full review: the file selection changed since the last approved review ({last.Id})";
             return;
         }
 
@@ -556,31 +556,32 @@ public sealed class ReviewPlanner
             }
             else
             {
-                candidate.Note = $"Full review: the last signed review ({last.Id}) is not an ancestor of this revision " +
+                candidate.Note = $"Full review: the last approved review ({last.Id}) is not an ancestor of this revision " +
                     "(history was rewritten or it is on another branch)";
             }
         }
         catch (DomainRuleException ex) when (ex.Rule is DomainRule.GitAccessFailed or DomainRule.GitTimeout)
         {
             // Not being able to tell is not a reason to fail the page; a full review is always correct
-            candidate.Note = $"Full review: it could not be checked whether the last signed review ({last.Id}) is an ancestor of this revision";
+            candidate.Note = $"Full review: it could not be checked whether the last approved review ({last.Id}) is an ancestor of this revision";
         }
     }
 
     /// <summary>
-    ///     Finds the most recently signed review of a review-set.
+    ///     Finds the most recently approved review of a review-set.
     /// </summary>
     /// <remarks>
-    ///     "Signed" is the signing service's approval: at least one reviewer slot, every slot signed with the
-    ///     current record digest and no thread open. "Most recent" is the latest signature time; reviews created at
+    ///     "Approved" is the signing service's approval: at least one reviewer slot, every slot signed with the
+    ///     current record digest, no thread open and an approved outcome; a review that was signed but concluded as
+    ///     rejected is not a baseline. "Most recent" is the latest signature time; reviews signed at
     ///     the same time fall back to the creation time.
     /// </remarks>
     /// <param name="projectId">The project identity.</param>
     /// <param name="existing">The reviews of the project made from this repository.</param>
     /// <param name="setId">The review-set identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The review, or <c>null</c> when no review of the set is signed.</returns>
-    private async Task<Review?> FindLastSignedAsync(
+    /// <returns>The review, or <c>null</c> when no review of the set is approved.</returns>
+    private async Task<Review?> FindLastApprovedAsync(
         int projectId,
         IReadOnlyList<Review> existing,
         string setId,
@@ -902,7 +903,7 @@ public sealed class ReviewPlanner
         public string? Note { get; set; }
 
         /// <summary>
-        ///     Gets or sets a value indicating whether the head equals the head of the last signed review.
+        ///     Gets or sets a value indicating whether the head equals the head of the last approved review.
         /// </summary>
         public bool Unchanged { get; set; }
 

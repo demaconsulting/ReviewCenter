@@ -132,6 +132,10 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("Auditors always see it", text, StringComparison.Ordinal);
         Assert.Contains("a resolved Finding with its resolution note, an open Finding with only its Open badge", text, StringComparison.Ordinal);
         Assert.DoesNotContain("once the review is concluded. See", text, StringComparison.Ordinal);
+
+        // Assert: the thread list starts with All on a concluded review, and a locked review offers no slot buttons
+        Assert.Contains("it starts with <strong>All</strong>, so the list is not empty.", text, StringComparison.Ordinal);
+        Assert.Contains("offers no buttons to add, change or remove a reviewer", text, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -154,6 +158,9 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("A Fail answer does not block signing.", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Rejected</strong>", text, StringComparison.Ordinal);
         Assert.Contains("(provisional until every slot has signed)", text, StringComparison.Ordinal);
+        Assert.Contains("complete, 1 check failed.", text, StringComparison.Ordinal);
+        Assert.Contains("1 check answered differently. Open it to discuss.", text, StringComparison.Ordinal);
+        Assert.Contains("1 of 2 ballots handed in. Bob has not handed in yet.", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Discuss</strong>", text, StringComparison.Ordinal);
         Assert.Contains("The discussion is a <strong>Question</strong>", text, StringComparison.Ordinal);
         AssertNoAnchorLinks(page);
@@ -174,6 +181,33 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("A Fail answer does not block signing", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Rejected</strong>", text, StringComparison.Ordinal);
         Assert.DoesNotContain("answered Fail", text, StringComparison.Ordinal);
+
+        // Assert: the plain wording of the status panel, the caution about missing ballots and the lost signature
+        Assert.Contains("Both reviewers failed REQ-01, so this review will be Rejected.", text, StringComparison.Ordinal);
+        Assert.Contains("Bob has not handed in a ballot yet. If you sign now, you may have to sign again.", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Next step</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("your inbox lists the review under <strong>Your signature no longer", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the planning topic names the default baseline as the last approved review of each set, defines
+    ///     approved as concluded with the Approved outcome (a Rejected review is not approved) and says what happens to
+    ///     a set that has none.
+    /// </summary>
+    [Fact]
+    public void HelpPage_Planning_NamesTheLastApprovedReviewBaseline()
+    {
+        // Act: render the topic page
+        var page = Render<HelpPlanningPage>();
+
+        // Assert: the default is the last approved review, approved means concluded as Approved, and a set without one is planned in full
+        var text = page.Markup;
+        Assert.Contains("<strong>Changes since the last approved review of each set</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("A set that has no approved review yet", text, StringComparison.Ordinal);
+        Assert.Contains("concluded with the <strong>Approved</strong> outcome", text, StringComparison.Ordinal);
+        Assert.Contains("concluded as <strong>Rejected</strong> is not approved", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("every reviewer has signed it and no thread is open", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("last signed review", text, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -460,10 +494,16 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Equal("Your inbox", page.Find("h1").TextContent);
         Assert.Equal("/inbox", page.Find("[data-testid='help-inbox-link']").GetAttribute("href"));
 
-        // Assert: the seven groups, the marker, mark all as read, and that updates are not work
+        // Assert: the eight groups, the marker, mark all as read, and that updates are not work
         Assert.Contains("<strong>To answer</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Question for you</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("no addressee", text, StringComparison.Ordinal);
+        Assert.Contains("the author of the review is told by Replies waiting instead", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Disputed</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("names the checks", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Ready to sign</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("handed in a ballot yet", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Your signature no longer counts</strong>", text, StringComparison.Ordinal);
         Assert.DoesNotContain("<strong>To sign</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Replies waiting</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Failed checks</strong>", text, StringComparison.Ordinal);
