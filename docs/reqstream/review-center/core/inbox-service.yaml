@@ -89,13 +89,15 @@ sections:
           review that is not concluded in which the user holds a slot and has done their part (the slot is signed, or
           the ballot is in and something that is not the user's to do blocks the signature), with a chip that names the
           number of reviewers waited for, or the open items when no reviewer is waited for, and a text that names
-          them, and shall never name a verdict or a dispute count of a ballot the user may not see.
+          them, and shall never name a verdict or a dispute count of a ballot the user may not see, and shall show no
+          due date and no Overdue mark on that row.
         justification: |
           A person who has done their part wants to know why the review is still open and who is holding it, without
           being asked for work that is not theirs. The names say who has not handed in; they say nothing about what
-          was answered.
+          was answered. A due date or an Overdue mark would make the row look like work.
         tests:
           - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
+          - InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue
           - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
           - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
           - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded

@@ -454,8 +454,8 @@ public sealed class InboxService
 
         InboxItem Row(InboxSection section, string chip, bool unread, string? detail = null)
         {
-            // The due date is only worth showing where the user has to act
-            var action = section != InboxSection.Updates;
+            // The due date is only worth showing where the user has to act, not on a waiting or update row
+            var action = InboxSections.IsAction(section);
             return new InboxItem(
                 section,
                 review.Candidate.ProjectId,

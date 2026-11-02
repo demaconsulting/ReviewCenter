@@ -1394,6 +1394,32 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that a waiting row, which is no work, shows no due date and no overdue marker even when the review is
+    ///     overdue.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue()
+    {
+        // Arrange: ann handed in her ballot, bob opens a thread, and the due date of the review has passed
+        var world = await InboxTestWorld.CreateAsync();
+        var due = DateOnly.FromDateTime(InboxTestWorld.Start.UtcDateTime).AddDays(1);
+        await world.CreateReviewAsync("r1", dueDate: due);
+        await world.AnswerAllAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.StartThreadAsync("r1", "bob");
+        world.Clock.Advance(TimeSpan.FromDays(3));
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+
+        // Assert: the only row is a waiting row without a due date or overdue marker
+        var row = Assert.Single(view.Items);
+        Assert.Equal(InboxSection.WaitingForOthers, row.Section);
+        Assert.Null(row.DueDate);
+        Assert.False(row.IsOverdue);
+    }
+
+    /// <summary>
     ///     Test that a reviewer who signed finds the review under Waiting for others, with the names of the people whose
     ///     signature is missing, that the row is never unread and that it is no work.
     /// </summary>

@@ -181,6 +181,10 @@ waits for others and does not find the review under Ready to sign. This scenario
 under Waiting for others with the chip and the names of the people who have not signed; the row is never unread and is
 not counted. This scenario is tested by `InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames`.
 
+**InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue**: A Waiting for others row of a
+review whose due date has passed shows no due date and no overdue mark, because the row is no work. This scenario is
+tested by `InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue`.
+
 **InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting**: The action count includes the To answer
 and the Disputed reviews and leaves out the Waiting for others and the Updates rows. This scenario is tested by
 `InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting`.
