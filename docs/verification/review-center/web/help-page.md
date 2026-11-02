@@ -118,7 +118,8 @@ Fail that blocks signing. This scenario is tested by `HelpPage_Signing_NoLongerS
 a reviewer slot that they own a ballot, answer the checks in it, submit it and then sign, and that the review concludes
 when every slot has signed the same, current record; it says that a concluded (approved or rejected) review is locked,
 and tells a person who holds a slot of the review that the conclusion is written in the Review conclusion card. It
-also says that the card lists the Findings in the report with their resolution notes, that the conclusion stays hidden
+also says that the card lists the Findings in the report (a resolved Finding with its resolution note, an open Finding
+with its Open badge only), that the conclusion stays hidden
 until the reader hands in their own ballot except for the lead, administrators, Auditors, a single-slot review and a
 concluded review, and no longer says that the Findings are listed only once the review is concluded. This scenario is
 tested by `HelpPage_ReadingReview_ShowsSlotOwnerNote`.

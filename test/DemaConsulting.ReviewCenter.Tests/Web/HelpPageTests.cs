@@ -130,7 +130,7 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("the conclusion stays hidden until you hand in your own ballot.", text, StringComparison.Ordinal);
         Assert.Contains("The lead", text, StringComparison.Ordinal);
         Assert.Contains("Auditors always see it", text, StringComparison.Ordinal);
-        Assert.Contains("Findings in the report, each with its resolution note", text, StringComparison.Ordinal);
+        Assert.Contains("a resolved Finding with its resolution note, an open Finding with only its Open badge", text, StringComparison.Ordinal);
         Assert.DoesNotContain("once the review is concluded. See", text, StringComparison.Ordinal);
     }
 
@@ -153,6 +153,7 @@ public sealed class HelpPageTests : PageTestBase
         // Assert: a Fail does not block signing, a rejection needs a conclusion, and Discuss starts a Question by default
         Assert.Contains("A Fail answer does not block signing.", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Rejected</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("(provisional until every slot has signed)", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Discuss</strong>", text, StringComparison.Ordinal);
         Assert.Contains("The discussion is a <strong>Question</strong>", text, StringComparison.Ordinal);
         AssertNoAnchorLinks(page);

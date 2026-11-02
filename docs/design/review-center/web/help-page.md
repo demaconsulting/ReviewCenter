@@ -131,15 +131,19 @@ then sign, and the review concludes when every slot has signed the same, current
 review the + buttons and the
 comment forms are disabled while every file and diff can still be read, tells that a reviewer who holds a slot (and the
 review creator, a project admin or a system administrator) writes the review conclusion in the "Review conclusion"
-card, and links to Reviewers and signing. It also says that the card lists the Findings in the report, each with its
-resolution note, once the reader may see the other reviewers' ballots, and that with several reviewers the conclusion
-stays hidden until the reader hands in their own ballot (the lead, administrators and Auditors, a single-slot review
-and a concluded review are the exceptions); the outcome shows once the review is concluded.
+card, and links to Reviewers and signing. It also says that the card lists the Findings in the report once the reader
+may see the other reviewers' ballots, a resolved Finding with its resolution note and an open Finding with its Open
+badge only, and that with several reviewers the conclusion stays hidden until the reader hands in their own ballot
+(the lead, administrators and Auditors, a single-slot review and a concluded review are the exceptions); the outcome
+shows once the review is concluded.
 Checklist (`HelpChecklistPage`) names the same exceptions for the answers of the other reviewers, says that a Fail
 answer does not block signing but makes the agreed outcome Rejected, which needs a conclusion text, and that the
 Discuss button of a check starts a Question unless the reader chooses Finding.
-The audit trail topic (`HelpAuditPage`) says that, until the own ballot is handed in, the entries of other people's
-checklist answers and check discussions show a neutral sentence instead of the details.
+The audit trail topic (`HelpAuditPage`) says that, in a review with several reviewers that is not concluded, the
+entries of other people's checklist answers and check discussions show a neutral sentence instead of the details until
+the reader hands in a ballot of their own, that who acted and when stays visible and the reader's own entries always
+show, and that the lead, administrators and Auditors, a single-slot review and a concluded review see the details at
+once (the rules of `AuditMasking` and `BallotVisibility`).
 Managing
 project members (`HelpMembersPage`) has a "Review rules" section that says the Review rules card of the project page is
 also only for a project admin or a system administrator, switches on or off whether the person who created a review may

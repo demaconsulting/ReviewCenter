@@ -104,7 +104,8 @@ report changed (details are hidden until you hand in your own ballot)", until th
 - **Fail** when the check is not met. A justification is required. State what is wrong and where. The answer itself is
   not a thread, so put the details in a thread on the lines concerned and point to it; where the ballots differ on the
   check, **Discuss** next to the check starts a thread about the check itself. When the ballots agree on a Fail, the
-  review ends as Rejected (see *When a Check Fails*).
+  provisional outcome is Rejected; the review is concluded as Rejected only when every slot has signed, a conclusion
+  text states the reasons, and no thread is open (see *When a Check Fails*).
 - **N/A** when the check cannot apply to the files of this review. A justification is required as well. Say why in a
   way a later reader can verify, for example "No database code in this change set", not just "not relevant". If a whole
   section does not apply, clear the switch of the section and give the reason once.
@@ -128,9 +129,11 @@ everything (see Review Checklist in the Reviewing chapter). A ballot
 counts only after its reviewer presses **Submit ballot**, or **Submit and sign** to hand in and sign in one step;
 changing it afterward makes it a draft again until it is handed in again. Practices that follow:
 
-- **Answer on your own.** Do not copy another slot's draft; you cannot see it anyway. Unless you are the lead, an
-  administrator, or an Auditor, the others' handed-in answers stay hidden until you have handed in yours, and even
-  then do not just follow them. The value of a second slot is that it reaches its own conclusion.
+- **Answer on your own.** Do not copy another slot's draft; you cannot see another reviewer's draft at all. In an
+  open review with several slots, the others' handed-in answers stay hidden from you until you have handed in yours
+  (the lead, administrators, and Auditors see them at once, and so does everyone in a review with a single slot or a
+  concluded review), and even when you can see them do not just follow them. The value of a second slot is that it
+  reaches its own conclusion.
 - **Settle a disagreement, do not overwrite it.** Where two submitted ballots give a check different answers, the
   check is disputed and blocks signing. Press **Discuss** next to the check, or talk to the other reviewer in a thread;
   the reviewer who changes the mind
