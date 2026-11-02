@@ -244,6 +244,7 @@ public class ProjectAccessGuardTests
     [
         "ChecklistService.CanSetReviewConclusionTextAsync",
         "ChecklistService.GetBallotViewAsync",
+        "ChecklistService.GetConsolidatedAsync",
         "ProjectChecklistService.GetAsync",
         "ProjectService.GetAsync",
         "ProjectService.ListAsync",
@@ -389,6 +390,7 @@ public class ProjectAccessGuardTests
         var reviews = await world.Reviews.ListAsync(world.Own, cancellationToken);
         var threads = await world.Threads.ListAsync(world.Own, "rev-1", cancellationToken);
         var checklist = await world.Checklists.GetAsync(world.Own, "rev-1", cancellationToken);
+        var consolidated = await world.Checklists.GetConsolidatedAsync(actor, world.Own, "rev-1", cancellationToken);
         var approval = await world.Signing.GetApprovalAsync(world.Own, "rev-1", cancellationToken);
         var preview = await world.Reviews.PreviewFollowUpAsync(
             world.Own, "rev-1", [new UploadedFile("a.txt", [1])], actor, cancellationToken);
@@ -405,6 +407,7 @@ public class ProjectAccessGuardTests
         Assert.Single(reviews);
         Assert.Single(threads);
         Assert.NotNull(checklist);
+        Assert.NotNull(consolidated);
         Assert.NotNull(approval);
         Assert.Equal(1, preview.CarriedThreads);
     }
