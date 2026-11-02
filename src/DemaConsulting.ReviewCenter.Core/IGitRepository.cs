@@ -132,7 +132,7 @@ public interface IGitRepository : IAsyncDisposable
     ///     Decides whether one commit is an ancestor of another (or the same commit).
     /// </summary>
     /// <remarks>
-    ///     The planner uses this to decide whether the head of the last signed review can serve as the baseline of a
+    ///     The planner uses this to decide whether the head of the last approved review can serve as the baseline of a
     ///     new review: after a force-push or on another branch it cannot.
     /// </remarks>
     /// <param name="ancestorSha">The commit that may be the ancestor, as a full lowercase hexadecimal identifier.</param>

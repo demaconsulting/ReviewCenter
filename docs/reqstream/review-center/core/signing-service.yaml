@@ -485,7 +485,8 @@ sections:
           which the ballots disagree is named once, as disputed, and never as unanswered, so that it says in plain
           words, when the only thing left is the conclusion and the agreed outcome is Rejected, which checks the
           reviewers failed and that the review will be Rejected, and so that, when nothing blocks, it names who has
-          signed and whose signature is awaited (a signature that went out of date included).
+          signed and whose signature is awaited (a signature that went out of date included, named by the person who
+          actually signed, which is the alternate when the alternate signed the slot).
         justification: |
           The next step is the first thing a reviewer reads. A dispute counted as an unanswered check sends the
           reviewer to answer a check that is answered, a bare "write the conclusion" does not say why a conclusion is
@@ -494,6 +495,9 @@ sections:
           - SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered
           - SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots
           - SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt
+          - SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate
+          - SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners
+          - SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner
           - SigningService_GetApprovalAsync_RejectedAgreed_NamesFailedCheckAndRejection
           - SigningService_GetApprovalAsync_RejectedAgreedWithOpenThread_NamesRejectionAndThread
           - SigningService_GetApprovalAsync_NoFail_HasNoFailedCheckIdsAndNoNote

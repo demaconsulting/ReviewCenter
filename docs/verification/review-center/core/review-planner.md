@@ -68,7 +68,7 @@ gives the changes since that head. This scenario is tested by
 last is the baseline. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast`.
 
 **ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder**: Four sets alternate between two
-last-signed baselines and the full head; the head and each baseline are listed once, no earlier change list is still
+last-approved baselines and the full head; the head and each baseline are listed once, no earlier change list is still
 alive when the next is requested, and the rows are in the order of the file with the changes of their own baseline. This
 scenario is tested by `ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder`.
 
@@ -81,7 +81,7 @@ is still made, with a full review and a note. This scenario is tested by
 `ReviewPlanner_PlanAsync_AncestorCheckFails_FullReviewWithNote`.
 
 **ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote**: A set whose selection differs from that of its last
-signed review gets a full review and a note. This scenario is tested by
+approved review gets a full review and a note. This scenario is tested by
 `ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote`.
 
 **ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview**: A set whose last approved review has the new head is
@@ -116,7 +116,7 @@ repository, and a disabled repository stop the plan with their own rules. This s
 `ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules`.
 
 **ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading**: A baseline mode value that no
-member has is refused with `ArgumentOutOfRangeException` before anything is read, and is not taken for the last-signed
+member has is refused with `ArgumentOutOfRangeException` before anything is read, and is not taken for the last-reviewed
 mode. This scenario is tested by `ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading`.
 
 **ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession**: The rows of a plan are created; each review
@@ -206,7 +206,7 @@ at the head of a side branch that the main branch does not contain; the real anc
 full review with the note. This scenario is tested by `ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview`.
 
 **ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview**: On a real repository, the paths of a set
-changed after its last signed review, so the set gets a full review with the note, although the old head is an
+changed after its last approved review, so the set gets a full review with the note, although the old head is an
 ancestor. This scenario is tested by `ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview`.
 
 **ReviewPlanner_PlanAsync_RealGit_NoConfigurationOrUnknownHead_ThrowTheirRules**: On a real repository, a head without a

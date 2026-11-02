@@ -75,6 +75,13 @@ public enum SlotSignatureState
 ///     checklist, because it has no ballots then. Whether a ballot is handed in is progress, not a verdict, so a
 ///     masked status keeps it.
 /// </param>
+/// <param name="LapsedSignerName">
+///     The display name of the person who gave the newest signature of the slot, which no longer counts because the
+///     review changed; <c>null</c> unless <see cref="State"/> is <see cref="SlotSignatureState.OutOfDate"/>. It is the
+///     person who actually signed, which is the alternate reviewer when the alternate signed the slot, so a sentence
+///     about a signature that lapsed names the right person instead of always the primary. A signer's name is not
+///     ballot data, so a masked status keeps it.
+/// </param>
 public sealed record SlotStatus(
     int SlotId,
     int Number,
@@ -83,7 +90,8 @@ public sealed record SlotStatus(
     SlotSignatureState State,
     string? SignerName,
     DateTimeOffset? SignedAt,
-    BallotState? Ballot = null);
+    BallotState? Ballot = null,
+    string? LapsedSignerName = null);
 
 /// <summary>
 ///     The approval status of a review: its slots, the current record digest and what blocks signing.

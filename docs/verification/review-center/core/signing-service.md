@@ -661,7 +661,25 @@ by Rita and Sam. Waiting for the signature of Tess.". This scenario is tested by
 
 **SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt**: A signature that went out of date because the
 conclusion text changed is named: "X's signature no longer counts because the review changed. Waiting for ...". This
-scenario is tested by `SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt`.
+scenario is tested by `SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt`. The slot of that test was
+signed by its primary, and `LapsedSignerName` is the primary, "Rita".
+
+**SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate**: Alex, the alternate of slot 1,
+signs it and the conclusion text then changes the record. The next step is "Alex's signature no longer counts because
+the review changed. Waiting for Rita, Sam and Tess." and `LapsedSignerName` of the slot is "Alex"; the primary of the slot
+is not named as the signer of the lapsed signature. This scenario is tested by
+`SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate`.
+
+**SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners**: Alex signs slot 1 and sam signs
+slot 2, then the conclusion text changes the record. The next step is "The signatures of Alex and Sam no longer count
+because the review changed. Waiting for Rita, Sam and Tess.". This scenario is tested by
+`SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners`.
+
+**SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner**: Rita signs slot 1, the record
+changes, alex signs the new record and the record changes again, and sam signs slot 2 at the final record. The lapsed
+signer of slot 1 is the signer of its newest signature ("Alex"), the signed slot 2 and the unsigned slot 3 have no
+lapsed signer, and the masked status keeps the name, because who signed is not ballot data. This scenario is tested by
+`SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner`.
 
 **SigningService_GetApprovalAsync_RejectedAgreed_NamesFailedCheckAndRejection**: Every ballot fails the same check and
 the conclusion is missing. `FailedCheckIds` has the check, and the next step and `RejectionNote` say "... failed {id},

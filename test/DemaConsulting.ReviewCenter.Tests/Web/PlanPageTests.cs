@@ -122,7 +122,7 @@ public class PlanPageTests : PageTestBase
 
     /// <summary>
     ///     Test that the page shows the form with the repository preselected when there is only one, the
-    ///     last-signed-review baseline chosen, and no baseline text box.
+    ///     last-approved-review baseline chosen, and no baseline text box.
     /// </summary>
     [Fact]
     public async Task PlanPage_Render_OneRepository_ShowsFormWithDefaults()

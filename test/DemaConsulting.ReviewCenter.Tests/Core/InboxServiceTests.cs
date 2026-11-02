@@ -1718,6 +1718,68 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that the Waiting for others row names the person who actually signed a slot that went out of date: the
+    ///     alternate when the alternate signed, the primary when the primary signed.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner()
+    {
+        // Arrange: slot 1 has the primary ann and the alternate cyd; cyd signs it; slot 2 is bob's; slot 3 is dee's and
+        // dee signs it; bob then opens a finding, which puts both signatures out of date
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann", "cyd");
+        await world.AddSlotAsync("r1", "bob");
+        var third = await world.AddSlotAsync("r1", "dee");
+        await world.SignAsync("r1", first.Id, "cyd");
+        await world.SignAsync("r1", third.Id, "dee");
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+
+        // Act
+        var forBob = await world.InboxOfAsync("bob");
+
+        // Assert: the sentence about the withdrawn signatures names Cyd (who signed) and Dee, and never Ann
+        var waiting = Assert.Single(forBob.Items, item => item.Section == InboxSection.WaitingForOthers);
+        Assert.Contains(
+            "The signatures of Cyd and Dee no longer count, so they must sign again.",
+            waiting.Detail,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Ann's signature", waiting.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a single lapsed signature of an alternate is named by the alternate in the Waiting for others row.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate()
+    {
+        // Arrange: cyd, the alternate of ann's slot, signs; bob then opens a finding
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann", "cyd");
+        await world.AddSlotAsync("r1", "bob");
+        await world.SignAsync("r1", first.Id, "cyd");
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+
+        // Act
+        var forBob = await world.InboxOfAsync("bob");
+
+        // Assert: the people awaited are Ann and Cyd, the signature that lapsed is Cyd's
+        var waiting = Assert.Single(forBob.Items, item => item.Section == InboxSection.WaitingForOthers);
+        Assert.Equal(
+            InboxRules.WaitingForText(["Ann", "Cyd"], ["Cyd"]),
+            waiting.Detail);
+        Assert.Contains("Cyd's signature no longer counts, so Cyd must sign again.", waiting.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ann's signature", waiting.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a stranger and a user who never signed get no Your signature no longer counts row.
     /// </summary>
     [Fact]

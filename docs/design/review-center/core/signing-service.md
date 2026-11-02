@@ -79,8 +79,11 @@ outcome is `Rejected` and the review has no conclusion text, which is when the c
 A `SlotStatus` holds the slot identity, its
 number, the primary and alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state,
 the state of the ballot of the slot (`Ballot`: `NotStarted`, `Draft` or `Submitted`; null for a review without a
-checklist; it is progress, not a verdict, so a masked status keeps it), and, for a signed slot, the name
-of the signer and the signing time. `IsMember` is `false` when the user is no longer a member of the project (a slot
+checklist; it is progress, not a verdict, so a masked status keeps it), for a signed slot the name
+of the signer and the signing time, and, for an out-of-date slot, `LapsedSignerName`: the display name of the person
+who gave the newest signature of the slot (the alternate when the alternate signed it, not always the primary), null
+otherwise; it is the name a sentence about a signature that no longer counts uses, and, being no ballot data, a masked
+status keeps it. `IsMember` is `false` when the user is no longer a member of the project (a slot
 keeps its assignee after a removal, so the status says who can no longer sign; step 1 of signing refuses such a user);
 the candidates of `ListCandidatesAsync` are members by definition. A member whose role is `Auditor` is never a
 reviewer: `AddSlotAsync` and `UpdateSlotAsync` refuse such a user as primary or alternate with `SlotUserInvalid`, and
@@ -284,8 +287,10 @@ conclusion, then sign."). Otherwise "Add a reviewer slot." when there is no slot
 signed, the sentence is signature-aware and agrees with the status panel: "Signed by Rita. Waiting for the signatures of
 Sam and Tess." (or "the signature of Tess" for one), and, for a signature that went out of date, "Rita's signature no
 longer counts because the review changed. Waiting for Rita, Sam and Tess." ("The signatures of A and B no longer
-count ..." for several). When nobody has signed: "Ready for signatures.", or "{rejection note} Ready for signatures."
-when the ballots agree on the rejected outcome.
+count ..." for several); the names of the lapsed signatures are those of the people who signed
+(`SlotStatus.LapsedSignerName`), so a slot signed by its alternate names the alternate, while the awaited people are the
+primaries of the slots that have no current signature. When nobody has signed: "Ready for signatures.", or
+"{rejection note} Ready for signatures." when the ballots agree on the rejected outcome.
 
 **Failed check identifiers and the rejection note**: `ReviewApproval.FailedCheckIds` lists the checks that the submitted
 ballots agree on as Fail, in checklist order (null or empty when there is none). `ReviewApproval.RejectionNote` is a

@@ -369,7 +369,7 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
-    ///     Test that the head of the last signed review becomes the baseline when it is an ancestor.
+    ///     Test that the head of the last approved review becomes the baseline when it is an ancestor.
     /// </summary>
     [Fact]
     public async Task ReviewPlanner_PlanAsync_LastReviewedSignedAncestor_UsesItsHeadAsBaseline()
@@ -419,7 +419,7 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
-    ///     Test that a last signed review that is not an ancestor of the head gives a full review with a reason.
+    ///     Test that a last approved review that is not an ancestor of the head gives a full review with a reason.
     /// </summary>
     [Fact]
     public async Task ReviewPlanner_PlanAsync_LastReviewedNotAncestor_FullReviewWithNote()
@@ -459,7 +459,7 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
-    ///     Test that a changed selection forces a full review even when the last signed head is an ancestor.
+    ///     Test that a changed selection forces a full review even when the last approved head is an ancestor.
     /// </summary>
     [Fact]
     public async Task ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote()
@@ -528,7 +528,7 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
-    ///     Test that a set whose last signed review has the same head has nothing to review.
+    ///     Test that a set whose last approved review has the same head has nothing to review.
     /// </summary>
     [Fact]
     public async Task ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview()
@@ -671,7 +671,7 @@ public class ReviewPlannerTests
 
     /// <summary>
     ///     Test that a baseline mode that is not defined is refused before anything is read, instead of being
-    ///     treated as the last-signed mode.
+    ///     treated as the last-reviewed mode.
     /// </summary>
     [Fact]
     public async Task ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading()

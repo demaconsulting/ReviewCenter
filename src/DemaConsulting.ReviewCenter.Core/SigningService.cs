@@ -536,7 +536,9 @@ public sealed class SigningService
                 // A review without a checklist has no ballots; with one, a slot without a ballot has not started
                 record.Checklist is null
                     ? null
-                    : record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State ?? BallotState.NotStarted));
+                    : record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State ?? BallotState.NotStarted,
+                // The newest signature of a lapsed slot names who actually signed, which may be the alternate
+                state == SlotSignatureState.OutOfDate ? own.MaxBy(s => s.Id)?.DisplayName : null));
         }
 
         var conclusion = ReviewLock.ConcludedOutcome(record, slots, signatures);
@@ -1483,7 +1485,8 @@ public sealed class SigningService
         var waiting = statuses.Where(s => s.State != SlotSignatureState.Signed).ToList();
         if (waiting.Count > 0 && outOfDate.Count > 0)
         {
-            var names = ReviewApproval.JoinList(outOfDate.Select(s => s.Primary.DisplayName).ToList());
+            // The people whose signatures lapsed are the signers, who may be an alternate rather than the primary
+            var names = ReviewApproval.JoinList(outOfDate.Select(s => s.LapsedSignerName ?? s.Primary.DisplayName).ToList());
             var lead = outOfDate.Count == 1
                 ? $"{names}'s signature no longer counts"
                 : $"The signatures of {names} no longer count";

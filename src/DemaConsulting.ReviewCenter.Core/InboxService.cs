@@ -840,11 +840,15 @@ public sealed class InboxService
         {
             var people = await OthersWithoutSignatureAsync(review, facts, cancellationToken);
 
-            // The other signers are told whose signature was withdrawn, so they know why the review waits
+            // The other signers are told whose signature was withdrawn, so they know why the review waits; the name is
+            // that of the person who gave the newest signature of the slot, which may be the alternate
             var users = await review.Names.GetAsync(cancellationToken);
             var signAgain = others
                 .Where(slot => InboxRules.SlotState(slot, facts.Signatures, facts.Digest) == SlotSignatureState.OutOfDate)
-                .Select(slot => users.TryGetValue(slot.PrimaryUserId, out var name) ? name : null)
+                .Select(slot => facts.Signatures
+                    .Where(signature => signature.SlotId == slot.Id)
+                    .MaxBy(signature => signature.Id)?.DisplayName
+                    ?? (users.TryGetValue(slot.PrimaryUserId, out var name) ? name : null))
                 .OfType<string>()
                 .ToList();
             detail = InboxRules.WaitingForText(people, signAgain);

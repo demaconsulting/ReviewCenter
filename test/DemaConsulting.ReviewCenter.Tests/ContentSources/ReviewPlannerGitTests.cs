@@ -296,7 +296,7 @@ public class ReviewPlannerGitTests
     }
 
     /// <summary>
-    ///     Test that a last signed review on another branch, which is not an ancestor of the head, gives a full review.
+    ///     Test that a last approved review on another branch, which is not an ancestor of the head, gives a full review.
     /// </summary>
     [Fact]
     public async Task ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview()
@@ -326,7 +326,7 @@ public class ReviewPlannerGitTests
 
     /// <summary>
     ///     Test that a changed selection gives a full review against a real repository, even though the last
-    ///     signed head is an ancestor.
+    ///     approved head is an ancestor.
     /// </summary>
     [Fact]
     public async Task ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview()

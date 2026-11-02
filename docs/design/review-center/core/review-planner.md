@@ -109,7 +109,7 @@ keep their fixed messages. Any other exception that
 is not a cancellation, for example a database error, becomes a `Failed` result of that request with a generic message
 that carries no exception text; nothing is created for that request, and the results of the other requests stay.
 A cancellation propagates. A null argument is `ArgumentNullException`, a baseline mode that is not defined is
-`ArgumentOutOfRangeException` (checked before anything is read, so it can never be taken for the last-signed mode), and
+`ArgumentOutOfRangeException` (checked before anything is read, so it can never be taken for the last-reviewed mode), and
 a batch with too many requests is `ArgumentException`.
 
 #### Limitations

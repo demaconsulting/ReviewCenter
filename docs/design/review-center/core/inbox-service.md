@@ -90,7 +90,9 @@ are assigned in posting order and never reused, so one integer per review tells 
   - *Waiting for others*: the user holds a slot, has done their part (handed in the ballot, and cannot sign yet or has
     signed). The chip is "Waiting for 1 reviewer", "Waiting for n reviewers" or "Open items remain", and the detail
     sentence names the people whose slots are not signed ("Waiting for Alice, Bob."), then says whose signature no
-    longer counts ("Alice's signature no longer counts, so Alice must sign again."), or says that open items remain,
+    longer counts ("Alice's signature no longer counts, so Alice must sign again."; the name is that of the person who
+    gave the newest signature of the slot, so a slot signed by its alternate names the alternate), or says that open
+    items remain,
     or that nothing is left to do. Who has not handed in is progress and not a verdict, so the names are shown to every
     viewer. The row is information: it is never unread and never counted.
   - *Replies waiting*: the user may contribute, the review is not concluded, and there is an open thread whose last

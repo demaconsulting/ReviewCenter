@@ -226,6 +226,17 @@ scenario is tested by `InboxService_GetInboxAsync_SignatureLostWhileBlocked_Show
 Signature lost row for the signature of ann. This scenario is tested by
 `InboxService_GetInboxAsync_SignatureLost_NotShownToOthers`.
 
+**InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner**: Slot 1 has the primary ann and the
+alternate cyd, slot 2 is bob's and slot 3 is dee's. Cyd signs slot 1 and dee signs slot 3, then bob opens a finding. The
+Waiting for others row of bob says "The signatures of Cyd and Dee no longer count, so they must sign again." and never
+names Ann's signature: the alternate who signed is named, and so is the primary who signed. This scenario is tested by
+`InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner`.
+
+**InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate**: Cyd, the alternate of the slot of
+ann, signs and bob then opens a finding. The Waiting for others row of bob is the sentence of `InboxRules.WaitingForText`
+with Ann and Cyd awaited and only Cyd's signature lapsed ("Cyd's signature no longer counts, so Cyd must sign again.").
+This scenario is tested by `InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate`.
+
 **InboxService_GetInboxAsync_ReadyToSignWithMissingBallot_NamesReviewerWhoHasNotHandedIn**: With the ballots of ann and
 bob in and the one of cyd missing, the Ready to sign row of ann holds the sentence of `ReviewApproval.MissingBallotsText`
 for cyd, and holds none once cyd has handed in. This scenario is tested by

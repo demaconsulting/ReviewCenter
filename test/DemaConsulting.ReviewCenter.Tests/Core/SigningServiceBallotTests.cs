@@ -312,6 +312,88 @@ public class SigningServiceBallotTests
         Assert.Equal(
             "Rita's signature no longer counts because the review changed. Waiting for Rita, Sam and Tess.",
             approval.NextStep);
+        Assert.Equal("Rita", approval.Slots[0].LapsedSignerName);
+    }
+
+    /// <summary>
+    ///     Test that a slot that was signed by its alternate names the alternate, not the primary, in the next step
+    ///     when that signature no longer counts.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate()
+    {
+        // Arrange: alex, the alternate of slot 1, signs, then the conclusion text changes the record, acknowledging it
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1, alternate: true);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [world.Slots[0].Id]);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert: the lapsed signature is Alex's; the awaited people are still the primaries of the slots
+        Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots[0].State);
+        Assert.Equal("Alex", approval.Slots[0].LapsedSignerName);
+        Assert.Equal(
+            "Alex's signature no longer counts because the review changed. Waiting for Rita, Sam and Tess.",
+            approval.NextStep);
+    }
+
+    /// <summary>
+    ///     Test that the next step names the actual signers when the signatures of several slots no longer count and
+    ///     one slot was signed by its alternate.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners()
+    {
+        // Arrange: alex signs slot 1 and sam signs slot 2, then the conclusion text changes, acknowledging both
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1, alternate: true);
+        await world.SignAsync(2);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken,
+            [world.Slots[0].Id, world.Slots[1].Id]);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert: Alex and Sam, never Rita, are named as the signers whose signatures lapsed
+        Assert.Equal(
+            "The signatures of Alex and Sam no longer count because the review changed. Waiting for Rita, Sam and Tess.",
+            approval.NextStep);
+    }
+
+    /// <summary>
+    ///     Test that the newest signature of a slot decides who is named when the signature no longer counts, and that
+    ///     a signed or unsigned slot and a masked status carry the name correctly.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner()
+    {
+        // Arrange: rita signs slot 1, the record changes, alex signs the new record, the record changes again; sam signs
+        // slot 2 at the final record
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var slotOne = world.Slots[0].Id;
+        await world.SignAsync(1);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [slotOne]);
+        await world.SignAsync(1, alternate: true);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "Another note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [slotOne]);
+        await world.SignAsync(2);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+        var masked = approval.Masked();
+
+        // Assert: slot 1 names the newest signer; the signed and the unsigned slot name nobody; masking keeps the name
+        Assert.Equal("Alex", approval.Slots[0].LapsedSignerName);
+        Assert.Null(approval.Slots[1].LapsedSignerName);
+        Assert.Null(approval.Slots[2].LapsedSignerName);
+        Assert.Equal("Alex", masked.Slots[0].LapsedSignerName);
     }
 
     /// <summary>

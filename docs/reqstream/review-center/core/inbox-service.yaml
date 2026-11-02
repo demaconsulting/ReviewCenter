@@ -87,7 +87,8 @@ sections:
           covers the record and a new signature is not possible yet, also while the review cannot be signed, with a
           sentence that says what blocks it and that the user shall look at the changes and sign again afterwards,
           shall turn the row into ready to sign when nothing blocks the signature, shall tell the other signers in
-          their row that waits for others that the signature no longer counts, shall count the row as action, and
+          their row that waits for others that the signature no longer counts (naming the person who actually signed,
+          which is the alternate when the alternate signed the slot), shall count the row as action, and
           shall list it to nobody else.
         justification: |
           A signer whose signature was withdrawn because the review changed must learn it, also while the review is
@@ -95,6 +96,8 @@ sections:
         tests:
           - InboxService_GetInboxAsync_SignatureLostWhileBlocked_ShowsSignatureLostRow
           - InboxService_GetInboxAsync_SignatureLost_NotShownToOthers
+          - InboxService_GetInboxAsync_SignatureLostOfAlternate_WaitingRowNamesTheSigner
+          - InboxService_GetInboxAsync_SignatureLostOfOneAlternate_WaitingRowNamesTheAlternate
           - InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection
           - InboxRules_ReviewerStanding_SignatureLostConcludedOrNoSlot_IsNone
           - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
