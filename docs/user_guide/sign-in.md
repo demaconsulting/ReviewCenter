@@ -338,3 +338,36 @@ at the next sign-in.
 
 **Planned.** Enforcement, so that a second factor is required for system administrators or by a policy of a project,
 is planned and not part of this release: today the choice is the person's own. A QR code for the setup is planned too.
+
+## Limitations of Sign-in
+
+- There is no password reset and no email. A system administrator sets a new password for a user who forgot it. A
+  local account can turn on an optional second factor, a one-time code from an authenticator app (see
+  [Two-Factor Sign-in](#two-factor-sign-in)); each account decides for itself, and this release does not enforce it by
+  a policy, neither for system administrators nor for a project. Only one OpenID Connect provider can be set, an
+  account at it is never linked to a local account, and it is not updated when the person changes at the provider (the
+  name and the state of the account are those of the first sign-in, and a person who is removed at the provider keeps
+  the account here until a system administrator disables it). The sign-in at a provider does not end the session at
+  the provider when you log out.
+- The lockout counts failures per user name, so anyone who knows a user name can keep that account locked for 5
+  minutes at a time by guessing wrongly on purpose, also from an address that the throttle allows. The sign-in
+  throttle (see [Sign In and Out](#sign-in-and-out)) limits how often one address can try, but it does not prevent
+  this. This is an accepted trade-off of locking by user name.
+- Every failed sign-in gives the same answer, and an unknown user costs one password verification. The response time
+  can still differ slightly between a known and an unknown user (a failure on a known account also stores the failure
+  counter and an audit entry), so timing can in principle reveal which user names exist. This is not mitigated further.
+- With `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` the server trusts `X-Forwarded-For` from any sender and does not
+  restrict which proxies it trusts. The proxy must overwrite that header and be the only route to the server;
+  otherwise a client can choose its own address and avoid the per-address and per-name limits (the lockout of the user
+  name still applies).
+- The sign-in throttle is kept in memory in one server process: it starts again when the server restarts, and with
+  several server processes each has its own counters. It holds at most 10,000 counters and evicts the oldest when it
+  is full, so a flood from very many addresses can push out older counters. Users behind one shared address (an office
+  network or a proxy) share the limit of that address, and the address is only as reliable as the proxy setup (see
+  Secure Cookie Behind a Reverse Proxy in the Deployment chapter). A wrong password at a signature is limited by the
+  lockout of the user name only.
+- The sign-in state of an open page is re-checked only every `Auth:RevalidationSeconds` seconds (30 by default), so a
+  disabled or changed user can still use some actions of an open page for up to that long; see
+  [Session Ended on an Open Page](#session-ended-on-an-open-page). Changing a password does not end the user's other
+  sessions. Opening a page that needs a role from an already open page is checked against the role you had when the
+  page was opened.

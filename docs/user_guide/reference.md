@@ -365,7 +365,7 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 | Group | A review is listed when | Needs action |
 | ----- | ----------------------- | ------------ |
 | To answer | You hold a slot of a review with a checklist and have not handed in your ballot; not concluded | Yes |
-| Disputed | You handed in, you may see the other ballots, and some checks or sections are disputed | Yes |
+| Disputed | You handed in (or are the author with no slot), may see the other ballots, and checks are disputed | Yes |
 | Ready to sign | You handed in, nothing blocks the signature, and a slot of yours needs signing | Yes |
 | Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
 | Failed checks | You authored the review, it is not concluded, and the ballots agree a check is Fail | Yes |

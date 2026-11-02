@@ -2,7 +2,7 @@
 
 This chapter is for the people who run ReviewCenter and manage its projects: system administrators and project
 administrators. It covers the user accounts, who can see which project, the evidence settings and the review rules of a
-project, the reopening of approved reviews, the audit
+project, the reopening of concluded (approved or rejected) reviews, the audit
 trail, the database, and the git repositories of a project.
 
 ## Manage Users (System Administrators)
@@ -57,7 +57,7 @@ ReviewCenter controls access by project. There are four roles:
 - **System administrator**: a flag on a user account. A system administrator creates projects, manages users and
   project membership, reads the audit trail, and can see and manage every project.
 - **Project administrator**: a member of one project who also manages the members, the git repositories, the
-  evidence settings, and the review rules of that project, and who can reopen an approved review of it.
+  evidence settings, and the review rules of that project, and who can reopen a concluded review of it.
 - **Member**: a user who belongs to a project (a project member, role "Member" on the project page). A member works on
   the reviews of that project.
 - **Auditor**: a member of one project who may read everything of it and change nothing. An Auditor sees the
@@ -315,6 +315,7 @@ Both work without signing in.
   flood of addresses the counters of the oldest ones are dropped first, so those clients start again with a full
   allowance, but nobody is refused because of it.
 - An anonymous download is recorded in the audit trail as `attestation.generated` with the actor `anonymous`.
+- The anonymous evidence index lists **Approved** reviews only; a **Rejected** review is never listed.
 - Anonymous attestation PDFs are served for **Approved** reviews only. The attestation of a **Rejected** review is
   never served to a request without a sign-in, and the answer is 404.
 
@@ -470,7 +471,7 @@ must not be affected switches them off.
   comment threads
   (starting, answering, and resolving them) are not affected, and a review created from the command line has no
   recorded author, so nobody is excluded from it.
-- **The person who reopened cannot sign again.** After an administrator reopens an approved review, that administrator
+- **The person who reopened cannot sign again.** After an administrator reopens a concluded review, that administrator
   cannot sign any slot of the review (the sign form is replaced by a notice, and the service refuses it before the
   password is checked, so it does not count as a failed attempt). A reopen is also refused when it would leave a slot in
   which nobody may sign, for example because the administrator is the only reviewer of a slot; the message names the
@@ -648,7 +649,7 @@ all hashes, because the hashes use no secret key. To detect either, record the *
 shown on the Audit page outside the database, for example in a ticket, a signed email, or a write-once log, and
 compare them with the values shown later: the entry count must not be lower, and while no new entries have been
 added the head hash must be the same. This release has no external anchoring of its own; recording the
-head hash is a manual step, and it is most useful after important events such as the approval of a review.
+head hash is a manual step, and it is most useful after important events such as the conclusion of a review.
 
 ### Recorded Actions
 
@@ -679,7 +680,9 @@ head hash is a manual step, and it is most useful after important events such as
 | Project   | `project.checklist-changed` (the checklist of a project was replaced or reset)       |
 | Project   | `project.independent-reviewers-changed` (the independence rule was switched)         |
 | Project   | `project.review-rule-changed` (a further review rule was switched)                   |
-| Reopening | `review.reopened` (an administrator reopened an approved review)                     |
+| Reopening | `review.reopened` (an administrator reopened a concluded review)                     |
+| Repo      | `repository.created`, `repository.updated` (a repository was added or changed)       |
+| Repo      | `repository.enabled`, `repository.disabled` (a repository was switched on or off)    |
 | Due date  | `review.due-date-changed` (the due date of a review was set, changed, or cleared)    |
 | Record    | `review.conclusion-changed` (conclusion text changed; lengths only, never the text)  |
 | Tokens    | `token.created`, `token.revoked`                                                     |

@@ -2,7 +2,7 @@
 
 This chapter describes the daily work of a review: projects and their reviews, planning, comments, the checklist,
 the signatures, the lock of a concluded (approved or rejected) review and how an administrator reopens it, and the
-signed attestation that proves an approval.
+signed attestation that records the outcome of a concluded review.
 
 ## Projects and Reviews
 
@@ -218,41 +218,6 @@ When the plan cannot be made, the page says why in plain English and what to do:
 
 The page never shows text printed by git, the location of the repository, or a credential.
 
-### Limitations of Sign-in
-
-- There is no password reset and no email. A system administrator sets a new password for a user who forgot it. A
-  local account can turn on an optional second factor, a one-time code from an authenticator app (see Two-Factor
-  Sign-in in the Users and Sign-in chapter); each account decides for itself, and this release does not enforce it by
-  a policy, neither for system administrators nor for a project. Only one OpenID Connect provider can be set, an
-  account at it is never linked to a local account, and it is not updated when the person changes at the provider (the
-  name and the state of the account are those of the first sign-in, and a person who is removed at the provider keeps
-  the account here until a system administrator disables it). The sign-in at a provider does not end the session at
-  the provider when you log out.
-- The lockout counts failures per user name, so anyone who knows a user name can keep that account locked for 5
-  minutes at a time by guessing wrongly on purpose, also from an address that the throttle allows. The sign-in
-  throttle (see Sign In and Out in the Users and Sign-in chapter) limits how often one address can try, but it does
-  not prevent this. This is an
-  accepted trade-off of locking by user name.
-- Every failed sign-in gives the same answer, and an unknown user costs one password verification. The response time
-  can still differ slightly between a known and an unknown user (a failure on a known account also stores the failure
-  counter and an audit entry), so timing can in principle reveal which user names exist. This is not mitigated further.
-- With `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` the server trusts `X-Forwarded-For` from any sender and does not
-  restrict which proxies it trusts. The proxy must overwrite that header and be the only route to the server;
-  otherwise a client can choose its own address and avoid the per-address and per-name limits (the lockout of the user
-  name still applies).
-- The sign-in throttle is kept in memory in one server process: it starts again when the server restarts, and with
-  several server processes each has its own counters. It holds at most 10,000 counters and evicts the oldest when it
-  is full, so a flood from very many addresses can push out older counters. Users behind one shared address (an office
-  network or a proxy)
-  share the limit of that address, and the address is only as reliable as the proxy setup (see Secure Cookie Behind a
-  Reverse Proxy in the Deployment chapter). A wrong password at a signature is limited by the lockout of the user name
-  only.
-- The sign-in state of an open page is re-checked only every `Auth:RevalidationSeconds` seconds (30 by default), so a
-  disabled or changed user can still use some actions of an open page for up to that long; see Session Ended on an
-  Open Page in the Users and Sign-in chapter. Changing a password does not end the user's other sessions. Opening a
-  page that needs a role from an
-  already open page is checked against the role you had when the page was opened.
-
 ## Your Inbox
 
 The **Inbox** (`/inbox`, linked from the home page and from the **Inbox** tab of the page header) lists the reviews that
@@ -271,9 +236,13 @@ author of the review. Someone who only wrote a comment in another person's revie
 | Waiting for others | You did your part; others or open items remain | "Waiting for N reviewers", "Open items remain" |
 | Updates | A review someone else concluded or reopened since you last looked | "Approved", "Rejected", "Reopened" |
 
-The first five groups need your action; Waiting for others and Updates are for information. A review is in at most one
-of To answer, Disputed, Ready to sign and Waiting for others for you, and the inbox agrees with the next-step line of
-the review page. **To answer** opens the checklist, where your ballot is. Reviewers answer independently: until you
+The first five groups need your action; Waiting for others and Updates are for information. A reviewer sees a Disputed
+row only while a slot of theirs is still unsigned. The author of a review who holds no slot has no ballot to hand in,
+so for them Disputed is the row that applies: when the ballots differ and are not hidden from the author (see
+[Review Checklist](#review-checklist)), the author sees the disputes, so that they can steer the review. A review is in
+at most one of To answer, Disputed, Ready to sign and Waiting for others for you, and the inbox agrees with the
+next-step line of the review page. **To answer** opens the checklist, where your ballot is. Reviewers answer
+independently: until you
 have handed in your own ballot the inbox shows nothing about how the others answered, so there is no Disputed row and
 no count of disputes for you; a Waiting for others row names the people who are waited for, because who has not
 handed in is progress and not a verdict. A failed-checks entry reads "Reviewers marked N checks as Fail so far. If that
@@ -415,7 +384,7 @@ submitted their ballot (the only reviewer of a review with a single slot may als
 draft, because there is no other ballot to hide), and so may the review's lead and a system administrator; any other
 member is refused. On the checklist page, the **Discuss** button next to a check on which the ballots differ starts one
 (see [Review Checklist](#review-checklist)); a viewer who has not handed in a ballot in a review with several slots does
-not see the check discussions or how many there are, but the lead and the administrators do.
+not see the check discussions or how many there are, but the lead, the administrators, and the Auditors do.
 
 A thread about a check is not carried into a follow-up review, because the checklist of the follow-up is frozen anew.
 Such threads do not need the confirmation of the dropped open threads; the form tells how many are left out.
@@ -458,9 +427,11 @@ appears later offers a sign-in link to the address the page was first opened at.
 Every new review gets a checklist: a copy of the checklist of its project. A project uses the default checklist,
 taken from the Continuous Compliance review template (14 sections and 58 checks), until a project administrator
 replaces it (see [Checklist Template](administration.md#checklist-template)). The review page shows a Checklist card
-with a summary such as "37 of 58
-checks answered" and a link to the checklist page; the review page's next-step line also counts the unanswered
-checks (for example "12 checklist checks unanswered, 1 open question to resolve." or "1 open finding to resolve.")
+with a summary such as "37 of 58 checks answered" and a link to the checklist page. A reviewer sees the progress of
+the own ballot there. A member who holds no slot in a review with several slots (and is not the lead, an
+administrator, or an Auditor) sees "Hidden until you answer" instead, because the progress of the others stays hidden
+(see below). The review page's next-step line also counts the unanswered checks (for example "12 checklist checks
+unanswered, 1 open question to resolve." or "1 open finding to resolve.")
 and says "Checklist complete and all threads resolved." when nothing is left.
 
 The checklist page tells you what to do next at its top: how many checks are unanswered, the overall progress, and
@@ -536,9 +507,10 @@ the unsaved choice, justification, and reason stay as you typed them (a section 
 applicable).
 
 The checklist of a review is fixed when the review is created: a later release with a different default checklist, or
-a project checklist that is replaced afterwards, does not change reviews that already exist. Checklist
-answers are not linked to comment threads. The checklist
-page is made for narrow screens too.
+a project checklist that is replaced afterwards, does not change reviews that already exist. An answer is not a
+comment, and a justification is not a thread; to talk about a check, use **Discuss** (see
+[Discussions About a Check](#discussions-about-a-check)), which starts a thread that is anchored to that check. The
+checklist page is made for narrow screens too.
 
 ### Review Conclusion Text
 
@@ -549,9 +521,21 @@ review page, by a primary or alternate reviewer of any slot or by the lead of th
 administrator, or a system administrator), and only while
 the review is not concluded; a concluded review is locked and refuses the change (see
 [Locked Reviews and Reopening](#locked-reviews-and-reopening)). An auditor, a member who is not a reviewer of the
-review, and a personal access token cannot write it. Leaving the text blank clears it. The card shows the saved text
-to everyone who can see the review; the form appears only for the people who may write it, and only while the review
-is not locked.
+review, and a personal access token cannot write it. Leaving the text blank clears it.
+
+**Who sees the card.** In a review with several slots the **Review conclusion** card stays hidden from you until you
+have handed in your own ballot: it then says only "The conclusion stays hidden until you hand in your own ballot." and
+shows neither the text nor the form. This holds for a member who holds no slot as well, so a reviewer cannot be
+influenced by a conclusion that was written before the own answers are in. The card is not hidden in a review with a
+single slot, for the lead of the review, the administrators, and the Auditors, after your own ballot is handed in, and
+once the review is concluded (see [Review Checklist](#review-checklist)). Where it is not hidden, it shows the saved
+text to everyone who can see the review (or "No conclusion written."); the form appears only for the people who may
+write it, and only while the review is not locked.
+
+**Findings in the report.** Where the card is not hidden and the review has Findings, it also lists the **Findings in
+the report**: each Finding with its place (the file and lines, or the check), the text of its first comment, an
+**Open** or **Resolved** badge, and the resolution note of a resolved one. Once the review is concluded, the card also
+shows its outcome, **Approved** or **Rejected**, and who signed and when.
 
 The text is part of the record that signatures cover, so a change of it makes the signatures given so far out of
 date. When signatures exist, **Save** first shows the same confirmation as a changed checklist answer, which names
@@ -578,9 +562,9 @@ When every slot has signed the rejection for the current record, the review is c
 page and the project page show a **Rejected** badge, and the review is locked. If the conclusion text is changed after
 signatures exist, the signers must sign again. An administrator can reopen a Rejected review
 like an Approved one. The signed attestation PDF is available for Rejected reviews too (it is marked as rejected); the
-evidence index lists Approved reviews only; see [Signed Attestation](#signed-attestation). The API field `isApproved`
-is true for approved reviews only, so a rejected
-review is concluded but not approved (see the Automation chapter).
+evidence index lists Approved reviews only; see [Signed Attestation](#signed-attestation). The API field `approved`
+is true for approved reviews only, so a rejected review is concluded but not approved: it has `approved: false` and
+`outcome: "Rejected"` (see the Automation chapter).
 
 ## Follow-up Reviews
 
@@ -779,12 +763,11 @@ default), and the page is replaced by the Session ended message. Until then the 
 not re-checked, such as answering checks and adding comments and threads. Signing and changing reviewer slots check
 the account again on every action and are refused for a disabled user at once.
 
-Approved and Rejected are computed each time from the record, the signatures, and the open threads; they are not stored
-states of the review, and neither
-is the lock that follows from them: a review is locked exactly while it is Approved or Rejected. Every
-signature is also recorded in the audit trail, which is described in Audit Trail in the Administration chapter. An
-Approved
-review can be downloaded as a digitally signed PDF; see the section Signed Attestation.
+Approved and Rejected are computed each time from the record, the signatures, and the open threads; they are not
+stored states of the review, and neither is the lock that follows from them: a review is locked exactly while it is
+Approved or Rejected. Every signature is also recorded in the audit trail, which is described in Audit Trail in the
+Administration chapter. A concluded (Approved or Rejected) review can be downloaded as a digitally signed PDF; see the
+section Signed Attestation.
 
 ## Locked Reviews and Reopening
 
@@ -814,8 +797,8 @@ before the review was concluded) is refused with the message "This review is con
 administrator must reopen it before it can change." Signing a concluded review is refused with the same message. The
 files and the selection of a review are fixed when it is created, so there is nothing to lock there. Everything that
 only reads keeps working on a locked review: reading the files, the diff, the threads and the checklist, copying
-links, the signed attestation PDF of an Approved review, and the evidence index. Project settings and project members
-are not part of a review and are not locked.
+links, the signed attestation PDF of an Approved or Rejected review, and the evidence index. Project settings and
+project members are not part of a review and are not locked.
 
 A review in which only some of the slots are signed is **not** locked: it can still change, and a change makes the
 signatures that were given no longer fit (see [Review Signatures](#review-signatures)). The lock begins with the last

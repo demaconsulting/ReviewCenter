@@ -95,8 +95,10 @@ sections:
         title: >-
           The HelpPage unit shall state in the Reading a review topic that the holder of a reviewer slot owns a ballot,
           answers the checks in it, submits it and then signs, and that the review concludes when every slot has signed
-          the same, current record, that a concluded review, approved or rejected, is locked, and shall tell the holder
-          of a reviewer slot where to write the review conclusion, in the Review conclusion card.
+          the same, current record, that a concluded review, approved or rejected, is locked, shall tell the holder
+          of a reviewer slot where to write the review conclusion, in the Review conclusion card, and shall say that the
+          conclusion stays hidden until the reader hands in their own ballot, except for the lead, administrators,
+          Auditors, a single-slot review and a concluded review.
         justification: |
           A reviewer needs to know that the ballot is their own and must be submitted before signing, that a review
           ends only when every slot has signed the same record, that a rejection is written in the review conclusion,

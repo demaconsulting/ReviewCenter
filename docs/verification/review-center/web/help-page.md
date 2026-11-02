@@ -117,8 +117,18 @@ Fail that blocks signing. This scenario is tested by `HelpPage_Signing_NoLongerS
 **HelpPage_ReadingReview_ShowsSlotOwnerNote**: The Reading a review page is rendered. The text tells a person who holds
 a reviewer slot that they own a ballot, answer the checks in it, submit it and then sign, and that the review concludes
 when every slot has signed the same, current record; it says that a concluded (approved or rejected) review is locked,
-and tells a person who holds a slot of the review that the conclusion is written in the Review conclusion card. This
-scenario is tested by `HelpPage_ReadingReview_ShowsSlotOwnerNote`.
+and tells a person who holds a slot of the review that the conclusion is written in the Review conclusion card. It
+also says that the card lists the Findings in the report (a resolved Finding with its resolution note, an open Finding
+with its Open badge only), that the conclusion stays hidden
+until the reader hands in their own ballot except for the lead, administrators, Auditors, a single-slot review and a
+concluded review, and no longer says that the Findings are listed only once the review is concluded. This scenario is
+tested by `HelpPage_ReadingReview_ShowsSlotOwnerNote`.
+
+**HelpPage_Checklist_ExplainsExceptionsAndFailOutcome**: The Checklist page is rendered. The text says that the answers
+of the other reviewers are seen only after the own ballot is handed in, names the exceptions (the lead, administrators,
+Auditors, a single reviewer slot and a concluded review), says that a Fail answer does not block signing but makes the
+agreed outcome Rejected, names the Discuss button, and says that the discussion is a Question by default. No link begins
+with `#`. This scenario is tested by `HelpPage_Checklist_ExplainsExceptionsAndFailOutcome`.
 
 **HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors**: The API tokens page is rendered; the heading is
 "Automation and API tokens", the screenshot is served from `/help/` with alternative text, and the text names the

@@ -74,7 +74,8 @@ Evidence Settings in the Administration chapter). Both are off by default, and t
 answered 401 as
 for every other route. When one is on, a request that sends no `Authorization` header is answered for that project, with
 `Cache-Control: no-store`, and at most 30 such requests a minute are accepted from one client address (more are answered
-429).
+429). The attestation PDF is served for a concluded review (approved or rejected), but a request without a token
+gets approved reviews only.
 
 The OpenAPI document describes every endpoint, the request and answer shapes, and the bearer and Basic schemes, so a
 client can be generated from it. A snapshot of it is kept in the repository as `docs/api/openapi.json`.
