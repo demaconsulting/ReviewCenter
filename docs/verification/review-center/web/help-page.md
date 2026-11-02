@@ -117,8 +117,9 @@ review will be Rejected."), the caution that names a reviewer who has not handed
 the inbox section Your signature no longer counts. This scenario is tested by `HelpPage_Signing_NoLongerSaysFailBlocks`.
 
 **HelpPage_Planning_NamesTheLastApprovedReviewBaseline**: The Planning reviews page is rendered. The text names the
-default "Changes since the last approved review of each set", says that a set that has no approved review yet is planned
-as a full review, and no longer contains the words "last signed review". This scenario is tested by
+default "Changes since the last approved review of each set", defines approved as concluded with the Approved outcome and
+says that a Rejected review is not approved, says that a set that has no approved review yet is planned as a full
+review, and no longer contains the words "last signed review". This scenario is tested by
 `HelpPage_Planning_NamesTheLastApprovedReviewBaseline`.
 
 **HelpPage_ReadingReview_ShowsSlotOwnerNote**: The Reading a review page is rendered. The text tells a person who holds

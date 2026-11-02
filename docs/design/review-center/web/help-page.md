@@ -77,8 +77,9 @@ how
 to plan several reviews from the review-sets of a repository (the Plan reviews button, the head revision, the choice of
 what to compare with, Show plan, ticking the sets, and that a set already filed at the same revisions is not offered
 twice). It also says that the default is "Changes since the last approved review of each set", that a review counts as
-approved when every reviewer has signed it and no thread is open, and that a set without an approved review is planned
-as a full review with a note that says so. It has one screenshot, `planning-reviews-1.png`.
+approved when it has concluded with the Approved outcome (every ballot submitted, current signatures, nothing disputed,
+pending or failing, no open thread) and that a Rejected review is not approved, and that a set without an approved
+review is planned as a full review with a note that says so. It has one screenshot, `planning-reviews-1.png`.
 
 **Project members topic** (`HelpMembersPage`, slug `project-members`, title "Managing project members"): The topic after
 Planning reviews and before the API tokens. It explains, in static text, that ordinary users see only the projects they

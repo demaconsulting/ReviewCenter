@@ -170,7 +170,9 @@ creates the reviews you tick.
    a tag, or a commit, for example `main`.
 1. Under **What to review** choose one of:
    - **Changes since the last approved review of each set** (the default): each set is compared with the head of its
-     last approved review (every reviewer signed and no thread open). A set that has no approved review yet is
+     last approved review (one that concluded as Approved: every reviewer submitted a ballot and signed the current
+     record, nothing is disputed or failing, and no thread is open; a Rejected review is not approved). A set that has
+     no approved review yet is
      reviewed in full and says so in its note ("no approved review of this set yet"). If that
      earlier head is no longer an ancestor of the new head (for example after a force push), or the patterns of the set
      changed since then, the set is also reviewed in full.

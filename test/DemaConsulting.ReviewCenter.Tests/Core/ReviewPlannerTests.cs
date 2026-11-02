@@ -249,6 +249,37 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
+    ///     Concludes a review as Rejected: adds a slot for ann, lets ann fail the first check and pass the others in the
+    ///     ballot of the slot (the only ballot, so it is handed in as it is complete), writes the conclusion text a
+    ///     rejection needs and signs. The review is then fully signed, concluded and not approved.
+    /// </summary>
+    /// <param name="f">The fixture.</param>
+    /// <param name="reviewId">The review to reject.</param>
+    /// <returns>A task that completes when the review is concluded as Rejected.</returns>
+    private static async Task RejectAsync(Fixture f, string reviewId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var slot = await f.Signing.AddSlotAsync(TestActors.Ann, f.ProjectId, reviewId, f.AnnId, null, cancellationToken);
+        var first = true;
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await f.Checklists.SetAnswerAsync(
+                f.ProjectId,
+                reviewId,
+                item.Id,
+                first ? ChecklistOutcome.Fail : ChecklistOutcome.Pass,
+                first ? "Wrong." : null,
+                TestActors.Ann,
+                cancellationToken);
+            first = false;
+        }
+        await f.Checklists.SetReviewConclusionTextAsync(
+            f.ProjectId, reviewId, "The first check failed; the change is not ready.", TestActors.Ann, cancellationToken);
+        var digest = (await f.Signing.GetApprovalAsync(f.ProjectId, reviewId, cancellationToken))!.Digest;
+        await f.Signing.SignAsync(TestActors.Ann, f.ProjectId, reviewId, slot.Id, digest, Password, cancellationToken);
+    }
+
+    /// <summary>
     ///     Test that a plan without a baseline classifies each set, counts files by kind and uses one session.
     /// </summary>
     [Fact]
@@ -414,6 +445,60 @@ public class ReviewPlannerTests
         var plan = await PlanAsync(f, BaselineMode.LastReviewed);
 
         // Assert: the baseline is the head of the review that was signed last
+        Assert.Equal(H0, plan.Rows[0].BaselineSha);
+        Assert.Equal("Changes since review 'core' (aaaaaaa)", plan.Rows[0].BaselineNote);
+    }
+
+    /// <summary>
+    ///     Test that a fully signed review that concluded as Rejected is no baseline: the set gets a full review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote()
+    {
+        // Arrange: a concluded Rejected review of core at H1, an ancestor of the head, so only the rejection can explain a full review
+        var f = await CreateAsync();
+        await FileAsync(f, H1, "core");
+        await RejectAsync(f, "core");
+        f.Git.Ancestors.Add((H1, H2));
+        var approval = await f.Signing.GetApprovalAsync(f.ProjectId, "core", TestContext.Current.CancellationToken);
+        Assert.NotNull(approval);
+        Assert.True(approval.IsConcluded);
+        Assert.Equal(ReviewConclusion.Rejected, approval.Conclusion);
+        Assert.False(approval.IsApproved);
+
+        // Act: plan with the last reviewed head as baseline
+        var plan = await PlanAsync(f, BaselineMode.LastReviewed);
+
+        // Assert: the rejected review is skipped, so there is no approved review of the set
+        Assert.Null(plan.Rows[0].BaselineSha);
+        Assert.Equal("Full review: no approved review of this set yet", plan.Rows[0].BaselineNote);
+        Assert.Equal(PlanRowStatus.WillCreate, plan.Rows[0].Status);
+    }
+
+    /// <summary>
+    ///     Test that an approved review stays the baseline when a later review of the set concluded as Rejected.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline()
+    {
+        // Arrange: an approved review of core at H0, then a review at H1 that is signed later but concluded as Rejected
+        var f = await CreateAsync();
+        await FileAsync(f, H0, "core");
+        await SignAsync(f, "core");
+        f.Clock.Advance(TimeSpan.FromHours(1));
+        await FileAsync(f, H1, "core");
+        f.Clock.Advance(TimeSpan.FromHours(1));
+        await RejectAsync(f, "core-2");
+        f.Git.Ancestors.Add((H0, H2));
+        f.Git.Ancestors.Add((H1, H2));
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Assert.True((await f.Signing.GetApprovalAsync(f.ProjectId, "core", cancellationToken))!.IsApproved);
+        Assert.False((await f.Signing.GetApprovalAsync(f.ProjectId, "core-2", cancellationToken))!.IsApproved);
+
+        // Act: plan with the last reviewed head as baseline
+        var plan = await PlanAsync(f, BaselineMode.LastReviewed);
+
+        // Assert: the approved review is the baseline although the rejected one was signed later
         Assert.Equal(H0, plan.Rows[0].BaselineSha);
         Assert.Equal("Changes since review 'core' (aaaaaaa)", plan.Rows[0].BaselineNote);
     }

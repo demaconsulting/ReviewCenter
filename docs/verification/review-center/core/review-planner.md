@@ -28,7 +28,8 @@ N/A - standard test environment (the integration tests need git, and skip themse
   plan with their rule (a project the actor may not see is refused like an unknown one by `IProjectAccess`); an
   unusable set is only a `CannotPlan` row.
 - With no baseline every selected file is reviewed; with an explicit baseline every set uses it; with the last reviewed
-  mode a set uses the head of the review that was signed last when it is an ancestor of the new head and the selection is
+  mode a set uses the head of the review that was approved last (a signed review that concluded as Rejected is not
+  approved) when it is an ancestor of the new head and the selection is
   the same, and otherwise gets a full review with a note that says why.
 - Change lists are loaded once per distinct baseline and one at a time: the earlier list is no longer held when the
   next one is requested, and the rows keep the order of the file.
@@ -66,6 +67,14 @@ gives the changes since that head. This scenario is tested by
 
 **ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast**: Of two signed reviews of a set the one signed
 last is the baseline. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast`.
+
+**ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote**: A set whose only review is fully signed but
+concluded as Rejected has no approved review, so it gets a full review with the note that there is no approved review of
+the set yet. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedOnlyRejected_FullReviewWithNote`.
+
+**ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline**: When a review that concluded as
+Rejected was signed after an approved review of the same set, the approved review is still the baseline. This scenario
+is tested by `ReviewPlanner_PlanAsync_LastReviewedRejectedSignedLater_StillUsesApprovedBaseline`.
 
 **ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder**: Four sets alternate between two
 last-approved baselines and the full head; the head and each baseline are listed once, no earlier change list is still

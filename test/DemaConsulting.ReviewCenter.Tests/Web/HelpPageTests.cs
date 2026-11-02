@@ -190,8 +190,9 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the planning topic names the default baseline as the last approved review of each set and says
-    ///     what happens to a set that has none.
+    ///     Test that the planning topic names the default baseline as the last approved review of each set, defines
+    ///     approved as concluded with the Approved outcome (a Rejected review is not approved) and says what happens to
+    ///     a set that has none.
     /// </summary>
     [Fact]
     public void HelpPage_Planning_NamesTheLastApprovedReviewBaseline()
@@ -199,10 +200,13 @@ public sealed class HelpPageTests : PageTestBase
         // Act: render the topic page
         var page = Render<HelpPlanningPage>();
 
-        // Assert: the default is the last approved review, and a set without one is planned in full
+        // Assert: the default is the last approved review, approved means concluded as Approved, and a set without one is planned in full
         var text = page.Markup;
         Assert.Contains("<strong>Changes since the last approved review of each set</strong>", text, StringComparison.Ordinal);
         Assert.Contains("A set that has no approved review yet", text, StringComparison.Ordinal);
+        Assert.Contains("concluded with the <strong>Approved</strong> outcome", text, StringComparison.Ordinal);
+        Assert.Contains("concluded as <strong>Rejected</strong> is not approved", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("every reviewer has signed it and no thread is open", text, StringComparison.Ordinal);
         Assert.DoesNotContain("last signed review", text, StringComparison.Ordinal);
     }
 

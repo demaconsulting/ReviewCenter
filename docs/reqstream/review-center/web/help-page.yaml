@@ -208,8 +208,9 @@ sections:
       - id: ReviewCenter-HelpPage-PlanningTopic
         title: >-
           The HelpPage unit shall state in the Planning reviews topic that the default baseline of the plan is the last
-          approved review of each set, that a review counts as approved when every reviewer has signed it and no thread
-          is open, and that a set without an approved review is planned as a full review.
+          approved review of each set, that a review counts as approved only when it concluded with the Approved outcome
+          (every ballot submitted, current signatures, nothing disputed, pending or failing, no open thread), so a
+          Rejected review is not approved, and that a set without an approved review is planned as a full review.
         justification: |
           A person who plans reviews must know which earlier review a delta is measured from, or a change of a review
           that was never approved could be taken for reviewed.
