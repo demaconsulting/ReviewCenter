@@ -29,6 +29,8 @@ a review blocked only by a dispute can say so). `IsApproved` (conclusion approve
 rejected) are derived from `Conclusion`. `FailedChecks` is informational: a Fail answer does not block.
 `IsBlocked` is true for a review that is not concluded and has no checklist, or has any open thread, unanswered or
 disputed check, or a rejected outcome that still needs its conclusion text (`ConclusionRequired`).
+The ballot progress is in `BallotsSubmitted`, `BallotsRequired`, `WaitingOnBallots` and `IsMasked`: see *Ballot
+progress* below.
 
 **Blocker counts**: the counts and the flags are fields of `ReviewApproval` (`OpenThreads`, `OpenQuestions`,
 `OpenFindings`, `UnansweredChecks`,
@@ -45,6 +47,15 @@ step that also writes the blocker sentences (`BuildApproval`), so the numbers, t
 disagree: `MissingChecklist` is true exactly when "This review has no checklist." is a blocker. This unit only copies
 them; it has no second rule for what blocks a review, and the later work list of the lead reuses the same counts.
 `SlotMember.Enabled` carries whether the account of a person in a slot is enabled.
+
+**Ballot progress**: `BallotsRequired` is the number of reviewer slots of a review that has a checklist (zero for a
+review without slots or without a checklist, which has no ballots), and `BallotsSubmitted` the number of those slots
+whose ballot is handed in (`SlotStatus.Ballot` is `Submitted`). `WaitingOnBallots` holds the display names of the
+people whose ballot is not in, chosen as for `WaitingOn` (a disabled person gets `DisabledSuffix`); it is empty for a
+concluded review and for a review without ballots. Whether a ballot is handed in is progress and not a verdict, so
+these three fields are the same for every viewer. `IsMasked` is true when the viewer may not see the other
+reviewers' answers yet (the approval was masked, see `BallotVisibility`): the disputed and failed checks, the
+outcome and the conclusion requirement are then already left out of the counts, and the overview says so.
 
 **Kind counts**: `OpenThreads` is the sum of `OpenQuestions` and `OpenFindings`, counted with `ThreadCounts` from the
 threads the viewer may see, so the discussions about checks are left out for a viewer who may not see the other

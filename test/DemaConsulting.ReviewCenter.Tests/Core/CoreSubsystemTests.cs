@@ -1714,14 +1714,14 @@ public class CoreSubsystemTests
         var thread = await world.StartThreadAsync("r1", "ann", "Why?");
         await world.ReplyAsync("r1", thread.Id, "bob", "Because");
 
-        // Act and Assert: ann has the review twice (to sign and a reply waiting) but counts it once
+        // Act and Assert: ann has the review twice (to answer and a reply waiting) but counts it once
         var ann = await world.InboxOfAsync("ann");
-        Assert.Equal([InboxSection.ToSign, InboxSection.RepliesWaiting], ann.Items.Select(item => item.Section));
+        Assert.Equal([InboxSection.ToAnswer, InboxSection.RepliesWaiting], ann.Items.Select(item => item.Section));
         Assert.Equal(1, ann.ActionCount);
         Assert.Equal(1, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("ann"), cancellationToken));
 
-        // Assert: bob only has to sign, the author waits for the replies
-        Assert.Equal([InboxSection.ToSign], (await world.InboxOfAsync("bob")).Items.Select(item => item.Section));
+        // Assert: bob only has to answer, the author waits for the replies
+        Assert.Equal([InboxSection.ToAnswer], (await world.InboxOfAsync("bob")).Items.Select(item => item.Section));
         Assert.Equal([InboxSection.RepliesWaiting], (await world.InboxOfAsync("author")).Items.Select(item => item.Section));
 
         // Act: resolve the thread, answer every check, and let both reviewers sign

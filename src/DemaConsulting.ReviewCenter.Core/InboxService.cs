@@ -38,6 +38,16 @@ namespace DemaConsulting.ReviewCenter.Core;
 public sealed class InboxService
 {
     /// <summary>
+    ///     The chip of a reviewer who has not started the ballot.
+    /// </summary>
+    public const string NotStartedChip = "Not started";
+
+    /// <summary>
+    ///     The chip of a reviewer whose ballot is a draft.
+    /// </summary>
+    public const string DraftChip = "Draft";
+
+    /// <summary>
     ///     The chip of a slot without any signature.
     /// </summary>
     public const string NotSignedChip = "Not signed";
@@ -202,6 +212,7 @@ public sealed class InboxService
         // What the user may do in a project is the same for all its reviews
         var rights = new Dictionary<int, (bool Contribute, bool Member)>();
         var items = new List<InboxItem>();
+        var names = new UserNames(_users);
         foreach (var candidate in candidates)
         {
             if (!rights.TryGetValue(candidate.ProjectId, out var right))
@@ -227,9 +238,21 @@ public sealed class InboxService
                              await SeesAllAsync(actor, user, candidate, right.Contribute, cancellationToken),
                              snapshot,
                              user.Id);
+            var project = visible[candidate.ProjectId];
             await AddItemsAsync(
                 items,
-                new ReviewContext(user, visible[candidate.ProjectId].Name, candidate, snapshot, state, today, right.Contribute, right.Member, hidden),
+                new ReviewContext(
+                    user,
+                    project.Name,
+                    candidate,
+                    snapshot,
+                    state,
+                    today,
+                    right.Contribute,
+                    right.Member,
+                    hidden,
+                    InboxRules.AuthorBlocked(project, candidate.CreatedBy, user.Username),
+                    names),
                 cancellationToken);
         }
 
@@ -239,7 +262,7 @@ public sealed class InboxService
             .ThenBy(item => item.ReviewId, StringComparer.Ordinal)
             .ToList();
         var actionCount = ordered
-            .Where(item => item.Section != InboxSection.Updates)
+            .Where(item => InboxSections.IsAction(item.Section))
             .Select(item => (item.ProjectId, item.ReviewId))
             .Distinct()
             .Count();
@@ -448,20 +471,14 @@ public sealed class InboxService
 
         if (!concluded)
         {
-            // To sign: one of my slots has no current signature
-            if (review.Contribute && review.Member)
-            {
-                var unsigned = mine
-                    .Select(slot => InboxRules.SlotState(slot, signatures, digest))
-                    .Where(state => state != SlotSignatureState.Signed)
-                    .ToList();
-                if (unsigned.Count > 0)
-                {
-                    var chip = unsigned.Contains(SlotSignatureState.NotSigned) ? NotSignedChip : SignAgainChip;
-                    var unread = await IsToSignUnreadAsync(review, lastSeenCommentId, lastSeenAt, cancellationToken);
-                    items.Add(Row(InboxSection.ToSign, chip, unread));
-                }
-            }
+            // The ballot, the disputes, the signature and the waiting of a reviewer: one standing decides which row
+            // the review gets, so it is never "To answer" and "Ready to sign" at once
+            await AddStandingItemAsync(
+                items,
+                review,
+                new StandingFacts(mine, signatures, digest, lastSeenCommentId, lastSeenAt),
+                Row,
+                cancellationToken);
 
             // Replies waiting: someone answered in a thread of mine, or on my review
             if (review.Contribute)
@@ -479,8 +496,8 @@ public sealed class InboxService
                 }
             }
 
-            // Failed checks: my own review has checks answered Fail; agreed, they make the review reject, otherwise they
-            // are a disagreement to resolve
+            // Failed checks: my own review has checks the reviewers agreed on as Fail (disputed checks are a section of
+            // their own); if that stands, the review is rejected and its reasons must be written down
             if (isAuthor && !review.Hidden)
             {
                 var failed = InboxRules.FailedAnswers(record, slots.Count);
@@ -492,7 +509,8 @@ public sealed class InboxService
                         InboxSection.FailedChecks,
                         $"{failed.Count} failed",
                         unread,
-                        "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is a disagreement to resolve."));
+                        $"Reviewers marked {failed.Count} {(failed.Count == 1 ? "check" : "checks")} as Fail so far. "
+                        + "If that stands, the review will be rejected and its reasons must be written down."));
                 }
             }
         }
@@ -501,6 +519,160 @@ public sealed class InboxService
         {
             await AddUpdatesAsync(items, review, Row, new ApprovalFacts(conclusion, digest, signatures, lastSeenAt), cancellationToken);
         }
+    }
+
+    /// <summary>
+    ///     Adds the row that says where the user stands in a review that is not concluded: to answer, disputed, ready
+    ///     to sign, or waiting for others; or no row when nothing is asked of the user.
+    /// </summary>
+    /// <remarks>
+    ///     The decision is <see cref="InboxRules.ReviewerStanding"/>. The ballot of the user is the one of the slot with
+    ///     the lowest identity the user holds, as the checklist page picks it. Disputes are only counted for a user who
+    ///     may see the other ballots, so a hidden user never reaches the count and no dispute can leak. Who is waited
+    ///     for is progress, not a verdict, and is named for every user.
+    /// </remarks>
+    /// <param name="items">The rows collected so far.</param>
+    /// <param name="review">What is known of the review.</param>
+    /// <param name="facts">The slots and signatures the standing is decided from.</param>
+    /// <param name="row">Creates a row of the review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the row is added.</returns>
+    private async Task AddStandingItemAsync(
+        List<InboxItem> items,
+        ReviewContext review,
+        StandingFacts facts,
+        Func<InboxSection, string, bool, string?, InboxItem> row,
+        CancellationToken cancellationToken)
+    {
+        var (record, slots, _) = review.Snapshot;
+        var mine = facts.Mine;
+        var holdsSlot = mine.Count > 0;
+
+        // A slot holder must be a member who may contribute; the author of a review without a slot only has to
+        // contribute
+        if (!review.Contribute || (holdsSlot && !review.Member))
+        {
+            return;
+        }
+
+        var hasChecklist = record.Checklist is not null;
+        var ownSlot = ReviewActorRoles.FindOwnSlot(review.User.Id, slots);
+        var ownBallot = ownSlot is null ? null : record.Ballots.FirstOrDefault(ballot => ballot.SlotId == ownSlot.Id);
+        var unsigned = mine
+            .Select(slot => InboxRules.SlotState(slot, facts.Signatures, facts.Digest))
+            .Where(state => state != SlotSignatureState.Signed)
+            .ToList();
+
+        // The disputes are only counted for a user who may see them, so a hidden user never reaches the count
+        var disputed = hasChecklist && !review.Hidden
+            ? BallotProjection.Consolidate(record, slots.Count)?.Result.Disputed ?? 0
+            : 0;
+        var standing = InboxRules.ReviewerStanding(
+            false,
+            holdsSlot,
+            hasChecklist,
+            review.AuthorBlocked,
+            ownBallot?.State ?? BallotState.NotStarted,
+            review.Hidden,
+            disputed,
+            unsigned.Count > 0,
+            unsigned.Count > 0 && SigningService.CanSignAfter(record, slots.Count, review.Hidden));
+        switch (standing)
+        {
+            case InboxStanding.ToAnswer:
+                // Nothing about the other reviewers is used here, so the row is the same whatever they answered
+                var progress = BallotProjection.ForBallot(record.Checklist!.Parse(), ownSlot!.Id, ownBallot).Overall;
+                items.Add(row(
+                    InboxSection.ToAnswer,
+                    ownBallot is null ? NotStartedChip : DraftChip,
+                    review.State is null,
+                    InboxRules.ToAnswerText(progress)));
+                break;
+
+            case InboxStanding.Disputed:
+                var otherSubmitted = record.Ballots.Any(ballot =>
+                    ballot.Status == BallotStatus.Submitted
+                    && ballot.SubmittedAt > facts.LastSeenAt
+                    && !InboxRules.SameUser(ballot.SubmittedByUsername, review.User.Username));
+                items.Add(row(
+                    InboxSection.Disputed,
+                    $"{disputed} disputed",
+                    review.State is null || otherSubmitted,
+                    holdsSlot
+                        ? "Change your answer or discuss it."
+                        : "The reviewers answered differently. Discuss it with them."));
+                break;
+
+            case InboxStanding.ToSign:
+                var chip = unsigned.Contains(SlotSignatureState.NotSigned) ? NotSignedChip : SignAgainChip;
+                var unread = await IsToSignUnreadAsync(review, facts.LastSeenCommentId, facts.LastSeenAt, cancellationToken);
+                items.Add(row(InboxSection.ToSign, chip, unread, null));
+                break;
+
+            case InboxStanding.Waiting:
+                await AddWaitingItemAsync(items, review, facts, row, cancellationToken);
+                break;
+        }
+    }
+
+    /// <summary>
+    ///     Adds the "Waiting for others" row: the user has done their part and the review waits for other people or
+    ///     for open items.
+    /// </summary>
+    /// <param name="items">The rows collected so far.</param>
+    /// <param name="review">What is known of the review.</param>
+    /// <param name="facts">The slots and signatures the standing is decided from.</param>
+    /// <param name="row">Creates a row of the review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the row is added.</returns>
+    private static async Task AddWaitingItemAsync(
+        List<InboxItem> items,
+        ReviewContext review,
+        StandingFacts facts,
+        Func<InboxSection, string, bool, string?, InboxItem> row,
+        CancellationToken cancellationToken)
+    {
+        var (record, slots, _) = review.Snapshot;
+
+        // The other slots that have no current signature, named by their primary and, when another person, alternate
+        var others = slots
+            .Where(slot => !facts.Mine.Contains(slot)
+                           && InboxRules.SlotState(slot, facts.Signatures, facts.Digest) != SlotSignatureState.Signed)
+            .ToList();
+        var chip = InboxRules.WaitingChip(others.Count);
+        string detail;
+        if (others.Count > 0)
+        {
+            var users = await review.Names.GetAsync(cancellationToken);
+            var people = new List<string>();
+            foreach (var slot in others)
+            {
+                foreach (var userId in new[] { slot.PrimaryUserId, slot.AlternateUserId ?? slot.PrimaryUserId }.Distinct())
+                {
+                    if (users.TryGetValue(userId, out var name) && !people.Contains(name))
+                    {
+                        people.Add(name);
+                    }
+                }
+            }
+
+            detail = InboxRules.WaitingForText(people);
+        }
+        else if (record.Checklist is null)
+        {
+            detail = "This review has no checklist yet.";
+        }
+        else
+        {
+            // What is left is known to the user: only a user who handed in the ballot waits, and they see everything
+            var open = ThreadCounts.From(
+                review.Hidden ? record.Threads.Where(thread => !thread.IsCheckThread) : record.Threads);
+            detail = open.Open > 0
+                ? $"Open items remain: {open.OpenText}."
+                : "Nothing is left for you to do now.";
+        }
+
+        items.Add(row(InboxSection.WaitingForOthers, chip, false, detail));
     }
 
     /// <summary>
@@ -612,6 +784,10 @@ public sealed class InboxService
     ///     Whether the user may not see the answers of the other reviewers yet, so nothing about the threads of the
     ///     checks may show (see <see cref="BallotVisibility"/>).
     /// </param>
+    /// <param name="AuthorBlocked">
+    ///     Whether the user created the review and the project does not let the author answer its checklist.
+    /// </param>
+    /// <param name="Names">The display names of the users, read once and only when a row needs them.</param>
     private sealed record ReviewContext(
         User User,
         string ProjectName,
@@ -621,7 +797,63 @@ public sealed class InboxService
         DateOnly Today,
         bool Contribute,
         bool Member,
-        bool Hidden);
+        bool Hidden,
+        bool AuthorBlocked,
+        UserNames Names);
+
+    /// <summary>
+    ///     What the standing of the user in a review is decided from.
+    /// </summary>
+    /// <param name="Mine">The slots the user holds as primary or alternate reviewer.</param>
+    /// <param name="Signatures">The signatures of the review.</param>
+    /// <param name="Digest">The digest of the current record.</param>
+    /// <param name="LastSeenCommentId">The highest comment identity the user has seen; zero when none.</param>
+    /// <param name="LastSeenAt">The time the user last saw the review; the minimum value when never.</param>
+    private sealed record StandingFacts(
+        IReadOnlyList<ReviewerSlot> Mine,
+        IReadOnlyList<ReviewSignature> Signatures,
+        string Digest,
+        int LastSeenCommentId,
+        DateTimeOffset LastSeenAt);
+
+    /// <summary>
+    ///     The display names of the users, read from the store once for one inbox and only when a row needs a name.
+    /// </summary>
+    /// <remarks>
+    ///     An instance lives for one call of <see cref="GetInboxAsync"/> and is not shared between calls or threads.
+    /// </remarks>
+    private sealed class UserNames
+    {
+        /// <summary>
+        ///     The store of the users.
+        /// </summary>
+        private readonly IUserStore _users;
+
+        /// <summary>
+        ///     The names by user identity once read; <c>null</c> before.
+        /// </summary>
+        private Dictionary<int, string>? _names;
+
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="UserNames"/> class.
+        /// </summary>
+        /// <param name="users">The store of the users.</param>
+        public UserNames(IUserStore users)
+        {
+            _users = users;
+        }
+
+        /// <summary>
+        ///     Gets the display names of all users by identity.
+        /// </summary>
+        /// <param name="cancellationToken">Cancels the operation.</param>
+        /// <returns>The names; read from the store on the first call only.</returns>
+        public async Task<IReadOnlyDictionary<int, string>> GetAsync(CancellationToken cancellationToken)
+        {
+            _names ??= (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id, user => user.DisplayName);
+            return _names;
+        }
+    }
 
     /// <summary>
     ///     The approval facts of one review that the information rows need.

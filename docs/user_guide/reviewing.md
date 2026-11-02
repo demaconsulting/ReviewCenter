@@ -263,19 +263,28 @@ author of the review. Someone who only wrote a comment in another person's revie
 
 | Group | What it lists | Chip |
 | ----- | ------------- | ---- |
-| To sign | A slot of yours that is unsigned, or must be signed again | "Not signed", "The review changed, sign again" |
+| To answer | You hold a reviewer slot and have not handed in your ballot | "Not started", "Draft" |
+| Disputed | You handed in your ballot, and the ballots differ on some checks or sections | "N disputed" |
+| Ready to sign | You handed in and a slot of yours needs signing | "Not signed", "The review changed, sign again" |
 | Replies waiting | An open thread whose latest comment is by someone else | "N waiting" |
 | Failed checks | Checks of your own review that the submitted ballots agree to be Fail | "N failed" |
+| Waiting for others | You did your part; others or open items remain | "Waiting for N reviewers", "Open items remain" |
 | Updates | A review someone else concluded or reopened since you last looked | "Approved", "Rejected", "Reopened" |
 
-Only the first three groups need your action. A failed-checks entry reads "A Fail the reviewers agree on makes the
-review reject; a Fail only one reviewer gave is a disagreement to resolve." The three groups also show the due date of
+The first five groups need your action; Waiting for others and Updates are for information. A review is in at most one
+of To answer, Disputed, Ready to sign and Waiting for others for you, and the inbox agrees with the next-step line of
+the review page. **To answer** opens the checklist, where your ballot is. Reviewers answer independently: until you
+have handed in your own ballot the inbox shows nothing about how the others answered, so there is no Disputed row and
+no count of disputes for you; a Waiting for others row names the people who are waited for, because who has not
+handed in is progress and not a verdict. A failed-checks entry reads "Reviewers marked N checks as Fail so far. If that
+stands, the review will be rejected and its reasons must be written down." The action groups also show the due date of
 the review, marked "Overdue" when it is
 past, and the home page card and the summary line at the top of the inbox count the distinct reviews
-in them. The Updates group is for information: it is not counted, and a row goes away once you open the review.
+in them; the summary adds how many reviews wait for others when there are any. The Updates group is not counted, and
+a row goes away once you open the review.
 A concluded review needs no one's action any more, so it appears only as an update for the others (a "Rejected" update
 for a review that you rejected-concluded). Auditors, who may
-only read, are shown no signature to give and no reply waiting. An empty inbox says that nothing needs your action.
+only read, are shown no ballot, signature or reply waiting. An empty inbox says that nothing needs your action.
 
 The **Inbox** tab in the page header shows a small badge with the same number as the home page card, the number of
 reviews that need your action, so you see from any page that something waits. The badge is hidden when the number is
@@ -859,7 +868,8 @@ project does not exist.
 - **Summary.** Above the table, the counts of reviews in setup, in review, approved ("N approved"), rejected
   ("N rejected"), and overdue.
 - **Columns.** *Review* (the identifier, the title, and the creation date; the identifier links to the review, and a
-  follow-up names the review it follows), *Stage*, *Signatures*, *Blockers*, *Waiting on*, *Last activity*, and *Due*.
+  follow-up names the review it follows), *Stage*, *Signatures*, *Ballots*, *Blockers*, *Waiting on*,
+  *Last activity*, and *Due*.
 - **Stage.** **Setup** is a review without a reviewer slot. **In review** has slots that are not all signed, or a
   signature that no longer fits the review. **Approved** has every slot signed as approved on the current record and nothing
   that blocks it (every slot has also handed in its ballot). **Rejected** has every slot signed as rejected on the
@@ -867,6 +877,11 @@ project does not exist.
   administrator reopened also shows a **Reopened** badge. The stage is worked out from the signatures, not stored.
 - **Signatures.** The signed slots out of the slots needed, such as `2/3`, and, when a signature no longer fits because
   the record changed after it was given, `1 signed, then the review changed`. A review without slots shows a dash.
+- **Ballots.** The ballots handed in out of the reviewers, such as `1/3`, and under it "Not yet:" with the names of the
+  people who have not handed in. A review with fewer than two reviewers shows a dash, because there is nothing to
+  compare. How many ballots are in is progress, not a verdict, so everyone who may see the project sees it. When some
+  details of a review are hidden from you because you have not handed in your own ballot, a note under the table says
+  so.
 - **Blockers.** What prevents the review from being concluded: a missing checklist ("No checklist"), the open comment
   threads, the unanswered checklist checks, the checks that the submitted ballots disagree on (disputed, such as
   `1 disputed`), and "conclusion needed" when the ballots agree on a Fail and the review has no conclusion text yet.

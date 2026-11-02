@@ -310,7 +310,9 @@ keep the filters), and `reviews-no-match` says so when the filters match nothing
 review (link `review-link-{id}` and title), its stage badge (`review-approval-{id}`: Setup, In review, Approved, or
 Rejected, and
 a "Reopened" mark for a reopened review), the signatures (`review-progress-{id}`: signed of required, and "n out of
-date" when any), what blocks it (`review-blockers-{id}`: "No checklist", open threads, unanswered checks, and
+date" when any), the ballots (`review-ballots-{id}`: handed in of required, such as "1/3", with the names of the people
+who have not handed in in `review-ballots-waiting-{id}`; "-" when the review has fewer than two ballots, because
+there is nothing to compare), what blocks it (`review-blockers-{id}`: "No checklist", open threads, unanswered checks, and
 "conclusion needed" when a rejected outcome has no conclusion text, and the number of disputed checks, such as
 "1 disputed"; a Fail answer is not a blocker and is not listed),
 the people it
@@ -319,7 +321,10 @@ waits on (`review-waiting-{id}`), the last activity, and the due date with the O
 attributes, are written with `CultureInfo.InvariantCulture` (Gregorian digits such as `2026-03-04`), like the review page
 and the API, so the culture of the request, for example the Thai Buddhist calendar, never changes the year. Everything
 is read-only, so the same table is shown to a member, a member who may only read (the Auditor role), an
-administrator, and a system administrator; the "+ New review" button, the "Plan
+administrator, and a system administrator. The ballot counts and the names of who has not handed in are progress and
+are shown to everyone; the verdict (disputed and failed checks) is already left out of the progress of a viewer who
+may not see the other ballots, and when any listed review is masked for the viewer the page adds one muted note,
+`reviews-masked-note` ("Some details are hidden until you hand in your ballot."). The "+ New review" button, the "Plan
 reviews" link, and the repository hint are shown only to a user who may contribute, and a read-only member sees a
 `readonly-notice` instead.
 

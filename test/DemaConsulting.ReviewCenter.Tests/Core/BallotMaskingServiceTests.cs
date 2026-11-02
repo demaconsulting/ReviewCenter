@@ -357,6 +357,98 @@ public class BallotMaskingServiceTests
     }
 
     /// <summary>
+    ///     Test that the progress overview gives a viewer who has not handed in the number of ballots that are in and
+    ///     the names of the people who have not handed in, with no dispute count, and marks the progress as masked.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked()
+    {
+        // Arrange: ann and bob handed in and differ; cyd holds a slot and has not handed in
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        await world.SeatAsync("cyd");
+
+        // Act
+        var masked = (await world.Progress.GetProgressAsync(
+            BallotMaskingWorld.ActorOf("cyd"), world.ProjectId, Token)).Single();
+        var reviewer = (await world.Progress.GetProgressAsync(
+            BallotMaskingWorld.ActorOf("ann"), world.ProjectId, Token)).Single();
+
+        // Assert: the ballot progress is the same for both, the dispute only for the one who handed in
+        Assert.True(masked.IsMasked);
+        Assert.False(reviewer.IsMasked);
+        Assert.Equal((2, 3), (masked.BallotsSubmitted, masked.BallotsRequired));
+        Assert.Equal(masked.WaitingOnBallots, reviewer.WaitingOnBallots);
+        Assert.Single(masked.WaitingOnBallots!);
+        Assert.Equal(0, masked.DisputedChecks);
+        Assert.Equal(1, reviewer.DisputedChecks);
+    }
+
+    /// <summary>
+    ///     Test that the section of the inbox row of a reviewer is the one the next action on the status page of the
+    ///     review names, for a reviewer with nothing to answer, a draft ballot, nothing blocking, a dispute and a
+    ///     signature that is in.
+    /// </summary>
+    /// <param name="scenario">The arrangement of the review.</param>
+    [Theory]
+    [InlineData("untouched")]
+    [InlineData("twoSubmitted")]
+    [InlineData("dispute")]
+    [InlineData("annSigned")]
+    public async Task InboxService_GetInboxAsync_SectionMatchesReviewStatusNextAction_ForAllStandings(string scenario)
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.SeatAsync("cyd");
+        if (scenario != "untouched")
+        {
+            await world.AnswerAsync("ann");
+            await world.SubmitAsync("ann");
+            await world.AnswerAsync("bob", scenario == "dispute" ? ChecklistOutcome.Fail : ChecklistOutcome.Pass);
+            await world.SubmitAsync("bob");
+        }
+
+        if (scenario == "annSigned")
+        {
+            var approval = (await world.Signing.GetApprovalAsync(world.ProjectId, BallotMaskingWorld.ReviewId, Token))!;
+            await world.Signing.SignAsync(
+                BallotMaskingWorld.ActorOf("ann"),
+                world.ProjectId,
+                BallotMaskingWorld.ReviewId,
+                approval.Slots[0].SlotId,
+                approval.Digest,
+                BallotMaskingWorld.Password,
+                Token);
+        }
+
+        // Act, Assert: for every reviewer the single standing row is the one of the next action
+        var standing = new[]
+        {
+            InboxSection.ToAnswer, InboxSection.Disputed, InboxSection.ToSign, InboxSection.WaitingForOthers
+        };
+        foreach (var user in new[] { "ann", "bob", "cyd" })
+        {
+            var actor = BallotMaskingWorld.ActorOf(user);
+            var status = (await world.Status.GetStatusAsync(actor, world.ProjectId, BallotMaskingWorld.ReviewId, Token))!;
+            var expected = status.NextAction.Kind switch
+            {
+                NextActionKind.AnswerChecks or NextActionKind.SubmitBallot or NextActionKind.SubmitAndSign
+                    => InboxSection.ToAnswer,
+                NextActionKind.DiscussDisputes => InboxSection.Disputed,
+                NextActionKind.Sign => InboxSection.ToSign,
+                NextActionKind.WaitForOthers => InboxSection.WaitingForOthers,
+                _ => throw new InvalidOperationException("Unexpected next action " + status.NextAction.Kind)
+            };
+
+            var inbox = await world.Inbox.GetInboxAsync(actor, Token);
+            var sections = inbox.Items.Select(item => item.Section).Where(standing.Contains).ToList();
+            Assert.Equal([expected], sections);
+        }
+    }
+
+    /// <summary>
     ///     Test that the inbox of a reviewer who has not handed in shows no row about disputed or failed checks, and
     ///     that a reviewer who handed in still gets the replies waiting.
     /// </summary>
@@ -408,8 +500,8 @@ public class BallotMaskingServiceTests
     }
 
     /// <summary>
-    ///     Test that a discussion about a check does not make the row of a reviewer who has not handed in unread, while
-    ///     it does for a reviewer who has handed in.
+    ///     Test that a discussion about a check does not make the To answer row of a reviewer who has not handed in
+    ///     unread.
     /// </summary>
     [Fact]
     public async Task InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer()
@@ -425,9 +517,10 @@ public class BallotMaskingServiceTests
         var bob = await world.Inbox.GetInboxAsync(BallotMaskingWorld.ActorOf("bob"), Token);
         var ann = await world.Inbox.GetInboxAsync(BallotMaskingWorld.ActorOf("ann"), Token);
 
-        // Assert
-        Assert.False(bob.Items.Single(item => item.Section == InboxSection.ToSign).IsUnread);
-        Assert.True(ann.Items.Single(item => item.Section == InboxSection.ToSign).IsUnread);
+        // Assert: the masked reviewer's To answer row stays read; the reviewer who handed in waits for bob
+        Assert.False(bob.Items.Single(item => item.Section == InboxSection.ToAnswer).IsUnread);
+        Assert.DoesNotContain(bob.Items, item => item.Section == InboxSection.ToSign);
+        Assert.Single(ann.Items, item => item.Section == InboxSection.WaitingForOthers);
     }
 
     /// <summary>

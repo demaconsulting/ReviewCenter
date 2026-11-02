@@ -39,9 +39,10 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_PrimarySlotNotSigned_ShowsToSignItem()
     {
-        // Arrange: a review with one slot, ann as primary and bob as alternate
+        // Arrange: an answered review with one slot, ann as primary and bob as alternate
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1", title: "Check the plan");
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "ann", "bob");
 
         // Act
@@ -68,6 +69,7 @@ public class InboxServiceTests
         // Arrange
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "ann", "bob");
 
         // Act
@@ -85,7 +87,7 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_SignatureOutOfDate_ShowsSignAgainChip()
     {
-        // Arrange: two slots, ann signs, then an answer changes, so the signature is out of date
+        // Arrange: two slots, ann signs, then a finding is started and resolved, so the signature is out of date
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
         await world.AnswerAllAsync("r1");
@@ -93,14 +95,13 @@ public class InboxServiceTests
         await world.AddSlotAsync("r1", "bob");
         await world.SignAsync("r1", first.Id, "ann");
         Assert.Empty(await world.RowsAsync("ann", InboxSection.ToSign));
-        var item = DefaultChecklist.Current.Sections[0].Items[0];
-        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
-        await world.Checklists.SetAnswerAsync(
-            world.ProjectId, "r1", item.Id, ChecklistOutcome.NotApplicable, "Not relevant", InboxTestWorld.ActorOf("bob"), Ct,
-            acknowledged);
 
-        // Bob hands the changed ballot in again: it disagrees with the one ann signed
-        await world.Checklists.SubmitBallotAsync(world.ProjectId, "r1", InboxTestWorld.ActorOf("bob"), Ct, acknowledged);
+        // Bob comments and settles it at once: the record is no longer the one ann signed
+        var acknowledged = await world.Store.CurrentlySignedSlotIdsAsync(world.ProjectId, "r1");
+        var thread = await world.Threads.StartThreadAsync(
+            world.ProjectId, "r1", new ThreadAnchor("a.txt"), InboxTestWorld.ActorOf("bob"), "Please look", Ct, acknowledged, true);
+        await world.Threads.ResolveAsync(
+            world.ProjectId, "r1", thread.Id, InboxTestWorld.ActorOf("bob"), Ct, acknowledged, "Fixed");
 
         // Act
         var rows = await world.RowsAsync("ann", InboxSection.ToSign);
@@ -221,9 +222,10 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_NonMemberOrRemovedMember_GetsEmptyView()
     {
-        // Arrange: dee has a slot and then loses the membership; out authored a review but is no member
+        // Arrange: dee has an answered slot and then loses the membership; out authored a review but is no member
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "dee");
         await world.CreateReviewAsync("r2", "out");
         Assert.Single(await world.RowsAsync("dee", InboxSection.ToSign));
@@ -246,9 +248,10 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_DisabledUser_GetsEmptyView()
     {
-        // Arrange: off has a slot, which shows until the account is disabled
+        // Arrange: off has an answered slot, which shows until the account is disabled
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "off");
         Assert.Single(await world.RowsAsync("off", InboxSection.ToSign));
         await world.Users.SetEnabledAsync("off", false, Actor.CommandLine, Ct);
@@ -268,9 +271,10 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_TemporaryPasswordUser_GetsEmptyView()
     {
-        // Arrange: tmp has a slot, which shows until the password becomes a temporary one
+        // Arrange: tmp has an answered slot, which shows until the password becomes a temporary one
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "tmp");
         Assert.Single(await world.RowsAsync("tmp", InboxSection.ToSign));
         var user = (await world.UserStore.GetByUsernameAsync("tmp", Ct))!;
@@ -510,11 +514,11 @@ public class InboxServiceTests
     }
 
     /// <summary>
-    ///     Test that a failed check tells the author that a Fail the reviewers agree on makes the review reject and that
-    ///     a Fail only one reviewer gave is a disagreement to resolve, without promising a rejection.
+    ///     Test that a failed check tells the author how many checks the reviewers marked as Fail so far, that the
+    ///     review will be rejected if that stands, and that the reasons must then be written down.
     /// </summary>
     [Fact]
-    public async Task InboxService_GetInboxAsync_FailedChecks_TextSaysAgreedFailRejectsAndSingleFailIsDisagreement()
+    public async Task InboxService_GetInboxAsync_FailedChecks_TextSaysFailSoFarAndRejectionNeedsReasons()
     {
         // Arrange: bob answers a check of the review of the author as Fail
         var world = await InboxTestWorld.CreateAsync();
@@ -524,9 +528,10 @@ public class InboxServiceTests
         // Act
         var row = Assert.Single(await world.RowsAsync("author", InboxSection.FailedChecks));
 
-        // Assert: the text names the outcome the agreed Fail leads to, not a blocker and not a certain rejection
+        // Assert: the text says so far, names the rejection and the reasons, and promises nothing certain
         Assert.Equal(
-            "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is a disagreement to resolve.",
+            "Reviewers marked 1 check as Fail so far. If that stands, the review will be rejected and its reasons "
+            + "must be written down.",
             row.Detail);
     }
 
@@ -670,6 +675,7 @@ public class InboxServiceTests
         var world = await InboxTestWorld.CreateAsync();
         var due = DateOnly.FromDateTime(InboxTestWorld.Start.UtcDateTime).AddDays(1);
         await world.CreateReviewAsync("r1", dueDate: due);
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "ann");
         await world.CreateReviewAsync("r2", dueDate: due);
         await world.AnswerAllAsync("r2");
@@ -700,9 +706,10 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach()
     {
-        // Arrange: ann has a slot and a thread that bob answered, on the same review
+        // Arrange: ann has an answered slot and a thread that bob answered, on the same review
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "ann");
         var thread = await world.StartThreadAsync("r1", "ann");
         await world.ReplyAsync("r1", thread.Id, "bob");
@@ -710,8 +717,8 @@ public class InboxServiceTests
         // Act
         var view = await world.InboxOfAsync("ann");
 
-        // Assert: two rows, one review, ordered by section
-        Assert.Equal([InboxSection.ToSign, InboxSection.RepliesWaiting], view.Items.Select(item => item.Section));
+        // Assert: two rows, one review, ordered by section; the open thread keeps the signature from being asked for
+        Assert.Equal([InboxSection.RepliesWaiting, InboxSection.WaitingForOthers], view.Items.Select(item => item.Section));
         Assert.All(view.Items, item => Assert.Equal("r1", item.ReviewId));
         Assert.Equal(1, view.ActionCount);
     }
@@ -862,17 +869,19 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_GetInboxAsync_ToSign_CommentByOtherAfterLastSeen_IsUnread()
     {
-        // Arrange: ann is a reviewer and has seen the review
+        // Arrange: ann is a reviewer with an answered ballot and has seen the review
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
         await world.AddSlotAsync("r1", "ann");
         world.Clock.Advance(TimeSpan.FromMinutes(1));
         await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
         var seen = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
         world.Clock.Advance(TimeSpan.FromMinutes(1));
 
-        // Act: bob starts a thread
-        await world.StartThreadAsync("r1", "bob");
+        // Act: bob starts a thread, which he resolves at once (the review stays free to sign)
+        var thread = await world.StartThreadAsync("r1", "bob");
+        await world.Threads.ResolveAsync(world.ProjectId, "r1", thread.Id, InboxTestWorld.ActorOf("bob"), Ct);
         var after = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
 
         // Assert
@@ -881,7 +890,7 @@ public class InboxServiceTests
     }
 
     /// <summary>
-    ///     Test that a draft ballot of another slot does not turn a read To sign row unread.
+    ///     Test that a draft ballot of another slot does not turn a read To answer row unread.
     /// </summary>
     [Fact]
     public async Task InboxService_Unread_DraftBallotOfOtherSlot_Ignored()
@@ -891,15 +900,13 @@ public class InboxServiceTests
         await world.CreateReviewAsync("r1");
         await world.AddSlotAsync("r1", "ann");
         await world.AddSlotAsync("r1", "bob");
-        var item = DefaultChecklist.Current.Sections[0].Items[0];
         world.Clock.Advance(TimeSpan.FromMinutes(1));
         await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
         world.Clock.Advance(TimeSpan.FromMinutes(1));
 
         // Act: bob answers a check in his draft ballot without handing it in
-        await world.Checklists.SetAnswerAsync(
-            world.ProjectId, "r1", item.Id, ChecklistOutcome.Pass, null, InboxTestWorld.ActorOf("bob"), Ct);
-        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+        await world.StartBallotAsync("r1", "bob");
+        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.ToAnswer));
 
         // Assert: the draft is not news to ann
         Assert.False(row.IsUnread);
@@ -911,20 +918,19 @@ public class InboxServiceTests
     [Fact]
     public async Task InboxService_Unread_SubmittedBallotOfOtherSlot_IsUnread()
     {
-        // Arrange: ann and bob are reviewers; ann has seen the review
+        // Arrange: ann and bob are reviewers; ann has answered and handed in her ballot, and has seen the review
         var world = await InboxTestWorld.CreateAsync();
         await world.CreateReviewAsync("r1");
         await world.AddSlotAsync("r1", "ann");
         await world.AddSlotAsync("r1", "bob");
+        await world.SubmitBallotAsync("r1", "ann");
         world.Clock.Advance(TimeSpan.FromMinutes(1));
         await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
         var seen = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
         world.Clock.Advance(TimeSpan.FromMinutes(1));
 
         // Act: bob answers every check and hands his ballot in
-        var bob = InboxTestWorld.ActorOf("bob");
-        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, "r1", bob, Ct);
-        await world.Checklists.SubmitBallotAsync(world.ProjectId, "r1", bob, Ct);
+        await world.SubmitBallotAsync("r1", "bob");
         var after = Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
 
         // Assert: the row was read before and is new now
@@ -1070,6 +1076,378 @@ public class InboxServiceTests
 
         // Assert: a user who is not known marks nothing
         Assert.Equal(0, await world.Inbox.MarkAllReadAsync(new Actor("ghost", "Ghost"), Ct));
+    }
+
+    /// <summary>
+    ///     Arranges a review with the three reviewers ann, bob and cyd, in which ann and bob handed in their ballots and
+    ///     cyd did not; bob gave a Fail on the first check when a dispute is wanted, so ann and bob answered it
+    ///     differently.
+    /// </summary>
+    /// <param name="dispute">Whether bob answers the first check differently from ann.</param>
+    /// <returns>The arranged world.</returns>
+    private static async Task<InboxTestWorld> ThreeReviewersAsync(bool dispute)
+    {
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.AddSlotAsync("r1", "cyd");
+        await world.SubmitBallotAsync("r1", "ann");
+        await world.SubmitBallotAsync("r1", "bob", dispute);
+        return world;
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who has not started the ballot finds the review under To answer, as not started.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_NoBallot_ShowsToAnswerNotStarted()
+    {
+        // Arrange: ann is seated in a review with two slots and has answered nothing
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+
+        // Assert: one To answer row that says nothing is answered yet, counted as work
+        var row = Assert.Single(view.Items);
+        Assert.Equal(InboxSection.ToAnswer, row.Section);
+        Assert.Equal(InboxService.NotStartedChip, row.Chip);
+        Assert.StartsWith("0 of ", row.Detail, StringComparison.Ordinal);
+        Assert.EndsWith("checks answered. Hand in your ballot when you are done.", row.Detail, StringComparison.Ordinal);
+        Assert.True(row.IsUnread);
+        Assert.Equal(1, view.ActionCount);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer with a ballot that is only started finds the review under To answer, as a draft with the
+    ///     number of answered checks.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_DraftBallot_ShowsToAnswerDraftWithProgressText()
+    {
+        // Arrange: ann answers the first check only
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.StartBallotAsync("r1", "ann");
+
+        // Act
+        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.ToAnswer));
+
+        // Assert
+        Assert.Equal(InboxService.DraftChip, row.Chip);
+        Assert.StartsWith("1 of ", row.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the alternate reviewer of a slot whose ballot is not handed in also finds the review under To answer.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_AlternateHolder_ShowsToAnswer()
+    {
+        // Arrange
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann", "bob");
+
+        // Act
+        var rows = await world.RowsAsync("bob", InboxSection.ToAnswer);
+
+        // Assert
+        Assert.Equal("r1", Assert.Single(rows).ReviewId);
+    }
+
+    /// <summary>
+    ///     Test that the author who holds a slot gets no To answer row while the project forbids the author to answer,
+    ///     and gets it once the rule is off.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_AuthorBlockedViewer_ShowsNoToAnswer()
+    {
+        // Arrange: ann authored the review and holds a slot of it (arranged in the store, which the rules would refuse)
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1", "ann");
+        await world.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = world.ProjectId, ReviewId = "r1", PrimaryUserId = world.Ids["ann"] },
+            _ => AuditTestExtensions.Draft(),
+            Ct);
+
+        // Act
+        var blocked = await world.InboxOfAsync("ann");
+        await TestServices.Projects(world.Store, world.Clock).SetReviewRuleOffAsync(
+            world.ProjectId, ReviewRule.NonAuthorChecklistAnswers, Ct);
+        var allowed = await world.RowsAsync("ann", InboxSection.ToAnswer);
+
+        // Assert
+        Assert.Empty(blocked.Items);
+        Assert.Single(allowed);
+    }
+
+    /// <summary>
+    ///     Test that a review without a checklist has no To answer row: there is nothing to answer.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_NoChecklist_ShowsNoToAnswer()
+    {
+        // Arrange: a stored review without a checklist, with a slot of ann
+        var world = await InboxTestWorld.CreateAsync();
+        await world.Store.AddReviewAsync(
+            new Review { ProjectId = world.ProjectId, Id = "r-none", Title = "No checklist", Created = InboxTestWorld.Start },
+            Ct);
+        await world.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = world.ProjectId, ReviewId = "r-none", PrimaryUserId = world.Ids["ann"] },
+            _ => AuditTestExtensions.Draft(),
+            Ct);
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+
+        // Assert: nothing to answer or sign; the review waits for a checklist
+        Assert.DoesNotContain(view.Items, item => item.Section is InboxSection.ToAnswer or InboxSection.ToSign);
+        var row = Assert.Single(view.Items);
+        Assert.Equal(InboxSection.WaitingForOthers, row.Section);
+        Assert.Equal("This review has no checklist yet.", row.Detail);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer whose handed-in ballot is changed is back under To answer, as a draft.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_RevertedToDraft_ReturnsToToAnswer()
+    {
+        // Arrange: ann handed in her ballot, then changes an answer
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.SubmitBallotAsync("r1", "ann");
+        Assert.Empty(await world.RowsAsync("ann", InboxSection.ToAnswer));
+        var item = DefaultChecklist.Current.Sections[0].Items[0];
+
+        // Act
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, "r1", item.Id, ChecklistOutcome.Fail, "It is wrong", InboxTestWorld.ActorOf("ann"), Ct);
+        var row = Assert.Single(await world.RowsAsync("ann", InboxSection.ToAnswer));
+
+        // Assert
+        Assert.Equal(InboxService.DraftChip, row.Chip);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who has not handed in sees the same inbox whether the other reviewers disagree or not:
+    ///     no row, chip, text, unread marker or count gives the dispute away.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_HiddenViewerWithDispute_ShowsNoDisputedRowOrCount()
+    {
+        // Arrange: the same review twice, cyd has not handed in; ann and bob agree in one, disagree in the other
+        var agreed = await ThreeReviewersAsync(false);
+        var disagreed = await ThreeReviewersAsync(true);
+
+        // Act
+        var without = await agreed.InboxOfAsync("cyd");
+        var with = await disagreed.InboxOfAsync("cyd");
+
+        // Assert: identical, with a To answer row and no word about disputes
+        Assert.Equal(
+            without.Items.Select(item => (item.Section, item.Chip, item.Detail, item.IsUnread)),
+            with.Items.Select(item => (item.Section, item.Chip, item.Detail, item.IsUnread)));
+        Assert.Equal(without.ActionCount, with.ActionCount);
+        Assert.Equal(
+            await agreed.Inbox.CountAsync(InboxTestWorld.ActorOf("cyd"), Ct),
+            await disagreed.Inbox.CountAsync(InboxTestWorld.ActorOf("cyd"), Ct));
+        var row = Assert.Single(with.Items);
+        Assert.Equal(InboxSection.ToAnswer, row.Section);
+        Assert.DoesNotContain("dispute", row.Chip + row.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who handed in a ballot finds a review whose ballots disagree under Disputed, with the
+    ///     number, and not under Ready to sign.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SubmittedViewerWithDispute_ShowsDisputedWithCount()
+    {
+        // Arrange: ann and bob answered the first check differently
+        var world = await ThreeReviewersAsync(true);
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+
+        // Assert
+        var row = Assert.Single(view.Items);
+        Assert.Equal(InboxSection.Disputed, row.Section);
+        Assert.Equal("1 disputed", row.Chip);
+        Assert.Equal("Change your answer or discuss it.", row.Detail);
+        Assert.Equal(1, view.ActionCount);
+    }
+
+    /// <summary>
+    ///     Test that the author, who may see every ballot and holds no slot, finds the disputed review under Disputed.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed()
+    {
+        // Arrange
+        var world = await ThreeReviewersAsync(true);
+
+        // Act
+        var row = Assert.Single(await world.RowsAsync("author", InboxSection.Disputed));
+
+        // Assert
+        Assert.Equal("1 disputed", row.Chip);
+        Assert.Equal("The reviewers answered differently. Discuss it with them.", row.Detail);
+    }
+
+    /// <summary>
+    ///     Test that the Disputed row goes away once the reviewers agree, and the reviewer is asked to sign.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_DisputeResolved_RowDisappears()
+    {
+        // Arrange: a dispute that bob settles by handing in a ballot that agrees with ann's
+        var world = await ThreeReviewersAsync(true);
+        Assert.Single(await world.RowsAsync("ann", InboxSection.Disputed));
+
+        // Act
+        await world.SubmitBallotAsync("r1", "bob");
+
+        // Assert
+        Assert.Empty(await world.RowsAsync("ann", InboxSection.Disputed));
+        Assert.Single(await world.RowsAsync("ann", InboxSection.ToSign));
+    }
+
+    /// <summary>
+    ///     Test that a Disputed row of a user who has seen the review turns unread again when another reviewer hands in
+    ///     a ballot, and not before.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_DisputedUnread_AfterOtherSubmission()
+    {
+        // Arrange: ann has seen the dispute
+        var world = await ThreeReviewersAsync(true);
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 0, null, Ct);
+        var seen = Assert.Single(await world.RowsAsync("ann", InboxSection.Disputed));
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        // Act: bob hands in his ballot again, still different
+        await world.SubmitBallotAsync("r1", "bob", true);
+        var after = Assert.Single(await world.RowsAsync("ann", InboxSection.Disputed));
+
+        // Assert
+        Assert.False(seen.IsUnread);
+        Assert.True(after.IsUnread);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer whose ballot and the other ballots are in and nothing blocks finds the review under
+    ///     Ready to sign.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign()
+    {
+        // Arrange: ann and bob handed in the same answers
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.SubmitBallotAsync("r1", "ann");
+        await world.SubmitBallotAsync("r1", "bob");
+
+        // Act
+        var forAnn = await world.InboxOfAsync("ann");
+
+        // Assert
+        var row = Assert.Single(forAnn.Items);
+        Assert.Equal(InboxSection.ToSign, row.Section);
+        Assert.Equal(InboxService.NotSignedChip, row.Chip);
+    }
+
+    /// <summary>
+    ///     Test that an open thread keeps a reviewer who handed in from being asked to sign: the row is a waiting row
+    ///     that says open items remain, and no work.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign()
+    {
+        // Arrange: ann handed in her one ballot and bob opens a thread
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.StartThreadAsync("r1", "bob");
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+
+        // Assert
+        var row = Assert.Single(view.Items);
+        Assert.Equal(InboxSection.WaitingForOthers, row.Section);
+        Assert.Equal("Open items remain", row.Chip);
+        Assert.StartsWith("Open items remain:", row.Detail, StringComparison.Ordinal);
+        Assert.Equal(0, view.ActionCount);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who signed finds the review under Waiting for others, with the names of the people whose
+    ///     signature is missing, that the row is never unread and that it is no work.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames()
+    {
+        // Arrange: ann and bob handed in; ann signs, bob has not
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AnswerAllAsync("r1");
+        var first = await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob", "cyd");
+        await world.SignAsync("r1", first.Id, "ann");
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+        var count = await world.Inbox.CountAsync(InboxTestWorld.ActorOf("ann"), Ct);
+
+        // Assert: the row names the people of the open slot; it is never unread and not counted
+        var row = Assert.Single(view.Items);
+        Assert.Equal(InboxSection.WaitingForOthers, row.Section);
+        Assert.Equal("Waiting for 1 reviewer", row.Chip);
+        Assert.Equal("Waiting for Bob, Cyd.", row.Detail);
+        Assert.False(row.IsUnread);
+        Assert.Equal(0, view.ActionCount);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    ///     Test that the action count counts the To answer and Disputed reviews, one each, and not the waiting ones.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting()
+    {
+        // Arrange: r1 is disputed for ann, r2 waits for her answers, r3 waits for others after her signature
+        var world = await ThreeReviewersAsync(true);
+        await world.CreateReviewAsync("r2");
+        await world.AddSlotAsync("r2", "ann");
+        await world.CreateReviewAsync("r3");
+        await world.AnswerAllAsync("r3");
+        var slot = await world.AddSlotAsync("r3", "ann");
+        await world.AddSlotAsync("r3", "bob");
+        await world.SignAsync("r3", slot.Id, "ann");
+
+        // Act
+        var view = await world.InboxOfAsync("ann");
+        var count = await world.Inbox.CountAsync(InboxTestWorld.ActorOf("ann"), Ct);
+
+        // Assert
+        Assert.Equal(
+            [InboxSection.ToAnswer, InboxSection.Disputed, InboxSection.WaitingForOthers],
+            view.Items.Select(item => item.Section).OrderBy(section => (int)section));
+        Assert.Equal(2, view.ActionCount);
+        Assert.Equal(2, count);
     }
 
     /// <summary>

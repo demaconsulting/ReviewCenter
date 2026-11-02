@@ -39,7 +39,8 @@ a project checklist, and sign the review with their credentials. Every action is
 - 🧭 **Where Are We?** - A panel at the top of every review shows each reviewer's ballot and signature, the disputed
   checks with a Discuss button, the open Questions and Findings, and one next step; it explains what changed since a
   reviewer signed, and keeps the disputes hidden until you hand in your own ballot
-- 📥 **Inbox** - What waits for you: signatures to give, replies, failed checks, and unread comments
+- 📥 **Inbox** - What waits for you: ballots to answer, disputes, signatures to give, replies, failed checks, and
+  unread comments
 - ✅ **Review Checklist** - Pass, Fail, or N/A checklist (14-section default; each project can import its own
   template), answered per reviewer slot in its own ballot and consolidated into the agreed standing
 - 👥 **Reviewer Slots** - Primary and alternate reviewers share a ballot and sign each slot, early once the ballot is in

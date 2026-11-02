@@ -6,15 +6,23 @@
         <p>The <a href="/inbox" data-testid="help-inbox-link">Inbox</a> lists the reviews that are waiting for you.
             The home page shows how many need your action. Open a row to go to the review.</p>
         <ul>
-            <li><strong>To sign</strong>: you are the primary or alternate reviewer of a slot that has no current
-                signature, or whose signature no longer fits because the review changed after you signed. The review
-                page then explains what changed since you signed.</li>
+            <li><strong>To answer</strong>: you are the primary or alternate reviewer of a slot and have not handed in
+                your ballot yet. The row says how many checks you answered. Open it to go to the checklist.</li>
+            <li><strong>Disputed</strong>: you handed in your ballot, and the ballots of the reviewers differ on some
+                checks. Change your answer or discuss it. Nobody sees this before handing in their own ballot, so a
+                reviewer who has not handed in never sees a Disputed row.</li>
+            <li><strong>Ready to sign</strong>: you handed in your ballot, nothing blocks the signature, and a slot of
+                yours has no current signature, or its signature no longer fits because the review changed after you
+                signed. The review page then explains what changed since you signed.</li>
             <li><strong>Replies waiting</strong>: the last comment of an open thread (a Question or a Finding) is from
                 someone else, and you hold a slot of the review and wrote in that thread, or you created the review.
                 The row says how many open questions and findings the review has.</li>
-            <li><strong>Failed checks</strong>: you created the review and a check of a section that applies is
-                answered Fail. A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is a
-                disagreement to resolve.</li>
+            <li><strong>Failed checks</strong>: you created the review and the reviewers marked a check of a section
+                that applies as Fail. If that stands, the review will be rejected and its reasons must be written
+                down. A check the reviewers answered differently is a Disputed row instead.</li>
+            <li><strong>Waiting for others</strong>: you did your part, and the review waits for the signature of other
+                reviewers or for open items. The row names the people. It is for information and is not counted as
+                work.</li>
             <li><strong>Updates</strong>: a review of yours was approved, rejected or reopened by someone else since
                 you last looked. Updates are for information and are not counted as work.</li>
         </ul>
@@ -22,7 +30,9 @@
             comments by others that you have not seen carry the same marker until your next visit.
             <strong>Mark all as read</strong> clears the markers of every listed review. A concluded review (approved
             or rejected) needs no
-            action, so it leaves the three action groups. You only see reviews of projects you are a member of, and a
-            read-only role does not get the groups that ask for a signature or a reply.</p>
+            action, so it leaves the action groups. You only see reviews of projects you are a member of, and a
+            read-only role does not get the groups that ask for an answer, a signature or a reply. Reviewers answer
+            independently: until you hand in your own ballot, the inbox never shows how the others answered or
+            whether anything is disputed.</p>
     </section>
 </HelpTopicFrame>

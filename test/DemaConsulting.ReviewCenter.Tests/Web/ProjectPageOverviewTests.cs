@@ -301,6 +301,90 @@ public class ProjectPageOverviewTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the table shows how many ballots are in of how many the review has and who has not handed in, and
+    ///     only a dash for a review with a single reviewer.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_Ballots_ShowsSubmittedOfTotalAndNames()
+    {
+        // Arrange: REV-B has two slots of which Ann handed in; REV-A and REV-D have one slot
+        var projectId = await SeedAsync();
+
+        // Act
+        var cut = RenderAt(projectId);
+
+        // Assert
+        Assert.Equal("1/2", cut.Find("[data-testid='review-ballots-REV-B']").TextContent);
+        Assert.Equal("Not yet: Bob", cut.Find("[data-testid='review-ballots-waiting-REV-B']").TextContent);
+        Assert.Equal("-", cut.Find("[data-testid='review-ballots-REV-A']").TextContent);
+        Assert.Equal("-", cut.Find("[data-testid='review-ballots-REV-D']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-ballots-waiting-REV-A']"));
+        Assert.Empty(cut.FindAll("[data-testid='reviews-masked-note']"));
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who has not handed in sees the ballot counts and who is missing, but no dispute, and is
+    ///     told that some details are hidden.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_HiddenViewer_ShowsBallotCountsAndMaskedNote()
+    {
+        // Arrange: Ann and Bob handed in and differ on a check; Cyd holds a slot and has not handed in
+        var token = TestContext.Current.CancellationToken;
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, token);
+        var bob = await Users.CreateAsync("bob", "Bob", UserRole.Reviewer, Password, token);
+        var cyd = await Users.CreateAsync("cyd", "Cyd", UserRole.Reviewer, Password, token);
+        var project = await Projects.CreateAsync("Apollo", null, token);
+        foreach (var user in new[] { ann, bob, cyd })
+        {
+            await Store.AddMembershipAsync(user.Id, project.Id, token);
+        }
+
+        await Reviews.CreateDraftAsync(project.Id, "REV-H", "Hidden", [new("a.txt", TestContent.A)], token);
+        foreach (var user in new[] { ann, bob, cyd })
+        {
+            await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-H", user.Id, null, token);
+        }
+
+        var firstItem = true;
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                project.Id, "REV-H", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, token);
+            await Checklists.SetAnswerAsync(
+                project.Id,
+                "REV-H",
+                item.Id,
+                firstItem ? ChecklistOutcome.Fail : ChecklistOutcome.Pass,
+                firstItem ? "Wrong." : null,
+                TestActors.Bob,
+                token);
+            firstItem = false;
+        }
+
+        await Checklists.SubmitBallotAsync(project.Id, "REV-H", TestActors.Ann, token);
+        await Checklists.SubmitBallotAsync(project.Id, "REV-H", TestActors.Bob, token);
+
+        // Act: Cyd looks, and then Ann, who handed in
+        SignInAs("cyd", "Cyd", false);
+        var hidden = RenderAt(project.Id);
+        SignInAs("ann", "Ann", false);
+        var open = RenderAt(project.Id);
+
+        // Assert: Cyd sees the progress and the note, and no dispute
+        Assert.Equal("2/3", hidden.Find("[data-testid='review-ballots-REV-H']").TextContent);
+        Assert.Equal("Not yet: Cyd", hidden.Find("[data-testid='review-ballots-waiting-REV-H']").TextContent);
+        Assert.Equal(
+            "Some details are hidden until you hand in your ballot.",
+            hidden.Find("[data-testid='reviews-masked-note']").TextContent);
+        Assert.DoesNotContain("disputed", hidden.Find("[data-testid='review-blockers-REV-H']").TextContent, StringComparison.Ordinal);
+
+        // Assert: Ann sees the dispute and no note
+        Assert.Equal("1 disputed", open.Find("[data-testid='review-blockers-REV-H']").TextContent);
+        Assert.Empty(open.FindAll("[data-testid='reviews-masked-note']"));
+    }
+
+    /// <summary>
     ///     Test that a review whose only blocker is a disputed check (two submitted ballots disagree) shows the count
     ///     of disputed checks instead of a dash, and is listed by the blocked filter.
     /// </summary>

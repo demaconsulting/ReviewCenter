@@ -1045,6 +1045,64 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the approval reports the ballot state of every slot, and none for a review without a checklist.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_ReportsBallotStatePerSlot()
+    {
+        // Arrange: three slots; ann hands in, bob has a draft, cyd has not started
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        await AddSlotAsync(fixture, "rev-1", "ann");
+        await AddSlotAsync(fixture, "rev-1", "bob");
+        await AddSlotAsync(fixture, "rev-1", "cyd");
+        await AuditTestExtensions.AnswerAllAsync(fixture.Checklists, fixture.ProjectId, "rev-1", TestActors.Ann, cancellationToken);
+        await fixture.Checklists.SubmitBallotAsync(fixture.ProjectId, "rev-1", TestActors.Ann, cancellationToken);
+        var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        await fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, "rev-1", first.Id, ChecklistOutcome.Pass, null, new Actor("bob", "Bob"), cancellationToken);
+        await fixture.Store.AddReviewAsync(
+            new Review { ProjectId = fixture.ProjectId, Id = "rev-none", Title = "None", Created = _now }, cancellationToken);
+        await fixture.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = fixture.ProjectId, ReviewId = "rev-none", PrimaryUserId = fixture.Ids["ann"] },
+            cancellationToken);
+
+        // Act
+        var approval = await ApprovalAsync(fixture);
+        var none = await ApprovalAsync(fixture, "rev-none");
+
+        // Assert
+        Assert.Equal(
+            [BallotState.Submitted, BallotState.Draft, BallotState.NotStarted],
+            approval.Slots.Select(slot => slot.Ballot));
+        Assert.All(none.Slots, slot => Assert.Null(slot.Ballot));
+    }
+
+    /// <summary>
+    ///     Test that masking an approval keeps the ballot state of the slots, which is progress and no verdict.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState()
+    {
+        // Arrange: ann handed in, bob did not
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        await AddSlotAsync(fixture, "rev-1", "ann");
+        await AddSlotAsync(fixture, "rev-1", "bob");
+        await AuditTestExtensions.AnswerAllAsync(fixture.Checklists, fixture.ProjectId, "rev-1", TestActors.Ann, cancellationToken);
+        await fixture.Checklists.SubmitBallotAsync(fixture.ProjectId, "rev-1", TestActors.Ann, cancellationToken);
+        var approval = await ApprovalAsync(fixture);
+
+        // Act
+        var masked = approval.Masked();
+
+        // Assert
+        Assert.True(masked.IsMasked);
+        Assert.Equal(approval.Slots.Select(slot => slot.Ballot), masked.Slots.Select(slot => slot.Ballot));
+        Assert.Equal([BallotState.Submitted, BallotState.NotStarted], masked.Slots.Select(slot => slot.Ballot));
+    }
+
+    /// <summary>
     ///     Test that a review without slots is never approved and the next step asks for a slot.
     /// </summary>
     [Fact]
