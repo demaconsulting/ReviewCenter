@@ -59,17 +59,21 @@ sections:
         title: >-
           The AttestationService class shall read the review and the evidence settings of the project again after the
           document is rendered and before it is signed, and when the review is no longer complete, or its record
-          digest, its slots, its signers, or the digests they signed differ from what was rendered, or the settings
-          differ from the ones that the document was rendered with, shall report that the review changed, and shall
-          sign nothing, return no document, and record nothing in the audit trail.
+          digest, its ballot fingerprint (the justifications, answerers, times, and section states that the digest
+          does not cover), its slots, its signers, or the digests they signed differ from what was rendered, or the
+          settings differ from the ones that the document was rendered with, shall report that the review changed, and
+          shall sign nothing, return no document, and record nothing in the audit trail.
         justification: |
           The approval and the content are read in separate steps and rendering takes time. Without the second check a
           slot added or a record changed in between would yield a signed document that attests a review that was no
-          longer complete when it was signed. A setting that was changed in between, for instance a switch that hides
+          longer complete when it was signed. A ballot field that the record digest leaves out, such as a
+          justification, would otherwise be printed in the appendix as it was before the change. A setting that was
+          changed in between, for instance a switch that hides
           the names of the reviewers, would otherwise yield a document that discloses what the project had just
           decided to keep back.
         tests:
           - AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_BallotFieldChangesWhileRendering_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_ReviewUnchangedWhileRendering_PassesRevalidationAndIsAttested

@@ -329,6 +329,39 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that a ballot field that the record digest does not cover, changed after the document was rendered and
+    ///     before it is signed, gives no attestation, no PDF and no audit event.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_BallotFieldChangesWhileRendering_ReturnsChangedAndRecordsNothing()
+    {
+        // Arrange: a complete review, and a step between rendering and signing that answers every check again with
+        // the same outcomes at a later time, so the digest stays the same and only the ballot fields differ
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var digestBefore = (await fixture.Signing.GetApprovalAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, TestContext.Current.CancellationToken))!.Digest;
+        var service = fixture.CreateService(
+            keys,
+            afterRender: _ =>
+            {
+                fixture.Clock.Advance(TimeSpan.FromHours(1));
+                return fixture.AnswerAllAsync(ChecklistOutcome.Pass);
+            });
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the digest did not change, yet the result is changed with nothing signed and nothing recorded
+        var digestAfter = (await fixture.Signing.GetApprovalAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, TestContext.Current.CancellationToken))!.Digest;
+        Assert.Equal(digestBefore, digestAfter);
+        Assert.Equal(AttestationStatus.Changed, result.Status);
+        Assert.Null(result.Content);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+    }
+
+    /// <summary>
     ///     Test that a slot added while the document is being prepared gives no attestation: the review is no longer
     ///     complete.
     /// </summary>

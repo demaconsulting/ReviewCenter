@@ -350,9 +350,9 @@ internal sealed class AttestationService
     /// <param name="settings">The evidence settings the document was built with.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>
-    ///     <c>true</c> when the review is still concluded with the same outcome and the same record digest, and has
-    ///     the same slots and the same signatures that count as the rendered one, and the evidence settings are still
-    ///     the ones rendered.
+    ///     <c>true</c> when the review is still concluded with the same outcome and the same record digest and the
+    ///     same ballot fingerprint, and has the same slots and the same signatures that count as the rendered one, and
+    ///     the evidence settings are still the ones rendered.
     /// </returns>
     private async Task<bool> IsUnchangedAsync(
         int projectId,
@@ -376,9 +376,12 @@ internal sealed class AttestationService
             return false;
         }
 
+        // The record digest does not cover everything the appendix prints (justifications, answerers, times and the
+        // state of each section), so the ballot fingerprint must be the one that was rendered, too
         var current = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
         return current is not null
                && RecordDigest.Compute(current.Record) == digest
+               && RecordDigest.ComputeBallotFingerprint(current.Record) == RecordDigest.ComputeBallotFingerprint(rendered.Record)
                && SlotSignature(current, digest) == SlotSignature(rendered, digest);
     }
 

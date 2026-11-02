@@ -88,6 +88,12 @@ written to the store directly by the fixture, because the services refuse to cha
 content or file name, and the audit trail has no attestation event. This scenario is tested by
 `AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing`.
 
+**AttestationService_GenerateAsync_BallotFieldChangesWhileRendering_ReturnsChangedAndRecordsNothing**: In that moment
+the answers of the ballot are written again with the same outcomes but another time, so the record digest is the same
+and only the ballot fingerprint differs. The status is `Changed`, there is no content, and nothing is recorded. This
+scenario is tested by
+`AttestationService_GenerateAsync_BallotFieldChangesWhileRendering_ReturnsChangedAndRecordsNothing`.
+
 **AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing**: A second slot that nobody
 has signed is added in that moment, directly in the store for the same reason. The status is `Changed`, there is no
 content, and nothing is recorded. This scenario is tested by

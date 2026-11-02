@@ -119,8 +119,9 @@ request) in that time.
   verified to get its head, and the document is rendered from the record, with the settings, the labels for the people,
   and the actor (or the statement that the request was anonymous). Then the project settings and the review are **read
   again and revalidated**: the settings must be equal to the ones used, the
-  approval must still be concluded with the same outcome and digest, and the snapshot must have the same digest and the
-  same slots,
+  approval must still be concluded with the same outcome and digest, and the snapshot must have the same digest, the
+  same ballot fingerprint (the digest does not cover the justifications, the answerers, the times, or the state of the
+  sections that the appendix prints), and the same slots,
   signers, and signature digests as the rendered one. If anything differs the result is `Changed` ("The review changed
   while the attestation was being prepared; try again."), nothing is signed, and **no audit event is written**. Only
   then is the document signed (a failure of the signer gives `KeyUnavailable` and records nothing). Last, an
@@ -150,7 +151,8 @@ review is no longer complete or no longer the same. The check is not a lock: a c
 read and before the signing and the audit event is not seen. That window is tiny (a signature computation and one
 audit write, with no I/O of the review between them), and the audit event states the record digest that was attested,
 so such a document can be recognized against the record afterwards. The second read compares the approval, the record
-digest, and the slots with their counting signatures, and the evidence settings of the project; it does not compare
+digest, the ballot fingerprint, and the slots with their counting signatures, and the evidence settings of the project;
+it does not compare
 the review, project, or repository names, so a rename in that window would be rendered under the old name (the names
 are not part of the record digest, see the renderer design). A change of the settings inside the window is the one
 case that is seen, because a document that mixed two settings would state a content scope that was never true. A
