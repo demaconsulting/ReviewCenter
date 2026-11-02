@@ -1065,7 +1065,7 @@ public class ReviewCenterSystemTests
     public async Task ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned()
     {
         // Arrange: a planned review by puppet with a finished checklist and a slot for second, who is signed in in a
-        // browser of their own
+        // browser of their own and hands in the ballot, so the review is ready to sign (not to answer)
         await using var scenario = await Scenario.CreateAsync(TestContext.Current.CancellationToken);
         var browser = scenario.Browser;
         await using var reviewer = await scenario.StartSignedInBrowserAsync("reviewer", "second");
@@ -1097,7 +1097,7 @@ public class ReviewCenterSystemTests
         await browser.GotoAsync("/audit", "audit-page");
         var trail = await browser.TextOfAsync("audit-page");
 
-        // Assert: one signature was waiting, named by the home page and the inbox with the review
+        // Assert: one signature was waiting, named by the home page and the inbox with the review (Ready to sign)
         Assert.Contains("1 needs your action", homeCount, StringComparison.Ordinal);
         Assert.Contains("1 needs your action", summary, StringComparison.Ordinal);
         Assert.Contains("Not signed", chip, StringComparison.Ordinal);

@@ -1,7 +1,7 @@
 ---
 # Software Unit Requirements for the InboxPage Unit
 #
-# The InboxPage unit is the page at /inbox that lists the reviews that wait for the signed-in user in four groups,
+# The InboxPage unit is the page at /inbox that lists the reviews that wait for the signed-in user in seven groups,
 # with a summary line, a chip and an unread badge on each item, and a button that marks everything as read. It is an
 # interactive page that needs a sign-in.
 
@@ -19,16 +19,18 @@ sections:
 
       - id: ReviewCenter-InboxPage-Sections
         title: >-
-          The InboxPage unit shall show the groups to sign, replies waiting, failed checks and updates, each with its
-          items, and for each item the project and the review with a link to the review, a chip, a detail line, the
-          Overdue or Due mark of an action item, and a New badge when it is unread, and shall show a short message
-          when nothing waits.
+          The InboxPage unit shall show the groups to answer, disputed, ready to sign, replies waiting, failed checks,
+          waiting for others and updates, each with its items, and for each item the project and the review with a
+          link (to the checklist for the groups to answer and disputed, to the review for the others), a chip, a detail
+          line, the Overdue or Due mark of an action item, and a New badge when it is unread, and shall show a short
+          message when nothing needs action.
         justification: |
           The reader must see what to do and where, in one place, and must find an empty inbox as good news and not as
-          an error.
+          an error. A ballot or a dispute is worked on in the checklist, so the link goes there.
         tests:
           - InboxPage_Render_NothingWaiting_ShowsEmptyState
-          - InboxPage_Render_ToSignAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks
           - InboxPage_Render_UnreadItem_ShowsDot
           - InboxPage_Render_OverdueReview_ShowsOverdueChip
           - InboxPage_Render_Auditor_ShowsNoSignItems
@@ -36,11 +38,13 @@ sections:
       - id: ReviewCenter-InboxPage-Summary
         title: >-
           The InboxPage unit shall show a summary line with the number of reviews that need action and the number of
-          updates.
+          updates, and, only when some review waits for others, the number of those, which are not counted as action.
         justification: |
-          The totals tell the reader at once how much work is waiting before any group is read.
+          The totals tell the reader at once how much work is waiting before any group is read, and a review that only
+          waits for other people must not look like work.
         tests:
           - InboxPage_Render_SummaryLine_ShowsActionAndUpdateCounts
+          - InboxPage_Render_WaitingForOthers_NotCountedInSummary
 
       - id: ReviewCenter-InboxPage-MarkAllRead
         title: >-

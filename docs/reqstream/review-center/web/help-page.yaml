@@ -189,8 +189,10 @@ sections:
 
       - id: ReviewCenter-HelpPage-InboxTopic
         title: >-
-          The HelpPage unit shall offer a topic on the inbox that explains its four groups, the New badge, and how to
-          mark everything as read, and that notes that what a user has seen is not part of the signed record.
+          The HelpPage unit shall offer a topic on the inbox that explains its seven groups (to answer, disputed, ready
+          to sign, replies waiting, failed checks, waiting for others and updates), the New badge, and how to
+          mark everything as read, that notes that a reviewer who has not handed in the own ballot never sees how the
+          others answered, and that notes that what a user has seen is not part of the signed record.
         justification: |
           A person who sees a number on the home page looks for what it counts and for what clears it.
         tests:

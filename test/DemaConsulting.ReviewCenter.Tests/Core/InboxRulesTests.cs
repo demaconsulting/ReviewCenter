@@ -254,6 +254,122 @@ public class InboxRulesTests
     }
 
     /// <summary>
+    ///     Test that the standing of a user in a review follows the rules: the ballot comes first, disputes are only
+    ///     looked at when the user may see them, and the user signs only when nothing blocks.
+    /// </summary>
+    /// <param name="concluded">Whether the review is concluded.</param>
+    /// <param name="holdsSlot">Whether the user holds a slot.</param>
+    /// <param name="hasChecklist">Whether the review has a checklist.</param>
+    /// <param name="authorBlocked">Whether the author is not allowed to answer.</param>
+    /// <param name="ownBallot">The state of the ballot of the user.</param>
+    /// <param name="hidden">Whether the other ballots are hidden from the user.</param>
+    /// <param name="disputed">The number of disputes.</param>
+    /// <param name="hasUnsigned">Whether a slot of the user has no current signature.</param>
+    /// <param name="canSign">Whether nothing blocks the signature.</param>
+    /// <param name="expected">The expected standing.</param>
+    [Theory]
+    [InlineData(true, true, true, false, BallotState.Submitted, false, 0, true, true, "None")]
+    [InlineData(false, false, true, false, BallotState.NotStarted, false, 2, false, false, "Disputed")]
+    [InlineData(false, false, true, false, BallotState.NotStarted, true, 2, false, false, "None")]
+    [InlineData(false, false, true, false, BallotState.NotStarted, false, 0, false, false, "None")]
+    [InlineData(false, true, true, false, BallotState.NotStarted, true, 0, true, false, "ToAnswer")]
+    [InlineData(false, true, true, false, BallotState.Draft, true, 3, true, true, "ToAnswer")]
+    [InlineData(false, true, true, true, BallotState.NotStarted, false, 0, true, false, "None")]
+    [InlineData(false, true, false, false, BallotState.NotStarted, false, 0, true, false, "Waiting")]
+    [InlineData(false, true, true, false, BallotState.Submitted, false, 1, true, false, "Disputed")]
+    [InlineData(false, true, true, false, BallotState.Submitted, false, 1, false, true, "Waiting")]
+    [InlineData(false, true, true, false, BallotState.Submitted, true, 3, true, true, "ToSign")]
+    [InlineData(false, true, true, false, BallotState.Submitted, false, 0, true, true, "ToSign")]
+    [InlineData(false, true, true, false, BallotState.Submitted, false, 0, true, false, "Waiting")]
+    public void InboxRules_ReviewerStanding_Facts_DecideTheSection(
+        bool concluded,
+        bool holdsSlot,
+        bool hasChecklist,
+        bool authorBlocked,
+        BallotState ownBallot,
+        bool hidden,
+        int disputed,
+        bool hasUnsigned,
+        bool canSign,
+        string expected)
+    {
+        // Act
+        var standing = InboxRules.ReviewerStanding(
+            concluded, holdsSlot, hasChecklist, authorBlocked, ownBallot, hidden, disputed, hasUnsigned, canSign);
+
+        // Assert
+        Assert.Equal(expected, standing.ToString());
+    }
+
+    /// <summary>
+    ///     Test that the author rule of the inbox is the rule of the checklist service for every combination.
+    /// </summary>
+    [Fact]
+    public void InboxRules_AuthorBlocked_ParityWithChecklistService()
+    {
+        // Arrange
+        var projects = new Project?[]
+        {
+            null,
+            new Project { Name = "On", RequireNonAuthorChecklistAnswers = true },
+            new Project { Name = "Off", RequireNonAuthorChecklistAnswers = false }
+        };
+        var creators = new string?[] { null, string.Empty, "ann", "bob" };
+        var users = new string?[] { null, string.Empty, "ann", "ANN", "bob" };
+
+        // Act, Assert
+        foreach (var project in projects)
+        {
+            foreach (var creator in creators)
+            {
+                foreach (var user in users)
+                {
+                    var review = new Review { Id = "r1", Title = "T", CreatedBy = creator };
+                    Assert.Equal(
+                        ChecklistService.IsAuthorBlocked(project, review, user),
+                        InboxRules.AuthorBlocked(project, creator, user));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Test the sentences of the To answer and Waiting rows.
+    /// </summary>
+    [Fact]
+    public void InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded()
+    {
+        // Act, Assert
+        Assert.Equal(
+            "3 of 10 checks answered. Hand in your ballot when you are done.",
+            InboxRules.ToAnswerText(new ChecklistProgress(3, 10)));
+        Assert.Equal("All checks are answered. Hand in your ballot.", InboxRules.ToAnswerText(new ChecklistProgress(4, 4)));
+        Assert.Equal("Waiting for Ann, Bob.", InboxRules.WaitingForText(["Ann", "Bob"]));
+        Assert.Equal("Open items remain", InboxRules.WaitingChip(0));
+        Assert.Equal("Waiting for 1 reviewer", InboxRules.WaitingChip(1));
+        Assert.Equal("Waiting for 3 reviewers", InboxRules.WaitingChip(3));
+    }
+
+    /// <summary>
+    ///     Test that the action sections are the ones that ask something of the user, and the waiting and update
+    ///     sections are not.
+    /// </summary>
+    [Fact]
+    public void InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates()
+    {
+        // Act, Assert
+        Assert.All(
+            new[]
+            {
+                InboxSection.ToAnswer, InboxSection.Disputed, InboxSection.ToSign, InboxSection.RepliesWaiting,
+                InboxSection.FailedChecks
+            },
+            section => Assert.True(InboxSections.IsAction(section)));
+        Assert.False(InboxSections.IsAction(InboxSection.WaitingForOthers));
+        Assert.False(InboxSections.IsAction(InboxSection.Updates));
+    }
+
+    /// <summary>
     ///     Builds a comment.
     /// </summary>
     /// <param name="id">The identity.</param>

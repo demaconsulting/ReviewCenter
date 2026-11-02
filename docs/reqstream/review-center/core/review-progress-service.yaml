@@ -157,3 +157,25 @@ sections:
           - ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings
           - ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads
           - ThreadCounts_MaskedViewer_NeverCountsCheckThreads
+
+      - id: ReviewCenter-ReviewProgressService-BallotProgress
+        title: >-
+          The ReviewProgressService class shall report for every review that has a checklist the number of ballots that
+          were handed in and the number of ballots the review needs (one for every reviewer slot), shall name, for a
+          review that is not concluded, the people whose ballot is not in, each once and in slot order and with the
+          suffix "(disabled)" for a disabled account, shall report no ballots for a review without a checklist or for
+          a concluded review (no names), and shall give the same counts and names to every viewer, together with a flag
+          that tells that the other details of the review are hidden from this viewer until the ballot is handed in.
+        justification: |
+          A lead who has to chase a review needs to know how many ballots are still missing and whose they are, and a
+          reviewer needs to know that the review waits for them. That a ballot is in is progress and not a verdict, so
+          it is shown to everybody, and the flag lets a page say that the dispute counts are hidden instead of showing
+          a zero that could be taken for agreement.
+        tests:
+          - ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal
+          - ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix
+          - ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked
+          - ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots
+          - ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne
+          - ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired
+          - ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked

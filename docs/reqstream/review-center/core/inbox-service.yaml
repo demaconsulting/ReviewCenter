@@ -1,26 +1,74 @@
 ---
 # Software Unit Requirements for the InboxService Class
 #
-# The InboxService class builds the inbox of a user: the reviews that wait for the user, in four groups, and the
+# The InboxService class builds the inbox of a user: the reviews that wait for the user, in seven groups, and the
 # count of the reviews that need action. It also keeps what a user has seen of a review, so that new comments and
 # changes can be marked. It holds the rules in the pure InboxRules helper, reads the reviews through the stores and
-# decides who may see what through ProjectAccess.
+# decides who may see what through ProjectAccess. It never shows a user who has not handed in the own ballot what
+# the other reviewers answered.
 
 sections:
   - title: InboxService Unit Requirements
     requirements:
+      - id: ReviewCenter-InboxService-ToAnswer
+        title: >-
+          The InboxService class shall list as to answer every review that is not concluded and has a checklist, in
+          which the user is the primary or the alternate reviewer of a slot and has not handed in the ballot, with the
+          chip Not started when the user has no ballot and the chip Draft with the number of checks answered when the
+          user has one, shall list a review again when a handed-in ballot is reverted to a draft, shall link the row to
+          the checklist, shall list nothing to a user who is not allowed to answer the checks of the review, as the
+          author of a review when the project requires the answers of somebody else, and shall list nothing for a
+          review without a checklist.
+        justification: |
+          The ballot comes first: nothing else about a review can be judged before the own answers are in. A person
+          who holds a slot must find the ballots they still owe, and must not be asked for what the rules refuse.
+        tests:
+          - InboxService_GetInboxAsync_NoBallot_ShowsToAnswerNotStarted
+          - InboxService_GetInboxAsync_DraftBallot_ShowsToAnswerDraftWithProgressText
+          - InboxService_GetInboxAsync_AlternateHolder_ShowsToAnswer
+          - InboxService_GetInboxAsync_AuthorBlockedViewer_ShowsNoToAnswer
+          - InboxService_GetInboxAsync_NoChecklist_ShowsNoToAnswer
+          - InboxService_GetInboxAsync_RevertedToDraft_ReturnsToToAnswer
+          - InboxRules_ReviewerStanding_Facts_DecideTheSection
+          - InboxRules_AuthorBlocked_ParityWithChecklistService
+          - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded
+
+      - id: ReviewCenter-InboxService-Disputed
+        title: >-
+          The InboxService class shall list as disputed every review that is not concluded and in which the ballots
+          that were handed in differ on some checks, to a user who has handed in the own ballot or who may see the
+          other ballots anyway (the creator of the review), with a chip that gives the number of disputed checks,
+          shall mark the row as unread only when another reviewer
+          handed in a ballot after the user last saw the review, shall drop the row when the dispute is settled, and
+          shall list no disputed row, count or text to a user who has not handed in the own ballot.
+        justification: |
+          Reviewers answer independently. What the others answered, and whether it differs, must not reach a person
+          before that person has answered, or the first answer would shape the others. Once the ballots are in, a
+          difference is work that waits for the people who gave it.
+        tests:
+          - InboxService_GetInboxAsync_HiddenViewerWithDispute_ShowsNoDisputedRowOrCount
+          - InboxService_GetInboxAsync_SubmittedViewerWithDispute_ShowsDisputedWithCount
+          - InboxService_GetInboxAsync_AuthorWithDispute_ShowsDisputed
+          - InboxService_GetInboxAsync_DisputeResolved_RowDisappears
+          - InboxService_GetInboxAsync_DisputedUnread_AfterOtherSubmission
+          - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
+          - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
+          - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer
+
       - id: ReviewCenter-InboxService-ToSign
         title: >-
-          The InboxService class shall list as to sign every review that is not concluded and in which the user is the
-          primary or the alternate reviewer of a slot that has no current signature, with the chip Not signed when
-          nothing was signed and the chip The review changed, sign again when the signature no longer covers the
-          record, shall list nothing for a slot that is signed, shall keep a review whose slots are all signed but that
-          still has an open thread out of the concluded reviews, and shall give the item the due date, and the Overdue
-          mark when the date is past, while the review is not concluded.
+          The InboxService class shall list as ready to sign every review that is not concluded in which the user is
+          the primary or the alternate reviewer of a slot that has no current signature, has handed in the own ballot,
+          and nothing blocks the signature (no unanswered check, no open thread, no dispute and, for a rejection, the
+          conclusion text), with the chip Not signed when nothing was signed and the chip The review changed, sign
+          again when the signature no longer covers the record, shall list nothing for a slot that is signed or for a
+          user whose ballot is not in, shall keep a review whose slots are all signed but that still has an open thread
+          out of the concluded reviews, and shall give the item the due date, and the Overdue mark when the date is
+          past, while the review is not concluded.
         justification: |
           A reviewer must find the signatures that are theirs to give, and a signature that went out of date because
           the review changed is as much work as one that was never given. The state of a slot is decided as the
-          approval of the review decides it, so the inbox and the review page never disagree.
+          approval of the review decides it, so the inbox and the status of the review never disagree.
         tests:
           - InboxService_GetInboxAsync_PrimarySlotNotSigned_ShowsToSignItem
           - InboxService_GetInboxAsync_AlternateSlotNotSigned_ShowsToSignItem
@@ -28,9 +76,31 @@ sections:
           - InboxService_GetInboxAsync_SlotSigned_HasNoToSignItem
           - InboxService_GetInboxAsync_DueDateInPast_ShowsOverdueChip_ApprovedShowsNone
           - InboxService_GetInboxAsync_AllSignedOpenThread_ShowsRepliesWaitingNotConcluded
+          - InboxService_GetInboxAsync_SubmittedOwnBallotNothingBlocking_ShowsReadyToSign
+          - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
+          - InboxService_GetInboxAsync_SectionMatchesReviewStatusNextAction_ForAllStandings
           - InboxRules_SlotState_MatchesSigningServiceApproval
           - InboxRules_IsAssigned_PrimaryAndAlternate_AreAssigned
           - ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations
+
+      - id: ReviewCenter-InboxService-WaitingForOthers
+        title: >-
+          The InboxService class shall list as waiting for others, for information and never counted as action, every
+          review that is not concluded in which the user holds a slot and has done their part (the slot is signed, or
+          the ballot is in and something that is not the user's to do blocks the signature), with a chip that names the
+          number of reviewers waited for, or the open items when no reviewer is waited for, and a text that names
+          them, and shall never name a verdict or a dispute count of a ballot the user may not see, and shall show no
+          due date and no Overdue mark on that row.
+        justification: |
+          A person who has done their part wants to know why the review is still open and who is holding it, without
+          being asked for work that is not theirs. The names say who has not handed in; they say nothing about what
+          was answered. A due date or an Overdue mark would make the row look like work.
+        tests:
+          - InboxService_GetInboxAsync_OwnSlotSignedOthersPending_ShowsWaitingWithNames
+          - InboxService_GetInboxAsync_WaitingForOthersOverdueReview_ShowsNoDueDateOrOverdue
+          - InboxService_GetInboxAsync_OpenThread_ShowsWaitingNotReadyToSign
+          - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
+          - InboxRules_Texts_ToAnswerWaitingAndChip_AreWorded
 
       - id: ReviewCenter-InboxService-RepliesWaiting
         title: >-
@@ -57,8 +127,9 @@ sections:
           The InboxService class shall list as failed checks every review that is not concluded and was created by the
           user and has at least one check that the ballots agree is Fail (the consolidated standing of the submitted
           ballots; the sole ballot of a review with a single slot is included before its hand-in) in a
-          section that applies, with a chip that gives the number of failed checks and a text that says an agreed Fail
-          makes the review reject and a Fail only one reviewer gave is a disagreement to resolve, shall ignore a Fail in
+          section that applies, with a chip that gives the number of failed checks and a text that says the reviewers
+          marked the checks as Fail so far and that, if that stands, the review will be rejected and its reasons must be
+          written down, shall ignore a Fail in
           a section that is marked not applicable, and shall list no failed checks and nothing to sign for a concluded
           review.
         justification: |
@@ -66,12 +137,12 @@ sections:
           the review will end as rejected, and a check of a section that does not apply to the review is not a
           finding. Only what the reviewers have handed in and agree on is a finding: a draft ballot is unfinished work
           (except the sole ballot of a single-slot review, which counts as it is answered), and a check on which the
-          ballots disagree is still to be settled, so neither is a failure yet.
+          ballots disagree is a Disputed row instead, so neither is a failure yet.
         tests:
           - InboxService_GetInboxAsync_FailAnswersInApplicableSections_ShowsFailedChecksWithCount
           - InboxService_GetInboxAsync_FailInNotApplicableSection_IsIgnored
           - InboxRules_FailedAnswers_OnlyFailInApplicableSections_AreFound
-          - InboxService_GetInboxAsync_FailedChecks_TextSaysAgreedFailRejectsAndSingleFailIsDisagreement
+          - InboxService_GetInboxAsync_FailedChecks_TextSaysFailSoFarAndRejectionNeedsReasons
 
       - id: ReviewCenter-InboxService-Updates
         title: >-
@@ -117,14 +188,17 @@ sections:
       - id: ReviewCenter-InboxService-Count
         title: >-
           The InboxService class shall count the reviews that need the action of the user as the number of distinct
-          reviews in the groups to sign, replies waiting and failed checks, so that a review in several groups counts
-          once and an update is not counted, and shall show a review that is in several groups in each of them.
+          reviews in the groups to answer, disputed, ready to sign, replies waiting and failed checks, so that a review
+          in several groups counts once and neither an update nor a review that waits for others is counted, and shall
+          show a review that is in several groups in each of them.
         justification: |
           The number on the home page says how many reviews wait, which is what a person can act on. Counting a review
           twice, or counting information, would inflate it.
         tests:
           - InboxService_CountAsync_EqualsDistinctActionReviews
+          - InboxService_GetInboxAsync_ActionCount_IncludesToAnswerAndDisputedNotWaiting
           - InboxService_GetInboxAsync_ReviewInSeveralSections_AppearsInEach
+          - InboxRules_InboxSections_IsAction_ExcludesWaitingAndUpdates
 
       - id: ReviewCenter-InboxService-Unread
         title: >-

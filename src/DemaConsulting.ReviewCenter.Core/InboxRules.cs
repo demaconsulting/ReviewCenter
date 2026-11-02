@@ -21,6 +21,27 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
+///     The standing of a user in a review for the inbox: which action section the review belongs to.
+/// </summary>
+internal enum InboxStanding
+{
+    /// <summary>The review needs nothing from the user and does not wait on the user's part.</summary>
+    None,
+
+    /// <summary>The user has to hand in the ballot (<see cref="InboxSection.ToAnswer"/>).</summary>
+    ToAnswer,
+
+    /// <summary>The user has to deal with disputed checks (<see cref="InboxSection.Disputed"/>).</summary>
+    Disputed,
+
+    /// <summary>The user can sign now (<see cref="InboxSection.ToSign"/>).</summary>
+    ToSign,
+
+    /// <summary>The user has done their part (<see cref="InboxSection.WaitingForOthers"/>).</summary>
+    Waiting
+}
+
+/// <summary>
 ///     The pure rules of the inbox: which slot needs a signature, which threads wait for an answer, which checks
 ///     failed and which comments are new to a user.
 /// </summary>
@@ -156,6 +177,125 @@ internal static class InboxRules
         }
 
         return waiting;
+    }
+
+    /// <summary>
+    ///     Tells whether a user created a review while the project does not let the author answer its checklist; the
+    ///     same rule as <see cref="ChecklistService"/> applies, worded for the light description the inbox holds.
+    /// </summary>
+    /// <param name="project">The project; <c>null</c> enforces nothing.</param>
+    /// <param name="createdBy">The user name of the creator of the review, or <c>null</c> when none is recorded.</param>
+    /// <param name="username">The user name to test.</param>
+    /// <returns>
+    ///     <c>true</c> when the project requires that the author does not answer and the review was created by the
+    ///     user, compared without regard to case.
+    /// </returns>
+    public static bool AuthorBlocked(Project? project, string? createdBy, string? username)
+    {
+        return project is { RequireNonAuthorChecklistAnswers: true }
+               && !string.IsNullOrEmpty(username)
+               && !string.IsNullOrEmpty(createdBy)
+               && SameUser(createdBy, username);
+    }
+
+    /// <summary>
+    ///     Decides which action section of the inbox a review belongs to for a user, from the facts of the review.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The standings are mutually exclusive, so one review is never both "To answer" and "Ready to sign" for the
+    ///         same user. The order is: a reviewer first hands in the ballot (<see cref="InboxStanding.ToAnswer"/>), then
+    ///         deals with the disputes (<see cref="InboxStanding.Disputed"/>), then signs
+    ///         (<see cref="InboxStanding.ToSign"/>), and otherwise waits (<see cref="InboxStanding.Waiting"/>). It
+    ///         mirrors <see cref="ReviewNextAction.Decide"/>, so the inbox and the status panel of the review say the
+    ///         same thing.
+    ///     </para>
+    ///     <para>
+    ///         Nothing in the result depends on the answers of the other reviewers when <paramref name="hidden"/> is
+    ///         <c>true</c>: the disputes are not looked at, so the row never gives a verdict away.
+    ///     </para>
+    /// </remarks>
+    /// <param name="concluded">Whether the review is concluded; a concluded review has no action.</param>
+    /// <param name="holdsSlot">Whether the user holds a reviewer slot; otherwise the user is the author.</param>
+    /// <param name="hasChecklist">Whether the review has a checklist, and so ballots.</param>
+    /// <param name="authorBlocked">Whether the project forbids the user to answer because the user is the author.</param>
+    /// <param name="ownBallot">The state of the ballot of the slot of the user.</param>
+    /// <param name="hidden">Whether the user may not see the answers of the other reviewers.</param>
+    /// <param name="disputed">The number of disputed checks and sections; only read when not hidden.</param>
+    /// <param name="hasUnsigned">Whether a slot of the user has no current signature.</param>
+    /// <param name="canSign">Whether nothing the user may know of blocks the signature.</param>
+    /// <returns>The standing of the user in the review.</returns>
+    public static InboxStanding ReviewerStanding(
+        bool concluded,
+        bool holdsSlot,
+        bool hasChecklist,
+        bool authorBlocked,
+        BallotState ownBallot,
+        bool hidden,
+        int disputed,
+        bool hasUnsigned,
+        bool canSign)
+    {
+        if (concluded)
+        {
+            return InboxStanding.None;
+        }
+
+        // An author without a slot has nothing to hand in; the disputes are theirs to steer when they may see them
+        if (!holdsSlot)
+        {
+            return hasChecklist && !hidden && disputed > 0 ? InboxStanding.Disputed : InboxStanding.None;
+        }
+
+        // The ballot comes first, and it never looks at anything the other reviewers answered
+        if (hasChecklist && ownBallot != BallotState.Submitted)
+        {
+            return authorBlocked ? InboxStanding.None : InboxStanding.ToAnswer;
+        }
+
+        if (hasChecklist && !hidden && hasUnsigned && disputed > 0)
+        {
+            return InboxStanding.Disputed;
+        }
+
+        return hasUnsigned && canSign ? InboxStanding.ToSign : InboxStanding.Waiting;
+    }
+
+    /// <summary>
+    ///     Words how far a ballot is, for the "To answer" row.
+    /// </summary>
+    /// <param name="progress">The answered and total checks of the ballot of the user.</param>
+    /// <returns>One sentence that ends with what to do.</returns>
+    public static string ToAnswerText(ChecklistProgress progress)
+    {
+        return progress.IsDone
+            ? "All checks are answered. Hand in your ballot."
+            : $"{progress.Answered} of {progress.Total} checks answered. Hand in your ballot when you are done.";
+    }
+
+    /// <summary>
+    ///     Words who a review waits for, for the "Waiting for others" row.
+    /// </summary>
+    /// <param name="names">The people whose signature is missing, in slot order.</param>
+    /// <returns>One sentence naming them.</returns>
+    public static string WaitingForText(IReadOnlyList<string> names)
+    {
+        return $"Waiting for {string.Join(", ", names)}.";
+    }
+
+    /// <summary>
+    ///     Words the chip of the "Waiting for others" row.
+    /// </summary>
+    /// <param name="others">The number of other slots that have no current signature.</param>
+    /// <returns>For example <c>Waiting for 2 reviewers</c>; <c>Open items remain</c> when no other slot is open.</returns>
+    public static string WaitingChip(int others)
+    {
+        return others switch
+        {
+            <= 0 => "Open items remain",
+            1 => "Waiting for 1 reviewer",
+            _ => $"Waiting for {others} reviewers"
+        };
     }
 
     /// <summary>

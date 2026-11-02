@@ -89,9 +89,11 @@ all domain behavior and never access the database.
 
 - *Type*: HTTP `GET` with an interactive server session (the "Mark all as read" button needs the live connection).
 - *Role*: Provider.
-- *Contract*: Shows the reviews that wait for the user in the groups To sign, Replies waiting, Failed checks, and
+- *Contract*: Shows the reviews that wait for the user in the groups To answer, Disputed, Ready to sign, Replies
+  waiting, Failed checks, Waiting for others, and
   Updates, each row with a link to the review, a chip, a New badge when it is unread, and the due date, and a summary
-  line with the number of reviews that need action. The button marks every listed review as seen. A review concluded as
+  line with the number of reviews that need action (Waiting for others and Updates are information and not counted).
+  The button marks every listed review as seen. A review concluded as
   rejected by someone else is listed as an update with a Rejected chip, never as an action.
 - *Constraints*: Needs a signed-in user; a request without a sign-in is challenged. Only reviews of projects the user
   can see are listed.

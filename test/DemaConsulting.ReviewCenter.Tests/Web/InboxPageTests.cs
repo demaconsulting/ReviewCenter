@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using Bunit;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
@@ -70,13 +71,13 @@ public class InboxPageTests : InboxWebTestBase
     }
 
     /// <summary>
-    ///     Test that a signature to give and a reply waiting are shown in their sections, with the review, the chip
-    ///     and a link to the review.
+    ///     Test that a ballot to hand in and a reply waiting are shown in their sections, with the review, the chip and
+    ///     a link to the checklist for the ballot and to the review for the reply.
     /// </summary>
     [Fact]
-    public async Task InboxPage_Render_ToSignAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks()
+    public async Task InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks()
     {
-        // Arrange: ann is a reviewer of r1, asked a question and bob answered
+        // Arrange: ann is a reviewer of r1 who has not started, asked a question and bob answered
         await ArrangeProjectAsync();
         await CreateInboxReviewAsync("r1");
         await AddSlotAsync("r1", "ann");
@@ -87,18 +88,96 @@ public class InboxPageTests : InboxWebTestBase
         var cut = Render<InboxPage>();
 
         // Assert: both sections, in order, each with one row
-        Assert.NotEmpty(cut.FindAll("[data-testid='inbox-section-to-sign']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='inbox-section-to-answer']"));
         Assert.NotEmpty(cut.FindAll("[data-testid='inbox-section-replies-waiting']"));
+        Assert.Empty(cut.FindAll("[data-testid='inbox-section-to-sign']"));
         Assert.Empty(cut.FindAll("[data-testid='inbox-section-failed-checks']"));
         Assert.Empty(cut.FindAll("[data-testid='inbox-section-updates']"));
-        Assert.Equal("Not signed", cut.Find("[data-testid='inbox-chip-1']").TextContent);
+        Assert.Equal("Not started", cut.Find("[data-testid='inbox-chip-1']").TextContent);
         Assert.Equal("1 waiting", cut.Find("[data-testid='inbox-chip-2']").TextContent);
         Assert.Equal("Apollo / r1", cut.Find("[data-testid='inbox-review-1']").TextContent);
         Assert.Equal("Review r1", cut.Find("[data-testid='inbox-link-1']").TextContent);
-        Assert.Equal($"/projects/{ProjectId}/reviews/r1", cut.Find("[data-testid='inbox-link-1']").GetAttribute("href"));
+        Assert.Equal($"/projects/{ProjectId}/reviews/r1/checklist", cut.Find("[data-testid='inbox-link-1']").GetAttribute("href"));
         Assert.Equal($"/projects/{ProjectId}/reviews/r1", cut.Find("[data-testid='inbox-link-2']").GetAttribute("href"));
         Assert.Equal("1 needs your action, 0 updates", cut.Find("[data-testid='inbox-summary']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='inbox-empty']"));
+    }
+
+    /// <summary>
+    ///     Test that the sections for a ballot to hand in, a dispute and a signature to give are shown with their titles
+    ///     and chips, and that the ballot and the dispute link to the checklist.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_NewSections_ShowTitlesChipsAndChecklistLinks()
+    {
+        // Arrange: r1 not started; r2 handed in by both; r3 handed in by both with a different answer
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        await AddSlotAsync("r1", "ann");
+        await CreateInboxReviewAsync("r2");
+        await AddSlotAsync("r2", "ann");
+        await AddSlotAsync("r2", "bob");
+        await AnswerAllAsync("r2", "ann");
+        await AnswerAllAsync("r2", "bob");
+        await CreateInboxReviewAsync("r3");
+        await AddSlotAsync("r3", "ann");
+        await AddSlotAsync("r3", "bob");
+        await AnswerAllAsync("r3", "ann");
+        var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            var outcome = item.Id == first.Id ? ChecklistOutcome.Fail : ChecklistOutcome.Pass;
+            await Checklists.SetAnswerAsync(
+                ProjectId, "r3", item.Id, outcome, outcome == ChecklistOutcome.Pass ? null : "Wrong", ActorOf("bob"), Ct);
+        }
+
+        await Checklists.SubmitBallotAsync(ProjectId, "r3", ActorOf("bob"), Ct);
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the sections in order with their titles
+        Assert.Equal("To answer", cut.Find("[data-testid='inbox-section-to-answer']").TextContent);
+        Assert.Equal("Disputed", cut.Find("[data-testid='inbox-section-disputed']").TextContent);
+        Assert.Equal("Ready to sign", cut.Find("[data-testid='inbox-section-to-sign']").TextContent);
+
+        // Assert: the rows, chips and links
+        Assert.Equal("Not started", cut.Find("[data-testid='inbox-chip-1']").TextContent);
+        Assert.Equal($"/projects/{ProjectId}/reviews/r1/checklist", cut.Find("[data-testid='inbox-link-1']").GetAttribute("href"));
+        Assert.Equal($"/projects/{ProjectId}/reviews/r3/checklist", cut.Find("[data-testid='inbox-link-2']").GetAttribute("href"));
+        Assert.Equal("1 disputed", cut.Find("[data-testid='inbox-chip-2']").TextContent);
+        Assert.Equal($"/projects/{ProjectId}/reviews/r2", cut.Find("[data-testid='inbox-link-3']").GetAttribute("href"));
+        Assert.Equal("Not signed", cut.Find("[data-testid='inbox-chip-3']").TextContent);
+        Assert.Equal("3 need your action, 0 updates", cut.Find("[data-testid='inbox-summary']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a review that waits for the other reviewers is listed for information, with the names of the
+    ///     people waited for, and is not counted as work.
+    /// </summary>
+    [Fact]
+    public async Task InboxPage_Render_WaitingForOthers_NotCountedInSummary()
+    {
+        // Arrange: ann handed in and signed r1; bob has not handed in
+        await ArrangeProjectAsync();
+        await CreateInboxReviewAsync("r1");
+        var annSlot = await AddSlotAsync("r1", "ann");
+        await AddSlotAsync("r1", "bob");
+        await AnswerAllAsync("r1", "ann");
+        await SignSlotAsync("r1", annSlot.Id, "ann");
+        SignInAs("ann", "Ann", false);
+
+        // Act
+        var cut = Render<InboxPage>();
+
+        // Assert: the section is shown, the empty state tells there is no action, the summary counts the waiting
+        Assert.Equal("Waiting for others", cut.Find("[data-testid='inbox-section-waiting-for-others']").TextContent);
+        Assert.Equal("Waiting for 1 reviewer", cut.Find("[data-testid='inbox-chip-1']").TextContent);
+        Assert.Contains("Bob", cut.Find("[data-testid='inbox-detail-1']").TextContent, StringComparison.Ordinal);
+        Assert.Equal($"/projects/{ProjectId}/reviews/r1", cut.Find("[data-testid='inbox-link-1']").GetAttribute("href"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='inbox-empty']"));
+        Assert.Equal("0 need your action, 0 updates, 1 waiting for others", cut.Find("[data-testid='inbox-summary']").TextContent);
     }
 
     /// <summary>
@@ -122,7 +201,7 @@ public class InboxPageTests : InboxWebTestBase
         var second = Render<InboxPage>();
 
         // Assert: the row is still listed, without the marker
-        Assert.Equal("Not signed", second.Find("[data-testid='inbox-chip-1']").TextContent);
+        Assert.Equal("Not started", second.Find("[data-testid='inbox-chip-1']").TextContent);
         Assert.Empty(second.FindAll("[data-testid='inbox-unread-1']"));
     }
 

@@ -77,7 +77,8 @@ outcome is `Rejected` and the review has no conclusion text, which is when the c
 `Blockers`.
 A `SlotStatus` holds the slot identity, its
 number, the primary and alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state,
-and, for a signed slot, the name
+the state of the ballot of the slot (`Ballot`: `NotStarted`, `Draft` or `Submitted`; null for a review without a
+checklist; it is progress, not a verdict, so a masked status keeps it), and, for a signed slot, the name
 of the signer and the signing time. `IsMember` is `false` when the user is no longer a member of the project (a slot
 keeps its assignee after a removal, so the status says who can no longer sign; step 1 of signing refuses such a user);
 the candidates of `ListCandidatesAsync` are members by definition. A member whose role is `Auditor` is never a
@@ -222,7 +223,7 @@ the slots whose primary is blocked and whose alternate is missing or blocked, nu
 and `ReopenRules.StrandedMessage` words the refusal. Every slot counts, not only the ones that were signed by the
 administrator. The check runs after the review is known to be locked and before anything is stored, so a refusal
 records nothing and the review stays concluded. Out of scope: an occupant that is disabled or no longer a member is not
-considered, and the inbox can still list the review under "To sign" for a blocked reopener who shares a slot.
+considered, and the inbox can still list the review under "Ready to sign" for a blocked reopener who shares a slot.
 
 **Rules for slots**:
 

@@ -88,6 +88,12 @@ masked in a review with several slots.
 carries a count of disputed or failed checks. The inbox also leaves the discussions about checks out of the waiting
 threads and out of the count of news in the row of a masked viewer, so that a new hidden discussion does not make the
 row unread. An API token is never the lead, so the creator's full view of the inbox is for a person only.
+What stays visible to a masked viewer is progress, not verdict: how many ballots are handed in out of how many, the
+names of the people who have not handed in (`ReviewProgress.BallotsSubmitted`, `BallotsRequired`,
+`WaitingOnBallots`), the state of each slot's ballot (`SlotStatus.Ballot`), and the inbox rows To answer and Waiting
+for others. `ReviewProgress.IsMasked` tells the page to say that the disputes are not shown yet. The inbox never
+counts the disputes for a masked viewer (the Disputed row is not even decided for such a viewer), and a viewer who
+has not handed in a ballot gets the To answer row, which uses nothing of the other reviewers.
 
 **ThreadService.ListAsync** (with the viewer): For a masked viewer, leave the discussions about checks out of the list.
 When the review vanishes between the thread read and the visibility check, the list fails closed: the discussions

@@ -34,7 +34,7 @@ repository; `RevisionValidator`, the check that a revision name cannot be taken 
 `ReviewProgressService`, the stage, signatures, waiting-on names, blockers, last activity, and overdue state of every
 review of a project, for the project overview and the API list;
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner; and
-`InboxService`, the inbox of a user (the reviews that wait for the user, in four groups, which also serves as the list
+`InboxService`, the inbox of a user (the reviews that wait for the user, in seven groups, which also serves as the list
 of notifications) and the read state that marks what is new;
 `UserImpactService`, the offboarding impact of a user
 (the reviewer slots that still wait for the user and the projects the user alone administers);
@@ -281,13 +281,15 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 
 - *Type*: In-process .NET class.
 - *Role*: Provider.
-- *Contract*: Build the inbox of an actor (the groups to sign, replies waiting, failed checks, and updates, with a
+- *Contract*: Build the inbox of an actor (the groups to answer, disputed, ready to sign, replies waiting, failed
+  checks, waiting for others, and updates, with a
   count of the reviews that need action), count the reviews that need action, read what the actor has seen of a
   review, store it, and mark every review of the inbox as seen. Only reviews of projects the actor can see are
   considered, and an anonymous actor, an unknown user, a disabled user, and a user with a temporary password get an
   empty inbox without an error.
 - *Constraints*: Read state is stored in one row per user and review, never moves back, is not audited, and is not part
-  of the record digest. There is no notification record: the inbox is computed from the review data.
+  of the record digest. There is no notification record: the inbox is computed from the review data. A user who has
+  not handed in the own ballot is never told what the others answered.
 
 **UserImpactService**: The offboarding impact of a user. It is consumed by the Users page (the disable confirmation) and
 by the Members card in a later slice.

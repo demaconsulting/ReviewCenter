@@ -206,10 +206,13 @@ sections:
 
       - id: ReviewCenter-Inbox
         title: >-
-          The tool shall give every signed-in user an inbox of the reviews that wait for them, in four groups: the
-          signatures to give or to give again, the open threads whose last comment is by someone else, the failed
-          checks of the reviews the user created, and, for information, the reviews that were approved or reopened
-          by someone else since the user last looked; shall count the reviews that need action on the home page and on
+          The tool shall give every signed-in user an inbox of the reviews that wait for them, in seven groups: the
+          ballots to hand in, the checks the reviewers answered differently, the signatures to give or to give again,
+          the open threads whose last comment is by someone else, the failed
+          checks of the reviews the user created, and, for information, the reviews that wait for other people and the
+          reviews that were approved or reopened
+          by someone else since the user last looked; shall never show a user who has not handed in the own ballot what
+          the others answered, shall count the reviews that need action on the home page and on
           an Inbox tab of the header,
           mark what is new since the last visit, in the inbox and in the comments of a review, let the user mark all
           as read, show only the reviews of projects the user may see and offer a signature or a reply only to a user

@@ -62,9 +62,10 @@ sections:
         title: >-
           The SigningService, ReviewProgressService, and InboxService classes shall, for a viewer who may not see the
           others, give no number or word that reveals a dispute, a failed check, or the provisional outcome (no
-          disputed or failed count in a blocker, a progress line, or an inbox row, no outcome, and no conclusion text),
-          shall say in one fixed sentence that the standing is hidden until the viewer hands in their own ballot, shall
-          not count a discussion about a check as news in an inbox row of such a viewer, and
+          disputed or failed count in a blocker, a progress line, or an inbox row, no disputed row, no outcome, and no
+          conclusion text), shall give the same ballot progress (who has handed in, not what was answered) to every
+          viewer, shall say in one fixed sentence that the standing is hidden until the viewer hands in their own
+          ballot, shall not count a discussion about a check as news in an inbox row of such a viewer, and
           shall give the same texts for a list of reviews as for a single review.
         justification: |
           A count of disputed checks tells a reviewer that somebody answered differently, and where, which is exactly
@@ -77,9 +78,12 @@ sections:
           - SigningService_GetApprovals_MaskedViewer_MatchesSingleRead
           - SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch
           - ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts
+          - ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked
+          - SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState
           - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
           - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer
           - InboxService_GetInbox_HiddenCheckThread_DoesNotMakeRowUnreadForMaskedViewer
+          - InboxService_GetInboxAsync_SectionMatchesReviewStatusNextAction_ForAllStandings
 
       - id: ReviewCenter-BallotVisibility-Discussions
         title: >-

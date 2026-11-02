@@ -364,28 +364,40 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 
 | Group | A review is listed when | Needs action |
 | ----- | ----------------------- | ------------ |
-| To sign | You are primary or alternate of a slot that is not signed or must be signed again; not concluded | Yes |
+| To answer | You hold a slot of a review with a checklist and have not handed in your ballot; not concluded | Yes |
+| Disputed | You handed in, you may see the other ballots, and some checks or sections are disputed | Yes |
+| Ready to sign | You handed in, nothing blocks the signature, and a slot of yours needs signing | Yes |
 | Replies waiting | Open thread ends with another's comment; you hold a slot and wrote in it, or authored it | Yes |
 | Failed checks | You authored the review, it is not concluded, and the ballots agree a check is Fail | Yes |
+| Waiting for others | You hold a slot, did your part, and the review waits for other reviewers or open items | No |
 | Updates | Someone else concluded (approved or rejected) or reopened the review after you last saw it | No |
 
-- Only members who may contribute are given To sign and Replies waiting; an auditor gets neither. A user who is
-  disabled, has a temporary password, or is not a known user gets an empty inbox.
-- A failed-checks entry reads "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is
-  a disagreement to resolve."; the chip of an update is
+- Only members who may contribute are given the groups for a slot and Replies waiting; an auditor gets none of them. A
+  user who is disabled, has a temporary password, or is not a known user gets an empty inbox.
+- For one review you are in at most one of To answer, Disputed, Ready to sign and Waiting for others, the same as the
+  next step of the review page. A slot holder whom the project forbids to answer as the author of the review gets no
+  To answer row. A review without a checklist has no ballots and no To answer row.
+- Masking: while you have not handed in your own ballot (and are not the lead, an administrator or an auditor, and the
+  review has several slots) the inbox says nothing about how the others answered: no Disputed row, no count of
+  disputes, no failed-checks row, and no discussions about checks. Who has not handed in is not hidden.
+- A failed-checks entry reads "Reviewers marked N checks as Fail so far. If that stands, the review will be rejected
+  and its reasons must be written down."; the chip of an update is
   "Approved", "Rejected", or "Reopened".
 - A replies-waiting entry names the kinds of the threads that wait, for example "Waiting for your reply: 1 open finding,
   2 open questions." The counts of the review page and of the progress lists use the same words: a **Question** is
   conversation (chat), a **Finding** goes into the signed report with its resolution note, and a thread of either kind
   that is open blocks signing.
-- The count on the home page is the number of distinct reviews in the first three groups, so a review in two groups
-  counts once. Updates are never counted. The badge of the Inbox tab in the header shows the same count, read when a
+- The count on the home page is the number of distinct reviews in the first five groups, so a review in two groups
+  counts once. Waiting for others and Updates are never counted. The badge of the Inbox tab in the header shows the
+  same count, read when a
   page is opened and kept for 30 seconds for each user, so it can be up to 30 seconds behind; it is hidden at zero and
   shown as 99+ above ninety-nine.
 - A comment is unread when it is by someone else and newer than the last comment you saw in that review. Your own
-  comments are never unread, whatever the case of your user name. A review to sign is marked New again when someone
+  comments are never unread, whatever the case of your user name. A Ready to sign row is marked New again when someone
   else signs it, hands in a ballot or (in a review with one slot) answers a check, writes a comment, or reopens it
-  after you last saw it. Another reviewer's draft ballot never marks it.
+  after you last saw it. A Disputed row is marked New again when another reviewer hands in a ballot. A To answer row is
+  New until you first open the review, and a Waiting for others row is never New. Another reviewer's draft ballot never
+  marks a row.
 - The read state is one row for each user and review, in the table `ReviewUserStates`, with the last time and the
   highest comment seen. It only moves forward, it is removed with its review or user, and it is neither audited nor
   part of the record digest.

@@ -216,6 +216,16 @@ public sealed class ReviewProgressService
                 || approval.ConclusionRequired
                 || approval.MissingChecklist);
 
+        // Ballots are progress, not a verdict: the counts and the names of who has not handed in are the same for every
+        // viewer, while the disputes and failures were already taken out of a masked approval
+        var ballotsRequired = approval.MissingChecklist ? 0 : approval.Slots.Count;
+        var ballotsSubmitted = ballotsRequired == 0
+            ? 0
+            : approval.Slots.Count(s => s.Ballot == BallotState.Submitted);
+        var waitingOnBallots = approval.IsConcluded || ballotsRequired == 0
+            ? []
+            : WaitingOn(approval.Slots.Where(s => s.Ballot != BallotState.Submitted));
+
         return new ReviewProgress(
             review.Id,
             review.Title,
@@ -223,7 +233,7 @@ public sealed class ReviewProgressService
             approval.Slots.Count,
             approval.Slots.Count(s => s.State == SlotSignatureState.Signed),
             approval.Slots.Count(s => s.State == SlotSignatureState.OutOfDate),
-            approval.IsConcluded ? [] : WaitingOn(approval.Slots),
+            approval.IsConcluded ? [] : WaitingOn(approval.Slots.Where(s => s.State != SlotSignatureState.Signed)),
             approval.OpenThreads,
             approval.UnansweredChecks,
             approval.FailedChecks,
@@ -239,22 +249,26 @@ public sealed class ReviewProgressService
             approval.ConclusionRequired,
             approval.DisputedChecks,
             approval.OpenQuestions,
-            approval.OpenFindings);
+            approval.OpenFindings,
+            ballotsSubmitted,
+            ballotsRequired,
+            waitingOnBallots,
+            approval.IsMasked);
     }
 
     /// <summary>
-    ///     Names the people whose signature is missing.
+    ///     Names the people behind some slots.
     /// </summary>
-    /// <param name="slots">The slots of the review.</param>
+    /// <param name="slots">The slots whose people are wanted, in slot order.</param>
     /// <returns>
-    ///     For each slot that is not signed or is out of date, the primary reviewer and the alternate when that is
-    ///     another person; each person once, in slot order.
+    ///     For each slot, the primary reviewer and the alternate when that is another person; each person once, in
+    ///     slot order.
     /// </returns>
-    private static List<string> WaitingOn(IReadOnlyList<SlotStatus> slots)
+    private static List<string> WaitingOn(IEnumerable<SlotStatus> slots)
     {
         var names = new List<string>();
         var seen = new HashSet<int>();
-        foreach (var slot in slots.Where(s => s.State != SlotSignatureState.Signed))
+        foreach (var slot in slots)
         {
             Add(slot.Primary);
             if (slot.Alternate is not null && slot.Alternate.UserId != slot.Primary.UserId)

@@ -4,11 +4,11 @@
 
 #### Purpose
 
-`InboxService` builds the inbox of a user: the reviews that wait for the user, in four groups, and the number of
+`InboxService` builds the inbox of a user: the reviews that wait for the user, in seven groups, and the number of
 reviews that need action. It also keeps what the user has seen of each review, which marks new comments and new
 changes. The inbox is also the notification list. There is no notification record: every row is computed from the
 review data when the inbox is read, and the single `ReviewUserState` row of a user and a review says what is new. The
-pure rules (which slot needs a signature, which threads wait for whom, which checks failed in the consolidated
+pure rules (where a reviewer stands, which threads wait for whom, which checks failed in the consolidated
 checklist, which comment is unread) are in the internal
 helper `InboxRules`, so they can be tested without a store. The unit also holds the domain types `InboxItem`,
 `InboxView`, `InboxSection`, `InboxCandidate`, `InboxSeenMark`, `ReviewUserState`, and the interface `IInboxStore`.
@@ -18,12 +18,13 @@ helper `InboxRules`, so they can be tested without a store. The unit also holds 
 The unit holds no state of its own beyond its injected stores, the access rules, and the clock. It is safe for
 concurrent use as long as the stores are.
 
-**InboxSection**: `ToSign`, `RepliesWaiting`, `FailedChecks` (these three need action and are counted), and `Updates`
-(information only).
+**InboxSection**: `ToAnswer`, `Disputed`, `ToSign`, `RepliesWaiting`, `FailedChecks` (these five need action and are
+counted), `WaitingForOthers` and `Updates` (information only), in the order in which the page shows them. The helper
+`InboxSections.IsAction` is the one place that says which sections are action, so the badge and the page agree.
 
 **InboxItem**: Section, project, project name, review identifier, title, a short chip, an unread flag, the due date, an
 overdue flag, and an optional detail sentence. **InboxView**: the items ordered by section, then project name, then
-review identifier, and `ActionCount`, the number of distinct reviews in the three action groups.
+review identifier, and `ActionCount`, the number of distinct reviews in the five action groups.
 
 **ReviewUserState**: user, project, review, `LastSeenCommentId` (the highest comment identity the user has seen; zero
 for none), and `LastSeenAt`, the time read before the review was loaded when the user last saw it. Comment identities
@@ -41,12 +42,28 @@ are assigned in posting order and never reused, so one integer per review tells 
   projects, and read the read-state rows of the user. For each such review load one snapshot, because the conclusion
   depends on the record digest, on the ballots, and on the open threads (a review is concluded, as approved or as
   rejected, only when every slot has handed in its ballot, the ballots agree on the outcome, every slot is signed for
-  the current record with that outcome and no thread is open; `ReviewLock.IsConcluded`), and add rows by these rules:
-  - *To sign*: the user may contribute and is a member, the review is not concluded, and a slot of the user (primary
-    or alternate) is not signed. The row does not wait for the ballot of the slot: it is listed whether or not the
-    slot has handed its ballot in, and the review page says what blocks the signature. The chip is "Not signed", or
-    "The review changed, sign again" when every such slot has a
+  the current record with that outcome and no thread is open; `ReviewLock.IsConcluded`), and add rows by these rules.
+  A review that is not concluded gets at most one of the four *standing* rows (To answer, Disputed, Ready to sign,
+  Waiting for others) for the user, decided by `InboxRules.ReviewerStanding`, which mirrors `ReviewNextAction.Decide`,
+  so the inbox and the status panel of the review say the same. A user who may not contribute, or a slot holder who is
+  not a member, gets no standing row.
+  - *To answer*: the user holds a slot, the review has a checklist, the project does not forbid the author to answer
+    (`InboxRules.AuthorBlocked`, the rule of `ChecklistService`), and the ballot of the slot is not handed in. The chip
+    is "Not started" or "Draft" and the detail sentence tells how many checks are answered. The row uses nothing of
+    the other reviewers, so it is the same whatever they answered. The ballot is the one of the slot of the user with
+    the lowest identity. A slot holder who is blocked as author gets no row.
+  - *Disputed*: the user has handed in the ballot, may see the other ballots (see `BallotVisibility`), and some
+    checks or sections are disputed. The chip is "{n} disputed". A viewer who may not see the other ballots is never
+    in this standing and the dispute count is not even read for such a viewer, so no dispute can leak.
+  - *Ready to sign* (`ToSign`): the user holds a slot without a current signature, has handed in the ballot, and
+    nothing blocks the signature (`SigningService.CanSignAfter`, including no open thread and no dispute). The chip
+    is "Not signed", or "The review changed, sign again" when every such slot has a
     signature that no longer covers the record. The state of a slot is the one the approval of the review uses.
+  - *Waiting for others*: the user holds a slot, has done their part (handed in the ballot, and cannot sign yet or has
+    signed). The chip is "Waiting for 1 reviewer", "Waiting for n reviewers" or "Open items remain", and the detail
+    sentence names the people whose slots are not signed ("Waiting for Alice, Bob."), or says that open items remain,
+    or that nothing is left to do. Who has not handed in is progress and not a verdict, so the names are shown to every
+    viewer. The row is information: it is never unread and never counted.
   - *Replies waiting*: the user may contribute, the review is not concluded, and there is an open thread whose last
     comment is by someone else (a comment of the system counts as someone else) in which the user, holding a slot of
     the review, wrote a comment, or of whose review the user is the creator. The chip gives the number of such threads,
@@ -57,10 +74,11 @@ are assigned in posting order and never reused, so one integer per review tells 
   - *Failed checks*: the user created the review, it is not concluded, and its consolidated checklist (the standing
     of the submitted ballots, see `BallotProjection`) has checks that the ballots agree are Fail in a section that
     applies. A check that the ballots dispute is not a failed check, a draft ballot counts for nothing, and the one
-    ballot of a review with a single slot counts even before the hand-in, as everywhere else. The chip gives the number,
-    and the detail sentence is "A Fail the reviewers agree on makes the review reject; a Fail only one reviewer gave is
-    a disagreement to resolve." because a Fail answer no longer blocks signing but, when the ballots agree on it, leads
-    to a rejected outcome. A concluded review has no failed-checks row and no to-sign row.
+    ballot of a review with a single slot counts even before the hand-in, as everywhere else. The chip gives the
+    number, and the detail sentence is "Reviewers marked n checks as Fail so far. If that stands, the review will be
+    rejected and its reasons must be written down." because a Fail answer no longer blocks signing but, when the
+    ballots agree on it, leads to a rejected outcome. A concluded review has no failed-checks row and no standing
+    row. A creator who sees nothing of the other ballots gets no failed-checks row.
   - *Updates*: the review is concluded and its completing signature (the latest of the current digest) is by someone
     else and newer than `LastSeenAt`, or it was reopened by someone else after that time. The chip is "Approved"
     (`ApprovedChip`) for an approved review and "Rejected" (`RejectedChip`) for a review concluded as rejected, so a
@@ -68,10 +86,13 @@ are assigned in posting order and never reused, so one integer per review tells 
     own is no news. Updates are always unread, carry no due mark, and are not counted as action.
 
   The due date is shown on the action rows, as overdue when it is past and the review is not concluded.
-- *Unread*: a row is unread when the user has no read-state row, or the reason is newer than the row: a comment of
+- *Unread*: a row is unread when the user has no read-state row, or the reason is newer than the row. A To answer row
+  is unread only without a read-state row. A Disputed row is unread without a read-state row or when another
+  reviewer handed in a ballot after `LastSeenAt`; comments do not count. A Waiting for others row is never unread. A
+  Replies waiting or Failed checks row is unread for a comment of
   someone else with a higher identity than `LastSeenCommentId`, a signature or a reopening after `LastSeenAt`, or a
-  Fail answered by someone else after `LastSeenAt` (the answerer of the representative row of the agreed Fail). A To
-  sign row follows the same rule, so it is unread when
+  Fail answered by someone else after `LastSeenAt` (the answerer of the representative row of the agreed Fail). A
+  Ready to sign row follows the same rule, so it is unread when
   someone else signed, answered a check in a submitted ballot after `LastSeenAt`, wrote a comment newer than
   `LastSeenCommentId`, or reopened the review after `LastSeenAt`; the missing row is not the only reason. The draft
   ballots of other slots are never news, because they are not part of the record yet; the ballot of the one slot of a
@@ -112,6 +133,9 @@ enters the record digest.
 - **IReviewStore** — the snapshot of a review: threads, ballots, signatures, reopenings.
 - **BallotVisibility** — decides whether the viewer may see the dispute and failure texts of a review; the inbox of a
   viewer who may not holds none.
+- **ReviewNextAction**, **SigningService** — the standing of a reviewer is decided by the same rules as the status
+  panel (`InboxRules.ReviewerStanding` mirrors `ReviewNextAction.Decide`; `SigningService.CanSignAfter` tells
+  whether nothing blocks the signature), so the inbox and the review page agree.
 - **IProjectAccess** — decides which projects the user may see and whether the user may contribute.
 - **IUserStore** — finds the user of an actor.
 - **RecordDigest**, **ReviewLock** and **BallotProjection** — the current digest and the conclusion

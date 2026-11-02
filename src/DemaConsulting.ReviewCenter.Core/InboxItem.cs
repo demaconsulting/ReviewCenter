@@ -24,12 +24,26 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The groups of the inbox, in the order in which the page shows them.
 /// </summary>
 /// <remarks>
-///     The first three need the user's action and are counted; <see cref="Updates"/> only informs.
+///     <see cref="ToAnswer"/>, <see cref="Disputed"/>, <see cref="ToSign"/>, <see cref="RepliesWaiting"/> and
+///     <see cref="FailedChecks"/> need the user's action and are counted; <see cref="WaitingForOthers"/> and
+///     <see cref="Updates"/> only inform. The numeric values are not stored anywhere; the order is the display order.
 /// </remarks>
 public enum InboxSection
 {
     /// <summary>
-    ///     The user is a reviewer of a slot that has no current signature.
+    ///     The user holds a reviewer slot and has not handed in the ballot of the checklist yet (none or a draft).
+    /// </summary>
+    ToAnswer,
+
+    /// <summary>
+    ///     The user has handed in a ballot, may see the other ballots, and some of the checks or sections they answered
+    ///     differently are still disputed. Never listed for a user who may not see the other ballots yet.
+    /// </summary>
+    Disputed,
+
+    /// <summary>
+    ///     The user is a reviewer of a slot that has no current signature, has handed in the ballot, and nothing blocks
+    ///     the signature (shown as "Ready to sign").
     /// </summary>
     ToSign,
 
@@ -44,10 +58,35 @@ public enum InboxSection
     FailedChecks,
 
     /// <summary>
+    ///     The user holds a reviewer slot, has done their part (the ballot is handed in) and cannot sign yet, or has
+    ///     signed; the review waits for other people or for open items. For information, not counted as work.
+    /// </summary>
+    WaitingForOthers,
+
+    /// <summary>
     ///     A review of the user was approved or reopened by someone else since the user last looked; this section
     ///     is for information and is not counted as work.
     /// </summary>
     Updates
+}
+
+/// <summary>
+///     Tells which inbox sections need the action of the user.
+/// </summary>
+/// <remarks>
+///     One place decides it, so the number in the navigation badge and the sections of the page cannot differ.
+/// </remarks>
+internal static class InboxSections
+{
+    /// <summary>
+    ///     Tells whether a section is work for the user.
+    /// </summary>
+    /// <param name="section">The section.</param>
+    /// <returns><c>false</c> for <see cref="InboxSection.WaitingForOthers"/> and <see cref="InboxSection.Updates"/>.</returns>
+    public static bool IsAction(InboxSection section)
+    {
+        return section is not (InboxSection.WaitingForOthers or InboxSection.Updates);
+    }
 }
 
 /// <summary>
@@ -87,9 +126,10 @@ public sealed record InboxItem(
 /// </remarks>
 /// <param name="Items">The rows ordered by section, then by project name and review identifier.</param>
 /// <param name="ActionCount">
-///     The number of distinct reviews with a row in <see cref="InboxSection.ToSign"/>,
-///     <see cref="InboxSection.RepliesWaiting"/> or <see cref="InboxSection.FailedChecks"/>; a review in several of
-///     them counts once, and <see cref="InboxSection.Updates"/> never counts.
+///     The number of distinct reviews with a row in <see cref="InboxSection.ToAnswer"/>,
+///     <see cref="InboxSection.Disputed"/>, <see cref="InboxSection.ToSign"/>, <see cref="InboxSection.RepliesWaiting"/>
+///     or <see cref="InboxSection.FailedChecks"/>; a review in several of them counts once, and
+///     <see cref="InboxSection.WaitingForOthers"/> and <see cref="InboxSection.Updates"/> never count.
 /// </param>
 public sealed record InboxView(IReadOnlyList<InboxItem> Items, int ActionCount)
 {

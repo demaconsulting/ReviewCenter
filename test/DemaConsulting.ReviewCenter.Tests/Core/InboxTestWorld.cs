@@ -251,6 +251,41 @@ internal sealed class InboxTestWorld
     }
 
     /// <summary>
+    ///     Lets a reviewer, who must hold a slot, answer every check of the own ballot and hand it in.
+    /// </summary>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="by">The user name of the reviewer.</param>
+    /// <param name="failFirstCheck">Whether the first check of the first section is answered Fail, not Pass.</param>
+    /// <returns>A task that completes when the ballot is handed in.</returns>
+    public async Task SubmitBallotAsync(string reviewId, string by, bool failFirstCheck = false)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = ActorOf(by);
+        await AuditTestExtensions.AnswerAllAsync(Checklists, ProjectId, reviewId, actor, cancellationToken);
+        if (failFirstCheck)
+        {
+            var item = DefaultChecklist.Current.Sections[0].Items[0];
+            await Checklists.SetAnswerAsync(
+                ProjectId, reviewId, item.Id, ChecklistOutcome.Fail, "It is wrong", actor, cancellationToken);
+        }
+
+        await Checklists.SubmitBallotAsync(ProjectId, reviewId, actor, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Lets a reviewer, who must hold a slot, start the own ballot: one check is answered, the ballot stays a draft.
+    /// </summary>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="by">The user name of the reviewer.</param>
+    /// <returns>A task that completes when the answer is stored.</returns>
+    public async Task StartBallotAsync(string reviewId, string by)
+    {
+        var item = DefaultChecklist.Current.Sections[0].Items[0];
+        await Checklists.SetAnswerAsync(
+            ProjectId, reviewId, item.Id, ChecklistOutcome.Pass, null, ActorOf(by), TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
     ///     Adds a reviewer slot; when the review is marked answered by <see cref="AnswerAllAsync"/>, the primary
     ///     reviewer of the slot answers every check Pass and hands the ballot in.
     /// </summary>

@@ -159,6 +159,12 @@ are protected by the password alone), and that the changes are audited, never th
 `two-factor-1.png`, of the card with the factor on. The Account page links to it (see the `AccountPage` design), and
 the Reviewers and signing topic (`HelpSigningPage`) mentions the code.
 
+**Inbox topic** (`HelpInboxPage`, slug `inbox`, title "Your inbox"): The second topic, after Getting started. It
+explains, in static text, the seven groups of the inbox (To answer, Disputed, Ready to sign, Replies waiting, Failed
+checks, Waiting for others, and Updates), which of them are counted as work, the New marker, Mark all as read, that a
+concluded review needs no action, that only reviews of projects the user is a member of are listed, and that a
+reviewer who has not handed in the own ballot never sees how the others answered or whether anything is disputed.
+
 **Evidence settings topic** (`HelpEvidenceSettingsPage`, slug `evidence-settings`, title "Evidence settings"): The
 topic after Two-factor sign-in. It explains, in static text, that only a project admin or a system
 administrator can see and change the evidence settings, from the "Evidence settings" button of the project page, and

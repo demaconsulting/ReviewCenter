@@ -322,8 +322,10 @@ enrolled user needs the password and a fresh code, which is tested by
 reported by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`. The challenge of the sign-in is
 verified by the unit tests of `TotpChallengeStore`.
 
-**Inbox**: The unit tests of `InboxService` verify the subsystem requirement for the inbox. The groups To sign,
-Replies waiting, Failed checks, and Updates, the count of the distinct reviews that need action, and the unread rules
+**Inbox**: The unit tests of `InboxService` verify the subsystem requirement for the inbox. The groups To answer,
+Disputed, Ready to sign, Replies waiting, Failed checks, Waiting for others, and Updates, the rule that a reviewer
+who has not handed in a ballot is never shown a dispute, the count of the distinct reviews that need action, and the
+unread rules
 are tested over in-memory stores, and the whole path over the real services is tested by
 `CoreSubsystem_InboxWorkflow_ValidInput_ListsActionItemsAndCounts`. The rules class is tested by `InboxRules`.
 

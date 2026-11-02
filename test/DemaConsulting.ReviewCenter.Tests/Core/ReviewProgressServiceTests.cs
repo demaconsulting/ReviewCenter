@@ -555,6 +555,162 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
+    ///     Test that the ballot counts are the slots that handed in a ballot of the slots the review has, and that the
+    ///     people who have not handed in are named, in slot order.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal()
+    {
+        // Arrange: three slots, only reviewer1 hands in
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AddSlotAsync(world, "rev-1", "reviewer1");
+        await AddSlotAsync(world, "rev-1", "reviewer2");
+        await AddSlotAsync(world, "rev-1", "member");
+        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, "rev-1", _reviewerOne, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, "rev-1", _reviewerOne, cancellationToken);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+
+        // Assert
+        Assert.Equal((1, 3), (progress.BallotsSubmitted, progress.BallotsRequired));
+        Assert.Equal(["reviewer2", "member"], progress.WaitingOnBallots);
+        Assert.False(progress.IsMasked);
+    }
+
+    /// <summary>
+    ///     Test that a person who has not handed in and whose account is disabled is named with the disabled marker.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix()
+    {
+        // Arrange: two slots nobody handed in for; reviewer2 is disabled
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AddSlotAsync(world, "rev-1", "reviewer1");
+        await AddSlotAsync(world, "rev-1", "reviewer2");
+        await world.Users.SetEnabledAsync("reviewer2", false, cancellationToken);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+
+        // Assert
+        Assert.Equal(["reviewer1", "reviewer2" + ReviewProgressService.DisabledSuffix], progress.WaitingOnBallots);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who has not handed in sees how many ballots are in and who is missing, but no dispute and
+    ///     no failed check, and that the progress says it is masked; the administrator sees the dispute.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked()
+    {
+        // Arrange: reviewer1 and member handed in and disagree on the first check; reviewer2 has not handed in
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AddSlotAsync(world, "rev-1", "reviewer1");
+        await AddSlotAsync(world, "rev-1", "reviewer2");
+        await AddSlotAsync(world, "rev-1", "member");
+        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, "rev-1", _reviewerOne, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, "rev-1", _reviewerOne, cancellationToken);
+        await AuditTestExtensions.AnswerAllAsync(world.Checklists, world.ProjectId, "rev-1", _member, cancellationToken);
+        var first = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, "rev-1", first.Id, ChecklistOutcome.Fail, "Wrong.", _member, cancellationToken);
+        await world.Checklists.SubmitBallotAsync(world.ProjectId, "rev-1", _member, cancellationToken);
+        var hidden = new Actor("reviewer2", "reviewer2");
+
+        // Act
+        var seenByHidden = Assert.Single(
+            await world.Progress.GetProgressAsync(hidden, world.ProjectId, cancellationToken), p => p.ReviewId == "rev-1");
+        var seenByAdmin = await ProgressOfAsync(world, "rev-1");
+
+        // Assert: the hidden viewer sees progress only
+        Assert.True(seenByHidden.IsMasked);
+        Assert.Equal((2, 3), (seenByHidden.BallotsSubmitted, seenByHidden.BallotsRequired));
+        Assert.Equal(["reviewer2"], seenByHidden.WaitingOnBallots);
+        Assert.Equal((0, 0), (seenByHidden.DisputedChecks, seenByHidden.FailedChecks));
+
+        // Assert: the administrator sees the dispute
+        Assert.False(seenByAdmin.IsMasked);
+        Assert.Equal(1, seenByAdmin.DisputedChecks);
+        Assert.Equal((2, 3), (seenByAdmin.BallotsSubmitted, seenByAdmin.BallotsRequired));
+    }
+
+    /// <summary>
+    ///     Test that a concluded review has no one left to wait for.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots()
+    {
+        // Arrange: both slots handed in and signed
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AnswerAllAsync(world, "rev-1");
+        var first = await AddSlotAsync(world, "rev-1", "reviewer1");
+        var second = await AddSlotAsync(world, "rev-1", "reviewer2");
+        await SignAsync(world, "rev-1", first, _reviewerOne);
+        await SignAsync(world, "rev-1", second, new Actor("reviewer2", "reviewer2"));
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+
+        // Assert
+        Assert.Equal(ReviewStage.Approved, progress.Stage);
+        Assert.Equal((2, 2), (progress.BallotsSubmitted, progress.BallotsRequired));
+        Assert.Empty(progress.WaitingOnBallots!);
+    }
+
+    /// <summary>
+    ///     Test that a review with one slot whose ballot is handed in shows one of one.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne()
+    {
+        // Arrange
+        var world = await WorldAsync();
+        await CreateReviewAsync(world, "rev-1");
+        await AnswerAllAsync(world, "rev-1");
+        await AddSlotAsync(world, "rev-1", "reviewer1");
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-1");
+
+        // Assert
+        Assert.Equal((1, 1), (progress.BallotsSubmitted, progress.BallotsRequired));
+        Assert.Empty(progress.WaitingOnBallots!);
+    }
+
+    /// <summary>
+    ///     Test that a review without a checklist has no ballots, whatever slots it has.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired()
+    {
+        // Arrange: a stored review without a checklist that has a slot
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        await world.Store.AddReviewAsync(
+            new Review { ProjectId = world.ProjectId, Id = "rev-none", Title = "No checklist", Created = _now },
+            cancellationToken);
+        await world.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = world.ProjectId, ReviewId = "rev-none", PrimaryUserId = world.Ids["reviewer1"] },
+            _ => AuditTestExtensions.Draft(),
+            cancellationToken);
+
+        // Act
+        var progress = await ProgressOfAsync(world, "rev-none");
+
+        // Assert
+        Assert.Equal((0, 0), (progress.BallotsSubmitted, progress.BallotsRequired));
+        Assert.Empty(progress.WaitingOnBallots!);
+    }
+
+    /// <summary>
     ///     Test that a stored review without a checklist is blocked and flagged as having no checklist, while a review
     ///     with a checklist and no blockers is neither.
     /// </summary>

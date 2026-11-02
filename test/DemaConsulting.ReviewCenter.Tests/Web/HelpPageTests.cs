@@ -406,16 +406,21 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Equal("Your inbox", page.Find("h1").TextContent);
         Assert.Equal("/inbox", page.Find("[data-testid='help-inbox-link']").GetAttribute("href"));
 
-        // Assert: the four groups, the marker, mark all as read, and that updates are not work
-        Assert.Contains("<strong>To sign</strong>", text, StringComparison.Ordinal);
+        // Assert: the seven groups, the marker, mark all as read, and that updates are not work
+        Assert.Contains("<strong>To answer</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Disputed</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Ready to sign</strong>", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("<strong>To sign</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Replies waiting</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Failed checks</strong>", text, StringComparison.Ordinal);
-        Assert.Contains("makes the review reject", text, StringComparison.Ordinal);
+        Assert.Contains("the review will be rejected", text, StringComparison.Ordinal);
         Assert.DoesNotContain("unless the answers change", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Waiting for others</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Updates</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>New</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>Mark all as read</strong>", text, StringComparison.Ordinal);
         Assert.Contains("not counted as work", text, StringComparison.Ordinal);
+        Assert.Contains("never shows how the others answered", text, StringComparison.Ordinal);
         AssertNoAnchorLinks(page);
     }
 

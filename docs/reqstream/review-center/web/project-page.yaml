@@ -735,3 +735,17 @@ sections:
           the reviewers differ.
         tests:
           - ProjectPage_HiddenViewer_ShowsNoDisputedCountAsBlocker
+
+      - id: ReviewCenter-ProjectPage-Ballots
+        title: >-
+          The ProjectPage unit shall show for a review with several reviewer slots how many ballots were handed in of
+          how many the review needs, and the names of the people whose ballot is missing, only a dash for a review with
+          fewer slots, the same counts and names to every viewer, and, for a viewer who has not handed in their own
+          ballot in some review, the note that some details are hidden until they hand it in.
+        justification: |
+          A lead who chases a review needs to see how many ballots are still missing and whose they are, and a
+          reviewer must be told why the dispute counts are not shown instead of reading their absence as agreement. That
+          a ballot is in is progress and no verdict, so it can be shown to all.
+        tests:
+          - ProjectPage_Render_Ballots_ShowsSubmittedOfTotalAndNames
+          - ProjectPage_HiddenViewer_ShowsBallotCountsAndMaskedNote

@@ -92,6 +92,23 @@ public enum ReviewStage
 /// </param>
 /// <param name="OpenQuestions">The number of open threads that are Questions (chat).</param>
 /// <param name="OpenFindings">The number of open threads that are Findings (part of the report).</param>
+/// <param name="BallotsSubmitted">
+///     The number of slots whose ballot is handed in; zero when <paramref name="BallotsRequired"/> is zero. This is
+///     progress, not a verdict, so it is the same for every viewer (see <see cref="BallotVisibility"/>).
+/// </param>
+/// <param name="BallotsRequired">
+///     The number of ballots the review needs: one per reviewer slot; zero for a review without reviewer slots or
+///     without a checklist, which has no ballots.
+/// </param>
+/// <param name="WaitingOnBallots">
+///     The display names of the people who have not handed in their ballot (see <paramref name="WaitingOn"/> for how
+///     the names are chosen); <c>null</c> or empty when every ballot is in, the review is concluded or it has no
+///     ballots. Who has not handed in is progress, not a verdict, so it is shown to every viewer.
+/// </param>
+/// <param name="IsMasked">
+///     <c>true</c> when the viewer may not see the answers of the other reviewers yet, so the disputed and failed
+///     checks, the outcome and the conclusion requirement are left out; the overview then says so.
+/// </param>
 public sealed record ReviewProgress(
     string ReviewId,
     string Title,
@@ -115,7 +132,11 @@ public sealed record ReviewProgress(
     bool ConclusionRequired = false,
     int DisputedChecks = 0,
     int OpenQuestions = 0,
-    int OpenFindings = 0)
+    int OpenFindings = 0,
+    int BallotsSubmitted = 0,
+    int BallotsRequired = 0,
+    IReadOnlyList<string>? WaitingOnBallots = null,
+    bool IsMasked = false)
 {
     /// <summary>
     ///     Gets a value indicating whether the review is concluded as approved.

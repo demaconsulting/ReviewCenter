@@ -804,6 +804,7 @@ sections:
           - ReviewCenter-ChecklistPage-AssignMe
           - ReviewCenter-ReviewPage-BallotMasking
           - ReviewCenter-ProjectPage-BallotMasking
+          - ReviewCenter-ProjectPage-Ballots
           - ReviewCenter-HistoryPage-BallotMasking
         tests:
           - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
@@ -836,7 +837,8 @@ sections:
       - id: ReviewCenter-Web-Inbox
         title: >-
           The Web subsystem shall give a signed-in user an inbox page that lists the reviews that wait for the user in
-          four groups with a summary, a chip and a New badge on each item, and a button to mark all as read, show the
+          seven groups (to answer, disputed, ready to sign, replies waiting, failed checks, waiting for others and
+          updates) with a summary, a chip and a New badge on each item, and a button to mark all as read, show the
           number of reviews that need action on the home page and on an Inbox tab of the header, mark the new comments
           of a review in its index and its threads, remember on a visit what the user has seen, serve the page only to
           a signed-in user, and explain all of this in a help topic.
@@ -855,7 +857,7 @@ sections:
           - ReviewCenter-ReviewPage-MarkSeen
           - ReviewCenter-HelpPage-InboxTopic
         tests:
-          - InboxPage_Render_ToSignAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
+          - InboxPage_Render_ToAnswerAndRepliesWaiting_ShowsSectionsRowsChipsAndLinks
           - WebSubsystem_InboxPage_Unauthenticated_IsChallenged
 
       - id: ReviewCenter-Web-WhereAreWe

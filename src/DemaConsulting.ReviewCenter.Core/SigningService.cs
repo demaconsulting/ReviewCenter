@@ -526,7 +526,11 @@ public sealed class SigningService
                 slot.AlternateUserId is { } alternate ? Member(members, memberIds, alternate) : null,
                 state,
                 current?.DisplayName,
-                current?.SignedAt));
+                current?.SignedAt,
+                // A review without a checklist has no ballots; with one, a slot without a ballot has not started
+                record.Checklist is null
+                    ? null
+                    : record.Ballots.FirstOrDefault(b => b.SlotId == slot.Id)?.State ?? BallotState.NotStarted));
         }
 
         var conclusion = ReviewLock.ConcludedOutcome(record, slots, signatures);

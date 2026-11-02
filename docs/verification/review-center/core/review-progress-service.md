@@ -53,6 +53,9 @@ N/A - standard test environment.
 - A null collaborator is refused with an argument exception.
 - The open threads are split into open questions and open findings (their sum is the open threads), the progress texts
   name the kinds, and the discussions about checks are never counted for a viewer who may not see them.
+- The progress carries the number of ballots handed in out of the number of slots, and the names of the people who have
+  not handed in (none for a concluded review or a review without a checklist); these are the same for every viewer,
+  and a viewer who may not see the other ballots gets `IsMasked` and no dispute count.
 
 #### Test Scenarios
 
@@ -169,3 +172,32 @@ scenario is tested by `ReviewProgressService_GetProgressAsync_GivenList_ChecksAc
 
 **ReviewProgressService_Constructor_NullArgument_Throws**: A null review service, signing service, audit store, or access
 rule each raise `ArgumentNullException`. This scenario is tested by `ReviewProgressService_Constructor_NullArgument_Throws`.
+
+**ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal**: A review with three slots, of which one ballot
+is handed in and one is a draft, reports 1 of 3 and names the two people who have not handed in. This scenario is tested
+by `ReviewProgressService_GetProgressAsync_BallotCounts_SubmittedOfTotal`.
+
+**ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix**: The name of a person with a disabled
+account in the list of the ballots that are not in carries the disabled suffix. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_WaitingOnBallots_DisabledUser_AddsSuffix`.
+
+**ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked**: For a viewer who has
+not handed in, the ballot counts and the names are the same as for the lead, the disputed count is zero, and `IsMasked`
+is true. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_MaskedViewer_BallotCountsVisibleDisputesZeroAndIsMasked`.
+
+**ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots**: A concluded review has no names of
+people who have not handed in. This scenario is tested by
+`ReviewProgressService_GetProgressAsync_ConcludedReview_HasNoWaitingOnBallots`.
+
+**ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne**: A review with one slot reports 1 of 1 once the ballot
+is handed in (a single slot hands in with its last answer). This scenario is tested by
+`ReviewProgressService_GetProgressAsync_SingleSlot_ShowsOneOfOne`.
+
+**ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired**: A review without a checklist requires no
+ballots and has no names. This scenario is tested by `ReviewProgressService_GetProgressAsync_NoChecklist_HasNoBallotsRequired`.
+
+**ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked**: Over the real services, a masked viewer
+sees the ballot progress and the masked flag and no dispute. This scenario is tested by
+`ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked`, defined in
+`BallotMaskingServiceTests.cs`.

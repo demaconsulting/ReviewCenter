@@ -1,8 +1,10 @@
 @* ProjectPage: one project with its reviews, at "/projects/{id}". The reviews are the whole page: a progress table
    (review id with title and creation date, stage, signatures such as 2/3 with a note for the signed-then-changed ones,
-   blockers
+   ballots handed in such as 1/3 with the names of the people who have not handed in one (only for a review with
+   several reviewers), blockers
    (open threads, unanswered checks, disputed checks), who a review is waiting on, last activity and due date with an
-   Overdue badge), each row a link to the review. Above the table sit a summary strip (reviews per stage and overdue)
+   Overdue badge), each row a link to the review. When a row hides details the viewer may not see yet (the disputes
+   and failures stay hidden until the viewer hands in their own ballot), a note under the table says so. Above the table sit a summary strip (reviews per stage and overdue)
    and a filter bar (stage, overdue only, blocked only, text search); the column headers sort; 25 reviews make a page.
    All of that lives in the query string (?stage=&overdue=1&blocked=1&sort=&dir=&q=&page=), so each view has an address.
    A "+ New review" button
@@ -173,6 +175,7 @@
                                 <th scope="col" aria-sort="@AriaSort("id")"><a href="@SortAddress("id")" data-testid="sort-id">Review</a></th>
                                 <th scope="col" aria-sort="@AriaSort("stage")"><a href="@SortAddress("stage")" data-testid="sort-stage">Stage</a></th>
                                 <th scope="col" aria-sort="@AriaSort("signatures")"><a href="@SortAddress("signatures")" data-testid="sort-signatures">Signatures</a></th>
+                                <th scope="col">Ballots</th>
                                 <th scope="col">Blockers</th>
                                 <th scope="col">Waiting on</th>
                                 <th scope="col" aria-sort="@AriaSort("activity")"><a href="@SortAddress("activity")" data-testid="sort-activity">Last activity</a></th>
@@ -213,6 +216,20 @@
                                             }
                                         }
                                     </td>
+                                    <td>
+                                        @if (review.BallotsRequired < 2)
+                                        {
+                                            <span class="muted" data-testid="review-ballots-@review.ReviewId" title="Only a review with several reviewers has ballots to compare">-</span>
+                                        }
+                                        else
+                                        {
+                                            <span data-testid="review-ballots-@review.ReviewId">@review.BallotsSubmitted/@review.BallotsRequired</span>
+                                            @if (review.WaitingOnBallots is { Count: > 0 } notYet)
+                                            {
+                                                <span class="muted" data-testid="review-ballots-waiting-@review.ReviewId">Not yet: @string.Join(", ", notYet)</span>
+                                            }
+                                        }
+                                    </td>
                                     <td data-testid="review-blockers-@review.ReviewId">@BlockersText(review)</td>
                                     <td data-testid="review-waiting-@review.ReviewId">@(review.WaitingOn.Count == 0 ? "-" : string.Join(", ", review.WaitingOn))</td>
                                     <td class="nowrap">
@@ -230,6 +247,11 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if (Matching.Any(review => review.IsMasked))
+                {
+                    <p class="muted" data-testid="reviews-masked-note">Some details are hidden until you hand in your ballot.</p>
+                }
 
                 <p class="review-paging" data-testid="reviews-paging">
                     <span class="muted" data-testid="reviews-range">Showing @((CurrentPage - 1) * PageSize + 1)-@((CurrentPage - 1) * PageSize + PageRows.Count) of @Matching.Count</span>
