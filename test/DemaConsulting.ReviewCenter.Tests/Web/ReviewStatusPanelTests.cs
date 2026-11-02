@@ -34,6 +34,11 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 public class ReviewStatusPanelTests : BallotPageTestBase
 {
     /// <summary>
+    ///     The password every test user signs with.
+    /// </summary>
+    private const string SigningPassword = "correct horse battery";
+
+    /// <summary>
     ///     Renders the review page of <c>REV-1</c>.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
@@ -344,6 +349,208 @@ public class ReviewStatusPanelTests : BallotPageTestBase
         Assert.Empty(cut.FindAll("[data-testid='check-discussions']"));
         Assert.DoesNotContain("Why Fail?", cut.Markup, StringComparison.Ordinal);
         Assert.Equal("0 open", cut.Find("[data-testid='status-open-questions-text']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a disputed check lists who answered what, and the justification of the other reviewer, with the
+    ///     text encoded as plain text.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification()
+    {
+        // Arrange: ann passes; bob fails with a reason that looks like markup; the viewer is ann
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob", ChecklistOutcome.Fail, submit: false);
+        var bob = new Actor("bob", "Bob");
+        await Checklists.SetAnswerAsync(
+            projectId, ReviewKey, FirstItemId, ChecklistOutcome.Fail, "<b>Too slow</b>", bob, cancellationToken);
+        await Checklists.SubmitBallotAsync(projectId, ReviewKey, bob, cancellationToken);
+
+        // Act
+        var cut = RenderReview(projectId);
+
+        // Assert: both answers, the viewer marked, and the other reviewer's reason as text (never the viewer's own)
+        Assert.Equal(
+            "Ann (you): Pass / Bob: Fail", cut.Find($"[data-testid='status-disputed-answers-{FirstItemTestId}']").TextContent);
+        var why = cut.Find($"[data-testid='status-disputed-why-{FirstItemTestId}-2']");
+        Assert.Contains("Bob: ", why.TextContent, StringComparison.Ordinal);
+        Assert.Contains("<b>Too slow</b>", why.TextContent, StringComparison.Ordinal);
+        Assert.Empty(why.QuerySelectorAll("b"));
+        Assert.Empty(cut.FindAll($"[data-testid='status-disputed-why-{FirstItemTestId}-1']"));
+    }
+
+    /// <summary>
+    ///     Test that a viewer who has not handed in sees no answer, no reason, no outcome note and no caution, and that
+    ///     a signature note is only for the owner of the signature.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution()
+    {
+        // Arrange: ann and cyd both failed the first check and handed in; bob keeps a draft and is the viewer
+        var projectId = await CreateReviewAsync("ann", "cyd", "bob");
+        await AnswerAsync(projectId, "ann", ChecklistOutcome.Fail);
+        await AnswerAsync(projectId, "cyd", ChecklistOutcome.Fail);
+        await AnswerAsync(projectId, "bob", submit: false);
+        SignInAs("bob", "Bob", false);
+
+        // Act
+        var cut = RenderReview(projectId);
+
+        // Assert
+        Assert.Empty(cut.FindAll("[data-testid='status-outcome']"));
+        Assert.Empty(cut.FindAll("[data-testid='status-caution']"));
+        Assert.Empty(cut.FindAll("[data-testid='status-signature-lost']"));
+        Assert.Empty(cut.FindAll("[data-testid^='status-disputed']"));
+        Assert.DoesNotContain("A reason", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rejected", cut.Find("[data-testid='status-panel']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("failed", cut.Find("[data-testid='status-panel']").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("check failed", cut.Find("[data-testid='checklist-progress-summary']").TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who handed in, and may see the answers, is told plainly that a check both reviewers failed
+    ///     makes the review Rejected, and that the Checklist card names the failed check.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_BothFailed_NamesTheOutcome()
+    {
+        // Arrange: ann and bob both failed the first check; the viewer is ann
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann", ChecklistOutcome.Fail);
+        await AnswerAsync(projectId, "bob", ChecklistOutcome.Fail);
+
+        // Act
+        var cut = RenderReview(projectId);
+
+        // Assert
+        var note = cut.Find("[data-testid='status-outcome']").TextContent;
+        Assert.Contains(FirstItemId, note, StringComparison.Ordinal);
+        Assert.Contains("Rejected", note, StringComparison.Ordinal);
+        Assert.Equal("Checklist complete, 1 check failed", cut.Find("[data-testid='checklist-progress-summary']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who could sign early is cautioned by name about the reviewer who has not handed in, and
+    ///     that the reviewer who has not handed in sees no such caution.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer()
+    {
+        // Arrange: ann handed in, bob did not
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob", submit: false);
+
+        // Act
+        var forAnn = RenderReview(projectId);
+        SignInAs("bob", "Bob", false);
+        var forBob = RenderReview(projectId);
+
+        // Assert
+        var caution = forAnn.Find("[data-testid='status-caution']").TextContent;
+        Assert.Contains("Bob", caution, StringComparison.Ordinal);
+        Assert.Contains("sign again", caution, StringComparison.Ordinal);
+        Assert.Empty(forBob.FindAll("[data-testid='status-caution']"));
+    }
+
+    /// <summary>
+    ///     Test that the person who started a discussion about a check waits for the answer, without a button, and that
+    ///     the other reviewer is still asked to answer.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers()
+    {
+        // Arrange: a dispute, and ann (the viewer) started the discussion about it
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob", ChecklistOutcome.Fail);
+        await Threads.StartThreadAsync(
+            projectId, ReviewKey, ThreadAnchor.ForCheck(FirstItemId), TestActors.Ann, "Why Fail?", TestContext.Current.CancellationToken);
+
+        // Act
+        var asker = RenderReview(projectId);
+        SignInAs("bob", "Bob", false);
+        var other = RenderReview(projectId);
+
+        // Assert: a sentence for the asker, a link for the other party
+        var waiting = asker.Find("[data-testid='next-action']");
+        Assert.Equal("Waiting for Bob to answer your question.", waiting.TextContent);
+        Assert.Null(waiting.GetAttribute("href"));
+        Assert.Empty(asker.FindAll("a[data-testid='next-action']"));
+        Assert.Equal("Answer the open questions", other.Find("a[data-testid='next-action']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer whose signature no longer counts is told so plainly in the panel, in the words of the
+    ///     inbox, and that somebody else is not.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_SignatureLost_StatedToTheSigner()
+    {
+        // Arrange: bob signed and then the review changed
+        var (projectId, _) = await ArrangeSignedThenChangedAsync();
+        SignInAs("bob", "Bob", false);
+
+        // Act
+        var forBob = RenderReview(projectId);
+        SignInAs("dee", "Dee", false);
+        var forDee = RenderReview(projectId);
+
+        // Assert
+        Assert.Equal(
+            "The review changed, your signature no longer counts.",
+            forBob.Find("[data-testid='status-signature-lost']").TextContent);
+        Assert.Empty(forDee.FindAll("[data-testid='status-signature-lost']"));
+    }
+
+    /// <summary>
+    ///     Test that after a reviewer signed, the panel and the next step of the review page both say whom the review
+    ///     waits for.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_AfterSigning_PanelAndNextStepAgree()
+    {
+        // Arrange: ann and bob agree, and ann signs; the viewer is ann
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob");
+        var slots = await SlotIdsAsync(projectId);
+        var approval = await Signing.GetApprovalAsync(projectId, ReviewKey, TestContext.Current.CancellationToken);
+        await Signing.SignAsync(
+            TestActors.Ann, projectId, ReviewKey, slots[0], approval!.Digest, SigningPassword, TestContext.Current.CancellationToken);
+
+        // Act
+        var cut = RenderReview(projectId);
+
+        // Assert
+        Assert.Equal("You have signed. Waiting for Bob to sign.", cut.Find("[data-testid='next-action']").TextContent);
+        var nextStep = cut.Find("[data-testid='next-step']").TextContent;
+        Assert.Contains("Waiting for the signature of Bob", nextStep, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a viewer who has not handed in is told once that the answers of the others stay hidden: the panel
+    ///     says so, and the next step of the review says to hand in without repeating it.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatusPanel_MaskedViewer_HideNoticeAppearsOnce()
+    {
+        // Arrange: ann handed in, bob keeps a draft and is the viewer
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "ann");
+        await AnswerAsync(projectId, "bob", submit: false);
+        SignInAs("bob", "Bob", false);
+
+        // Act
+        var cut = RenderReview(projectId);
+
+        // Assert
+        var nextStep = cut.Find("[data-testid='next-step']").TextContent;
+        Assert.StartsWith("Hand in your ballot", nextStep, StringComparison.Ordinal);
+        Assert.DoesNotContain("stay hidden", nextStep, StringComparison.Ordinal);
+        Assert.Single(cut.FindAll("[data-testid='status-hidden']"));
     }
 
     /// <summary>

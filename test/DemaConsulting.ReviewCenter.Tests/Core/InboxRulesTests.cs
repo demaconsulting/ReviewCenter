@@ -302,6 +302,125 @@ public class InboxRulesTests
     }
 
     /// <summary>
+    ///     Test that a signer whose signature no longer counts is asked to sign when nothing blocks and otherwise gets
+    ///     the SignatureLost standing, even while the review is not signable, and that a signer who lost nothing still
+    ///     only waits.
+    /// </summary>
+    /// <param name="signatureLost">Whether a slot of the user has a signature that no longer counts.</param>
+    /// <param name="hasUnsigned">Whether a slot of the user has no current signature.</param>
+    /// <param name="canSign">Whether nothing blocks the signature.</param>
+    /// <param name="ownBallot">The state of the ballot of the user.</param>
+    /// <param name="hidden">Whether the other ballots are hidden from the user.</param>
+    /// <param name="expected">The expected standing.</param>
+    [Theory]
+    [InlineData(true, true, false, BallotState.Submitted, false, "SignatureLost")]
+    [InlineData(true, true, true, BallotState.Submitted, false, "ToSign")]
+    [InlineData(false, true, false, BallotState.Submitted, false, "Waiting")]
+    [InlineData(true, false, false, BallotState.Submitted, false, "SignatureLost")]
+    [InlineData(true, true, false, BallotState.Submitted, true, "SignatureLost")]
+    [InlineData(true, true, false, BallotState.Draft, false, "ToAnswer")]
+    public void InboxRules_ReviewerStanding_SignatureLost_DecidesTheSection(
+        bool signatureLost, bool hasUnsigned, bool canSign, BallotState ownBallot, bool hidden, string expected)
+    {
+        // Act
+        var standing = InboxRules.ReviewerStanding(
+            false, true, true, false, ownBallot, hidden, 0, hasUnsigned, canSign, signatureLost);
+
+        // Assert
+        Assert.Equal(expected, standing.ToString());
+    }
+
+    /// <summary>
+    ///     Test that a concluded review and a user without a slot never get the SignatureLost standing.
+    /// </summary>
+    [Fact]
+    public void InboxRules_ReviewerStanding_SignatureLostConcludedOrNoSlot_IsNone()
+    {
+        // Act, Assert
+        Assert.Equal(
+            InboxStanding.None,
+            InboxRules.ReviewerStanding(true, true, true, false, BallotState.Submitted, false, 0, true, false, true));
+        Assert.NotEqual(
+            InboxStanding.SignatureLost,
+            InboxRules.ReviewerStanding(false, false, true, false, BallotState.NotStarted, false, 0, true, false, true));
+    }
+
+    /// <summary>
+    ///     Test that a question is for the user only when it is open, a question, started by someone else, and not
+    ///     written in by the user.
+    /// </summary>
+    [Fact]
+    public void InboxRules_QuestionsForYou_OpenQuestionOfOthers_OnlyThoseNotAnswered()
+    {
+        // Arrange
+        var open = Thread(1, ReviewThreadState.Open, Comment(1, "bob"));
+        var own = Thread(2, ReviewThreadState.Open, Comment(2, "ann"));
+        var answered = Thread(3, ReviewThreadState.Open, Comment(3, "bob"), Comment(4, "ANN"));
+        var resolved = Thread(4, ReviewThreadState.Resolved, Comment(5, "bob"));
+        var finding = new ReviewThread
+        {
+            Id = 5,
+            ProjectId = 1,
+            ReviewId = "r1",
+            FilePath = "a.txt",
+            State = ReviewThreadState.Open,
+            Comments = [new ReviewComment { Id = 6, Author = "bob", AuthorUsername = "bob", Text = "T", IncludeInReport = true }]
+        };
+        var empty = Thread(6, ReviewThreadState.Open);
+
+        // Act
+        var found = InboxRules.QuestionsForYou([open, own, answered, resolved, finding, empty], "ann");
+
+        // Assert
+        Assert.Equal([1], found.Select(thread => thread.Id));
+        Assert.Empty(InboxRules.QuestionsForYou([], "ann"));
+    }
+
+    /// <summary>
+    ///     Test the sentences of the Question for you, Your signature no longer counts, Waiting and Disputed rows.
+    /// </summary>
+    [Fact]
+    public void InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded()
+    {
+        // Arrange
+        var bob = Thread(1, ReviewThreadState.Open, Comment(1, "bob"));
+        var cyd = Thread(2, ReviewThreadState.Open, Comment(2, "cyd"));
+        var nameless = Thread(3, ReviewThreadState.Open, new ReviewComment { Id = 3, Text = "T" });
+
+        // Act, Assert: the question row names one asker, counts several, and quotes nothing
+        Assert.Equal("bob asked a question. You can answer it.", InboxRules.QuestionText([bob]));
+        Assert.Equal("2 open questions from others. You can answer them.", InboxRules.QuestionText([bob, cyd]));
+        Assert.Equal("Someone asked a question. You can answer it.", InboxRules.QuestionText([nameless]));
+
+        // Act, Assert: the lost signature
+        Assert.Equal(
+            "You cannot sign again yet: open items remain. When nothing blocks it, look at the changes and sign again.",
+            InboxRules.SignatureLostText("open items remain"));
+        Assert.Equal(
+            "The review changed, your signature no longer counts. Look at the changes and sign again.",
+            InboxRules.SignAgainText);
+
+        // Act, Assert: the waiting row tells who must sign again
+        Assert.Equal(
+            "Waiting for Ann. Ann's signature no longer counts, so Ann must sign again.",
+            InboxRules.WaitingForText(["Ann"], ["Ann"]));
+        Assert.Equal(
+            "Waiting for Ann, Bob. The signatures of Ann and Bob no longer count, so they must sign again.",
+            InboxRules.WaitingForText(["Ann", "Bob"], ["Ann", "Bob"]));
+        Assert.Equal("Waiting for Ann.", InboxRules.WaitingForText(["Ann"], []));
+
+        // Act, Assert: the disputed row names the checks, up to five
+        Assert.Equal("Change your answer or discuss it.", InboxRules.DisputedText([], true));
+        Assert.Equal("The reviewers answered differently. Discuss it with them.", InboxRules.DisputedText([], false));
+        Assert.Equal("Change your answer to A or discuss it.", InboxRules.DisputedText(["A"], true));
+        Assert.Equal("Change your answers to A and B or discuss them.", InboxRules.DisputedText(["A", "B"], true));
+        Assert.Equal("The reviewers answered A differently. Discuss it with them.", InboxRules.DisputedText(["A"], false));
+        Assert.Equal(
+            "Change your answers to A, B, C, D, E and 2 more or discuss them.",
+            InboxRules.DisputedText(["A", "B", "C", "D", "E", "F", "G"], true));
+    }
+
+    /// <summary>
     ///     Test that the author rule of the inbox is the rule of the checklist service for every combination.
     /// </summary>
     [Fact]
@@ -361,8 +480,8 @@ public class InboxRulesTests
         Assert.All(
             new[]
             {
-                InboxSection.ToAnswer, InboxSection.Disputed, InboxSection.ToSign, InboxSection.RepliesWaiting,
-                InboxSection.FailedChecks
+                InboxSection.ToAnswer, InboxSection.Disputed, InboxSection.ToSign, InboxSection.SignatureLost,
+                InboxSection.RepliesWaiting, InboxSection.FailedChecks
             },
             section => Assert.True(InboxSections.IsAction(section)));
         Assert.False(InboxSections.IsAction(InboxSection.WaitingForOthers));

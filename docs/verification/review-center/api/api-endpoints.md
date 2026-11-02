@@ -207,6 +207,18 @@ that every read of the approval, the threads, and the consolidated checklist pas
 and that the removed viewer-less checklist read does not come back. This scenario is tested by
 `ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail`.
 
+**ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote**: Both ballots fail the first check. The
+token of a member who has not handed in a ballot gets a body with no check identifier and no word "Rejected", a next
+step that starts with the request to hand in the ballot, and the stored `state` Draft; the token of a reviewer who handed
+in gets the named rejection ("Both reviewers failed {id}, so this review will be Rejected. Write the review conclusion,
+then sign.") and the state is still Draft. This scenario is tested by
+`ApiEndpoints_GetReview_AgreedFail_TokenNeverGetsFailedCheckIdOrRejectionNote`.
+
+**ApiEndpoints_GetReview_OneSigned_NextStepNamesSignerForVisibleStandingOnly**: When one reviewer has signed, the token
+of a reviewer who handed in reads "Signed by ann. Waiting for the signature of bob." and the masked token keeps the
+hand-in sentence. This scenario is tested by
+`ApiEndpoints_GetReview_OneSigned_NextStepNamesSignerForVisibleStandingOnly`.
+
 **ApiEndpoints_Request_NoToken_Answers401**: Each route (the three reads, the creation, and the attestation) is
 requested without a token, while the anonymous evidence settings of the project are off. Each answer is 401. This
 scenario is tested by `ApiEndpoints_Request_NoToken_Answers401`.

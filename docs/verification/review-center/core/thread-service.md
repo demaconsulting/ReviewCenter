@@ -224,6 +224,11 @@ and without open threads, each give the matching sentence. The disputed checks a
 complete while a check is disputed; a needed conclusion ends the sentence with "a conclusion stating the reasons is
 needed". This scenario is tested by `ThreadService_NextStep_DisputedAndConclusion_AreNamed`.
 
+**ThreadService_NextStep_ExplicitUnanswered_ReplacesTheProgressCount**: A theory over a progress whose unanswered count
+includes a disputed check, and an explicit `unanswered` count: the explicit count is the one worded, so a disputed check
+is named once, as disputed, and a count of 0 leaves the unanswered part out. This scenario is tested by
+`ThreadService_NextStep_ExplicitUnanswered_ReplacesTheProgressCount`.
+
 **ThreadService_Mutations_ApprovedReview_ThrowReviewLocked**: A theory over the four changes of a thread (start, reply,
 resolve, and reopen) on a concluded review, that is a review whose every slot holds a current signature and that has no
 open thread; each is refused with `ReviewLocked`, the

@@ -48,7 +48,18 @@ public sealed record ReviewerStatus(
 /// <param name="CanDiscuss">
 ///     Whether the viewer can start a discussion about the check now: they may start one, and none is open yet.
 /// </param>
-public sealed record DisputedCheck(string ItemId, string Text, bool CanDiscuss);
+public sealed record DisputedCheck(string ItemId, string Text, bool CanDiscuss)
+{
+    /// <summary>
+    ///     Gets what every submitted ballot answered to the check, in slot order, with the justification (<c>null</c> or
+    ///     blank when there is none): one <see cref="BallotAnswerView"/> (slot number, reviewer name, outcome,
+    ///     justification) per submitted ballot, including the viewer's own. It is the same data as
+    ///     <see cref="BallotView.Differing"/> and is never <c>null</c>; it is empty only when the status was built
+    ///     without answers. A viewer who may not see the answers of the other reviewers (see
+    ///     <see cref="BallotVisibility"/>) never gets a <see cref="DisputedCheck"/> at all.
+    /// </summary>
+    public IReadOnlyList<BallotAnswerView> Answers { get; init; } = [];
+}
 
 /// <summary>
 ///     One change to the review after a reviewer signed, in plain words.
@@ -80,9 +91,11 @@ public sealed record SignatureChanges(
 /// <remarks>
 ///     <para>
 ///         It is computed on demand by <see cref="ReviewStatusService"/> and never stored. It never holds the content of
-///         a ballot. For a viewer who may not see the answers of the other reviewers yet (see
-///         <see cref="BallotVisibility"/>), <see cref="DisputedChecks"/> is empty, the open threads about checks are not
-///         counted and <see cref="IsMasked"/> is <c>true</c>.
+///         a ballot the viewer may not see: the answers and justifications of a dispute (<see cref="DisputedCheck.Answers"/>)
+///         are there only for a viewer who may see the answers of the other reviewers (see
+///         <see cref="BallotVisibility"/>). For a viewer who may not, <see cref="DisputedChecks"/> is empty, the open
+///         threads about checks are not counted, <see cref="OutcomeNote"/> is <c>null</c> and <see cref="IsMasked"/> is
+///         <c>true</c>.
 ///     </para>
 ///     <para>
 ///         <see cref="ChangesSinceSigning"/> is derived from the audit trail: it lists the entries after the signature
@@ -104,6 +117,18 @@ public sealed record SignatureChanges(
 /// <param name="OpenFindings">How many findings are open, among those the viewer may see.</param>
 /// <param name="NextAction">The one thing the viewer should do next.</param>
 /// <param name="ChangesSinceSigning">The changes since signing, for each slot that was signed before the review changed.</param>
+/// <param name="Caution">
+///     A warning for a viewer who is offered to sign (or to hand in and sign) while other reviewers have not handed in a
+///     ballot yet: "Bob has not handed in a ballot yet. If you sign now, you may have to sign again." (see
+///     <see cref="ReviewApproval.MissingBallotsText"/>); <c>null</c> when there is nothing to warn about. It names
+///     people only, never an answer, so it is the same for a masked and an unmasked viewer.
+/// </param>
+/// <param name="OutcomeNote">
+///     The sentence that names a provisional rejection, for example "Both reviewers failed REQ-01, so this review will be
+///     Rejected." (see <see cref="ReviewApproval.RejectionNote"/>); <c>null</c> when nothing is rejected, the review is
+///     concluded, or the viewer may not see the answers of the other reviewers (always <c>null</c> when
+///     <paramref name="IsMasked"/> is <c>true</c>).
+/// </param>
 public sealed record ReviewStatus(
     bool IsMasked,
     bool IsConcluded,
@@ -113,4 +138,6 @@ public sealed record ReviewStatus(
     int OpenQuestions,
     int OpenFindings,
     ReviewNextAction NextAction,
-    IReadOnlyList<SignatureChanges> ChangesSinceSigning);
+    IReadOnlyList<SignatureChanges> ChangesSinceSigning,
+    string? Caution = null,
+    string? OutcomeNote = null);

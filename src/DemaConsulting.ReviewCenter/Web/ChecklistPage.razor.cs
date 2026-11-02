@@ -1038,8 +1038,66 @@ public partial class ChecklistPage : ComponentBase
     /// <returns>For example "1 of 2 ballots handed in.".</returns>
     private string BallotsLine()
     {
-        return $"{Ballots!.BallotsSubmitted} of {Ballots.BallotsTotal} ballots handed in.";
+        var line = $"{Ballots!.BallotsSubmitted} of {Ballots.BallotsTotal} ballots handed in.";
+        var missing = Ballots.MissingNames;
+        if (missing.Count == 0)
+        {
+            return line;
+        }
+
+        var verb = missing.Count == 1 ? "has" : "have";
+        return $"{line} {JoinNames(missing)} {verb} not handed in yet.";
     }
+
+    /// <summary>
+    ///     Joins names into a plain-language list.
+    /// </summary>
+    /// <param name="names">The names; not empty.</param>
+    /// <returns>"A", "A and B" or "A, B and C".</returns>
+    private static string JoinNames(IReadOnlyList<string> names)
+    {
+        return names.Count == 1
+            ? names[0]
+            : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+    }
+
+    /// <summary>
+    ///     Words the line at the top that tells how many checks the submitted ballots answer differently.
+    /// </summary>
+    /// <returns>
+    ///     For example "1 check answered differently. Open it to discuss.", or <c>null</c> when no check differs or the
+    ///     viewer may not see the other ballots yet (the view then lists no differing check, so the count never leaks).
+    /// </returns>
+    private string? DifferingSummary()
+    {
+        if (Ballots is not { IsMasked: false, Differing.Count: > 0 })
+        {
+            return null;
+        }
+
+        var count = Ballots.Differing.Count;
+        return count == 1
+            ? "1 check answered differently. Open it to discuss."
+            : $"{count} checks answered differently. Open them to discuss.";
+    }
+
+    /// <summary>
+    ///     Tells whether an answer in a differing check is one of another reviewer and carries a reason to show.
+    /// </summary>
+    /// <param name="answer">The answer of one reviewer.</param>
+    /// <returns>
+    ///     <c>true</c> when the answer is not the viewer's own and has a justification; the viewer's own reason is not
+    ///     repeated.
+    /// </returns>
+    private bool IsOtherWithReason(BallotAnswerView answer)
+    {
+        return !string.IsNullOrWhiteSpace(answer.Justification) && answer.SlotNumber != Ballots?.OwnSlotNumber;
+    }
+
+    /// <summary>
+    ///     Gets the page address of the history of this review, where every reviewer's answers are listed.
+    /// </summary>
+    private string HistoryAddress => $"{ReviewAddress}/history";
 
     /// <summary>
     ///     Words the differing answers of one check side by side.
@@ -1295,16 +1353,25 @@ public partial class ChecklistPage : ComponentBase
     /// <summary>
     ///     Words the "what is left" status line.
     /// </summary>
-    /// <returns>For example "15 checks unanswered." or "Checklist complete.".</returns>
+    /// <returns>
+    ///     For example "15 checks unanswered.", "Checklist complete." or, when the viewer may see that the ballots agree
+    ///     on failed checks, "Checklist complete, 1 check failed.".
+    /// </returns>
     private string StatusLine()
     {
         var unanswered = State!.Overall.Unanswered;
-        return unanswered switch
+        if (unanswered == 0)
         {
-            0 => "Checklist complete.",
-            1 => "1 check unanswered.",
-            _ => $"{unanswered} checks unanswered."
-        };
+            // The count is zero for a viewer who may not see the other ballots (see BallotView), so nothing leaks
+            return Ballots?.FailedChecks switch
+            {
+                null or 0 => "Checklist complete.",
+                1 => "Checklist complete, 1 check failed.",
+                var failed => $"Checklist complete, {failed} checks failed."
+            };
+        }
+
+        return unanswered == 1 ? "1 check unanswered." : $"{unanswered} checks unanswered.";
     }
 
     /// <summary>

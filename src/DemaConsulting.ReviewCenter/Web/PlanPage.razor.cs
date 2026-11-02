@@ -359,7 +359,7 @@ public partial class PlanPage : ComponentBase
             {
                 BaselineMode.None => "all files (no baseline)",
                 BaselineMode.Explicit => $"changes since {plan.ExplicitBaselineRevision} ({Short(plan.ExplicitBaselineSha!)})",
-                _ => "changes since the last signed review of each set"
+                _ => "changes since the last approved review of each set"
             };
             return $"Repository {plan.RepositoryName}, head {plan.HeadRevision} ({Short(plan.HeadSha)}). Baseline: {baseline}.";
         }

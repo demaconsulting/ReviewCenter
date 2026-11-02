@@ -34,7 +34,7 @@ internal sealed record ProjectDto(int Id, string Name, string Description, DateT
 /// </summary>
 /// <param name="Id">The review identifier, unique within its project.</param>
 /// <param name="Title">The review title.</param>
-/// <param name="State">The life-cycle state of the review, for example <c>Draft</c>.</param>
+/// <param name="State">The stored state of the review. It is always <c>Draft</c> for now and does not change when the review is signed, approved or rejected; use <c>approved</c>, <c>outcome</c> and <c>slots</c> to follow the life cycle.</param>
 /// <param name="Created">When the review was created.</param>
 /// <param name="ContentFingerprint">The fingerprint of the reviewed content.</param>
 /// <param name="CreatedBy">The user name of the creator, or <c>null</c> when it was not recorded.</param>
@@ -117,7 +117,7 @@ internal sealed record ReviewCountsDto(
 /// </summary>
 /// <param name="Id">The review identifier, unique within its project.</param>
 /// <param name="Title">The review title.</param>
-/// <param name="State">The life-cycle state of the review, for example <c>Draft</c>.</param>
+/// <param name="State">The stored state of the review. It is always <c>Draft</c> for now and does not change when the review is signed, approved or rejected; use <c>approved</c>, <c>outcome</c> and <c>slots</c> to follow the life cycle.</param>
 /// <param name="Created">When the review was created.</param>
 /// <param name="ContentFingerprint">The fingerprint of the reviewed content.</param>
 /// <param name="CreatedBy">The user name of the creator, or <c>null</c> when it was not recorded.</param>
@@ -135,7 +135,7 @@ internal sealed record ReviewCountsDto(
 /// <param name="Slots">The reviewer slots in creation order.</param>
 /// <param name="Counts">The progress counts.</param>
 /// <param name="Blockers">The plain-language reasons the review cannot be signed yet; empty when it can be.</param>
-/// <param name="NextStep">One short sentence that words what to do next.</param>
+/// <param name="NextStep">One short sentence that words what to do next; once nothing blocks signing it also says who has signed and whose signature is awaited. In a masked review it never names a failed or disputed check.</param>
 /// <param name="FollowsReviewId">The review this one follows up, or <c>null</c> when it is not a follow-up.</param>
 /// <param name="CarriedAnswerCount">How many checklist answers were carried over from the followed review; 0 when none.</param>
 /// <param name="CarriedThreadCount">How many open threads were carried over from the followed review; 0 when none.</param>

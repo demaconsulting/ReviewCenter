@@ -222,8 +222,9 @@ sections:
         title: >-
           The ChecklistPage unit shall tell a reviewer of a review with several reviewer slots who has not handed in
           their own ballot how many ballots are handed in out of how many, and that the answers of the others stay
-          hidden until the own ballot is handed in, shall show no standing, no number of disputed checks, and no
-          different-answers mark to that reviewer, shall tell a member without a slot the same count with no
+          hidden until the own ballot is handed in, and who of the other reviewers has not handed in, shall show no
+          standing, no number of disputed checks, no different-answers mark, no justification of another reviewer, and
+          no failed check to that reviewer, shall tell a member without a slot the same count with no
           standing, shall show everything to an administrator without a ballot, and shall show none of it for a review
           with a single slot.
         justification: |
@@ -236,20 +237,33 @@ sections:
           - ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount
           - ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers
           - ChecklistPage_SingleSlot_ShowsNoBallotCountsOrSideBySide
+          - ChecklistPage_BallotsLine_NamesWhoHasNotHandedIn
+          - ChecklistPage_HiddenViewer_ShowsNoReasonNoDisputeCountNoFailedCheck
+          - ChecklistPage_AgreedFailureHiddenFromDraftViewer_StatusLineSaysOnlyComplete
 
       - id: ReviewCenter-ChecklistPage-SideBySide
         title: >-
           The ChecklistPage unit shall show a reviewer who has handed in their own ballot, under every check that the
-          submitted ballots answer differently, the answers by name side by side in the order of the slots, shall mark
-          the check with a different-answers badge, and shall offer a Discuss button that opens a small form and
+          submitted ballots answer differently, the answers by name side by side in the order of the slots, with the
+          justification of every other reviewer who gave one (encoded, and without repeating the viewer's own), shall
+          mark the check with a different-answers badge, shall say at the top how many checks are answered
+          differently, shall word the status line "Checklist complete, N checks failed." when the submitted ballots
+          agree on a failure, shall point a concluded review with several slots to the history of the review, where
+          the answers of all reviewers are, and shall offer a Discuss button that opens a small form and
           starts a discussion thread about that check with the text given, refusing an empty text with a message
           next to the form, closing the form on cancel, and linking to the review page for the thread.
         justification: |
           After the own ballot is in, the reviewers are meant to compare and to settle the difference. Seeing who
-          answered what, in one line, is the quickest way to know whom to talk to, and a button next to the check
-          turns that into the conversation without a search for the right place.
+          answered what, and why, in one line, is the quickest way to know whom to talk to, and a button next to the
+          check turns that into the conversation without a search for the right place. The count at the top and the
+          failed-check wording keep a reviewer from reading a green "complete" over a difference or a failure, and the
+          pointer keeps a concluded page from looking as if only one reviewer had answered.
         tests:
           - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
+          - ChecklistPage_DisputedCheck_ShowsOtherReviewersReasonEncodedAndNotOwn
+          - ChecklistPage_DisputedChecks_SummaryAtTheTopCountsThem
+          - ChecklistPage_AgreedFailure_StatusLineNamesFailedChecks
+          - ChecklistPage_ConcludedMultiSlotReview_PointsToTheHistory
           - ChecklistPage_DisputedCheck_DiscussStartsCheckThread
           - ChecklistPage_DiscussWithoutText_ShowsError
           - ChecklistPage_DiscussCancel_ClosesTheForm
@@ -265,7 +279,8 @@ sections:
           button for an incomplete draft, and not Submit and sign in a review with a single slot, and shall sign only
           the digest of the record that the viewer is shown after the hand-in, so that when the reloaded view shows a
           check that the submitted ballots answer differently nothing is signed and the page says that something
-          changed.
+          changed, and shall warn above the form, in the wording of the review page, which other reviewers have not
+          handed in.
         justification: |
           Handing in and signing are two steps that most reviewers want as one, once the answers are final and nobody
           else is in the way. Offering it only when the signature would be accepted avoids a refusal, and keeping the
@@ -273,9 +288,12 @@ sections:
           same step, so the ballot is handed in first and the confirmation follows. Before the hand-in the viewer has
           not seen the answers of the other reviewers, so a signature given in the same click must never cover a
           record that the viewer has not been shown: when the view after the hand-in reveals a difference, the
-          viewer reads it and signs on the review page, which is the second confirmation.
+          viewer reads it and signs on the review page, which is the second confirmation. The signature of a ballot
+          that other reviewers have still to hand in is not a mistake, but the viewer should know the others are
+          missing before signing.
         tests:
           - ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction
+          - ChecklistPage_SubmitAndSign_WarnsWhenOtherBallotsAreMissing
           - ChecklistPage_IncompleteDraft_OffersNoSubmitButtons
           - ChecklistPage_SubmitAndSign_SubmitsThenSigns
           - ChecklistPage_SubmitAndSign_WrongPassword_KeepsBallotAndExplains

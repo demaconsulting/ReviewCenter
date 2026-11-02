@@ -592,6 +592,7 @@ sections:
           - ReviewCenter-PlanPage-State
           - ReviewCenter-PlanPage-Interactive
           - ReviewCenter-ProjectPage-PlanLink
+          - ReviewCenter-HelpPage-PlanningTopic
           - ReviewCenter-ReviewPage-ReviewSet
         tests:
           - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
@@ -837,7 +838,8 @@ sections:
       - id: ReviewCenter-Web-Inbox
         title: >-
           The Web subsystem shall give a signed-in user an inbox page that lists the reviews that wait for the user in
-          seven groups (to answer, disputed, ready to sign, replies waiting, failed checks, waiting for others and
+          eight groups (to answer, disputed, ready to sign, signature no longer counts, replies waiting, failed checks,
+          waiting for others and
           updates) with a summary, a chip and a New badge on each item, and a button to mark all as read, show the
           number of reviews that need action on the home page and on an Inbox tab of the header, mark the new comments
           of a review in its index and its threads, remember on a visit what the user has seen, serve the page only to
@@ -874,6 +876,7 @@ sections:
           by the component tests of the units.
         children:
           - ReviewCenter-ReviewPage-StatusPanel
+          - ReviewCenter-ReviewPage-StatusPanelGuidance
           - ReviewCenter-ReviewPage-ChangesSinceSigning
           - ReviewCenter-HelpPage-PlainLanguage
         tests:

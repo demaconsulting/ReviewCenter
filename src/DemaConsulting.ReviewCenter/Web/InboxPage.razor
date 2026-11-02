@@ -1,17 +1,21 @@
 @* InboxPage: the work waiting for the signed-in user, at "/inbox". The inbox is also the notification list: every row
    is computed from the review data when the page opens, so there is nothing to clear except the "New" markers.
 
-   Seven groups, in this order: "To answer" (the user holds a reviewer slot and has not handed in the ballot),
-   "Disputed" (the user handed in the ballot and the ballots differ on some checks; never listed for a user who may not
-   see the other ballots yet), "Ready to sign" (the ballot is in, nothing blocks the signature and a slot of the user has
-   no current signature), "Replies waiting" (someone answered in a thread of the user, or on the user's own review),
-   "Failed checks" (the user's own review has checks answered Fail), "Waiting for others" (the user did their part and the
-   review waits for other people or open items; for information and not counted as work) and "Updates" (a review of the
-   user was approved, rejected or reopened by someone else since the user last looked; for information only and not
-   counted as work). A review can appear in several groups, but never in "To answer" and "Ready to sign" at once. Each
-   row links to the review (to the checklist for "To answer" and "Disputed"), shows why it is listed as a chip, a "New"
-   marker when the reason happened after the user last saw the review, and the due date (marked when overdue) for the
-   groups that need action. "Mark all as read" marks every listed review as seen.
+   Eight groups, in this order: "To answer" (the user holds a reviewer slot and has not handed in the ballot, or someone
+   else asked an open question that the user has not written in yet: a "Question for you" row, which opens the review
+   because the thread is there; a thread has no addressee, so the row is a heuristic), "Disputed" (the user handed in the
+   ballot and the ballots differ on some checks, which the row names; never listed for a user who may not see the other
+   ballots yet), "Ready to sign" (the ballot is in, nothing blocks the signature and a slot of the user has no current
+   signature; the row warns when other reviewers have not handed in a ballot), "Your signature no longer counts" (the
+   user signed, the review changed afterwards and something still blocks a new signature), "Replies waiting" (someone
+   answered in a thread of the user, or on the user's own review), "Failed checks" (the user's own review has checks
+   answered Fail), "Waiting for others" (the user did their part and the review waits for other people or open items;
+   for information and not counted as work) and "Updates" (a review of the user was approved, rejected or reopened by
+   someone else since the user last looked; for information only and not counted as work). A review can appear in
+   several groups, but never in "To answer" for the ballot and "Ready to sign" at once. Each row links to the review (to
+   the checklist for "To answer" and "Disputed", except a question for the user), shows why it is listed as a chip, a
+   "New" marker when the reason happened after the user last saw the review, and the due date (marked when overdue) for
+   the groups that need action. "Mark all as read" marks every listed review as seen.
 
    Presentation only; state lives in InboxPage.razor.cs. Every interactive element and every key value carries a
    stable kebab-case data-testid (row-level ids carry the 1-based position of the row), and the data-interactive

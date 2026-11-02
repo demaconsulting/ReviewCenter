@@ -72,6 +72,14 @@ project admin can leave out the discussion threads, the names, the checklist wor
 context, that every PDF then has a Content scope section that says what was omitted, and links to the Evidence settings
 topic.
 
+**Planning topic** (`HelpPlanningPage`, slug `planning-reviews`, title "Planning reviews"): It explains, in static text,
+how
+to plan several reviews from the review-sets of a repository (the Plan reviews button, the head revision, the choice of
+what to compare with, Show plan, ticking the sets, and that a set already filed at the same revisions is not offered
+twice). It also says that the default is "Changes since the last approved review of each set", that a review counts as
+approved when every reviewer has signed it and no thread is open, and that a set without an approved review is planned
+as a full review with a note that says so. It has one screenshot, `planning-reviews-1.png`.
+
 **Project members topic** (`HelpMembersPage`, slug `project-members`, title "Managing project members"): The topic after
 Planning reviews and before the API tokens. It explains, in static text, that ordinary users see only the projects they
 belong to while system administrators see all projects, and that a project admin or a system administrator manages the
@@ -176,7 +184,9 @@ are protected by the password alone), and that the changes are audited, never th
 the Reviewers and signing topic (`HelpSigningPage`) mentions the code.
 
 **Inbox topic** (`HelpInboxPage`, slug `inbox`, title "Your inbox"): The second topic, after Getting started. It
-explains, in static text, the seven groups of the inbox (To answer, Disputed, Ready to sign, Replies waiting, Failed
+explains, in static text, the eight groups of the inbox (To answer, with the Question for you row and the note that a
+thread has no addressee, Disputed, which names the checks, Ready to sign, with the caution about ballots not handed in,
+Your signature no longer counts, Replies waiting, Failed
 checks, Waiting for others, and Updates), which of them are counted as work, the New marker, Mark all as read, that a
 concluded review needs no action, that only reviews of projects the user is a member of are listed, and that a
 reviewer who has not handed in the own ballot never sees how the others answered or whether anything is disputed.

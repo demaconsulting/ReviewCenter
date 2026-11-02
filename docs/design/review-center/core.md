@@ -34,7 +34,7 @@ repository; `RevisionValidator`, the check that a revision name cannot be taken 
 `ReviewProgressService`, the stage, signatures, waiting-on names, blockers, last activity, and overdue state of every
 review of a project, for the project overview and the API list;
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner; and
-`InboxService`, the inbox of a user (the reviews that wait for the user, in seven groups, which also serves as the list
+`InboxService`, the inbox of a user (the reviews that wait for the user, in eight groups, which also serves as the list
 of notifications) and the read state that marks what is new;
 `UserImpactService`, the offboarding impact of a user
 (the reviewer slots that still wait for the user and the projects the user alone administers);
@@ -416,7 +416,7 @@ a registered repository needs.
 - *Role*: Provider.
 - *Contract*: Plan the reviews for a repository of a project the actor can see, a head revision, and a baseline choice
   (none, a given revision, or the
-  last signed review of each set): one row for each review-set of the configuration file of the repository, as a full
+  last approved review of each set): one row for each review-set of the configuration file of the repository, as a full
   review or a change since a baseline, already filed, with nothing to review, or one that cannot be planned, with a
   plain note when
   a fallback was used. Create the picked rows through `ReviewService`, each in its own transaction, and report the

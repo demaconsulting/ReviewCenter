@@ -254,6 +254,118 @@ public class SigningServiceBallotTests
     }
 
     /// <summary>
+    ///     Test that a disputed check is named once, as disputed, in the next step, and not also as unanswered, while
+    ///     every check is answered.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered()
+    {
+        // Arrange: every check is answered by every slot; sam disagrees on the first check
+        var world = await SignedReviewWorld.CreateAsync();
+        await DissentAsync(world, "sam");
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert: one dispute, nothing unanswered, in the structure and in the sentence
+        Assert.Equal(1, approval.DisputedChecks);
+        Assert.Equal(0, approval.UnansweredChecks);
+        Assert.Equal("1 check disputed between the ballots.", approval.NextStep);
+        Assert.DoesNotContain("unanswered", approval.NextStep, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the next step says who has signed and whose signature is awaited once nothing blocks signing, and
+    ///     is unchanged while nobody has signed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots()
+    {
+        // Arrange, Act, Assert: nobody, then one, then two have signed
+        var world = await SignedReviewWorld.CreateAsync();
+        Assert.Equal("Ready for signatures.", (await world.ApprovalAsync()).NextStep);
+        await world.SignAsync(1);
+        Assert.Equal("Signed by Rita. Waiting for the signatures of Sam and Tess.", (await world.ApprovalAsync()).NextStep);
+        await world.SignAsync(2);
+        Assert.Equal("Signed by Rita and Sam. Waiting for the signature of Tess.", (await world.ApprovalAsync()).NextStep);
+    }
+
+    /// <summary>
+    ///     Test that a signature that no longer counts is named in the next step, with everybody who is awaited.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt()
+    {
+        // Arrange: rita signs, then the conclusion text changes the record, acknowledging her signature
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        await world.Checklists.SetReviewConclusionTextAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, "A note.", SignedReviewWorld.ActorOf("rita"), cancellationToken, [world.Slots[0].Id]);
+
+        // Act
+        var approval = await world.ApprovalAsync();
+
+        // Assert
+        Assert.Equal(SlotSignatureState.OutOfDate, approval.Slots[0].State);
+        Assert.Empty(approval.Blockers);
+        Assert.Equal(
+            "Rita's signature no longer counts because the review changed. Waiting for Rita, Sam and Tess.",
+            approval.NextStep);
+    }
+
+    /// <summary>
+    ///     Test that a masked status never carries the signature-aware sentence of the full status, only the sentence
+    ///     built from the counts that stay visible, so the masked next step is the same whoever has signed.
+    /// </summary>
+    [Fact]
+    public void ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome()
+    {
+        // Arrange: a status with no open thread and one with an open question
+        var none = new ReviewApproval(ReviewConclusion.None, "d", [], [], "Signed by Rita. Waiting for the signature of Sam.");
+        var open = none with { OpenThreads = 1, OpenQuestions = 1 };
+
+        // Act
+        var maskedNone = none.Masked();
+        var maskedOpen = open.Masked();
+
+        // Assert: the hand-in sentence comes first; the open threads are added only when there are some
+        Assert.Equal("Hand in your ballot to see the other reviewers' answers.", maskedNone.NextStep);
+        Assert.Equal(
+            "Hand in your ballot to see the other reviewers' answers. Resolve the open threads. " + ReviewApproval.HiddenNotice,
+            maskedOpen.NextStep);
+    }
+
+    /// <summary>
+    ///     Test the sentence that warns a signer about ballots that are not handed in: singular, plural, a longer list
+    ///     and no names.
+    /// </summary>
+    /// <param name="names">The names, separated by a vertical bar.</param>
+    /// <param name="expected">The expected sentence.</param>
+    [Theory]
+    [InlineData("Bob", "Bob has not handed in a ballot yet. If you sign now, you may have to sign again.")]
+    [InlineData("Bob|Carol", "Bob and Carol have not handed in a ballot yet. If you sign now, you may have to sign again.")]
+    [InlineData("Bob|Carol|Dave", "Bob, Carol and Dave have not handed in a ballot yet. If you sign now, you may have to sign again.")]
+    [InlineData("", "")]
+    public void ReviewApproval_MissingBallotsText_WordsTheNames(string names, string expected)
+    {
+        // Arrange
+        var list = names.Length == 0 ? [] : names.Split('|');
+
+        // Act, Assert
+        Assert.Equal(expected, ReviewApproval.MissingBallotsText(list));
+    }
+
+    /// <summary>
+    ///     Test that the missing-ballots sentence refuses a missing list.
+    /// </summary>
+    [Fact]
+    public void ReviewApproval_MissingBallotsText_NullNames_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => ReviewApproval.MissingBallotsText(null!));
+    }
+
+    /// <summary>
     ///     Test that a review without a slot has no submitted ballot, so its next step is the open checklist.
     /// </summary>
     [Fact]

@@ -364,7 +364,7 @@ public class ReviewPlannerTests
 
         // Assert: a draft is not a baseline
         Assert.Null(plan.Rows[0].BaselineSha);
-        Assert.Equal("Full review: no signed review of this set yet", plan.Rows[0].BaselineNote);
+        Assert.Equal("Full review: no approved review of this set yet", plan.Rows[0].BaselineNote);
         Assert.Equal(PlanRowStatus.WillCreate, plan.Rows[0].Status);
     }
 
@@ -390,7 +390,7 @@ public class ReviewPlannerTests
         Assert.Equal((1, 1, 0), (core.Added, core.Modified, core.Deleted));
         Assert.Equal("Changes since review 'core' (bbbbbbb)", core.BaselineNote);
         Assert.Null(plan.Rows[1].BaselineSha);
-        Assert.Equal("Full review: no signed review of this set yet", plan.Rows[1].BaselineNote);
+        Assert.Equal("Full review: no approved review of this set yet", plan.Rows[1].BaselineNote);
     }
 
     /// <summary>
@@ -435,7 +435,7 @@ public class ReviewPlannerTests
         // Assert: a full review, and the note says why
         Assert.Null(plan.Rows[0].BaselineSha);
         Assert.Equal(PlanRowStatus.WillCreate, plan.Rows[0].Status);
-        Assert.Contains("is not an ancestor of this revision", plan.Rows[0].BaselineNote);
+        Assert.Contains("the last approved review (core) is not an ancestor of this revision", plan.Rows[0].BaselineNote);
     }
 
     /// <summary>
@@ -455,7 +455,7 @@ public class ReviewPlannerTests
 
         // Assert: a full review, and the note says the check was not possible
         Assert.Null(plan.Rows[0].BaselineSha);
-        Assert.Contains("could not be checked", plan.Rows[0].BaselineNote);
+        Assert.Contains("whether the last approved review (core) is an ancestor of this revision", plan.Rows[0].BaselineNote);
     }
 
     /// <summary>
@@ -478,7 +478,7 @@ public class ReviewPlannerTests
         var core = plan.Rows[0];
         Assert.Null(core.BaselineSha);
         Assert.Equal("src/**\ndocs/**", core.Selection);
-        Assert.Contains("file selection changed", core.BaselineNote);
+        Assert.Contains("file selection changed since the last approved review (core)", core.BaselineNote);
         Assert.Equal((3, 0, 0), (core.Added, core.Modified, core.Deleted));
     }
 

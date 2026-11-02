@@ -11,7 +11,8 @@ sections:
         title: >-
           The PlanPage unit shall show the name of the project and a form with the enabled repositories of the
           project by name only, never a location, user name, or token, a head revision, and a choice of baseline of
-          None, Explicit revision, or Last reviewed, with Last reviewed as the default and the text box for the
+          None, Explicit revision, or Last reviewed (labeled "Changes since the last approved review of each set"), with
+          Last reviewed as the default and the text box for the
           baseline revision shown only for Explicit revision, and shall show a not-found message for a project that
           does not exist or that the user may not see, and a plain message that names whom to ask when the project
           has no repository.

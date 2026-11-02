@@ -141,7 +141,9 @@ sections:
           answered Fail, the number of open threads to
           resolve, all of them that apply, that the checklist is complete, or that all threads are resolved, and,
           when there are no threads and no checklist, to start a discussion, and shall add the hint to write the
-          review conclusion when the review would be rejected and has no conclusion text.
+          review conclusion when the review would be rejected and has no conclusion text, and shall, when the caller
+          gives the number of unanswered checks, use it in place of the unanswered count of the progress, so that a
+          disputed check is named once.
         justification: |
           A reader should not have to count threads or checks to know what to do next; one sentence says it. A
           disputed check stops the signing and a rejection needs its reasons, so the sentence names them.
@@ -150,6 +152,7 @@ sections:
           - ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads
           - ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads
           - ThreadService_NextStep_DisputedAndConclusion_AreNamed
+          - ThreadService_NextStep_ExplicitUnanswered_ReplacesTheProgressCount
 
       - id: ReviewCenter-ThreadService-Audit
         title: >-

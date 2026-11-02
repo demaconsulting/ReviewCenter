@@ -114,9 +114,10 @@ a batch with too many requests is `ArgumentException`.
 
 #### Limitations
 
-The last-signed baseline asks the signing service for the approval of every review of a set to find the latest signed
-one. The lookups are bounded by the reviews of each set, not by the sets times all reviews of the project, so a plan
-stays cheap for the project sizes this release targets; there is no cache.
+The last-approved baseline asks the signing service for the approval of every review of a set to find the latest
+approved one (every slot signed and no thread open). The lookups are bounded by the reviews of each set, not by the
+sets times all reviews of the project, so a plan stays cheap for the project sizes this release targets; there is no
+cache.
 
 That read has no viewer and is a verdict-free system read: the planner uses only whether a review is approved and the
 signature times, and never the per-slot ballot verdicts, the dispute counts, or the failed counts. The HTTP API reads

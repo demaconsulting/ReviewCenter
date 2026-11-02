@@ -106,7 +106,7 @@
                             <label>
                                 <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.LastReviewed)"
                                        data-testid="plan-baseline-last" disabled="@Busy" @onchange="() => GuardedAsync(() => ChooseMode(BaselineMode.LastReviewed))" />
-                                Changes since the last signed review of each set
+                                Changes since the last approved review of each set
                             </label>
                         </fieldset>
                         @if (Mode == BaselineMode.Explicit)

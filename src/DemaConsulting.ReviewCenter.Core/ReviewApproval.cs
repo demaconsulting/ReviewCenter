@@ -155,6 +155,12 @@ public sealed record SlotStatus(
 /// <param name="OpenFindings">How many of <paramref name="OpenThreads"/> are Findings (part of the report).</param>
 /// <param name="OpenCheckQuestions">How many of <paramref name="OpenQuestions"/> are check threads.</param>
 /// <param name="OpenCheckFindings">How many of <paramref name="OpenFindings"/> are check threads.</param>
+/// <param name="FailedCheckIds">
+///     The identifiers of the checks of applicable sections the submitted ballots agree on as Fail, in checklist
+///     order; its length is <paramref name="FailedChecks"/>. <c>null</c> or empty for a review without a checklist or
+///     without an agreed Fail, and always empty in a masked status, because which checks failed reveals how the other
+///     reviewers voted. It is informational, like <paramref name="FailedChecks"/>.
+/// </param>
 public sealed record ReviewApproval(
     ReviewConclusion Conclusion,
     string Digest,
@@ -175,7 +181,8 @@ public sealed record ReviewApproval(
     int OpenQuestions = 0,
     int OpenFindings = 0,
     int OpenCheckQuestions = 0,
-    int OpenCheckFindings = 0)
+    int OpenCheckFindings = 0,
+    IReadOnlyList<string>? FailedCheckIds = null)
 {
     /// <summary>
     ///     The sentence that tells a viewer why the answers of the other reviewers are not shown; it is added to every
@@ -183,6 +190,52 @@ public sealed record ReviewApproval(
     /// </summary>
     public const string HiddenNotice =
         "The other reviewers' answers stay hidden until you hand in your own ballot.";
+
+    /// <summary>
+    ///     The most failed check identifiers a sentence names; further ones are counted ("and 2 more").
+    /// </summary>
+    private const int MaxNamedChecks = 5;
+
+    /// <summary>
+    ///     Gets the sentence that names a provisional rejection, or <c>null</c> when there is nothing to name.
+    /// </summary>
+    /// <remarks>
+    ///     The sentence exists only for a status that is not masked and not concluded, whose outcome is
+    ///     <see cref="ReviewOutcome.Rejected"/> and that has failed check identifiers. A masked status carries no
+    ///     failed check identifiers and no outcome, so a viewer who may not see the answers of the other reviewers
+    ///     never gets it. Examples: "The reviewer failed REQ-01, so this review will be Rejected." (one slot), "Both
+    ///     reviewers failed REQ-01 and REQ-03, so this review will be Rejected." (two slots), "All 3 reviewers failed
+    ///     REQ-01, so this review will be Rejected." (more), and "The reviewers who handed in a ballot failed REQ-01,
+    ///     so this review will be Rejected." while a ballot is still out.
+    /// </remarks>
+    public string? RejectionNote =>
+        IsMasked || IsConcluded || Outcome != ReviewOutcome.Rejected
+            ? null
+            : BuildRejectionNote(FailedCheckIds, Slots.Count, UnsubmittedBallots);
+
+    /// <summary>
+    ///     Words the one sentence that warns a viewer who is about to sign that other reviewers have not handed in a
+    ///     ballot yet.
+    /// </summary>
+    /// <param name="names">The display names of the slots whose ballot is not handed in. Must not be null.</param>
+    /// <returns>
+    ///     For example "Bob has not handed in a ballot yet. If you sign now, you may have to sign again." or, for
+    ///     several names, "Bob and Carol have not handed in a ballot yet. If you sign now, you may have to sign
+    ///     again."; an empty string when <paramref name="names"/> is empty. It names people only, never an answer, so
+    ///     it is the same for a masked and an unmasked viewer.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="names"/> is null.</exception>
+    public static string MissingBallotsText(IReadOnlyList<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        if (names.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var verb = names.Count == 1 ? "has" : "have";
+        return $"{JoinList(names)} {verb} not handed in a ballot yet. If you sign now, you may have to sign again.";
+    }
 
     /// <summary>
     ///     Gets a value indicating whether the review is concluded as approved.
@@ -199,9 +252,11 @@ public sealed record ReviewApproval(
     ///     Reduces the status to what a viewer may see before handing in their own ballot.
     /// </summary>
     /// <returns>
-    ///     A status without the disputes, the failed checks, the provisional outcome, the conclusion requirement and the
-    ///     open check threads, whose blockers and next step are worded from what is left, plus
-    ///     <see cref="HiddenNotice"/>; the status itself when it is concluded or already masked.
+    ///     A status without the disputes, the failed checks (and their identifiers), the provisional outcome (and so
+    ///     <see cref="RejectionNote"/>), the conclusion requirement and the open check threads, whose blockers and
+    ///     next step are worded from what is left, plus <see cref="HiddenNotice"/>; the status itself when it is
+    ///     concluded or already masked. The next step leads with the hand-in sentence ("Hand in your ballot to see the
+    ///     other reviewers' answers.") and adds the open threads only when there are some.
     /// </returns>
     /// <remarks>
     ///     The counts are reduced from the structured fields, never by taking sentences out of the blockers, so a new
@@ -238,10 +293,11 @@ public sealed record ReviewApproval(
             blockers.Add(ThreadCounts.OpenPhrase(openQuestions, openFindings) + " to resolve");
         }
 
-        // The notice comes last and always, so that its presence tells nothing about the hidden answers
+        // The notice comes last and always, so that its presence tells nothing about the hidden answers; the next step
+        // leads with what the viewer can do about the hidden answers (hand in), then names the open threads
         blockers.Add(HiddenNotice);
         var nextStep = openOther > 0
-            ? "Resolve the open threads. " + HiddenNotice
+            ? "Hand in your ballot to see the other reviewers' answers. Resolve the open threads. " + HiddenNotice
             : "Hand in your ballot to see the other reviewers' answers.";
         return this with
         {
@@ -254,10 +310,61 @@ public sealed record ReviewApproval(
             OpenCheckQuestions = 0,
             OpenCheckFindings = 0,
             FailedChecks = 0,
+            FailedCheckIds = [],
             DisputedChecks = 0,
             Outcome = null,
             ConclusionRequired = false,
             IsMasked = true
         };
+    }
+
+    /// <summary>
+    ///     Joins names or identifiers into a plain-language list.
+    /// </summary>
+    /// <param name="items">The items; not empty.</param>
+    /// <returns>"A", "A and B" or "A, B and C".</returns>
+    internal static string JoinList(IReadOnlyList<string> items)
+    {
+        return items.Count switch
+        {
+            0 => string.Empty,
+            1 => items[0],
+            _ => string.Join(", ", items.Take(items.Count - 1)) + " and " + items[^1]
+        };
+    }
+
+    /// <summary>
+    ///     Words the sentence that names a provisional rejection (see <see cref="RejectionNote"/>).
+    /// </summary>
+    /// <param name="failedCheckIds">The identifiers of the agreed Fail checks; <c>null</c> or empty gives <c>null</c>.</param>
+    /// <param name="slotCount">The number of reviewer slots.</param>
+    /// <param name="unsubmittedBallots">The number of slots whose ballot is not handed in.</param>
+    /// <returns>The sentence, or <c>null</c> when there is no failed check to name.</returns>
+    internal static string? BuildRejectionNote(
+        IReadOnlyList<string>? failedCheckIds,
+        int slotCount,
+        int unsubmittedBallots)
+    {
+        if (failedCheckIds is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        // Who failed it: every reviewer when all ballots are in, else only those who handed in
+        var who = unsubmittedBallots > 0 || slotCount == 0
+            ? "The reviewers who handed in a ballot"
+            : slotCount switch
+            {
+                1 => "The reviewer",
+                2 => "Both reviewers",
+                _ => $"All {slotCount} reviewers"
+            };
+
+        // Name the first few checks and count the rest
+        var named = failedCheckIds.Take(MaxNamedChecks).ToList();
+        var checks = failedCheckIds.Count > MaxNamedChecks
+            ? string.Join(", ", named) + $" and {failedCheckIds.Count - MaxNamedChecks} more"
+            : JoinList(named);
+        return $"{who} failed {checks}, so this review will be Rejected.";
     }
 }

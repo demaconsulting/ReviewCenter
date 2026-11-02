@@ -528,14 +528,14 @@ public sealed class ReviewPlanner
         var last = await FindLastSignedAsync(projectId, existing, candidate.Definition.Id, cancellationToken);
         if (last is null)
         {
-            candidate.Note = "Full review: no signed review of this set yet";
+            candidate.Note = "Full review: no approved review of this set yet";
             return;
         }
 
         // A changed selection would let newly selected files escape review in a delta, so it forces a full review
         if (!string.Equals(last.Selection, candidate.SelectionText, StringComparison.Ordinal))
         {
-            candidate.Note = $"Full review: the file selection changed since the last signed review ({last.Id})";
+            candidate.Note = $"Full review: the file selection changed since the last approved review ({last.Id})";
             return;
         }
 
@@ -556,14 +556,14 @@ public sealed class ReviewPlanner
             }
             else
             {
-                candidate.Note = $"Full review: the last signed review ({last.Id}) is not an ancestor of this revision " +
+                candidate.Note = $"Full review: the last approved review ({last.Id}) is not an ancestor of this revision " +
                     "(history was rewritten or it is on another branch)";
             }
         }
         catch (DomainRuleException ex) when (ex.Rule is DomainRule.GitAccessFailed or DomainRule.GitTimeout)
         {
             // Not being able to tell is not a reason to fail the page; a full review is always correct
-            candidate.Note = $"Full review: it could not be checked whether the last signed review ({last.Id}) is an ancestor of this revision";
+            candidate.Note = $"Full review: it could not be checked whether the last approved review ({last.Id}) is an ancestor of this revision";
         }
     }
 

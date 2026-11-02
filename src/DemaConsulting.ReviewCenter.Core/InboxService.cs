@@ -58,6 +58,16 @@ public sealed class InboxService
     public const string SignAgainChip = "The review changed, sign again";
 
     /// <summary>
+    ///     The chip of a slot whose signature no longer covers the record and that cannot be signed again yet.
+    /// </summary>
+    public const string SignatureLostChip = "The review changed, your signature no longer counts";
+
+    /// <summary>
+    ///     The chip of an open question that someone else asked and the user has not answered.
+    /// </summary>
+    public const string QuestionChip = "Question for you";
+
+    /// <summary>
     ///     The chip of an approved review.
     /// </summary>
     public const string ApprovedChip = "Approved";
@@ -494,6 +504,20 @@ public sealed class InboxService
                         unread,
                         $"Waiting for your reply: {counts.OpenText}."));
                 }
+
+                // A question for me: someone else asked and I have not written in the thread. The author's replies
+                // waiting already list every such thread, and the threads are the ones I may know of (see above), so
+                // no check discussion of a hidden user is ever named
+                IReadOnlyList<ReviewThread> questions = isAuthor || (mine.Count > 0 && !review.Member)
+                    ? []
+                    : InboxRules.QuestionsForYou(threads, username);
+                if (questions.Count > 0)
+                {
+                    var unread = review.State is null || InboxRules.CountUnread(questions, username, lastSeenCommentId) > 0;
+                    items.Add(Row(InboxSection.ToAnswer, QuestionChip, unread, InboxRules.QuestionText(questions))
+                        with
+                    { OpensReview = true });
+                }
             }
 
             // Failed checks: my own review has checks the reviewers agreed on as Fail (disputed checks are a section of
@@ -523,7 +547,7 @@ public sealed class InboxService
 
     /// <summary>
     ///     Adds the row that says where the user stands in a review that is not concluded: to answer, disputed, ready
-    ///     to sign, or waiting for others; or no row when nothing is asked of the user.
+    ///     to sign, signature no longer counts, or waiting for others; or no row when nothing is asked of the user.
     /// </summary>
     /// <remarks>
     ///     The decision is <see cref="InboxRules.ReviewerStanding"/>. The ballot of the user is the one of the slot with
@@ -563,10 +587,9 @@ public sealed class InboxService
             .Where(state => state != SlotSignatureState.Signed)
             .ToList();
 
-        // The disputes are only counted for a user who may see them, so a hidden user never reaches the count
-        var disputed = hasChecklist && !review.Hidden
-            ? BallotProjection.Consolidate(record, slots.Count)?.Result.Disputed ?? 0
-            : 0;
+        // The disputes are only counted and named for a user who may see them, so a hidden user never reaches them
+        var consolidated = hasChecklist && !review.Hidden ? BallotProjection.Consolidate(record, slots.Count) : null;
+        var disputed = consolidated?.Result.Disputed ?? 0;
         var standing = InboxRules.ReviewerStanding(
             false,
             holdsSlot,
@@ -576,7 +599,8 @@ public sealed class InboxService
             review.Hidden,
             disputed,
             unsigned.Count > 0,
-            unsigned.Count > 0 && SigningService.CanSignAfter(record, slots.Count, review.Hidden));
+            unsigned.Count > 0 && SigningService.CanSignAfter(record, slots.Count, review.Hidden),
+            unsigned.Contains(SlotSignatureState.OutOfDate));
         switch (standing)
         {
             case InboxStanding.ToAnswer:
@@ -598,21 +622,192 @@ public sealed class InboxService
                     InboxSection.Disputed,
                     $"{disputed} disputed",
                     review.State is null || otherSubmitted,
-                    holdsSlot
-                        ? "Change your answer or discuss it."
-                        : "The reviewers answered differently. Discuss it with them."));
+                    InboxRules.DisputedText(DisputedNames(consolidated), holdsSlot)));
                 break;
 
             case InboxStanding.ToSign:
                 var chip = unsigned.Contains(SlotSignatureState.NotSigned) ? NotSignedChip : SignAgainChip;
                 var unread = await IsToSignUnreadAsync(review, facts.LastSeenCommentId, facts.LastSeenAt, cancellationToken);
-                items.Add(row(InboxSection.ToSign, chip, unread, null));
+                items.Add(row(InboxSection.ToSign, chip, unread, await ToSignDetailAsync(review, facts, unsigned, cancellationToken)));
+                break;
+
+            case InboxStanding.SignatureLost:
+                // Progress only: the state of the slot and the blocker the user may know of, no answer of anyone
+                var lostUnread = await IsToSignUnreadAsync(review, facts.LastSeenCommentId, facts.LastSeenAt, cancellationToken);
+                items.Add(row(
+                    InboxSection.SignatureLost,
+                    SignatureLostChip,
+                    lostUnread,
+                    InboxRules.SignatureLostText(await WhyNotSignableAsync(review, facts, consolidated, cancellationToken))));
                 break;
 
             case InboxStanding.Waiting:
                 await AddWaitingItemAsync(items, review, facts, row, cancellationToken);
                 break;
         }
+    }
+
+    /// <summary>
+    ///     Names the disputed checks and sections of a consolidated checklist.
+    /// </summary>
+    /// <param name="consolidated">The consolidated view; <c>null</c> when the user may not see the disputes.</param>
+    /// <returns>The check identifiers in checklist order, then the disputed sections as <c>section "Title"</c>.</returns>
+    private static List<string> DisputedNames(ConsolidatedView? consolidated)
+    {
+        if (consolidated is null)
+        {
+            return [];
+        }
+
+        var names = consolidated.Result.Checks
+            .Where(check => check.Consensus == CheckConsensus.Disputed)
+            .Select(check => check.ItemId)
+            .ToList();
+        var titles = consolidated.State.Definition.Sections.ToDictionary(section => section.Id, section => section.Title);
+        names.AddRange(consolidated.Result.Sections
+            .Where(section => section.Consensus == SectionConsensus.Disputed)
+            .Select(section => $"section \"{titles.GetValueOrDefault(section.SectionId, section.SectionId)}\""));
+        return names;
+    }
+
+    /// <summary>
+    ///     Words the detail of a "Ready to sign" row: that the signature was withdrawn when it was, and which reviewers
+    ///     have not handed in a ballot yet.
+    /// </summary>
+    /// <remarks>
+    ///     Who has not handed in is progress and is named for every user; no answer is used.
+    /// </remarks>
+    /// <param name="review">What is known of the review.</param>
+    /// <param name="facts">The slots and signatures the standing is decided from.</param>
+    /// <param name="unsigned">The signature states of the slots of the user that have no current signature.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The sentences, or <c>null</c> when there is nothing to add.</returns>
+    private static async Task<string?> ToSignDetailAsync(
+        ReviewContext review,
+        StandingFacts facts,
+        IReadOnlyList<SlotSignatureState> unsigned,
+        CancellationToken cancellationToken)
+    {
+        var parts = new List<string>();
+        if (unsigned.Contains(SlotSignatureState.OutOfDate))
+        {
+            parts.Add(InboxRules.SignAgainText);
+        }
+
+        var missing = await MissingBallotNamesAsync(review, facts, cancellationToken);
+        if (missing.Count > 0)
+        {
+            parts.Add(ReviewApproval.MissingBallotsText(missing));
+        }
+
+        return parts.Count == 0 ? null : string.Join(' ', parts);
+    }
+
+    /// <summary>
+    ///     Finds the reviewers of the other slots whose ballot is not handed in.
+    /// </summary>
+    /// <param name="review">What is known of the review.</param>
+    /// <param name="facts">The slots the standing is decided from.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The display names of the primary reviewers, in slot order; empty for a review without a checklist.</returns>
+    private static async Task<IReadOnlyList<string>> MissingBallotNamesAsync(
+        ReviewContext review,
+        StandingFacts facts,
+        CancellationToken cancellationToken)
+    {
+        var (record, slots, _) = review.Snapshot;
+        if (record.Checklist is null)
+        {
+            return [];
+        }
+
+        var open = slots
+            .Where(slot => !facts.Mine.Contains(slot)
+                           && !record.Ballots.Any(ballot => ballot.SlotId == slot.Id && ballot.Status == BallotStatus.Submitted))
+            .ToList();
+        if (open.Count == 0)
+        {
+            return [];
+        }
+
+        var users = await review.Names.GetAsync(cancellationToken);
+        return open
+            .Select(slot => users.TryGetValue(slot.PrimaryUserId, out var name) ? name : null)
+            .OfType<string>()
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Words why a user whose signature no longer counts cannot sign again yet.
+    /// </summary>
+    /// <remarks>
+    ///     Only what the user may know of is used: the open threads the user may see, the conclusion a rejection needs
+    ///     (not for a user who may not see the other ballots) and who else has not signed.
+    /// </remarks>
+    /// <param name="review">What is known of the review.</param>
+    /// <param name="facts">The slots and signatures the standing is decided from.</param>
+    /// <param name="consolidated">The consolidated view; <c>null</c> for a user who may not see it.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A phrase that fits after "You cannot sign again yet:".</returns>
+    private static async Task<string> WhyNotSignableAsync(
+        ReviewContext review,
+        StandingFacts facts,
+        ConsolidatedView? consolidated,
+        CancellationToken cancellationToken)
+    {
+        var record = review.Snapshot.Record;
+        var open = ThreadCounts.From(review.Hidden ? record.Threads.Where(thread => !thread.IsCheckThread) : record.Threads);
+        if (open.Open > 0)
+        {
+            return $"open items remain ({open.OpenText})";
+        }
+
+        if (consolidated?.Result.Outcome == ReviewOutcome.Rejected && string.IsNullOrWhiteSpace(record.ReviewConclusionText))
+        {
+            return "the review conclusion is not written yet";
+        }
+
+        var waitingFor = await OthersWithoutSignatureAsync(review, facts, cancellationToken);
+        return waitingFor.Count > 0
+            ? $"waiting for {ReviewApproval.JoinList(waitingFor)}"
+            : "some checks are still open";
+    }
+
+    /// <summary>
+    ///     Finds the people of the other slots that have no current signature.
+    /// </summary>
+    /// <param name="review">What is known of the review.</param>
+    /// <param name="facts">The slots and signatures the standing is decided from.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The display names of the primary and, when another person, alternate reviewers, in slot order.</returns>
+    private static async Task<IReadOnlyList<string>> OthersWithoutSignatureAsync(
+        ReviewContext review,
+        StandingFacts facts,
+        CancellationToken cancellationToken)
+    {
+        var others = review.Snapshot.Slots
+            .Where(slot => !facts.Mine.Contains(slot)
+                           && InboxRules.SlotState(slot, facts.Signatures, facts.Digest) != SlotSignatureState.Signed)
+            .ToList();
+        if (others.Count == 0)
+        {
+            return [];
+        }
+
+        var users = await review.Names.GetAsync(cancellationToken);
+        var people = new List<string>();
+        foreach (var slot in others)
+        {
+            foreach (var userId in new[] { slot.PrimaryUserId, slot.AlternateUserId ?? slot.PrimaryUserId }.Distinct())
+            {
+                if (users.TryGetValue(userId, out var name) && !people.Contains(name))
+                {
+                    people.Add(name);
+                }
+            }
+        }
+
+        return people;
     }
 
     /// <summary>
@@ -643,20 +838,16 @@ public sealed class InboxService
         string detail;
         if (others.Count > 0)
         {
-            var users = await review.Names.GetAsync(cancellationToken);
-            var people = new List<string>();
-            foreach (var slot in others)
-            {
-                foreach (var userId in new[] { slot.PrimaryUserId, slot.AlternateUserId ?? slot.PrimaryUserId }.Distinct())
-                {
-                    if (users.TryGetValue(userId, out var name) && !people.Contains(name))
-                    {
-                        people.Add(name);
-                    }
-                }
-            }
+            var people = await OthersWithoutSignatureAsync(review, facts, cancellationToken);
 
-            detail = InboxRules.WaitingForText(people);
+            // The other signers are told whose signature was withdrawn, so they know why the review waits
+            var users = await review.Names.GetAsync(cancellationToken);
+            var signAgain = others
+                .Where(slot => InboxRules.SlotState(slot, facts.Signatures, facts.Digest) == SlotSignatureState.OutOfDate)
+                .Select(slot => users.TryGetValue(slot.PrimaryUserId, out var name) ? name : null)
+                .OfType<string>()
+                .ToList();
+            detail = InboxRules.WaitingForText(people, signAgain);
         }
         else if (record.Checklist is null)
         {

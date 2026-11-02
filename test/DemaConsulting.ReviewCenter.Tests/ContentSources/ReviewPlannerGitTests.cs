@@ -321,7 +321,7 @@ public class ReviewPlannerGitTests
         Assert.Equal(PlanRowStatus.WillCreate, core.Status);
         Assert.Null(core.BaselineSha);
         Assert.Equal((2, 0, 0), (core.Added, core.Modified, core.Deleted));
-        Assert.Contains("is not an ancestor of this revision", core.BaselineNote);
+        Assert.Contains("the last approved review (core) is not an ancestor of this revision", core.BaselineNote);
     }
 
     /// <summary>
@@ -348,7 +348,7 @@ public class ReviewPlannerGitTests
         var core = plan.Rows[0];
         Assert.Null(core.BaselineSha);
         Assert.Equal("src/**\ndocs/**", core.Selection);
-        Assert.Contains("file selection changed", core.BaselineNote);
+        Assert.Contains("file selection changed since the last approved review (core)", core.BaselineNote);
         Assert.Equal((3, 0, 0), (core.Added, core.Modified, core.Deleted));
     }
 

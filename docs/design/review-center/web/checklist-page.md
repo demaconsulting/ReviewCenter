@@ -42,17 +42,28 @@ every other member sees no notice.
 
 In a review with several slots the page keeps the answers of the other reviewers from a viewer who may not see them
 (see *BallotVisibility*): a reviewer who has not handed in the own ballot, and a member who holds no slot. Such a viewer
-sees the line `ballots-handed-in` ("2 of 3 ballots handed in.") and the notice `ballots-hidden-notice` (the answers of
-the others stay hidden until the own ballot is handed in), and no standing, no count of disputed checks, and no
-different-answers badge; the lead, a project or system administrator, and an Auditor see everything, and so does
-everybody once the review is concluded. A review with a single slot shows none of this. A viewer who has handed in the
+sees the line `ballots-handed-in` ("1 of 3 ballots handed in. Cyd has not handed in yet.", naming the other reviewers
+whose ballot is not in, which is progress and not an answer) and the notice `ballots-hidden-notice` (the answers of
+the others stay hidden until the own ballot is handed in), and no standing, no count of disputed checks, no
+different-answers badge, no justification of another reviewer, and no failed check ("Checklist complete." says only
+that the viewer has answered everything); the lead, a project or system administrator, and an Auditor see everything,
+and so does everybody once the review is concluded. A review with a single slot shows none of this. A viewer who may
+see the others sees at the top, when checks are answered differently, the line `differing-summary` ("2 checks answered
+differently. Open them to discuss."), and the status line says "Checklist complete, 1 check failed." when the
+submitted ballots agree on a failure. A viewer who has handed in the
 own ballot sees, under every check that the submitted ballots answer differently, the line `ballot-others-{id}` ("Ann:
-Pass / Bob: N/A", in slot order, with the justifications) and a "Different answers" badge, and a **Discuss** button
+Pass / Bob: N/A", in slot order) with, for every other reviewer who gave a justification, a line
+`ballot-others-why-{id}-{slot}` ("Bob: “too vague”"; text is encoded by the component, and the viewer's own
+justification is not repeated), and a "Different answers" badge, and a **Discuss** button
 that opens a small form (`discuss-form-{id}`); starting it creates a discussion thread about that check through
-`ThreadService` and shows a link to the review page where the thread is read and answered. A reviewer whose own ballot
+`ThreadService` and shows a link to the review page where the thread is read and answered. A concluded review with
+several slots shows `checklist-history-pointer`, which links (`checklist-history-link`) to the history page, because
+the page shows one ballot at a time and the answers of all reviewers are in the history. A reviewer whose own ballot
 is a complete draft in a review with several slots, where nothing but the hand-in blocks the signature, sees **Submit
 and sign** as the main action (`submit-and-sign`, with the password field `submit-sign-password`, and the code field
-`submit-sign-totp` when the account has a second factor) and **Submit ballot** as the secondary one. The first hands in
+`submit-sign-totp` when the account has a second factor) and **Submit ballot** as the secondary one; when other ballots
+are not in, a caution `submit-and-sign-caution` above the form names who has not handed in (the wording of
+`ReviewApproval.MissingBallotsText`, as in the inbox and on the review page). The first hands in
 the ballot and then signs it for the viewer's slot; when the signature is refused the ballot stays handed in and the
 page says so and links to the review page. An account of an identity provider has no password to give, so its button
 hands in the ballot and then offers the confirmation at the provider, which leads back to the page. A member who holds
@@ -126,7 +137,8 @@ check identifiers are written in lower case (`section-req-toggle`,
 they are needed.
 
 **Ballots**: the `BallotView` of the viewer, read from `ChecklistService.GetBallotViewAsync` whenever the checklist is
-read (`IsMasked`, the differing checks with the answers of every slot, the counts of handed-in ballots,
+read (`IsMasked`, the differing checks with the answers and justifications of every slot, `OwnSlotNumber`, `FailedChecks`,
+`MissingNames`, the counts of handed-in ballots,
 `CanSubmitAndSign`, and `CanAssignMe`). **Capabilities**: the `ThreadCapabilities` of the viewer, which decide whether
 Discuss is offered.
 **CurrentIsExternal**, **CurrentHasTotp**: the kind of account of the viewer, which decide the entries of Submit and
@@ -293,7 +305,8 @@ in" message on this page.
   `AuthorBlocked`) and records answers, section decisions, and the hand-in of the ballot; it refuses a change of a
   locked review with `ReviewLocked`, the change of the author with `AuthorCannotAnswer`, and an answer or hand-in of a
   user without a slot with `NoReviewerSlot`, and an incomplete hand-in with `BallotIncomplete`; its ballot view
-  (`GetBallotViewAsync`) says whether the answers of the others are hidden from the viewer, which checks differ, how
+  (`GetBallotViewAsync`) says whether the answers of the others are hidden from the viewer, which checks differ (with the
+  justifications), how many checks failed, who has not handed in, how
   many ballots are handed in, and whether Assign me and Submit and sign are offered.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
   name for the breadcrumb.

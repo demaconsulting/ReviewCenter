@@ -269,6 +269,7 @@ sections:
           - ReviewCenter-ChecklistService-BallotSubmit
           - ReviewCenter-ChecklistService-SingleSlotAutoSubmit
           - ReviewCenter-ChecklistService-OwnBallotView
+          - ReviewCenter-ChecklistService-BallotViewDetails
         tests:
           - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
 
@@ -352,6 +353,8 @@ sections:
           - ReviewCenter-SigningService-OwnBallotSubmitted
           - ReviewCenter-SigningService-EarlySigning
           - ReviewCenter-SigningService-DisputedBlocker
+          - ReviewCenter-SigningService-NextStepWording
+          - ReviewCenter-SigningService-FailedChecksMasked
           - ReviewCenter-SigningService-SlotBallotImpact
           - ReviewCenter-SigningService-SlotBallotState
           - ReviewCenter-SigningService-RejectedOutcome
@@ -566,9 +569,9 @@ sections:
         title: >-
           The Core subsystem shall plan the reviews that a head revision of a registered repository needs, one for each
           review-set that the repository defines in its configuration file, choosing for each set a full review, the
-          changes since a given revision, or the changes since the last signed review of that set (falling back to a
-          full
-          review, with a plain note, when that review is not in the history or covered other files), telling which sets
+          changes since a given revision, or the changes since the last approved review of that set (falling back to a
+          full review, with a plain note, when that review is not in the history or covered other files), telling which
+          sets
           are already filed or have nothing to review, and create the picked reviews through the review service, each in
           its own transaction, reporting the result of each.
         justification: |
@@ -724,6 +727,7 @@ sections:
           - ReviewCenter-ReviewStatusService-Status
           - ReviewCenter-ReviewStatusService-MaskedViewer
           - ReviewCenter-ReviewStatusService-ChangesSinceSigning
+          - ReviewCenter-ReviewStatusService-Guidance
         tests:
           - ReviewNextAction_OneActionPerViewer
           - ReviewStatus_MaskedViewer_NoDisputedChecks
@@ -768,7 +772,8 @@ sections:
       - id: ReviewCenter-Core-Inbox
         title: >-
           The Core subsystem shall build for a user an inbox of the reviews that wait for the user, in the groups to
-          answer, disputed, ready to sign, replies waiting, failed checks, waiting for others, and updates, decide on
+          answer, disputed, ready to sign, signature no longer counts, replies waiting, failed checks, waiting for
+          others, and updates, decide on
           the current access of the user which reviews
           and which actions are shown, never show a user who has not handed in the own ballot what the others answered,
           count the reviews that need action, keep what the user has seen of each review
@@ -782,6 +787,8 @@ sections:
           - ReviewCenter-InboxService-ToAnswer
           - ReviewCenter-InboxService-Disputed
           - ReviewCenter-InboxService-ToSign
+          - ReviewCenter-InboxService-QuestionForYou
+          - ReviewCenter-InboxService-SignatureLost
           - ReviewCenter-InboxService-RepliesWaiting
           - ReviewCenter-InboxService-FailedChecks
           - ReviewCenter-InboxService-WaitingForOthers

@@ -10,7 +10,8 @@ choice and of the
 classification is reached with exact commits and files, and the number of sessions that git opened can be counted. The
 integration tests in `ReviewPlannerGitTests.cs` use the real `GitSource` and `ReviewMarkConfigParser` over real git
 repositories that the tests create with the installed git (through `GitTestSupport`), and a real SQLite database, so
-that the plan is computed from real history: the baseline since the last signed review, the fallback when that commit is
+that the plan is computed from real history: the baseline since the last approved review, the fallback when that
+commit is
 not an ancestor, the detection of a review that was already filed, and the skipping of a set without changes. The tests
 that need git skip themselves when it is not installed.
 
@@ -32,7 +33,7 @@ N/A - standard test environment (the integration tests need git, and skip themse
 - Change lists are loaded once per distinct baseline and one at a time: the earlier list is no longer held when the
   next one is requested, and the rows keep the order of the file.
 - A set with a review of the same head and baseline is `AlreadyFiled`; a set with no changed file, or at the head of its
-  last signed review, is `NothingToReview`.
+  last approved review, is `NothingToReview`.
 - Creation uses one session, creates each review through the review service with its set identifier and the range title,
   reports each request on its own, and lets the others succeed when one fails, also when the failure is an unexpected
   fault, which is reported with a generic reason; a git access failure is reported with a fixed sentence that carries no
@@ -56,7 +57,7 @@ stops the plan with `RevisionNotFound`. This scenario is tested by
 `ReviewPlanner_PlanAsync_UnknownExplicitBaseline_ThrowsRevisionNotFound`.
 
 **ReviewPlanner_PlanAsync_LastReviewedWithOnlyDraft_FullReview**: A set whose only review is not signed gets a full
-review with the note that there is no signed review yet. This scenario is tested by
+review with the note that there is no approved review of the set yet. This scenario is tested by
 `ReviewPlanner_PlanAsync_LastReviewedWithOnlyDraft_FullReview`.
 
 **ReviewPlanner_PlanAsync_LastReviewedSignedAncestor_UsesItsHeadAsBaseline**: A signed review whose head is an ancestor
@@ -83,7 +84,7 @@ is still made, with a full review and a note. This scenario is tested by
 signed review gets a full review and a note. This scenario is tested by
 `ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote`.
 
-**ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview**: A set whose last signed review has the new head is
+**ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview**: A set whose last approved review has the new head is
 `NothingToReview`. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview`.
 
 **ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled**: A set with a review of the same head and baseline is

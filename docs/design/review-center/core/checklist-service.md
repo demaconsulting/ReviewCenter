@@ -220,6 +220,21 @@ and comments are not affected by the rule.
   (`_store.GetSnapshotAsync`), and the review comes from `_store.GetReviewAsync`, which the lead and the audit check
   need. A review that has disappeared between the two reads gives the masked state (fail closed), never the standing.
 
+**GetBallotViewAsync**: The viewer-requiring read of what the checklist page shows of the other ballots (`BallotView`).
+
+- *Parameters*: `Actor viewer`, `int projectId`, `string reviewId`, and a cancellation token.
+- *Returns*: `Task<BallotView?>` — null when the review does not exist.
+- *Postconditions*: `IsMasked` is true when the viewer may not see the others. `Differing` (the checks the submitted
+  ballots answer differently, each with the answer, and the justification, of every slot) and `FailedChecks` (how many
+  checks the submitted ballots agree on as Fail) are filled only when the viewer may see the others *and* may view the
+  project; for any other viewer they are empty and 0, so a stranger learns neither a dispute nor a failed check.
+  `OwnSlotNumber` is the position of the viewer's own slot (null without a slot), so the page does not repeat the
+  viewer's own justification. `MissingBallotNames` lists the display names of the other slots whose ballot is not
+  handed in (a draft, or none yet), in slot order; it shows who has not handed in, which is progress and never an
+  answer, so a viewer of the project gets it in a masked view too, and a stranger gets an empty list. The counts of
+  handed-in ballots, `CanSubmitAndSign` and `CanAssignMe` are as before. No justification of a masked viewer is ever
+  returned; `GetConsolidatedAsync`, which serves the API, is unchanged.
+
 **SetSectionApplicabilityAsync**: Records whether a section applies in the ballot of the slot of the actor.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string sectionId`, `bool applicable`, `string? reason`,

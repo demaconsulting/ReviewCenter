@@ -24,8 +24,14 @@ N/A - standard test environment.
   ballot, lists the disputed checks with whether a discussion can be started, and counts the open questions and findings.
 - A review with one slot is not masked and asks the reviewer to answer; a review with no slot asks the lead to add the
   reviewers; a viewer who may not see the project is refused; a missing review gives nothing.
-- A viewer who may not see the others yet gets no disputed check, no count of discussions about checks, and no answer
-  in the changes since a signature.
+- A viewer who may not see the others yet gets no disputed check, no answer, no failed check, no outcome note, no early
+  signing caution, no count of discussions about checks, and no answer in the changes since a signature.
+- A viewer who may see the answers gets, for each disputed check, the answer and the justification of every submitted
+  ballot in slot order; the outcome note that names the failed check and says Rejected; a caution that names the
+  reviewers who have not handed in when the viewer is about to sign (none for a single reviewer); a sentence instead
+  of a
+  button for the person who asked every open question, while the other reviewer is still asked to answer; and, for a
+  reviewer who signed, the name of the reviewer the review waits for.
 - The changes since a signature list only the entries after the signature that can alter the report, a reply or a
   comment only when it is in the report, and nothing when the signature still matches.
 - The audit trail of a long review is read to its end, so the newest entries are listed however many entries precede
@@ -62,6 +68,15 @@ tested by `ReviewNextAction_SignedWaiting_WaitForOthers`.
 **ReviewNextAction_OneActionPerViewer**: Every combination of the facts gives one action, and a sentence has no place
 to go to. This scenario is tested by `ReviewNextAction_OneActionPerViewer`.
 
+**ReviewNextAction_OwnQuestion_WaitsForTheOtherParty**: The person who asked every open question gets a sentence that
+names whom they wait for (or none when there are many), the other party is still asked to answer, unknown facts keep the
+older rule, and findings still come first. This scenario is tested by
+`ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`.
+
+**ReviewNextAction_AfterSigning_NamesWhoIsMissing**: A reviewer who signed is told whom the review waits for, and a
+reviewer whose signature no longer counts, and who cannot sign yet, is told so without a button. This scenario is tested
+by `ReviewNextAction_AfterSigning_NamesWhoIsMissing`.
+
 **ReviewStatus_Reviewers_ShowBallotAndSignatureState**: The reviewers are listed in slot order with the state of the
 ballot and of the signature. This scenario is tested by `ReviewStatus_Reviewers_ShowBallotAndSignatureState`.
 
@@ -72,6 +87,35 @@ discussion about it is open. This scenario is tested by
 **ReviewStatus_MaskedViewer_NoDisputedChecks**: A reviewer with a draft, and a member without a slot, see no disputed
 check and no discussion about a check in the counts. This scenario is tested by
 `ReviewStatus_MaskedViewer_NoDisputedChecks`.
+
+**ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording**: For a reviewer with a draft and a member
+without a
+slot, whose view of a review with failed checks and an open discussion is serialized, nothing of the answers, the
+justification, the check text, the check id, the outcome note, the caution or the word Rejected is present, and a
+stranger is refused. This scenario is tested by `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`.
+
+**ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification**: A viewer who handed in, and the lead, get the answer
+of every submitted ballot to a disputed check in slot order, with the justification written. This scenario is tested by
+`ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification`.
+
+**ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt**: A review that both reviewers failed on a check gives a
+viewer who handed in an outcome note with the check and the word Rejected, and a viewer without a ballot nothing. This
+scenario is tested by `ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt`.
+
+**ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot**: A reviewer who could sign while another reviewer has
+not handed in is cautioned by name; the reviewer without a ballot and the reviewer after the ballot is in get no caution.
+This scenario is tested by `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`.
+
+**ReviewStatus_SingleSlot_NoCaution**: A review with one reviewer gives no caution. This scenario is tested by
+`ReviewStatus_SingleSlot_NoCaution`.
+
+**ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers**: The person who started the discussion about a check waits
+for the other reviewer without a button, and the other reviewer is asked to answer. This scenario is tested by
+`ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers`.
+
+**ReviewStatus_AfterSigning_NamesWhoSignsNext**: A reviewer who signed is told whom the review waits for, in the words
+of the panel and in the next step of the approval. This scenario is tested by
+`ReviewStatus_AfterSigning_NamesWhoSignsNext`.
 
 **ReviewStatus_Auditor_SeesDisputesButCannotDiscuss**: An Auditor sees the disputed checks and may not start a
 discussion. This scenario is tested by `ReviewStatus_Auditor_SeesDisputesButCannotDiscuss`.
@@ -128,7 +172,8 @@ project and gives nothing for a missing review. This scenario is tested by
   `ReviewNextAction_DraftBallot_Submit`, `ReviewNextAction_SubmittedWithDispute_Discuss`,
   `ReviewNextAction_OpenFindings_Resolve`, `ReviewNextAction_ReadyToSign_Sign`,
   `ReviewNextAction_SignedWaiting_WaitForOthers`, `ReviewNextAction_Concluded_Done`,
-  `ReviewNextAction_OneActionPerViewer`
+  `ReviewNextAction_OneActionPerViewer`, `ReviewNextAction_OwnQuestion_WaitsForTheOtherParty`,
+  `ReviewNextAction_AfterSigning_NamesWhoIsMissing`
 - **ReviewCenter-ReviewStatusService-Status**: `ReviewStatus_Reviewers_ShowBallotAndSignatureState`,
   `ReviewStatus_DisputedChecks_ListedWithDiscussUntilThreadIsOpen`, `ReviewStatus_Auditor_SeesDisputesButCannotDiscuss`,
   `ReviewStatus_Outsider_IsRefusedAndMissingReviewIsNull`, `ReviewStatus_NoSlots_LeadIsAskedToAddReviewers`,
@@ -137,7 +182,12 @@ project and gives nothing for a missing review. This scenario is tested by
   `ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule`,
   `ReviewStatus_Reopener_WithoutEarlierSignature_SignDependsOnProjectRule`
 - **ReviewCenter-ReviewStatusService-MaskedViewer**: `ReviewStatus_MaskedViewer_NoDisputedChecks`,
+  `ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording`,
   `ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer`
+- **ReviewCenter-ReviewStatusService-Guidance**: `ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification`,
+  `ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt`,
+  `ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot`, `ReviewStatus_SingleSlot_NoCaution`,
+  `ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers`, `ReviewStatus_AfterSigning_NamesWhoSignsNext`
 - **ReviewCenter-ReviewStatusService-ChangesSinceSigning**:
   `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`,
   `ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches`,

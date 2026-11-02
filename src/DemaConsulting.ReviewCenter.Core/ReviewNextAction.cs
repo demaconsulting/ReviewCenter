@@ -108,6 +108,19 @@ public enum NextActionTarget
 /// <param name="OpenQuestions">How many questions the viewer sees open.</param>
 /// <param name="ConclusionNeeded">Whether the viewer sees that the review needs a conclusion and may write it.</param>
 /// <param name="CanSign">Whether the viewer may sign right now.</param>
+/// <param name="OpenQuestionsAwaitingYou">
+///     How many of the open questions wait for the viewer: the latest comment of the question is by somebody else. The
+///     default <c>-1</c> means "not known" and keeps the older rule: every open question is for the viewer to answer.
+///     <c>0</c> means that every open question is one the viewer asked and nobody answered yet, so the viewer waits.
+/// </param>
+/// <param name="OtherReviewers">
+///     The display names of the other reviewers (every slot the viewer does not hold); used to say whom the viewer waits
+///     for. <c>null</c> when not known.
+/// </param>
+/// <param name="OthersToSign">
+///     The display names of the other reviewers who have no current signature; used to tell a reviewer who signed whom
+///     the review waits for. <c>null</c> when not known.
+/// </param>
 public sealed record NextActionFacts(
     bool IsConcluded,
     bool CanContribute,
@@ -123,7 +136,10 @@ public sealed record NextActionFacts(
     int OpenFindings,
     int OpenQuestions,
     bool ConclusionNeeded,
-    bool CanSign);
+    bool CanSign,
+    int OpenQuestionsAwaitingYou = -1,
+    IReadOnlyList<string>? OtherReviewers = null,
+    IReadOnlyList<string>? OthersToSign = null);
 
 /// <summary>
 ///     The one thing a viewer should do next in a review, in plain words.
@@ -137,6 +153,17 @@ public sealed record NextActionFacts(
 /// <param name="Target">Where it is done.</param>
 public sealed record ReviewNextAction(NextActionKind Kind, string Label, NextActionTarget Target)
 {
+    /// <summary>
+    ///     The sentence that tells a reviewer whose signature was withdrawn (the review changed after it was given)
+    ///     that it no longer counts; the same words as the inbox row of that reviewer.
+    /// </summary>
+    public const string SignatureLostText = "The review changed, your signature no longer counts.";
+
+    /// <summary>
+    ///     The sentence of a reviewer whose signature no longer counts and who cannot sign again yet.
+    /// </summary>
+    private const string SignAgainLater = "You can sign again when nothing blocks it.";
+
     /// <summary>
     ///     Gets a value indicating whether there is something to go to (a button), as opposed to a sentence that only
     ///     says what is going on.
@@ -206,7 +233,7 @@ public sealed record ReviewNextAction(NextActionKind Kind, string Label, NextAct
 
         if (signed)
         {
-            return Wait();
+            return WaitAfterSigning(facts.OthersToSign);
         }
 
         if (facts.ConclusionNeeded)
@@ -222,7 +249,10 @@ public sealed record ReviewNextAction(NextActionKind Kind, string Label, NextAct
             return new ReviewNextAction(NextActionKind.Sign, label, NextActionTarget.Reviewers);
         }
 
-        return Wait();
+        // The signature is gone and something still blocks a new one: say so plainly (the inbox says the same)
+        return facts.OwnSignature == SlotSignatureState.OutOfDate
+            ? new ReviewNextAction(NextActionKind.WaitForOthers, SignAgainLater, NextActionTarget.None)
+            : Wait();
     }
 
     /// <summary>
@@ -276,9 +306,41 @@ public sealed record ReviewNextAction(NextActionKind Kind, string Label, NextAct
             return new ReviewNextAction(NextActionKind.ResolveFindings, "Resolve the open findings", NextActionTarget.Threads);
         }
 
-        return facts.OpenQuestions > 0
-            ? new ReviewNextAction(NextActionKind.AnswerQuestions, "Answer the open questions", NextActionTarget.Threads)
-            : null;
+        if (facts.OpenQuestions <= 0)
+        {
+            return null;
+        }
+
+        // The person who asked every open question does not answer it: they wait for the answer
+        return facts.OpenQuestionsAwaitingYou == 0
+            ? new ReviewNextAction(NextActionKind.WaitForOthers, WaitingForAnswer(facts.OtherReviewers), NextActionTarget.None)
+            : new ReviewNextAction(NextActionKind.AnswerQuestions, "Answer the open questions", NextActionTarget.Threads);
+    }
+
+    /// <summary>
+    ///     Words the sentence of a person who asked a question and waits for the answer.
+    /// </summary>
+    /// <param name="others">The names of the other reviewers; may be <c>null</c>.</param>
+    /// <returns>"Waiting for Bob to answer your question.", or a sentence without names when there are none or many.</returns>
+    private static string WaitingForAnswer(IReadOnlyList<string>? others)
+    {
+        // A question has no addressee, so the names are given only when they are few and clear
+        return others is { Count: > 0 and <= 2 }
+            ? $"Waiting for {ReviewApproval.JoinList(others)} to answer your question."
+            : "Waiting for an answer to your question.";
+    }
+
+    /// <summary>
+    ///     Gets the action of a reviewer who has signed.
+    /// </summary>
+    /// <param name="others">The names of the other reviewers who have no current signature; may be <c>null</c>.</param>
+    /// <returns>The action: a sentence that names whom the review waits for.</returns>
+    private static ReviewNextAction WaitAfterSigning(IReadOnlyList<string>? others)
+    {
+        var label = others is { Count: > 0 }
+            ? $"You have signed. Waiting for {ReviewApproval.JoinList(others)} to sign."
+            : "You have signed. Wait for the other reviewers.";
+        return new ReviewNextAction(NextActionKind.WaitForOthers, label, NextActionTarget.None);
     }
 
     /// <summary>

@@ -17,7 +17,9 @@ sections:
           answers the checklist and hands in the ballot first (in one step with the signature when that is offered),
           then discusses the checks answered differently, resolves open findings, answers open questions, writes the
           conclusion when one is needed, and signs, a person without a slot adds the reviewers or themselves or helps
-          with the discussions, and everybody else waits, in plain words and with the place where it is done.
+          with the discussions, and everybody else waits, in plain words and with the place where it is done; the
+          person who asked every open question waits for the answer with a sentence instead of a button, a reviewer who
+          signed is told whom the review waits for, and a reviewer whose signature no longer counts is told so.
         justification: |
           A person who opens a review wants to know what to do, not to read a status table. One pure rule that gives a
           single answer cannot contradict itself or the rest of the page, and the order makes the reviewer's own
@@ -31,6 +33,8 @@ sections:
           - ReviewNextAction_SignedWaiting_WaitForOthers
           - ReviewNextAction_Concluded_Done
           - ReviewNextAction_OneActionPerViewer
+          - ReviewNextAction_OwnQuestion_WaitsForTheOtherParty
+          - ReviewNextAction_AfterSigning_NamesWhoIsMissing
 
       - id: ReviewCenter-ReviewStatusService-Status
         title: >-
@@ -69,7 +73,28 @@ sections:
           until the own ballot is handed in.
         tests:
           - ReviewStatus_MaskedViewer_NoDisputedChecks
+          - ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording
           - ReviewStatus_ChangesSinceSigning_MaskedForDraftViewer
+
+      - id: ReviewCenter-ReviewStatusService-Guidance
+        title: >-
+          The ReviewStatusService class shall, for a viewer who may see the answers of the other reviewers, give each
+          disputed check the answer of every submitted ballot with the justification written, name in a caution the
+          reviewers who have not handed in a ballot when the viewer is about to sign, state plainly that the review
+          will be Rejected and which check the reviewers failed, and tell the person who asked every open question to
+          wait for the answer while the other reviewer is still asked to answer, and shall give none of this to a
+          viewer who may not see the answers or to a person outside the project, and no caution to a single reviewer.
+        justification: |
+          The reviewers of a disputed check need to see what the other said and why, a reviewer who signs early needs to
+          know that the signature may be lost again, and a review that is going to be Rejected should say so before the
+          last signature. All of it is content of the ballots, so it is given only where the ballots may be read.
+        tests:
+          - ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification
+          - ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt
+          - ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot
+          - ReviewStatus_SingleSlot_NoCaution
+          - ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers
+          - ReviewStatus_AfterSigning_NamesWhoSignsNext
 
       - id: ReviewCenter-ReviewStatusService-ChangesSinceSigning
         title: >-

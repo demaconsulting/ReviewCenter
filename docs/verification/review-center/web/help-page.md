@@ -61,7 +61,7 @@ N/A - standard test environment.
   existing reviews keep theirs, the export, the import limit of 256 KiB, the validation, the replace and the reset, the
   rule of another version label, the audit action `project.checklist-changed`, and the IEC 62304 example with the note
   that a template does not make a record compliant; it contains no link that begins with `#`.
-- The Inbox topic follows the Getting started topic in the list (second), explains the seven groups, the New marker and
+- The Inbox topic follows the Getting started topic in the list (second), explains the eight groups, the New marker and
   Mark all as read, says that a reviewer who has not handed in never sees how the others answered, and links to the
   inbox.
 
@@ -112,7 +112,14 @@ a slot without anyone who may sign is refused; no link begins with `#`. This sce
 
 **HelpPage_Signing_NoLongerSaysFailBlocks**: The Reviewers and signing page is rendered. The text says that a Fail
 answer does not block signing, names the Rejected outcome, and does not contain the old sentence about an answer of
-Fail that blocks signing. This scenario is tested by `HelpPage_Signing_NoLongerSaysFailBlocks`.
+Fail that blocks signing. It also names the plain panel wording (for example "Both reviewers failed REQ-01, so this
+review will be Rejected."), the caution that names a reviewer who has not handed in a ballot, the Next step line, and
+the inbox section Your signature no longer counts. This scenario is tested by `HelpPage_Signing_NoLongerSaysFailBlocks`.
+
+**HelpPage_Planning_NamesTheLastApprovedReviewBaseline**: The Planning reviews page is rendered. The text names the
+default "Changes since the last approved review of each set", says that a set that has no approved review yet is planned
+as a full review, and no longer contains the words "last signed review". This scenario is tested by
+`HelpPage_Planning_NamesTheLastApprovedReviewBaseline`.
 
 **HelpPage_ReadingReview_ShowsSlotOwnerNote**: The Reading a review page is rendered. The text tells a person who holds
 a reviewer slot that they own a ballot, answer the checks in it, submit it and then sign, and that the review concludes
@@ -121,13 +128,17 @@ and tells a person who holds a slot of the review that the conclusion is written
 also says that the card lists the Findings in the report (a resolved Finding with its resolution note, an open Finding
 with its Open badge only), that the conclusion stays hidden
 until the reader hands in their own ballot except for the lead, administrators, Auditors, a single-slot review and a
-concluded review, and no longer says that the Findings are listed only once the review is concluded. This scenario is
-tested by `HelpPage_ReadingReview_ShowsSlotOwnerNote`.
+concluded review, and no longer says that the Findings are listed only once the review is concluded. It also says that
+the thread list starts with All on a concluded review and that a locked review offers no buttons to add, change or
+remove a reviewer. This scenario is tested by
+`HelpPage_ReadingReview_ShowsSlotOwnerNote`.
 
 **HelpPage_Checklist_ExplainsExceptionsAndFailOutcome**: The Checklist page is rendered. The text says that the answers
 of the other reviewers are seen only after the own ballot is handed in, names the exceptions (the lead, administrators,
 Auditors, a single reviewer slot and a concluded review), says that a Fail answer does not block signing but makes the
-agreed outcome Rejected, names the Discuss button, and says that the discussion is a Question by default. No link begins
+agreed outcome Rejected (status line "Checklist complete, 1 check failed."), shows the line that counts the checks
+answered differently and the ballots line that names who has not handed in, names the Discuss button, and says that the
+discussion is a Question by default. No link begins
 with `#`. This scenario is tested by `HelpPage_Checklist_ExplainsExceptionsAndFailOutcome`.
 
 **HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors**: The API tokens page is rendered; the heading is
@@ -181,8 +192,10 @@ the setting `Identity:Totp:Enabled` with the warning about the password alone. T
 `HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning`.
 
 **HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead**: The topic `inbox` is listed second, after the first
-topic. Its page is rendered; the text names the seven groups (To answer, Disputed, Ready to sign, Replies waiting,
-Failed checks, Waiting for others, and Updates), the
+topic. Its page is rendered; the text names the eight groups (To answer, with the Question for you row and its limit,
+that a thread has no addressee and that the author is told by Replies waiting instead; Disputed, which names the
+checks; Ready to sign, with the caution about ballots not handed
+in; Your signature no longer counts; Replies waiting; Failed checks; Waiting for others; and Updates), the
 New marker, and Mark all as read, and it links to `/inbox`. This scenario is tested by
 `HelpPage_HelpInboxPage_Render_ExplainsSectionsUnreadAndMarkAllRead`.
 

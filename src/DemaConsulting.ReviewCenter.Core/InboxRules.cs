@@ -37,6 +37,12 @@ internal enum InboxStanding
     /// <summary>The user can sign now (<see cref="InboxSection.ToSign"/>).</summary>
     ToSign,
 
+    /// <summary>
+    ///     The signature of the user no longer counts and cannot be given again yet
+    ///     (<see cref="InboxSection.SignatureLost"/>).
+    /// </summary>
+    SignatureLost,
+
     /// <summary>The user has done their part (<see cref="InboxSection.WaitingForOthers"/>).</summary>
     Waiting
 }
@@ -53,6 +59,17 @@ internal enum InboxStanding
 /// </remarks>
 internal static class InboxRules
 {
+    /// <summary>
+    ///     The number of disputed checks the "Disputed" row names before it counts the rest.
+    /// </summary>
+    private const int MaxNamedDisputes = 5;
+
+    /// <summary>
+    ///     The sentence of the row of a user whose signature no longer counts and who can sign again.
+    /// </summary>
+    public const string SignAgainText =
+        "The review changed, your signature no longer counts. Look at the changes and sign again.";
+
     /// <summary>
     ///     Compares two user names the way the rest of the system does, without regard to case.
     /// </summary>
@@ -149,6 +166,38 @@ internal static class InboxRules
     }
 
     /// <summary>
+    ///     Finds the open questions that someone else started and in which the user has not written yet.
+    /// </summary>
+    /// <remarks>
+    ///     A thread has no addressee, so "for you" is a heuristic: nobody wrote in the thread but its starter, and the
+    ///     starter is not the user. Findings (threads of the report) are not questions. The caller passes only the
+    ///     threads the user may know of (a viewer who may not see the other ballots gets no check threads), and
+    ///     leaves out the review author, whose replies waiting are already listed by <see cref="WaitingThreads"/>.
+    /// </remarks>
+    /// <param name="threads">The threads with their comments.</param>
+    /// <param name="username">The user name of the user.</param>
+    /// <returns>The open question threads of other people that the user has not answered; empty when none.</returns>
+    public static IReadOnlyList<ReviewThread> QuestionsForYou(IEnumerable<ReviewThread> threads, string username)
+    {
+        var found = new List<ReviewThread>();
+        foreach (var thread in threads.Where(thread => thread.State == ReviewThreadState.Open && thread.Kind == ThreadKind.Question))
+        {
+            var first = thread.Comments.FirstOrDefault();
+            if (first is null || SameUser(first.AuthorUsername, username))
+            {
+                continue;
+            }
+
+            if (!thread.Comments.Any(comment => SameUser(comment.AuthorUsername, username)))
+            {
+                found.Add(thread);
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
     ///     Finds the open threads in which the latest comment is by someone else and that the user took part in
     ///     or whose review the user authored.
     /// </summary>
@@ -208,7 +257,8 @@ internal static class InboxRules
     ///         deals with the disputes (<see cref="InboxStanding.Disputed"/>), then signs
     ///         (<see cref="InboxStanding.ToSign"/>), and otherwise waits (<see cref="InboxStanding.Waiting"/>). It
     ///         mirrors <see cref="ReviewNextAction.Decide"/>, so the inbox and the status panel of the review say the
-    ///         same thing.
+    ///         same thing. When the signature of the user was withdrawn because the review changed and the user cannot
+    ///         sign again yet, the standing is <see cref="InboxStanding.SignatureLost"/>, not waiting.
     ///     </para>
     ///     <para>
     ///         Nothing in the result depends on the answers of the other reviewers when <paramref name="hidden"/> is
@@ -224,6 +274,11 @@ internal static class InboxRules
     /// <param name="disputed">The number of disputed checks and sections; only read when not hidden.</param>
     /// <param name="hasUnsigned">Whether a slot of the user has no current signature.</param>
     /// <param name="canSign">Whether nothing the user may know of blocks the signature.</param>
+    /// <param name="signatureLost">
+    ///     Whether a slot of the user has a signature that no longer covers the record. When the user cannot sign
+    ///     again yet, the review is then <see cref="InboxStanding.SignatureLost"/> instead of waiting, so the user is
+    ///     told that the signature was withdrawn. Progress only: no answer of another reviewer is looked at.
+    /// </param>
     /// <returns>The standing of the user in the review.</returns>
     public static InboxStanding ReviewerStanding(
         bool concluded,
@@ -234,7 +289,8 @@ internal static class InboxRules
         bool hidden,
         int disputed,
         bool hasUnsigned,
-        bool canSign)
+        bool canSign,
+        bool signatureLost = false)
     {
         if (concluded)
         {
@@ -258,7 +314,12 @@ internal static class InboxRules
             return InboxStanding.Disputed;
         }
 
-        return hasUnsigned && canSign ? InboxStanding.ToSign : InboxStanding.Waiting;
+        if (hasUnsigned && canSign)
+        {
+            return InboxStanding.ToSign;
+        }
+
+        return signatureLost ? InboxStanding.SignatureLost : InboxStanding.Waiting;
     }
 
     /// <summary>
@@ -277,10 +338,87 @@ internal static class InboxRules
     ///     Words who a review waits for, for the "Waiting for others" row.
     /// </summary>
     /// <param name="names">The people whose signature is missing, in slot order.</param>
-    /// <returns>One sentence naming them.</returns>
-    public static string WaitingForText(IReadOnlyList<string> names)
+    /// <param name="signAgain">
+    ///     The people of the slots whose signature no longer counts because the review changed, in slot order; none
+    ///     when <c>null</c> or empty. They are told to sign again, so the other signers know why the review waits.
+    /// </param>
+    /// <returns>One sentence naming them, followed by a sentence about the signatures that were withdrawn.</returns>
+    public static string WaitingForText(IReadOnlyList<string> names, IReadOnlyList<string>? signAgain = null)
     {
-        return $"Waiting for {string.Join(", ", names)}.";
+        var text = $"Waiting for {string.Join(", ", names)}.";
+        if (signAgain is not { Count: > 0 })
+        {
+            return text;
+        }
+
+        return signAgain.Count == 1
+            ? $"{text} {signAgain[0]}'s signature no longer counts, so {signAgain[0]} must sign again."
+            : $"{text} The signatures of {ReviewApproval.JoinList(signAgain)} no longer count, so they must sign again.";
+    }
+
+    /// <summary>
+    ///     Words the row of a user whose signature no longer counts and who cannot sign again yet.
+    /// </summary>
+    /// <param name="why">What blocks a new signature, for example <c>open items remain (1 open finding)</c>.</param>
+    /// <returns>One sentence that says why the user cannot sign yet and what to do afterwards.</returns>
+    public static string SignatureLostText(string why)
+    {
+        return $"You cannot sign again yet: {why}. When nothing blocks it, look at the changes and sign again.";
+    }
+
+    /// <summary>
+    ///     Words the "Question for you" row.
+    /// </summary>
+    /// <param name="questions">The questions of other people the user has not answered; not empty.</param>
+    /// <returns>
+    ///     A sentence that names the asker when there is one question, else counts them; it says nothing about the
+    ///     content of a question.
+    /// </returns>
+    public static string QuestionText(IReadOnlyList<ReviewThread> questions)
+    {
+        if (questions.Count != 1)
+        {
+            return $"{questions.Count} open questions from others. You can answer them.";
+        }
+
+        var first = questions[0].Comments.FirstOrDefault();
+        var asker = string.IsNullOrWhiteSpace(first?.Author) ? first?.AuthorUsername : first.Author;
+        return string.IsNullOrWhiteSpace(asker)
+            ? "Someone asked a question. You can answer it."
+            : $"{asker} asked a question. You can answer it.";
+    }
+
+    /// <summary>
+    ///     Words what a reviewer who has handed in a ballot can do about the disputed checks, naming them.
+    /// </summary>
+    /// <remarks>
+    ///     Only called for a user who may see the disputes (see <see cref="ReviewerStanding"/>), so the names of the
+    ///     checks never reach a user who may not see the other ballots.
+    /// </remarks>
+    /// <param name="disputed">The names of the disputed checks and sections; empty when they are not known.</param>
+    /// <param name="holdsSlot">Whether the user holds a reviewer slot; otherwise the user is the author.</param>
+    /// <returns>One sentence; the check names are listed up to five, then counted.</returns>
+    public static string DisputedText(IReadOnlyList<string> disputed, bool holdsSlot)
+    {
+        if (disputed.Count == 0)
+        {
+            return holdsSlot
+                ? "Change your answer or discuss it."
+                : "The reviewers answered differently. Discuss it with them.";
+        }
+
+        var named = disputed.Take(MaxNamedDisputes).ToList();
+        var list = disputed.Count > MaxNamedDisputes
+            ? string.Join(", ", named) + $" and {disputed.Count - MaxNamedDisputes} more"
+            : ReviewApproval.JoinList(named);
+        if (!holdsSlot)
+        {
+            return $"The reviewers answered {list} differently. Discuss it with them.";
+        }
+
+        return disputed.Count == 1
+            ? $"Change your answer to {list} or discuss it."
+            : $"Change your answers to {list} or discuss them.";
     }
 
     /// <summary>

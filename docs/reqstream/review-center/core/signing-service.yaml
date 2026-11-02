@@ -479,6 +479,44 @@ sections:
           - SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences
           - SigningService_SignAsync_Disputed_BlocksSigning
 
+      - id: ReviewCenter-SigningService-NextStepWording
+        title: >-
+          The SigningService class shall word the next step of a review that is not concluded so that a check on
+          which the ballots disagree is named once, as disputed, and never as unanswered, so that it says in plain
+          words, when the only thing left is the conclusion and the agreed outcome is Rejected, which checks the
+          reviewers failed and that the review will be Rejected, and so that, when nothing blocks, it names who has
+          signed and whose signature is awaited (a signature that went out of date included).
+        justification: |
+          The next step is the first thing a reviewer reads. A dispute counted as an unanswered check sends the
+          reviewer to answer a check that is answered, a bare "write the conclusion" does not say why a conclusion is
+          needed, and a line that says "Ready for signatures" after the signer has signed contradicts the status panel.
+        tests:
+          - SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered
+          - SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots
+          - SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt
+          - SigningService_GetApprovalAsync_RejectedAgreed_NamesFailedCheckAndRejection
+          - SigningService_GetApprovalAsync_RejectedAgreedWithOpenThread_NamesRejectionAndThread
+          - SigningService_GetApprovalAsync_NoFail_HasNoFailedCheckIdsAndNoNote
+          - ReviewApproval_RejectionNote_WordsReviewersAndChecks
+          - ReviewApproval_MissingBallotsText_WordsTheNames
+          - ReviewApproval_MissingBallotsText_NullNames_Throws
+
+      - id: ReviewCenter-SigningService-FailedChecksMasked
+        title: >-
+          The SigningService class shall never give the identifiers of the failed checks, the note on the provisional
+          rejection or any wording that depends on the signatures to a viewer who may not see the standing of the
+          others (a reviewer who has not handed in a ballot, a user without a slot, an API token, or no viewer), and
+          shall start the next step of such a viewer with the request to hand in the own ballot.
+        justification: |
+          The failed checks and the provisional outcome are the verdict of the others. A reviewer who sees them before
+          handing in the own ballot is no longer independent, and the id of a failed check alone gives it away.
+        tests:
+          - SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote
+          - SigningService_GetApproval_MaskedViewer_NextStepDoesNotDependOnSignatures
+          - ReviewApproval_RejectionNote_MaskedConcludedOtherOutcomeOrNoIds_IsNull
+          - ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote
+          - ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome
+
       - id: ReviewCenter-SigningService-OwnBallotSubmitted
         title: >-
           The SigningService class shall refuse a signature of a slot whose own ballot has not been handed in

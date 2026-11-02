@@ -1094,6 +1094,33 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that an explicit unanswered count replaces the unanswered count of the checklist progress, so that a
+    ///     disputed check (which the progress counts as unanswered) is named once, as disputed.
+    /// </summary>
+    /// <param name="progressUnanswered">The unanswered count of the checklist progress.</param>
+    /// <param name="unanswered">The explicit unanswered count; <c>null</c> keeps the progress count.</param>
+    /// <param name="disputed">The number of disputed checks.</param>
+    /// <param name="expected">The expected sentence.</param>
+    [Theory]
+    [InlineData(1, 0, 1, "1 check disputed between the ballots.")]
+    [InlineData(2, 1, 1, "1 checklist check unanswered, 1 check disputed between the ballots.")]
+    [InlineData(1, null, 1, "1 checklist check unanswered, 1 check disputed between the ballots.")]
+    [InlineData(0, null, 0, "Checklist complete.")]
+    public void ThreadService_NextStep_ExplicitUnanswered_ReplacesTheProgressCount(
+        int progressUnanswered, int? unanswered, int disputed, string expected)
+    {
+        // Arrange: no threads, a checklist of 58 checks
+        var progress = new ChecklistProgress(58 - progressUnanswered, 58);
+
+        // Act: word the next step with and without the explicit count
+        var sentence = ThreadService.NextStep(
+            [], progress, disputedChecks: disputed, unanswered: unanswered);
+
+        // Assert
+        Assert.Equal(expected, sentence);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a missing store or clock.
     /// </summary>
     [Fact]

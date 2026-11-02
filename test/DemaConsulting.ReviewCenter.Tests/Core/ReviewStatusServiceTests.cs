@@ -320,6 +320,201 @@ public class ReviewStatusServiceTests
     }
 
     /// <summary>
+    ///     Test that a viewer who handed in sees each reviewer's answer to a disputed check, with the justification the
+    ///     other reviewer gave, in slot order, and that the answers are the same as the ballot view lists.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_DisputedChecks_ListEveryAnswerWithJustification()
+    {
+        // Arrange: ann says Pass, bob says Fail with a reason
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+
+        // Act
+        var forAnn = await StatusAsync(world, "ann");
+        var forLead = await StatusAsync(world, "lead");
+
+        // Assert: both answers in slot order; the viewer's own answer is included
+        var dispute = Assert.Single(forAnn.DisputedChecks);
+        Assert.Equal(["ann", "bob"], dispute.Answers.Select(a => a.ReviewerName));
+        Assert.Equal([ChecklistOutcome.Pass, ChecklistOutcome.Fail], dispute.Answers.Select(a => a.Outcome));
+        Assert.Equal([1, 2], dispute.Answers.Select(a => a.SlotNumber));
+        Assert.Null(dispute.Answers[0].Justification);
+        Assert.Equal("A reason", dispute.Answers[1].Justification);
+        Assert.Equal("A reason", Assert.Single(forLead.DisputedChecks).Answers[1].Justification);
+    }
+
+    /// <summary>
+    ///     Test that nothing about the answers, the failed checks or the outcome reaches a viewer who may not see the
+    ///     answers of the others: a draft ballot, a contributor without a slot, and a stranger.
+    /// </summary>
+    /// <param name="username">The viewer.</param>
+    [Theory]
+    [InlineData("bob")]
+    [InlineData("cyd")]
+    public async Task ReviewStatus_MaskedViewer_NoAnswersNoFailedCheckNoRejectedWording(string username)
+    {
+        // Arrange: ann handed in Fail on the first check, and bob did not hand in; a discussion about the check is open
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.AnswerAsync("ann", ChecklistOutcome.Fail);
+        await world.SubmitAsync("ann");
+        await world.AnswerAsync("bob", ChecklistOutcome.Fail);
+        await world.StartCheckThreadAsync("ann");
+        var itemText = DefaultChecklist.Current.Sections[0].Items[0].Text;
+
+        // Act
+        var masked = await StatusAsync(world, username);
+        var text = System.Text.Json.JsonSerializer.Serialize(masked);
+
+        // Assert: nothing that the answers of the others would tell
+        Assert.True(masked.IsMasked);
+        Assert.Empty(masked.DisputedChecks);
+        Assert.Null(masked.OutcomeNote);
+        Assert.Null(masked.Caution);
+        Assert.DoesNotContain("A reason", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rejected", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(itemText, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(BallotMaskingWorld.FirstItemId, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Waiting for", masked.NextAction.Label, StringComparison.Ordinal);
+
+        // Assert: a stranger gets no status at all
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Status.GetStatusAsync(BallotMaskingWorld.ActorOf("out"), world.ProjectId, BallotMaskingWorld.ReviewId, Token));
+    }
+
+    /// <summary>
+    ///     Test that a viewer who handed in is told that both reviewers failed a check, and that the review will be
+    ///     Rejected, while a viewer who has not handed in is told nothing of it.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_BothFailed_OutcomeNoteOnlyForViewerWhoMaySeeIt()
+    {
+        // Arrange: both reviewers failed the first check and handed in; cyd holds a slot with no ballot
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.AnswerAsync("ann", ChecklistOutcome.Fail);
+        await world.SubmitAsync("ann");
+        await world.AnswerAsync("bob", ChecklistOutcome.Fail);
+        await world.SubmitAsync("bob");
+        await world.SeatAsync("cyd");
+
+        // Act
+        var forAnn = await StatusAsync(world, "ann");
+        var forCyd = await StatusAsync(world, "cyd");
+
+        // Assert: the note names the check and the outcome; the viewer without a ballot of their own gets nothing
+        Assert.NotNull(forAnn.OutcomeNote);
+        Assert.Contains(BallotMaskingWorld.FirstItemId, forAnn.OutcomeNote, StringComparison.Ordinal);
+        Assert.Contains("Rejected", forAnn.OutcomeNote, StringComparison.Ordinal);
+        Assert.True(forCyd.IsMasked);
+        Assert.Null(forCyd.OutcomeNote);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who is about to sign is warned by name when another reviewer has not handed in, that the
+    ///     warning goes away when that ballot is in, and that a single reviewer and a reviewer with something else to do
+    ///     get no warning.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_EarlySigning_CautionNamesReviewersWithoutBallot()
+    {
+        // Arrange: ann handed in, bob did not
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.AnswerAsync("ann");
+        await world.SubmitAsync("ann");
+
+        // Act
+        var early = await StatusAsync(world, "ann");
+        var forBob = await StatusAsync(world, "bob");
+        await world.AnswerAsync("bob");
+        await world.SubmitAsync("bob");
+        var later = await StatusAsync(world, "ann");
+
+        // Assert
+        Assert.Equal(NextActionKind.Sign, early.NextAction.Kind);
+        Assert.NotNull(early.Caution);
+        Assert.Contains("bob", early.Caution, StringComparison.Ordinal);
+        Assert.Contains("sign again", early.Caution, StringComparison.Ordinal);
+        Assert.Null(forBob.Caution);
+        Assert.Null(later.Caution);
+    }
+
+    /// <summary>
+    ///     Test that a single reviewer gets no early-signing caution.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_SingleSlot_NoCaution()
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.AnswerAsync("ann");
+
+        // Act
+        var status = await StatusAsync(world, "ann");
+
+        // Assert
+        Assert.Null(status.Caution);
+    }
+
+    /// <summary>
+    ///     Test that the person who started the discussion waits for the other reviewer, and that the other reviewer is
+    ///     still asked to answer.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_OwnQuestion_AskerWaitsAndOtherPartyAnswers()
+    {
+        // Arrange: a dispute, and ann starts the discussion about it
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        await world.StartCheckThreadAsync("ann");
+
+        // Act
+        var forAnn = await StatusAsync(world, "ann");
+        var forBob = await StatusAsync(world, "bob");
+
+        // Assert
+        Assert.Equal(NextActionKind.WaitForOthers, forAnn.NextAction.Kind);
+        Assert.False(forAnn.NextAction.IsActionable);
+        Assert.Equal("Waiting for bob to answer your question.", forAnn.NextAction.Label);
+        Assert.Equal(NextActionKind.AnswerQuestions, forBob.NextAction.Kind);
+        Assert.True(forBob.NextAction.IsActionable);
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who signed is told whom the review waits for, in the panel and in the next step of the
+    ///     review, which agree.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_AfterSigning_NamesWhoSignsNext()
+    {
+        // Arrange: both ballots agree, and ann signs
+        var world = await BallotMaskingWorld.CreateAsync();
+        var slot = await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        await world.AnswerAsync("ann");
+        await world.AnswerAsync("bob");
+        await world.SubmitAsync("ann");
+        await world.SubmitAsync("bob");
+        await SignAsync(world, "ann", slot.Id);
+
+        // Act
+        var status = await StatusAsync(world, "ann");
+        var approval = await world.Signing.GetApprovalAsync(
+            BallotMaskingWorld.ActorOf("ann"), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        Assert.Equal("You have signed. Waiting for bob to sign.", status.NextAction.Label);
+        Assert.False(status.NextAction.IsActionable);
+        Assert.Contains("Waiting for the signature of bob", approval!.NextStep, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the changes since signing list the entries that alter the report, in plain words and in order, and
     ///     leave out draft answers, threads that stay out of the report, signing and slot changes.
     /// </summary>

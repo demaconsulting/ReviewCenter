@@ -560,11 +560,24 @@ tested by `ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId`.
 **ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls**: An approved review is rendered. The
 Locked badge (`review-locked`) next to the Approved badge and the banner (`review-locked-banner`) that says the review
 is locked and that an administrator can reopen it are shown; the controls that would change the review by one click (the
-resolve and reopen thread buttons and the add slot form) are disabled and marked `data-locked="true"`, while the
+resolve and reopen thread buttons) are disabled and marked `data-locked="true"`, the controls that change the reviewers
+(the add slot form, the slot edit controls, Remove) are not rendered, only the hint `slots-locked-hint` is, while the
 whole-file new-thread form (`new-thread-form`, `thread-text-input`, `start-thread-button`) is not rendered at all, and
 reading the files and the download of the attestation still work.
 A review that is not approved shows none of these and has `data-locked="false"` controls. This scenario is tested by
 `ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls`.
+
+**ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll**: A review with a resolved thread is approved and rendered; the
+All filter is chosen, the resolved thread is listed rather than "No open threads.", and the add-slot form and the slot
+edit hints are not rendered. This scenario is tested by `ReviewPage_Render_ConcludedReview_ThreadsDefaultToAll`.
+
+**ReviewPage_Render_OnlyResolvedThreads_ThreadsDefaultToAll**: A review that is not concluded and has only a resolved
+thread starts with the All filter; with an open thread too it starts with Open. This scenario is tested by
+`ReviewPage_Render_OnlyResolvedThreads_ThreadsDefaultToAll`.
+
+**ReviewPage_Render_UnlockedSlot_NotesThatRemovingTakesTheBallot**: The edit controls of an unsigned slot of a review
+that is not locked are followed by the hint that removing or replacing a reviewer also removes the ballot. This scenario
+is tested by `ReviewPage_Render_UnlockedSlot_NotesThatRemovingTakesTheBallot`.
 
 **ReviewPage_Render_ApprovedReviewWithThread_HidesReplyBox**: An approved review with a thread is rendered; the thread
 is shown with its comments and neither a reply field nor a reply button. This scenario is tested by
@@ -1078,6 +1091,38 @@ the warning and keeps the form with its text. This scenario is tested by
 **ReviewStatusPanel_MaskedViewer_HidesDisputes**: A viewer who has not handed in the own ballot sees the notice
 "hidden until you submit your ballot", no disputed check, and no discuss button. This scenario is tested by
 `ReviewStatusPanel_MaskedViewer_HidesDisputes`.
+
+**ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification**: A disputed check lists who answered
+what, marks the viewer, and shows the justification the other reviewer wrote as plain text (markup in it stays text) and
+not the viewer's own. This scenario is tested by `ReviewStatusPanel_DisputedCheck_ShowsAnswersAndOtherReviewersJustification`.
+
+**ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution**: A viewer who has not handed in sees no answer, no
+justification, no outcome note, no caution, no signature note, no word of failed checks or Rejected in the panel, and no
+failed count in the Checklist card. This scenario is tested by `ReviewStatusPanel_MaskedViewer_NoAnswersNoOutcomeNoCaution`.
+
+**ReviewStatusPanel_BothFailed_NamesTheOutcome**: A viewer who handed in, where both reviewers failed a check, reads the
+outcome note with the check and the word Rejected, and the Checklist card reads "Checklist complete, 1 check failed".
+This scenario is tested by `ReviewStatusPanel_BothFailed_NamesTheOutcome`.
+
+**ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer**: A reviewer who could sign while the other has not
+handed in reads a caution that names the other reviewer; the other reviewer reads none. This scenario is tested by
+`ReviewStatusPanel_EarlySigning_ShowsCautionNamingTheMissingReviewer`.
+
+**ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers**: The viewer who asked the open question reads "Waiting
+for Bob to answer your question." as a sentence without a link; the other reviewer reads the link "Answer the open
+questions". This scenario is tested by `ReviewStatusPanel_OwnQuestion_AskerWaitsAndOtherPartyAnswers`.
+
+**ReviewStatusPanel_SignatureLost_StatedToTheSigner**: The reviewer whose signature no longer counts reads "The review
+changed, your signature no longer counts."; another reviewer does not. This scenario is tested by
+`ReviewStatusPanel_SignatureLost_StatedToTheSigner`.
+
+**ReviewStatusPanel_AfterSigning_PanelAndNextStepAgree**: After the viewer signed, the panel reads "You have signed.
+Waiting for Bob to sign." and the next-step line says that the signature of Bob is awaited. This scenario is tested by
+`ReviewStatusPanel_AfterSigning_PanelAndNextStepAgree`.
+
+**ReviewStatusPanel_MaskedViewer_HideNoticeAppearsOnce**: A viewer who has not handed in reads a next step that starts
+with "Hand in your ballot" and does not repeat that the answers stay hidden; the panel says it once. This scenario is
+tested by `ReviewStatusPanel_MaskedViewer_HideNoticeAppearsOnce`.
 
 **ReviewPage_SignedThenChanged_ExplainsWhatChanged**: After a slot signed and a Finding then went into the report, the
 slot reads "Signed, then the review changed" and the expandable list names the change, the person and the time, with

@@ -1040,7 +1040,7 @@ public class SigningServiceTests
 
         // Assert: In review after one signature, Approved after both
         Assert.False(half.IsApproved);
-        Assert.Equal("Ready for signatures.", half.NextStep);
+        Assert.Equal("Signed by Ann. Waiting for the signature of Cyd.", half.NextStep);
         Assert.True(full.IsApproved);
     }
 

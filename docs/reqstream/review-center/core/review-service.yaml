@@ -228,7 +228,7 @@ sections:
           entry, and keep the identifier empty for every other review.
         justification: |
           A review that was planned from a set must say which set it covers, so that the next plan can find the
-          last signed review of the same set. A shared session keeps a plan of many sets from fetching the
+          last approved review of the same set. A shared session keeps a plan of many sets from fetching the
           repository once per review, and a bounded identifier keeps the stored value and the audit text bounded.
         tests:
           - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession

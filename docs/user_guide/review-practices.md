@@ -135,14 +135,16 @@ changing it afterward makes it a draft again until it is handed in again. Practi
   concluded review), and even when you can see them do not just follow them. The value of a second slot is that it
   reaches its own conclusion.
 - **Settle a disagreement, do not overwrite it.** Where two submitted ballots give a check different answers, the
-  check is disputed and blocks signing. Press **Discuss** next to the check, or talk to the other reviewer in a thread;
+  check is disputed and blocks signing. The **Where are we?** panel lists each disputed check with who answered what and
+  the reason the other reviewer gave. Press **Discuss** next to the check, or talk to the other reviewer in a thread;
   the reviewer who changes the mind
   changes the own answer and hands the ballot in again. Use the thread to record why.
 - **Hand in when you are done.** A ballot that stays a draft never counts, so the review waits. The checklist page tells
   you whether your own ballot is a draft or submitted; ask the other reviewers about theirs.
 - **Early signing is allowed, with a price.** You may sign as soon as your own ballot is submitted and nothing blocks
   the review, even when other slots have not handed in theirs. If another ballot later disagrees with an agreed
-  check, your signature no longer fits and you sign again. A late ballot that agrees changes nothing.
+  check, your signature no longer fits and you sign again. A late ballot that agrees changes nothing. The panel warns
+  you with a caution that names the reviewers who have not handed in yet.
 - **One slot is simple.** In a review with a single slot nothing changes: the answers count at once, and the answer
   that completes the ballot hands it in (a complete draft that no answer produced, such as a follow-up whose checks are
   all carried, still shows **Submit ballot**). The review can be Approved as soon as that slot has signed.
@@ -241,7 +243,7 @@ refuses it.
   only that review.
 - **Review against the previous revision.** Give a repository review a baseline, so the diff shows what changed and the
   reviewers do not read the unchanged code again. With **Plan reviews**, the default compares each review-set with its
-  last signed review, so changes of an unsigned review are not skipped.
+  last approved review, so changes of a review that is not yet approved are not skipped.
 - **Know the trade-off with ReviewMark.** A review made from the changes since a baseline holds only the changed
   files, so its fingerprint is not the one ReviewMark computes for the whole review-set, and ReviewMark reports it as
   stale. If you enforce review-sets with the evidence index, review all files of the set (see Use the Evidence Index

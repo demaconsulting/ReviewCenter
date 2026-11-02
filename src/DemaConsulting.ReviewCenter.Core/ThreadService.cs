@@ -817,6 +817,13 @@ public sealed class ThreadService
     ///     <c>true</c> when the review is to be rejected and has no conclusion text yet, so the sentence asks for it.
     ///     Ignored without a checklist. <c>false</c> (the default) leaves the wording unchanged.
     /// </param>
+    /// <param name="unanswered">
+    ///     The number of checks that have no consolidated answer yet, or <c>null</c> (the default) to take the
+    ///     unanswered count of <paramref name="checklist"/>. A check on which the ballots disagree has no consolidated
+    ///     answer, so the progress of the checklist counts it as unanswered although it is answered; a caller that
+    ///     knows the consolidation passes its pending count here so that a disputed check is named once, as disputed,
+    ///     and never as unanswered. Ignored without a checklist.
+    /// </param>
     /// <returns>
     ///     One short sentence: the number of unanswered checks, disputed checks, failed checks and open threads, the
     ///     need for the conclusion, that the checklist is complete, that all threads are resolved, or (without a
@@ -827,7 +834,8 @@ public sealed class ThreadService
         ChecklistProgress? checklist = null,
         int failedChecks = 0,
         int disputedChecks = 0,
-        bool conclusionRequired = false)
+        bool conclusionRequired = false,
+        int? unanswered = null)
     {
         ArgumentNullException.ThrowIfNull(threads);
 
@@ -843,11 +851,11 @@ public sealed class ThreadService
 
         // With a checklist the unanswered checks come first, then disputed and failed checks, then the open threads
         // and, last, the conclusion a rejected review needs
-        var unanswered = checklist.Value.Unanswered;
+        var unansweredChecks = unanswered ?? checklist.Value.Unanswered;
         var parts = new List<string>();
-        if (unanswered > 0)
+        if (unansweredChecks > 0)
         {
-            parts.Add(Counted(unanswered, "checklist check unanswered", "checklist checks unanswered"));
+            parts.Add(Counted(unansweredChecks, "checklist check unanswered", "checklist checks unanswered"));
         }
 
         if (disputedChecks > 0)
@@ -873,7 +881,7 @@ public sealed class ThreadService
         if (parts.Count > 0)
         {
             var sentence = string.Join(", ", parts);
-            return unanswered > 0 || disputedChecks > 0 ? $"{sentence}." : $"Checklist complete; {sentence}.";
+            return unansweredChecks > 0 || disputedChecks > 0 ? $"{sentence}." : $"Checklist complete; {sentence}.";
         }
 
         return all.Count > 0 ? "Checklist complete and all threads resolved." : "Checklist complete.";

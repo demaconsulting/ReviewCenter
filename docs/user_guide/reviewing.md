@@ -156,7 +156,7 @@ contain control characters, and the ids must be different. A file that is not va
 limit is refused with a message that
 names the problem, and a review-set without usable paths cannot be planned. A review that is made for a review-set
 keeps its `id`, and the record digest that a signature covers includes it, so the next review of the same set can
-start from the last signed one.
+start from the last approved one.
 
 ## Planning Reviews
 
@@ -169,8 +169,9 @@ creates the reviews you tick.
    chosen) and enter the **head revision**, a branch,
    a tag, or a commit, for example `main`.
 1. Under **What to review** choose one of:
-   - **Changes since the last signed review of each set** (the default): each set is compared with the head of its
-     last signed review. A set that has never been signed is reviewed in full and says so in its note. If that
+   - **Changes since the last approved review of each set** (the default): each set is compared with the head of its
+     last approved review (every reviewer signed and no thread open). A set that has no approved review yet is
+     reviewed in full and says so in its note ("no approved review of this set yet"). If that
      earlier head is no longer an ancestor of the new head (for example after a force push), or the patterns of the set
      changed since then, the set is also reviewed in full.
    - **Changes since a branch, tag or commit**: a text box for the baseline revision appears. Every set is compared with
@@ -228,20 +229,37 @@ author of the review. Someone who only wrote a comment in another person's revie
 
 | Group | What it lists | Chip |
 | ----- | ------------- | ---- |
-| To answer | You hold a reviewer slot and have not handed in your ballot | "Not started", "Draft" |
+| To answer | Ballot not handed in; or someone asked you a question | "Not started", "Draft", "Question for you" |
 | Disputed | You handed in your ballot, and the ballots differ on some checks or sections | "N disputed" |
 | Ready to sign | You handed in and a slot of yours needs signing | "Not signed", "The review changed, sign again" |
+| Your signature no longer counts | Withdrawn, signing blocked | "The review changed, your signature no longer counts" |
 | Replies waiting | An open thread whose latest comment is by someone else | "N waiting" |
 | Failed checks | Checks of your own review that the submitted ballots agree to be Fail | "N failed" |
 | Waiting for others | You did your part; others or open items remain | "Waiting for N reviewers", "Open items remain" |
 | Updates | A review someone else concluded or reopened since you last looked | "Approved", "Rejected", "Reopened" |
 
-The first five groups need your action; Waiting for others and Updates are for information. A reviewer sees a Disputed
-row only while a slot of theirs is still unsigned. The author of a review who holds no slot has no ballot to hand in,
+The first six groups need your action; Waiting for others and Updates are for information. A reviewer sees a Disputed
+row only while a slot of theirs is still unsigned. The Disputed row names the checks that are disputed, and only a
+person who may see the other ballots is told. The author of a review who holds no slot has no ballot to hand in,
 so for them Disputed is the row that applies: when the ballots differ and are not hidden from the author (see
 [Review Checklist](#review-checklist)), the author sees the disputes, so that they can steer the review. A review is in
 at most one of To answer, Disputed, Ready to sign and Waiting for others for you, and the inbox agrees with the
-next-step line of the review page. **To answer** opens the checklist, where your ballot is. Reviewers answer
+next-step line of the review page. **To answer** opens the checklist, where your ballot is.
+
+A **Question for you** row opens the review page, where the thread is. A thread has no addressee, so ReviewCenter guesses:
+an open question that someone else started, in which you have not written yet, is shown to every slot holder of the
+review who may take part (the author of the review is told by Replies waiting instead).
+In a review with three or more people that means more people see a question than it
+was meant for. The row names the person who asked and never quotes the question. The author's own questions to answer
+are already listed under Replies waiting, so the author gets no such row. A question on a check is never shown to a
+reviewer who may not yet see the other ballots.
+
+**Ready to sign** adds a caution when other reviewers have not handed in a ballot yet, naming them (who has handed in is
+progress, not a verdict): signing early may mean you have to sign again. **Your signature no longer counts** is shown to
+a signer
+whose signature was withdrawn because the review changed, and says what blocks signing again; when nothing blocks it,
+the row becomes Ready to sign with the chip "The review changed, sign again". The other signers read in their
+Waiting for others row that the signature of that person no longer counts. Reviewers answer
 independently: until you
 have handed in your own ballot the inbox shows nothing about how the others answered, so there is no Disputed row and
 no count of disputes for you; a Waiting for others row names the people who are waited for, because who has not
@@ -277,15 +295,24 @@ It shows:
 - **Reviewers.** One row for each reviewer slot: the person, the state of the ballot (**Not started**, **Draft**, or
   **Handed in**), and the state of the signature (**Signed**, **Not signed**, or **Signed, then the review changed**).
   A review with one slot shows the same table with one row.
-- **Disputed checks.** The checks that the handed-in ballots answered differently, each with a **Discuss** button that
+- **Disputed checks.** The checks that the handed-in ballots answered differently, each with who answered what (for
+  example "Ann (you): Pass / Bob: Fail"), the reason the other reviewer wrote for the answer, and a **Discuss** button that
   starts the discussion of that check (see [Discussions About a Check](#discussions-about-a-check)). They are shown
   only after you have handed in your own ballot; until then the panel says that this stays hidden until you submit your
   ballot, and it shows no count, no outcome, and no answers of others (see
   [Review Checklist](#review-checklist)).
+- **Outcome.** When you may see the ballots and the reviewers agree on a Fail, the panel says so plainly, for example
+  "Both reviewers failed REQ-01, so this review will be Rejected", and the Checklist card reads "Checklist complete,
+  1 check failed". Until you have handed in your own ballot, none of this is shown.
 - **Open threads.** How many Questions and how many Findings are still open, each with its icon and its word.
 - **One next step.** A single button that takes you where you are needed, for example to the checklist to hand in your
   ballot, to a disputed check, to an open thread, or to the signing form. A person who has nothing to do sees what the
-  review waits for instead.
+  review waits for instead: the person who asked the open question reads "Waiting for Bob to answer your question." (the
+  other reviewer gets the button **Answer the open questions**), and a reviewer who signed reads "You have signed.
+  Waiting for Bob to sign." A reviewer whose signature no longer counts reads "The review changed, your signature no
+  longer counts." and can sign again once nothing blocks it.
+- **A caution before signing.** When you can sign while another reviewer has not handed in a ballot, a caution names that
+  reviewer: signing now may have to be repeated if that ballot changes what the signatures cover.
 - **What changed since {name} signed.** For a signature that no longer fits the review, a list that opens under the
   reviewer. It lists the changes after the signature that can alter the signed report, such as a ballot handed in
   again, a conclusion edited, a Finding added, or a Finding resolved with its note, with who did it and when. It
@@ -304,7 +331,8 @@ the number of open threads of each file.
 The thread index lists the threads of all files with the kind (Question or Finding), the file (a thread about a check
 shows "Check discussion"), the lines, the state, the number of comments, the
 author of the first comment, and the time of the last activity, newest first. Use the All, Open, and Resolved
-buttons and the All, Questions, and Findings buttons (which show the totals) to filter it; it starts with Open. Press a
+buttons and the All, Questions, and Findings buttons (which show the totals) to filter it; it starts with Open, or with
+All when the review is concluded or has only resolved threads, so that the list is not empty. Press a
 row to show that thread: its file is selected, its lines are highlighted, and the page scrolls to them. The summary line
 above shows the number of open questions and open findings.
 
@@ -455,21 +483,27 @@ only after you press it. Changing a submitted ballot makes it a draft again unti
 ballots differ on a check, the check is disputed and blocks signing until the reviewers agree.
 
 **Other reviewers' answers stay hidden until you hand in yours.** In a review with several slots, the checklist page
-tells you only how many ballots are handed in ("2 of 3 ballots handed in."), so that you know who is still to come, and
-nothing about what they answered: no answers, no count of checks that are disputed, and no outcome so far. The same
+tells you only how many ballots are handed in and who has not ("1 of 3 ballots handed in. Cyd has not handed in yet."),
+so that you know who is still to come, and nothing about what they answered: no answers, no justifications, no count of
+checks that are disputed, no failed check, and no outcome so far. The same
 holds on the review page, the project overview, the inbox, and the history of the review, where the details of other
 reviewers' answers read "details are hidden until you hand in your own ballot". This is meant to keep your own judgment
 independent, and it applies to a project member who holds no slot as well. It does not apply to the lead of the review,
 the administrators of the project, the system administrators, and the Auditors, who see everything, and everybody sees
 everything once the review is concluded. A review with one slot hides nothing.
 
-**After you hand in, compare.** Under every check on which the submitted ballots differ, the page shows the answers side
-by side with the names ("Ann: Pass / Bob: N/A") and a **Different answers** mark. **Discuss** next to it opens a small
+**After you hand in, compare.** At the top the page says how many checks are answered differently ("1 check answered
+differently. Open it to discuss."). Under every check on which the submitted ballots differ, the page shows the answers
+side by side with the names ("Ann: Pass / Bob: N/A"), a **Different answers** mark, and the justification of each other
+reviewer who gave one. **Discuss** next to it opens a small
 form: type what you want to ask or point out and start the discussion, which is a thread about that check on the review
-page.
+page. When the submitted ballots agree on a failure, the status line reads "Checklist complete, 1 check failed.". The
+page shows one ballot at a time: once the review is concluded it points to the history of the review, where the answers
+of all reviewers are.
 
 **Submit and sign.** When your ballot is complete, nothing else blocks the signature, and the review has several slots,
-the main button is **Submit and sign**. Type your password (and the code of your second factor if you have one) next to
+the main button is **Submit and sign**. If other reviewers have not handed in yet, a caution above it names them. Type
+your password (and the code of your second factor if you have one) next to
 it: your ballot is handed in and then signed in one step. If the signature is refused, for example because of a wrong
 password, your ballot stays handed in, and the page says so and links to the review page, where you can sign. If you
 sign in with an identity provider, the button hands in your ballot and then takes you to the provider to confirm who you
@@ -638,13 +672,15 @@ members of the project. Either of the two can sign the slot. A review can have a
 without a slot stays In review. Any member of the project (and any
 system administrator) can add a slot (open **Add a slot**,
 choose the reviewers and press **Add slot**) and change or remove a slot that is not signed (open **Change
-reviewers**, then **Save** or **Remove**). A user can be in only one slot of
+reviewers**, then **Save** or **Remove**; the page notes that removing a reviewer also removes the ballot that reviewer
+handed in). A user can be in only one slot of
 a review, and the primary and the alternate must be different users. A slot that has been signed can no longer be
 changed or removed, even when the review changed after it; to change the reviewers, add a new slot. A reviewer who is
 taken out of a slot that holds a ballot takes the own answers back, and that can change what the signatures of the other
 slots cover; the page then names the affected slots and signers in a warning and asks you to confirm, like for a
 changed answer. The slots of a
-concluded review cannot be changed at all (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
+concluded review cannot be changed at all: the review page does not offer **Add a slot**, **Change reviewers**, or
+**Remove** there (see [Locked Reviews and Reopening](#locked-reviews-and-reopening)).
 
 **Independent reviewers.** In a project that requires independent reviewers (the default; see Review Rules in the
 Administration chapter), the person who created the review cannot be the primary or the alternate reviewer of any

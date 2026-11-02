@@ -12,7 +12,14 @@
    circuit is connected.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
-   valid while the page is open. *@
+   valid while the page is open.
+
+   Ballots (reviews with several reviewers): the line "N of M ballots handed in" names who has not handed in; the
+   "Submit and sign" form warns when other ballots are missing; once the viewer may see the other ballots, a line at the
+   top counts the checks answered differently, each "Different answers" bar adds the other reviewers' reasons (text
+   encoded by Razor), and the status line names the number of failed checks. A concluded review points to the history,
+   where the answers of all reviewers are listed. All of it reads the BallotView, which holds nothing about other
+   reviewers' answers while they are hidden. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/checklist"
 @rendermode InteractiveServer
 @attribute [Authorize]
@@ -62,6 +69,13 @@
                 administrator can reopen the
                 review; the signatures are then kept as history and the review must be signed again.
             </p>
+            @if (IsMultiSlot && !IsMasked)
+            {
+                <p class="muted" data-testid="checklist-history-pointer">
+                    This page shows one ballot at a time. The answers of all reviewers are in the
+                    <a href="@HistoryAddress" data-testid="checklist-history-link">history of the review</a>.
+                </p>
+            }
         }
         else if (State.AuthorBlocked)
         {
@@ -111,6 +125,11 @@
             <p class="muted" data-testid="ballot-status">@BallotStatusLine()</p>
             @if (ShowSubmitAndSign)
             {
+                @if (Ballots!.MissingNames.Count > 0)
+                {
+                    <p class="notice" role="status" data-testid="submit-and-sign-caution">@ReviewApproval.MissingBallotsText(Ballots.MissingNames)</p>
+                }
+
                 <SignConfirm NeedsPassword="@(!CurrentIsExternal)" NeedsCode="@CurrentHasTotp" OnSubmitAndSign="SubmitAndSignAsync" />
                 <p class="muted hint">Or hand in your ballot now and sign later.</p>
             }
@@ -160,6 +179,11 @@
         @* A viewer without a ballot who may not see the others yet gets no standing: it would show answers *@
         @if (!State.IsMasked)
         {
+        @if (DifferingSummary() is { } differingSummary)
+        {
+            <p class="notice ballot-others" role="status" data-testid="differing-summary"><span aria-hidden="true">&#9888; </span>@differingSummary</p>
+        }
+
         <section class="card">
             <p class="status" data-testid="checklist-status">@StatusLine()</p>
             <p data-testid="checklist-progress">@ProgressLine()</p>
@@ -309,6 +333,11 @@
                                                 <p class="ballot-others ballot-disagree" data-testid="ballot-others-@iid">
                                                     <span class="badge"><span aria-hidden="true">&#9888; </span>Different answers</span>
                                                     <span data-testid="ballot-others-text-@iid">@SideBySide(differing)</span>
+                                                    @foreach (var other in differing.Where(answer => IsOtherWithReason(answer)))
+                                                    {
+                                                        @* Razor encodes the text; nothing the reviewer typed is rendered as markup *@
+                                                        <span class="ballot-why" data-testid="ballot-others-why-@iid-@other.SlotNumber">@other.ReviewerName: &ldquo;@other.Justification&rdquo;</span>
+                                                    }
                                                 </p>
                                                 @if (Capabilities.CanStartCheckThread && !DiscussOpen.Contains(item.Id))
                                                 {
