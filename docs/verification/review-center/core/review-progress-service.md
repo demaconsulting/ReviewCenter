@@ -56,6 +56,8 @@ N/A - standard test environment.
 - The progress carries the number of ballots handed in out of the number of slots, and the names of the people who have
   not handed in (none for a concluded review or a review without a checklist); these are the same for every viewer,
   and a viewer who may not see the other ballots gets `IsMasked` and no dispute count.
+- An actor that came through an API token is masked like any viewer who is not the lead, an administrator, or an
+  auditor: `IsMasked` is true and there are no disputed or failed counts, while the ballot progress is shown.
 
 #### Test Scenarios
 
@@ -201,3 +203,9 @@ ballots and has no names. This scenario is tested by `ReviewProgressService_GetP
 sees the ballot progress and the masked flag and no dispute. This scenario is tested by
 `ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked`, defined in
 `BallotMaskingServiceTests.cs`.
+
+**ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer**: The lead reads the progress of a review whose two
+ballots are handed in and differ, once as an API token actor and once as the person. The token is masked like any
+viewer: `IsMasked` is true, the disputed and failed counts are 0, and the ballots show 2 of 2; the person is not masked
+and sees one disputed check. This scenario is tested by `ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer`,
+defined in `BallotMaskingServiceTests.cs`.

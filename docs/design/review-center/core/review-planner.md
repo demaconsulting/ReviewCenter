@@ -118,6 +118,10 @@ The last-signed baseline asks the signing service for the approval of every revi
 one. The lookups are bounded by the reviews of each set, not by the sets times all reviews of the project, so a plan
 stays cheap for the project sizes this release targets; there is no cache.
 
+That read has no viewer and is a verdict-free system read: the planner uses only whether a review is approved and the
+signature times, and never the per-slot ballot verdicts, the dispute counts, or the failed counts. The HTTP API reads
+approvals only for the actor of the token.
+
 Matching the changed files against the selections costs the number of sets times the number of changed files, and a
 listing is held in memory while its sets are classified (bounded by the 64 MiB limit of a git listing), so a very large
 repository with hundreds of sets is slow to plan.

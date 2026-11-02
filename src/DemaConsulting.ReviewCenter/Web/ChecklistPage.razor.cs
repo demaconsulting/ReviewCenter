@@ -388,6 +388,7 @@ public partial class ChecklistPage : ComponentBase
         FollowedState = Review?.FollowsReviewId is { } followed && State is not null
             ? await ChecklistService.GetAsync(ProjectId, followed, viewerUsername: CurrentUsername)
             : null;
+        // Only whether the review is concluded is used, and a concluded review is never masked, so the system read is safe
         IsConcluded = project is not null && State is not null
             && (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsConcluded == true;
 
@@ -441,6 +442,7 @@ public partial class ChecklistPage : ComponentBase
     {
         var actor = await AuthenticationState.GetActorOrNullAsync();
         State = await ChecklistService.GetAsync(ProjectId, ReviewId, viewerUsername: CurrentUsername);
+        // Only whether the review is concluded is used (never masked), so the system read is safe
         IsConcluded = IsConcluded
             || (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsConcluded == true;
         await LoadBallotViewAsync(actor);

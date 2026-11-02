@@ -201,11 +201,21 @@ and comments are not affected by the rule.
   given and holds no slot. A review with
   exactly one slot is read with its sole ballot as submitted, for the progress counts only, so a partly answered
   single-slot draft counts in the progress. `AuthorBlocked` is set as described above.
-- *System callers*: without a `viewerUsername` no viewer is asked about, so nothing is masked and `AuthorBlocked` is not
-  set: the consolidated standing is returned. This is an explicit, named path, `GetForSystemAsync`, for callers that
-  act for the system and not for a person (a report, a carry-over); a page that shows the state to a person always
-  passes the viewer. The API and the evidence read through the system path today; masking them is deferred to a later
-  slice (PR 5). A test pins that the system path is not masked and a viewer's read is.
+- *Without a viewer*: without a `viewerUsername` no viewer is asked about, so nothing is masked and `AuthorBlocked` is
+  not set: the consolidated standing is returned. No page and no endpoint reads without a viewer (a page always passes
+  the viewer, the API uses `GetConsolidatedAsync`); the overload remains for tests and for internal reads that need no
+  verdict.
+
+**GetConsolidatedAsync**: The viewer-requiring read of the consolidated standing, for the API.
+
+- *Parameters*: `Actor viewer`, `int projectId`, `string reviewId`, and a cancellation token.
+- *Returns*: `Task<ChecklistState?>` — null when the review or its checklist does not exist.
+- *Preconditions*: The viewer is not null (`ArgumentNullException`) and may see the project (the project access check,
+  which answers a project that does not exist like one that may not be seen).
+- *Postconditions*: When the viewer may see the others (`BallotVisibility.CanSeeOthers` with the audit right of the
+  viewer, which an API token never has) the result is the consolidation of the submitted ballots, never the own ballot
+  of a slot; otherwise it is an empty state with `NoSlot` and `IsMasked` set and no answers. The review and its
+  checklist are read from one snapshot, so a change between reads cannot leak.
 
 **SetSectionApplicabilityAsync**: Records whether a section applies in the ballot of the slot of the actor.
 

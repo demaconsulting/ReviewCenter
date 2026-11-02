@@ -524,30 +524,210 @@ public class BallotMaskingServiceTests
     }
 
     /// <summary>
-    ///     Test that the system-caller read of the checklist (<see cref="ChecklistService.GetForSystemAsync"/>, and
-    ///     <see cref="ChecklistService.GetAsync"/> without a viewer) is not masked, while the same read for a viewer
-    ///     without a slot is: the unmasked path is a named choice and never reached by a page that passes the viewer.
+    ///     Test that the consolidated read of an API token is masked in a review with several slots that is not
+    ///     concluded, even for a token whose owner has not handed in, and is not masked for a person who handed in.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_GetForSystemAsync_NoViewer_ReturnsUnmaskedStanding()
+    public async Task ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked()
     {
         // Arrange
         var world = await BallotMaskingWorld.CreateAsync();
         await world.ArrangeDisputeAsync();
+        var token = new Actor("cyd", "cyd") { ApiTokenId = "tok-1" };
 
         // Act
-        var system = await world.Checklists.GetForSystemAsync(world.ProjectId, BallotMaskingWorld.ReviewId, Token);
-        var noViewer = await world.Checklists.GetAsync(world.ProjectId, BallotMaskingWorld.ReviewId, Token);
-        var viewer = await world.Checklists.GetAsync(world.ProjectId, BallotMaskingWorld.ReviewId, Token, "cyd");
+        var viaToken = await world.Checklists.GetConsolidatedAsync(token, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert: no answers and no consolidation, so no failed check can be counted
+        Assert.True(viaToken!.IsMasked);
+        Assert.Null(viaToken.Consolidation);
+        Assert.Null(viaToken.AnswerFor(BallotMaskingWorld.FirstItemId));
+    }
+
+    /// <summary>
+    ///     Test that a token of the lead of the review, an administrator or an auditor is masked like any other token,
+    ///     because a token is never the lead, an administrator or an auditor, while the same people signed in are not.
+    /// </summary>
+    /// <param name="username">The owner of the token.</param>
+    [Theory]
+    [InlineData("lead")]
+    [InlineData("padm")]
+    [InlineData("aud")]
+    [InlineData("root")]
+    public async Task ChecklistService_GetConsolidatedAsync_LeadAdminAuditorViaToken_IsMasked(string username)
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        var token = new Actor(username, username) { ApiTokenId = "tok-1" };
+
+        // Act
+        var viaToken = await world.Checklists.GetConsolidatedAsync(token, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var person = await world.Checklists.GetConsolidatedAsync(
+            BallotMaskingWorld.ActorOf(username), world.ProjectId, BallotMaskingWorld.ReviewId, Token);
 
         // Assert
-        Assert.False(system!.IsMasked);
-        Assert.NotNull(system.Consolidation);
-        Assert.False(system.NoSlot);
-        Assert.False(system.AuthorBlocked);
-        Assert.False(noViewer!.IsMasked);
-        Assert.NotNull(noViewer.Consolidation);
-        Assert.True(viewer!.IsMasked);
+        Assert.True(viaToken!.IsMasked);
+        Assert.False(person!.IsMasked);
+        Assert.NotNull(person.Consolidation);
+    }
+
+    /// <summary>
+    ///     Test that a token of a person who handed in a ballot sees the consolidated standing of the submitted ballots,
+    ///     and not the own ballot of that person (a draft answer is never shown).
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetConsolidatedAsync_SubmittedSlotOwner_SeesConsolidatedNotOwnBallot()
+    {
+        // Arrange: ann and bob handed in and differ; cyd holds a slot and has a draft with a Fail on the second check
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        await world.SeatAsync("cyd");
+        var second = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).ElementAt(1).Id;
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId,
+            BallotMaskingWorld.ReviewId,
+            second,
+            ChecklistOutcome.Fail,
+            "A draft reason",
+            BallotMaskingWorld.ActorOf("cyd"),
+            Token);
+        var token = new Actor("ann", "ann") { ApiTokenId = "tok-1" };
+
+        // Act
+        var viaToken = await world.Checklists.GetConsolidatedAsync(token, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var cydToken = new Actor("cyd", "cyd") { ApiTokenId = "tok-2" };
+        var draftOwner = await world.Checklists.GetConsolidatedAsync(cydToken, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert: ann sees the consolidated standing (the first check is disputed) and not cyd's draft; cyd has not
+        // handed in, so cyd's token is masked
+        Assert.False(viaToken!.IsMasked);
+        Assert.NotNull(viaToken.Consolidation);
+        Assert.NotEqual((ChecklistOutcome?)ChecklistOutcome.Fail, viaToken.AnswerFor(second)?.Outcome);
+        Assert.True(draftOwner!.IsMasked);
+    }
+
+    /// <summary>
+    ///     Test that the consolidated read of a token shows the standing of a concluded review.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetConsolidatedAsync_ConcludedReview_Visible()
+    {
+        // Arrange: ann and bob hand in the same answers and both sign
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.SeatAsync("bob");
+        foreach (var user in new[] { "ann", "bob" })
+        {
+            await world.AnswerAsync(user);
+            await world.SubmitAsync(user);
+        }
+
+        var approval = (await world.Signing.GetApprovalAsync(world.ProjectId, BallotMaskingWorld.ReviewId, Token))!;
+        foreach (var slot in approval.Slots)
+        {
+            var user = slot.Primary.Username;
+            await world.Signing.SignAsync(
+                BallotMaskingWorld.ActorOf(user),
+                world.ProjectId,
+                BallotMaskingWorld.ReviewId,
+                slot.SlotId,
+                approval.Digest,
+                BallotMaskingWorld.Password,
+                Token);
+        }
+
+        var token = new Actor("cyd", "cyd") { ApiTokenId = "tok-1" };
+
+        // Act
+        var viaToken = await world.Checklists.GetConsolidatedAsync(token, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        Assert.False(viaToken!.IsMasked);
+        Assert.Equal(ChecklistOutcome.Pass, viaToken.AnswerFor(BallotMaskingWorld.FirstItemId)!.Outcome);
+    }
+
+    /// <summary>
+    ///     Test that the consolidated read of a token shows the standing of a review with a single slot.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetConsolidatedAsync_SingleSlot_Visible()
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.SeatAsync("ann");
+        await world.AnswerAsync("ann", ChecklistOutcome.Fail);
+        var token = new Actor("cyd", "cyd") { ApiTokenId = "tok-1" };
+
+        // Act
+        var viaToken = await world.Checklists.GetConsolidatedAsync(token, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert
+        Assert.False(viaToken!.IsMasked);
+        Assert.Equal(ChecklistOutcome.Fail, viaToken.AnswerFor(BallotMaskingWorld.FirstItemId)!.Outcome);
+    }
+
+    /// <summary>
+    ///     Test that a read without a viewer is refused instead of being treated as a system read.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetConsolidatedAsync_NullViewer_Throws()
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+
+        // Act, Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => world.Checklists.GetConsolidatedAsync(null!, world.ProjectId, BallotMaskingWorld.ReviewId, Token));
+    }
+
+    /// <summary>
+    ///     Test that a review that does not exist gives nothing, and that a viewer who may not see the project is
+    ///     refused as for every other read.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetConsolidatedAsync_UnknownReviewAndStranger_ReturnsNullAndRefuses()
+    {
+        // Arrange
+        var world = await BallotMaskingWorld.CreateAsync();
+        var member = new Actor("ann", "ann") { ApiTokenId = "tok-1" };
+        var stranger = new Actor("out", "out") { ApiTokenId = "tok-2" };
+
+        // Act
+        var unknown = await world.Checklists.GetConsolidatedAsync(member, world.ProjectId, "no-such-review", Token);
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Checklists.GetConsolidatedAsync(stranger, world.ProjectId, BallotMaskingWorld.ReviewId, Token));
+
+        // Assert
+        Assert.Null(unknown);
+        Assert.Equal(DomainRule.ProjectNotFound, refused.Rule);
+    }
+
+    /// <summary>
+    ///     Test that the progress overview masks an API token like any viewer who is not the lead, an administrator or
+    ///     an auditor: it gives no count of disputed or failed checks and says that it is masked, while the progress of
+    ///     the ballots is shown.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer()
+    {
+        // Arrange: ann and bob handed in and differ
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        var token = new Actor("lead", "lead") { ApiTokenId = "tok-1" };
+
+        // Act
+        var viaToken = (await world.Progress.GetProgressAsync(token, world.ProjectId, Token)).Single();
+        var person = (await world.Progress.GetProgressAsync(
+            BallotMaskingWorld.ActorOf("lead"), world.ProjectId, Token)).Single();
+
+        // Assert
+        Assert.True(viaToken.IsMasked);
+        Assert.Equal(0, viaToken.DisputedChecks);
+        Assert.Equal(0, viaToken.FailedChecks);
+        Assert.Equal((2, 2), (viaToken.BallotsSubmitted, viaToken.BallotsRequired));
+        Assert.False(person.IsMasked);
+        Assert.Equal(1, person.DisputedChecks);
     }
 
     /// <summary>

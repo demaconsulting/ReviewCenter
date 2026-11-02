@@ -20,6 +20,7 @@
 
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using DemaConsulting.ReviewCenter.Api;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
@@ -198,6 +199,7 @@ public class ApiEndpointsTests
         Assert.Equal("REV-1", review.GetProperty("id").GetString());
         Assert.Equal("First review", review.GetProperty("title").GetString());
         Assert.False(review.GetProperty("createdViaApi").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, review.GetProperty("outcome").ValueKind);
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         Assert.Equal("application/problem+json", missing.Content.Headers.ContentType?.MediaType);
     }
@@ -231,6 +233,8 @@ public class ApiEndpointsTests
         Assert.Equal("ann", slot.GetProperty("primary").GetString());
         Assert.Equal("bob", slot.GetProperty("alternate").GetString());
         Assert.Equal("Ann", slot.GetProperty("signedBy").GetString());
+        Assert.Equal("Approved", root.GetProperty("outcome").GetString());
+        Assert.False(root.GetProperty("masked").GetBoolean());
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
@@ -263,6 +267,12 @@ public class ApiEndpointsTests
         var counts = json.RootElement.GetProperty("counts");
         Assert.Equal(1, counts.GetProperty("openThreads").GetInt32());
         Assert.Equal(1, counts.GetProperty("resolvedThreads").GetInt32());
+
+        // Assert: the check threads are chat, so they are questions
+        Assert.Equal(1, counts.GetProperty("openQuestions").GetInt32());
+        Assert.Equal(1, counts.GetProperty("resolvedQuestions").GetInt32());
+        Assert.Equal(0, counts.GetProperty("openFindings").GetInt32());
+        Assert.False(json.RootElement.GetProperty("masked").GetBoolean());
     }
 
     /// <summary>

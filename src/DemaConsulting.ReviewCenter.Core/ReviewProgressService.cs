@@ -146,8 +146,9 @@ public sealed class ReviewProgressService
     /// <remarks>
     ///     For a review with several reviewers whose answers the caller may not see yet, the counts of disputed checks
     ///     and failed checks and the checks of the threads about a check are left out, so the overview does not give
-    ///     away what the other reviewers answered. A caller that signed in with an API token is not masked here; the
-    ///     API is covered by the later API slice.
+    ///     away what the other reviewers answered. A caller that signed in with an API token is masked like any viewer
+    ///     who is not the lead, an administrator or an auditor (a token is never one of those), so the API list never
+    ///     carries hidden wording.
     /// </remarks>
     private async Task<IReadOnlyList<ReviewProgress>> ComputeAsync(
         Actor? actor,
@@ -162,9 +163,7 @@ public sealed class ReviewProgressService
 
         // A constant number of reads, however many reviews the project has
         var ids = reviews.Select(r => r.Id);
-        var approvals = actor is { ViaApiToken: true }
-            ? await _signing.GetApprovalsAsync(projectId, ids, cancellationToken)
-            : await _signing.GetApprovalsAsync(actor, projectId, ids, cancellationToken);
+        var approvals = await _signing.GetApprovalsAsync(actor, projectId, ids, cancellationToken);
         var activity = await _audit.LastActivityAsync(projectId, cancellationToken);
 
         var result = new List<ReviewProgress>(reviews.Count);

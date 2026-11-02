@@ -109,13 +109,16 @@ sections:
           The ReviewProgressService class shall return the progress of a project to every actor who may see the
           project, a read-only auditor included, and give every other
           actor, including a user outside the project, a disabled user, and no actor at all, the answer for a project
-          that does not exist.
+          that does not exist, and shall reduce the standing of a review for an actor that came through an API token
+          exactly as for any viewer, with no exception for the token.
         justification: |
           The overview only shows what the review pages show to the same people. A project that the actor may not see
-          must read like a missing one, so that its existence does not leak.
+          must read like a missing one, so that its existence does not leak. A token is never the lead, an
+          administrator or an auditor, so it never sees what a masked viewer does not.
         tests:
           - ReviewProgressService_GetProgressAsync_ActorKinds_AreAllowedOrNotFound
           - ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList
+          - ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer
 
       - id: ReviewCenter-ReviewProgressService-Performance
         title: >-

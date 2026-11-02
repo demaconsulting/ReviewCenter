@@ -78,8 +78,8 @@ own ballot (`State.IsOwnBallot` is false: the viewer holds no slot). `State` com
 time the page reads the checklist; for a slot owner it is the own ballot (`IsOwnBallot`, `BallotState`, `SlotId`), for
 every other viewer the consolidated standing of the submitted ballots, or, when the viewer may not see the others yet
 (a review with several slots that is not concluded), a state without a standing (`IsMasked`; `NoSlot` is true for a
-viewer without a slot). The page never reads the checklist without the viewer: a read without a viewer is the unmasked
-system-caller path of `ChecklistService` (`GetForSystemAsync`), which no page uses. `AuthorBlocked` is
+viewer without a slot). The page never reads the checklist without the viewer: the read without a viewer is for tests
+and internal reads that need no verdict, and the API uses the viewer-requiring `GetConsolidatedAsync`. `AuthorBlocked` is
 computed in the same call; a page loaded before the project switched the rule on shows the refusal message of
 the rule (`AuthorCannotAnswer`) in the error line of the check or section, stores nothing, and shows the notice after
 the next read. A page loaded before the user lost the slot shows the refusal `NoReviewerSlot` in the same way.

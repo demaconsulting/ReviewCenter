@@ -36,8 +36,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     shows a reviewer the own ballot and a viewer without a slot the consolidated standing of the submitted ballots,
 ///     except that in a review with several slots that is not concluded the standing is hidden from a viewer who has
 ///     not handed in an own ballot and does not lead the review, administer the project or audit it (see
-///     <see cref="BallotVisibility"/>). A caller that reads for the system and not for a person uses
-///     <see cref="GetForSystemAsync"/>. The service never shows the draft of another slot.
+///     <see cref="BallotVisibility"/>). The API reads the consolidated standing only through
+///     <see cref="GetConsolidatedAsync"/>, which masks a token like any viewer who is not the lead, an administrator
+///     or an auditor. The service never shows the draft of another slot.
 ///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is concluded (approved
 ///     or rejected, see <see cref="ReviewLock"/>).
 ///     When the project requires it (on by default, also for projects that existed before the rule was enforced), the
@@ -101,25 +102,58 @@ public sealed class ChecklistService
     }
 
     /// <summary>
-    ///     Reads the checklist of a review as a system caller: the consolidated standing of the submitted ballots,
-    ///     never masked.
+    ///     Reads the consolidated standing of the checklist of a review for a viewer who is not working on it: the
+    ///     answers of the submitted ballots, masked by the rules of <see cref="BallotVisibility"/>.
     /// </summary>
+    /// <param name="viewer">The caller, a person or an API token. Must not be null.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The state, or <c>null</c> when the review does not exist or has no checklist.</returns>
+    /// <returns>
+    ///     The state, or <c>null</c> when the review does not exist or has no checklist. When the viewer may not see the
+    ///     answers of the reviewers yet the state has no answers and <see cref="ChecklistState.IsMasked"/> is set.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="viewer"/> is null.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the viewer may not see the project.</exception>
     /// <remarks>
-    ///     This is the named path for callers that act for the system and not for a person (a report, a carry-over).
-    ///     It is the same as <see cref="GetAsync"/> without a viewer: no viewer is asked about, so nothing is
-    ///     hidden and <see cref="ChecklistState.AuthorBlocked"/> is not set. The API and the evidence still read
-    ///     through it without masking; that is deferred to the slice that masks them. A page must not use it.
+    ///     This is the read of the API. It never returns the own ballot of the viewer (drafts included) and never
+    ///     reads a ballot view: it answers only the consolidated standing. A token is never the lead, an administrator
+    ///     or an auditor, so it sees the standing only as its owner would as a reviewer who has handed in the own
+    ///     ballot, in a review with a single slot, or once the review is concluded. A review that cannot be read is
+    ///     treated as masked (fail closed).
     /// </remarks>
-    public Task<ChecklistState?> GetForSystemAsync(
+    public async Task<ChecklistState?> GetConsolidatedAsync(
+        Actor viewer,
         int projectId,
         string reviewId,
         CancellationToken cancellationToken = default)
     {
-        return GetAsync(projectId, reviewId, cancellationToken, null);
+        ArgumentNullException.ThrowIfNull(viewer);
+        await _access.RequireViewAsync(viewer, projectId, cancellationToken);
+
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (snapshot?.Record.Checklist is null)
+        {
+            return null;
+        }
+
+        var definition = snapshot.Record.Checklist.Parse();
+
+        // A review that is gone between the reads counts as masked rather than as visible
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var seesAll = review is not null
+                      && await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);
+        var user = await _users.GetByUsernameAsync(viewer.Username, cancellationToken);
+        if (review is null || !BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id))
+        {
+            return new ChecklistState(definition, [], [])
+            {
+                NoSlot = true,
+                IsMasked = true
+            };
+        }
+
+        return BallotProjection.Consolidate(snapshot.Record, snapshot.Slots.Count)!.State;
     }
 
     /// <summary>
@@ -130,10 +164,10 @@ public sealed class ChecklistService
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <param name="viewerUsername">
     ///     The user name of the person who looks at the checklist, or <c>null</c> (the default) for a system caller
-    ///     (see <see cref="GetForSystemAsync"/>); it decides <see cref="ChecklistState.AuthorBlocked"/>, and whether
-    ///     the standing of the other reviewers is hidden from a viewer who holds no slot (see
-    ///     <see cref="BallotVisibility"/>). Without a viewer nothing is hidden, so a caller that shows the state to a
-    ///     person must always pass the viewer.
+    ///     (a test or a system read that never reaches a person or the API); it decides
+    ///     <see cref="ChecklistState.AuthorBlocked"/>, and whether the standing of the other reviewers is hidden from a
+    ///     viewer who holds no slot (see <see cref="BallotVisibility"/>). Without a viewer nothing is hidden, so a page
+    ///     must always pass the viewer and the API uses <see cref="GetConsolidatedAsync"/> instead.
     /// </param>
     /// <returns>
     ///     The state, or <c>null</c> when the review does not exist or has no checklist. For a viewer who may not see the

@@ -397,6 +397,10 @@ not found.
   is present; the sentences are unchanged. `ReviewProgressService` and any later list of work use
   the counts and do not repeat the rule. `SlotMember.Enabled` tells whether the account of a person in a slot is enabled
   (true by default).
+- *Viewer-less read*: the overload without a viewer is not masked. It is a verdict-free system read for callers that
+  use only facts that are no verdict (concluded, approved, the digest, and the signatures): they never use the per-slot
+  ballot verdicts, the dispute counts, or the failed counts. A person or an API token reads through the overload that is
+  given the actor, and the HTTP API reads approvals only for the actor of the token.
 
 **GetApprovalsAsync**: Computes the status of several reviews of a project.
 

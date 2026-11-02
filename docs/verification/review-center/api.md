@@ -32,7 +32,10 @@ provider with a scripted fake.
 - A token that is created, used, and revoked works until it is revoked, and the same request is answered with 401 after
   the revocation.
 - A draft created from files is answered with 201, is flagged as created through the API, can be read back as not
-  approved, and its attestation is refused with 409; the attestation of a complete review is a PDF.
+  approved, and its attestation is refused with 409; the attestation of a concluded review is a PDF.
+- The review resource of the API shows a token no more of the standing of the reviewers than the pages show its owner
+  (see the unit *ApiEndpoints*): no failed count, dispute, blocker wording, or check thread counts for a token that has
+  not handed in a ballot in a review with several slots that is not concluded; `outcome` only once concluded.
 - The evidence index of a project is read with HTTP Basic credentials that carry a token as the password, its
   attestation
   address can be followed with the same credentials, and the same credentials are refused with 401 after the revocation.

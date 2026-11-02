@@ -29,6 +29,8 @@ N/A - standard test environment.
   in, who has not handed in, the state of each ballot) is not a verdict and stays visible, and the inbox section of a
   reviewer agrees with the next action of the status panel.
 - A viewer who is not known is treated as one who has not handed in, in a review with several slots only.
+- An API token is treated like any other viewer, so it is masked in the consolidated checklist read of the API and in
+  the progress of a review with several slots that is not concluded; there is no consolidated read without a viewer.
 - The discussions about checks are left out of the list for a viewer who may not see the others, and the capabilities
   follow the rules for starting them.
 - The audit masking hides only the detail of entries that name an answer, a change of applicability, or a discussion
@@ -116,11 +118,34 @@ by `ChecklistService_GetBallotView_UnknownReview_ReturnsNull`.
 masked state in place of the standing. This scenario is tested by
 `ChecklistService_GetAsync_ViewerWithoutSlotAndBallot_ReturnsMaskedState`.
 
-**ChecklistService_GetForSystemAsync_NoViewer_ReturnsUnmaskedStanding**: In a review with several slots, the system
-caller path (`GetForSystemAsync`) and a read without a viewer give the unmasked consolidated standing, while a read as a
-member without a slot is masked. This pins that the unmasked read is a named choice for callers that act for the system
-(the API and the evidence, masked in a later slice) and never reached by a page, which passes the viewer. This scenario
-is tested by `ChecklistService_GetForSystemAsync_NoViewer_ReturnsUnmaskedStanding`.
+**ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked**: In a review with several slots that is not concluded, the
+viewer-requiring consolidated read (the one of the API) gives an API token a masked, empty state. This scenario is
+tested by `ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked`.
+
+**ChecklistService_GetConsolidatedAsync_LeadAdminAuditorViaToken_IsMasked**: The token of the lead, of an
+administrator, and of an Auditor is masked as well, because a token is never one of them. This scenario is tested by
+`ChecklistService_GetConsolidatedAsync_LeadAdminAuditorViaToken_IsMasked`.
+
+**ChecklistService_GetConsolidatedAsync_SubmittedSlotOwner_SeesConsolidatedNotOwnBallot**: A viewer whose slot has
+handed in sees the consolidated standing and not the own ballot. This scenario is tested by
+`ChecklistService_GetConsolidatedAsync_SubmittedSlotOwner_SeesConsolidatedNotOwnBallot`.
+
+**ChecklistService_GetConsolidatedAsync_ConcludedReview_Visible**: A concluded review shows the standing to any viewer.
+This scenario is tested by `ChecklistService_GetConsolidatedAsync_ConcludedReview_Visible`.
+
+**ChecklistService_GetConsolidatedAsync_SingleSlot_Visible**: A review with a single slot shows the standing. This
+scenario is tested by `ChecklistService_GetConsolidatedAsync_SingleSlot_Visible`.
+
+**ChecklistService_GetConsolidatedAsync_NullViewer_Throws**: There is no consolidated read without a viewer. This
+scenario is tested by `ChecklistService_GetConsolidatedAsync_NullViewer_Throws`.
+
+**ChecklistService_GetConsolidatedAsync_UnknownReviewAndStranger_ReturnsNullAndRefuses**: An unknown review gives null,
+and a viewer who may not see the project is refused like a missing project. This scenario is tested by
+`ChecklistService_GetConsolidatedAsync_UnknownReviewAndStranger_ReturnsNullAndRefuses`.
+
+**ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer**: The progress of a review with several slots for
+a token actor holds no failed or disputed count and no outcome before the conclusion. This scenario is tested by
+`ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer`.
 
 **SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome**: The blockers of a masked viewer hold no
 count of disputed or failed checks, no outcome, and no conclusion text, only the fixed sentence. This scenario is tested

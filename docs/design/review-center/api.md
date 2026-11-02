@@ -35,9 +35,10 @@ validate, and revoke them, and `AccountPage` of `Web` is where a user manages th
     administrator, and for anybody else only the projects they are a member of.
   - `GET /api/projects/{projectId}/reviews` returns the review summaries of a project, 404 when the project does not
     exist or the owner of the token may not see it.
-  - `GET /api/projects/{projectId}/reviews/{reviewId}` returns the details of one review, with the slots, the counts,
-    the
-    approval state, and what is still missing.
+  - `GET /api/projects/{projectId}/reviews/{reviewId}` returns the details of one review, with the slots, the counts
+    (also the open and resolved threads per kind), the approval state, what is still missing, and, once the review is
+    concluded, the `outcome` and the conclusion text. The standing of the reviewers is masked for the token exactly as
+    the pages mask it for its owner (`masked` is true then), and there is no endpoint for a single thread.
   - `GET /api/projects/{projectId}/checklist` returns the checklist template that new reviews of the project start
     with: the definition (sections and checks), the version label, whether it is the built-in default, the SHA-256
     hash of the definition, and the counts; 404 when the project does not exist or the owner of the token may not see

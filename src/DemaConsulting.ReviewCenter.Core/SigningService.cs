@@ -248,6 +248,9 @@ public sealed class SigningService
     ///     <see cref="SlotSignatureState.OutOfDate"/> when it has signatures but none of them is current, and
     ///     <see cref="SlotSignatureState.NotSigned"/> otherwise. The review is concluded when it has at least one slot
     ///     and every slot is signed.
+    ///     This overload has no viewer and so is not masked: it is a system read for callers that use only the facts
+    ///     that are verdict-free (concluded, approved, the digest and the signatures). A person or an API token must
+    ///     read through <see cref="GetApprovalAsync(Actor?, int, string, CancellationToken)"/>.
     /// </remarks>
     public Task<ReviewApproval?> GetApprovalAsync(
         int projectId,
@@ -311,6 +314,9 @@ public sealed class SigningService
     ///     The status of each review that exists, by review identifier; a review that does not exist is absent.
     ///     Each status equals what <see cref="GetApprovalAsync(int, string, CancellationToken)"/> returns for the same
     ///     review.
+    ///     This overload has no viewer and is not masked; it is a system read like
+    ///     <see cref="GetApprovalAsync(int, string, CancellationToken)"/>. A person or an API token must use
+    ///     <see cref="GetApprovalsAsync(Actor?, int, IEnumerable{string}, CancellationToken)"/>.
     /// </returns>
     public async Task<IReadOnlyDictionary<string, ReviewApproval>> GetApprovalsAsync(
         int projectId,
