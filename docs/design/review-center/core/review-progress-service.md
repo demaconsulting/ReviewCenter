@@ -84,7 +84,10 @@ The service holds the injected collaborators and no other state, so it is safe f
   auditor, a project administrator, a system administrator, and an actor that came through an API token. A project the
   actor may not see, a project that does not exist, a disabled or unknown user, and a missing actor give
   `ProjectNotFound`, with the same message for each.
-- *Postconditions*: nothing is changed and nothing is recorded.
+- *Postconditions*: nothing is changed and nothing is recorded. The standing is masked for the actor by the same rule
+  as the pages (`BallotVisibility`), also for an actor that came through an API token: a token is never the lead, an
+  administrator or an auditor, so a review with several slots that is not concluded shows no failed or disputed count,
+  no blocker wording and no outcome to it until its owner has handed in a ballot, and then only to that owner.
 
 **GetProgressAsync (with the list of reviews)**: The same answer for a caller that already holds the review list, such
 as the API list, which needs the list itself for the review fields. The caller passes the list that

@@ -27,13 +27,15 @@ from a repository, the approval state and record digest, the slots (the primary 
 and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the
 next
 step. A summary carries `dueDate` and `overdue` as well, and the progress of the review: `approved` (true only for a
-review concluded as approved, never for a rejected one; the shape is unchanged), `slotsRequired`,
+review concluded as approved, never for a rejected one; the shape is unchanged), `outcome` (`Approved` or `Rejected`
+once the review is concluded, otherwise null), `slotsRequired`,
 `slotsSigned`, `slotsOutOfDate`, and `lastActivity` (the time of the newest audit entry of the review, or its creation
 time). The list takes all of them from `ReviewProgressService` (the same service as the project page), which reads the
 approvals and the last activity of all reviews of the project at once; the list endpoint reads the reviews of the project
 once and hands that list to `ReviewProgressService.GetProgressAsync` (the overload that takes the list), so the reviews
 are not read a second time; the fields were added and none was changed. The
-details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over.
+details and the summary also carry `followsReviewId`, and the details the two counts of what was carried over, the
+`outcome`, the `conclusionText` and the flag `masked` (see Read a review).
 
 #### Key Methods
 
@@ -113,14 +115,28 @@ details and the summary also carry `followsReviewId`, and the details the two co
   - The answer is 201 with the review and the files that the repository selection skipped.
 
 **Read a review**: Checks the project first like every route (a project that the owner may not see is a 404 as for a
-missing project), then builds the details from the services that own each part: the review from `ReviewService`, the
-approval, blockers, and next step from `SigningService`, the thread counts from `ThreadService`, and the checklist
-counts from `ChecklistService`. The checklist counts use the system-caller read of `ChecklistService`
-(`GetForSystemAsync`), which is not masked (masking the API is a later slice, PR 5), so they are those
-of the consolidated checklist of the submitted ballots (an agreed check is answered, a disputed or pending one is not;
-the one ballot of a review with a single slot counts before its hand-in), and only the items of applicable sections
-count. A draft ballot of a slot never changes them. The thread counts include the threads about a check of the checklist
-(open and resolved), as they are counted over every thread of the review; the shape of the answer does not change.
+missing project), then builds the details from the services that own each part: the review from `ReviewService`, and
+then three reads that are all made **for the actor of the token and never without one**: the approval, blockers, and
+next step from `SigningService.GetApprovalAsync(actor, ...)`, the threads from `ThreadService.ListAsync(actor, ...)`, and
+the checklist counts from `ChecklistService.GetConsolidatedAsync(actor, ...)`. These reads apply `BallotVisibility`
+like the pages do, and a token is never the lead of a review, a system administrator or an auditor, so it sees the
+consolidated standing of a review with several slots that is not concluded only when its owner holds a slot whose ballot
+is handed in (the same as the owner on the pages), in a review with a single slot, or in a concluded review. When any of
+the three reads says masked (or the review has vanished between the reads) the whole result is masked, which fails
+closed: `masked` is true, the failed and answered counts are 0, the check threads are left out of the thread counts, the
+approval is `ReviewApproval.Masked()` (no disputed or failed wording in the blockers or the next step, no provisional
+outcome), `outcome` and `conclusionText` are null. Not masked, the checklist counts are those of the consolidated
+checklist of the submitted ballots (an agreed check is answered, a disputed or pending one is not; the one ballot of a
+review with a single slot counts before its hand-in), and only the items of applicable sections count; a draft ballot of
+a slot never changes them. The thread counts include the threads about a check of the checklist (open and resolved) when
+they are visible, and are also given per kind: `openFindings`, `openQuestions`, `resolvedFindings` and
+`resolvedQuestions` (a finding is a thread that is part of the report, a question is chat); the kind of a single thread
+is never exposed and there is no thread endpoint. `outcome` is `Approved` or `Rejected` only when the review is concluded
+and not masked (never the provisional outcome), and `conclusionText` is the review conclusion text, hidden exactly when
+the approval is masked, as on the review page. The details never carry a ballot of a single reviewer, a per-check
+answer, or a thread text. The same details are the answer of the creation of a review, built for the same actor. The
+list endpoint adds `outcome` to each summary from `ReviewProgressService`, which masks for the token actor like for any
+viewer (there is no exception for tokens any more), so the list reveals no verdict before the conclusion.
 
 **Download the attestation**: Asks `AttestationService` for the attestation of the review with the actor of the caller
 (`ApiProblems.ActorOrAnonymous`: the actor of the token, or `null` when no token was presented, which the policy lets
@@ -128,10 +144,11 @@ through only when the project allows anonymous attestation PDFs) and
 passes the result to the shared `AttestationEndpoint.ToResult`, with a problem 404 for a review that does not exist. The
 service checks that the owner may view the project before it reads the review, so a project that the owner may not see
 gives the same 404 as a review that does not exist. The
-answer is therefore the same as for the page route (200 with the PDF, 409 for a review that is not complete or that
+answer is therefore the same as for the page route (200 with the PDF, 409 for a review that is not concluded or that
 changed, 500 for an unusable key), always with `Cache-Control: no-store`, but as a problem description in JSON. A caller
-without a token (anonymous) is the one exception for a review that is not complete: it gets the same 404 problem as for
-a review that does not exist, so it cannot probe which review identifiers exist or whether they are complete. What the
+without a token (anonymous) is the one exception for a review that is not concluded: it gets the same 404 problem as for
+a review that does not exist, so it cannot probe which review identifiers exist or whether they are concluded, and a
+rejected review is not served to a caller without a token either (see `AttestationService`). What the
 PDF contains follows the evidence settings of the project (see `AttestationService`), whoever asks.
 
 **Read the checklist template**: Checks the project first like every route (`ProjectService.GetAsync` with the actor of

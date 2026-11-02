@@ -345,8 +345,11 @@ The architecture above is the target design. Only the first slices are implement
   of a registered repository (flagged on the review as created through the API, with its creator), and downloads the
   attestation of a complete review. The OpenAPI document is served at `/api/openapi.json` and a committed snapshot
   (`docs/api/openapi.json`) is compared with it in a test. A token never signs and never opens a page; the former is
-  enforced in the Core `SigningService`, not only in the routes. Development databases created before this slice must be
-  recreated (no migrations).
+  enforced in the Core `SigningService`, not only in the routes. The API masks the details of a review for the actor
+  of a token like the UI does (a token is never the lead or an auditor, so it sees the standing only after its owner
+  has submitted a ballot, or when the review has a single slot or is concluded), and the review resource carries the
+  outcome and the thread counts per kind. Development databases created before this slice must be recreated (no
+  migrations).
 - **Implemented, slice 9b (evidence index for ReviewMark)**: `GET /api/projects/{projectId}/evidence/index.json` serves
   the completed reviews of a project as the ReviewMark evidence index (the new Evidence unit `EvidenceIndexService`):
   only `pass` entries, only reviews planned from a review-set, one entry for each id and fingerprint, in a fixed order,

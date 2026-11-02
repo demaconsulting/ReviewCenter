@@ -24,6 +24,36 @@ sections:
           - ApiEndpoints_ReviewDetail_Counts_IncludeCheckThreads
           - ApiEndpoints_Request_NoToken_Answers401
           - ApiEndpoints_CreateReview_NoTokenOddBody_Answers401
+          - ApiEndpoints_GetReview_ThreadKindCounts_FindingsAndQuestions
+
+      - id: ReviewCenter-ApiEndpoints-Masking
+        title: >-
+          The ApiEndpoints unit shall, in the details of a review and in the answer to the creation of a review, read
+          the approval status, the threads and the consolidated checklist for the actor of the token, never without
+          one, so that a token (which is never the lead of a review, a system administrator or an auditor) gets the
+          consolidated standing of a review with several reviewer slots that is not concluded only when the owner of the
+          token holds a slot whose ballot is handed in; shall otherwise mark the details masked and give no failed
+          count, no answered count, no check thread in the thread counts, no wording about a dispute or a failed check
+          in the blockers or the next step, no outcome and no conclusion text; shall give the outcome (approved or
+          rejected) and the conclusion text only when the review is concluded and not masked; shall give the counts of
+          the threads per kind (findings and questions) and no per-reviewer ballot, no dispute and no thread text; and
+          shall answer as before when the project is not visible to the token owner or no token is sent.
+        justification: |
+          The pages hide the answers of the other reviewers until a reviewer has handed in their own ballot, so that a
+          reviewer is not swayed. A script with a token is a second way to read the same review, and a token that is
+          not masked would hand the standing to anyone who can create a token, so the API follows the rules of the
+          pages and fails closed. The outcome is a decision that is public once it is made, and the kind counts
+          tell a script how much work is open without naming the discussions.
+        tests:
+          - ApiEndpoints_GetReview_TokenNonSubmitterMultiSlot_HidesFailedDisputeBlockersAndCheckThreads
+          - ApiEndpoints_GetReview_TokenOfLeadOrDraftOwner_StillMasked
+          - ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts
+          - ApiEndpoints_GetReview_Concluded_ShowsOutcomeConclusionTextAndCounts
+          - ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome
+          - ApiEndpoints_CreateReview_ResponseIsMaskedLikeTheDetails
+          - ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields
+          - ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged
+          - ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail
 
       - id: ReviewCenter-ApiEndpoints-ProjectAccess
         title: >-
@@ -130,11 +160,12 @@ sections:
 
       - id: ReviewCenter-ApiEndpoints-Attestation
         title: >-
-          The ApiEndpoints unit shall return the signed attestation PDF of a review whose reviewer slots have all
-          signed, with the same release rules and audit record as the download from the web pages, to a client with a
-          valid token or, when the project allows it, to a client without a token, and shall answer
-          with a problem document, status 409, for a review that is not signed, and status 401 to a request without a
-          valid token when the project does not allow anonymous attestation PDFs.
+          The ApiEndpoints unit shall return the signed attestation PDF of a concluded review (every reviewer slot has
+          signed and the review is approved or rejected), with the same release rules and audit record as the download
+          from the web pages, to a client with a valid token or, when the project allows it, to a client without a
+          token, and shall answer
+          with a problem document, status 409, for a review that is not concluded, and status 401 to a request without
+          a valid token when the project does not allow anonymous attestation PDFs.
         justification: |
           Fetching the attestation after the sign-off lets a pipeline file it with a release. Using the same
           mapping as the page keeps what is released, and what is recorded, the same. A project that publishes its
@@ -285,14 +316,17 @@ sections:
           approved, the number of its reviewer slots, of valid signatures, and of out-of-date signatures, the time of
           its last activity, and its due date and overdue flag, taking them from the same service as the project
           page, and shall add the fields without changing any existing field. The list shall read the reviews of the
-          project once and give that same list to the progress service.
+          project once and give that same list to the progress service. The outcome (approved or rejected) shall be
+          given only for a concluded review, for a token as for any viewer.
         justification: |
           A script that watches a project needs the progress that the project page shows, without opening every
           review. The fields are added and nothing is renamed, so existing clients keep working. One read of the
-          review list keeps a project with many reviews fast.
+          review list keeps a project with many reviews fast. The progress service masks the standing for the token
+          actor like for any viewer, so the list reveals no verdict before the conclusion.
         tests:
           - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
           - ApiEndpoints_ListReviews_Project_ReadsTheReviewListOnce
+          - ApiEndpoints_ListReviews_TokenActor_OutcomeShownOnlyWhenConcluded
           - ApiDocument_Get_MatchesCommittedSnapshot
 
       - id: ReviewCenter-ApiEndpoints-ReadOnlyRole

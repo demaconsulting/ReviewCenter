@@ -1883,6 +1883,7 @@ reviews:
       - "src/**/Api/ApiProblems.cs"
       - "src/**/Api/AuditExportEndpoints.cs"
       - "test/**/Api/ApiEndpointsTests.cs"
+      - "test/**/Api/ApiEndpointsMaskingTests.cs"
       - "test/**/Api/ApiProjectAccessTests.cs"
       - "test/**/Api/AuditExportEndpointsTests.cs"
       - "test/**/Api/ApiAuditorTests.cs"

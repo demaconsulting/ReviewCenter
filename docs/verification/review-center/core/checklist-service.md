@@ -45,7 +45,8 @@ N/A - standard test environment.
 - A viewer who holds a slot gets the own ballot with its draft and nothing of another slot's draft; a viewer without a
   slot gets the consolidated standing of the submitted ballots, marked as without a slot, in a review with a single slot
   or a concluded review (a review with several slots that is not concluded gives such a viewer a masked state, see the
-  verification of *BallotVisibility*); a read without a viewer is the system-caller path and is not masked.
+  verification of *BallotVisibility*); the API reads the consolidated standing with `GetConsolidatedAsync`, which
+  requires a viewer and masks for an API token.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
 - While the project does not let authors answer the checklist (the default, also for projects that existed before the

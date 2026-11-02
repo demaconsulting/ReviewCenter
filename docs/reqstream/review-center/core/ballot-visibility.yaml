@@ -39,15 +39,15 @@ sections:
           the viewer to add themselves as a reviewer only when they are a member who may be a reviewer and hold no
           slot, that offers submitting and signing in one step only when the own ballot is a complete draft in a review
           with several slots and nothing but the hand-in blocks the signature, and shall give a viewer who holds no slot
-          and may not see the others an empty checklist state that is marked hidden, with no consolidation, while a read
-          without a viewer is the named system-caller path that is not masked.
+          and may not see the others, an API token included, an empty checklist state that is marked hidden, with no
+          consolidation, while every read of the consolidated standing requires the viewer.
         justification: |
           A reviewer who has handed in wants to compare, so the differences are listed with the names of those who
           answered. The counts stay visible because they say who is still to come without giving anything away. The
           shortcuts are offered only when the service would accept them, so the page never offers a step it must
           refuse, and a viewer who may not see the others must not get the standing through the checklist either. The
-          callers that act for the system (the API and the evidence, masked in a later slice) use a named path, so
-          that an unmasked read is a visible choice and never a default of a page.
+          callers that act for a person or a token (the pages and the API) always name the viewer, and a token is never
+          the lead, an administrator or an auditor, so there is no unmasked read left to choose by mistake.
         tests:
           - ChecklistService_GetBallotView_SubmittedViewer_ListsDifferingChecksInSlotOrder
           - ChecklistService_GetBallotView_ViewerWithoutSubmittedBallot_HidesDifferences
@@ -56,7 +56,13 @@ sections:
           - ChecklistService_GetBallotView_CompleteDraft_OffersSubmitAndSignOnlyWhenNothingBlocks
           - ChecklistService_GetBallotView_UnknownReview_ReturnsNull
           - ChecklistService_GetAsync_ViewerWithoutSlotAndBallot_ReturnsMaskedState
-          - ChecklistService_GetForSystemAsync_NoViewer_ReturnsUnmaskedStanding
+          - ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked
+          - ChecklistService_GetConsolidatedAsync_LeadAdminAuditorViaToken_IsMasked
+          - ChecklistService_GetConsolidatedAsync_SubmittedSlotOwner_SeesConsolidatedNotOwnBallot
+          - ChecklistService_GetConsolidatedAsync_ConcludedReview_Visible
+          - ChecklistService_GetConsolidatedAsync_SingleSlot_Visible
+          - ChecklistService_GetConsolidatedAsync_NullViewer_Throws
+          - ChecklistService_GetConsolidatedAsync_UnknownReviewAndStranger_ReturnsNullAndRefuses
 
       - id: ReviewCenter-BallotVisibility-NoDisputeLeak
         title: >-
@@ -79,6 +85,7 @@ sections:
           - SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch
           - ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts
           - ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked
+          - ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer
           - SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState
           - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
           - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer

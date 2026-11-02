@@ -38,8 +38,14 @@ N/A - standard test environment (a temporary database and key folder are created
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
   is a 413, and no review is created in these cases. A file count above the limit, or a Base64 text longer than that of
   the largest file, is a 400 validation problem that is answered before anything is decoded.
-- The attestation of a complete review is a PDF, of a review that is not complete a 409 problem (for a request without a
-  token a 404 problem, as for a review that does not exist).
+- A review's details are built for the actor of the token with the same masking rule as the pages: a token that is
+  neither the owner of a handed-in slot nor in a review with a single slot or a concluded review gets `masked` true, no
+  failed or answered count, no check threads in the counts, no disputed or failed wording, no `outcome`, and no
+  `conclusionText`; the thread kind appears only as counts, and the allow list and the source scan of
+  `ApiEndpointsMaskingTests.cs` pin the shape and that no read is made without the actor.
+- A review in the details and the list shows `outcome` (`Approved` or `Rejected`) only when it is concluded.
+- The attestation of a concluded review is a PDF, of a review that is not concluded a 409 problem (for a request without
+  a token a 404 problem, as for a review that does not exist).
 - The evidence index of a project is a JSON document with the complete reviews that have a review-set id, each with an
   absolute attestation address built from the request; it is empty when no review can be listed, and a 404 problem for
   an
@@ -149,6 +155,57 @@ slot with its reviewers and who signed; the other is 404. This scenario is teste
 **ApiEndpoints_ReviewDetail_Counts_IncludeCheckThreads**: A review has an open and a resolved thread about a check. The
 details count them among the open and the resolved threads, and the shape of the answer is unchanged. This scenario is
 tested by `ApiEndpoints_ReviewDetail_Counts_IncludeCheckThreads`.
+
+**ApiEndpoints_GetReview_ThreadKindCounts_FindingsAndQuestions**: A review has threads that are in the report
+(findings) and threads that are not (questions), open and resolved. The details count each kind (`openFindings`,
+`openQuestions`, `resolvedFindings`, `resolvedQuestions`). This scenario is tested by
+`ApiEndpoints_GetReview_ThreadKindCounts_FindingsAndQuestions`.
+
+**ApiEndpoints_GetReview_TokenNonSubmitterMultiSlot_HidesFailedDisputeBlockersAndCheckThreads**: A review with several
+slots is not concluded, one reviewer has failed a check and another disagrees, and a check has a thread. The token of a
+member who has not handed in a ballot reads the details: `masked` is true, the failed and answered counts are 0, the
+check threads are not counted, the blockers and the next step name no failed or disputed check, and there is no
+`outcome` and no `conclusionText`. This scenario is tested by
+`ApiEndpoints_GetReview_TokenNonSubmitterMultiSlot_HidesFailedDisputeBlockersAndCheckThreads`.
+
+**ApiEndpoints_GetReview_TokenOfLeadOrDraftOwner_StillMasked**: The token of the lead of the review and the token of a
+reviewer who has not handed in the ballot read the same review. Both are masked, because a token is not the lead and a
+draft is not a hand-in. This scenario is tested by `ApiEndpoints_GetReview_TokenOfLeadOrDraftOwner_StillMasked`.
+
+**ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts**: The token of a reviewer who has handed in
+the ballot reads the review that is not concluded and sees the consolidated counts, the check threads and their kinds,
+and `masked` false, but no `outcome`. This scenario is tested by
+`ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts`.
+
+**ApiEndpoints_GetReview_Concluded_ShowsOutcomeConclusionTextAndCounts**: A theory concludes a review with two slots as
+approved and as rejected. The token of a member who holds no slot then sees `masked` false, the `outcome`, the
+`conclusionText`, and the counts. This scenario is tested by
+`ApiEndpoints_GetReview_Concluded_ShowsOutcomeConclusionTextAndCounts`.
+
+**ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome**: A review that is not concluded has no
+`outcome`, even for the token of a reviewer who sees the standing, and a review with a single slot is not masked. This
+scenario is tested by `ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome`.
+
+**ApiEndpoints_CreateReview_ResponseIsMaskedLikeTheDetails**: The token of a member creates a review. The answer has no
+outcome, no conclusion text, and no failed count, like the details of the review. This scenario is tested by
+`ApiEndpoints_CreateReview_ResponseIsMaskedLikeTheDetails`.
+
+**ApiEndpoints_ListReviews_TokenActor_OutcomeShownOnlyWhenConcluded**: The list shows the `outcome` of a review only
+when it is concluded, and the progress of a review whose standing the token may not see reveals no verdict. This
+scenario is tested by `ApiEndpoints_ListReviews_TokenActor_OutcomeShownOnlyWhenConcluded`.
+
+**ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields**: The names of the fields of the details are exactly the
+documented ones (an allow list), so no field of the ballot of a single reviewer, no per-reviewer answer, and no dispute
+can appear without a deliberate change. This scenario is tested by `ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields`.
+
+**ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged**: A request without a token is a 401 and the token of a user who
+is no member of the project is a 404, as before. This scenario is tested by
+`ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged`.
+
+**ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail**: An allow-list scan of the source of the endpoints finds
+that every read of the approval, the threads, and the consolidated checklist passes the actor as its first argument,
+and that the removed viewer-less checklist read does not come back. This scenario is tested by
+`ApiEndpoints_Source_UsesNoViewerLessReadsForReviewDetail`.
 
 **ApiEndpoints_Request_NoToken_Answers401**: Each route (the three reads, the creation, and the attestation) is
 requested without a token, while the anonymous evidence settings of the project are off. Each answer is 401. This

@@ -34,7 +34,9 @@ namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
 /// <remarks>
 ///     Every step calls the production service (user, project, repository, planner, checklist, signing and
 ///     evidence index) registered by <see cref="SelfTestServices"/>. The database, the git cache and the keys
-///     live in a temporary folder that is deleted at the end. The class is stateless and thread-safe.
+///     live in a temporary folder that is deleted at the end. The reads of the approval use the system overload of the
+///     signing service on purpose: the database is the temporary one, the review has one slot and only the digest and
+///     whether it is approved are used, never a verdict that could be masked. The class is stateless and thread-safe.
 /// </remarks>
 internal static class ReviewWorkflowCheck
 {

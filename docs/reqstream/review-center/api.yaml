@@ -39,8 +39,9 @@ sections:
         title: >-
           The Api subsystem shall let a client with a valid token list the projects the owner of the token may see and
           the reviews of such a project, read
-          one review, create a review draft from uploaded files or from the changes of a repository, mark a review
-          that was created this way, download the attestation of a signed review, report an invalid request or a
+          one review (hiding the standing of the reviewers from a token exactly where the pages hide it), create a
+          review draft from uploaded files or from the changes of a repository, mark a review
+          that was created this way, download the attestation of a concluded review, report an invalid request or a
           refused rule as a problem document that names the cause, refuse a body that is too large or beyond the
           review limits, and answer an address that does not exist with a
           JSON problem document.
@@ -51,6 +52,7 @@ sections:
           lets a script act on an error without parsing text.
         children:
           - ReviewCenter-ApiEndpoints-Read
+          - ReviewCenter-ApiEndpoints-Masking
           - ReviewCenter-ApiEndpoints-Create
           - ReviewCenter-ApiEndpoints-Validation
           - ReviewCenter-ApiEndpoints-Limits

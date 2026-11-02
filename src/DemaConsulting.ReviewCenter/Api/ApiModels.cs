@@ -48,6 +48,7 @@ internal sealed record ProjectDto(int Id, string Name, string Description, DateT
 /// <param name="SlotsSigned">The number of slots that hold a signature of the current record.</param>
 /// <param name="SlotsOutOfDate">The number of slots whose signatures are all of an earlier record.</param>
 /// <param name="LastActivity">When the review last had an entry in the audit trail; the creation time when it has none.</param>
+/// <param name="Outcome"><c>Approved</c> or <c>Rejected</c> once the review is concluded; <c>null</c> while it is in review (the provisional outcome is never shown).</param>
 internal sealed record ReviewSummaryDto(
     string Id,
     string Title,
@@ -64,7 +65,8 @@ internal sealed record ReviewSummaryDto(
     int SlotsRequired = 0,
     int SlotsSigned = 0,
     int SlotsOutOfDate = 0,
-    DateTimeOffset? LastActivity = null);
+    DateTimeOffset? LastActivity = null,
+    string? Outcome = null);
 
 /// <summary>
 ///     A reviewer slot of a review.
@@ -89,18 +91,26 @@ internal sealed record SlotDto(
 ///     The counts that summarize the progress of a review.
 /// </summary>
 /// <param name="Files">The number of files in the review.</param>
-/// <param name="OpenThreads">The number of comment threads that are open.</param>
-/// <param name="ResolvedThreads">The number of comment threads that are resolved.</param>
+/// <param name="OpenThreads">The number of comment threads that are open. Check threads are left out while the review is masked.</param>
+/// <param name="ResolvedThreads">The number of comment threads that are resolved. Check threads are left out while the review is masked.</param>
 /// <param name="ChecklistItems">The number of checklist items that apply to the review.</param>
-/// <param name="ChecklistAnswered">The number of applicable checklist items that have an answer.</param>
-/// <param name="ChecklistFailed">The number of applicable checklist items answered as failed.</param>
+/// <param name="ChecklistAnswered">The number of applicable checklist items that have an answer; 0 while the review is masked.</param>
+/// <param name="ChecklistFailed">The number of applicable checklist items answered as failed; 0 while the review is masked.</param>
+/// <param name="OpenFindings">The number of open threads that are findings (part of the report).</param>
+/// <param name="OpenQuestions">The number of open threads that are questions (chat).</param>
+/// <param name="ResolvedFindings">The number of resolved threads that are findings.</param>
+/// <param name="ResolvedQuestions">The number of resolved threads that are questions.</param>
 internal sealed record ReviewCountsDto(
     int Files,
     int OpenThreads,
     int ResolvedThreads,
     int ChecklistItems,
     int ChecklistAnswered,
-    int ChecklistFailed);
+    int ChecklistFailed,
+    int OpenFindings = 0,
+    int OpenQuestions = 0,
+    int ResolvedFindings = 0,
+    int ResolvedQuestions = 0);
 
 /// <summary>
 ///     A review with its details, approval status and counts.
@@ -129,6 +139,9 @@ internal sealed record ReviewCountsDto(
 /// <param name="FollowsReviewId">The review this one follows up, or <c>null</c> when it is not a follow-up.</param>
 /// <param name="CarriedAnswerCount">How many checklist answers were carried over from the followed review; 0 when none.</param>
 /// <param name="CarriedThreadCount">How many open threads were carried over from the followed review; 0 when none.</param>
+/// <param name="Outcome"><c>Approved</c> or <c>Rejected</c> once the review is concluded; <c>null</c> while it is in review (the provisional outcome is never shown).</param>
+/// <param name="ConclusionText">The review conclusion text the reviewers wrote; <c>null</c> when there is none or while the review is masked.</param>
+/// <param name="Masked"><c>true</c> when the reviewers' answers are hidden from the caller: in a review with several reviewer slots that is not concluded, an API token never sees the failed or disputed checks, the provisional outcome, the check threads or the conclusion text unless its owner has handed in a ballot as a slot holder (a token is never the lead, an administrator or an auditor).</param>
 internal sealed record ReviewDetailDto(
     string Id,
     string Title,
@@ -153,7 +166,10 @@ internal sealed record ReviewDetailDto(
     string NextStep,
     string? FollowsReviewId = null,
     int CarriedAnswerCount = 0,
-    int CarriedThreadCount = 0);
+    int CarriedThreadCount = 0,
+    string? Outcome = null,
+    string? ConclusionText = null,
+    bool Masked = false);
 
 /// <summary>
 ///     One file of an upload.

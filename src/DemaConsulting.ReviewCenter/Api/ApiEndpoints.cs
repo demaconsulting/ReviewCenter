@@ -44,7 +44,12 @@ namespace DemaConsulting.ReviewCenter.Api;
 ///     call the same Core services as the web pages, so the rules (limits,
 ///     validation, audit trail) are identical. A failed domain rule becomes a problem document through one filter
 ///     (see <see cref="ApiProblems"/>). Nothing here can sign: reviewer slots and signatures are refused for a token
-///     actor by <see cref="SigningService"/>, and no route for them exists. An unknown address under <c>/api</c> is
+///     actor by <see cref="SigningService"/>, and no route for them exists. What the reviewers answered is masked for a
+///     token by the same rules as on the pages (<see cref="BallotVisibility"/>): a token is never the lead, an
+///     administrator or an auditor, so in a review with several slots that is not concluded the details carry no failed
+///     or disputed check, no provisional outcome, no check thread and no conclusion text, and every read of the details
+///     is made for the actor (a read without a viewer is never used). There is no route for a ballot or a thread. An
+///     unknown address under <c>/api</c> is
 ///     answered with a JSON 404 for every standard HTTP method, also without a token, so the API never falls through
 ///     to the web pages. The class is
 ///     stateless and thread-safe.
@@ -158,7 +163,7 @@ internal static class ApiEndpoints
         group.MapGet("/projects/{projectId:int}/reviews", ListReviewsAsync)
             .WithName("ListReviews")
             .WithSummary("Lists the reviews of a project.")
-            .WithDescription("Returns the reviews of the project, ordered by their identifier, without their details; each with its due date and whether it is overdue.")
+            .WithDescription("Returns the reviews of the project, ordered by their identifier, without their details; each with its due date, whether it is overdue and, once concluded, its outcome.")
             .Produces<ReviewSummaryDto[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -166,7 +171,12 @@ internal static class ApiEndpoints
         group.MapGet("/projects/{projectId:int}/reviews/{reviewId}", GetReviewAsync)
             .WithName("GetReview")
             .WithSummary("Gets a review.")
-            .WithDescription("Returns the review with its reviewer slots, approval status, progress counts and next step.")
+            .WithDescription(
+                "Returns the review with its reviewer slots, approval status, progress counts, the outcome once the "
+                + "review is concluded, the conclusion text and next step. In a review with several reviewer slots that "
+                + "is not concluded the answers of the reviewers are masked for a token (masked is true): no failed or "
+                + "disputed check, no provisional outcome, no check thread and no conclusion text, until its owner has "
+                + "handed in a ballot as a reviewer; a token is never the lead, an administrator or an auditor.")
             .Produces<ReviewDetailDto>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -208,7 +218,9 @@ internal static class ApiEndpoints
             .WithName(ApiDocument.AttestationOperation)
             .WithSummary("Downloads the signed attestation of a complete review.")
             .WithDescription(
-                "Returns the signed PDF attestation; the review must be complete (every slot signed). What the PDF "
+                "Returns the signed PDF attestation; the review must be concluded (approved or rejected: every slot "
+                + "has signed the current record and no thread is open). A review that is not concluded is refused "
+                + "with 409 (404 without a token), and a rejected review is not served without a token. What the PDF "
                 + "contains follows the evidence settings of the project. Without a token the request is answered "
                 + "only when the project allows anonymous attestation PDFs; otherwise the answer is 401.")
             .Produces(StatusCodes.Status200OK, contentType: "application/pdf")
@@ -407,7 +419,8 @@ internal static class ApiEndpoints
         [AsParameters] DetailServices detail,
         CancellationToken cancellationToken)
     {
-        if (await projects.GetAsync(ApiProblems.ActorOf(http.User), projectId, cancellationToken) is null)
+        var actor = ApiProblems.ActorOf(http.User);
+        if (await projects.GetAsync(actor, projectId, cancellationToken) is null)
         {
             return ApiProblems.NotFound(ProjectNotFoundMessage);
         }
@@ -418,7 +431,7 @@ internal static class ApiEndpoints
             return ApiProblems.NotFound("The review does not exist.");
         }
 
-        return TypedResults.Ok(await BuildDetailAsync(review, detail, cancellationToken));
+        return TypedResults.Ok(await BuildDetailAsync(review, actor, detail, cancellationToken));
     }
 
     /// <summary>
@@ -508,7 +521,7 @@ internal static class ApiEndpoints
             skipped = result.Skipped.Select(s => new SkippedFileDto(s.Path, s.Reason)).ToList();
         }
 
-        var created = await BuildDetailAsync(review, detail, cancellationToken);
+        var created = await BuildDetailAsync(review, actor, detail, cancellationToken);
         var location = $"{Prefix}/projects/{projectId}/reviews/{Uri.EscapeDataString(review.Id)}";
         return TypedResults.Created(location, new CreatedReviewDto(created, skipped));
     }
@@ -702,7 +715,8 @@ internal static class ApiEndpoints
             progress.SlotsRequired,
             progress.SlotsSigned,
             progress.SlotsOutOfDate,
-            progress.LastActivity);
+            progress.LastActivity,
+            progress.IsConcluded ? progress.Conclusion.ToString() : null);
     }
 
     /// <summary>
@@ -716,44 +730,65 @@ internal static class ApiEndpoints
     }
 
     /// <summary>
-    ///     Builds the details of a review from the services that own each part.
+    ///     Builds the details of a review from the services that own each part, as the caller may see them.
     /// </summary>
     /// <param name="review">The review, with its files.</param>
+    /// <param name="actor">The caller (an API token actor), who decides what is hidden.</param>
     /// <param name="services">The services that own the parts of the details.</param>
     /// <param name="cancellationToken">Cancels the work.</param>
     /// <returns>The details.</returns>
+    /// <remarks>
+    ///     Every part is read for the actor and none without one: the approval status, the threads and the consolidated
+    ///     checklist are reduced by the rules of <see cref="BallotVisibility"/>, so a token never learns the failed or
+    ///     disputed checks, the provisional outcome, the check threads or the conclusion text of a review with several
+    ///     slots that is not concluded (a token is never the lead, an administrator or an auditor). When any of the
+    ///     reads is masked the whole result is masked, so a change between the reads cannot leak (fail closed).
+    /// </remarks>
     private static async Task<ReviewDetailDto> BuildDetailAsync(
         Review review,
+        Actor actor,
         DetailServices services,
         CancellationToken cancellationToken)
     {
-        var approval = await services.Signing.GetApprovalAsync(review.ProjectId, review.Id, cancellationToken);
-        var threadList = await services.Threads.ListAsync(review.ProjectId, review.Id, cancellationToken);
-        // The API reads as a system caller; masking it for the caller is deferred to the slice that masks the API
-        var checklist = await services.Checklists.GetForSystemAsync(review.ProjectId, review.Id, cancellationToken);
+        var read = await services.Signing.GetApprovalAsync(actor, review.ProjectId, review.Id, cancellationToken);
+        var threadList = await services.Threads.ListAsync(actor, review.ProjectId, review.Id, cancellationToken);
+        var checklist = await services.Checklists.GetConsolidatedAsync(actor, review.ProjectId, review.Id, cancellationToken);
+
+        // Masked when any read says so; a review that vanished between the reads is masked too
+        var masked = read is null || read.IsMasked || (checklist?.IsMasked ?? false);
+        var approval = masked ? read?.Masked() : read;
+        var threads = masked ? threadList.Where(t => !t.IsCheckThread).ToList() : threadList.ToList();
 
         // The checklist counts come from the consolidation of the submitted ballots (a single-slot review counts its
-        // only ballot even while it is a draft); only items of applicable sections count
+        // only ballot even while it is a draft); only items of applicable sections count. A masked state has no answers
         var items = 0;
         var answered = 0;
         var failed = 0;
         if (checklist is not null)
         {
             items = checklist.Overall.Total;
-            answered = checklist.Overall.Answered;
-            failed = checklist.Definition.Sections
-                .Where(section => checklist.IsApplicable(section.Id))
-                .SelectMany(section => section.Items)
-                .Count(item => checklist.AnswerFor(item.Id)?.Outcome == ChecklistOutcome.Fail);
+            answered = masked ? 0 : checklist.Overall.Answered;
+            failed = masked
+                ? 0
+                : checklist.Definition.Sections
+                    .Where(section => checklist.IsApplicable(section.Id))
+                    .SelectMany(section => section.Items)
+                    .Count(item => checklist.AnswerFor(item.Id)?.Outcome == ChecklistOutcome.Fail);
         }
 
+        var open = threads.Where(t => t.State == ReviewThreadState.Open).ToList();
+        var resolved = threads.Where(t => t.State == ReviewThreadState.Resolved).ToList();
         var counts = new ReviewCountsDto(
             review.Files.Count,
-            threadList.Count(t => t.State == ReviewThreadState.Open),
-            threadList.Count(t => t.State == ReviewThreadState.Resolved),
+            open.Count,
+            resolved.Count,
             items,
             answered,
-            failed);
+            failed,
+            open.Count(t => t.Kind == ThreadKind.Finding),
+            open.Count(t => t.Kind == ThreadKind.Question),
+            resolved.Count(t => t.Kind == ThreadKind.Finding),
+            resolved.Count(t => t.Kind == ThreadKind.Question));
         var slots = approval?.Slots.Select(s => new SlotDto(
             s.SlotId,
             s.Number,
@@ -762,6 +797,13 @@ internal static class ApiEndpoints
             s.State.ToString(),
             s.SignerName,
             s.SignedAt)).ToList() ?? [];
+
+        // Only the conclusion is an outcome here, never the provisional one; the conclusion text is hidden exactly when
+        // the approval is masked, as the review page does
+        var outcome = !masked && approval is { IsConcluded: true } ? approval.Conclusion.ToString() : null;
+        var conclusionText = masked || string.IsNullOrWhiteSpace(review.ReviewConclusionText)
+            ? null
+            : review.ReviewConclusionText;
         return new ReviewDetailDto(
             review.Id,
             review.Title,
@@ -786,6 +828,9 @@ internal static class ApiEndpoints
             approval?.NextStep ?? string.Empty,
             review.FollowsReviewId,
             review.CarriedAnswerCount,
-            review.CarriedThreadCount);
+            review.CarriedThreadCount,
+            outcome,
+            conclusionText,
+            masked);
     }
 }

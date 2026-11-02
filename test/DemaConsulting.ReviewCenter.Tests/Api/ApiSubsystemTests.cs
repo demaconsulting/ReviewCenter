@@ -157,6 +157,7 @@ public class ApiSubsystemTests
         // Assert: readable, and the refused change maps to 409
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         Assert.True(readJson.RootElement.GetProperty("approved").GetBoolean());
+        Assert.Equal("Approved", readJson.RootElement.GetProperty("outcome").GetString());
         Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
         Assert.Equal(HttpStatusCode.OK, index.StatusCode);
         Assert.Equal(DomainRule.ReviewLocked, refusal.Rule);

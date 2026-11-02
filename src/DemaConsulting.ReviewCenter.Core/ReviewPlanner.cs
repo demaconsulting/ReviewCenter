@@ -590,6 +590,7 @@ public sealed class ReviewPlanner
         DateTimeOffset bestTime = default;
         foreach (var review in existing.Where(r => r.ReviewSetId == setId && r.HeadSha is not null))
         {
+            // A verdict-free system read: only IsApproved and the signature times are used, never a count or wording
             var approval = await _signing.GetApprovalAsync(projectId, review.Id, cancellationToken);
             if (approval is not { IsApproved: true })
             {

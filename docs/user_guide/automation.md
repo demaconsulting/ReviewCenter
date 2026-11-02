@@ -219,6 +219,24 @@ when it follows none). The review data of one review has also `followsReviewId`,
 `carriedThreadCount`, the numbers of answers and threads that were carried when the review was created (0 when it
 follows none).
 
+**`outcome`, `conclusionText`, and `masked`.** The review data of the list and of one review has `outcome` (`Approved`
+or `Rejected` once the review is concluded, otherwise `null`; it never shows the provisional outcome of a review that
+is still open). The data of one review also has `conclusionText` (the free text of the conclusion, or `null`) and
+`masked` (`true` when the standing of the reviewers is hidden from the token, see below).
+
+**Thread counts.** The `counts` of one review hold `openThreads` and `resolvedThreads`, and the same threads by kind:
+`openFindings`, `openQuestions`, `resolvedFindings`, and `resolvedQuestions` (a finding is a thread that is part of the
+report, a question is one that is not). The API has no route that reads a single thread.
+
+**What a token sees of the standing.** A token sees what its owner would see on the pages. In a review with several
+reviewer slots that is **not yet concluded**, the reviewers do not see each other's answers until they have handed in
+their own ballot, and an API token is never the lead of a review, an administrator, or an Auditor, so it does not see
+them either: unless the owner of the token holds a slot whose ballot is handed in, the review shows `masked: true`,
+`checklistAnswered` and `checklistFailed` are 0, the threads about checks are not counted, and the blockers and the next
+step name no failed or disputed check and no outcome. The same holds for the list, which shows no verdict before the
+conclusion, and for the answer to the creation of a review. A review with one slot, and a concluded review, are shown
+completely. Failing closed is deliberate: if the standing cannot be read for the token, it is hidden.
+
 ## Errors, Refusals, and the Throttle
 
 - A request without a token, or with a token that is wrong, malformed, expired, or revoked, or whose owner is disabled

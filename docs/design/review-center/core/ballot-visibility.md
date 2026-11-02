@@ -72,10 +72,18 @@ token. The second adds the lead of the review.
   draft, the review has several slots, and the approval service reports nothing but the missing hand-in).
 
 **ChecklistService.GetAsync** (with the viewer): Gives a viewer who holds no slot and may not see the others an empty
-state with `IsMasked` set and no consolidation, in place of the consolidated standing. Without a viewer the read is the
-named system-caller path, **ChecklistService.GetForSystemAsync**: it is never masked, no page uses it, and a test pins
-the choice. It exists for the callers that act for the system, which are the API and the evidence index today; they
-stay unmasked until the slice that masks them (PR 5).
+state with `IsMasked` set and no consolidation, in place of the consolidated standing. Without a viewer the read is a
+test and system path that no page and no endpoint uses.
+
+**ChecklistService.GetConsolidatedAsync**: The read of the consolidated standing for the API. It requires the viewer
+(a null viewer is an `ArgumentNullException`, there is no read without one), checks that the viewer may see the project,
+and returns the consolidation of the submitted ballots when the viewer may see the others, and the masked state
+(`NoSlot` and `IsMasked`, no answers) otherwise, which is the case for an API token whose owner has not handed in a
+ballot in a review with several slots that is not concluded, since a token is never the lead, an administrator or an
+auditor. A review that disappears between the snapshot read and the read of the review itself also gives the masked
+state. It never gives the own ballot of a slot owner, so the API shows the same standing to a token as a person
+sees in the consolidated view. It returns `null` when the review or its checklist does not exist. There is no
+unmasked checklist read left.
 
 **SigningService.GetApprovalAsync** and **GetApprovalsAsync** (with the viewer): For a masked viewer, leave out the
 counts of disputed and failed checks, the outcome, and the conclusion text from the blockers and the state, set
@@ -85,7 +93,9 @@ a review is recognized from the loaded reviews, and an API token is never the cr
 masked in a review with several slots.
 
 **ReviewProgressService** and **InboxService**: Apply the same rule, so that no progress line, blocker, or inbox row
-carries a count of disputed or failed checks. The inbox also leaves the discussions about checks out of the waiting
+carries a count of disputed or failed checks. `ReviewProgressService` has no exception for an API token any more: it
+always reads the approvals for the actor, so a token is masked like any viewer who is not the lead, an administrator or
+an auditor. The inbox also leaves the discussions about checks out of the waiting
 threads and out of the count of news in the row of a masked viewer, so that a new hidden discussion does not make the
 row unread. An API token is never the lead, so the creator's full view of the inbox is for a person only.
 What stays visible to a masked viewer is progress, not verdict: how many ballots are handed in out of how many, the
@@ -123,8 +133,11 @@ the owner of the only slot.
 
 `BallotVisibility.CanSeeOthers` raises `ArgumentNullException` for a null snapshot, and `AuditMasking.ForViewer` for a
 null list of entries. A viewer that is not known fails closed: the overloads that take a viewer treat a `null` viewer
-as one who has not handed in, so that a caller that forgets the viewer hides more and never less. The one exception is
-the checklist read without a viewer, which is the named system-caller path (`GetForSystemAsync`) and is not masked.
+as one who has not handed in, so that a caller that forgets the viewer hides more and never less. The checklist has no
+read without a viewer for the API: `GetConsolidatedAsync` requires one. The viewer-less overloads of the approval read
+(`SigningService.GetApprovalAsync` and `GetApprovalsAsync` without an actor) remain for system use that needs only
+verdict-free facts (concluded, approved, the digest, signature times), and the API never calls them (a source scan test
+pins that the endpoints pass the actor).
 Every other
 combination of arguments has a defined answer, and the services add no error of their own for masking.
 
@@ -143,5 +156,4 @@ combination of arguments has a defined answer, and the services add no error of 
   answers, and the note that explains the hiding; `HistoryPage` masks the audit entries it reads with `AuditMasking`.
   `AuditPage` and `ProjectAuditPage` are open only to administrators and Auditors, who see every ballot, so they do not
   mask.
-- The API, the attestation, and the evidence index use the unmasked reads; masking them is outside this unit for now
-  (PR 5).
+- The API reads the review standing for the token actor, so it is masked like the pages (see *ApiEndpoints*).
