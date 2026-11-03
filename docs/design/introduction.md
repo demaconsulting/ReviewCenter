@@ -148,9 +148,9 @@ added to the model, with its requirements and design documents, as it is impleme
 - **tools/** - development tools that are not distributed
   - **puppet/** - source of the ReviewCenterPuppet system
 - **docs/api/** - the committed snapshot of the OpenAPI document of the API (`openapi.json`), compared by a test
-- **docs/user_guide/** - the user guide, one Markdown file for each chapter (introduction, installation, deployment,
-  sign-in, identity providers, administration, reviewing, automation, reference), assembled in the order that
-  `definition.yaml` lists
+- **docs/user_guide/** - the user guide, one Markdown file for each chapter (introduction, installation, first review,
+  deployment, sign-in, identity providers, administration, reviewing, review practices, automation, reference),
+  assembled in the order that `definition.yaml` lists
 - **test/** - test projects
   - **DemaConsulting.ReviewCenter.Tests/** - tests of the ReviewCenter system, including the Core subsystem
     (`Core/` folder) and the Storage subsystem (`Storage/` folder)

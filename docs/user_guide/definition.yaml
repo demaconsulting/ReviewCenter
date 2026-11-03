@@ -6,6 +6,7 @@ input-files:
   - docs/user_guide/title.txt
   - docs/user_guide/introduction.md
   - docs/user_guide/installation.md
+  - docs/user_guide/first-review.md
   - docs/user_guide/deployment.md
   - docs/user_guide/sign-in.md
   - docs/user_guide/identity-providers.md

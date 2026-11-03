@@ -80,10 +80,10 @@ or `.xml` for JUnit format.
 
 When a validation test fails, the tool exits with a non-zero exit code.
 
-### Heading Depth
+### Heading Level of the Report
 
-Use `--depth <#>` to control the heading level of the validation output (default: `1`).
-This is useful when embedding the validation report into a larger markdown document:
+Use `--depth <#>` to set the heading level of the validation report (default: `1`).
+This is useful when embedding the report into a larger markdown document:
 
 ```bash
 # Embed validation at heading level 2
@@ -344,9 +344,8 @@ authors are not matched. Two further per-project settings, **Authors cannot answ
 and **The person who reopened a review cannot sign it again**, are on by default and changed in the same way;
 ReviewCenter applies and audits them.
 
-> **These rules apply to all existing projects.** The rules are on by default and apply to ALL existing projects, also
-> those created before this version (the stored columns default to on). A project that needs one person to do
-> everything switches them off on the project page.
+The rules apply to every project, also to one created before they existed, until the project switches them off (see
+Review Rules in the Administration chapter).
 
 A development database created before the approval lock existed lacks the table `ReviewReopens` and the column
 `Projects.RequireIndependentReviewers`, and one created before the review rule switches lacks the columns
@@ -415,7 +414,8 @@ This section lists the rules of the inbox (see Your Inbox in the Reviewing chapt
 
 ## Puppet Development Tool
 
-Puppet is a small developer helper for AI agents, not part of the distributed ReviewCenter executables. It keeps one
+Puppet is a small helper for the developers of ReviewCenter (and their AI agents), not for users and not part of the
+distributed ReviewCenter executables; skip this section unless you work on ReviewCenter itself. It keeps one
 persistent headless Chromium open and drives it one command per shell call (go to a page, click, hover, fill, read
 text, screenshot) against a running ReviewCenter web interface. See `tools/puppet/README.md` for the setup, the
 commands, and the workflow. Each agent session can run its own browser by setting the environment variable

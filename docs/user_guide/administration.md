@@ -14,9 +14,11 @@ a **System admin** badge for system administrators. It also shows, for each user
 the account is locked after too many failed sign-ins, and a **Temporary password** badge while the user still has to
 change the password. The time of the last sign-in is stored for information only; it is not an audit entry. A failed
 sign-in does not change it, and it is set by a successful sign-in with a password, with the code of the second factor,
-or with an identity provider. A system administrator can:
+or with an identity provider.
 
 ![The Users page with one system administrator and two ordinary users.](images/users-list.png)
+
+A system administrator can:
 
 1. Create a user: press **+ New user**, which opens the form at `/users/new`, enter a user name (3 to 50 letters,
    digits, `.`, `_`, or `-`; unique regardless of letter case), display name, and
@@ -124,9 +126,6 @@ owner of the token as its author.
 project members and system administrators. A project administrator or a system administrator can open the evidence
 index, the attestation PDFs, or both of one project to readers who are not signed in; see
 [Evidence Settings](#evidence-settings). Nothing else becomes visible to them.
-
-This release lets a project administrator manage the members of that project (see
-[Managing Project Members](#managing-project-members)); a system administrator manages the members of every project.
 
 ### Managing Project Members
 
@@ -431,9 +430,8 @@ only to a project administrator of the project and to a system administrator; ot
 switches, saved together with **Save review rules**: **Require independent reviewers** and two further switches (see
 below). ReviewCenter applies all three.
 
-> **These rules apply to all existing projects.** The rules are on by default and apply to ALL existing projects, also
-> those created before this version (the stored columns default to on). A project that needs one person to do
-> everything switches them off on the project page.
+> **These rules apply to every project.** The rules are on by default, also in projects that were created before the
+> rules existed. A project that needs one person to do everything switches them off on the project page.
 
 **Require independent reviewers.** The setting is **on by default**, for every project of a newly created database (a
 database made before this setting existed must be recreated, because the schema has no migrations). While it is on,
@@ -506,16 +504,10 @@ Open the review; in the locked notice, enter a **Reason for reopening** (require
 
 ## Inbox and Read State
 
-Every user has an inbox of the reviews that wait for them (see Your Inbox in the Reviewing chapter). It is built from
-the reviews in which the user is named in a slot or is the author, and from what is stored about what the user has
-seen. Nothing needs to be set up, and no setting turns it off.
-
-- The read state (when a user last saw a review, and the highest comment seen) is stored for each user and review. It
-  is not an entry of the audit trail and it is not part of the record that a signature binds to, so reading a review
-  never makes the signers sign again and never adds an audit entry.
-- Administrators cannot read the inbox of another user, and a system administrator who is no member of a project sees
-  in the inbox only the reviews in which that person is named as a reviewer or the author.
-- Deleting a user or a review deletes the read state that belongs to it.
+Every user has an inbox (see Your Inbox in the Reviewing chapter). Nothing needs to be set up, and no setting turns it
+off. The read state behind the **New** marker is stored for each user and review; it is not an audit entry and not
+part of the signed record, so reading a review never makes the signers sign again. Administrators cannot read the inbox
+of another user, and deleting a user or a review deletes the read state that belongs to it.
 
 ## Audit Trail
 
@@ -746,46 +738,10 @@ Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
 
 If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
 server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
-release: the tables are created only when the database is new. **A database file created by an earlier build, before
-user accounts, reviewer signatures, or the audit trail existed, does not have the tables and columns that are
-needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
-start again, then create the first system administrator.** Do this only with development data. The repository registry and
-the reviews from a repository add tables and columns, and the record digest of a review is calculated in the
-format `ReviewCenter record v2` that includes the review-set, the side of every line comment, and the comments that
-are included in the report (the report block replaces the earlier coverage of every comment), so a development
-database created before them must be recreated in the same way. The personal access tokens add a table, and every
-review has new columns that tell who created it and whether it was created with an API token, so a development database
-created before them must be recreated as well. Project-based access control adds the project memberships, replaces the
-role of a user with a system administrator flag, and ties every repository to one project, so a development database
-created before it must be recreated too. Project member management adds the must-change-password flag of a user
-(`Users.MustChangePassword`), so a development database created before it must be recreated as well. The evidence
-settings add seven columns to the projects (`EvidenceAnonymousIndex`, `EvidenceAnonymousAttestations`,
-`EvidenceIncludeThreads`, `EvidenceIncludeReviewerNames`, `EvidenceIncludeChecklistWording`, `EvidenceIncludeFiles`,
-and `EvidenceIncludeGitContext`), and the record digest is labeled `ReviewCenter record v2`, a format private to
-ReviewCenter that also covers the wording of the checklist questions and the consolidated standing of the submitted
-ballots (the agreed answer, disputed, or open per check; agreed or disputed not-applicable per section; the outcome),
-and no answerer, justification, slot or draft. The sign-in with an
-OpenID Connect provider adds two columns to the users (`Users.ExternalIssuer` and `Users.ExternalSubject`) with a unique
-index on the pair. The two-factor sign-in adds two tables (`UserTotps` and `TotpRecoveryCodes`). There is no migration:
-recreate development databases created before them. The approval lock and the independent reviewers add the table
-`ReviewReopens` (the history of reopened reviews) and the column `Projects.RequireIndependentReviewers`, again with no
-migration: the server creates them only when the database is new, so a development database created before them must
-be deleted and created again, like the earlier ones. A new project, and a review that was never reopened, keep their
-record digests (the number of reopens is added to the digest only when it is more than zero). The review rule switches
-add the columns `Projects.RequireNonAuthorChecklistAnswers` and `Projects.RequireNonReopenerSigning`, again with no
-migration: a development database created before them must be deleted and created again. The optional due date of a
-review adds the column `Reviews.DueDate`, which the server also creates only when the database is new (no migration).
-The follow-up review adds the columns `Reviews.FollowsReviewId`, `Reviews.CarriedAnswerCount`, and
-`Reviews.CarriedThreadCount`, and the carried-from columns of the checklist answers, the section states, and the
-threads, again with no migration. A review that follows nothing keeps its record digest, because the line for a
-followed review and the marker of a carried thread are added to the digest only when they exist. The reviewer
-ballots add the table `ChecklistBallots` (the state of the ballot of each slot) and the slot identity to the key of the
-checklist answers and the section states, again with no migration: a development database created before them must be
-deleted and created again. The time of the
-last sign-in adds the
-column `Users.LastSignInUtc`, again with no migration: a development database created before it must be deleted and
-created again. The comments of a thread add the columns `Comments.IncludeInReport` and `Comments.Kind`, again with no
-migration: a development database created before them must be deleted and created again.
+release: the tables are created only when the database is new. **A database file created by an earlier build does not
+have the tables and columns that the current version needs, and the pages cannot work with it: delete the file (or point
+`Database:ConnectionString` at a new one) and start again, then create the first system administrator.** Do this only
+with development data.
 
 ## Repositories and Credentials
 

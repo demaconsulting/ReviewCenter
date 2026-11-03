@@ -43,6 +43,8 @@ never prints the password. Further users are created on the Users page by a syst
 be created (the user name is taken, the password is too short, no password was provided, or the database cannot be
 used) it prints an error and exits with a non-zero exit code.
 
+After you sign in as this user (see Sign In and Out below), the home page looks like this:
+
 ![The home page after first sign-in, with links to Inbox, Projects, Audit, and Users.](images/home-after-sign-in.png)
 
 ## Sign In and Out
@@ -207,8 +209,8 @@ provider.
 
 ## Account
 
-Open `/account` (the Account link in the header) to choose how ReviewCenter looks, to change your password, and to
-manage your API tokens.
+Open `/account` (the Account link in the header) to choose how ReviewCenter looks, to change your password, to turn on
+two-factor sign-in, and to manage your API tokens.
 
 The **Appearance** card offers **System**, **Light**, and **Dark**. **System** is the default and follows the light or
 dark setting of your device; **Light** and **Dark** always use that theme. The choice applies as soon as you select
@@ -227,6 +229,9 @@ only this form, asks for the temporary password as the
 current one, and sends you to the sign-in page with a notice when the password is changed; see
 Managing Project Members in the Administration chapter.
 
+The **Two-factor authentication** card, for an account with a ReviewCenter password, turns on a second factor; see
+[Two-Factor Sign-in](#two-factor-sign-in).
+
 The **API tokens** card creates and revokes the personal access tokens that let a script or tool use the API as you
 (see the Automation and API Tokens chapter):
 
@@ -241,9 +246,6 @@ The **API tokens** card creates and revokes the personal access tokens that let 
 
 A user has at most 20 active tokens; expired and revoked tokens do not count. The card has an **About API tokens**
 button that opens the Help topic.
-
-The **Two-factor authentication** card, for an account with a ReviewCenter password, turns on a second factor; see
-[Two-Factor Sign-in](#two-factor-sign-in).
 
 ## Two-Factor Sign-in
 
