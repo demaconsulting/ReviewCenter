@@ -5,7 +5,8 @@
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
 `UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`,
 `ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, `ProjectChecklistStoreTests.cs`,
-`TotpStoreTests.cs`, `NotificationStoreTests.cs`, and `DatabaseSetupTests.cs`, which exercise the context through the units that use it, and with
+`TotpStoreTests.cs`, `NotificationStoreTests.cs`, and `DatabaseSetupTests.cs`, which exercise the context through the
+units that use it, and with
 `ReviewCenterDbContextTests.cs`, which writes to the context directly where no store reaches a rule of the schema. The
 context has no behavior that can be reached without a database, and its job is to produce the right schema, so the
 tests run against real SQLite database files in a private temporary folder. No mocking or in-memory substitute is
