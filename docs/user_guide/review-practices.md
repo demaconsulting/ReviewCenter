@@ -76,8 +76,8 @@ signatures current.
 
 ReviewCenter does not let such a change go through silently. When the change would make a current signature no
 longer fit, the page stores nothing and shows a warning where you worked: "Signed reviewers will need to look again and
-sign again, because the report changes". It names every affected slot and its signer, for
-example "Slot 1 (Alice)". **Confirm change** makes the change and the named signers have to sign again; **Cancel** removes
+sign again, because the report changes". It names every affected slot and its signer, for example
+"Slot 1 (Alice)". **Confirm change** makes the change and the named signers have to sign again; **Cancel** removes
 the warning and changes nothing, and what you typed stays in its field so that you can still use it. If another
 reviewer signs while the warning is open, the first **Confirm change** is answered with a new warning that names every
 signature, so you only confirm what you have seen. The signers then sign the new record again.

@@ -502,8 +502,8 @@ everything once the review is concluded. A review with one slot hides nothing.
 
 **After you hand in, compare.** At the top the page says how many checks are answered differently ("1 check answered
 differently. Open it to discuss."). Under every check on which the submitted ballots differ, the page shows the answers
-side by side with the names ("Alice: Pass / Bob: N/A"), a **Different answers** mark, and the justification of each other
-reviewer who gave one. **Discuss** next to it opens a small
+side by side with the names ("Alice: Pass / Bob: N/A"), a **Different answers** mark, and the justification of each
+other reviewer who gave one. **Discuss** next to it opens a small
 form: type what you want to ask or point out and start the discussion, which is a thread about that check on the review
 page. When the submitted ballots agree on a failure, the status line reads "Checklist complete, 1 check failed.". The
 page shows one ballot at a time: once the review is concluded it points to the history of the review, where the answers

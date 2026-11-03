@@ -54,8 +54,8 @@ independent.
    you can see.
 
 In this example Alice and Bob answer all checks with **Pass**, except for one check, where Alice chooses **Pass** and
-Bob chooses **Fail** with the justification "The reorder level is not checked for negative stock." Carol cannot answer or
-sign, because she created the review.
+Bob chooses **Fail** with the justification "The reorder level is not checked for negative stock." Carol cannot
+answer or sign, because she created the review.
 
 ![The checklist of a draft ballot: two sections done, one in progress, a justified N/A.](images/checklist-partial.png)
 
