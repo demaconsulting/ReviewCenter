@@ -91,4 +91,32 @@ public class AuditStoreExportTests
         Assert.Equal(Enumerable.Range(1, 15).Select(i => (long)i), all.Select(e => e.Sequence));
         Assert.Empty(none);
     }
+
+    /// <summary>
+    ///     Test that the matching read applies the actor text, the action, the action prefix, and the review of the
+    ///     filter, like the listing.
+    /// </summary>
+    [Fact]
+    public async Task AuditStore_ReadMatchingAsync_ActorActionAndReviewFilters_ReturnOnlyMatches()
+    {
+        // Arrange: four entries of project 1 with different actors, actions, and reviews
+        using var db = new TestStore();
+        var token = TestContext.Current.CancellationToken;
+        await db.Audit.AppendAsync(new AuditDraft("review.created", null, "Ann", 1, "r1", "d1"), token);
+        await db.Audit.AppendAsync(new AuditDraft("review.signed", null, "Bob", 1, "r2", "d2"), token);
+        await db.Audit.AppendAsync(new AuditDraft("project.created", null, "Ann", 1, null, "d3"), token);
+        await db.Audit.AppendAsync(new AuditDraft("review.created", null, "Ann", 1, "r1", "d4"), token);
+
+        // Act
+        var byActor = await db.Audit.ReadMatchingAsync(new AuditFilter(ActorText: "bob"), 0, 4, 100, token);
+        var byAction = await db.Audit.ReadMatchingAsync(new AuditFilter(Action: "review.created"), 0, 4, 100, token);
+        var byPrefix = await db.Audit.ReadMatchingAsync(new AuditFilter(ActionPrefix: "review."), 0, 4, 100, token);
+        var byReview = await db.Audit.ReadMatchingAsync(new AuditFilter(ReviewId: "r1"), 0, 4, 100, token);
+
+        // Assert
+        Assert.Equal([2L], byActor.Select(e => e.Sequence));
+        Assert.Equal([1L, 4L], byAction.Select(e => e.Sequence));
+        Assert.Equal([1L, 2L, 4L], byPrefix.Select(e => e.Sequence));
+        Assert.Equal([1L, 4L], byReview.Select(e => e.Sequence));
+    }
 }

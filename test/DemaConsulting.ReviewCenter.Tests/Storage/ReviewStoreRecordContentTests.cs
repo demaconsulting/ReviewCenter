@@ -505,11 +505,13 @@ public class ReviewStoreRecordContentTests
         // Act
         var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.SetThreadKindAsync(
             projectId, "REV-1", bare.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken));
+        var auditAfterRefusal = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
         var promoted = await db.Store.SetThreadKindAsync(
             projectId, "REV-1", noted.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken);
 
         // Assert
         Assert.Equal(DomainRule.ResolutionNoteRequired, exception.Rule);
+        Assert.Equal(auditBefore, auditAfterRefusal);
         var unchanged = await ReadThreadAsync(db, projectId, bare.Id);
         Assert.Equal(ThreadKind.Question, unchanged.Kind);
         Assert.False(unchanged.Comments[0].IncludeInReport);
@@ -561,6 +563,61 @@ public class ReviewStoreRecordContentTests
         Assert.True(off);
         var final = await ReadThreadAsync(db, projectId, thread.Id);
         Assert.Equal([false, false, false], final.Comments.Select(c => c.IncludeInReport));
+    }
+
+    /// <summary>
+    ///     Test that a change of the kind of a thread records exactly one audit entry with the action of the caller,
+    ///     and that the same kind again records none.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_SetThreadKindAsync_Change_RecordsOneAuditEntry()
+    {
+        // Arrange: an open Question
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var thread = await AddThreadAsync(db, projectId, false);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+
+        // Act: promote it, then promote it again
+        await db.Store.SetThreadKindAsync(
+            projectId, "REV-1", thread.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken);
+        var afterChange = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Skip(auditBefore).ToList();
+        await db.Store.SetThreadKindAsync(
+            projectId, "REV-1", thread.Id, ThreadKind.Finding, Draft(projectId, "thread.kind-changed"), cancellationToken);
+        var afterRepeat = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Skip(auditBefore).ToList();
+
+        // Assert: one entry for the change, and no further entry for the repeat
+        Assert.Equal("thread.kind-changed", Assert.Single(afterChange).Action);
+        Assert.Single(afterRepeat);
+    }
+
+    /// <summary>
+    ///     Test that a change of the report flag of a reply records exactly one audit entry with the action of the
+    ///     caller, and that the same flag again records none.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_SetCommentReportAsync_Change_RecordsOneAuditEntry()
+    {
+        // Arrange: an open thread with a reply that is not in the report
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var thread = await AddThreadAsync(db, projectId, false);
+        var reply = await AddReplyAsync(db, projectId, thread.Id, false);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+
+        // Act: put the reply into the report, then do it again
+        await db.Store.SetCommentReportAsync(
+            projectId, "REV-1", thread.Id, reply.Id, true, Draft(projectId, "thread.comment-report-changed"), cancellationToken);
+        var afterChange = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Skip(auditBefore).ToList();
+        await db.Store.SetCommentReportAsync(
+            projectId, "REV-1", thread.Id, reply.Id, true, Draft(projectId, "thread.comment-report-changed"), cancellationToken);
+        var afterRepeat = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Skip(auditBefore).ToList();
+
+        // Assert: one entry for the change, and no further entry for the repeat
+        Assert.Equal("thread.comment-report-changed", Assert.Single(afterChange).Action);
+        Assert.Single(afterRepeat);
     }
 
     /// <summary>

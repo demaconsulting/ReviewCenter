@@ -788,6 +788,55 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the first use of a database that does not exist creates the file and its tables, so that
+    ///     the services work at once.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_NewDatabase_FirstUse_CreatesFileAndTables()
+    {
+        // Arrange: options with a file path that does not exist yet
+        var connectionString = TestDatabase.NewConnectionString();
+        var file = connectionString.Split(';')[0].Replace("Data Source=", string.Empty, StringComparison.Ordinal);
+        var options = new DatabaseOptions { ConnectionString = connectionString };
+        var existedBefore = File.Exists(file);
+
+        // Act: open the database and use it through the services
+        var (provider, projects, _, _) = Open(options);
+        using var _ = provider;
+        var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var listed = await projects.ListAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the file was created by the first use and the tables hold the project
+        Assert.False(existedBefore);
+        Assert.True(File.Exists(file));
+        Assert.Equal(project.Id, Assert.Single(listed).Id);
+    }
+
+    /// <summary>
+    ///     Test that a second user whose name differs from an existing one only in letter case is refused over
+    ///     a real database, and that the first user is unchanged.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_Users_UsernameOtherCase_IsRefused()
+    {
+        // Arrange: a database with one user
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var (provider, _, _, _) = Open(options);
+        using var _ = provider;
+        var users = NewUserService(provider);
+        await users.CreateAsync("Root", "Root", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
+
+        // Act: create another user whose name differs only in letter case
+        var error = await Assert.ThrowsAsync<DomainRuleException>(
+            () => users.CreateAsync("ROOT", "Other", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken));
+
+        // Assert: the name is refused as taken and only the first user exists
+        Assert.Equal(DomainRule.UserNameTaken, error.Rule);
+        var all = await users.ListAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("Root", Assert.Single(all).Username);
+    }
+
+    /// <summary>
     ///     Builds the inbox service over the real stores of an opened database.
     /// </summary>
     /// <param name="provider">The provider that owns the database factory.</param>

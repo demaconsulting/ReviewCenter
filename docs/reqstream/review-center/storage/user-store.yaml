@@ -2,75 +2,282 @@
 # Software Unit Requirements for the UserStore Class
 #
 # The UserStore class is the database implementation of the Core user store interface.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: UserStore Unit Requirements
     requirements:
+      # Saving and reading users
       - id: ReviewCenter-UserStore-Persist
         title: >-
           The UserStore class shall save a user with its user name, display name, system administrator flag, enabled
-          state, password hash, must-change-password flag, failed sign-in count, lockout end, time of the last
-          sign-in, and creation time, assign its identifier, find it again by user name, change a saved user, and
-          list all users ordered by user name, with every value coming back as it was saved, and the time of the
-          last sign-in empty for a user who never signed in.
+          state, password hash, failed sign-in count, lockout end, time of the last sign-in, and creation time, and give
+          back every value as it was saved.
         justification: |
-          The user record is the basis of every sign-in. The lockout state must survive a restart, or a restart
-          would reset the protection against password guessing, and the flag that confines an account with a
-          temporary password must survive it too, or a restart would lift the confinement. The last sign-in is kept
-          so that an access review can see which accounts are not used.
+          The user record is the basis of every sign-in. The lockout state must survive a restart, or a restart would
+          reset the protection against password guessing.
         tests:
           - UserStore_AddAsync_User_RoundTripsEveryField
-          - UserStore_UpdateAsync_ChangedFields_AreStored
-          - UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault
-          - UserStore_ListAsync_Users_AreOrderedByUsername
-          - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
 
-      - id: ReviewCenter-UserStore-Unique
+      - id: ReviewCenter-UserStore-Persist-AssignedId
         title: >-
-          The UserStore class shall find a user by user name regardless of letter case and shall refuse to save a
-          second user whose user name differs from an existing one only in letter case, reporting it as a user
-          name taken rule violation.
+          The UserStore class shall assign the identifier of a saved user itself, whatever identifier the caller
+          supplied.
         justification: |
-          Two requests made at the same moment can both pass a check made before saving, so the database itself
-          must enforce that a user name is unique, and names that differ only in case must not look like two
-          people.
+          The identifier is what the rest of the system refers to a user by, so the caller must not choose it.
+        tests:
+          - UserStore_AddAsync_User_RoundTripsEveryField
+
+      - id: ReviewCenter-UserStore-Persist-FindByName
+        title: >-
+          The UserStore class shall find a saved user by its user name.
+        justification: |
+          The sign-in finds the account by the name that was typed.
+        tests:
+          - UserStore_AddAsync_User_RoundTripsEveryField
+          - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
+
+      - id: ReviewCenter-UserStore-Persist-FindByNameUnknown
+        title: >-
+          The UserStore class shall find no user for a user name that is not saved.
+        justification: |
+          A sign-in with an invented name must end as a failed sign-in and not as the account of somebody else.
         tests:
           - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
 
+      - id: ReviewCenter-UserStore-Persist-Update
+        title: >-
+          The UserStore class shall store the changed fields of a saved user.
+        justification: |
+          The enabled state, the administrator flag, the password hash, and the lockout state must survive a restart,
+          or a restart would reset the protection against password guessing.
+        tests:
+          - UserStore_UpdateAsync_ChangedFields_AreStored
+
+      - id: ReviewCenter-UserStore-Persist-MustChangePassword
+        title: >-
+          The UserStore class shall store the flag that a user must change the password.
+        justification: |
+          The flag that confines an account with a temporary password must survive a restart, or a restart would lift
+          the confinement.
+        tests:
+          - UserStore_UpdateAsync_MustChangePassword_IsStoredAndCleared
+
+      - id: ReviewCenter-UserStore-Persist-MustChangePasswordCleared
+        title: >-
+          The UserStore class shall store a cleared flag that a user must change the password as false.
+        justification: |
+          A person who set a new password must not be sent to the page for a new password again at every sign-in.
+        tests:
+          - UserStore_UpdateAsync_MustChangePassword_IsStoredAndCleared
+
+      - id: ReviewCenter-UserStore-Persist-List
+        title: >-
+          The UserStore class shall list all users ordered by user name.
+        justification: |
+          The administration pages need a stable order.
+        tests:
+          - UserStore_ListAsync_Users_AreOrderedByUsername
+
+      - id: ReviewCenter-UserStore-Persist-LastSignInEmpty
+        title: >-
+          The UserStore class shall give an empty time of the last sign-in for a user who never signed in.
+        justification: |
+          An access review must be able to tell an account that was never used from one used long ago.
+        tests:
+          - UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault
+
+      - id: ReviewCenter-UserStore-Persist-LastSignIn
+        title: >-
+          The UserStore class shall store the time of the last sign-in of a user.
+        justification: |
+          The last sign-in is kept so that an access review can see which accounts are not used.
+        tests:
+          - UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault
+
+      - id: ReviewCenter-UserStore-Persist-LastSignInCleared
+        title: >-
+          The UserStore class shall store a cleared time of the last sign-in as empty.
+        justification: |
+          A time that was reset by an administrator must not come back as the old time after the next read.
+        tests:
+          - UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault
+
+      # Unique user names
+      - id: ReviewCenter-UserStore-Unique
+        title: >-
+          The UserStore class shall refuse to save a second user whose user name differs from an existing one only in
+          letter case, reporting it as a user name taken rule violation.
+        justification: |
+          Two requests made at the same moment can both pass a check made before saving, so the database itself must
+          enforce that a user name is unique, and names that differ only in case must not look like two people.
+        tests:
+          - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
+
+      - id: ReviewCenter-UserStore-Unique-LookupIgnoresCase
+        title: >-
+          The UserStore class shall find a user by user name regardless of letter case.
+        justification: |
+          A person who types the name in another case must reach the same account.
+        tests:
+          - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
+
+      # Audit entry of a user change
       - id: ReviewCenter-UserStore-Audit
         title: >-
-          The UserStore class shall store a new user, and every update that carries an audit draft, together with
-          its audit entry in one transaction, through the process-wide audit gate, shall store neither when either
-          fails, and shall store no entry for an update without a draft.
+          The UserStore class shall store a new user together with its audit entry.
         justification: |
-          Changes of accounts and rights must appear in the history exactly when they happened, while a failure
-          counter is not an event of its own.
+          The creation of an account is a change of rights, so the trail must show it from the moment the account
+          exists.
         tests:
-          - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
           - UserStore_UpdateAsync_WithAndWithoutDraft_RecordsOnlyWithDraft
 
+      - id: ReviewCenter-UserStore-Audit-Update
+        title: >-
+          The UserStore class shall store every update that carries an audit draft together with its audit entry.
+        justification: |
+          An update of the administrator flag or of the enabled state changes who may do what, so the trail must show
+          it at the moment of the update.
+        tests:
+          - UserStore_UpdateAsync_WithAndWithoutDraft_RecordsOnlyWithDraft
+
+      - id: ReviewCenter-UserStore-Audit-RollbackOnFailure
+        title: >-
+          The UserStore class shall store no new user when the audit entry of its creation cannot be stored.
+        justification: |
+          An account that exists without the entry of its creation would be a change of rights that the trail never
+          shows.
+        tests:
+          - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
+
+      - id: ReviewCenter-UserStore-Audit-RollbackUpdate
+        title: >-
+          The UserStore class shall leave a user unchanged when the audit entry of its update cannot be stored.
+        justification: |
+          An update that took effect without its entry would let an account change its rights without a record, and an
+          entry without the update would claim a change that never happened.
+        tests:
+          - UserStore_UpdateAsync_AuditInsertFails_LeavesTheUserUnchanged
+
+      - id: ReviewCenter-UserStore-Audit-GateRelease
+        title: >-
+          The UserStore class shall allow a later change to be stored after a change that failed.
+        justification: |
+          The audit entries are written one at a time, so a failed change that kept the gate would stop every later
+          change.
+        tests:
+          - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
+
+      - id: ReviewCenter-UserStore-Audit-RefusedNoEntry
+        title: >-
+          The UserStore class shall store no audit entry for a new user that it refuses because its user name is taken.
+        justification: |
+          A refused account was not created, so the history must not claim it.
+        tests:
+          - UserStore_AddAsync_NameTakenWithDraft_StoresNoAuditEntry
+
+      - id: ReviewCenter-UserStore-Audit-NoEntryWithoutDraft
+        title: >-
+          The UserStore class shall store no audit entry for an update that carries no audit draft.
+        justification: |
+          A failure counter is not an event of its own, so counting a failed sign-in must not flood the history.
+        tests:
+          - UserStore_UpdateAsync_WithAndWithoutDraft_RecordsOnlyWithDraft
+
+      # Adding a user to a project
       - id: ReviewCenter-UserStore-AddToProject
         title: >-
-          The UserStore class shall store a new user, its membership of a project with a role, and one audit entry
-          that names the project in one transaction, through the process-wide audit gate, shall build the audit
-          entry from the stored user, and shall store none of the three when the user name is taken, the project
-          does not exist, or any part fails, releasing the gate on every path.
+          The UserStore class shall store a new user together with its membership of a project with a role.
         justification: |
-          A project administrator creates an account only as part of adding it to the project. An account without
-          its membership would be an account nobody manages, and a membership without its account cannot exist, so
-          the three must be stored together or not at all.
+          A project administrator creates an account only as part of adding it to the project. An account without its
+          membership would be an account nobody manages.
         tests:
           - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
+
+      - id: ReviewCenter-UserStore-AddToProject-Audit
+        title: >-
+          The UserStore class shall store one audit entry that names the project with a new user that it adds to a
+          project.
+        justification: |
+          The history of the project must show that the account was created.
+        tests:
+          - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
+
+      - id: ReviewCenter-UserStore-AddToProject-EntryFromStoredUser
+        title: >-
+          The UserStore class shall build the audit entry of a user that it adds to a project from the stored user.
+        justification: |
+          The entry must describe the account as it was stored, with the identifier that the database assigned.
+        tests:
+          - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
+
+      - id: ReviewCenter-UserStore-AddToProject-NameTaken
+        title: >-
+          The UserStore class shall store no user, no membership, and no audit entry when it adds a user to a project
+          and the user name is taken.
+        justification: |
+          A membership without its account cannot exist, and a refused account must leave nothing behind.
+        tests:
           - UserStore_AddToProjectAsync_Failure_StoresNothing
 
+      - id: ReviewCenter-UserStore-AddToProject-ProjectMissing
+        title: >-
+          The UserStore class shall store no user, no membership, and no audit entry when it adds a user to a project
+          that does not exist.
+        justification: |
+          An account for a project that does not exist would be an account nobody manages.
+        tests:
+          - UserStore_AddToProjectAsync_Failure_StoresNothing
+
+      - id: ReviewCenter-UserStore-AddToProject-AllOrNothing
+        title: >-
+          The UserStore class shall store no user and no membership when the audit entry of the addition cannot be
+          stored.
+        justification: |
+          The account, the membership, and the entry must be stored together or not at all.
+        tests:
+          - UserStore_AddToProjectAsync_AuditInsertFails_StoresNothing
+
+      - id: ReviewCenter-UserStore-AddToProject-GateRelease
+        title: >-
+          The UserStore class shall allow a later change to be stored after an addition to a project that failed.
+        justification: |
+          The audit entries are written one at a time, so a failed addition that kept the gate would stop every later
+          change.
+        tests:
+          - UserStore_AddToProjectAsync_Failure_StoresNothing
+
+      # Identity at an external provider
       - id: ReviewCenter-UserStore-ExternalIdentity
         title: >-
-          The UserStore class shall store the issuer and the subject of the identity of a user at a provider, shall
-          find a user by the exact pair and by nothing else, and shall refuse to store a second user with the same
-          pair.
+          The UserStore class shall store the issuer and the subject of the identity of a user at a provider.
         justification: |
-          The pair is the only thing that says which account belongs to a person at a provider, so a lookup must match
-          it exactly, and two accounts with one pair would let one sign-in open two accounts.
+          The pair is the only thing that says which account belongs to a person at a provider.
         tests:
           - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
+
+      - id: ReviewCenter-UserStore-ExternalIdentity-ExactPair
+        title: >-
+          The UserStore class shall find a user by the exact pair of issuer and subject and by nothing else.
+        justification: |
+          A lookup that matched a different case or a similar issuer would let a person into the account of another.
+        tests:
+          - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
+
+      - id: ReviewCenter-UserStore-ExternalIdentity-LocalHasNone
+        title: >-
+          The UserStore class shall keep no issuer and no subject for a user who is not of a provider.
+        justification: |
+          A local account must never be taken for an account at a provider.
+        tests:
+          - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
+
+      - id: ReviewCenter-UserStore-ExternalIdentity-DuplicateRefused
+        title: >-
+          The UserStore class shall refuse to store a second user with the same pair of issuer and subject.
+        justification: |
+          Two accounts with one pair would let one sign-in open two accounts.
+        tests:
           - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused

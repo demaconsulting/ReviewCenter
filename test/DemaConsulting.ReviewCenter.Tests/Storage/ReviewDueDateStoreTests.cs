@@ -158,6 +158,55 @@ public class ReviewDueDateStoreTests
     }
 
     /// <summary>
+    ///     Test that a change of the due date of one review leaves the due date of another review of the same project
+    ///     as it was.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_UpdateDueDateAsync_Change_ChangesOnlyThatReview()
+    {
+        // Arrange: a project with REV-1 that has no date, and REV-2 that has one
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db, null);
+        var other = new DateOnly(2035, 6, 7);
+        byte[] content = [4, 5, 6];
+        await db.Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = projectId,
+                Id = "REV-2",
+                Title = "Other",
+                State = ReviewState.Draft,
+                Created = _created,
+                DueDate = other,
+                ContentFingerprint = Fingerprint.Compute([content]),
+                Files =
+                [
+                    new ReviewFile
+                    {
+                        ProjectId = projectId,
+                        ReviewId = "REV-2",
+                        Path = "b.txt",
+                        Content = content,
+                        Size = content.Length,
+                        Sha256 = Fingerprint.ComputeFileHash(content)
+                    }
+                ]
+            },
+            cancellationToken);
+        var changed = new DateOnly(2031, 1, 2);
+
+        // Act: set the date of REV-1
+        var set = await db.Store.UpdateDueDateAsync(
+            projectId, "REV-1", null, changed, AuditDraft.By(TestActors.Ann, Action, "x", projectId, "REV-1"), cancellationToken);
+
+        // Assert: REV-1 has the new date, and REV-2 keeps its own
+        Assert.True(set);
+        Assert.Equal(changed, (await db.Store.GetReviewAsync(projectId, "REV-1", cancellationToken))!.DueDate);
+        Assert.Equal(other, (await db.Store.GetReviewAsync(projectId, "REV-2", cancellationToken))!.DueDate);
+    }
+
+    /// <summary>
     ///     Test that of two writers that start from the same stored due date at the same time exactly one wins
     ///     and the other is told it lost, with one audit entry and an intact chain.
     /// </summary>

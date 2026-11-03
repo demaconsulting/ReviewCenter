@@ -146,6 +146,14 @@ carries the fingerprint, the ballot with the answer and the section state, and t
 added the digest of the record differs. This scenario is tested by
 `ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments`.
 
+**ReviewStore_GetRecordAsync_ReviewWithChecklist_CarriesTheChecklistSnapshot**: The record of a review that has a
+checklist snapshot carries that snapshot, and the record of a review without one carries none. This scenario is tested
+by `ReviewStore_GetRecordAsync_ReviewWithChecklist_CarriesTheChecklistSnapshot`.
+
+**ReviewStore_GetRecordAsync_ThreadWithSeveralComments_ListsCommentsInPostingOrder**: Several comments are posted to
+one thread; the record lists them in the order in which they were posted. This scenario is tested by
+`ReviewStore_GetRecordAsync_ThreadWithSeveralComments_ListsCommentsInPostingOrder`.
+
 **ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull**: The record of an unknown review is requested; it is null.
 This scenario is tested by `ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull`.
 
@@ -201,6 +209,14 @@ commands it sends (a command interceptor). Reading 2 reviews and reading 20 revi
 and reading the 20 reviews one by one sends more than five times as many. This scenario is tested by
 `ReviewStore_ListSnapshotsAsync_MoreReviews_SendsTheSameNumberOfQueries`.
 
+**ReviewStore_ListSnapshotsAsync_NoIds_SendsNoQuery**: A store over the same database counts the commands it sends. A
+batch read of the snapshots without identifiers and a batch read of the reopens without identifiers both return an
+empty result and send no command. This scenario is tested by `ReviewStore_ListSnapshotsAsync_NoIds_SendsNoQuery`.
+
+**ReviewStore_ListReopensAsync_MoreReviews_SendsTheSameNumberOfQueries**: A store over the same database counts the
+commands it sends. The batch read of the reopens of 2 reviews and that of 20 reviews send the same number of commands.
+This scenario is tested by `ReviewStore_ListReopensAsync_MoreReviews_SendsTheSameNumberOfQueries`.
+
 **ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A slot is signed with the current digest; the
 signature is stored with a database-assigned identity and listed with the slot, user, display name, role, time, digest,
 and meaning unchanged. This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
@@ -223,6 +239,19 @@ This scenario is tested by `ReviewStore_AddSignatureAsync_RejectedSignatureWitho
 that was made up, and with a digest that was current until a thread was added; each throws a `DomainRuleException` for
 `RecordChanged` and no signature is listed. This scenario is tested by
 `ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing`.
+
+**ReviewStore_AddSignatureAsync_StaleDigestAndOpenThread_ThrowsRecordChanged**: A thread is added after the digest was
+taken, so the digest is stale and a thread is open. The signature throws a `DomainRuleException` for `RecordChanged`,
+not for `SigningNotAllowed`, and nothing is stored. This scenario is tested by
+`ReviewStore_AddSignatureAsync_StaleDigestAndOpenThread_ThrowsRecordChanged`.
+
+**ReviewStore_PublicSurface_Signatures_OffersNoUpdateOrDelete**: The public methods of the store are inspected by
+reflection. Signatures can be added and listed, and no method updates or deletes a signature. This scenario is tested
+by `ReviewStore_PublicSurface_Signatures_OffersNoUpdateOrDelete`.
+
+**ReviewStore_ListSignaturesAsync_SeveralSignatures_ReturnsThemInTheOrderAdded**: Three slots are signed in an order
+that differs from the order of their identities. The listing returns the signatures in the order in which they were
+added. This scenario is tested by `ReviewStore_ListSignaturesAsync_SeveralSignatures_ReturnsThemInTheOrderAdded`.
 
 **ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed**: A slot is signed and then signed
 again with the same digest; the second attempt throws a `DomainRuleException` for `SigningNotAllowed` and one
@@ -407,6 +436,14 @@ stored and no entry; a resolved Question with a note can be promoted. This scena
 an entry, and the starting comment and a Resolution comment are refused. This scenario is tested by
 `ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused`.
 
+**ReviewStore_SetThreadKindAsync_Change_RecordsOneAuditEntry**: An open Question is promoted with an audit draft; one
+`thread.kind-changed` entry exists after the change, and promoting it again records no further entry. This scenario is
+tested by `ReviewStore_SetThreadKindAsync_Change_RecordsOneAuditEntry`.
+
+**ReviewStore_SetCommentReportAsync_Change_RecordsOneAuditEntry**: A reply is put into the report with an audit draft;
+one `thread.comment-report-changed` entry exists after the change, and the same flag again records no further entry.
+This scenario is tested by `ReviewStore_SetCommentReportAsync_Change_RecordsOneAuditEntry`.
+
 **ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked**: A theory over every thread write (start, reply, state,
 resolve, promote, demote, and toggle) on a concluded review; each is refused with `ReviewLocked` and stores nothing.
 This scenario is tested by `ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked`.
@@ -490,12 +527,19 @@ list. This scenario is tested by `ReviewStore_ListSoleAdminProjectsAsync_Disable
 
 **DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes**: A new database has the indexes on the
 primary and the alternate user of the reviewer slots that the read of the slots of a user relies on. This scenario is
-defined in the `DatabaseSetup` unit and is tested by `DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`.
+defined in the `DatabaseSetup` unit and is tested by `DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`;
+it supports the read of the slots of a user but is not linked to a `ReviewStore` requirement, because the existence of an
+index is a property of the `DatabaseSetup` unit.
 
 **ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings**: A project is stored without other settings; it
 is read back with the default evidence settings (the two anonymous switches off and the five content switches on). This
 scenario is defined in `EvidenceSettingsStoreTests.cs` and is tested by
 `ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings`.
+
+**ReviewStore_AddProjectAsync_GivenEvidenceSettings_AreStoredAndReturned**: A project is added with evidence settings
+that differ from the defaults; the settings read back unchanged by `GetProjectAsync` and by `ListProjectsAsync`. This
+scenario is defined in `EvidenceSettingsStoreTests.cs` and is tested by
+`ReviewStore_AddProjectAsync_GivenEvidenceSettings_AreStoredAndReturned`.
 
 **ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited**: The settings of one of two projects are
 changed from the defaults, with an audit draft. The call reports `true`; the new settings are read back by
@@ -631,6 +675,10 @@ the review in the same transaction; the chain of the audit trail verifies. This 
 another date than the stored one, and one for a review that does not exist report `false`; the stored date is as it
 was and no entry is written. This scenario is tested by `ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing`.
 
+**ReviewStore_UpdateDueDateAsync_Change_ChangesOnlyThatReview**: A project holds a review without a date and a second
+review with a date. The date of the first review is set; the first review has the new date and the second keeps its
+own. This scenario is tested by `ReviewStore_UpdateDueDateAsync_Change_ChangesOnlyThatReview`.
+
 **ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins**: Two writers that start from the same stored date
 with different new dates are released together; exactly one wins, the stored date is the winner's, one entry exists,
 and the chain verifies. This scenario is tested by `ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins`.
@@ -645,6 +693,11 @@ and in the record that `GetRecordAsync` returns, and the digest changes. This sc
 **ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation**: A change that expects another
 text than the stored one reports `false`; the stored text is as it was and no entry is written. This scenario is
 tested by `ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation`.
+
+**ReviewStore_UpdateReviewConclusionTextAsync_Change_ChangesOnlyThatReviewAndKeepsTheChainIntact**: A project holds a
+review without text and a second review with its own text. The text of the first review is set; the first review has
+the new text, the second keeps its own, and the hash chain of the audit trail still verifies. This scenario is tested
+by `ReviewStore_UpdateReviewConclusionTextAsync_Change_ChangesOnlyThatReviewAndKeepsTheChainIntact`.
 
 **ReviewStore_UpdateReviewConclusionTextAsync_MissingReview_ReturnsFalse**: A change for a review that does not exist
 reports `false` and writes no entry. This scenario is tested by
@@ -699,11 +752,21 @@ whose ballot is a draft, a signature with the current digest is refused with `Ba
 after the ballot is handed in, the same signature with the new digest is stored. This scenario is tested by
 `ReviewStore_AddSignatureAsync_OwnBallotDraft_ThrowsBallotNotSubmitted`.
 
+**ReviewStore_AddSignatureAsync_NoBallotInReviewWithChecklist_ThrowsBallotNotSubmitted**: In a review with a checklist,
+a slot that has no ballot at all is signed with the current digest; the signature is refused with `BallotNotSubmitted`
+and nothing is stored. This scenario is tested by
+`ReviewStore_AddSignatureAsync_NoBallotInReviewWithChecklist_ThrowsBallotNotSubmitted`.
+
 **ReviewStore_GetRecordAsync_BallotRows_AreInTheRecordAsBallots**: A review-level row is in no ballot, and a record read
 before any ballot has none. After the edits and the hand-in of a ballot, the record carries that ballot with its status,
 its answer, and its section state, and the digest computed from the record equals the digest of the snapshot of the
 review. The ballot of the stored-review scenario above, which is still a draft, is in the record too.
 This scenario is tested by `ReviewStore_GetRecordAsync_BallotRows_AreInTheRecordAsBallots`.
+
+**ReviewStore_GetRecordAsync_DraftAndSubmittedBallots_AreAllInTheRecordInSlotOrder**: Of several slots, one has a
+submitted ballot, one a draft, and one has not started. The record carries the submitted and the draft ballot in slot
+order and none for the slot that has not started. This scenario is tested by
+`ReviewStore_GetRecordAsync_DraftAndSubmittedBallots_AreAllInTheRecordInSlotOrder`.
 
 **ReviewStore_SetBallotAnswerAsync_SubmittedBallot_RevertsToDraftWithAudit**: An edit of a handed-in ballot makes it a
 draft again and records `ballot.reopened` with the slot number only. This scenario is tested by

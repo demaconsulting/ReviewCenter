@@ -3,6 +3,9 @@
 #
 # The PersonalAccessTokenStore unit keeps the personal access tokens in the database file: the hash, the display id,
 # the owner, the expiry, the time of last use, and the time of revocation. The value of a token is never stored.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: PersonalAccessTokenStore Unit Requirements
@@ -10,44 +13,175 @@ sections:
       - id: ReviewCenter-PersonalAccessTokenStore-Persist
         title: >-
           The PersonalAccessTokenStore unit shall keep a token with its hash, display id, name, owner, and dates in
-          the database file, record the creation in the audit trail in the same transaction, and refuse a hash that
-          is already stored without recording anything.
+          the database file.
         justification: |
-          A token that is stored but not audited, or audited but not stored, would leave the record untrue. The
-          hash is what a request is found by, so two tokens with one hash would make the owner of a request
-          ambiguous.
+          A token that is not kept cannot be found again when a request presents its value.
         tests:
           - PersonalAccessTokenStore_AddAsync_Token_RoundTripsAndAudits
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Persist-Audit
+        title: >-
+          The PersonalAccessTokenStore unit shall record the creation of a token in the audit trail.
+        justification: |
+          A token that is stored but not audited would leave the record untrue.
+        tests:
+          - PersonalAccessTokenStore_AddAsync_Token_RoundTripsAndAudits
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Persist-AuditAtomic
+        title: >-
+          The PersonalAccessTokenStore unit shall keep no token when the audit entry of its creation cannot be stored.
+        justification: |
+          An audit entry without the token, or the token without the entry, would leave the record untrue.
+        tests:
+          - PersonalAccessTokenStore_AddAsync_AuditInsertFails_StoresNoToken
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Persist-DuplicateHash
+        title: >-
+          The PersonalAccessTokenStore unit shall refuse a token whose hash is already stored.
+        justification: |
+          The hash is what a request is found by, so two tokens with one hash would make the owner of a request
+          ambiguous.
+        tests:
+          - PersonalAccessTokenStore_AddAsync_DuplicateHash_IsRefusedAndNothingIsAudited
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Persist-DuplicateHashNoEntry
+        title: >-
+          The PersonalAccessTokenStore unit shall record nothing in the audit trail for a token that is refused
+          because its hash is already stored.
+        justification: |
+          A refused token did not happen, so the trail must not claim that it was created.
+        tests:
           - PersonalAccessTokenStore_AddAsync_DuplicateHash_IsRefusedAndNothingIsAudited
 
       - id: ReviewCenter-PersonalAccessTokenStore-Find
         title: >-
-          The PersonalAccessTokenStore unit shall find a token with its owner by the hash, and list the tokens of one
-          user, newest first, without the tokens of other users.
+          The PersonalAccessTokenStore unit shall find a token with its owner by the hash.
         justification: |
-          A request carries only the value, so the token must be found by its hash. The list of a user must not show
-          the tokens of other users.
+          A request carries only the value, so the token must be found by its hash.
         tests:
           - PersonalAccessTokenStore_FindByHashAsync_Hash_FindsTokenWithOwner
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Find-Unknown
+        title: >-
+          The PersonalAccessTokenStore unit shall find no token for a hash that is not stored.
+        justification: |
+          A request with an invented value must not be matched to any token.
+        tests:
+          - PersonalAccessTokenStore_FindByHashAsync_Hash_FindsTokenWithOwner
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Find-List
+        title: >-
+          The PersonalAccessTokenStore unit shall list the tokens of one user, including the revoked ones.
+        justification: |
+          The owner needs to see every token, also the revoked ones, to manage them.
+        tests:
+          - PersonalAccessTokenStore_ListForUserAsync_Tokens_AreOwnedAndNewestFirst
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Find-ListNewestFirst
+        title: >-
+          The PersonalAccessTokenStore unit shall list the tokens of a user with the newest first.
+        justification: |
+          The newest token is the one the owner most likely looks for.
+        tests:
+          - PersonalAccessTokenStore_ListForUserAsync_Tokens_AreOwnedAndNewestFirst
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Find-ListOwnOnly
+        title: >-
+          The PersonalAccessTokenStore unit shall not list the tokens of other users.
+        justification: |
+          The list of a user must not show the tokens of other users.
+        tests:
           - PersonalAccessTokenStore_ListForUserAsync_Tokens_AreOwnedAndNewestFirst
 
       - id: ReviewCenter-PersonalAccessTokenStore-Revoke
         title: >-
-          The PersonalAccessTokenStore unit shall mark an own token of the user as revoked once, and record the
-          revocation in the audit trail in the same transaction.
+          The PersonalAccessTokenStore unit shall mark an own token of the user as revoked with the time of the
+          revocation.
         justification: |
-          Revoking twice must not change the time of the first revocation, and an audit record without the change,
-          or the change without the record, would leave the record untrue.
+          A revoked token must stop working, and the owner must be able to tell since when.
+        tests:
+          - PersonalAccessTokenStore_RevokeAsync_OwnToken_RevokesOnceAndAudits
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Revoke-Once
+        title: >-
+          The PersonalAccessTokenStore unit shall keep the time of the first revocation when a token is revoked again.
+        justification: |
+          Revoking twice must not change the time of the first revocation.
+        tests:
+          - PersonalAccessTokenStore_RevokeAsync_OwnToken_RevokesOnceAndAudits
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Revoke-OtherUsers
+        title: >-
+          The PersonalAccessTokenStore unit shall not revoke a token of another user or a token that does not exist.
+        justification: |
+          A user must not be able to switch off the tokens of other users.
+        tests:
+          - PersonalAccessTokenStore_RevokeAsync_OwnToken_RevokesOnceAndAudits
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Revoke-Audit
+        title: >-
+          The PersonalAccessTokenStore unit shall record the revocation of a token in the audit trail.
+        justification: |
+          A revocation without a record would leave the trail untrue.
+        tests:
+          - PersonalAccessTokenStore_RevokeAsync_OwnToken_RevokesOnceAndAudits
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Revoke-AuditAtomic
+        title: >-
+          The PersonalAccessTokenStore unit shall leave a token unrevoked when the audit entry of its revocation cannot
+          be stored.
+        justification: |
+          A change without its record, or a record without the change, would leave the trail untrue.
+        tests:
+          - PersonalAccessTokenStore_RevokeAsync_AuditInsertFails_LeavesTheTokenUnrevoked
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Revoke-NoEntryWhenUnchanged
+        title: >-
+          The PersonalAccessTokenStore unit shall record nothing in the audit trail when a revocation changes nothing.
+        justification: |
+          A second revocation, or one that is refused, did not happen, so the trail must not claim it.
         tests:
           - PersonalAccessTokenStore_RevokeAsync_OwnToken_RevokesOnceAndAudits
 
       - id: ReviewCenter-PersonalAccessTokenStore-Touch
         title: >-
-          The PersonalAccessTokenStore unit shall change only the time of last use of a token when it is used, and only
-          if the stored time is still the one the caller read, so that of several concurrent uses exactly one writes.
+          The PersonalAccessTokenStore unit shall change only the time of last use of a token when it is used.
         justification: |
-          Recording a use must not change any other property of a token, such as its expiry or revocation. A burst of
-          requests that read the same stale time must not each write it, or the throttle of the writes would not hold.
+          Recording a use must not change any other property of a token, such as its expiry or revocation.
         tests:
           - PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Touch-OtherValuesKept
+        title: >-
+          The PersonalAccessTokenStore unit shall keep a revocation and the expiry of a token when it records a use.
+        justification: |
+          A use must never undo a revocation.
+        tests:
+          - PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Touch-NoAudit
+        title: >-
+          The PersonalAccessTokenStore unit shall record nothing in the audit trail when it records a use.
+        justification: |
+          A use happens with every request, so recording it in the audit trail would flood the trail.
+        tests:
+          - PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Touch-CompareAndSet
+        title: >-
+          The PersonalAccessTokenStore unit shall write the time of last use only if the stored time is still the one
+          the caller read.
+        justification: |
+          A caller that holds a stale value must not overwrite a newer one.
+        tests:
+          - PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce
+
+      - id: ReviewCenter-PersonalAccessTokenStore-Touch-OneWriter
+        title: >-
+          The PersonalAccessTokenStore unit shall let exactly one of several concurrent uses that read the same time
+          write.
+        justification: |
+          A burst of requests that read the same stale time must not each write it, or the throttle of the writes
+          would not hold.
+        tests:
           - PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce

@@ -422,6 +422,7 @@ public class ReviewStoreSnapshotBatchTests
 
         // Assert: the interesting parts are really there (the comparison above would also pass on empty reads)
         Assert.Equal(2, batch["REV-REOPENED"].Record.Reopens);
+        Assert.Equal(0, batch["REV-APPROVED"].Record.Reopens);
         Assert.True(ReviewLock.IsConcluded(
             batch["REV-APPROVED"].Record, batch["REV-APPROVED"].Slots, batch["REV-APPROVED"].Signatures));
         Assert.False(ReviewLock.IsConcluded(
@@ -559,5 +560,97 @@ public class ReviewStoreSnapshotBatchTests
         Assert.True(few > 0);
         Assert.Equal(few, many);
         Assert.True(single > many * 5, $"The single reads sent {single} commands, the batch read {many}.");
+    }
+
+    /// <summary>
+    ///     Builds a store over the database of <paramref name="db"/> that counts the commands it sends.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="counter">The counter of the commands.</param>
+    /// <returns>The provider that owns the context factory, and the store.</returns>
+    private static (ServiceProvider Provider, ReviewStore Store) CreateCountingStore(TestStore db, CommandCounter counter)
+    {
+        var options = new DatabaseOptions { ConnectionString = db.ConnectionString };
+        var provider = new ServiceCollection()
+            .AddDbContextFactory<ReviewCenterDbContext>(builder =>
+            {
+                DatabaseSetup.Configure(builder, options);
+                builder.AddInterceptors(counter);
+            })
+            .BuildServiceProvider();
+        var store = new ReviewStore(
+            provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+            new AuditAppender(TimeProvider.System));
+        return (provider, store);
+    }
+
+    /// <summary>
+    ///     Test that a batch read without identifiers sends no command to the database, for the snapshots and for the
+    ///     reopens.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ListSnapshotsAsync_NoIds_SendsNoQuery()
+    {
+        // Arrange: a counting store over a database that holds a review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore(fastCommits: true);
+        var counter = new CommandCounter();
+        var (provider, store) = CreateCountingStore(db, counter);
+        using var countingProvider = provider;
+        var projectId = await AddProjectAsync(db);
+        await AddReviewAsync(db, projectId, "REV-1");
+        counter.Count = 0;
+
+        // Act: read the snapshots and the reopens of no review
+        var snapshots = await store.ListSnapshotsAsync(projectId, [], cancellationToken);
+        var reopens = await store.ListReopensAsync(projectId, [], cancellationToken);
+
+        // Assert: empty results, and no command was sent
+        Assert.Empty(snapshots);
+        Assert.Empty(reopens);
+        Assert.Equal(0, counter.Count);
+    }
+
+    /// <summary>
+    ///     Test that the number of queries of the batch read of the reopens does not grow with the number of reviews.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ListReopensAsync_MoreReviews_SendsTheSameNumberOfQueries()
+    {
+        // Arrange: a counting store, and reviews that were approved and reopened once
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore(fastCommits: true);
+        var counter = new CommandCounter();
+        var (provider, store) = CreateCountingStore(db, counter);
+        using var countingProvider = provider;
+        var projectId = await AddProjectAsync(db);
+        var ids = new List<string>();
+        async Task AddMoreAsync(int count)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                var id = $"REV-{ids.Count}";
+                ids.Add(id);
+                await AddReviewAsync(db, projectId, id);
+                await SignAsync(db, projectId, id, await AddSlotAsync(db, projectId, id));
+                await ReopenAsync(db, projectId, id, "Again " + id);
+            }
+        }
+
+        await AddMoreAsync(2);
+
+        // Act: read the reopens of two reviews, add many more, and read the reopens of all
+        counter.Count = 0;
+        await store.ListReopensAsync(projectId, ids.ToList(), cancellationToken);
+        var few = counter.Count;
+        await AddMoreAsync(18);
+        counter.Count = 0;
+        var all = await store.ListReopensAsync(projectId, ids.ToList(), cancellationToken);
+        var many = counter.Count;
+
+        // Assert: every review has its reopen, and the number of queries stayed the same
+        Assert.Equal(20, all.Count);
+        Assert.True(few > 0);
+        Assert.Equal(few, many);
     }
 }

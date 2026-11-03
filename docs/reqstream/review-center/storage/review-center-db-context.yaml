@@ -4,292 +4,777 @@
 # The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
 # files, threads, comments, checklists, users, memberships, reviewer slots, signatures, and the e-mail address and
 # send log for notifications to database tables.
+#
+# The schema is created from the model without migrations while the product is not released, so a development
+# database that was created before a table, column, or index existed has to be recreated.
 
 sections:
   - title: ReviewCenterDbContext Unit Requirements
     requirements:
       - id: ReviewCenter-DbContext-Schema
         title: >-
-          The ReviewCenterDbContext class shall map projects, reviews, and review files to tables in which a
-          review is identified by its project and identifier, so that the same review identifier can exist in
-          different projects.
+          The ReviewCenterDbContext class shall map projects, reviews, and review files to database tables.
+        justification: |
+          Projects, their reviews, and the files of a review are the core records of the product, and each
+          needs a table of its own to be stored and read back.
+        tests:
+          - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+
+      - id: ReviewCenter-DbContext-Schema-ReviewKey
+        title: >-
+          The ReviewCenterDbContext class shall identify a review by its project and its identifier, so that the
+          same review identifier can exist in different projects.
         justification: |
           Review identifiers are chosen by users per project. A key that included only the identifier would
           force identifiers to be unique across all projects.
         tests:
-          - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
           - ReviewStore_AddReviewAsync_SameIdInTwoProjects_KeepsThemApart
 
       - id: ReviewCenter-DbContext-Content
         title: >-
           The ReviewCenterDbContext class shall store the content of a review file as binary data, so that any
-          bytes, including empty content, binary content, and Windows line endings, are stored unchanged.
+          bytes, including Windows line endings and binary content, are stored unchanged.
         justification: |
           Review content is fingerprinted and shown byte for byte. Storing it as text would let the database
           change line endings or reject bytes that are not valid text.
         tests:
           - ReviewStore_AddReviewAsync_BinaryCrLfAndEmptyFiles_StoresBytesVerbatim
 
+      - id: ReviewCenter-DbContext-Content-Empty
+        title: >-
+          The ReviewCenterDbContext class shall store a review file with empty content as a file with no bytes.
+        justification: |
+          An empty file is a legitimate part of a review, and it must not be turned into a missing value or
+          refused.
+        tests:
+          - ReviewStore_AddReviewAsync_BinaryCrLfAndEmptyFiles_StoresBytesVerbatim
+
       - id: ReviewCenter-DbContext-Source
         title: >-
-          The ReviewCenterDbContext class shall map the source of a review (repository identity and name,
-          baseline and head commit identifiers, selection text, and the review-set identifier) and, for each review
-          file, its change kind and baseline content, size, and hash, as columns that are empty for an uploaded
-          review, and shall keep the baseline content as binary data like the head content.
+          The ReviewCenterDbContext class shall map the source of a review, which is the repository identity and
+          name, the baseline and head commit identifiers, the selection text, and the review-set identifier, to
+          columns of the review.
         justification: |
-          A review from a repository freezes what it covers in its own rows. Binary columns keep the baseline
-          bytes unchanged, and empty columns let uploaded reviews stay what they were.
+          A review from a repository freezes what it covers in its own row, so the review stays readable when the
+          repository changes or is removed.
         tests:
           - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
-          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
-          - ReviewStore_GetRecordAsync_UploadReview_HasUploadSource
           - ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips
+
+      - id: ReviewCenter-DbContext-Source-Upload
+        title: >-
+          The ReviewCenterDbContext class shall leave the source columns of a review empty for an uploaded
+          review.
+        justification: |
+          Empty columns let an uploaded review stay what it was, with no repository source.
+        tests:
+          - ReviewStore_GetRecordAsync_UploadReview_HasUploadSource
+
+      - id: ReviewCenter-DbContext-Source-FileBaseline
+        title: >-
+          The ReviewCenterDbContext class shall map the change kind and the baseline size and hash of a review
+          file to columns of the file.
+        justification: |
+          The baseline facts of a file are frozen with the file, so the change a review covers can be shown
+          without reading the baseline content.
+        tests:
+          - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
+
+      - id: ReviewCenter-DbContext-Source-BaselineContent
+        title: >-
+          The ReviewCenterDbContext class shall store the baseline content of a review file as binary data, like
+          the head content.
+        justification: |
+          Binary columns keep the baseline bytes unchanged, so the change a review covers is shown against the
+          exact bytes that the review started from.
+        tests:
+          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
+
+      - id: ReviewCenter-DbContext-Source-BaselineEmpty
+        title: >-
+          The ReviewCenterDbContext class shall read no baseline content for a review file that has none.
+        justification: |
+          A file that is new in the review has no baseline, which must not be mistaken for a baseline that is an
+          empty file.
+        tests:
+          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
 
       - id: ReviewCenter-DbContext-Integrity
         title: >-
           The ReviewCenterDbContext class shall make the database refuse a review whose project and identifier
-          are already used, and a review whose project does not exist.
+          are already used.
         justification: |
-          Relationships and uniqueness are enforced by the database so that concurrent requests and any
-          programming error cannot leave inconsistent review records.
+          Uniqueness is enforced by the database so that concurrent requests and any programming error cannot
+          leave two records for one review.
         tests:
           - ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate
+
+      - id: ReviewCenter-DbContext-Integrity-UnknownProject
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a review whose project does not exist.
+        justification: |
+          Relationships are enforced by the database so that concurrent requests and any programming error
+          cannot leave a review without its project.
+        tests:
           - ReviewStore_AddReviewAsync_UnknownProject_IsNotStored
 
       - id: ReviewCenter-DbContext-Threads
         title: >-
-          The ReviewCenterDbContext class shall map threads and comments to tables in which a thread belongs to
-          an existing review and a comment belongs to a thread, so that the database refuses a thread for a review
-          that does not exist and deletes the threads of a deleted review and the comments of a deleted thread, shall
-          map the identifier of the check of a thread about a check as an optional column that is empty for a thread
-          on a file and keep the file column empty for a thread about a check, so that such a thread needs no file
-          row (that a thread on a file names a file of its review is kept by the store), and shall map the side
-          of a thread as text with Head as the default, and shall map the kind of a comment as text with Comment as the
-          default and the report flag of a comment as a column that is false by default; the kind of a thread is not
-          stored, it is derived from its starting comment.
+          The ReviewCenterDbContext class shall map threads and comments to database tables.
         justification: |
-          A thread is about one review, and a thread on a file or about a check is stored the same way. Having the
-          database enforce the relationship to the review keeps the record consistent even when two requests overlap
-          or a programming error occurs, and tying the thread to a file row would make a thread about a check
-          impossible. Storing the side by
-          name keeps the stored value readable and independent of the order of the enumeration. A comment that was
-          stored without the new columns is chat, so nothing becomes part of the signed record by accident.
+          Discussions on a review are stored as threads of comments, so each needs a table of its own.
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
-          - ReviewStore_AddThreadAsync_FileThreadOnMissingFile_IsRefused
+          - ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments
+
+      - id: ReviewCenter-DbContext-Threads-ReviewForeignKey
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a thread for a review that does not
+          exist.
+        justification: |
+          A thread is about one review. Having the database enforce the relationship keeps the record consistent
+          even when two requests overlap or a programming error occurs.
+        tests:
           - ReviewCenterDbContext_Thread_ReviewForeignKey_RejectsThreadOfUnknownReview
+
+      - id: ReviewCenter-DbContext-Threads-ReviewCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the threads of a review when the review is deleted.
+        justification: |
+          A thread has no meaning without its review, so it must not outlive it.
+        tests:
+          - ReviewCenterDbContext_Thread_ReviewForeignKey_RejectsThreadOfUnknownReview
+
+      - id: ReviewCenter-DbContext-Threads-CommentCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the comments of a thread when the thread is deleted.
+        justification: |
+          A comment belongs to its thread and has no meaning without it.
+        tests:
+          - ReviewCenterDbContext_Comment_ThreadDeleted_DeletesItsComments
+
+      - id: ReviewCenter-DbContext-Threads-CheckItem
+        title: >-
+          The ReviewCenterDbContext class shall map the identifier of the check of a thread about a check as an
+          optional column that is empty for a thread on a file.
+        justification: |
+          A thread is about a file or about a check of the checklist, and both are stored the same way.
+        tests:
           - ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId
+
+      - id: ReviewCenter-DbContext-Threads-CheckNoFile
+        title: >-
+          The ReviewCenterDbContext class shall keep the file column of a thread about a check empty, so that
+          such a thread needs no file row.
+        justification: |
+          Tying every thread to a file row would make a thread about a check impossible. That a thread on a
+          file names a file of its review is kept by the store, not by the database.
+        tests:
+          - ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId
+
+      - id: ReviewCenter-DbContext-Threads-Side
+        title: >-
+          The ReviewCenterDbContext class shall map the side of a thread as text.
+        justification: |
+          Storing the side by name keeps the stored value readable and independent of the order of the
+          enumeration.
+        tests:
           - ReviewStore_AddThreadAsync_Side_IsStoredAsText
+
+      - id: ReviewCenter-DbContext-Threads-SideDefault
+        title: >-
+          The ReviewCenterDbContext class shall use Head as the side of a thread that was stored without one.
+        justification: |
+          A thread that was stored without a side belongs to the head text, which is what a reader expects.
+        tests:
+          - ReviewCenterDbContext_Thread_SideNotGiven_DefaultsToHeadText
+
+      - id: ReviewCenter-DbContext-Threads-CommentKind
+        title: >-
+          The ReviewCenterDbContext class shall map the kind of a comment as text with Comment as the default.
+        justification: |
+          A comment that was stored without a kind is a plain comment, so nothing becomes something else by
+          accident.
+        tests:
           - ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment
+
+      - id: ReviewCenter-DbContext-Threads-ReportFlag
+        title: >-
+          The ReviewCenterDbContext class shall map the report flag of a comment as a column that is false by
+          default.
+        justification: |
+          A comment that was stored without the flag is chat, so nothing becomes part of the signed record by
+          accident.
+        tests:
+          - ReviewCenterDbContext_Model_CommentColumns_DefaultToChatAndComment
+
+      - id: ReviewCenter-DbContext-Threads-KindNotStored
+        title: >-
+          The ReviewCenterDbContext class shall not store the kind of a thread, which is derived from its
+          starting comment.
+        justification: |
+          A stored kind could disagree with the starting comment it is derived from.
+        tests:
+          - ReviewCenterDbContext_Thread_Table_HasNoKindColumn
 
       - id: ReviewCenter-DbContext-Checklist
         title: >-
-          The ReviewCenterDbContext class shall map the checklist snapshot, the section states, and the check
-          answers to tables in which a reviewer slot of a review has at most one state per section and one answer
-          per check, and in which the rows belong to the review, so that the database refuses a second row for the
-          same slot and section or check.
+          The ReviewCenterDbContext class shall map the check answers to a table in which a reviewer slot of a
+          review has at most one answer per check.
         justification: |
-          A check has one current answer in each ballot. Having the database enforce that keeps the record consistent
-          even when two requests overlap.
+          A check has one current answer in each ballot. Having the database enforce that keeps the record
+          consistent even when two requests overlap.
         tests:
           - ReviewStore_SetBallotAnswer_UpsertsSingleRowPerItem
+
+      - id: ReviewCenter-DbContext-Checklist-SectionState
+        title: >-
+          The ReviewCenterDbContext class shall map the section states to a table in which a reviewer slot of a
+          review has at most one state per section.
+        justification: |
+          A section has one current state in each ballot. Having the database enforce that keeps the record
+          consistent even when two requests overlap.
+        tests:
           - ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection
+
+      - id: ReviewCenter-DbContext-Checklist-Snapshot
+        title: >-
+          The ReviewCenterDbContext class shall map the checklist snapshot of a review to a table whose rows
+          belong to the review.
+        justification: |
+          The review freezes the checklist it was started with, so later changes of the project definition do
+          not change the review.
+        tests:
+          - ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically
+
+      - id: ReviewCenter-DbContext-Checklist-ReviewCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the checklist snapshot, the answers, and the section
+          states of a review when the review is deleted.
+        justification: |
+          The checklist rows belong to the review, so they must not outlive it.
+        tests:
+          - ReviewCenterDbContext_Checklist_ReviewDeleted_DeletesSnapshotAnswersAndSectionStates
 
       - id: ReviewCenter-DbContext-Users
         title: >-
           The ReviewCenterDbContext class shall map users to a table in which the user name is unique regardless
-          of letter case, the system administrator right and the must-change-password flag are stored as flags, and
-          the time of the last sign-in is stored as an optional time,
-          and shall map the user name of the
-          author of a comment, of the person who answered a check, and of the person who set a section next to the
-          display name, so that the database refuses a second user whose name differs only in letter case.
+          of letter case, so that the database refuses a second user whose name differs only in letter case.
         justification: |
-          The database is the last line of defense against two users with the same name. The user name beside the
-          display name keeps the record identifiable when the display name changes. The schema is created from the
-          model without migrations, so a database that was created before the flag or the last sign-in existed has to
-          be recreated.
+          The database is the last line of defense against two users with the same name.
         tests:
           - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
+
+      - id: ReviewCenter-DbContext-Users-Flags
+        title: >-
+          The ReviewCenterDbContext class shall store the system administrator right and the
+          must-change-password flag of a user as flags.
+        justification: |
+          Both are yes or no facts of one user and are read with the user.
+        tests:
           - UserStore_AddAsync_User_RoundTripsEveryField
           - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
 
+      - id: ReviewCenter-DbContext-Users-LastSignIn
+        title: >-
+          The ReviewCenterDbContext class shall store the time of the last sign-in of a user as an optional
+          time.
+        justification: |
+          A user who has never signed in has no time, which must not be confused with a time at the start of
+          the epoch.
+        tests:
+          - UserStore_AddAsync_User_RoundTripsEveryField
+          - UserStore_UpdateAsync_LastSignIn_IsStoredAndClearedAndNullByDefault
+
+      - id: ReviewCenter-DbContext-Users-CommentAuthorName
+        title: >-
+          The ReviewCenterDbContext class shall store the user name of the author of a comment next to the
+          display name.
+        justification: |
+          A comment is read long after it was written, so its author must stay identifiable when the display
+          name of that author changes.
+        tests:
+          - ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments
+
+      - id: ReviewCenter-DbContext-Users-AnswerAuthorName
+        title: >-
+          The ReviewCenterDbContext class shall store the user name of the person who answered a check next to
+          the display name.
+        justification: |
+          An answer is evidence of who judged the check, so the person must stay identifiable in the checklist
+          when the display name changes.
+        tests:
+          - ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot
+          - ReviewStore_BallotRows_RoundTripOutcomeAndTimestamps
+
+      - id: ReviewCenter-DbContext-Users-SectionSetterName
+        title: >-
+          The ReviewCenterDbContext class shall store the user name of the person who set a section next to the
+          display name.
+        justification: |
+          A section state is a decision of one reviewer, so the person who made it must stay identifiable when
+          the display name changes.
+        tests:
+          - ReviewStore_SetBallotSectionStateAsync_PerSlotRows_RoundTrip
+          - ReviewStore_SetBallotSectionState_UpsertsSingleRowPerSection
+
       - id: ReviewCenter-DbContext-EvidenceSettings
         title: >-
-          The ReviewCenterDbContext class shall map the evidence settings of a project to seven boolean columns of
-          the project table, whose defaults are the default settings (anonymous index and anonymous attestations
-          off, and the five content switches on), so that a project that was not given other settings reads back
-          with the defaults and a changed setting is stored in its own column. The schema is created from the
-          model without a migration, so a database that was created before the columns existed has to be recreated.
+          The ReviewCenterDbContext class shall map the evidence settings of a project to seven boolean columns
+          of the project table.
         justification: |
-          The settings belong to exactly one project and are read with it, so they are columns of the project, not
-          a table of their own. Defaults that make the evidence private and complete mean that nothing is opened or
-          left out until a project administrator decides so. The schema is created from the model and not
-          migrated while the product is not released, so development databases are recreated.
+          The settings belong to exactly one project and are read with it, so they are columns of the project,
+          not a table of their own.
+        tests:
+          - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+          - ReviewStore_AddProjectAsync_GivenEvidenceSettings_AreStoredAndReturned
+
+      - id: ReviewCenter-DbContext-EvidenceSettings-Defaults
+        title: >-
+          The ReviewCenterDbContext class shall read back the default evidence settings, which are anonymous index
+          and anonymous attestations off and the five content switches on, for a project that was not given other
+          settings.
+        justification: |
+          Defaults that make the evidence private and complete mean that nothing is opened or left out until a
+          project administrator decides so.
         tests:
           - ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings
+
+      - id: ReviewCenter-DbContext-EvidenceSettings-Change
+        title: >-
+          The ReviewCenterDbContext class shall store a changed evidence setting of a project in its own column.
+        justification: |
+          Each setting is changed on its own, so each needs its own column to be stored and read back.
+        tests:
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
 
       - id: ReviewCenter-DbContext-ProjectChecklist
         title: >-
           The ReviewCenterDbContext class shall map the checklist definition of a project to one nullable text
-          column of the project table with no length limit, so that a project that was not given a definition reads
-          back with none, which stands for the built-in default checklist, and a definition of any size the Core
-          validation allows is stored and read back unchanged. The schema is created from the model without a
-          migration, so a database that was created before the column existed has to be recreated.
+          column of the project table.
         justification: |
-          The definition belongs to exactly one project and is read with it, so it is a column of the project. A
-          definition is a document of up to several hundred kilobytes, so the column must not be bounded. The
-          schema is created from the model and not migrated while the product is not released, so development
-          databases are recreated.
+          The definition belongs to exactly one project and is read with it, so it is a column of the project.
         tests:
           - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
+
+      - id: ReviewCenter-DbContext-ProjectChecklist-None
+        title: >-
+          The ReviewCenterDbContext class shall read back no checklist definition, which stands for the built-in
+          default checklist, for a project that was not given a definition.
+        justification: |
+          A project without its own definition must get the built-in checklist, so an absent definition has to
+          read back as none rather than as an empty text.
+        tests:
+          - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
+
+      - id: ReviewCenter-DbContext-ProjectChecklist-Stored
+        title: >-
+          The ReviewCenterDbContext class shall store a checklist definition that was given to a project and
+          read it back unchanged.
+        justification: |
+          A definition that is changed by storing it would change the checklists of later reviews.
+        tests:
+          - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
+
+      - id: ReviewCenter-DbContext-ProjectChecklist-Unbounded
+        title: >-
+          The ReviewCenterDbContext class shall not limit the length of the checklist definition of a project.
+        justification: |
+          A definition is a document of up to several hundred kilobytes, so the column must not be bounded.
+        tests:
           - ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn
 
       - id: ReviewCenter-DbContext-DueDate
         title: >-
-          The ReviewCenterDbContext class shall map the optional due date of a review to one nullable text column of
-          the review table that holds the calendar day as yyyy-MM-dd, so that a review that was not given a date reads
-          back with none and a date reads back as the same day. The
-          schema is created from the model without a migration, so a database that was created before the column
-          existed has to be recreated.
+          The ReviewCenterDbContext class shall map the optional due date of a review to one nullable text
+          column of the review table that holds the calendar day as yyyy-MM-dd, so that a date reads back as
+          the same day.
         justification: |
-          The date belongs to exactly one review and is read with it, so it is a column of the review. A calendar day
-          has no time zone, so storing it as text keeps it from shifting. The schema is created from the model and not
-          migrated while the product is not released, so development databases are recreated.
+          The date belongs to exactly one review and is read with it, so it is a column of the review. A
+          calendar day has no time zone, so storing it as text keeps it from shifting.
+        tests:
+          - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
+          - ReviewCenterDbContext_Review_DueDate_IsStoredAsCalendarDayText
+
+      - id: ReviewCenter-DbContext-DueDate-None
+        title: >-
+          The ReviewCenterDbContext class shall read back a review that was not given a due date with none.
+        justification: |
+          A review without a due date must not be shown with a made-up one.
         tests:
           - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
 
       - id: ReviewCenter-DbContext-ReviewConclusionText
         title: >-
-          The ReviewCenterDbContext class shall map the optional review conclusion text of a review (the free text, not
-          the approved or rejected conclusion) to one nullable text column of the review table that is limited to
-          4000 characters, so that a review that was not given a text reads back with none and a text reads back
-          unchanged. The schema is created from the model without a migration, so a development database that was
-          created before the column existed has to be recreated.
+          The ReviewCenterDbContext class shall map the optional review conclusion text of a review, which is
+          the free text and not the approved or rejected conclusion, to one nullable text column of the review
+          table.
         justification: |
-          The text belongs to exactly one review and is read with it, so it is a column of the review. The limit keeps
-          the signed record small and the same everywhere. The schema is created from the model and not migrated
-          while the product is not released, so development databases are recreated.
+          The text belongs to exactly one review and is read with it, so it is a column of the review. It is
+          optional, so a review that was not given a text reads back with none.
+        tests:
+          - ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional
+
+      - id: ReviewCenter-DbContext-ReviewConclusionText-Limit
+        title: >-
+          The ReviewCenterDbContext class shall limit the review conclusion text of a review to 4000
+          characters.
+        justification: |
+          The limit keeps the signed record small and the same everywhere.
+        tests:
+          - ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional
+
+      - id: ReviewCenter-DbContext-ReviewConclusionText-RoundTrip
+        title: >-
+          The ReviewCenterDbContext class shall read back a review conclusion text of the longest allowed length
+          unchanged.
+        justification: |
+          A text at the limit must be stored whole, since a cut text would change what is signed.
         tests:
           - ReviewCenterDbContext_Model_ReviewConclusionTextColumn_IsLimitedAndOptional
 
       - id: ReviewCenter-DbContext-Ballots
         title: >-
-          The ReviewCenterDbContext class shall map the answers and the section states with the reviewer slot in their
-          key (the identity 0 for the review-level rows) and a ballot status row for each slot, keyed by project, review
-          and slot, that holds the status and the time and the user name of the hand-in, and that is deleted together
-          with its review or its slot. The schema is created from the model without a migration, so a development
-          database that was created before the tables changed has to be recreated.
+          The ReviewCenterDbContext class shall map the answers and the section states with the reviewer slot in
+          their key.
         justification: |
-          Each reviewer's answer is a row of its own, so the slot is part of the key. The status row follows the life of
-          its review and slot so that no ballot can outlive them. The schema is created from the model and not migrated
-          while the product is not released, so development databases are recreated.
+          Each reviewer's answer is a row of its own, so the slot is part of the key.
         tests:
           - ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot
           - ReviewStore_SetBallotSectionStateAsync_PerSlotRows_RoundTrip
+
+      - id: ReviewCenter-DbContext-Ballots-ReviewLevel
+        title: >-
+          The ReviewCenterDbContext class shall use the slot identity 0 for the review-level answers and section
+          states.
+        justification: |
+          The rows that belong to the review as a whole, not to a reviewer, need a slot value that no reviewer
+          slot has.
+        tests:
+          - ReviewStore_ListChecklistAnswersAsync_BallotRows_AreNotListedAsReviewRows
+
+      - id: ReviewCenter-DbContext-Ballots-Status
+        title: >-
+          The ReviewCenterDbContext class shall map a ballot status row for each slot, keyed by project, review,
+          and slot, that holds the status and the time and the user name of the hand-in.
+        justification: |
+          A ballot is handed in as a whole, so its status is kept in one row for each slot.
+        tests:
+          - ReviewStore_SubmitBallotAsync_CompleteDraft_SubmitsWithAudit
+          - ReviewStore_SetBallotAnswerAsync_FirstAnswer_CreatesDraftBallot
+
+      - id: ReviewCenter-DbContext-Ballots-SlotCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the ballot rows of a slot when the slot is deleted.
+        justification: |
+          The status row follows the life of its slot so that no ballot can outlive it.
+        tests:
           - ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows
+
+      - id: ReviewCenter-DbContext-Ballots-ReviewCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the ballot status rows of a review when the review is
+          deleted.
+        justification: |
+          The status row follows the life of its review so that no ballot can outlive it.
+        tests:
+          - ReviewCenterDbContext_Ballot_ReviewDeleted_DeletesTheStatusRows
 
       - id: ReviewCenter-DbContext-FollowUp
         title: >-
-          The ReviewCenterDbContext class shall map the review that a review follows, with the numbers of answers and
-          threads it took over, to columns of the review table, with an index on the project and the followed review,
-          and without a foreign key because the followed review is a reference by identifier within the project, shall
-          map the review that a carried answer, a carried section and a carried thread came from, and the number of a
-          carried thread in the earlier review, to nullable columns, and shall not map the carried rows that a review
-          holds only until it is stored, so that a review that follows nothing reads back with none of them. The schema
-          is created from the model without a migration, so a development database that was created before the columns
-          existed has to be recreated.
+          The ReviewCenterDbContext class shall map the review that a review follows, with the numbers of answers
+          and threads it took over, to columns of the review table.
         justification: |
-          The followed review belongs to exactly one review and is read with it, so it is a column. A review that has
-          been followed must not be blocked from being kept or removed by a reference, and the lookup of the reviews
-          that follow a review needs the index. The schema is created from the model and not migrated while the product
-          is not released, so development databases are recreated.
+          The followed review belongs to exactly one review and is read with it, so it is a column.
         tests:
           - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+
+      - id: ReviewCenter-DbContext-FollowUp-None
+        title: >-
+          The ReviewCenterDbContext class shall read back a review that follows nothing with no followed review
+          and no taken-over counts.
+        justification: |
+          A review that follows nothing must not show a made-up follow-up.
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+
+      - id: ReviewCenter-DbContext-FollowUp-Index
+        title: >-
+          The ReviewCenterDbContext class shall index the reviews by project and followed review.
+        justification: |
+          The lookup of the reviews that follow a review needs the index.
+        tests:
+          - ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview
+
+      - id: ReviewCenter-DbContext-FollowUp-NoForeignKey
+        title: >-
+          The ReviewCenterDbContext class shall not make the followed review of a review a foreign key, so that
+          deleting a followed review leaves the follow-up review in place.
+        justification: |
+          The followed review is a reference by identifier within the project. A review that has been followed
+          must not be blocked from being kept or removed by a reference.
+        tests:
+          - ReviewCenterDbContext_Review_FollowedReviewDeleted_KeepsTheFollowUp
+
+      - id: ReviewCenter-DbContext-FollowUp-CarriedFrom
+        title: >-
+          The ReviewCenterDbContext class shall map the review that a carried answer, a carried section, and a
+          carried thread came from, and the number of a carried thread in the earlier review, to nullable
+          columns.
+        justification: |
+          A carried row must say where it came from, and a row that was not carried has no origin.
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+
+      - id: ReviewCenter-DbContext-FollowUp-CarriedRowsNotMapped
+        title: >-
+          The ReviewCenterDbContext class shall not map the carried rows that a review holds only until it is
+          stored.
+        justification: |
+          The carried rows are copied into the answers, sections, and threads of the new review, so a table of
+          their own would only duplicate them.
+        tests:
           - ReviewCenterDbContext_Model_HasIndexOnProjectAndFollowedReview
 
       - id: ReviewCenter-DbContext-Signatures
         title: >-
-          The ReviewCenterDbContext class shall map reviewer slots and signatures to tables in which a slot and
-          a signature belong to a review, and a signature belongs to a slot, so that the database refuses a slot
-          or a signature for a review that does not exist, refuses to delete a slot that has a signature, and
-          refuses a second signature of the same slot with the same digest. A signature shall be stored and read
-          back with its role, digest, outcome (Approved or Rejected), and meaning unchanged.
+          The ReviewCenterDbContext class shall map reviewer slots and signatures to tables in which a slot
+          belongs to a review, so that the database refuses a slot for a review that does not exist.
         justification: |
-          A signature is evidence and must not lose the slot it was made for. Having the database enforce the
-          relationships and the uniqueness keeps the record consistent when two requests overlap or a programming
-          error occurs.
+          A slot is the place where a reviewer signs, so one that belongs to no review would let a signature
+          exist for a review that nobody can open, even when two requests overlap or a programming error occurs.
         tests:
           - ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-Signatures-SignatureReview
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a signature for a review that does not
+          exist.
+        justification: |
+          A signature is evidence of one review and must not point at nothing.
+        tests:
+          - ReviewCenterDbContext_Signature_UnknownReview_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-Signatures-SignatureSlot
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a signature for a slot that does not
+          exist.
+        justification: |
+          A signature is made in a slot and must not point at nothing.
+        tests:
+          - ReviewCenterDbContext_Signature_UnknownSlot_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-Signatures-SignedSlotKept
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse to delete a slot that has a signature.
+        justification: |
+          A signature is evidence and must not lose the slot it was made for.
+        tests:
           - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-Signatures-SameDigest
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a second signature of the same slot
+          with the same digest.
+        justification: |
+          Having the database enforce the uniqueness keeps the record consistent when two requests overlap.
+        tests:
           - ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed
+
+      - id: ReviewCenter-DbContext-Signatures-RoundTrip
+        title: >-
+          The ReviewCenterDbContext class shall store a signature and read it back with its role, digest, and
+          meaning unchanged.
+        justification: |
+          A signature is evidence, so what is read back must be what was signed.
+        tests:
           - ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips
+
+      - id: ReviewCenter-DbContext-Signatures-Outcome
+        title: >-
+          The ReviewCenterDbContext class shall store the outcome of a signature, Approved or Rejected, and read
+          it back unchanged.
+        justification: |
+          The outcome is what the signature says, so a Rejected signature must not read back as Approved.
+        tests:
           - ReviewStore_AddSignatureAsync_RejectedOutcome_PersistsOutcome
 
       - id: ReviewCenter-DbContext-AuditEntries
         title: >-
           The ReviewCenterDbContext class shall map the audit entries to a table keyed by the sequence number,
-          never assigned by the database, so that a second entry with the same sequence is refused, with no
-          relationship to any other table so that an entry survives whatever happens to the rows it describes,
-          and with an index for reading the entries of one review.
+          which the database never assigns, so that a second entry with the same sequence is refused.
         justification: |
-          The key is the last defense of the hash chain against two entries with the same position, and an entry
-          is a snapshot of text that must not depend on other rows.
+          The key is the last defense of the hash chain against two entries with the same position.
         tests:
           - AuditStore_Database_DuplicateSequence_IsRefusedByUniqueKey
-          - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+
+      - id: ReviewCenter-DbContext-AuditEntries-NoRelationships
+        title: >-
+          The ReviewCenterDbContext class shall map the audit entries with no relationship to any other table,
+          so that an entry survives whatever happens to the rows it describes.
+        justification: |
+          An entry is a snapshot of text that must not depend on other rows.
+        tests:
+          - ReviewCenterDbContext_AuditEntry_ProjectDeleted_KeepsTheEntry
+
+      - id: ReviewCenter-DbContext-AuditEntries-ReviewIndex
+        title: >-
+          The ReviewCenterDbContext class shall index the audit entries for reading the entries of one review.
+        justification: |
+          The entries of one review are read in order of their sequence, and the index keeps that from reading
+          all entries.
+        tests:
+          - StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes
 
       - id: ReviewCenter-DbContext-Repositories
         title: >-
-          The ReviewCenterDbContext class shall map the registered repositories to a table with an identity assigned
-          by the database and a required project, with a name that is unique within the project regardless of letter
-          case, and shall keep the token only in its encrypted form, so that the database refuses a second repository
-          in the same project whose name differs only in letter case, allows the same name in two projects, and
-          refuses a repository for a project that does not exist.
+          The ReviewCenterDbContext class shall map the registered repositories to a table with an identity
+          assigned by the database and a required project.
         justification: |
-          The database is the last defense against two repositories with the same name in a project, and a token
-          stored only in encrypted form is not readable in a copy of the database. A name that is unique within the
-          project, not across all projects, tells nobody that another project has a repository of that name.
+          A repository belongs to exactly one project and has an identity that does not depend on its name.
         tests:
           - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
+
+      - id: ReviewCenter-DbContext-Repositories-UniqueName
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a second repository in the same
+          project whose name differs only in letter case.
+        justification: |
+          The database is the last defense against two repositories with the same name in a project.
+        tests:
           - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+
+      - id: ReviewCenter-DbContext-Repositories-NameInOtherProject
+        title: >-
+          The ReviewCenterDbContext class shall allow the same repository name in two projects.
+        justification: |
+          A name that is unique within the project, not across all projects, tells nobody that another project
+          has a repository of that name.
+        tests:
           - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
+
+      - id: ReviewCenter-DbContext-Repositories-UnknownProject
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a repository for a project that does
+          not exist.
+        justification: |
+          A repository must not point at a project that is not there.
+        tests:
+          - ReviewCenterDbContext_Repository_UnknownProject_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-Repositories-EncryptedToken
+        title: >-
+          The ReviewCenterDbContext class shall keep the token of a repository only in its encrypted form.
+        justification: |
+          A token stored only in encrypted form is not readable in a copy of the database.
+        tests:
+          - RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText
 
       - id: ReviewCenter-DbContext-Memberships
         title: >-
-          The ReviewCenterDbContext class shall map the memberships to a table keyed by the user and the project, so
-          that the database refuses a second membership of a user in a project, with the role stored by its name, and
-          with relationships to the user and to the project, so that the database refuses a membership for a project
-          or a user that does not exist and removes the memberships of a project or a user that is removed.
+          The ReviewCenterDbContext class shall map the memberships to a table keyed by the user and the
+          project, so that the database refuses a second membership of a user in a project.
         justification: |
-          The key is the last defense against two roles for one user in one project when two requests overlap, and
-          the relationships keep a membership from pointing at nothing. A role stored by name stays readable and stays
-          valid if the list of roles is reordered.
+          The key is the last defense against two roles for one user in one project when two requests overlap.
         tests:
           - ReviewStore_AddMembershipAsync_SecondMembership_IsRejected
+          - ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed
+
+      - id: ReviewCenter-DbContext-Memberships-RoleName
+        title: >-
+          The ReviewCenterDbContext class shall store the role of a membership by its name.
+        justification: |
+          A role stored by name stays readable and stays valid if the list of roles is reordered.
+        tests:
+          - ReviewCenterDbContext_Membership_Role_IsStoredByName
+
+      - id: ReviewCenter-DbContext-Memberships-UnknownProject
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a membership for a project that does
+          not exist.
+        justification: |
+          A membership must not point at a project that is not there.
+        tests:
           - ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase
+
+      - id: ReviewCenter-DbContext-Memberships-UnknownUser
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a membership for a user that does not
+          exist.
+        justification: |
+          A membership must not point at a user that is not there.
+        tests:
+          - ReviewCenterDbContext_Membership_UnknownUser_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-Memberships-ProjectCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the memberships of a project when the project is deleted.
+        justification: |
+          A membership has no meaning without its project.
+        tests:
+          - ReviewCenterDbContext_Membership_ProjectDeleted_DeletesItsMemberships
+
+      - id: ReviewCenter-DbContext-Memberships-UserCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the memberships of a user when the user is deleted.
+        justification: |
+          A membership has no meaning without its user.
+        tests:
+          - ReviewCenterDbContext_Membership_UserDeleted_DeletesTheMemberships
 
       - id: ReviewCenter-DbContext-Tokens
         title: >-
           The ReviewCenterDbContext class shall map the personal access tokens to a table in which the hash is
-          unique, and shall map the creator and the creation through the API of a review to
+          unique.
+        justification: |
+          The database is the last defense against two tokens with one hash, which would make the owner of a
+          request ambiguous.
+        tests:
+          - ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns
+
+      - id: ReviewCenter-DbContext-Tokens-ReviewCreator
+        title: >-
+          The ReviewCenterDbContext class shall map the creator and the creation through the API of a review to
           columns of the review.
         justification: |
-          The database is the last defense against two tokens with one hash, which would make the owner of a request
-          ambiguous, and the creator of a review must be kept with the review to be shown and audited later.
+          The creator of a review must be kept with the review to be shown and audited later.
         tests:
           - ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns
 
       - id: ReviewCenter-DbContext-TotpTables
         title: >-
-          The ReviewCenterDbContext class shall map the enrollment of the second factor to a table with one row for each
-          user and the recovery codes to a table with a unique index on the user and the hash of the code, and shall
-          delete both with the user.
+          The ReviewCenterDbContext class shall map the enrollment of the second factor to a table with one row
+          for each user, so that the database refuses a second enrollment of a user.
         justification: |
-          The database is the last defense against two equal recovery codes of one user, and against an enrollment that
-          outlives its user.
+          The database is the last defense against two enrollments of one user.
+        tests:
+          - ReviewCenterDbContext_UserTotp_SecondEnrollmentOfUser_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-TotpTables-RecoveryCodeHash
+        title: >-
+          The ReviewCenterDbContext class shall map the recovery codes to a table with a unique index on the user
+          and the hash of the code, so that the database refuses a second equal recovery code of one user.
+        justification: |
+          The database is the last defense against two equal recovery codes of one user.
         tests:
           - TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack
+
+      - id: ReviewCenter-DbContext-TotpTables-SameHashOtherUsers
+        title: >-
+          The ReviewCenterDbContext class shall allow the same recovery code hash for different users.
+        justification: |
+          The index is on the user and the hash, so one user's code does not tell another user that the same
+          hash is in use.
+        tests:
+          - TotpStore_ConfirmAsync_SameHashForDifferentUsers_IsAllowed
+
+      - id: ReviewCenter-DbContext-TotpTables-UserCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the enrollment and the recovery codes of a user when the
+          user is deleted.
+        justification: |
+          An enrollment must not outlive its user.
+        tests:
           - TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes
 
       - id: ReviewCenter-DbContext-NotificationPreferencesTable
@@ -310,83 +795,186 @@ sections:
           one row for each mail.
         justification: |
           The limits on the mails of a user, of an address, and of the server are counted from this log on every
-          request. The schema is created from the model without a
-          migration, so a database that was created before the table existed has to be recreated.
+          request. The schema is created from the model without a migration, so a database that was created before the
+          table existed has to be recreated.
         tests:
           - NotificationStore_IsAvailableAsync_NewDatabase_ReturnsTrue
           - NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse
 
       - id: ReviewCenter-DbContext-ExternalIdentity
         title: >-
-          The ReviewCenterDbContext class shall map the issuer and the subject of the identity of a user at a provider
-          to columns of the user, with a unique index on the pair for the users that have one.
+          The ReviewCenterDbContext class shall map the issuer and the subject of the identity of a user at a
+          provider to columns of the user.
         justification: |
-          The database is the last defense against two accounts for one identity at a provider, while any number of
-          local accounts, which have no such identity, must remain possible.
+          The identity at a provider is a fact of one user and is read with the user.
+        tests:
+          - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
+
+      - id: ReviewCenter-DbContext-ExternalIdentity-UniquePair
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a second user with the same issuer and
+          subject.
+        justification: |
+          The database is the last defense against two accounts for one identity at a provider.
+        tests:
+          - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused
+
+      - id: ReviewCenter-DbContext-ExternalIdentity-LocalUsers
+        title: >-
+          The ReviewCenterDbContext class shall allow any number of users that have no external identity.
+        justification: |
+          Local accounts have no such identity, and the uniqueness of the pair must not limit them.
         tests:
           - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused
 
       - id: ReviewCenter-DbContext-ReviewRules
         title: >-
-          The ReviewCenterDbContext class shall map the setting that requires independent reviewers to a boolean column
-          of the project table whose value comes from the project, on for a project that was not given another value,
-          so that a changed setting is stored in its own column. The schema is created from the model without a
-          migration, so a database that was created before the column existed has to be recreated.
+          The ReviewCenterDbContext class shall map the setting that requires independent reviewers to a boolean
+          column of the project table whose value comes from the project.
         justification: |
-          The setting belongs to exactly one project and is read with it. The value is not declared as a database
-          default, so the default of the project type is the only one and a stored false is never mistaken for an
-          unset value. The schema is not migrated while the product is not released, so development databases are
-          recreated.
+          The setting belongs to exactly one project and is read with it. The value is not declared as a
+          database default, so the default of the project type is the only one.
         tests:
           - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
 
+      - id: ReviewCenter-DbContext-ReviewRules-Default
+        title: >-
+          The ReviewCenterDbContext class shall read the setting that requires independent reviewers as on for a
+          project that was not given another value.
+        justification: |
+          A project that never chose must get the stricter review, so that independence is lost only by a
+          decision of the project.
+        tests:
+          - ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned
+
+      - id: ReviewCenter-DbContext-ReviewRules-Changed
+        title: >-
+          The ReviewCenterDbContext class shall store a changed setting that requires independent reviewers in
+          its own column.
+        justification: |
+          A changed setting must be read back as changed.
+        tests:
+          - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
+
+      - id: ReviewCenter-DbContext-ReviewRules-StoredOff
+        title: >-
+          The ReviewCenterDbContext class shall read back a project that was added with the setting that requires
+          independent reviewers off as off.
+        justification: |
+          A project that switched independent review off would silently be forced to use it if the stored false
+          were mistaken for an unset value.
+        tests:
+          - ReviewCenterDbContext_Project_AddedWithIndependentReviewersOff_ReadsBackOff
+
       - id: ReviewCenter-DbContext-ReviewRuleColumns
         title: >-
-          The ReviewCenterDbContext class shall map the two further review rules of a project (authors answering the
-          checklist of their own review, and the person who reopened a review signing it again) to boolean columns of
-          the project table whose value comes from the project, on for a project that was not given another value, so
-          that a changed rule is stored in its own column. The schema is created from the model without a migration,
-          so a database that was created before the columns existed has to be recreated.
+          The ReviewCenterDbContext class shall map the two further review rules of a project, authors answering
+          the checklist of their own review and the person who reopened a review signing it again, to boolean
+          columns of the project table whose value comes from the project.
         justification: |
           Each rule belongs to exactly one project and is read with it. The values are not declared as database
-          defaults, so the default of the project type is the only one and a stored false is never mistaken for an
-          unset value. The schema is not migrated while the product is not released, so development databases are
-          recreated.
+          defaults, so the default of the project type is the only one.
+        tests:
+          - ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned
+
+      - id: ReviewCenter-DbContext-ReviewRuleColumns-Default
+        title: >-
+          The ReviewCenterDbContext class shall read both further review rules as on for a project that was not
+          given another value.
+        justification: |
+          A project that never chose must get the stricter rules on authors and on those who reopen, so that they are
+          relaxed only by a decision of the project.
+        tests:
+          - ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned
+
+      - id: ReviewCenter-DbContext-ReviewRuleColumns-StoredOff
+        title: >-
+          The ReviewCenterDbContext class shall read back a project that was added with a further review rule
+          off as off.
+        justification: |
+          A project that switched off the rule on authors or on those who reopen would keep a stricter rule than it
+          chose if the stored false were mistaken for an unset value.
+        tests:
+          - ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned
+
+      - id: ReviewCenter-DbContext-ReviewRuleColumns-Changed
+        title: >-
+          The ReviewCenterDbContext class shall store a changed further review rule in its own column.
+        justification: |
+          A changed rule must be read back as changed.
         tests:
           - ReviewStore_UpdateReviewRuleAsync_CompareAndSet
-          - ReviewStore_AddProjectAsync_NewReviewRules_AreStoredAndReturned
 
       - id: ReviewCenter-DbContext-ReviewReopens
         title: >-
-          The ReviewCenterDbContext class shall map the reopenings of a review to a table in which each row belongs to
-          a review and is deleted with it, holds the user name, display name, time, reason, and digest of the approved
-          record, and is found by project and review, so that the database refuses a reopening of a review that does
-          not exist. The schema is created from the model without a migration, so a database that was created before
-          the table existed has to be recreated.
+          The ReviewCenterDbContext class shall map the reopenings of a review to a table whose rows hold the
+          user name, display name, time, reason, and digest of the approved record, and are found by project
+          and review.
         justification: |
-          The history of reopenings is evidence that belongs to one review. Having the database enforce the
-          relationship keeps the record consistent when two requests overlap or a programming error occurs.
+          The history of reopenings is evidence that belongs to one review and is read by project and review.
         tests:
           - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
 
+      - id: ReviewCenter-DbContext-ReviewReopens-ReviewKey
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a reopening of a review that does not
+          exist.
+        justification: |
+          A reopening that names no review would put an entry into a history that no review owns, so the database
+          refuses it even when a request names a review that was deleted meanwhile.
+        tests:
+          - ReviewCenterDbContext_ReviewReopen_UnknownReview_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-ReviewReopens-ReviewCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the reopenings of a review when the review is deleted.
+        justification: |
+          A reopening has no meaning without its review.
+        tests:
+          - ReviewCenterDbContext_ReviewReopen_ReviewDeleted_DeletesTheReopenings
+
       - id: ReviewCenter-DbContext-ReviewUserState
         title: >-
-          The ReviewCenterDbContext class shall map what a user has seen of a review to a table in which each row
-          belongs to one user and one review, is found by that pair, holds the newest comment and the time seen, and
-          is deleted with the review or the user. The schema is created from the model without a migration, so a
-          database that was created before the table existed has to be recreated.
+          The ReviewCenterDbContext class shall map what a user has seen of a review to a table.
         justification: |
-          The inbox keeps one row per user and review, and it doubles as the list of notifications, so no other table
-          is needed. Having the database own the relationships keeps the rows consistent when requests overlap.
+          The inbox keeps its rows in a table of its own, which doubles as the list of notifications, so no
+          other table is needed.
         tests:
           - DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes
+
+      - id: ReviewCenter-DbContext-ReviewUserState-Fields
+        title: >-
+          The ReviewCenterDbContext class shall keep one row for each user and review, found by that pair, that
+          holds the newest comment and the time seen.
+        justification: |
+          The inbox keeps one row per user and review, so the state of a review for a user is found with one
+          lookup.
+        tests:
+          - InboxStore_MarkSeenAsync_InsertsThenUpdatesAndNeverMovesBackwards
+          - InboxStore_MarkSeenAsync_ParallelCalls_NoExceptionAndHighestWins
+
+      - id: ReviewCenter-DbContext-ReviewUserState-ReviewCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the seen states of a review when the review is deleted.
+        justification: |
+          A seen state of a review that no longer exists would list a notification for something nobody can open,
+          even when the deletion overlaps a visit.
+        tests:
           - InboxStore_DeletingTheReview_DeletesTheStates
+
+      - id: ReviewCenter-DbContext-ReviewUserState-UserCascade
+        title: >-
+          The ReviewCenterDbContext class shall delete the seen states of a user when the user is deleted.
+        justification: |
+          A seen state of a user who no longer exists would keep the data of a deleted person in the inbox
+          table, even when the deletion overlaps a visit of that user.
+        tests:
           - InboxStore_DeletingTheUser_DeletesTheStates
 
       - id: ReviewCenter-DbContext-InboxIndexes
         title: >-
-          The ReviewCenterDbContext class shall index the primary and the alternate user of the reviewer slots and the
-          creator of the reviews, so that the reviews of one user are found without reading all of them.
+          The ReviewCenterDbContext class shall index the primary and the alternate user of the reviewer slots
+          and the creator of the reviews, so that the reviews of one user are found without reading all of them.
         justification: |
           The inbox is built on every visit of the home page, so the lookup by user must not scan the tables.
         tests:

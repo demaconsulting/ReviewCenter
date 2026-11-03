@@ -130,6 +130,32 @@ public class UserStoreTests
     }
 
     /// <summary>
+    ///     Test that the flag that a user must change the password is stored when the user is added and cleared by an
+    ///     update.
+    /// </summary>
+    [Fact]
+    public async Task UserStore_UpdateAsync_MustChangePassword_IsStoredAndCleared()
+    {
+        // Arrange: a store with a user who must change the password
+        var store = Open(out var provider);
+        using var _ = provider;
+        var confined = NewUser("Ann");
+        confined.MustChangePassword = true;
+        await store.AddAsync(confined, TestContext.Current.CancellationToken);
+        var user = (await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!;
+        var initial = user.MustChangePassword;
+
+        // Act: clear the flag and read the user again
+        user.MustChangePassword = false;
+        await store.UpdateAsync(user, TestContext.Current.CancellationToken);
+        var cleared = (await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!.MustChangePassword;
+
+        // Assert: the flag was stored and then cleared
+        Assert.True(initial);
+        Assert.False(cleared);
+    }
+
+    /// <summary>
     ///     Test that a user name that differs only in case is refused as taken, and that lookups ignore case.
     /// </summary>
     [Fact]
@@ -250,5 +276,113 @@ public class UserStoreTests
         // Assert
         Assert.Equal(DomainRule.UserNameTaken, exception.Rule);
         Assert.Equal(3, (await store.ListAsync(TestContext.Current.CancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     The statement that makes the database refuse every audit entry.
+    /// </summary>
+    private const string RefuseAuditSql =
+        "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;";
+
+    /// <summary>
+    ///     Builds the audit draft of a user change.
+    /// </summary>
+    /// <param name="action">The audit action.</param>
+    /// <returns>The draft.</returns>
+    private static AuditDraft Draft(string action) => AuditDraft.By(new Actor("adm", "Adm"), action, "detail");
+
+    /// <summary>
+    ///     Runs one SQL statement against the database of the test store.
+    /// </summary>
+    /// <param name="db">The test database.</param>
+    /// <param name="sql">The statement.</param>
+    /// <returns>A task that completes when the statement ran.</returns>
+    private static async Task ExecuteSqlAsync(TestStore db, string sql)
+    {
+        await using var context = await db.Factory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await context.Database.ExecuteSqlRawAsync(sql, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Counts the audit entries of a database.
+    /// </summary>
+    /// <param name="db">The test database.</param>
+    /// <returns>The number of entries.</returns>
+    private static async Task<int> CountAuditAsync(TestStore db)
+    {
+        await using var context = await db.Factory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        return await context.AuditEntries.CountAsync(TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Test that a new user that is refused because its name is taken leaves no audit entry, besides the entry of
+    ///     the user that holds the name.
+    /// </summary>
+    [Fact]
+    public async Task UserStore_AddAsync_NameTakenWithDraft_StoresNoAuditEntry()
+    {
+        // Arrange: a user that was added with its audit entry
+        using var db = new TestStore();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await db.Users.AddAsync(NewUser("Ann"), u => Draft("user.created"), cancellationToken);
+
+        // Act: add a user whose name differs only in case, with an audit draft
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => db.Users.AddAsync(NewUser("ANN"), u => Draft("user.created"), cancellationToken));
+
+        // Assert: only the entry of the first user exists
+        Assert.Equal(1, await CountAuditAsync(db));
+    }
+
+    /// <summary>
+    ///     Test that a user stays as it was when the audit entry of its update cannot be stored.
+    /// </summary>
+    [Fact]
+    public async Task UserStore_UpdateAsync_AuditInsertFails_LeavesTheUserUnchanged()
+    {
+        // Arrange: a user, then a database that refuses every audit entry
+        using var db = new TestStore();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var user = await db.Users.AddAsync(NewUser("ann"), u => Draft("user.created"), cancellationToken);
+        await ExecuteSqlAsync(db, RefuseAuditSql);
+
+        // Act: disable the user with an audit draft
+        user.Enabled = false;
+        await Assert.ThrowsAnyAsync<Exception>(() => db.Users.UpdateAsync(user, Draft("user.disabled"), cancellationToken));
+        await ExecuteSqlAsync(db, "DROP TRIGGER refuse_audit");
+
+        // Assert: the user is still enabled and only the creation entry exists
+        Assert.True((await db.Users.GetByUsernameAsync("ann", cancellationToken))!.Enabled);
+        Assert.Equal(1, await CountAuditAsync(db));
+    }
+
+    /// <summary>
+    ///     Test that adding a user to a project stores no account and no membership when the audit entry cannot be
+    ///     stored.
+    /// </summary>
+    [Fact]
+    public async Task UserStore_AddToProjectAsync_AuditInsertFails_StoresNothing()
+    {
+        // Arrange: a project, then a database that refuses every audit entry
+        using var db = new TestStore();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var project = await db.Store.AddProjectAsync(new Project { Name = "Apollo", Created = _created }, cancellationToken);
+        var auditCountBefore = await CountAuditAsync(db);
+        await ExecuteSqlAsync(db, RefuseAuditSql);
+
+        // Act: add a new user to the project
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => db.Users.AddToProjectAsync(
+                NewUser("newbie"),
+                project.Id,
+                ProjectRole.User,
+                u => Draft("project.account-created"),
+                cancellationToken));
+        await ExecuteSqlAsync(db, "DROP TRIGGER refuse_audit");
+
+        // Assert: no account, no membership, and no entry
+        Assert.Null(await db.Users.GetByUsernameAsync("newbie", cancellationToken));
+        Assert.Empty(await db.Store.ListMembershipsAsync(project.Id, cancellationToken));
+        Assert.Equal(auditCountBefore, await CountAuditAsync(db));
     }
 }

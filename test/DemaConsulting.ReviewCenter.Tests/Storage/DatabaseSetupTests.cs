@@ -216,7 +216,8 @@ public class DatabaseSetupTests
             // Act: create the database
             DatabaseSetup.EnsureCreated(factory, options);
 
-            // Assert: the file exists and the tables can be queried
+            // Assert: the folder and the file exist and the tables can be queried
+            Assert.True(Directory.Exists(Path.GetDirectoryName(file)));
             Assert.True(File.Exists(file));
             using var context = factory.CreateDbContext();
             Assert.Empty(context.Projects);

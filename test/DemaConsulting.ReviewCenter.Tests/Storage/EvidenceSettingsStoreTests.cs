@@ -30,6 +30,27 @@ public class EvidenceSettingsStoreTests
     }
 
     /// <summary>
+    ///     Test that a project added with evidence settings is stored with them, and that the settings are returned
+    ///     again by the project and the list of projects.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddProjectAsync_GivenEvidenceSettings_AreStoredAndReturned()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var given = new EvidenceSettings(true, true, false, false, false, false, false);
+
+        // Act
+        var added = await db.Store.AddProjectAsync(
+            new Project { Name = "Apollo", Created = _created, Evidence = given }, cancellationToken);
+
+        // Assert
+        Assert.Equal(given, (await db.Store.GetProjectAsync(added.Id, cancellationToken))!.Evidence);
+        Assert.Equal(given, (await db.Store.ListProjectsAsync(cancellationToken)).Single(p => p.Id == added.Id).Evidence);
+    }
+
+    /// <summary>
     ///     Test that a change is persisted for its own project only, survives a reload, and writes one audit entry
     ///     of the project whose chain still verifies.
     /// </summary>

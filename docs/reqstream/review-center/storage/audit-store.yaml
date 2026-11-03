@@ -3,117 +3,475 @@
 #
 # The AuditStore class and its AuditAppender persist the audit trail: every entry is appended once, in order,
 # linked to its predecessor, and, for a change of data, in the same transaction as the change.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: AuditStore Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Append: one entry after the other, linked to its predecessor
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditStore-Append
         title: >-
-          The AuditStore unit shall append each audit entry with the next sequence number and the hash of its
-          predecessor, resolving the acting user, cleaning the text, and stamping the time inside the process-wide
-          gate, so that the sequence has no gap and the chain is verifiable.
+          The AuditStore unit shall give each appended audit entry the next sequence number, counting from 1 without
+          a gap.
         justification: |
           A gap or a fork in the sequence would make a healthy trail look tampered with.
         tests:
           - AuditStore_AppendAsync_SequentialAppends_GapFreeLinkedAndVerifiable
+
+      - id: ReviewCenter-AuditStore-Append-Predecessor
+        title: >-
+          The AuditStore unit shall link each appended audit entry to the hash of the entry before it.
+        justification: |
+          The links make an edited or a deleted entry visible, because the hash of every later entry no longer fits.
+        tests:
+          - AuditStore_AppendAsync_SequentialAppends_GapFreeLinkedAndVerifiable
+
+      - id: ReviewCenter-AuditStore-Append-Actor
+        title: >-
+          The AuditStore unit shall resolve the acting user of an appended entry from the user name of the actor,
+          without regard to letter case.
+        justification: |
+          The trail must name the account that acted even when the name was typed in another case.
+        tests:
           - AuditStore_AppendAsync_Draft_StoresResolvedActorCleanedTextAndTime
 
+      - id: ReviewCenter-AuditStore-Append-UnknownActor
+        title: >-
+          The AuditStore unit shall keep no user for an appended entry whose actor has no user name that matches an
+          account.
+        justification: |
+          A failed sign-in names a person who has no account, and the entry must still be written, as the name that
+          was given.
+        tests:
+          - AuditStore_AppendAsync_Draft_StoresResolvedActorCleanedTextAndTime
+
+      - id: ReviewCenter-AuditStore-Append-Text
+        title: >-
+          The AuditStore unit shall clean the detail text of an appended entry by replacing its line breaks.
+        justification: |
+          A detail with a line break could forge a second line in a text export of the trail.
+        tests:
+          - AuditStore_AppendAsync_Draft_StoresResolvedActorCleanedTextAndTime
+
+      - id: ReviewCenter-AuditStore-Append-Time
+        title: >-
+          The AuditStore unit shall stamp an appended entry with the instant of the append.
+        justification: |
+          The time of an entry says when the action happened, and the hash of the chain covers it.
+        tests:
+          - AuditStore_AppendAsync_Draft_StoresResolvedActorCleanedTextAndTime
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Atomic: a change of data and its entry
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditStore-Atomic
         title: >-
-          The AuditStore unit shall store a change of data and its audit entry in one Serializable transaction, so
-          that either both or neither are stored, with no entry for a change that did not take effect, and shall
-          release the gate on every path.
+          The AuditStore unit shall store a change of data together with its audit entry.
         justification: |
-          An entry without its change, or a change without its entry, would make the history untrue.
+          A reader of the trail relies on every stored change of data having its entry, so a project that exists
+          without the entry of its creation would be a change that nobody can trace.
         tests:
           - ReviewStore_AddProjectAsync_WithDraft_StoresProjectAndEntryTogether
+
+      - id: ReviewCenter-AuditStore-Atomic-NoEntryForFailedChange
+        title: >-
+          The AuditStore unit shall store no audit entry for a change of data that is refused.
+        justification: |
+          An entry for a change that did not take effect would make the history untrue.
+        tests:
           - ReviewStore_AddReviewAsync_FailedChange_LeavesNoAuditEntry
+
+      - id: ReviewCenter-AuditStore-Atomic-NoEntryForNoOp
+        title: >-
+          The AuditStore unit shall store no audit entry for a change of data that has no effect.
+        justification: |
+          A comment on a thread that does not exist changes nothing, so the history must not say that it did.
+        tests:
+          - ReviewStore_NoOpChanges_RecordNothing
+
+      - id: ReviewCenter-AuditStore-Atomic-DraftFails
+        title: >-
+          The AuditStore unit shall store neither the change nor an entry when the audit entry of the change cannot
+          be built.
+        justification: |
+          A change that cannot be recorded must not take effect, or the history would miss it.
+        tests:
           - ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing
+
+      - id: ReviewCenter-AuditStore-Atomic-EntryFailure
+        title: >-
+          The AuditStore unit shall roll back a change of data when its audit entry cannot be stored.
+        justification: |
+          An entry without its change, or a change without its entry, would make the history untrue, so the change and
+          the entry are stored in one transaction.
+        tests:
           - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
           - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
-          - ReviewStore_NoOpChanges_RecordNothing
+
+      - id: ReviewCenter-AuditStore-Atomic-GateRelease
+        title: >-
+          The AuditStore unit shall accept a new entry after a change failed because its audit entry could not be
+          stored.
+        justification: |
+          A failure that kept the process-wide gate closed would stop every later change of the application.
+        tests:
+          - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
+
+      - id: ReviewCenter-AuditStore-Atomic-WithoutDraft
+        title: >-
+          The AuditStore unit shall store a change of a user that carries no audit draft without an audit entry.
+        justification: |
+          A counter of failed sign-ins is not an event of its own and must not flood the trail.
+        tests:
           - UserStore_UpdateAsync_WithAndWithoutDraft_RecordsOnlyWithDraft
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Concurrency: one chain for all writers
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditStore-Concurrency
         title: >-
-          The AuditStore unit shall keep the chain linear when appends arrive concurrently, whether from the same
-          store or from different stores, and shall refuse a second entry with the same sequence number through the
-          primary key of the table.
+          The AuditStore unit shall keep the chain linear, with every sequence number exactly once, when appends of
+          one store arrive at the same time.
         justification: |
-          Several users act at the same time, so one gate and one database key must make the order of entries
-          unambiguous.
+          Several users act at the same time, so the order of entries must stay unambiguous.
         tests:
           - AuditStore_AppendAsync_ConcurrentAppends_ProduceLinearChain
+
+      - id: ReviewCenter-AuditStore-Concurrency-DifferentStores
+        title: >-
+          The AuditStore unit shall keep the chain linear when changes with their audit entries arrive at the same
+          time from different stores.
+        justification: |
+          Projects, users, and plain events are written by different stores and must still share one chain.
+        tests:
           - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
+
+      - id: ReviewCenter-AuditStore-Concurrency-DuplicateSequence
+        title: >-
+          The AuditStore unit shall refuse a second entry with a sequence number that already exists.
+        justification: |
+          The key of the table is the last defense of the order of entries, whatever the code does.
+        tests:
           - AuditStore_Database_DuplicateSequence_IsRefusedByUniqueKey
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Read: listing and verification batches
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditStore-Read
         title: >-
-          The AuditStore unit shall list entries newest first, optionally for one project, for one review, or both,
-          and before or after a sequence, with the listing of a project returning only the entries of that project
-          and never an entry without a project, shall read entries in ascending bounded batches for verification, and
-          shall offer no operation that updates or deletes an entry.
+          The AuditStore unit shall list audit entries newest first.
         justification: |
-          Reading must support paging and streaming verification, the administrators of a project must be able to
-          read the history of their project without seeing that of another, and the application must not provide a
-          way to rewrite history.
+          The page of the trail shows the latest events first and pages back into history.
         tests:
           - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
-          - AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies
-          - AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded
-          - AuditStore_PublicSurface_OffersNoUpdateOrDelete
-          - AuditStore_Verification_EditedRow_ReportsThatSequence
-          - AuditStore_Verification_DeletedRow_ReportsThatSequence
 
+      - id: ReviewCenter-AuditStore-Read-Project
+        title: >-
+          The AuditStore unit shall list only the entries of one project when a project is given, never an entry of
+          another project or an entry without a project.
+        justification: |
+          The administrators of a project must be able to read the history of their project without seeing that of
+          another.
+        tests:
+          - AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies
+
+      - id: ReviewCenter-AuditStore-Read-Review
+        title: >-
+          The AuditStore unit shall list only the entries of one review of a project when a review is given.
+        justification: |
+          The history of one review is what the reviewers of that review need.
+        tests:
+          - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+
+      - id: ReviewCenter-AuditStore-Read-Before
+        title: >-
+          The AuditStore unit shall list only the entries older than a given sequence when a before cursor is given.
+        justification: |
+          Paging back into history continues from the oldest entry that the page shows.
+        tests:
+          - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+
+      - id: ReviewCenter-AuditStore-Read-After
+        title: >-
+          The AuditStore unit shall list only the entries newer than a given sequence when an after cursor is given.
+        justification: |
+          Paging forward continues from the newest entry that the page shows.
+        tests:
+          - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+
+      - id: ReviewCenter-AuditStore-Read-Batches
+        title: >-
+          The AuditStore unit shall read the entries after a given sequence in batches of at most the requested size.
+        justification: |
+          Streaming verification must read a trail of any size without loading it at once.
+        tests:
+          - AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded
+
+      - id: ReviewCenter-AuditStore-Read-Ascending
+        title: >-
+          The AuditStore unit shall return the entries that it reads after a given sequence in ascending sequence order.
+        justification: |
+          The verification follows the links of the chain from each entry to the next, which only works when the
+          entries arrive in the order in which they were appended.
+        tests:
+          - AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded
+
+      - id: ReviewCenter-AuditStore-Read-Immutable
+        title: >-
+          The AuditStore unit shall offer no operation that updates or deletes an audit entry.
+        justification: |
+          The application must not provide a way to rewrite history.
+        tests:
+          - AuditStore_PublicSurface_OffersNoUpdateOrDelete
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # ReadMatching: the reads of an export
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditStore-ReadMatching
         title: >-
-          The AuditStore unit shall read, for an export, the entries that match a filter in ascending sequence order
-          in bounded keyset batches after a given sequence and up to a given sequence, with the conditions of the
-          listing (so that a project filter never returns an entry without a project), and shall return the newest
-          sequence of the trail, or zero for an empty trail.
+          The AuditStore unit shall read, for an export, the entries that match a filter after a given sequence.
         justification: |
-          An export must stream a trail of any size in constant memory and give a consistent view while entries are
-          appended, which an upper bound on the sequence and a cursor on the primary key do, using the same filter as
-          the page so that the export contains what the page shows.
+          An export must stream a trail of any size in constant memory, which a cursor on the sequence does.
         tests:
-          - AuditStore_LatestSequenceAsync_EmptyThenFilled_ReturnsHighestSequence
           - AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches
 
+      - id: ReviewCenter-AuditStore-ReadMatching-Ascending
+        title: >-
+          The AuditStore unit shall return the entries that it reads for an export in ascending sequence order.
+        justification: |
+          The file of an export is read from the first event to the last, so a reader of it can follow the history in
+          the order in which it happened.
+        tests:
+          - AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches
+
+      - id: ReviewCenter-AuditStore-ReadMatching-Batches
+        title: >-
+          The AuditStore unit shall return at most the requested number of entries from one read for an export.
+        justification: |
+          A bound on each read keeps the memory of an export constant, however many entries match the filter.
+        tests:
+          - AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches
+
+      - id: ReviewCenter-AuditStore-ReadMatching-UpperBound
+        title: >-
+          The AuditStore unit shall not return an entry above the upper sequence that the read for an export is given.
+        justification: |
+          An upper bound gives the export a consistent view while entries are appended.
+        tests:
+          - AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches
+
+      - id: ReviewCenter-AuditStore-ReadMatching-ProjectFilter
+        title: >-
+          The AuditStore unit shall not return an entry without a project when the read for an export is filtered
+          by a project.
+        justification: |
+          The export must contain what the page of that project shows, and the page never shows an entry without a
+          project.
+        tests:
+          - AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches
+
+      - id: ReviewCenter-AuditStore-ReadMatching-Filter
+        title: >-
+          The AuditStore unit shall return for an export only the entries that match the actor, action, and review
+          of the filter.
+        justification: |
+          The export uses the same conditions as the listing, so that it contains what the page shows.
+        tests:
+          - AuditStore_ReadMatchingAsync_ActorActionAndReviewFilters_ReturnOnlyMatches
+
+      - id: ReviewCenter-AuditStore-ReadMatching-LatestSequence
+        title: >-
+          The AuditStore unit shall return the highest sequence number of the trail.
+        justification: |
+          The newest sequence is the snapshot bound of an export.
+        tests:
+          - AuditStore_LatestSequenceAsync_EmptyThenFilled_ReturnsHighestSequence
+
+      - id: ReviewCenter-AuditStore-ReadMatching-LatestSequenceEmpty
+        title: >-
+          The AuditStore unit shall return zero as the highest sequence number of an empty trail.
+        justification: |
+          An empty trail has no entry, and an export of it must be empty rather than fail.
+        tests:
+          - AuditStore_LatestSequenceAsync_EmptyThenFilled_ReturnsHighestSequence
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Filter: narrowing the listing
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditStore-Filter
         title: >-
-          The AuditStore unit shall narrow the listing by the identity of the actor, by a case-insensitive text in the
-          actor name that matches the characters %, _ and \ literally, by one exact action or a group of actions
-          (a literal prefix), by review, and by a range of UTC days with both ends included (the day of the end up to
-          its last instant), all together with the project and the cursors, using the indexes of the project, the
-          actor and the action and no count of the trail, shall store the time of an entry as fixed-width UTC text so
-          that ranges and order are correct on the database without changing the hash of any entry, and shall create
-          the indexes with the database.
+          The AuditStore unit shall narrow the listing to the entries of one actor identity.
         justification: |
-          A filter that scans the whole trail, or that treats a typed percent sign as a wildcard, is slow on a trail
-          that only grows and wrong for the person who typed it. The provider of the database cannot compare the
-          unconverted time with offsets, so the stored form is made sortable text of the same instant, and the hash of
-          the chain, which is computed in code from the ticks of the instant, stays valid for every entry written
-          before and after.
+          A reader wants to know everything that one person did.
         tests:
           - AuditStore_ListAsync_EachField_SelectsMatchingEntries
-          - AuditStore_ListAsync_CombinedFields_AllMustMatch
-          - AuditStore_ListAsync_ProjectFilter_NeverReturnsGlobalEntries
+
+      - id: ReviewCenter-AuditStore-Filter-ActorText
+        title: >-
+          The AuditStore unit shall narrow the listing to the entries whose actor name contains a given text, without
+          regard to letter case.
+        justification: |
+          A reader who types part of a name must find the entries of that person, whatever the case.
+        tests:
+          - AuditStore_ListAsync_EachField_SelectsMatchingEntries
           - AuditStore_ListAsync_ActorText_MatchesLiterallyAndIgnoresCase
+
+      - id: ReviewCenter-AuditStore-Filter-ActorTextLiteral
+        title: >-
+          The AuditStore unit shall match the characters %, _ and \ of an actor text as themselves.
+        justification: |
+          A typed percent sign that acts as a wildcard would be wrong for the person who typed it.
+        tests:
+          - AuditStore_ListAsync_ActorText_MatchesLiterallyAndIgnoresCase
+
+      - id: ReviewCenter-AuditStore-Filter-Action
+        title: >-
+          The AuditStore unit shall narrow the listing to the entries of one exact action.
+        justification: |
+          A reader wants to find every event of one kind.
+        tests:
+          - AuditStore_ListAsync_EachField_SelectsMatchingEntries
+
+      - id: ReviewCenter-AuditStore-Filter-ActionPrefix
+        title: >-
+          The AuditStore unit shall narrow the listing to the entries of a group of actions that start with a given
+          prefix.
+        justification: |
+          Actions are named in groups, such as every action of a review, and a reader wants a whole group.
+        tests:
+          - AuditStore_ListAsync_EachField_SelectsMatchingEntries
           - AuditStore_ListAsync_ActionPrefix_MatchesLiterally
+
+      - id: ReviewCenter-AuditStore-Filter-ActionPrefixLiteral
+        title: >-
+          The AuditStore unit shall match the characters % and _ of an action prefix as themselves.
+        justification: |
+          A prefix is a literal start of the action name, and not a pattern.
+        tests:
+          - AuditStore_ListAsync_ActionPrefix_MatchesLiterally
+
+      - id: ReviewCenter-AuditStore-Filter-Review
+        title: >-
+          The AuditStore unit shall narrow the listing to the entries of one review.
+        justification: |
+          A reader of a review wants the history of that review.
+        tests:
+          - AuditStore_ListAsync_EachField_SelectsMatchingEntries
+
+      - id: ReviewCenter-AuditStore-Filter-Project
+        title: >-
+          The AuditStore unit shall narrow the listing to the entries of one project and never return an entry
+          without a project when a project is given.
+        justification: |
+          The history of a project must not show the global events, such as sign-ins.
+        tests:
+          - AuditStore_ListAsync_EachField_SelectsMatchingEntries
+          - AuditStore_ListAsync_ProjectFilter_NeverReturnsGlobalEntries
+
+      - id: ReviewCenter-AuditStore-Filter-DateRange
+        title: >-
+          The AuditStore unit shall narrow the listing to the entries from the first instant of a first UTC day to
+          the last instant of a last UTC day, whatever offset the time of an entry was written with.
+        justification: |
+          A range of days with both ends included is what a reader means, and the entries are compared by the
+          instant and not by the offset in which they were written.
+        tests:
           - AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive
-          - AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable
+
+      - id: ReviewCenter-AuditStore-Filter-Combined
+        title: >-
+          The AuditStore unit shall return only the entries that match every field of the filter when several fields
+          are given.
+        justification: |
+          Each further field must narrow the result, never widen it.
+        tests:
+          - AuditStore_ListAsync_CombinedFields_AllMustMatch
+
+      - id: ReviewCenter-AuditStore-Filter-Cursors
+        title: >-
+          The AuditStore unit shall page a filtered listing with the cursors over the matching entries only.
+        justification: |
+          A page must continue from a position among the matches, so that no match is skipped or shown twice.
+        tests:
           - AuditStore_ListAsync_FilterWithCursors_PagesThroughMatchesOnly
-          - AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded
+
+      - id: ReviewCenter-AuditStore-Filter-UtcText
+        title: >-
+          The AuditStore unit shall store the time of an entry as fixed-width UTC text.
+        justification: |
+          The provider of the database cannot compare the unconverted time with offsets, so the stored form is made
+          sortable text of the same instant and ranges and order are correct on the database.
+        tests:
+          - AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable
+
+      - id: ReviewCenter-AuditStore-Filter-HashUnchanged
+        title: >-
+          The AuditStore unit shall read the time of an entry back as the same instant, so that the hash of every
+          entry stays valid.
+        justification: |
+          The hash of the chain is computed in code from the ticks of the instant, and must stay valid for every entry
+          written before and after the stored form was chosen.
+        tests:
+          - AuditStore_Timestamp_StoredAsUtcTextAndKeepsTheChainVerifiable
+
+      - id: ReviewCenter-AuditStore-Filter-Indexes
+        title: >-
+          The AuditStore unit shall create the indexes of the project, the actor, and the action together with the
+          database.
+        justification: |
+          A filter that scans the whole trail is slow on a trail that only grows.
+        tests:
           - StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes
 
+      - id: ReviewCenter-AuditStore-Filter-PageBounded
+        title: >-
+          The AuditStore unit shall return no more entries in a filtered page than the page size that is asked for.
+        justification: |
+          The read of a page never needs a count of the trail. The test also bounds the read time loosely, to catch a
+          read that scans and sorts the whole trail repeatedly.
+        tests:
+          - AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # LastActivity: the newest entry of each review of a project
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-AuditStore-LastActivity
         title: >-
-          The AuditStore unit shall return for one project, with one query, the time of the newest entry of each
-          review of that project, leaving out the entries that belong to no review and every entry of another
-          project, and shall change nothing in the chain by doing so.
+          The AuditStore unit shall return for one project the time of the newest entry of each review of that
+          project.
         justification: |
           The project overview shows when each review last changed. One grouped read of the trail serves any number
           of reviews, and because the entries of a review are never combined with others, the newest entry is the
           real last activity.
+        tests:
+          - AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject
+
+      - id: ReviewCenter-AuditStore-LastActivity-NoReview
+        title: >-
+          The AuditStore unit shall leave out the entries that belong to no review when it returns the last activity
+          of a project.
+        justification: |
+          An event of the project itself is not the activity of any review.
+        tests:
+          - AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject
+
+      - id: ReviewCenter-AuditStore-LastActivity-OtherProject
+        title: >-
+          The AuditStore unit shall leave out every entry of another project when it returns the last activity of a
+          project.
+        justification: |
+          The overview of one project must not show a review of another.
+        tests:
+          - AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject
+
+      - id: ReviewCenter-AuditStore-LastActivity-ReadOnly
+        title: >-
+          The AuditStore unit shall leave the chain unchanged when it returns the last activity of a project.
+        justification: |
+          Reading the activity must not write to the trail.
         tests:
           - AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject
