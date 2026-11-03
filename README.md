@@ -93,12 +93,14 @@ reviewcenter serve
 ```
 
 Open `http://localhost:5000` in a browser, sign in as the system administrator, create a project, and add its members.
-The built-in **Help** in the page header guides you through creating and signing a review.
+The built-in **Help** in the page header guides you through creating and signing a review, and
+[Your First Review][link-guide-first-review] in the user guide walks through one from start to finish.
 
 ## Documentation
 
 The [User Guide][link-guide] describes everything in detail, including:
 
+- [Your First Review][link-guide-first-review]: a short walkthrough from the new review to the signed attestation
 - [Deployment][link-guide-deployment]: where the data lives, configuration, running as a service, TLS and a reverse
   proxy, backup, and upgrades
 - [Users and Sign-in][link-guide-users]: accounts, system administrators, lockout, and the sign-in throttle
@@ -156,6 +158,7 @@ By contributing to this project, you agree that your contributions will be licen
 [link-security]: https://sonarcloud.io/dashboard?id=demaconsulting_ReviewCenter
 [link-releases]: https://github.com/demaconsulting/ReviewCenter/releases
 [link-guide]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md
+[link-guide-first-review]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/first-review.md
 [link-guide-installation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/installation.md#installation
 [link-guide-deployment]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/deployment.md
 [link-guide-users]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/sign-in.md#users-and-sign-in
