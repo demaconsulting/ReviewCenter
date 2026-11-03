@@ -88,9 +88,13 @@ sections:
           - SigningService_GetApproval_NullViewerAndSingleSlot_FailsClosedOnlyForSeveralSlots
           - SigningService_GetApprovals_MaskedViewer_MatchesSingleRead
           - SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch
+          - SigningService_GetApprovals_GivenReviews_RecognizesLeadWithoutListingReviews
+          - SigningService_GetApprovals_GivenReviewsMissingTheReview_FailsClosed
           - ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts
           - ReviewProgressService_GetProgress_MaskedViewer_ShowsBallotProgressAndIsMasked
           - ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer
+          - ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding
+          - ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked
           - SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState
           - InboxService_GetInbox_MaskedViewer_ShowsNoDisputeOrFailureText
           - InboxService_GetInbox_CreatorViaApiToken_IsMaskedLikeAnyViewer

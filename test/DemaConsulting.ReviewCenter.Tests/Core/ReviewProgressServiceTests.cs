@@ -1059,6 +1059,48 @@ public partial class ReviewProgressServiceTests
     }
 
     /// <summary>
+    ///     Test that the overload that is given the list also hands it on when the viewer has to be masked: a plain
+    ///     member and the creator (the lead) cause no review list read, the lead of the review is recognized from the
+    ///     given list, and the original overload reads the list exactly once (not a second time to find the creator).
+    ///     The administrator case of <see cref="ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList"/>
+    ///     does not reach the creator lookup, so this one covers the viewers that do.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgressAsync_GivenListMaskedViewer_ReadsNoReviewList()
+    {
+        // Arrange: two reviews with two slots each, so they are not concluded and have several reviewers
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await WorldAsync();
+        foreach (var id in new[] { "rev-1", "rev-2" })
+        {
+            await CreateReviewAsync(world, id);
+            await AddSlotAsync(world, id, "reviewer1");
+            await AddSlotAsync(world, id, "reviewer2");
+        }
+
+        var list = await world.Reviews.ListAsync(world.ProjectId, cancellationToken);
+
+        foreach (var (viewer, masked) in new[] { (_member, true), (_creator, false) })
+        {
+            // Act: the overload that is given the list, then the original overload
+            var beforeGiven = world.Store.ListReviewsCalls;
+            var given = await world.Progress.GetProgressAsync(viewer, world.ProjectId, list, cancellationToken);
+            var afterGiven = world.Store.ListReviewsCalls;
+            var original = await world.Progress.GetProgressAsync(viewer, world.ProjectId, cancellationToken);
+            var afterOriginal = world.Store.ListReviewsCalls;
+
+            // Assert: no list read with the list given, one without it, the same rows, and the lead is recognized
+            Assert.Equal(beforeGiven, afterGiven);
+            Assert.Equal(1, afterOriginal - afterGiven);
+            Assert.Equal(2, given.Count);
+            Assert.All(given, p => Assert.Equal(masked, p.IsMasked));
+            Assert.Equal(
+                original.Select(p => (p.ReviewId, p.IsMasked, p.BallotsSubmitted, p.BallotsRequired)),
+                given.Select(p => (p.ReviewId, p.IsMasked, p.BallotsSubmitted, p.BallotsRequired)));
+        }
+    }
+
+    /// <summary>
     ///     Test that the overload that is given the list uses exactly that list: a subset gives only those reviews, in
     ///     the order given.
     /// </summary>

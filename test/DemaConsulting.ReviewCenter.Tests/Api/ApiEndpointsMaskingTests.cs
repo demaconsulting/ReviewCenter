@@ -124,8 +124,8 @@ public class ApiEndpointsMaskingTests
 
     /// <summary>
     ///     Test that the token of a reviewer who has handed in the ballot sees the consolidated standing, the check
-    ///     threads and their kinds, as its owner does on the review page, and still no outcome while the review is not
-    ///     concluded.
+    ///     threads and their kinds, as its owner does on the review page, and still no outcome and no conclusion text
+    ///     (although a text is stored) while the review is not concluded.
     /// </summary>
     [Fact(Timeout = 120000)]
     public async Task ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts()
@@ -151,7 +151,39 @@ public class ApiEndpointsMaskingTests
         Assert.Equal(2, counts.GetProperty("openQuestions").GetInt32());
         Assert.Equal(1, counts.GetProperty("openFindings").GetInt32());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("outcome").ValueKind);
-        Assert.Equal(ConclusionText, root.GetProperty("conclusionText").GetString());
+
+        // The conclusion text was written, but the review is not concluded: the text is not shown before the conclusion
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("conclusionText").ValueKind);
+    }
+
+    /// <summary>
+    ///     Test that the conclusion text of a review with a single slot, which is not masked, is not shown while the
+    ///     review is not concluded even though a text is stored, as the outcome is not shown either.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_GetReview_SingleSlotNotConcludedWithStoredText_HidesConclusionText()
+    {
+        // Arrange: a review with one slot that is not signed and has a stored conclusion text
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        await app.Services.GetRequiredService<ChecklistService>().SetReviewConclusionTextAsync(
+            projectId, "REV-1", ConclusionText, new Actor("ann", "ann"), cancellationToken);
+        var token = await CreateTokenAsync(app, "bob");
+        using var client = ClientFor(app, token.Value);
+
+        // Act
+        var response = await client.GetAsync($"/api/projects/{projectId}/reviews/REV-1", cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var json = JsonDocument.Parse(body);
+        var root = json.RootElement;
+
+        // Assert: not masked, not concluded, and so no outcome and no conclusion text
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(root.GetProperty("masked").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("outcome").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("conclusionText").ValueKind);
+        Assert.DoesNotContain("no open concerns", body, StringComparison.Ordinal);
     }
 
     /// <summary>

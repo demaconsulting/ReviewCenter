@@ -140,7 +140,7 @@ internal sealed record ReviewCountsDto(
 /// <param name="CarriedAnswerCount">How many checklist answers were carried over from the followed review; 0 when none.</param>
 /// <param name="CarriedThreadCount">How many open threads were carried over from the followed review; 0 when none.</param>
 /// <param name="Outcome"><c>Approved</c> or <c>Rejected</c> once the review is concluded; <c>null</c> while it is in review (the provisional outcome is never shown).</param>
-/// <param name="ConclusionText">The review conclusion text the reviewers wrote; <c>null</c> when there is none or while the review is masked.</param>
+/// <param name="ConclusionText">The review conclusion text the reviewers wrote; <c>null</c> when there is none, while the review is not concluded, or while it is masked.</param>
 /// <param name="Masked"><c>true</c> when the reviewers' answers are hidden from the caller: in a review with several reviewer slots that is not concluded, an API token never sees the failed or disputed checks, the provisional outcome, the check threads or the conclusion text unless its owner has handed in a ballot as a slot holder (a token is never the lead, an administrator or an auditor).</param>
 internal sealed record ReviewDetailDto(
     string Id,

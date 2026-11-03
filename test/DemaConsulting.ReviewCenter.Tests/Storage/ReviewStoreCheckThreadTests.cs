@@ -80,8 +80,16 @@ public class ReviewStoreCheckThreadTests
     /// <param name="filePath">The file path of the anchor (empty for a check thread).</param>
     /// <param name="checkItemId">The check of the anchor, or <c>null</c> for a file thread.</param>
     /// <param name="startLine">The first line, or <c>null</c>.</param>
+    /// <param name="state">The state of the thread; a new thread is open.</param>
+    /// <param name="withComment">Whether the thread carries its first comment.</param>
     /// <returns>The thread, ready to add.</returns>
-    private static ReviewThread NewThread(int projectId, string filePath, string? checkItemId, int? startLine = null)
+    private static ReviewThread NewThread(
+        int projectId,
+        string filePath,
+        string? checkItemId,
+        int? startLine = null,
+        ReviewThreadState state = ReviewThreadState.Open,
+        bool withComment = true)
     {
         return new ReviewThread
         {
@@ -91,12 +99,11 @@ public class ReviewStoreCheckThreadTests
             CheckItemId = checkItemId,
             StartLine = startLine,
             EndLine = startLine,
-            State = ReviewThreadState.Open,
+            State = state,
             Created = _time,
-            Comments =
-            [
-                new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "Starting comment", Created = _time }
-            ]
+            Comments = withComment
+                ? [new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "Starting comment", Created = _time }]
+                : []
         };
     }
 
@@ -186,6 +193,77 @@ public class ReviewStoreCheckThreadTests
 
         // Assert: no thread exists afterwards
         Assert.Empty(await db.Store.ListThreadsAsync(projectId, "REV-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a thread that is already resolved is refused by the store, for a file thread and a check thread,
+    ///     before anything is saved: no thread row, no comment, no audit entry, and the audit draft is never built, so
+    ///     a thread can be resolved only through the resolve method.
+    /// </summary>
+    /// <param name="filePath">The file path of the anchor.</param>
+    /// <param name="checkItemId">The check of the anchor.</param>
+    [Theory]
+    [InlineData("a.txt", null)]
+    [InlineData("", "SEC-1")]
+    public async Task ReviewStore_AddThreadAsync_ResolvedThread_IsRefusedAndStoresNothing(string filePath, string? checkItemId)
+    {
+        // Arrange: a review with one file
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+        var drafts = 0;
+
+        // Act: add a thread that is resolved already
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => db.Store.AddThreadAsync(
+                NewThread(projectId, filePath, checkItemId, state: ReviewThreadState.Resolved),
+                _ =>
+                {
+                    drafts++;
+                    return AuditDraft.By(Actor.CommandLine, "thread.started", "x", projectId, "REV-1");
+                },
+                cancellationToken));
+
+        // Assert: nothing is stored, nothing is audited
+        Assert.Empty(await db.Store.ListThreadsAsync(projectId, "REV-1", cancellationToken));
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+        Assert.Equal(0, drafts);
+    }
+
+    /// <summary>
+    ///     Test that a thread without a comment is refused by the store, for a file thread and a check thread, before
+    ///     anything is saved: no thread row, no audit entry, and the audit draft is never built.
+    /// </summary>
+    /// <param name="filePath">The file path of the anchor.</param>
+    /// <param name="checkItemId">The check of the anchor.</param>
+    [Theory]
+    [InlineData("a.txt", null)]
+    [InlineData("", "SEC-1")]
+    public async Task ReviewStore_AddThreadAsync_ThreadWithoutComment_IsRefusedAndStoresNothing(string filePath, string? checkItemId)
+    {
+        // Arrange: a review with one file
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+        var drafts = 0;
+
+        // Act: add an open thread that has no first comment
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => db.Store.AddThreadAsync(
+                NewThread(projectId, filePath, checkItemId, withComment: false),
+                _ =>
+                {
+                    drafts++;
+                    return AuditDraft.By(Actor.CommandLine, "thread.started", "x", projectId, "REV-1");
+                },
+                cancellationToken));
+
+        // Assert: nothing is stored, nothing is audited
+        Assert.Empty(await db.Store.ListThreadsAsync(projectId, "REV-1", cancellationToken));
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+        Assert.Equal(0, drafts);
     }
 
     /// <summary>

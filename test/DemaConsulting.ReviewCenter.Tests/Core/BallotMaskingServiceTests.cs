@@ -587,6 +587,59 @@ public class BallotMaskingServiceTests
     }
 
     /// <summary>
+    ///     Test that the batch read that is given the reviews of the project finds the lead (the creator) in them and
+    ///     lists no reviews itself, masks a plain member, and returns what the read without the list returns, which
+    ///     lists the reviews once.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovals_GivenReviews_RecognizesLeadWithoutListingReviews()
+    {
+        // Arrange: a review of the lead with two slots, and the reviews of the project as a caller holds them
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        var known = await world.Reviews.ListAsync(world.ProjectId, Token);
+        var lead = BallotMaskingWorld.ActorOf("lead");
+        var member = BallotMaskingWorld.ActorOf("cyd");
+
+        // Act: with the reviews given, then without them
+        var before = world.Store.ListReviewsCalls;
+        var leadGiven = await world.Signing.GetApprovalsAsync(lead, world.ProjectId, [BallotMaskingWorld.ReviewId], Token, known);
+        var memberGiven = await world.Signing.GetApprovalsAsync(member, world.ProjectId, [BallotMaskingWorld.ReviewId], Token, known);
+        var afterGiven = world.Store.ListReviewsCalls;
+        var leadRead = await world.Signing.GetApprovalsAsync(lead, world.ProjectId, [BallotMaskingWorld.ReviewId], Token);
+        var afterRead = world.Store.ListReviewsCalls;
+
+        // Assert: no list read with the reviews given, one without; the same masking either way
+        Assert.Equal(before, afterGiven);
+        Assert.Equal(1, afterRead - afterGiven);
+        Assert.False(leadGiven[BallotMaskingWorld.ReviewId].IsMasked);
+        Assert.True(memberGiven[BallotMaskingWorld.ReviewId].IsMasked);
+        Assert.Equal(leadRead[BallotMaskingWorld.ReviewId].IsMasked, leadGiven[BallotMaskingWorld.ReviewId].IsMasked);
+        Assert.Equal(leadRead[BallotMaskingWorld.ReviewId].Blockers, leadGiven[BallotMaskingWorld.ReviewId].Blockers);
+    }
+
+    /// <summary>
+    ///     Test that the batch read that is given reviews without the review asked about has no creator to find and
+    ///     so masks it: it is never less masked than the read that lists the reviews from the store.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovals_GivenReviewsMissingTheReview_FailsClosed()
+    {
+        // Arrange: a review of the lead with two slots, and a list that does not hold it
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        var lead = BallotMaskingWorld.ActorOf("lead");
+
+        // Act
+        var given = await world.Signing.GetApprovalsAsync(lead, world.ProjectId, [BallotMaskingWorld.ReviewId], Token, []);
+        var read = await world.Signing.GetApprovalsAsync(lead, world.ProjectId, [BallotMaskingWorld.ReviewId], Token);
+
+        // Assert: the lead is not recognized without the review in the list, and is with the store read
+        Assert.True(given[BallotMaskingWorld.ReviewId].IsMasked);
+        Assert.False(read[BallotMaskingWorld.ReviewId].IsMasked);
+    }
+
+    /// <summary>
     ///     Test that the progress overview gives no count of disputed or failed checks to a masked viewer, and gives it
     ///     to a reviewer who handed in.
     /// </summary>
@@ -981,6 +1034,61 @@ public class BallotMaskingServiceTests
         Assert.Equal((2, 2), (viaToken.BallotsSubmitted, viaToken.BallotsRequired));
         Assert.False(person.IsMasked);
         Assert.Equal(1, person.DisputedChecks);
+    }
+
+    /// <summary>
+    ///     Test that the progress overview gives the token of a person who handed in a ballot the consolidated
+    ///     standing, like the review page does for that person (the token is the viewer with the slot of its owner),
+    ///     and that the token of the lead, who holds no slot, is still masked. The progress carries counts only, no
+    ///     answer or reason of any reviewer.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding()
+    {
+        // Arrange: ann and bob handed in and differ on the first check
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        var annToken = new Actor("ann", "ann") { ApiTokenId = "tok-1" };
+        var leadToken = new Actor("lead", "lead") { ApiTokenId = "tok-2" };
+
+        // Act
+        var owner = (await world.Progress.GetProgressAsync(annToken, world.ProjectId, Token)).Single();
+        var lead = (await world.Progress.GetProgressAsync(leadToken, world.ProjectId, Token)).Single();
+
+        // Assert: the owner of a handed-in ballot sees the dispute, the lead's token does not
+        Assert.False(owner.IsMasked);
+        Assert.Equal(1, owner.DisputedChecks);
+        Assert.Equal((2, 2), (owner.BallotsSubmitted, owner.BallotsRequired));
+        Assert.True(lead.IsMasked);
+        Assert.Equal(0, lead.DisputedChecks);
+    }
+
+    /// <summary>
+    ///     Test that the progress overview masks the token of a person whose ballot is still a draft, which shows the
+    ///     progress of the ballots only, and that the token of a person who handed in does not carry the draft answers
+    ///     of the other reviewer into the counts.
+    /// </summary>
+    [Fact]
+    public async Task ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked()
+    {
+        // Arrange: ann handed in, bob has a draft that answers Fail on the first check
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync(bobSubmitted: false);
+        var bobToken = new Actor("bob", "bob") { ApiTokenId = "tok-1" };
+        var annToken = new Actor("ann", "ann") { ApiTokenId = "tok-2" };
+
+        // Act
+        var draftOwner = (await world.Progress.GetProgressAsync(bobToken, world.ProjectId, Token)).Single();
+        var submittedOwner = (await world.Progress.GetProgressAsync(annToken, world.ProjectId, Token)).Single();
+
+        // Assert: bob's token is masked with no counts; ann's token counts the submitted ballots only
+        Assert.True(draftOwner.IsMasked);
+        Assert.Equal(0, draftOwner.DisputedChecks);
+        Assert.Equal(0, draftOwner.FailedChecks);
+        Assert.Equal((1, 2), (draftOwner.BallotsSubmitted, draftOwner.BallotsRequired));
+        Assert.False(submittedOwner.IsMasked);
+        Assert.Equal(0, submittedOwner.DisputedChecks);
+        Assert.Equal(0, submittedOwner.FailedChecks);
     }
 
     /// <summary>

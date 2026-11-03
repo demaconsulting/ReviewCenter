@@ -87,11 +87,15 @@ The service holds the injected collaborators and no other state, so it is safe f
 - *Postconditions*: nothing is changed and nothing is recorded. The standing is masked for the actor by the same rule
   as the pages (`BallotVisibility`), also for an actor that came through an API token: a token is never the lead, an
   administrator or an auditor, so a review with several slots that is not concluded shows no failed or disputed count,
-  no blocker wording and no outcome to it until its owner has handed in a ballot, and then only to that owner.
+  no blocker wording and no outcome to it until its owner has handed in a ballot, and then only to that owner. The token
+  is the viewer with the slot of its owner, as on the pages; the progress carries only the consolidated counts, never the
+  answers or reasons of a reviewer.
 
 **GetProgressAsync (with the list of reviews)**: The same answer for a caller that already holds the review list, such
 as the API list, which needs the list itself for the review fields. The caller passes the list that
-`ReviewService.ListAsync` returned and the service does not read it again, so the reviews are still read once.
+`ReviewService.ListAsync` returned and the service does not read it again, so the reviews are still read once. The list
+is also handed to the batch read of the approvals, so that read finds the creator (the lead) of a review in it and does
+not list the reviews a second time for a viewer who has to be masked.
 
 - *Parameters*: the `Actor` (may be null), the project identity, the list of `Review` (not null), and a cancellation
   token.
@@ -103,7 +107,8 @@ as the API list, which needs the list itself for the review fields. The caller p
 
 The number of reads does not depend on the number of reviews: one read of the reviews (`ReviewService.ListAsync`, made
 by the caller that passes the list in), one
-batch read of the approval statuses (`SigningService.GetApprovalsAsync`, which itself takes one set-based read of the
+batch read of the approval statuses (`SigningService.GetApprovalsAsync`, given the reviews that are already in hand, which
+itself takes one set-based read of the
 snapshots of all the reviews, `IReviewStore.ListSnapshotsAsync`, and one of the reopen history of the reviews that were
 reopened), and one read of the last activity. A review
 that is removed between the first two reads is left out. The page that lists the reviews of a project used to ask for the

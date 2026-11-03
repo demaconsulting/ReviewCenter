@@ -337,6 +337,16 @@ reads back without a check. This scenario is tested by `ReviewStore_AddThreadAsy
 neither, a check with a line range, or an empty check identifier is refused with an `ArgumentException` and nothing is
 stored. This scenario is tested by `ReviewStore_AddThreadAsync_ThreadWithBothOrNeitherAnchor_IsRefused`.
 
+**ReviewStore_AddThreadAsync_ResolvedThread_IsRefusedAndStoresNothing**: A file thread and a check thread that are
+already resolved are added. Each is refused with an `ArgumentException`: no thread and no comment is stored, no audit
+entry is recorded, and the audit draft is never built. This scenario is tested by
+`ReviewStore_AddThreadAsync_ResolvedThread_IsRefusedAndStoresNothing`.
+
+**ReviewStore_AddThreadAsync_ThreadWithoutComment_IsRefusedAndStoresNothing**: An open file thread and an open check
+thread that have no comment are added. Each is refused with an `ArgumentException`: no thread is stored, no audit entry
+is recorded, and the audit draft is never built. This scenario is tested by
+`ReviewStore_AddThreadAsync_ThreadWithoutComment_IsRefusedAndStoresNothing`.
+
 **ReviewStore_Conclude_OpenCheckThread_IsRefusedInTheTransaction**: With one of two slots signed and an open check
 thread, the second signature is refused with the `SigningNotAllowed` rule, one signature remains and the review is not
 concluded. This scenario is tested by `ReviewStore_Conclude_OpenCheckThread_IsRefusedInTheTransaction`.

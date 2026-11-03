@@ -316,7 +316,7 @@ public sealed class SigningService
     ///     review.
     ///     This overload has no viewer and is not masked; it is a system read like
     ///     <see cref="GetApprovalAsync(int, string, CancellationToken)"/>. A person or an API token must use
-    ///     <see cref="GetApprovalsAsync(Actor?, int, IEnumerable{string}, CancellationToken)"/>.
+    ///     <see cref="GetApprovalsAsync(Actor?, int, IEnumerable{string}, CancellationToken, IReadOnlyList{Review})"/>.
     /// </returns>
     public async Task<IReadOnlyDictionary<string, ReviewApproval>> GetApprovalsAsync(
         int projectId,
@@ -336,20 +336,26 @@ public sealed class SigningService
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewIds">The review identifiers.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="knownReviews">
+    ///     The reviews of the project when the caller already has them, as <see cref="IReviewStore.ListReviewsAsync"/>
+    ///     returns them; <c>null</c> reads them when they are needed. A review that is missing from the list has no
+    ///     known creator, which can only mask more, never less.
+    /// </param>
     /// <returns>
     ///     The status of each review that exists, by review identifier, each masked exactly when
     ///     <see cref="GetApprovalAsync(Actor?, int, string, CancellationToken)"/> would mask it.
     /// </returns>
     /// <remarks>
-    ///     The roles of the viewer are resolved once for the project; the reviews of the project are read (for the
-    ///     creator of each) only when a review actually has to be masked and the viewer is not an administrator or an
-    ///     Auditor.
+    ///     The roles of the viewer are resolved once for the project; the reviews of the project (for the creator of
+    ///     each) are taken from <paramref name="knownReviews"/> when given, and otherwise read once and only when a
+    ///     review actually has to be masked and the viewer is not an administrator or an Auditor.
     /// </remarks>
     public async Task<IReadOnlyDictionary<string, ReviewApproval>> GetApprovalsAsync(
         Actor? viewer,
         int projectId,
         IEnumerable<string> reviewIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<Review>? knownReviews = null)
     {
         var (reads, members) = await ReadManyAsync(projectId, reviewIds, cancellationToken);
         var approvals = new Dictionary<string, ReviewApproval>();
@@ -357,7 +363,7 @@ public sealed class SigningService
         // Resolved lazily: a project in which nothing has to be masked costs no role lookup at all
         bool? seesAllInProject = null;
         bool? canContribute = null;
-        IReadOnlyList<Review>? reviews = null;
+        var reviews = knownReviews;
         var viewerId = viewer is null
             ? null
             : members.Values

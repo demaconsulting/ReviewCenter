@@ -225,7 +225,8 @@ follows none).
 
 **`outcome`, `conclusionText`, and `masked`.** The review data of the list and of one review has `outcome` (`Approved`
 or `Rejected` once the review is concluded, otherwise `null`; it never shows the provisional outcome of a review that
-is still open). The data of one review also has `conclusionText` (the free text of the conclusion, or `null`) and
+is still open). The data of one review also has `conclusionText` (the free text of the conclusion once the review is
+concluded, otherwise `null`; a text that was written before the conclusion is not shown) and
 `masked` (`true` when the standing of the reviewers is hidden from the token, see below).
 
 **Thread counts.** The `counts` of one review hold `openThreads` and `resolvedThreads`, and the same threads by kind:

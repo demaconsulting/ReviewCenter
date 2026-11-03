@@ -43,7 +43,9 @@ N/A - standard test environment (a temporary database and key folder are created
   failed or answered count, no check threads in the counts, no disputed or failed wording, no `outcome`, and no
   `conclusionText`; the thread kind appears only as counts, and the allow list and the source scan of
   `ApiEndpointsMaskingTests.cs` pin the shape and that no read is made without the actor.
-- A review in the details and the list shows `outcome` (`Approved` or `Rejected`) only when it is concluded.
+- A review in the details and the list shows `outcome` (`Approved` or `Rejected`) only when it is concluded; the
+  details show `conclusionText` only when the review is concluded and not masked, even though a text can be stored
+  earlier.
 - The attestation of a concluded review is a PDF, of a review that is not concluded a 409 problem (for a request without
   a token a 404 problem, as for a review that does not exist).
 - The evidence index of a project is a JSON document with the complete reviews that have a review-set id, each with an
@@ -174,7 +176,8 @@ draft is not a hand-in. This scenario is tested by `ApiEndpoints_GetReview_Token
 
 **ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts**: The token of a reviewer who has handed in
 the ballot reads the review that is not concluded and sees the consolidated counts, the check threads and their kinds,
-and `masked` false, but no `outcome`. This scenario is tested by
+and `masked` false, but no `outcome` and no `conclusionText` (a text is stored, but the review is not concluded). This
+scenario is tested by
 `ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts`.
 
 **ApiEndpoints_GetReview_Concluded_ShowsOutcomeConclusionTextAndCounts**: A theory concludes a review with two slots as
@@ -185,6 +188,11 @@ approved and as rejected. The token of a member who holds no slot then sees `mas
 **ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome**: A review that is not concluded has no
 `outcome`, even for the token of a reviewer who sees the standing, and a review with a single slot is not masked. This
 scenario is tested by `ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome`.
+
+**ApiEndpoints_GetReview_SingleSlotNotConcludedWithStoredText_HidesConclusionText**: A review with a single slot is
+not concluded and has a stored conclusion text. The token of its reviewer reads the details: `masked` is false, and
+there is no `outcome` and no `conclusionText`, because the text is given only once the review is concluded. This
+scenario is tested by `ApiEndpoints_GetReview_SingleSlotNotConcludedWithStoredText_HidesConclusionText`.
 
 **ApiEndpoints_CreateReview_ResponseIsMaskedLikeTheDetails**: The token of a member creates a review. The answer has no
 outcome, no conclusion text, and no failed count, like the details of the review. This scenario is tested by

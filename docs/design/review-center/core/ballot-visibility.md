@@ -96,7 +96,11 @@ unmasked checklist read left.
 counts of disputed and failed checks, the outcome, and the conclusion text from the blockers and the state, set
 `IsMasked`, and give one fixed sentence that the standing stays hidden until the viewer hands in their own ballot. The
 list gives the same result as a single read, and the viewer's role is looked up once for the whole list: the creator of
-a review is recognized from the loaded reviews, and an API token is never the creator. A viewer that is not known is
+a review is recognized from the loaded reviews, and an API token is never the creator. A caller that already holds the
+reviews of the project passes them in (the optional last argument of the batch read, as `ReviewProgressService` does),
+and then the creator comes from them and the reviews are not listed again; without them they are listed once for the
+whole batch, never per review. A review that is missing from the given list has no known creator, which only masks
+more. A viewer that is not known is
 masked in a review with several slots.
 
 **ReviewProgressService** and **InboxService**: Apply the same rule, so that no progress line, blocker, or inbox row

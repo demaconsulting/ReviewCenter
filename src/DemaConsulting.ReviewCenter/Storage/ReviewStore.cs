@@ -652,6 +652,20 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 nameof(thread));
         }
 
+        // A new thread is stored open with its first comment; it is resolved only through ResolveThreadAsync, which
+        // applies the rules of resolving (the note, the kind, the lock) and records the resolution comment
+        if (thread.State != ReviewThreadState.Open)
+        {
+            throw new ArgumentException(
+                "A new thread is stored open; a thread is resolved only through ResolveThreadAsync.",
+                nameof(thread));
+        }
+
+        if (thread.Comments is null || thread.Comments.Count == 0)
+        {
+            throw new ArgumentException("A thread is stored with its first comment.", nameof(thread));
+        }
+
         return await appender.ExecuteAsync<ReviewThread>(
             factory,
             async context =>
@@ -682,7 +696,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     Side = thread.Side,
                     StartLine = thread.StartLine,
                     EndLine = thread.EndLine,
-                    State = thread.State,
+                    State = ReviewThreadState.Open,
                     Created = thread.Created,
                     Comments = thread.Comments.Select(comment => NewComment(comment)).ToList()
                 };

@@ -1249,7 +1249,7 @@
               "null",
               "string"
             ],
-            "description": "The review conclusion text the reviewers wrote; `null` when there is none or while the review is masked."
+            "description": "The review conclusion text the reviewers wrote; `null` when there is none, while the review is not concluded, or while it is masked."
           },
           "masked": {
             "type": "boolean",

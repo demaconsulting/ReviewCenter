@@ -136,8 +136,9 @@ a slot never changes them. The thread counts include the threads about a check o
 they are visible, and are also given per kind: `openFindings`, `openQuestions`, `resolvedFindings` and
 `resolvedQuestions` (a finding is a thread that is part of the report, a question is chat); the kind of a single thread
 is never exposed and there is no thread endpoint. `outcome` is `Approved` or `Rejected` only when the review is concluded
-and not masked (never the provisional outcome), and `conclusionText` is the review conclusion text, hidden exactly when
-the approval is masked, as on the review page. The details never carry a ballot of a single reviewer, a per-check
+and not masked (never the provisional outcome), and `conclusionText` is the review conclusion text, given like `outcome`
+only when the review is concluded and not masked (a text can be written earlier, but is not shown before the
+conclusion). The details never carry a ballot of a single reviewer, a per-check
 answer, or a thread text. The same details are the answer of the creation of a review, built for the same actor. The
 list endpoint adds `outcome` to each summary from `ReviewProgressService`, which masks for the token actor like for any
 viewer (there is no exception for tokens any more), so the list reveals no verdict before the conclusion.

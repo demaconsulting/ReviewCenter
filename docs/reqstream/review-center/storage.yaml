@@ -74,6 +74,7 @@ sections:
           - ReviewCenter-ReviewStore-Threads
           - ReviewCenter-DbContext-Threads
           - ReviewCenter-ReviewStore-CheckThreads
+          - ReviewCenter-ReviewStore-ThreadCreation
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
 
