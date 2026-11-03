@@ -6,8 +6,8 @@
 
 The ReviewCenter is an ASP.NET Core web service with a companion command-line interface,
 built on .NET. It is structured as one system containing one top-level unit (`Program`) and
-eleven subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Storage`, `ContentSources`,
-`Evidence`, `Api`):
+eleven subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Messaging`, `Storage`,
+`ContentSources`, `Evidence`, `Api`):
 
 ```mermaid
 flowchart TD
@@ -88,6 +88,14 @@ flowchart TD
         SelectionMatcher
         RevisionValidator
         ReviewPlanner
+        NotificationAddress
+        NotificationMessage
+        NotificationPreferenceService
+    end
+    subgraph Messaging
+        NotificationOptions
+        SmtpNotificationSender
+        FileNotificationSender
     end
     subgraph Storage
         ReviewCenterDbContext
@@ -98,6 +106,7 @@ flowchart TD
         RepositoryStore
         InboxStore
         TotpStore
+        NotificationStore
         DatabaseSetup
     end
     subgraph ContentSources
@@ -304,7 +313,20 @@ flowchart TD
     UserStore --> ReviewCenterDbContext
     PersonalAccessTokenStore --> ReviewCenterDbContext
     TotpStore --> ReviewCenterDbContext
-    AuditStore --> AuditChain
+    NotificationStore --> ReviewCenterDbContext
+    NotificationPreferenceService --> NotificationStore
+    NotificationPreferenceService --> NotificationAddress
+    NotificationPreferenceService --> NotificationMessage
+    NotificationPreferenceService --> AuditService
+    NotificationPreferenceService --> UserService
+    SmtpNotificationSender --> NotificationOptions
+    SmtpNotificationSender --> NotificationMessage
+    FileNotificationSender --> NotificationOptions
+    FileNotificationSender --> SmtpNotificationSender
+    ServerHost --> NotificationOptions
+    ServerHost --> NotificationStore
+    ServerHost --> NotificationPreferenceService
+    NotificationOptions --> SecretSource    AuditStore --> AuditChain
     AuditStore --> ReviewCenterDbContext
     RepositoryService --> RepositoryStore
     RepositoryService --> CredentialProtector
@@ -408,6 +430,14 @@ database through
 Entity Framework Core. The pages call the Core services and never see the database; the
 services reach it through the Core store interfaces, which `ReviewStore`, `UserStore`, and `AuditStore` implement, and
 `ServerHost` wires the pieces together.
+
+The `Messaging` subsystem delivers the e-mail of the optional e-mail notifications. `NotificationOptions` reads and
+checks the `Notifications` section, which is off by default; `SmtpNotificationSender` delivers a message through an SMTP
+server with MailKit, and `FileNotificationSender` writes it to a folder. Both implement the Core interface
+`INotificationSender`, and while the feature is off the sender is the Core `NoNotificationSender`, so nothing else in
+the system changes. `NotificationPreferenceService` of `Core` keeps the notification address of a user and its
+confirmation by a code, with `NotificationStore` of `Storage` holding the state; the `Account` page lets a user manage
+them. `ServerHost` registers these pieces, and a mail goes only to a confirmed address.
 
 The `ContentSources` subsystem reads content from outside the system. Its units run the git command-line tool
 (`GitRunner`), maintain a local mirror of each registered repository and answer the questions the Core contract asks
@@ -839,6 +869,9 @@ is running.
 - **Otp.NET**: computes and checks the time-based one-time codes of the second factor and codes the Base32 secret; it
   is used only by `TotpAlgorithm` in the `Identity` subsystem, so `Core` stays free of libraries; see the Otp.NET
   integration design in the OTS chapter.
+- **MailKit** (with MimeKit): sends e-mail through an SMTP server and builds the MIME messages; it is used only by
+  `SmtpNotificationSender` (and `FileNotificationSender`, which reuses the message building) in the `Messaging`
+  subsystem, so `Core` stays free of libraries; see the MailKit integration design in the OTS chapter.
 - **OpenIddict** (test only): provides a fake identity provider for the tests of the sign-in with a provider; it is
   not part of the shipped product.
 

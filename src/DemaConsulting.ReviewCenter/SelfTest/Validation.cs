@@ -34,8 +34,8 @@ namespace DemaConsulting.ReviewCenter.SelfTest;
 /// </summary>
 /// <remarks>
 ///     The default run is hermetic: it never reads or changes the configured database or configuration and never
-///     binds the configured port (see <see cref="Checks"/>). The opt-in exceptions are the two read-only checks of
-///     the configured database and key ring that <c>--check-config</c> adds. Timing, outcome and reporting of each check are
+///     binds the configured port (see <see cref="Checks"/>). The opt-in exceptions are the three read-only checks of
+///     the configured database, key ring and e-mail notification settings that <c>--check-config</c> adds. Timing, outcome and reporting of each check are
 ///     done by <see cref="ValidationRunner"/>; this class only decides which checks run and summarizes them. The
 ///     checks run at the same time, each in its own temporary folder, and are reported in their listed order.
 ///     The class is stateless and therefore thread-safe.
@@ -46,10 +46,10 @@ internal static class Validation
     ///     Gets the checks of the default run, in the order they are executed.
     /// </summary>
     /// <param name="includeConfigured">
-    ///     <c>true</c> to append the opt-in read-only checks of the configured database and of the configured key
-    ///     ring and its secrets (<c>--check-config</c>).
+    ///     <c>true</c> to append the opt-in read-only checks of the configured database, of the configured key
+    ///     ring and its secrets, and of the configured e-mail notification settings (<c>--check-config</c>).
     /// </param>
-    /// <returns>The checks; the default run has nine, the opt-in run eleven.</returns>
+    /// <returns>The checks; the default run has nine, the opt-in run twelve.</returns>
     public static IReadOnlyList<ValidationCheck> CreateChecks(bool includeConfigured)
     {
         var checks = new List<ValidationCheck>
@@ -70,6 +70,7 @@ internal static class Validation
         {
             checks.Add(new(ConfiguredDatabaseCheck.Name, ConfiguredDatabaseCheck.RunAsync));
             checks.Add(new(ConfiguredKeysCheck.Name, ConfiguredKeysCheck.RunAsync));
+            checks.Add(new(ConfiguredNotificationsCheck.Name, ConfiguredNotificationsCheck.RunAsync));
         }
 
         return checks;

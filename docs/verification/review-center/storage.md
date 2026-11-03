@@ -77,6 +77,11 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - The second factor of a user (the encrypted secret, the accepted step, the recovery code hashes, and the pending
   enrollment) is stored with its audit entry or not at all; a step is accepted once and a recovery code is consumed
   once, also when thirty-two requests race; this is verified in the unit tests of `TotpStore` on the real database.
+- The e-mail address of a user for notifications, with its pending confirmation, is stored with its audit entry or not
+  at all, and a confirmation of the address is made by exactly one of several parallel requests; a confirmation mail
+  is reserved only when the pause and the limits of the user, the address, and the server allow it, with exactly one
+  winner among parallel requests, and at most the limit of attempts at a code are counted; this is verified in the unit
+  tests of `NotificationStore` on the real database.
 
 ### Test Scenarios
 
@@ -243,6 +248,14 @@ reading and verification of stored entries is verified in the unit tests of `Aud
 **Second factor**: The race of the step is tested by `TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner`
 and the race of a recovery code by `TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner`, both
 defined in `TotpStoreTests.cs` and run on a real SQLite file.
+
+**E-mail notification address**: The confirmation of an address by exactly one of several parallel requests is tested by
+`NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner`, and the change of the address with its audit entry
+by `NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit`. The reservation of a confirmation mail by exactly
+one of several parallel requests is tested by `NotificationStore_ReserveConfirmationAsync_Concurrent_HasExactlyOneWinner`,
+and the limit of the attempts at a code under parallel requests by
+`NotificationStore_TryCountAttemptAsync_Concurrent_NeverExceedsTheLimit`; all are defined in
+`NotificationStoreTests.cs` and run on a real SQLite file.
 
 **Inbox**: The candidate reviews of a user and the read state that never moves backwards, also when many writers race,
 are verified in the unit tests of `InboxStore`. The read state of a user is still present, and still honored, after the

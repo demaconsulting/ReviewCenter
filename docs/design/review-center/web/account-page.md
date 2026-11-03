@@ -8,15 +8,17 @@
 interface, let the user change their own password (a user who signs in with an identity provider has no password, so
 the page says so instead), let the user create, list, and revoke their personal access tokens
 for the API, let a local user set up and turn off an optional second factor (a one-time code from an authenticator app,
-with recovery codes), and report when the page is interactive. It requires a signed-in user. When the account still has
+with recovery codes), let the user confirm, change, and remove the e-mail address that notifications are sent to (when
+the administrator has set up e-mail notifications), and report when the page is interactive. It requires a signed-in
+user. When the account still has
 a
 temporary password (the claim `must_change_password`), it is also the only page the user may use: it then shows a
-banner and only the change-password form (no appearance, no tokens, and no second factor), and after the change it
-sends the user to the
+banner and only the change-password form (no appearance, no tokens, no second factor, and no e-mail notifications), and
+after the change it sends the user to the
 login page. It is a Razor component split into
 presentation (`AccountPage.razor`) and behavior (`AccountPage.razor.cs`). The
 page uses the narrow page container, because it holds forms, and its cards are headed Appearance, Change password,
-API tokens, and Two-factor authentication.
+API tokens, Two-factor authentication, and E-mail notifications.
 
 #### Data Model
 
@@ -59,6 +61,21 @@ removes them. **TotpStartPassword**, **TotpConfirmCode**, **TotpDisablePassword*
 **TotpRegenPassword**, **TotpRegenCode**: the values typed into the forms; **TotpError**, **TotpMessage**, and
 **TotpCopyStatus** hold the last rejected action, the last confirmation, and the answer of the copy button.
 
+**Notifications** (injected `NotificationPreferenceService`) and the state of the E-mail notifications card, which
+exists whenever the user has no temporary password, for a local user and for an account of an identity provider alike.
+While `Notifications.IsAvailable` is false (the administrator has not turned the feature on, or no mail transport is
+configured) the card holds only the sentence "E-mail notifications are not set up by your administrator." and no
+field, no button, and no explanation, and the page reads nothing from the store, so a database that was created before
+the feature keeps working. Otherwise **NotificationInfo** is the status read with `GetStatusAsync` when the page is
+initialized and after every action: the confirmed address, the address that waits for its code, and whether that code
+has expired. **NotificationAddressText** and **NotificationCode** are the values typed into the two forms;
+**NotificationError** and **NotificationNotice** hold the last rejected action and the last confirmation. The card
+shows an explanation that says an e-mail never contains review text, comments, or file contents, and that only a
+confirmed address receives mail, followed by the state that applies: the confirmed address with a form to use a
+different one, the address that waits for its code with a field for the 6-digit code and a button to send a new code,
+or the address form. A remove button is shown while there is a confirmed or a waiting address. The code itself is never
+shown by the page: only the mailed copy holds it, and the page learns nothing about it from Core.
+
 **Message**: the confirmation of the last successful change; `null` when there is none.
 
 **InteractiveMarker**: `"true"` or `"false"`, rendered as the `data-interactive` attribute of the root element; it
@@ -92,7 +109,12 @@ in place of the form), and for the tokens card `tokens-card`, `tokens-help-link`
 `totp-confirm-button`, `totp-cancel-button`, `totp-disable-form`, `totp-disable-password`, `totp-disable-code`,
 `totp-disable-button`, `totp-regen-form`, `totp-regen-password`, `totp-regen-code`, `totp-regen-button`, and for the
 recovery codes `totp-recovery-box`, `totp-recovery-codes`, `totp-recovery-code-{index}`, `totp-recovery-copy`,
-`totp-recovery-dismiss`, and `totp-copy-status`.
+`totp-recovery-dismiss`, and `totp-copy-status`; and for the notifications card `notifications-card`,
+`notifications-unavailable`, `notifications-explanation`, `notifications-error`, `notifications-message`,
+`notifications-confirmed-address`, `notifications-pending-address`, `notifications-address-form`,
+`notifications-address-input`, `notifications-send-code-button`, `notifications-confirm-form`,
+`notifications-code-input`, `notifications-confirm-button`, `notifications-resend-button`, and
+`notifications-remove-button`.
 
 #### Key Methods
 
@@ -163,6 +185,29 @@ is shown as `TotpError`. Both fields are emptied in every case.
 **CopyRecoveryCodesAsync** and **DismissRecoveryCodes**: Copy the recovery codes with `reviewCenter.copyText` and show
 "Copied." (or a hint to copy by hand), and remove the codes from the page for good.
 
+**SendNotificationCodeAsync** and **ResendNotificationCodeAsync**: Handle the address form and the button for a new
+code: `NotificationPreferenceService.RequestConfirmationAsync` with the actor and the typed address (for a new code, the
+address that waits).
+
+- *Postconditions*: On success one confirmation mail was sent, the page shows the address that waits and the field for
+  the code, and the notice "A confirmation code was sent. Enter it below." ("A new confirmation code was sent. Only the
+  newest code works." for a new code); the page also states that the code is valid for 30 minutes. A rule violation (an
+  address that is not valid, a code asked for within 60 seconds of the last one, or a daily limit of mails per user or
+  per address) is shown as `NotificationError`; no mail is sent then.
+
+**ConfirmNotificationAddressAsync**: Handles the code form: `NotificationPreferenceService.ConfirmAsync` with the typed
+code.
+
+- *Postconditions*: On success the address is confirmed, the page shows it, the notice "Your e-mail address is
+  confirmed." is shown, and the code form is gone. A rule violation (a wrong code, an expired code, or too many wrong
+  attempts) is shown as `NotificationError`, the code form stays, and the code field is emptied in every case.
+
+**RemoveNotificationAddressAsync**: Calls `NotificationPreferenceService.RemoveAddressAsync`; the page then shows the
+address form again and the notice "Your e-mail address was removed.".
+
+All four actions go through one helper that clears the last error and notice, runs the action for the actor from
+`SignIn.GetActorAsync`, shows the outcome, and reads the status again, so a user can only change their own address.
+
 **RevokeTokenAsync**: Revokes one token of the user by its identity and shows "The token was revoked.". The revoke
 button is offered only for a token that is active; a rule violation is shown as the message of the violation.
 
@@ -188,6 +233,8 @@ the authority.
 - **UserService** — changes the password, and tells whether the signed-in user is an account of an identity provider.
 - **TotpService** — sets up, confirms, cancels, and turns off the second factor, renews the recovery codes, and reports
   the status and whether the feature is on.
+- **NotificationPreferenceService** — tells whether e-mail notifications are available, and requests, confirms, and
+  removes the notification address of the user.
 - **OidcOptions** (Identity) — the display name of the provider named in the sentence (injected options).
 - **PersonalAccessTokenService** — creates, lists, and revokes the tokens.
 - **TimeProvider** — decides whether a token has expired.

@@ -882,3 +882,50 @@ sections:
         tests:
           - ReviewStatusPanel_ShowsExactlyOneNextActionButton
           - ReviewPage_SignedThenChanged_ExplainsWhatChanged
+
+      - id: ReviewCenter-Web-NotificationCard
+        title: >-
+          The Web subsystem shall give a signed-in user a card on the Account page for the e-mail address that
+          notifications are sent to.
+        justification: |
+          E-mail reaches a person only at an address that the person gave and proved to be theirs, and the Account
+          page is where a person manages their own settings. The card must also say plainly when the feature is not
+          enabled and must keep the proof, the code, off the page.
+        children:
+          - ReviewCenter-AccountPage-NotificationUnavailableSentence
+          - ReviewCenter-AccountPage-NotificationUnavailableNoFields
+          - ReviewCenter-AccountPage-NotificationUnavailableNoButton
+          - ReviewCenter-AccountPage-NotificationUnavailableNoExplanation
+          - ReviewCenter-AccountPage-NotificationUnavailableNoStoreRead
+          - ReviewCenter-AccountPage-NotificationExplanationShown
+          - ReviewCenter-AccountPage-NotificationExplanationNoReviewText
+          - ReviewCenter-AccountPage-NotificationAddressField
+          - ReviewCenter-AccountPage-NotificationSendCodeButton
+          - ReviewCenter-AccountPage-NotificationNoRemoveWithoutAddress
+          - ReviewCenter-AccountPage-NotificationCodeMailed
+          - ReviewCenter-AccountPage-NotificationPendingAddressShown
+          - ReviewCenter-AccountPage-NotificationCodeFieldShown
+          - ReviewCenter-AccountPage-NotificationSentNotice
+          - ReviewCenter-AccountPage-NotificationInvalidAddressError
+          - ReviewCenter-AccountPage-NotificationInvalidAddressNoMail
+          - ReviewCenter-AccountPage-NotificationRightCodeConfirmed
+          - ReviewCenter-AccountPage-NotificationRightCodeNotice
+          - ReviewCenter-AccountPage-NotificationRightCodeClosesForm
+          - ReviewCenter-AccountPage-NotificationWrongCodeError
+          - ReviewCenter-AccountPage-NotificationWrongCodeKeepsForm
+          - ReviewCenter-AccountPage-NotificationWrongCodeEmptiesField
+          - ReviewCenter-AccountPage-NotificationWrongCodeNotConfirmed
+          - ReviewCenter-AccountPage-NotificationResendButton
+          - ReviewCenter-AccountPage-NotificationResendCooldownError
+          - ReviewCenter-AccountPage-NotificationResendCooldownNoMail
+          - ReviewCenter-AccountPage-NotificationResendAfterCooldown
+          - ReviewCenter-AccountPage-NotificationRemoveButton
+          - ReviewCenter-AccountPage-NotificationRemoveShowsForm
+          - ReviewCenter-AccountPage-NotificationRemoveNotice
+          - ReviewCenter-AccountPage-NotificationRemoveHidesAddress
+          - ReviewCenter-AccountPage-NotificationCodeNeverShown
+          - ReviewCenter-AccountPage-NotificationHiddenForTemporaryPassword
+          - ReviewCenter-AccountPage-NotificationExternalUser
+        tests:
+          - AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm
+          - AccountPage_Confirm_RightCode_ShowsConfirmedAddress

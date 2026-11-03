@@ -3,9 +3,9 @@
 #
 # The checks are the tests that `--validate` runs: each one exercises a real part of ReviewCenter (git, a
 # complete review workflow, the content fingerprint, password hashing, the audit chain, the signed attestation
-# PDF and the web host) against throw-away data in a temporary folder. The tenth and eleventh checks, opt-in through
-# `--check-config`, compare the configured database with the schema of this build and the configured key ring with the
-# database, both read-only.
+# PDF and the web host) against throw-away data in a temporary folder. The tenth to twelfth checks, opt-in through
+# `--check-config`, compare the configured database with the schema of this build, the configured key ring with the
+# database, and examine the e-mail notification settings, all read-only.
 
 sections:
   - title: Validation Checks Unit Requirements
@@ -189,6 +189,137 @@ sections:
           - ValidationChecks_ConfiguredKeys_FileProviderWithoutPath_FailsNamingTheSetting
           - ValidationChecks_ConfiguredKeys_FileProviderWrongPassword_FailsWithoutPasswordOrFolder
           - ValidationChecks_ConfiguredKeys_FileProviderUntrustedKeyWithRequireTrustedKey_Fails
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsSkipped
+        title: >-
+          The ConfiguredNotifications check shall be skipped while e-mail notifications are not enabled.
+        justification: |
+          Notifications are not enabled by default, so a deployment that does not use them has nothing to check. That is
+          not a failure of the tool, and the report must not claim a pass for settings that were never looked at. The
+          report states the reason.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_NotEnabled_IsSkipped
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpReport
+        title: >-
+          The ConfiguredNotifications check shall report the SMTP server name when the sender is SMTP.
+        justification: |
+          An operator who asks for the check wants to see which settings the server will use before the first mail is
+          sent. The server name is the first fact that decides whether a mail server accepts the connection.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpPortReport
+        title: >-
+          The ConfiguredNotifications check shall report the SMTP port when the sender is SMTP.
+        justification: |
+          The port decides which service of the mail server answers the connection.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpProtectionReport
+        title: >-
+          The ConfiguredNotifications check shall report the connection protection when the sender is SMTP.
+        justification: |
+          The protection decides whether the password and the mails can be read on the way to the mail server.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpPasswordSourceReport
+        title: >-
+          The ConfiguredNotifications check shall report where the SMTP password comes from when the sender is SMTP.
+        justification: |
+          The operator can then see whether a password file is used, without the check showing the password.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsNoSecret
+        title: >-
+          The ConfiguredNotifications check shall not show the SMTP password read from a password file in its report.
+        justification: |
+          The report of a validation run is archived and shared as qualification evidence, so it must not hold a
+          secret.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsNoPath
+        title: >-
+          The ConfiguredNotifications check shall not show a folder path of the server in its report.
+        justification: |
+          A path of the server tells a reader of the archived report where the secrets and the mails are kept.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+          - ValidationChecks_ConfiguredNotifications_FileSender_ReportsFileSender
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsInlineWarning
+        title: >-
+          The ConfiguredNotifications check shall add a warning to its report when the SMTP password is written
+          directly into the configuration.
+        justification: |
+          A password in the configuration is copied with it into backups and tickets. The operator should hear that a
+          password file is the better place, at a time when the change costs nothing.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_InlinePassword_WarnsWithoutShowingIt
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsWarningNoSecret
+        title: >-
+          The ConfiguredNotifications check shall not show the inline SMTP password in its warning.
+        justification: |
+          A warning that repeated the secret would defeat its purpose, because the report is archived.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_InlinePassword_WarnsWithoutShowingIt
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsFileSender
+        title: >-
+          The ConfiguredNotifications check shall report that mails are written as files when the sender is File.
+        justification: |
+          The file sender is meant for demonstrations and development. The operator should see in the report that no
+          mail leaves the machine with these settings.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_FileSender_ReportsFileSender
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsFailsUnusable
+        title: >-
+          The ConfiguredNotifications check shall fail when a notification setting is not usable.
+        justification: |
+          The server refuses to start with such a setting. The check lets the operator find the problem before the
+          start, with the same rules.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_MissingHost_FailsAndNamesSetting
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsFailureNamesSetting
+        title: >-
+          The ConfiguredNotifications check shall name the setting that is not usable in its failure message.
+        justification: |
+          An operator can only correct a setting that the message points to.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_MissingHost_FailsAndNamesSetting
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsWrongTypeFails
+        title: >-
+          The ConfiguredNotifications check shall fail when a notification setting has a value of the wrong type.
+        justification: |
+          A value such as text in place of a port number would stop the server at the start, so the check has to
+          find it first.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_WrongType_FailsWithoutShowingValue
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsWrongTypeNoValue
+        title: >-
+          The ConfiguredNotifications check shall not show a value of the wrong type in its failure message.
+        justification: |
+          The value may be a mistyped secret, and the message is archived.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_WrongType_FailsWithoutShowingValue
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredNotificationsNoNetwork
+        title: >-
+          The ConfiguredNotifications check shall not open a network connection.
+        justification: |
+          The check examines settings only. A connection to a mail server would make the result depend on the
+          network, and would send the password to a machine on the strength of a mere check.
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
 
       - id: ReviewCenter-ValidationChecks-Hermetic
         title: >-

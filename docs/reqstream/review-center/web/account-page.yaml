@@ -147,3 +147,300 @@ sections:
           - AccountPage_Disable_RecoveryCode_TurnsItOff
           - AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce
           - AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes
+
+      - id: ReviewCenter-AccountPage-NotificationUnavailableSentence
+        title: >-
+          The AccountPage unit shall show the sentence "E-mail notifications are not set up by your administrator." in
+          the notification card while e-mail notifications are not enabled.
+        justification: |
+          A person who looks for the setting must learn that the feature is missing and whom to ask, without being
+          shown a form that cannot work.
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore
+
+      - id: ReviewCenter-AccountPage-NotificationUnavailableNoFields
+        title: >-
+          The AccountPage unit shall show no input field in the notification card while e-mail notifications are not
+          enabled.
+        justification: |
+          Fields that cannot work would invite an entry that has no effect.
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore
+
+      - id: ReviewCenter-AccountPage-NotificationUnavailableNoButton
+        title: >-
+          The AccountPage unit shall show no button in the notification card while e-mail notifications are not
+          enabled.
+        justification: |
+          A button that cannot work would invite an action that has no effect.
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore
+
+      - id: ReviewCenter-AccountPage-NotificationUnavailableNoExplanation
+        title: >-
+          The AccountPage unit shall show no explanation of e-mail contents in the notification card while e-mail
+          notifications are not enabled.
+        justification: |
+          The explanation describes mails that are never sent while the feature is not enabled, so it would mislead.
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore
+
+      - id: ReviewCenter-AccountPage-NotificationUnavailableNoStoreRead
+        title: >-
+          The AccountPage unit shall not read the notification address of the user while e-mail notifications are not
+          enabled.
+        justification: |
+          A database that was created before the feature has no table for the address, so the page must keep working
+          while the feature is not enabled.
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore
+
+      - id: ReviewCenter-AccountPage-NotificationExplanationShown
+        title: >-
+          The AccountPage unit shall show an explanation of what an e-mail contains in the notification card while
+          the user has no address.
+        justification: |
+          A person decides whether to give an address only when they know what will be sent to it.
+        tests:
+          - AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm
+
+      - id: ReviewCenter-AccountPage-NotificationExplanationNoReviewText
+        title: >-
+          The AccountPage unit shall state in the explanation that an e-mail never contains review text.
+        justification: |
+          Reviews of regulated projects can be confidential, so the person must be told that a mail does not carry
+          them out of the system.
+        tests:
+          - AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm
+
+      - id: ReviewCenter-AccountPage-NotificationAddressField
+        title: >-
+          The AccountPage unit shall show a field for the e-mail address in the notification card while the user has
+          no address.
+        justification: |
+          The person must be able to say where the mail goes.
+        tests:
+          - AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm
+
+      - id: ReviewCenter-AccountPage-NotificationSendCodeButton
+        title: >-
+          The AccountPage unit shall show a button that sends a confirmation code in the notification card while the
+          user has no address.
+        justification: |
+          An address is used only after it has been confirmed, so the first step must be to send the code.
+        tests:
+          - AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm
+
+      - id: ReviewCenter-AccountPage-NotificationNoRemoveWithoutAddress
+        title: >-
+          The AccountPage unit shall show no button to remove the address in the notification card while the user has
+          no address.
+        justification: |
+          A button that has nothing to act on would only confuse.
+        tests:
+          - AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm
+
+      - id: ReviewCenter-AccountPage-NotificationCodeMailed
+        title: >-
+          The AccountPage unit shall have exactly one confirmation e-mail sent to a valid address that the user
+          submits.
+        justification: |
+          The mail is the proof that the person can read the address, and a second mail would only add to the
+          sending limits.
+        tests:
+          - AccountPage_SendCode_ValidAddress_MailsCodeAndShowsConfirmForm
+
+      - id: ReviewCenter-AccountPage-NotificationPendingAddressShown
+        title: >-
+          The AccountPage unit shall show the address that waits for its code after the confirmation e-mail was sent.
+        justification: |
+          The person must see where the code went, to notice a typing error in the address.
+        tests:
+          - AccountPage_SendCode_ValidAddress_MailsCodeAndShowsConfirmForm
+
+      - id: ReviewCenter-AccountPage-NotificationCodeFieldShown
+        title: >-
+          The AccountPage unit shall show a field for the confirmation code after the confirmation e-mail was sent.
+        justification: |
+          The code is typed back on the page, so the page must ask for it.
+        tests:
+          - AccountPage_SendCode_ValidAddress_MailsCodeAndShowsConfirmForm
+
+      - id: ReviewCenter-AccountPage-NotificationSentNotice
+        title: >-
+          The AccountPage unit shall show a notice that a code was sent after the confirmation e-mail was sent.
+        justification: |
+          The person must know that the next step is to read the mail.
+        tests:
+          - AccountPage_SendCode_ValidAddress_MailsCodeAndShowsConfirmForm
+
+      - id: ReviewCenter-AccountPage-NotificationInvalidAddressError
+        title: >-
+          The AccountPage unit shall show an error when the user submits an address that is not a valid e-mail
+          address.
+        justification: |
+          A refusal must say that the address was not accepted, so the person corrects it.
+        tests:
+          - AccountPage_SendCode_InvalidAddress_ShowsErrorAndMailsNothing
+
+      - id: ReviewCenter-AccountPage-NotificationInvalidAddressNoMail
+        title: >-
+          The AccountPage unit shall have no e-mail sent when the user submits an address that is not a valid e-mail
+          address.
+        justification: |
+          A mail to an invalid text could be misused to send mail to a destination that the person does not own.
+        tests:
+          - AccountPage_SendCode_InvalidAddress_ShowsErrorAndMailsNothing
+
+      - id: ReviewCenter-AccountPage-NotificationRightCodeConfirmed
+        title: >-
+          The AccountPage unit shall show the address as confirmed after the user enters the right code.
+        justification: |
+          The person must see that the address is now in use.
+        tests:
+          - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+
+      - id: ReviewCenter-AccountPage-NotificationRightCodeNotice
+        title: >-
+          The AccountPage unit shall show the message "Your e-mail address is confirmed." after the user enters the
+          right code.
+        justification: |
+          The outcome of the action is told in words, not only by a change of the page.
+        tests:
+          - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+
+      - id: ReviewCenter-AccountPage-NotificationRightCodeClosesForm
+        title: >-
+          The AccountPage unit shall remove the field for the code after the user enters the right code.
+        justification: |
+          A code that has been used cannot be used again, so the field would only confuse.
+        tests:
+          - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+
+      - id: ReviewCenter-AccountPage-NotificationWrongCodeError
+        title: >-
+          The AccountPage unit shall show an error when the user enters a wrong code.
+        justification: |
+          The person must learn that the address is not confirmed, so they type the code again.
+        tests:
+          - AccountPage_Confirm_WrongCode_ShowsErrorAndKeepsForm
+
+      - id: ReviewCenter-AccountPage-NotificationWrongCodeKeepsForm
+        title: >-
+          The AccountPage unit shall keep the field for the code on the page after the user enters a wrong code.
+        justification: |
+          The person must be able to try again without asking for a new mail.
+        tests:
+          - AccountPage_Confirm_WrongCode_ShowsErrorAndKeepsForm
+
+      - id: ReviewCenter-AccountPage-NotificationWrongCodeEmptiesField
+        title: >-
+          The AccountPage unit shall empty the field for the code after the user enters a wrong code.
+        justification: |
+          A wrong entry must not stay on the page, so it is not mistaken for a right one.
+        tests:
+          - AccountPage_Confirm_WrongCode_ShowsErrorAndKeepsForm
+
+      - id: ReviewCenter-AccountPage-NotificationWrongCodeNotConfirmed
+        title: >-
+          The AccountPage unit shall not show an address as confirmed after the user enters a wrong code.
+        justification: |
+          A page that showed a confirmed address after a wrong code would give a false assurance.
+        tests:
+          - AccountPage_Confirm_WrongCode_ShowsErrorAndKeepsForm
+
+      - id: ReviewCenter-AccountPage-NotificationResendButton
+        title: >-
+          The AccountPage unit shall show a button that sends a new code while an address waits for its code.
+        justification: |
+          A mail can be lost or can expire, and the person must be able to ask for another without starting over.
+        tests:
+          - AccountPage_Resend_TooSoonThenAfterCooldown_ShowsErrorThenMailsAgain
+
+      - id: ReviewCenter-AccountPage-NotificationResendCooldownError
+        title: >-
+          The AccountPage unit shall show an error when the user asks for a new code within 60 seconds of the previous
+          confirmation e-mail.
+        justification: |
+          The pause keeps the page from being used to flood an address with mail, and the person must be told why
+          nothing was sent.
+        tests:
+          - AccountPage_Resend_TooSoonThenAfterCooldown_ShowsErrorThenMailsAgain
+
+      - id: ReviewCenter-AccountPage-NotificationResendCooldownNoMail
+        title: >-
+          The AccountPage unit shall have no e-mail sent when the user asks for a new code within 60 seconds of the
+          previous confirmation e-mail.
+        justification: |
+          A mail inside the pause would defeat its purpose.
+        tests:
+          - AccountPage_Resend_TooSoonThenAfterCooldown_ShowsErrorThenMailsAgain
+
+      - id: ReviewCenter-AccountPage-NotificationResendAfterCooldown
+        title: >-
+          The AccountPage unit shall have a new confirmation e-mail sent when the user asks for a new code more than
+          60 seconds after the previous confirmation e-mail.
+        justification: |
+          Once the pause is over, the person must be able to get another mail.
+        tests:
+          - AccountPage_Resend_TooSoonThenAfterCooldown_ShowsErrorThenMailsAgain
+
+      - id: ReviewCenter-AccountPage-NotificationRemoveButton
+        title: >-
+          The AccountPage unit shall show a button to remove the address while the user has a confirmed address.
+        justification: |
+          The person must be able to withdraw the address at any time.
+        tests:
+          - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+
+      - id: ReviewCenter-AccountPage-NotificationRemoveShowsForm
+        title: >-
+          The AccountPage unit shall show the field for a new address after the user removes the address.
+        justification: |
+          After the removal the person is in the state of having no address and must be able to enter another.
+        tests:
+          - AccountPage_Remove_ConfirmedAddress_ShowsAddressFormAgain
+
+      - id: ReviewCenter-AccountPage-NotificationRemoveNotice
+        title: >-
+          The AccountPage unit shall show the message "Your e-mail address was removed." after the user removes the
+          address.
+        justification: |
+          The outcome of the action is told in words, not only by a change of the page.
+        tests:
+          - AccountPage_Remove_ConfirmedAddress_ShowsAddressFormAgain
+
+      - id: ReviewCenter-AccountPage-NotificationRemoveHidesAddress
+        title: >-
+          The AccountPage unit shall not show the removed address after the user removes the address.
+        justification: |
+          A removed address must not stay visible as if it were in use.
+        tests:
+          - AccountPage_Remove_ConfirmedAddress_ShowsAddressFormAgain
+
+      - id: ReviewCenter-AccountPage-NotificationCodeNeverShown
+        title: >-
+          The AccountPage unit shall not show the confirmation code as text in the notification card.
+        justification: |
+          The code proves that the person can read the mail, so a page that displayed it would make the proof worth
+          nothing.
+        tests:
+          - AccountPage_Render_PendingAddress_NeverShowsTheCode
+
+      - id: ReviewCenter-AccountPage-NotificationHiddenForTemporaryPassword
+        title: >-
+          The AccountPage unit shall show no notification card to a user whose password is temporary.
+        justification: |
+          A user with a temporary password may use only the form that replaces it, so nothing else is offered.
+        tests:
+          - AccountPage_Render_TemporaryPassword_HidesNotificationsCard
+
+      - id: ReviewCenter-AccountPage-NotificationExternalUser
+        title: >-
+          The AccountPage unit shall show the field for the e-mail address in the notification card to a user of an
+          identity provider.
+        justification: |
+          The address is kept by ReviewCenter and not by the provider, so a person without a password needs the same
+          way to give it.
+        tests:
+          - AccountPage_Render_ExternalUser_ShowsAddressForm

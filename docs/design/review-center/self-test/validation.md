@@ -31,7 +31,8 @@ types are in `ValidationRunner.cs`:
 - *Returns*: the nine default checks in the order `ReviewCenter_GitAvailable`, `ReviewCenter_GitRoundTrip`,
   `ReviewCenter_ReviewWorkflow`, `ReviewCenter_Fingerprint`, `ReviewCenter_PasswordHash`, `ReviewCenter_Totp`,
   `ReviewCenter_AuditChain`, `ReviewCenter_AttestationPdf`, `ReviewCenter_HostStart`; with the flag set, the
-  opt-in `ReviewCenter_ConfiguredDatabase` and then `ReviewCenter_ConfiguredKeys` are appended.
+  opt-in `ReviewCenter_ConfiguredDatabase`, then `ReviewCenter_ConfiguredKeys`, and then
+  `ReviewCenter_ConfiguredNotifications` are appended, for twelve checks.
 
 **Run(Context)**: Entry point for the self-validation run.
 

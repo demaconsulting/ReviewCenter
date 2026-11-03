@@ -11,7 +11,7 @@ Each OTS item is verified by a combination of:
 - Pipeline output assertions performed by FileAssert on documents produced by the tool
 - Integration evidence from the project's own tests for libraries and frameworks that have no self-validation mode
   (ASP.NET Core, bUnit, Entity Framework Core, FileSystemGlobbing, git, Microsoft.AspNetCore.OpenApi,
-  Microsoft.AspNetCore.Authentication.OpenIdConnect, OpenIddict, Otp.NET, Playwright,
+  Microsoft.AspNetCore.Authentication.OpenIdConnect, OpenIddict, Otp.NET, MailKit, Playwright,
   System.Security.Cryptography.Pkcs, xUnit, and YamlDotNet)
 
 Internal OTS tool design is out of scope; only integration and usage evidence is documented.
@@ -33,6 +33,7 @@ The following OTS items have verification evidence in this section:
   Identity subsystem
 - OpenIddict (_openiddict.md_) — OpenID Connect server library used by the tests as a fake identity provider
 - Otp.NET (_otpnet.md_) — one-time password library used by the Identity subsystem for the second factor
+- MailKit (_mailkit.md_) — mail library used by the Messaging subsystem to send e-mail and to build the messages
 - Pandoc (_pandoc.md_) — Markdown-to-HTML conversion tool
 - System.Security.Cryptography.Pkcs (_pkcs.md_) — CMS signing library used to sign the PDF attestations
 - Playwright (_playwright.md_) — browser automation library used by the Puppet developer tool

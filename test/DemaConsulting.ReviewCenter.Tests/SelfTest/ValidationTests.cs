@@ -580,19 +580,21 @@ public partial class ValidationTests
     }
 
     /// <summary>
-    ///     Test that the opt-in check list adds only the configured-database and key checks, after the default ones.
+    ///     Test that the opt-in check list adds only the configured-notification, database and key checks, after the
+    ///     default ones.
     /// </summary>
     [Fact]
-    public void Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseAndKeysLast()
+    public void Validation_CreateChecks_CheckConfig_AddsConfiguredNotificationsDatabaseAndKeysLast()
     {
         // Arrange: no setup; the opt-in list is asked for
 
         // Act: create the opt-in check list
         var checks = Validation.CreateChecks(includeConfigured: true);
 
-        // Assert: eleven checks; the configured-database check and then the configured-keys check come last
-        Assert.Equal(11, checks.Count);
-        Assert.Equal("ReviewCenter_ConfiguredDatabase", checks[^2].Name);
-        Assert.Equal("ReviewCenter_ConfiguredKeys", checks[^1].Name);
+        // Assert: twelve checks; the configured-database, -keys and -notifications checks come last, in this order
+        Assert.Equal(12, checks.Count);
+        Assert.Equal("ReviewCenter_ConfiguredDatabase", checks[^3].Name);
+        Assert.Equal("ReviewCenter_ConfiguredKeys", checks[^2].Name);
+        Assert.Equal("ReviewCenter_ConfiguredNotifications", checks[^1].Name);
     }
 }

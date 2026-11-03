@@ -340,3 +340,46 @@ sections:
         tests:
           - ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError
           - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings
+
+      - id: ReviewCenter-Hosting-NotificationSettings
+        title: >-
+          The Hosting subsystem shall check the notification settings at the start of the server while e-mail
+          notifications are enabled.
+        justification: |
+          A feature that is enabled must not start with settings that cannot work.
+        children:
+          - ReviewCenter-ServerHost-NotificationInvalidStopsStart
+          - ReviewCenter-ServerHost-NotificationInvalidNamesSetting
+          - ReviewCenter-ServerHost-NotificationInvalidNoSecret
+          - ReviewCenter-ServerHost-NotificationValidBuilds
+          - ReviewCenter-ServerHost-NotificationInlinePasswordWarning
+          - ReviewCenter-ServerHost-NotificationWarningNoSecret
+        tests:
+          - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
+          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+
+      - id: ReviewCenter-Hosting-NotificationTables
+        title: >-
+          The Hosting subsystem shall check the notification tables of the database at the start of the server while
+          e-mail notifications are enabled.
+        justification: |
+          A feature that is enabled must not start with a database that cannot work. The database of an earlier
+          version has no notification tables.
+        children:
+          - ReviewCenter-ServerHost-NotificationTablesMissingStopsStart
+        tests:
+          - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn
+
+      - id: ReviewCenter-Hosting-NotificationNotEnabledSkipsChecks
+        title: >-
+          While e-mail notifications are not enabled, the Hosting subsystem shall start the server without checking
+          the notification settings.
+        justification: |
+          A feature that is not enabled must leave the server as it was, so that an installation without a mail server
+          keeps working.
+        children:
+          - ReviewCenter-ServerHost-NotificationOffNotChecked
+          - ReviewCenter-ServerHost-NotificationTablesMissingOffStarts
+        tests:
+          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+          - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn

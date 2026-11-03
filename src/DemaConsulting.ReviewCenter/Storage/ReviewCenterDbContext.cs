@@ -36,7 +36,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     not gain their tables or columns and must be deleted and recreated (this includes the repository registry and
 ///     the repository source columns of reviews and review files, the personal access token table and the creator
 ///     columns of reviews). The same is true for the second factor tables (<c>UserTotps</c> and
-///     <c>TotpRecoveryCodes</c>): a database from before them must be deleted and recreated. The same is true for
+///     <c>TotpRecoveryCodes</c>) and for the e-mail notification tables (<c>NotificationPreferences</c> and
+///     <c>NotificationSendLog</c>): a database from before them must be deleted and recreated. The same is true for
 ///     the <c>ReviewReopens</c> table, for the <c>RequireIndependentReviewers</c>,
 ///     <c>RequireNonAuthorChecklistAnswers</c> and <c>RequireNonReopenerSigning</c> columns of projects, and for the
 ///     <c>DueDate</c> column of reviews, and for the follow-up columns (<c>FollowsReviewId</c>, <c>CarriedAnswerCount</c>
@@ -206,6 +207,16 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     Gets the table of recovery codes of the second factor.
     /// </summary>
     public DbSet<TotpRecoveryCode> TotpRecoveryCodes => Set<TotpRecoveryCode>();
+
+    /// <summary>
+    ///     Gets the table of notification e-mail addresses (at most one row per user).
+    /// </summary>
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+
+    /// <summary>
+    ///     Gets the table of mails counted against the sending limits.
+    /// </summary>
+    public DbSet<NotificationSendLogEntry> NotificationSendLog => Set<NotificationSendLogEntry>();
 
     /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
@@ -401,6 +412,39 @@ internal sealed class ReviewCenterDbContext : DbContext
             code.Property(c => c.CodeHash).IsRequired().HasMaxLength(Sha256HexColumnLength);
             code.HasIndex(c => new { c.UserId, c.CodeHash }).IsUnique();
             code.HasOne<User>().WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Notification e-mail addresses: one row per user (the user id is the key), kept apart from the user row for
+        // the same reason as the second factor. The confirmation code is stored only as a salted hash. The send log
+        // exists only to count mails against the limits; its timestamp uses the fixed-width UTC text form of the audit
+        // trail, because the SQLite provider cannot compare an unconverted DateTimeOffset and the limits compare
+        // times. Both tables go away with the user
+        modelBuilder.Entity<NotificationPreference>(preference =>
+        {
+            preference.HasKey(p => p.UserId);
+            preference.Property(p => p.UserId).ValueGeneratedNever();
+            preference.Property(p => p.Email).HasMaxLength(NotificationAddress.MaxLength);
+            preference.Property(p => p.PendingEmail).HasMaxLength(NotificationAddress.MaxLength);
+            preference.Property(p => p.PendingCodeHash).HasMaxLength(Sha256HexColumnLength);
+            preference.Property(p => p.PendingCodeSalt).HasMaxLength(Sha256HexColumnLength);
+            preference.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NotificationSendLogEntry>(entry =>
+        {
+            entry.HasKey(e => e.Id);
+            entry.Property(e => e.ToAddress).IsRequired().HasMaxLength(NotificationAddress.MaxLength);
+            entry.Property(e => e.Kind).IsRequired().HasMaxLength(StateColumnLength);
+            entry.Property(e => e.SentUtc).HasConversion(
+                value => value.UtcDateTime.ToString(TimestampFormat, CultureInfo.InvariantCulture),
+                text => DateTimeOffset.Parse(
+                    text,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal));
+            entry.HasIndex(e => new { e.UserId, e.SentUtc });
+            entry.HasIndex(e => new { e.ToAddress, e.SentUtc });
+            entry.HasIndex(e => e.SentUtc);
+            entry.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Repositories: identity assigned by the database; every repository belongs to exactly one project (and goes

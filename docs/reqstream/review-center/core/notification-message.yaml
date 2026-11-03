@@ -1,0 +1,155 @@
+---
+# Software Unit Requirements for the NotificationMessage Class
+#
+# The NotificationMessage class is one e-mail message to one recipient. It refuses, when it is built, every part that
+# could change the header of the mail. The unit also holds the sender contract (INotificationSender), the
+# implementation used when no mail server is set up (NoNotificationSender), and the failure type of a send
+# (NotificationSendException). Each requirement states one rule.
+
+sections:
+  - title: NotificationMessage Unit Requirements
+    requirements:
+      - id: ReviewCenter-NotificationMessage-KeepParts
+        title: >-
+          The NotificationMessage class shall keep the subject it was built with.
+        justification: |
+          The sender must send exactly what the caller composed.
+        tests:
+          - NotificationMessage_Constructor_ValidParts_KeepsThemAndNormalizesRecipient
+
+      - id: ReviewCenter-NotificationMessage-KeepTextBody
+        title: >-
+          The NotificationMessage class shall keep the plain text body it was built with.
+        justification: |
+          The sender must send exactly what the caller composed.
+        tests:
+          - NotificationMessage_Constructor_ValidParts_KeepsThemAndNormalizesRecipient
+
+      - id: ReviewCenter-NotificationMessage-KeepHtmlBody
+        title: >-
+          The NotificationMessage class shall keep the HTML body it was built with.
+        justification: |
+          The sender must send exactly what the caller composed.
+        tests:
+          - NotificationMessage_Constructor_ValidParts_KeepsThemAndNormalizesRecipient
+
+      - id: ReviewCenter-NotificationMessage-NormalizeRecipient
+        title: >-
+          The NotificationMessage class shall give the recipient in the normal form of an e-mail address.
+        justification: |
+          One form of the address makes the recipient comparable and keeps the sender from handling odd spellings.
+        tests:
+          - NotificationMessage_Constructor_ValidParts_KeepsThemAndNormalizesRecipient
+
+      - id: ReviewCenter-NotificationMessage-RefuseInvalidRecipient
+        title: >-
+          The NotificationMessage class shall refuse a recipient that is not one valid e-mail address.
+        justification: |
+          A recipient that is a list or carries a line break could send the mail to people who never asked for it.
+        tests:
+          - NotificationMessage_Constructor_InvalidRecipient_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-NotificationMessage-HideInvalidRecipient
+        title: >-
+          The NotificationMessage class shall not repeat a refused recipient in its error message.
+        justification: |
+          The error text can end up in a log or on a page, and an address is personal data.
+        tests:
+          - NotificationMessage_Constructor_InvalidRecipient_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-NotificationMessage-RefuseSubjectLineBreak
+        title: >-
+          The NotificationMessage class shall refuse a subject that has a line break in it.
+        justification: |
+          A line break in the subject starts a new header line and lets a caller add a header, such as a second
+          recipient.
+        tests:
+          - NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-NotificationMessage-RefuseSubjectControlCharacter
+        title: >-
+          The NotificationMessage class shall refuse a subject that has a control character in it.
+        justification: |
+          A control character does not belong to a subject and can disturb the header of the mail.
+        tests:
+          - NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-NotificationMessage-HideInvalidSubject
+        title: >-
+          The NotificationMessage class shall not repeat a refused subject in its error message.
+        justification: |
+          The refused text is attacker controlled, and it must not reach a log or a page by way of the error message.
+        tests:
+          - NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-NotificationMessage-RefuseEmptySubject
+        title: >-
+          The NotificationMessage class shall refuse an empty subject.
+        justification: |
+          A mail without a subject looks like spam and is easily lost.
+        tests:
+          - NotificationMessage_Constructor_SubjectLength_RefusesEmptyAndTooLong
+
+      - id: ReviewCenter-NotificationMessage-RefuseLongSubject
+        title: >-
+          The NotificationMessage class shall refuse a subject of more than 200 characters.
+        justification: |
+          A very long header line is refused by some mail servers and bounds the size of what a caller can inject.
+        tests:
+          - NotificationMessage_Constructor_SubjectLength_RefusesEmptyAndTooLong
+
+      - id: ReviewCenter-NotificationMessage-RefuseBlankBody
+        title: >-
+          The NotificationMessage class shall refuse a body that has only white space.
+        justification: |
+          A message without content is a caller error, and it is better found when the message is built.
+        tests:
+          - NotificationMessage_Constructor_InvalidBody_Throws
+
+      - id: ReviewCenter-NotificationMessage-RefuseEmptyBody
+        title: >-
+          The NotificationMessage class shall refuse an empty body.
+        justification: |
+          A message without content is a caller error, and it is better found when the message is built.
+        tests:
+          - NotificationMessage_Constructor_EmptyBody_Throws
+
+      - id: ReviewCenter-NotificationMessage-RefuseLongBody
+        title: >-
+          The NotificationMessage class shall refuse a body of more than 100,000 characters.
+        justification: |
+          A limit on the size keeps one message from being a way to send very large mails.
+        tests:
+          - NotificationMessage_Constructor_InvalidBody_Throws
+
+      - id: ReviewCenter-NotificationMessage-RefuseNulInBody
+        title: >-
+          The NotificationMessage class shall refuse a body that has a NUL character in it.
+        justification: |
+          A NUL character can cut the body off in mail software.
+        tests:
+          - NotificationMessage_Constructor_InvalidBody_Throws
+
+      - id: ReviewCenter-NotificationMessage-AcceptBodyLineBreaks
+        title: >-
+          The NotificationMessage class shall accept line breaks in a body.
+        justification: |
+          A body has several lines, and only the header parts have to be free of line breaks.
+        tests:
+          - NotificationMessage_Constructor_BodyWithLineBreaks_Succeeds
+
+      - id: ReviewCenter-NotificationMessage-NoSenderNotConfigured
+        title: >-
+          The NoNotificationSender class shall report that no mail transport is configured.
+        justification: |
+          A server without mail settings must not offer features that need mail.
+        tests:
+          - NoNotificationSender_SendAsync_ThrowsSendException
+
+      - id: ReviewCenter-NotificationMessage-NoSenderRefuses
+        title: >-
+          The NoNotificationSender class shall fail a send with a send exception.
+        justification: |
+          A send that silently does nothing would make a user wait for a mail that never comes.
+        tests:
+          - NoNotificationSender_SendAsync_ThrowsSendException

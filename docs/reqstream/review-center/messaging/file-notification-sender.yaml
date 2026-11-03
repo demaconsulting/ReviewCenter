@@ -1,0 +1,126 @@
+---
+# Software Unit Requirements for the FileNotificationSender Class
+#
+# The FileNotificationSender class delivers one e-mail by writing it as a file into a folder, for demonstrations,
+# development and tests. A send that fails is reported as a send error whose message holds no path.
+
+sections:
+  - title: FileNotificationSender Unit Requirements
+    requirements:
+      - id: ReviewCenter-FileNotificationSender-IsConfigured
+        title: >-
+          The FileNotificationSender class shall report that a mail transport is configured.
+        justification: |
+          The rest of the server asks the sender whether mail can be delivered; a working transport answers yes.
+        tests:
+          - FileNotificationSender_IsConfigured_IsTrue
+
+      - id: ReviewCenter-FileNotificationSender-OneFile
+        title: >-
+          The FileNotificationSender class shall write one file for each message into the folder of the settings.
+        justification: |
+          A file that a mail client can open shows what a mail server would have received.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-Extension
+        title: >-
+          The FileNotificationSender class shall give each file the extension eml.
+        justification: |
+          A mail client opens a file with this extension as a mail.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-CreateFolder
+        title: >-
+          The FileNotificationSender class shall create the folder of the settings when it does not exist.
+        justification: |
+          A demonstration must work without a manual set-up of a folder.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-Subject
+        title: >-
+          The FileNotificationSender class shall write a file that holds the subject of the message as the subject of
+          the mail.
+        justification: |
+          The subject is what a person reads first.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-Recipient
+        title: >-
+          The FileNotificationSender class shall write a file that holds the recipient address of the message as the
+          recipient of the mail.
+        justification: |
+          The file must show to whom the mail would have gone.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-Sender
+        title: >-
+          The FileNotificationSender class shall write a file that holds the sender address of the settings as the
+          sender of the mail.
+        justification: |
+          The file must show from whom the mail would have come.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-TextPart
+        title: >-
+          The FileNotificationSender class shall write a file that holds the plain text body of the message as the text
+          part of the mail.
+        justification: |
+          The file must show the content that a plain text mail client shows.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-HtmlPart
+        title: >-
+          The FileNotificationSender class shall write a file that holds the HTML body of the message as the HTML part
+          of the mail.
+        justification: |
+          The file must show the content that a formatted mail client shows.
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-NewFileEachTime
+        title: >-
+          The FileNotificationSender class shall give each file a name that no other file written by it has.
+        justification: |
+          A mail that overwrites an earlier mail is a mail that is lost.
+        tests:
+          - FileNotificationSender_Send_SeveralMessages_WritesSeparateFiles
+
+      - id: ReviewCenter-FileNotificationSender-Concurrent
+        title: >-
+          The FileNotificationSender class shall write the files of messages that are sent at the same moment without
+          a failure.
+        justification: |
+          The server sends mail from several requests at once; none of them may fail because of another.
+        tests:
+          - FileNotificationSender_Send_SeveralMessages_WritesSeparateFiles
+
+      - id: ReviewCenter-FileNotificationSender-WriteFailure
+        title: >-
+          The FileNotificationSender class shall report a send error when the file cannot be written.
+        justification: |
+          The caller must be able to tell that no mail was delivered.
+        tests:
+          - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
+
+      - id: ReviewCenter-FileNotificationSender-ErrorNoPath
+        title: >-
+          The FileNotificationSender class shall not put the path of the folder in the message of a send error.
+        justification: |
+          The message of an error reaches pages and logs; the layout of the server must not be disclosed.
+        tests:
+          - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
+
+      - id: ReviewCenter-FileNotificationSender-NullMessage
+        title: >-
+          The FileNotificationSender class shall reject a missing message with an argument error.
+        justification: |
+          A missing message is a mistake of the caller, which must show at once.
+        tests:
+          - FileNotificationSender_Send_NullMessage_ThrowsArgumentNull

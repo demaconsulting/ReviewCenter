@@ -2,7 +2,8 @@
 # Software Unit Requirements for the ReviewCenterDbContext Class
 #
 # The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
-# files, threads, comments, checklists, users, memberships, reviewer slots, and signatures to database tables.
+# files, threads, comments, checklists, users, memberships, reviewer slots, signatures, and the e-mail address and
+# send log for notifications to database tables.
 
 sections:
   - title: ReviewCenterDbContext Unit Requirements
@@ -290,6 +291,30 @@ sections:
         tests:
           - TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack
           - TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes
+
+      - id: ReviewCenter-DbContext-NotificationPreferencesTable
+        title: >-
+          The ReviewCenterDbContext class shall map the notification address settings of a user to a table with one
+          row for each user.
+        justification: |
+          The preference is read and changed as one unit, and the database is the last defense against two rows for one
+          user. The schema is created from the model without a migration, so a database that was created before the
+          table existed has to be recreated; the store reports such a database as not available.
+        tests:
+          - NotificationStore_IsAvailableAsync_NewDatabase_ReturnsTrue
+          - NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse
+
+      - id: ReviewCenter-DbContext-NotificationSendLogTable
+        title: >-
+          The ReviewCenterDbContext class shall map the log of the notification mails that were sent to a table with
+          one row for each mail.
+        justification: |
+          The limits on the mails of a user, of an address, and of the server are counted from this log on every
+          request. The schema is created from the model without a
+          migration, so a database that was created before the table existed has to be recreated.
+        tests:
+          - NotificationStore_IsAvailableAsync_NewDatabase_ReturnsTrue
+          - NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse
 
       - id: ReviewCenter-DbContext-ExternalIdentity
         title: >-

@@ -33,8 +33,8 @@ N/A - standard test environment.
   and a late exception of an abandoned check is observed.
 - TRX and JUnit XML result files are created with the correct XML root elements.
 - An unsupported result file extension produces no file and an error message on the context.
-- `Validation.CreateChecks` lists the nine default checks, and adds the configured-database and the configured-key-ring
-  checks last, in that order, only for `--check-config`.
+- `Validation.CreateChecks` lists the nine default checks, and adds the configured-database, the configured-key-ring and
+  the configured-notifications checks last, in that order, twelve in all, only for `--check-config`.
 
 #### Test Scenarios
 
@@ -99,9 +99,10 @@ others; the report still lists the checks in the listed order. This scenario is 
 returns the nine default checks, in order, with the `ReviewCenter_` names (`ReviewCenter_Totp` follows
 `ReviewCenter_PasswordHash`). This scenario is tested by `Validation_CreateChecks_Default_ListsNineHermeticChecks`.
 
-**Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseAndKeysLast**: `Validation.CreateChecks(true)`
-returns eleven checks with `ReviewCenter_ConfiguredDatabase` and `ReviewCenter_ConfiguredKeys` last, in that order.
-This scenario is tested by `Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseAndKeysLast`.
+**Validation_CreateChecks_CheckConfig_AddsConfiguredNotificationsDatabaseAndKeysLast**: `Validation.CreateChecks(true)`
+returns twelve checks with `ReviewCenter_ConfiguredDatabase`, `ReviewCenter_ConfiguredKeys` and
+`ReviewCenter_ConfiguredNotifications` last, in that order. This scenario is tested by
+`Validation_CreateChecks_CheckConfig_AddsConfiguredNotificationsDatabaseAndKeysLast`.
 
 **ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting**: A check
 blocks its thread synchronously and ignores its token; with a deadline of 100 ms the runner returns

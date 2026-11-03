@@ -70,6 +70,12 @@ N/A - standard test environment.
   `Identity:Totp:Issuer` that is empty or holds a colon) stop the start with an error that says the two-factor
   settings are invalid and names the setting; valid settings provide the settings object to the services, with the
   feature on and the issuer `ReviewCenter` by default, and a switched-off feature with a trimmed issuer when set.
+- Invalid notification settings (a sender address that is not an address, an empty base address, an empty SMTP host, a
+  port out of range, an hour out of range, and an unknown time zone) stop the start while notifications are on with an
+  error that says the notification settings are invalid and names the setting, and that does not contain the SMTP
+  password; with notifications off the same garbage is not checked; valid settings build the application and log one
+  warning for an inline password that holds no password; a database without the notification tables stops the start
+  while notifications are on and does not while they are off.
 
 #### Test Scenarios
 
@@ -366,6 +372,26 @@ described with the `TotpSignIn` unit.
 with the feature on and the issuer `ReviewCenter`; with the feature off and an issuer with spaces around it the
 settings carry the feature off and the trimmed issuer, in `TotpOptionsTests.cs`. This scenario is tested by
 `ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings`.
+
+**ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret**: A theory over valid enabled
+SMTP settings (with the inline password `top-secret-value`) in which one value is replaced: `FromAddress` set to text
+that is not an address, an empty `BaseUrl`, an empty `Smtp:Host`, `Smtp:Port` 70000, `DigestHour` 24, and `TimeZone` set
+to an unknown zone. An `InvalidOperationException` with the text "Invalid notification settings" that names
+`Notifications:` and the setting is thrown, and its message does not contain the password. This scenario is tested by
+`ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret`.
+
+**ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword**: One application is built
+with notifications off and an invalid `FromAddress`, and one with valid enabled SMTP settings and an inline password,
+both over a new database and a capturing log provider. Both are built, and exactly one warning that starts with
+"Notification settings" is logged, for the second; it names `Notifications:Smtp:PasswordFile` and does not contain the
+password. This scenario is tested by
+`ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword`.
+
+**ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn**: A database file that
+holds one unrelated table, so that the server does not create the model, is used with valid enabled settings; an
+`InvalidOperationException` whose message contains "no notification tables" is thrown. With the same database and
+notifications off the application is built. This scenario is tested by
+`ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`.
 
 **Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
 `AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real

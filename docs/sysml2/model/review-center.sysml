@@ -38,6 +38,7 @@ package ReviewCenter {
         part web : WebSubsystem;
         part identity : IdentitySubsystem;
         part core : CoreSubsystem;
+        part messaging : MessagingSubsystem;
         part storage : StorageSubsystem;
         part contentSources : ContentSourcesSubsystem;
         part evidence : EvidenceSubsystem;

@@ -52,7 +52,7 @@ that its provider replaces the framework default); applies the options callback;
 Connect provider with `OidcSignIn.AddOidcSignIn` after the callback, because only then is the configuration final (it
 registers nothing unless `Identity:Oidc:Enabled` is true); loads static web assets
 when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, `ValidateOidcOptions`,
-`ValidateTotpOptions`,
+`ValidateTotpOptions`, `ValidateNotificationOptions`,
 `ValidateGitOptions`, and
 `ValidateDataProtection`; adds `UseNotFoundPage` (the not-found middleware, below) and routing; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
@@ -94,17 +94,20 @@ response.
 - *Preconditions*: Neither argument is null.
 - *Postconditions*: The `Database` options, a `ReviewCenterDbContext` factory configured by
   `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`,
-  `PersonalAccessTokenStore`, `TotpStore`, `InboxStore`, and `AuditStore` as
+  `PersonalAccessTokenStore`, `TotpStore`, `InboxStore`, `NotificationStore`, and `AuditStore` as
   the Core store interfaces, `PasswordHasher` as the Core hasher interface, `TotpAlgorithm` and `TotpSecretProtector`
   as the Core second factor interfaces, `ProjectAccess` as the Core interface
   `IProjectAccess` (one singleton that every service and the API share, registered before the services that take it),
   and `ProjectService`, `ReviewService`,
   `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, `ReauthProofStore`
   (the single-use proofs of users of an identity provider, shared by the sign-in and the signing service),
-  `TotpChallengeStore` and `TotpService` (the second factor), `InboxService` (the inbox and the read state),
+  `TotpChallengeStore` and `TotpService` (the second factor), `NotificationPreferenceService` (the notification
+  address), `InboxService` (the inbox and the read state),
   `UserImpactService` (the offboarding impact of a user), and
   `AuditService`
-  as singletons are registered. `TotpSignIn.AddTotpSignIn` binds the `Identity:Totp` settings.
+  as singletons are registered. `TotpSignIn.AddTotpSignIn` binds the `Identity:Totp` settings. The `Notifications`
+  settings and the sender that they choose are registered by `NotificationRegistration.AddNotifications`; no hosted
+  service or other background work is registered.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
   (its coalescing of repeated events uses the clock, so tests can move time). The `DataProtection` and `Git`
   settings are bound (an empty `Git:CachePath` becomes a `git-cache` folder beside the database, through
@@ -190,6 +193,22 @@ start-up turns a wrong setting into one clear message instead of a failure at th
 The validator (see `TotpSignIn`) rejects an issuer name that is longer than 64 characters or contains a colon or a
 control character, because the name is part of the `otpauth://` address. The message names the setting and never a
 secret.
+
+**ValidateNotificationOptions**: Reads the e-mail notification settings of a built application once.
+
+- *Parameters*: `WebApplication app` — supplies the options, the settings for the services, the sender, and the store.
+- *Returns*: `void`.
+- *Postconditions*: While `Notifications:Enabled` is false nothing is checked and the method returns. Otherwise the
+  settings are valid, a warning is logged for each doubtful setting, and the database has the notification tables;
+  or the application is disposed and an `InvalidOperationException` is thrown, beginning "Invalid notification
+  settings:" with the validation failure as its inner exception, or, for a database without the tables, "Invalid
+  notification settings: the database has no notification tables ..." with the remedy.
+
+Resolving the options, the settings, and the sender from the container runs the validator of `NotificationOptions`
+(see `NotificationOptions` in the `Messaging` design). Its messages name the setting and the rule, never a value, so the
+SMTP password cannot reach a log through them. The warnings (an inline password, an unencrypted connection to another
+machine) name the setting and hold no value. The check for the tables calls `INotificationStore.IsAvailableAsync`; it
+runs only while the feature is on, so a database that was created before the feature keeps working while it is off.
 
 **ValidateGitOptions**: Reads the git options of a built application once.
 
@@ -309,11 +328,12 @@ This is the mechanism behind the requirement that the listen URL be exposed as a
 handles three environmental conditions locally: an `OperationCanceledException` raised while the
 caller has requested cancellation is treated as a normal stop and returns 0; an
 `InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in, OpenID
-Connect sign-in, two-factor sign-in, or git
+Connect sign-in, two-factor sign-in, notification, or git
 settings are reported, is
 written through `Context.WriteError` as is ("Failed to prepare the database: {detail}", "Invalid sign-in
 settings: {detail}", "Invalid OpenID Connect sign-in settings: {detail}", "Invalid two-factor sign-in
-settings: {detail}", "Invalid git settings: {detail}", "Invalid key ring settings: {detail}", "The Data
+settings: {detail}", "Invalid notification settings: {detail}", "Invalid git settings: {detail}", "Invalid key ring
+settings: {detail}", "The Data
 Protection key ring folder '{path}' is not
 writable: ...", or "The attestation signing key is not usable: {detail}") and returns 1; and an
 `IOException`, which Kestrel uses to report an address that is in use or not bindable, is
@@ -326,11 +346,12 @@ always disposed.
 - **Context** — supplies `Urls` and `Silent`, and receives start-up error reports.
 - **App** — the root component mapped as the user interface.
 - **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **PersonalAccessTokenStore**,
-  **TotpStore**, **InboxStore**,
+  **TotpStore**, **InboxStore**, **NotificationStore**,
   **AuditStore**, **AuditAppender**,
   **RepositoryStore** — the database configuration, context, and stores registered for the pages.
 - **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**,
   **PersonalAccessTokenService**, **SigningService**, **TotpService**, **TotpChallengeStore**, **InboxService**,
+  **NotificationPreferenceService**,
   **UserImpactService**,
   **AuditService**, **RepositoryService** — the Core services registered for the pages and the API.
 - **ProjectAccess**, **IProjectAccess** — Core; the one place that decides which project a user may see, registered as a
@@ -351,7 +372,10 @@ always disposed.
 - **TotpSignIn**, **TotpOptions**, **TotpAlgorithm**, **TotpSecretProtector** — the second step of a sign-in
   (registered, validated at the start, and mapped only when enabled) and the Identity implementations of the second
   factor interfaces.
-- **ASP.NET Core shared framework** — `WebApplication`, Kestrel, endpoint routing, authentication, authorization,
+- **NotificationRegistration**, **NotificationOptions**, **INotificationSender**, **INotificationStore** — the
+  `Messaging` registration of the settings and the sender, validated at the start only while the feature is on, and the
+  store that tells whether the notification tables exist. — `WebApplication`, Kestrel, endpoint routing,
+  authentication, authorization,
   request forgery protection, Blazor Server components, and `Microsoft.Extensions.Logging`.
 - **Entity Framework Core** — the database context factory registration.
 

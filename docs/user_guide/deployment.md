@@ -156,6 +156,8 @@ that is not part of the release archive. The defaults are:
 | `Attestation:ExpiryWarningDays`           | 30 (0 for no warning)          | The Attestation Signing Key (below)     |
 | `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
 | `Git:TimeoutSeconds`                      | 120 seconds (1 to 3600)        | Repositories and Credentials            |
+| `Notifications:Enabled`                   | false (no e-mail)              | E-mail Notifications (Administration)   |
+| `Notifications:Smtp:PasswordFile`         | empty (no password file)       | E-mail Notifications (Administration)   |
 
 The two attempt limits and the window belong together: one client address may make at most the given number of
 sign-in attempts (a successful sign-in gives its attempt back) within one window.
@@ -169,10 +171,16 @@ it with a message that names the setting (see Troubleshooting). Which settings a
   `Enabled` that is not a boolean also stops the server), `Git:TimeoutSeconds`, the database provider and connection
   string, the Data Protection folder (it must be writable), and the attestation key (the provider name, and the
   settings of the provider that you chose, must give a usable key).
-- **Checked only when switched on**: `Identity:Oidc`. While `Identity:Oidc:Enabled` is `false` (the default), nothing
+- **Checked only when switched on**: `Identity:Oidc` and `Notifications`. While `Identity:Oidc:Enabled` is `false` (the
+  default), nothing
   else of that section is read or checked, so a wrong value there shows up only when you turn the sign-in on. The
   project observed that with `Enabled` set to `true` and no `Authority`, the server stopped with `Invalid OpenID
-  Connect sign-in settings: Identity:Oidc:Authority is required when sign-in with OpenID Connect is enabled.`
+  Connect sign-in settings: Identity:Oidc:Authority is required when sign-in with OpenID Connect is enabled.` The
+  same holds for `Notifications:Enabled`: while it is `false`, nothing else of the `Notifications` section is read.
+  Turned on, an invalid setting stops the start with `Invalid notification settings:` and the name of the setting,
+  and so does a database that has no notification tables (see Upgrade). The password of the mail server belongs into a
+  file, named by `Notifications:Smtp:PasswordFile` and readable only by the account of the service; a password written
+  into the configuration is logged as a warning at every start, without the password.
 
 A disabled feature is therefore not checked until you enable it. Start the server by hand with the feature enabled to
 check its settings before you rely on them.
@@ -396,8 +404,8 @@ $env:Database__ConnectionString = 'D:\ReviewCenterData\reviewcenter.db'
 ```
 
 The run takes a few seconds. It checks that git is available (and its version), runs a review workflow, a signed
-attestation, and a short start of the web server on a free loopback port, and last runs two checks of the
-deployment itself, both **read-only**:
+attestation, and a short start of the web server on a free loopback port, and last runs three checks of the
+deployment itself, all **read-only**:
 
 - `ReviewCenter_ConfiguredDatabase` opens the configured database and compares its tables and columns with what this
   version expects.
@@ -416,20 +424,30 @@ deployment itself, both **read-only**:
   that others can read). It **fails** when the path, the file or the password is missing, the password is wrong, or
   `RequireTrustedKey` or `DataProtection:RequireEncryptedKeys` refuses the key. It names a file by its name only and
   never prints the password or the folder.
+- `ReviewCenter_ConfiguredNotifications` examines the `Notifications` settings (see E-mail Notifications in the
+  Administration chapter). It is **skipped** while `Notifications:Enabled` is false. Otherwise it applies the checks
+  of the server start and reports the sender, for the `Smtp` sender the server, the port, the connection protection,
+  and whether the password comes from a file, plus a warning for a password written into the configuration. It
+  **fails**, naming the setting, for a setting that cannot be used. It never connects to a mail server and never
+  prints a password, a path, or an address.
 
-With a database and a key ring in place, the run ends with `Passed: 11` and exit code 0, and the last two lines read like
+With a database and a key ring in place, the run ends with `Passed: 12` (`Passed: 11` and `Skipped: 1` while
+notifications are off) and exit code 0, and the last lines read like
 `ReviewCenter_ConfiguredDatabase - Passed (...): provider Sqlite; opened read-only; schema matches (18 tables, 148
 columns)` and `ReviewCenter_ConfiguredKeys - Passed (...): protection Dpapi; key files 1 (0 not encrypted); protected
 secrets 3 (repository tokens 2, second-factor secrets 1); unreadable 0; attestation key SelfSigned: subject 'CN=...',
-thumbprint ..., valid ... to ...`; the numbers are those of the installation and,
-for the schema, grow when a release adds tables or columns. The first of the two lines was observed on a Windows
-machine of the project; the second shows the form of the report. A non-zero exit code means that a
+thumbprint ..., valid ... to ...` and `ReviewCenter_ConfiguredNotifications - Passed (...): Sender SMTP, server
+smtp.example.com:587, TLS StartTls, password from a file.`; the numbers are those of the installation and,
+for the schema, grow when a release adds tables or columns (the counts of tables and columns in the first line were
+observed with a build that had no notification tables). The first of the lines was observed on a Windows
+machine of the project; the others show the form of the report. A non-zero exit code means that a
 check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter). The key check
 **fails** when secrets cannot be decrypted (the message gives the counts and the repository and user ids), when the key
 folder is empty or missing but the database holds secrets, when the ring is not encrypted and
 `DataProtection:RequireEncryptedKeys` is true, and when the newest key cannot be decrypted. A fresh
-installation has no database file yet: both checks are then **skipped** (the report shows `SKIPPED` and the run does not
-fail), and the server creates the file at the first start. The key check is also skipped when the database exists and
+installation has no database file yet: the database and key checks are then **skipped** (the report shows `SKIPPED`
+and the run does not fail), and the server creates the file at the first start. The key check is also skipped when
+the database exists and
 holds no secret and the key folder does not exist yet.
 
 Then start the server and check `/health`. A first start with a new database creates the data folder, the database,
@@ -760,6 +778,14 @@ lacked a table, and `/health` answered `200`. Only `--validate --check-config` r
 message `The database schema does not match this version of ReviewCenter: table 'UserTotps' is missing.` and exit
 code 1. Planned Work in the Introduction lists a migration command as future work.
 
+E-mail notifications are the latest example. They need two new tables, `NotificationPreferences` and
+`NotificationSendLog`, which a database of an earlier version does not have. With `Notifications:Enabled` off, such a
+database keeps working. Before you turn notifications on, the database must be **recreated** (the server creates the
+tables only for a new file, with no migration): for development data, start with a new database file as the Database
+section of the Administration chapter describes, and create the first administrator again. The server then refuses
+to start with notifications on and without the tables, with a message that says so, and
+`--validate --check-config` reports the missing tables.
+
 The supported upgrade procedure is therefore:
 
 1. Read the release notes of the new version for changes of the database, and of the settings.
@@ -811,8 +837,9 @@ because no release has been published yet.
 - Prefer an account at your identity provider where one exists (see Sign In with an OpenID Connect Provider in the
   Users and Sign-in chapter), and turn anonymous evidence access on only for projects that need it.
 - The server checks its settings when it starts, and refuses to start when an enabled setting is invalid, when the
-  key folder cannot be written, or when the attestation key is not usable (the `Identity:Oidc` settings are not checked
-  while that sign-in is off; see Configuration). Start it once by hand after every change of the
+  key folder cannot be written, or when the attestation key is not usable (the `Identity:Oidc` and `Notifications`
+  settings are not checked
+  while they are off; see Configuration). Start it once by hand after every change of the
   settings, and run `--validate --check-config` (see Check an Installation).
 - Review the audit trail regularly (see Audit Trail in the Administration chapter), and verify its chain from the
   command line.

@@ -32,6 +32,10 @@ package ReviewCenter {
         expose CoreSubsystem;
     }
 
+    view MessagingView {
+        expose MessagingSubsystem;
+    }
+
     view StorageView {
         expose StorageSubsystem;
     }

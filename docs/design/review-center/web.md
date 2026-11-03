@@ -167,7 +167,9 @@ appearance, and manages their personal access tokens.
   page shows a banner and only the password form (labeled with the temporary password), and a successful change leads
   to `/login?changed=1`. For a user who signs in with an identity provider a sentence that names the provider replaces
   the password form, because such an account has no password. A Two-factor card lets a local user set up, turn off, and
-  renew the recovery codes of a one-time password second factor.
+  renew the recovery codes of a one-time password second factor. An E-mail notifications card lets any user whose
+  password is not temporary give an e-mail address, confirm it with a 6-digit code that was mailed to it, and remove
+  it; while the administrator has not set up e-mail notifications the card holds one sentence and nothing else.
 - *Constraints*: Requires a signed-in user. A user with a temporary password may open no other page of the
   application except the login, help, and About pages (the layout redirects to this page).
 
@@ -291,7 +293,8 @@ marker. They obtain `ProjectService`, `ReviewService`, and the other Core servic
 Inbox tab; `ProjectPage`: also `SigningService`, `RepositoryService`,
 and `IProjectAccess`; `NewMemberPage` and `NewMemberAccountPage`: `ProjectService` and `IProjectAccess`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
-`ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
+`ChecklistService`; `AccountPage`: `UserService`, `NotificationPreferenceService`, and `PersonalAccessTokenService`;
+`UsersPage`:
 `UserService`, `UserImpactService`, and `TotpService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage`
 also the user store through
 `UserService`; `AuditPage` also `ProjectService` for the project selector; `ProjectAuditPage`: `AuditService`,
@@ -650,6 +653,17 @@ was just used to sign in; the code is passed to `SigningService.SignWithCredenti
 shows a badge for each,
 and offers a Reset two-factor button that calls `TotpService.ResetAsync`. The Help topic `two-factor` explains the setup,
 the sign-in, the recovery codes, and what to do after losing a phone.
+
+#### E-mail notification address
+
+The E-mail notifications card of `AccountPage` only collects input and shows results; the rules, the limits, and the
+mail are in `NotificationPreferenceService`. The card is shown to every user whose password is not temporary, a user of
+an identity provider included. While the feature is not available (`IsAvailable` is false) the card holds one sentence
+and no field, and the page reads nothing from the store, so a database from before the feature keeps working. Otherwise
+the card explains that an e-mail never contains review text and that only a confirmed address receives mail, and offers
+the address form, then the code form (with a button for a new code), and then the confirmed address with a button to
+remove it. The confirmation code is never shown by the page. A refusal is shown as the message of the rule next to the
+card, and the code field is cleared after every attempt.
 
 #### History and audit
 

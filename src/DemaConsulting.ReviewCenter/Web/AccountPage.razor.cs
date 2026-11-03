@@ -29,12 +29,13 @@ namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the account page (<c>AccountPage.razor</c>): the signed-in user changes their own
-///     password, manages their optional second factor (authenticator app) and their personal access tokens for the
+///     password, manages their optional second factor (authenticator app), their notification e-mail address
+///     (when the administrator has set up e-mail notifications) and their personal access tokens for the
 ///     API.
 /// </summary>
 /// <remarks>
-///     The page talks to the domain only through <see cref="UserService"/>, <see cref="TotpService"/> and
-///     <see cref="PersonalAccessTokenService"/>,
+///     The page talks to the domain only through <see cref="UserService"/>, <see cref="TotpService"/>,
+///     <see cref="NotificationPreferenceService"/> and <see cref="PersonalAccessTokenService"/>,
 ///     which own the rules; a rule violation is shown next to the form instead of being thrown. Whose password or
 ///     tokens change is decided by the authentication state, never by a field on the page. The repeated new password
 ///     is only a typing check, so it is compared here. Passwords and codes are never shown or logged, and the fields are
@@ -274,8 +275,141 @@ public partial class AccountPage : ComponentBase
         {
             await LoadTokensAsync();
             await LoadTotpAsync();
+            await LoadNotificationsAsync();
         }
     }
+
+    /// <summary>
+    ///     Loads the notification address status of the signed-in user; nothing is read while e-mail notifications
+    ///     are not set up, so a database without the notification tables keeps working.
+    /// </summary>
+    /// <returns>A task that completes when the status is loaded.</returns>
+    private async Task LoadNotificationsAsync()
+    {
+        NotificationInfo = null;
+        if (!Notifications.IsAvailable)
+        {
+            return;
+        }
+
+        try
+        {
+            NotificationInfo = await Notifications.GetStatusAsync(await AuthenticationState.GetActorAsync());
+        }
+        catch (DomainRuleException)
+        {
+            // The account is gone; SessionGate shows the "session ended" message
+        }
+    }
+
+    /// <summary>
+    ///     Mails a confirmation code to the typed address.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task SendNotificationCodeAsync()
+    {
+        await RunNotificationActionAsync(
+            actor => Notifications.RequestConfirmationAsync(actor, NotificationAddressText),
+            "A confirmation code was sent. Enter it below.");
+    }
+
+    /// <summary>
+    ///     Mails a new confirmation code to the address that waits for its confirmation.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task ResendNotificationCodeAsync()
+    {
+        var pending = NotificationInfo?.PendingAddress;
+        await RunNotificationActionAsync(
+            actor => Notifications.RequestConfirmationAsync(actor, pending),
+            "A new confirmation code was sent. Only the newest code works.");
+    }
+
+    /// <summary>
+    ///     Confirms the waiting address with the typed code.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task ConfirmNotificationAddressAsync()
+    {
+        await RunNotificationActionAsync(
+            actor => Notifications.ConfirmAsync(actor, NotificationCode),
+            "Your e-mail address is confirmed.");
+    }
+
+    /// <summary>
+    ///     Removes the address of the signed-in user, confirmed or waiting.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task RemoveNotificationAddressAsync()
+    {
+        await RunNotificationActionAsync(
+            actor => Notifications.RemoveAddressAsync(actor),
+            "Your e-mail address was removed.");
+    }
+
+    /// <summary>
+    ///     Runs one notification address action, shows its outcome and reloads the status.
+    /// </summary>
+    /// <param name="action">The action of the service for the signed-in user.</param>
+    /// <param name="success">The sentence that confirms the action.</param>
+    /// <returns>A task that completes when the action has been handled.</returns>
+    /// <remarks>
+    ///     The typed code is emptied after every attempt. A rule violation is shown, never thrown; the status is
+    ///     reloaded either way, so a code that has expired or is used up is shown as it is now.
+    /// </remarks>
+    private async Task RunNotificationActionAsync(Func<Actor, Task> action, string success)
+    {
+        NotificationError = null;
+        NotificationNotice = null;
+        try
+        {
+            await action(await AuthenticationState.GetActorAsync());
+            NotificationNotice = success;
+            NotificationAddressText = string.Empty;
+        }
+        catch (DomainRuleException ex)
+        {
+            NotificationError = ex.Message;
+        }
+        finally
+        {
+            NotificationCode = string.Empty;
+        }
+
+        await LoadNotificationsAsync();
+    }
+
+    /// <summary>
+    ///     Gets or sets the service of the notification address, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private NotificationPreferenceService Notifications { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets what the page shows of the notification address of the signed-in user, or <c>null</c> when it is not
+    ///     loaded (notifications are not set up, or no account).
+    /// </summary>
+    private NotificationAddressStatus? NotificationInfo { get; set; }
+
+    /// <summary>
+    ///     Gets the message of the last rejected notification address action, or <c>null</c>.
+    /// </summary>
+    private string? NotificationError { get; set; }
+
+    /// <summary>
+    ///     Gets the confirmation of the last notification address action, or <c>null</c>.
+    /// </summary>
+    private string? NotificationNotice { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the address typed into the address form.
+    /// </summary>
+    private string NotificationAddressText { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the code typed into the confirm form.
+    /// </summary>
+    private string NotificationCode { get; set; } = string.Empty;
 
     /// <summary>
     ///     Loads the second factor status of the signed-in user; nothing is shown for an account of an identity

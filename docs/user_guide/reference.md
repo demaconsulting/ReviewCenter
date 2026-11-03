@@ -21,7 +21,7 @@ The following command-line options are supported:
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
 | `--validate`                          | Run self-validation                                          |
-| `--check-config`                      | With `--validate`, also check the database and keys          |
+| `--check-config`                      | With `--validate`, also check database, keys, and e-mail     |
 | `--results <file>`, `--result <file>` | Write validation results to file (TRX or JUnit format)       |
 | `--depth <#>`                         | Set heading depth for markdown output (default: 1)           |
 | `--log <file>`                        | Write output to log file                                     |
@@ -170,17 +170,19 @@ does not hang. The temporary folders are deleted at the end of each test; a file
 (for example by a virus scanner) is retried for a short time and, if it stays locked, left to the operating system's
 temporary cleanup without failing the run.
 
-### Checking the Configured Database and Keys
+### Checking the Configured Database, Keys, and E-mail Settings
 
 The default run never looks at your configuration. To also check that the database your server is configured to
-use can be reached and has the schema of this version, and that the key ring decrypts what the database holds, add
+use can be reached and has the schema of this version, that the key ring decrypts what the database holds, and that
+the e-mail notification settings are usable, add
 `--check-config`:
 
 ```bash
 reviewcenter --validate --check-config
 ```
 
-This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**, and an eleventh, **`ReviewCenter_ConfiguredKeys`**.
+This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**, an eleventh, **`ReviewCenter_ConfiguredKeys`**, and a
+twelfth, **`ReviewCenter_ConfiguredNotifications`**, so that the run has twelve tests instead of nine.
 The first loads the configuration the way `serve` does
 (`appsettings.json` and the environment variables), recognizes the database provider, opens the database
 **read-only**, and compares its tables and columns with the ones this version expects. It never writes to the
@@ -220,6 +222,18 @@ provider for a trusted key. It never prints a key, a secret, a password, or a pa
 with the attestation key names only the file name or the setting.
 It is **skipped** when no database is configured or the database file does not exist yet, and when the database
 holds no secret and the key folder does not exist yet. See Back Up and Restore in the Deployment chapter.
+
+**`ReviewCenter_ConfiguredNotifications`** examines the `Notifications` settings (see E-mail Notifications in the
+Administration chapter) and nothing else: it never connects to a mail server, never sends a mail, and creates
+nothing. It is **skipped** while `Notifications:Enabled` is not true. Otherwise it applies the checks that the server
+makes at its start and reports the sender; for the `Smtp` sender it reports the server and port, the connection
+protection (`None`, `StartTls`, or `Implicit`), and whether the password comes from a file, is written into the
+configuration, or is not set, for example `Sender SMTP, server smtp.example.com:587, TLS StartTls, password from a
+file.` For the `File` sender it reports that mails are written as `.eml` files. A password in the configuration, and an
+unencrypted connection to another machine, add `Warning:` and the text of the warning to the line, without the
+password. It **fails** (exit code 1), naming the setting, when a setting cannot be used, for example a missing
+`Notifications:Smtp:Host`, and it **fails** without showing the value when a value has the wrong type, for example text
+in place of a port number. It prints no password, no path, and no mail address.
 
 ## Rotating the Data Protection Key
 

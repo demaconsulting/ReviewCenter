@@ -9,6 +9,7 @@ resource-path:
   - docs/design/review-center/identity
   - docs/design/review-center/web
   - docs/design/review-center/core
+  - docs/design/review-center/messaging
   - docs/design/review-center/storage
   - docs/design/review-center/content-sources
   - docs/design/review-center/evidence
@@ -86,6 +87,13 @@ input-files:
   - docs/design/review-center/core/ballot-consolidation.md
   - docs/design/review-center/core/ballot-visibility.md
   - docs/design/review-center/core/review-status-service.md
+  - docs/design/review-center/core/notification-address.md
+  - docs/design/review-center/core/notification-message.md
+  - docs/design/review-center/core/notification-preference-service.md
+  - docs/design/review-center/messaging.md
+  - docs/design/review-center/messaging/notification-options.md
+  - docs/design/review-center/messaging/smtp-notification-sender.md
+  - docs/design/review-center/messaging/file-notification-sender.md
   - docs/design/review-center/storage.md
   - docs/design/review-center/storage/review-center-db-context.md
   - docs/design/review-center/storage/review-store.md
@@ -95,6 +103,7 @@ input-files:
   - docs/design/review-center/storage/database-setup.md
   - docs/design/review-center/storage/repository-store.md
   - docs/design/review-center/storage/inbox-store.md
+  - docs/design/review-center/storage/notification-store.md
   - docs/design/review-center/content-sources.md
   - docs/design/review-center/content-sources/git-runner.md
   - docs/design/review-center/content-sources/git-source.md
@@ -126,6 +135,7 @@ input-files:
   - docs/design/ots/fileassert.md
   - docs/design/ots/filesystemglobbing.md
   - docs/design/ots/git.md
+  - docs/design/ots/mailkit.md
   - docs/design/ots/openapi.md
   - docs/design/ots/openidconnect.md
   - docs/design/ots/openiddict.md

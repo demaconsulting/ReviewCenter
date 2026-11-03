@@ -6,7 +6,8 @@
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
 #   ReviewPlanner, LineDiff, ProjectAccess, EvidenceSettingsService, ProjectChecklistService, InboxService,
-#   UserImpactService, BallotConsolidation, BallotVisibility, and ReviewStatusService
+#   UserImpactService, BallotConsolidation, BallotVisibility, ReviewStatusService, NotificationAddress,
+#   NotificationMessage, and NotificationPreferenceService
 #   units, with the
 #   domain types they share
 #   (project, evidence settings, review,
@@ -889,3 +890,196 @@ sections:
         tests:
           - TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds
           - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
+
+      - id: ReviewCenter-Core-NotificationAddress
+        title: >-
+          The Core subsystem shall accept a text as the e-mail address for notifications only when the text is exactly
+          one syntactically valid address.
+        justification: |
+          The address is typed by a person and ends up in the header of a mail that the server sends. A list, a
+          display name, or a line break could aim the mail at someone else or add a header, so only one plain address
+          may pass, in one normal form.
+        children:
+          - ReviewCenter-NotificationAddress-Accept
+          - ReviewCenter-NotificationAddress-AcceptPlusTag
+          - ReviewCenter-NotificationAddress-LowerCase
+          - ReviewCenter-NotificationAddress-TrimWhiteSpace
+          - ReviewCenter-NotificationAddress-RefuseNoAtSign
+          - ReviewCenter-NotificationAddress-RefuseTwoAtSigns
+          - ReviewCenter-NotificationAddress-RefuseList
+          - ReviewCenter-NotificationAddress-RefuseDisplayName
+          - ReviewCenter-NotificationAddress-RefuseComment
+          - ReviewCenter-NotificationAddress-RefuseQuotedLocalPart
+          - ReviewCenter-NotificationAddress-RefuseIpLiteral
+          - ReviewCenter-NotificationAddress-RefuseLineBreak
+          - ReviewCenter-NotificationAddress-RefuseControlCharacter
+          - ReviewCenter-NotificationAddress-RefuseNonAscii
+          - ReviewCenter-NotificationAddress-RefuseDomainWithoutDot
+          - ReviewCenter-NotificationAddress-RefuseLeadingDot
+          - ReviewCenter-NotificationAddress-RefuseTrailingDot
+          - ReviewCenter-NotificationAddress-RefuseDoubleDot
+          - ReviewCenter-NotificationAddress-RefuseEmptyLabel
+          - ReviewCenter-NotificationAddress-RefuseHyphenAtLabelStart
+          - ReviewCenter-NotificationAddress-RefuseHyphenAtLabelEnd
+          - ReviewCenter-NotificationAddress-RefuseEmptyLocalPart
+          - ReviewCenter-NotificationAddress-RefuseEmptyDomain
+          - ReviewCenter-NotificationAddress-RefuseEmpty
+          - ReviewCenter-NotificationAddress-RefuseMissing
+          - ReviewCenter-NotificationAddress-RefuseWhiteSpaceOnly
+          - ReviewCenter-NotificationAddress-AcceptMaxLength
+          - ReviewCenter-NotificationAddress-RefuseTooLong
+          - ReviewCenter-NotificationAddress-AcceptLongestLocalPart
+          - ReviewCenter-NotificationAddress-RefuseLongLocalPart
+        tests:
+          - NotificationAddress_TryNormalize_PlainAddress_Succeeds
+          - NotificationAddress_TryNormalize_ControlCharacter_Fails
+
+      - id: ReviewCenter-Core-NotificationConfirmation
+        title: >-
+          The Core subsystem shall confirm an e-mail address for notifications only when the user types back the code
+          that was mailed to that address.
+        justification: |
+          Mail may go only to an address that its owner has shown to be theirs. The owner shows it by reading a code
+          in a mail that was sent to the address, so a typing error or a stranger's address never receives
+          notifications. The code is mailed once, kept only as a salted hash, never shown elsewhere, and the mail has no
+          link.
+        children:
+          - ReviewCenter-NotificationPreferenceService-MailCode
+          - ReviewCenter-NotificationPreferenceService-MailNormalizedAddress
+          - ReviewCenter-NotificationPreferenceService-PendingUntilConfirmed
+          - ReviewCenter-NotificationPreferenceService-ConfirmRightCode
+          - ReviewCenter-NotificationPreferenceService-IgnoreSpacesInCode
+          - ReviewCenter-NotificationPreferenceService-ConfirmedAddressShown
+          - ReviewCenter-NotificationPreferenceService-PendingAddressShown
+          - ReviewCenter-NotificationPreferenceService-WrongCodeRefused
+          - ReviewCenter-NotificationPreferenceService-WrongCodeKeepsPending
+          - ReviewCenter-NotificationPreferenceService-NothingPending
+          - ReviewCenter-NotificationPreferenceService-CodeUsedOnce
+          - ReviewCenter-NotificationPreferenceService-InvalidAddressRefused
+          - ReviewCenter-NotificationPreferenceService-InvalidAddressSendsNothing
+          - ReviewCenter-NotificationPreferenceService-NewCodeReplacesOld
+          - ReviewCenter-NotificationPreferenceService-SendFailureReported
+          - ReviewCenter-NotificationPreferenceService-SendFailureRollsBack
+          - ReviewCenter-NotificationPreferenceService-ConfirmedAddressKept
+          - ReviewCenter-NotificationPreferenceService-MailOnlyToConfirmed
+          - ReviewCenter-NotificationPreferenceService-Remove
+          - ReviewCenter-NotificationPreferenceService-RemoveReported
+          - ReviewCenter-NotificationPreferenceService-CodeNotStored
+          - ReviewCenter-NotificationPreferenceService-CanceledSendRollsBack
+          - ReviewCenter-NotificationPreferenceService-MailCarriesLifetime
+          - ReviewCenter-NotificationPreferenceService-MailCarriesName
+          - ReviewCenter-NotificationPreferenceService-MailIgnoreHint
+          - ReviewCenter-NotificationPreferenceService-MailNoLinkText
+          - ReviewCenter-NotificationPreferenceService-MailNoLinkHtml
+          - ReviewCenter-NotificationPreferenceService-HtmlEncodesName
+        tests:
+          - NotificationPreferenceService_Confirm_RightCode_ConfirmsAddress
+          - NotificationPreferenceService_Confirm_WrongCode_ThrowsAndStaysPending
+
+      - id: ReviewCenter-Core-NotificationLimits
+        title: >-
+          The Core subsystem shall refuse an e-mail confirmation step that goes beyond a limit that is set for the
+          confirmation.
+        justification: |
+          A confirmation sends mail to an address chosen by a user, so it could be used to flood a mailbox or to use
+          the mail server for bulk mail, and a six digit code could be guessed. The limits are the pause of 60 seconds
+          between mails, three mails per user and three mails per address in a day, a limit per hour for the whole
+          server, five wrong codes for each code, and a lifetime of 30 minutes for a code.
+        children:
+          - ReviewCenter-NotificationPreferenceService-ResendCooldown
+          - ReviewCenter-NotificationPreferenceService-ResendAfterCooldown
+          - ReviewCenter-NotificationPreferenceService-UserDailyLimit
+          - ReviewCenter-NotificationPreferenceService-AddressDailyLimit
+          - ReviewCenter-NotificationPreferenceService-ServerHourlyLimit
+          - ReviewCenter-NotificationPreferenceService-LimitsRecover
+          - ReviewCenter-NotificationPreferenceService-AttemptLimit
+          - ReviewCenter-NotificationPreferenceService-CodeLifetime
+          - ReviewCenter-NotificationPreferenceService-ExpiredReported
+        tests:
+          - NotificationPreferenceService_RequestConfirmation_UserDailyLimit_ThrowsLimitReached
+          - NotificationPreferenceService_Confirm_AfterMaxWrongAttempts_RefusesTheRightCode
+
+      - id: ReviewCenter-Core-NotificationAccess
+        title: >-
+          The Core subsystem shall refuse a notification address action that is not permitted for the acting account.
+        justification: |
+          The address decides where the server sends mail, so only the interactive session of an enabled user may
+          change it. An actor that signed in with an API token, a disabled or unknown user, a user with a temporary
+          password, and every request while the feature is off or no sender is configured are not permitted, and a
+          refusal touches no data.
+        children:
+          - ReviewCenter-NotificationPreferenceService-RefuseApiToken
+          - ReviewCenter-NotificationPreferenceService-RefuseFeatureOff
+          - ReviewCenter-NotificationPreferenceService-FeatureOffTouchesNoStore
+          - ReviewCenter-NotificationPreferenceService-UnavailableWithoutSender
+          - ReviewCenter-NotificationPreferenceService-RefuseDisabledUser
+          - ReviewCenter-NotificationPreferenceService-RefuseUnknownUser
+          - ReviewCenter-NotificationPreferenceService-RefuseTemporaryPassword
+          - ReviewCenter-NotificationPreferenceService-RefuseMissingActor
+        tests:
+          - NotificationPreferenceService_Actions_ApiTokenActor_AreRefused
+          - NotificationPreferenceService_Actions_FeatureOff_AreRefusedAndTouchNoStore
+
+      - id: ReviewCenter-Core-NotificationAudit
+        title: >-
+          The Core subsystem shall record each change of a notification address as an audit entry.
+        justification: |
+          A change of the place where mail goes belongs in the audit trail. The trail is kept for a long time and read
+          by many people, so it must hold neither personal data nor a code that could still be used.
+        children:
+          - ReviewCenter-NotificationPreferenceService-AuditRequest
+          - ReviewCenter-NotificationPreferenceService-AuditConfirm
+          - ReviewCenter-NotificationPreferenceService-AuditRemove
+        tests:
+          - NotificationPreferenceService_Changes_AreAuditedWithoutAddressOrCode
+
+      - id: ReviewCenter-Core-NotificationAuditNoAddress
+        title: >-
+          The Core subsystem shall keep the e-mail address of a user out of the audit entries.
+        justification: |
+          The audit trail is kept for a long time and read by many people, so it must hold no personal data.
+        children:
+          - ReviewCenter-NotificationPreferenceService-AuditNoAddress
+        tests:
+          - NotificationPreferenceService_Changes_AreAuditedWithoutAddressOrCode
+
+      - id: ReviewCenter-Core-NotificationAuditNoCode
+        title: >-
+          The Core subsystem shall keep the confirmation code out of the audit entries.
+        justification: |
+          A code in the audit trail could still be used by a person who must not be able to confirm the address.
+        children:
+          - ReviewCenter-NotificationPreferenceService-AuditNoCode
+        tests:
+          - NotificationPreferenceService_Changes_AreAuditedWithoutAddressOrCode
+
+      - id: ReviewCenter-Core-NotificationMessage
+        title: >-
+          The Core subsystem shall refuse a notification message that has a line break in a part that goes into the
+          header of the mail.
+        justification: |
+          A line break in the subject or the recipient starts a new header line, with which a caller could add a
+          recipient or change the mail. The check is made when the message is built, so that no sender can be handed
+          such a message.
+        children:
+          - ReviewCenter-NotificationMessage-KeepParts
+          - ReviewCenter-NotificationMessage-KeepTextBody
+          - ReviewCenter-NotificationMessage-KeepHtmlBody
+          - ReviewCenter-NotificationMessage-NormalizeRecipient
+          - ReviewCenter-NotificationMessage-RefuseInvalidRecipient
+          - ReviewCenter-NotificationMessage-HideInvalidRecipient
+          - ReviewCenter-NotificationMessage-RefuseSubjectLineBreak
+          - ReviewCenter-NotificationMessage-RefuseSubjectControlCharacter
+          - ReviewCenter-NotificationMessage-HideInvalidSubject
+          - ReviewCenter-NotificationMessage-RefuseEmptySubject
+          - ReviewCenter-NotificationMessage-RefuseLongSubject
+          - ReviewCenter-NotificationMessage-RefuseBlankBody
+          - ReviewCenter-NotificationMessage-RefuseEmptyBody
+          - ReviewCenter-NotificationMessage-RefuseLongBody
+          - ReviewCenter-NotificationMessage-RefuseNulInBody
+          - ReviewCenter-NotificationMessage-AcceptBodyLineBreaks
+          - ReviewCenter-NotificationMessage-NoSenderNotConfigured
+          - ReviewCenter-NotificationMessage-NoSenderRefuses
+        tests:
+          - NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue
+          - NotificationMessage_Constructor_InvalidRecipient_ThrowsWithoutEchoingTheValue

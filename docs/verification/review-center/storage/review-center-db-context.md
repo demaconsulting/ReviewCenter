@@ -5,7 +5,7 @@
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
 `UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`,
 `ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, `ProjectChecklistStoreTests.cs`,
-`TotpStoreTests.cs`, and `DatabaseSetupTests.cs`, which
+`TotpStoreTests.cs`, `NotificationStoreTests.cs`, and `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
 private temporary folder. No mocking or in-memory substitute is applied. Each test uses its own database file.
@@ -56,6 +56,11 @@ be loadable on the test platform.
 - The tables for the second factor hold one enrollment per user and the recovery codes of a user; the database refuses
   two identical recovery code hashes of one user and allows the same hash for two users, and deleting a user deletes the
   enrollment and its codes.
+- The tables for the e-mail address for notifications and for the log of the mails that were sent are created in a new
+  database, and a database without them is reported as not available by the store
+  (`NotificationStore_IsAvailableAsync_NewDatabase_ReturnsTrue` and
+  `NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse`); the real store is verified in the tests of the
+  `NotificationStore` unit.
 - The table for review reopens holds the reopen history of a review (who, when, why, and the previous digest), with the
   identity assigned by the database; it is removed together with its review; and a new project reads back with the
   `RequireIndependentReviewers` column set (a column of the `Projects` table without a database default, whose value
@@ -238,6 +243,13 @@ by `TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack`; t
 which is tested by `TotpStore_ConfirmAsync_SameHashForDifferentUsers_IsAllowed`. Deleting a user removes the enrollment
 and the codes by cascade, which is tested by `TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes`. Both tests are
 described with the `TotpStore` unit.
+
+**Notification tables**: The `NotificationPreferences` and `NotificationSendLog` tables are exercised by the tests of
+`NotificationStore` in `NotificationStoreTests.cs` over a real database file. A new database has both tables, which
+is tested by `NotificationStore_IsAvailableAsync_NewDatabase_ReturnsTrue`; after both tables are dropped, as in a
+database that was created before they existed, the store reports that it is not available, which is tested by
+`NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse`. Both tests are described with the `NotificationStore`
+unit.
 
 **The follow-up columns** are verified through the real store in `ReviewFollowUpStoreTests.cs`.
 

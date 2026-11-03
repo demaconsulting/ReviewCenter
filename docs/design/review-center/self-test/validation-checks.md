@@ -72,7 +72,7 @@ The default run has nine checks:
   static asset, expects HTTP 200 for both, and stops the host cleanly before the temporary folder is disposed. The
   host is started once.
 
-The opt-in tenth and eleventh checks are run only with `--validate --check-config`:
+The opt-in tenth, eleventh, and twelfth checks are run only with `--validate --check-config`:
 
 - **ConfiguredDatabaseCheck** (`ReviewCenter_ConfiguredDatabase`): loads the configuration the way the server does
   (`appsettings.json` and the environment variables), recognizes the provider, opens the database read-only, and
@@ -115,6 +115,19 @@ The opt-in tenth and eleventh checks are run only with `--validate --check-confi
   never printed. The store provider is not covered by a test of the check; it relies on the describe path of the
   provider itself (`GetSigningKey` and its trust policy), which is tested in the `Evidence` subsystem. The clause is
   only added when the check runs, not when it is skipped.
+- **ConfiguredNotificationsCheck** (`ReviewCenter_ConfiguredNotifications`, the twelfth and last): answers whether the
+  e-mail notification settings of the server are usable. It loads the configuration the way the server does, binds the
+  `Notifications` section, and throws `ValidationSkippedException` ("E-mail notifications are not enabled
+  (Notifications:Enabled).") while `Enabled` is false. A value that cannot be converted to its type (for example text
+  for a port) fails with a fixed message that does not show the value, because the exception text can hold it. Otherwise
+  it runs `NotificationOptionsValidator`, the check of the server start-up, whose failure message names the setting and
+  never a value, and fails with that message. A passing run reports one line: for the SMTP sender the server name, the
+  port, the connection protection (`None`, `StartTls`, or `Implicit`), and where the password comes from (from a file,
+  inline in the configuration, or not set); for the File sender the sentence that mails are written as `.eml` files
+  into the configured folder. Each warning of `NotificationOptions.GetWarnings` (a password written into the
+  configuration, an unencrypted connection to another machine) is appended as " Warning: ..." without the password. The
+  check never opens a network connection and never sends a mail, and it prints no password, no folder path, and no
+  address.
 
 **FastCommitInterceptor** (internal, `SelfTestServices`): an EF Core connection interceptor that sets
 `synchronous=OFF` and `journal_mode=MEMORY` when a connection opens, so that the many commits of the review
@@ -144,7 +157,8 @@ so a hung git process or host ends as a failure instead of hanging the run.
 - **Core, Storage, ContentSources, Evidence and the web host** — the production services the checks call; the
   checks never reimplement the production logic. `TotpCheck` calls `TotpAlgorithm` of the `Identity` subsystem.
   `ConfiguredKeysCheck` calls `SecretScan` and `KeyRingProtection` of the `Hosting` subsystem, and
-  `AttestationKeyProviderFactory` of the `Evidence` subsystem.
+  `AttestationKeyProviderFactory` of the `Evidence` subsystem. `ConfiguredNotificationsCheck` calls
+  `NotificationOptions` and `NotificationOptionsValidator` of the `Messaging` subsystem.
 - **System.Security.Cryptography.Pkcs** — the independent verification of the attestation signature.
 
 #### Callers

@@ -131,6 +131,9 @@ administrator is not throttled but is a trusted actor).
 | `auth.totp-recovery-used` | `recovery code used to sign in`, or `... to remove the second factor` (same transaction) |
 | `auth.totp-recovery-regenerated` | `10 new recovery codes issued` (same transaction as the change) |
 | `auth.totp-failed` | `wrong or reused code (sign-in)`, `(enrollment)`, or `(account page)` (fixed text; best-effort) |
+| `notification.settings-changed` | `Notification e-mail address entered; confirmation pending.` (no address) |
+| `notification.email-confirmed` | `Notification e-mail address confirmed.` (never the address; same transaction) |
+| `notification.email-removed` | `Notification e-mail address removed.` (never the address; same transaction) |
 | `audit.events-suppressed` | `tracking table full, events of new keys are not recorded` (see below) |
 
 The three `ballot.` actions are recorded by the store in the transaction of the change that causes them. The slot number
@@ -176,7 +179,9 @@ and a flag that already has the requested value record nothing. The text of a no
 
 Changes are recorded in the same transaction as the change (this includes the second factor: `TotpService` takes no
 `AuditService`, and the entries `auth.totp-enrolled`, `auth.totp-disabled`, `auth.totp-reset`,
-`auth.totp-recovery-used`, and `auth.totp-recovery-regenerated` are built as drafts and saved by `TotpStore`);
+`auth.totp-recovery-used`, and `auth.totp-recovery-regenerated` are built as drafts and saved by `TotpStore`, and the
+same holds for the three `notification.` entries, which `NotificationPreferenceService` builds and `NotificationStore`
+saves; the entries hold neither the e-mail address nor the confirmation code);
 sign-in, sign-out, failed sign-in, attempts on a locked
 account, refusals by the throttle, failed re-authentication, a wrong second factor code (`auth.totp-failed`), and
 lockout are recorded on the best-effort path in their
@@ -252,10 +257,10 @@ to its last instant.
 
 **AuditActions** (static): the vocabulary of the action codes the product records, `All` (sorted, without the
 `selftest.` entries of the self test, which never reach an installation), the groups `Prefixes` (`account.`,
-`attestation.`, `audit.`, `auth.`, `checklist.`, `project.`, `repository.`, `review.`, `signature.`, `slot.`,
-`thread.`, `token.`, `user.`), and the lookups `InGroup`, `IsKnownAction` and `IsKnownPrefix`. The pages offer these as
-the choices of the action filter and accept no other value from an address. The list is kept in step with the code by
-a test that scans the product sources for the action codes passed to an audit draft.
+`attestation.`, `audit.`, `auth.`, `checklist.`, `notification.`, `project.`, `repository.`, `review.`, `signature.`,
+`slot.`, `thread.`, `token.`, `user.`), and the lookups `InGroup`, `IsKnownAction` and `IsKnownPrefix`. The pages offer
+these as the choices of the action filter and accept no other value from an address. The list is kept in step with the
+code by a test that scans the product sources for the action codes passed to an audit draft.
 
 **VerifyAsync**: Verifies the whole chain.
 

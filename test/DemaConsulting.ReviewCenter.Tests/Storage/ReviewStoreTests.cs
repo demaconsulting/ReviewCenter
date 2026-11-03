@@ -64,9 +64,15 @@ internal sealed class TestStore : IDisposable
         Users = new UserStore(factory, appender);
         Tokens = new PersonalAccessTokenStore(factory, appender);
         Totp = new TotpStore(factory, appender);
+        Notifications = new NotificationStore(factory, appender);
         Inbox = new InboxStore(factory);
         Factory = factory;
     }
+
+    /// <summary>
+    ///     Gets the notification store over the same database.
+    /// </summary>
+    public NotificationStore Notifications { get; }
 
     /// <summary>
     ///     Gets the inbox store over the same database.

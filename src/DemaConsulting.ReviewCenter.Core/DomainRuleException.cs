@@ -348,7 +348,49 @@ public enum DomainRule
     ///     The agreed outcome of the review is rejected and the review has no conclusion text, so a signature would reject
     ///     the review without the reasons; nothing is stored.
     /// </summary>
-    ConclusionRequired
+    ConclusionRequired,
+
+    /// <summary>
+    ///     E-mail notifications are not available to the caller: they are not enabled, or the caller is an API token
+    ///     or an account that must still replace its temporary password; nothing is stored.
+    /// </summary>
+    NotificationsNotAvailable,
+
+    /// <summary>The e-mail address is not exactly one acceptable address; nothing is stored.</summary>
+    NotificationAddressInvalid,
+
+    /// <summary>
+    ///     A confirmation mail was sent to the user a moment ago, so another one is refused for a short time;
+    ///     nothing is stored.
+    /// </summary>
+    NotificationResendTooSoon,
+
+    /// <summary>
+    ///     A limit on confirmation mails is reached (per user, per address or for the whole server); nothing is
+    ///     stored and no mail is sent.
+    /// </summary>
+    NotificationLimitReached,
+
+    /// <summary>
+    ///     The mail server did not accept the confirmation mail; the pending address is not stored and the mail is
+    ///     not counted.
+    /// </summary>
+    NotificationSendFailed,
+
+    /// <summary>No address waits for a confirmation code, so there is nothing to confirm; nothing is stored.</summary>
+    NotificationNothingToConfirm,
+
+    /// <summary>The confirmation code is wrong; the attempt is counted.</summary>
+    NotificationCodeIncorrect,
+
+    /// <summary>The confirmation code is no longer valid because its time ran out; the address stays unconfirmed.</summary>
+    NotificationCodeExpired,
+
+    /// <summary>
+    ///     Too many wrong codes were typed for the waiting address, so it can no longer be confirmed; a new code must be
+    ///     requested.
+    /// </summary>
+    NotificationTooManyAttempts
 }
 
 /// <summary>

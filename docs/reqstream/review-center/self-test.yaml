@@ -52,11 +52,53 @@ sections:
           which is read-only.
         children:
           - ReviewCenter-Validation-CheckConfig
+          - ReviewCenter-Validation-DefaultChecks
           - ReviewCenter-ValidationChecks-Hermetic
           - ReviewCenter-ValidationChecks-FastCommit
           - ReviewCenter-ServerHost-IsolatedSettings
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
+
+      - id: ReviewCenter-SelfTest-ConfiguredNotifications
+        title: >-
+          When `--check-config` is given, the self-validation run shall check the configured e-mail notification
+          settings.
+        justification: |
+          An operator who enables e-mail notifications wants to know before the server start that the settings are
+          usable. The default run stays hermetic, so the check runs only on request.
+        children:
+          - ReviewCenter-Validation-DefaultChecks
+          - ReviewCenter-Validation-CheckConfig
+          - ReviewCenter-Validation-CheckConfigAfterHermetic
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpReport
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpPortReport
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpProtectionReport
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsSmtpPasswordSourceReport
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsNoSecret
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsNoPath
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsInlineWarning
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsWarningNoSecret
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsFileSender
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsFailsUnusable
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsFailureNamesSetting
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsWrongTypeFails
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsWrongTypeNoValue
+        tests:
+          - Validation_CreateChecks_CheckConfig_AddsConfiguredNotificationsDatabaseAndKeysLast
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+
+      - id: ReviewCenter-SelfTest-ConfiguredNotificationsNoNetwork
+        title: >-
+          When `--check-config` is given, the self-validation run shall open no network connection while it checks the
+          e-mail notification settings.
+        justification: |
+          A validation run that reached out to a mail server would depend on the network and would send the password
+          on the strength of a mere check.
+        children:
+          - ReviewCenter-ValidationChecks-ConfiguredNotificationsNoNetwork
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
 
       - id: ReviewCenter-SelfTest-ResultsOutput
         title: The tool shall write self-validation results to a standard test result file when --results is provided.

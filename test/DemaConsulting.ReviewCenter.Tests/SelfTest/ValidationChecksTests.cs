@@ -292,6 +292,156 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the notification check is skipped, not failed, while e-mail notifications are off.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_NotEnabled_IsSkipped()
+    {
+        // Arrange: notifications are not enabled
+        using var configuration = new ConfiguredKeysEnvironment(KeyValuePair.Create<string, string?>("Notifications__Enabled", "false"));
+
+        // Act: run the check
+        var exception = await Assert.ThrowsAsync<ValidationSkippedException>(
+            () => ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the reason names the setting
+        Assert.Contains("Notifications:Enabled", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the notification check describes a usable SMTP setting without a secret and without a network
+    ///     connection.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret()
+    {
+        // Arrange: a complete SMTP configuration with a password in a file
+        using var folder = new TemporaryDirectory();
+        var passwordFile = folder.GetFilePath("smtp-password.txt");
+        await File.WriteAllTextAsync(passwordFile, "file-secret-value", TestContext.Current.CancellationToken);
+        using var configuration = new ConfiguredKeysEnvironment(SmtpVariables(
+            KeyValuePair.Create<string, string?>("Notifications__Smtp__PasswordFile", passwordFile)));
+
+        // Act: run the check
+        var detail = await ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: server, port, protection and password source are each named; no secret, no path, no warning
+        Assert.Contains("SMTP", detail);
+        Assert.Contains("server mail.example.com", detail);
+        Assert.Contains(":587", detail);
+        Assert.Contains("TLS StartTls", detail);
+        Assert.Contains("password from a file", detail);
+        Assert.DoesNotContain("file-secret-value", detail);
+        Assert.DoesNotContain(folder.DirectoryPath, detail);
+        Assert.DoesNotContain("Warning", detail);
+    }
+
+    /// <summary>
+    ///     Test that the notification check warns about a password written into the configuration.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_InlinePassword_WarnsWithoutShowingIt()
+    {
+        // Arrange: an SMTP configuration with an inline password
+        using var configuration = new ConfiguredKeysEnvironment(SmtpVariables(
+            KeyValuePair.Create<string, string?>("Notifications__Smtp__Password", "inline-secret-value")));
+
+        // Act: run the check
+        var detail = await ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: a warning that prefers the file, and the password is not shown
+        Assert.Contains("Warning", detail);
+        Assert.Contains("PasswordFile", detail);
+        Assert.Contains("inline in the configuration", detail);
+        Assert.DoesNotContain("inline-secret-value", detail);
+    }
+
+    /// <summary>
+    ///     Test that the notification check reports the file sender.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_FileSender_ReportsFileSender()
+    {
+        // Arrange: a file sender with a folder
+        using var folder = new TemporaryDirectory();
+        using var configuration = new ConfiguredKeysEnvironment(
+            new("Notifications__Enabled", "true"),
+            new("Notifications__Sender", "File"),
+            new("Notifications__FromAddress", "reviewcenter@example.com"),
+            new("Notifications__BaseUrl", "https://reviewcenter.example.com/"),
+            new("Notifications__File__Directory", folder.DirectoryPath));
+
+        // Act: run the check
+        var detail = await ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the file sender is named and the folder is not
+        Assert.Contains("Sender File", detail);
+        Assert.DoesNotContain(folder.DirectoryPath, detail);
+    }
+
+    /// <summary>
+    ///     Test that the notification check fails for settings that are not usable and names the setting.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_MissingHost_FailsAndNamesSetting()
+    {
+        // Arrange: SMTP without a host
+        using var configuration = new ConfiguredKeysEnvironment(
+            new("Notifications__Enabled", "true"),
+            new("Notifications__Sender", "Smtp"),
+            new("Notifications__FromAddress", "reviewcenter@example.com"),
+            new("Notifications__BaseUrl", "https://reviewcenter.example.com/"),
+            new("Notifications__Smtp__Host", null));
+
+        // Act: run the check
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the setting is named
+        Assert.Contains("Notifications:Smtp:Host", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the notification check fails for a value of the wrong type without showing the value.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_WrongType_FailsWithoutShowingValue()
+    {
+        // Arrange: a port that is not a number
+        using var configuration = new ConfiguredKeysEnvironment(
+            new("Notifications__Enabled", "true"),
+            new("Notifications__Smtp__Port", "not-a-number-xyz"));
+
+        // Act: run the check
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the message does not show the value
+        Assert.DoesNotContain("not-a-number-xyz", exception.Message);
+    }
+
+    /// <summary>
+    ///     Builds the environment of a complete SMTP configuration plus further variables.
+    /// </summary>
+    /// <param name="extra">The further variables.</param>
+    /// <returns>The variables.</returns>
+    private static KeyValuePair<string, string?>[] SmtpVariables(params KeyValuePair<string, string?>[] extra)
+    {
+        KeyValuePair<string, string?>[] basic =
+        [
+            new("Notifications__Enabled", "true"),
+            new("Notifications__Sender", "Smtp"),
+            new("Notifications__FromAddress", "reviewcenter@example.com"),
+            new("Notifications__BaseUrl", "https://reviewcenter.example.com/"),
+            new("Notifications__Smtp__Host", "mail.example.com"),
+            new("Notifications__Smtp__Port", "587"),
+            new("Notifications__Smtp__Tls", "StartTls"),
+            new("Notifications__Smtp__Username", "rc-mailer")
+        ];
+        return [.. basic, .. extra];
+    }
+
+    /// <summary>
     ///     Test that the key check is skipped, not failed, when nothing is configured.
     /// </summary>
     [Fact]

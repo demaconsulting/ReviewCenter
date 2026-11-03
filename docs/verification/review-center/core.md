@@ -17,7 +17,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the twenty-three units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the thirty-one units.
 
 ### Test Environment
 
@@ -115,6 +115,12 @@ N/A - standard test environment.
   recovery codes work once for signing in and never for signing, a signing needs the password and a fresh code, and
   a system administrator can reset the second factor; each change is audited without a secret or a code (see the unit
   tests of `TotpService`, `TotpChallengeStore`, `UserService`, and `SigningService`).
+- An e-mail address for notifications is accepted only as exactly one plain address, is confirmed only by typing back
+  the code that was mailed to it, within the pause, the limits, the number of attempts, and the lifetime of a code, is
+  refused to an actor with an API token, to a feature that is off, to a disabled or unknown user, and to a user with a
+  temporary password, and each change is audited without the address and the code; a message with a line break in
+  the subject or the recipient is refused (see the unit tests of `NotificationAddress`, `NotificationMessage`, and
+  `NotificationPreferenceService`).
 - The progress of the reviews of a project gives, for each review, the stage derived from its approval status (Setup,
   In review, Approved, Rejected), the signatures given, needed, and out of date, the people it waits on, the blocker
   counts that
@@ -321,6 +327,24 @@ enrolled user needs the password and a fresh code, which is tested by
 `SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs`. The six rules of the second factor are
 reported by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`. The challenge of the sign-in is
 verified by the unit tests of `TotpChallengeStore`.
+
+**E-mail notification address**: The unit tests of `NotificationAddress`, `NotificationMessage`, and
+`NotificationPreferenceService` verify the subsystem requirements for the e-mail address for notifications. An
+ordinary address with a plus tag is accepted and a list, a line break, and a second at sign are refused, which is tested
+by `NotificationAddress_TryNormalize_PlainAddress_Succeeds` and
+`NotificationAddress_TryNormalize_ControlCharacter_Fails`. An address is confirmed by the mailed code and not by a wrong
+one, which is tested by `NotificationPreferenceService_Confirm_RightCode_ConfirmsAddress` and
+`NotificationPreferenceService_Confirm_WrongCode_ThrowsAndStaysPending`. A fourth request within a day and a sixth
+attempt at one code are refused, which is tested by
+`NotificationPreferenceService_RequestConfirmation_UserDailyLimit_ThrowsLimitReached` and
+`NotificationPreferenceService_Confirm_AfterMaxWrongAttempts_RefusesTheRightCode`. An actor with an API token and a
+feature that is off are refused, which is tested by `NotificationPreferenceService_Actions_ApiTokenActor_AreRefused` and
+`NotificationPreferenceService_Actions_FeatureOff_AreRefusedAndTouchNoStore`. The audit entries hold neither the address
+nor the code, which is tested by `NotificationPreferenceService_Changes_AreAuditedWithoutAddressOrCode`. A message with
+a line break in the subject or the recipient is refused, which is tested by
+`NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue` and
+`NotificationMessage_Constructor_InvalidRecipient_ThrowsWithoutEchoingTheValue`. The tests of the service use an
+in-memory store and sender; the real store is verified in the `Storage` subsystem.
 
 **Inbox**: The unit tests of `InboxService` verify the subsystem requirement for the inbox. The groups To answer,
 Disputed, Ready to sign, Replies waiting, Failed checks, Waiting for others, and Updates, the rule that a reviewer

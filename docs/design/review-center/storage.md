@@ -5,19 +5,21 @@
 ### Overview
 
 The `Storage` subsystem keeps projects (with their evidence settings), project memberships, reviews, review comment
-threads, review checklists, users, second factor enrollments,
+threads, review checklists, users, second factor enrollments, the e-mail address for notifications,
 reviewer slots,
 signatures, review reopens, personal access tokens, and the hash-chained audit trail in a relational
 database through Entity
 Framework Core. It
 implements the store interfaces of the `Core` subsystem and owns everything about the database: the schema, the
-choice of provider, the location of the data, and the creation of the database. It contains nine units:
+choice of provider, the location of the data, and the creation of the database. It contains ten units:
 `ReviewCenterDbContext`, the mapping of the domain types to tables; `ReviewStore`, the implementation of the
 review store interface; `UserStore`, the implementation of the user store interface; `AuditStore`, the implementation
 of the audit store interface together with the `AuditAppender` that serializes and chains the entries;
 `RepositoryStore`, the implementation of the repository store interface; `PersonalAccessTokenStore`, the implementation
 of the personal access token store interface; `TotpStore`, the implementation of the second factor store interface;
-`InboxStore`, the implementation of the inbox store interface (what each user has seen of each review); and
+`InboxStore`, the implementation of the inbox store interface (what each user has seen of each review);
+`NotificationStore`, the implementation of the notification store interface (the e-mail address for notifications, its
+pending confirmation, and the log of the mails that were sent); and
 `DatabaseSetup`, the
 provider selection, connection string resolution, and database
 creation, together with its options type `DatabaseOptions`. The types of the subsystem are internal to the
@@ -143,6 +145,20 @@ application; the rest of the system sees only the Core store interfaces.
   as seen with a monotonic upsert that never moves the comment identity or the time back.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. A mark is
   a compare-and-set that retries when it loses a race, so parallel calls never fail. Nothing is audited.
+
+**NotificationStore (as INotificationStore)**: The persistence operations for the e-mail address for notifications.
+
+- *Type*: In-process .NET class implementing the Core interface.
+- *Role*: Provider.
+- *Contract*: Tells whether its tables exist, reads the preference of a user, reserves a confirmation (the pause and the
+  limits per user, per address, and per server are checked and the pending state and the send log entry are stored in
+  one transaction), aborts a reservation, counts an attempt at the current code, confirms the pending address, and
+  removes the preference. Reserving, confirming, and removing are stored together with their audit entry; aborting and
+  counting an attempt are not audited.
+- *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. Each
+  decision with one winner is one transaction or one conditional update. The store holds only the salted hash of a
+  code; a code never reaches it. The send log is kept when an address is removed.
+
 **AuditStore (as IAuditStore)**: The persistence operations for the audit trail.
 
 - *Type*: In-process .NET class implementing the Core interface.
@@ -278,11 +294,22 @@ migration: a development database that was created before them is recreated.
 
 **Inbox read state**: The `ReviewUserStates` table holds one row per user and review with the highest comment identity
 the user has seen and the time of the last visit; it is deleted with the user and with the review. It is the only
-storage of the inbox, which is also the notification list: there is no notification table, because every row of the
-inbox is computed from the review data. The reviews of a user are found through indexes on the users of the reviewer
+storage of the inbox, which is also the notification list: there is no table of inbox notifications, because every row
+of the inbox is computed from the review data. The reviews of a user are found through indexes on the users of the reviewer
 slots and on the case-insensitive creator column of the reviews. The rows are not audited and are not part of the
 record digest, because what a person has seen is not a change of a review. The table and the indexes have no migration:
 a development database that was created before them is recreated.
+
+**E-mail notification address**: The `NotificationPreferences` table holds one row per user with the confirmed address,
+the pending address, the salted hash of its code, the expiry, and the count of attempts; the `NotificationSendLog` table
+holds one row per mail that was sent, which the limits count. Both are deleted with the user. They are separate tables,
+not columns of `Users`, for the same reason as the second factor. `NotificationStore` reserves a confirmation in one
+serialized transaction that counts the log, decides, and then stores the log entry, the pending state, and the audit
+entry; an attempt is counted and an address is confirmed only by a conditional update. The send log is kept when an
+address is removed. A mail that could not be sent is taken back by an abort, so it costs nothing. The tables have no
+migration: a development database that was created before them is recreated, and until then the store reports itself
+as not available.
+
 **Context lifetime and concurrency**: Blazor Server connections are long-lived and concurrent, and a database
 context is not thread-safe. The store therefore obtains a new context from a context factory for every
 operation and disposes it at the end, and never keeps a context in a page or in a service. `UserStore` follows the
