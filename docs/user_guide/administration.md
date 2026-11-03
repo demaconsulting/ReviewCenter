@@ -434,7 +434,7 @@ below). ReviewCenter applies all three.
 > rules existed. A project that needs one person to do everything switches them off on the project page.
 
 **Require independent reviewers.** The setting is **on by default**, for every project of a newly created database (a
-database made before this setting existed must be recreated, because the schema has no migrations). While it is on,
+database that lacks the setting's column must be recreated, because the schema has no migrations). While it is on,
 the person who created a review (the ReviewCenter user who made it, or the owner of the API token that made it)
 cannot be the primary or the alternate reviewer of a slot of that review and cannot sign it. This holds for a slot that
 was filled while the setting was off, too: the signature of the author is refused. The review page leaves the author
@@ -705,9 +705,9 @@ head hash is a manual step, and it is most useful after important events such as
   digest, never as text. The reason for reopening a review is the exception: it is recorded as text (at most 250
   characters, so that it fits the entry), together with the digest of the record that was reopened.
 - There is no retention or archiving of the trail (the export is a copy to keep elsewhere), and no external anchoring.
-- The audit trail is a new table. A development database created before it existed must be recreated (see the next
-  section). The same applies to a database created before the filter of the audit pages, which stores the time of an
-  entry in another form and has fewer indexes.
+- The audit trail is a new table. A database that lacks it is incompatible and must be recreated if it holds only
+  development data (see the next section). The same applies to a database created before the filter of the audit pages,
+  which stores the time of an entry in another form and has fewer indexes.
 
 ## Database
 
@@ -738,10 +738,13 @@ Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
 
 If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
 server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
-release: the tables are created only when the database is new. **A database file created by an earlier build does not
-have the tables and columns that the current version needs, and the pages cannot work with it: delete the file (or point
-`Database:ConnectionString` at a new one) and start again, then create the first system administrator.** Do this only
-with development data.
+release: the tables are created only when the database is new. **An existing database file keeps working only if it
+already has every table and column that the current version needs. One that lacks any of them (typically a file created
+by a much earlier build) is incompatible, and the pages cannot work with it: only then delete the file (or point
+`Database:ConnectionString` at a new one), start again, and create the first system administrator.** A database from an
+earlier build is not wrong in itself, so do not delete one that has the schema: run `reviewcenter --validate
+--check-config` first, which reports a missing table or column (see Upgrade in the Deployment chapter). Recreate a
+database only when it holds development data, because everything in it is lost.
 
 ## Repositories and Credentials
 
