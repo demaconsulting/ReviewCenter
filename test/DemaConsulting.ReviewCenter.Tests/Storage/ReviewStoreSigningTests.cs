@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Data;
+using System.Reflection;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Tests.Core;
@@ -226,6 +227,7 @@ public class ReviewStoreSigningTests
         var otherReviewUpdate = await db.Store.UpdateSlotAsync(projectId, "REV-2", slot.Id, 8, null, TestContext.Current.CancellationToken);
         var unknownRemove = await db.Store.RemoveSlotAsync(projectId, "REV-1", 999, TestContext.Current.CancellationToken);
         var otherReviewRemove = await db.Store.RemoveSlotAsync(projectId, "REV-2", slot.Id, TestContext.Current.CancellationToken);
+        var afterNotFound = await db.Store.ListSlotsAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
         var removed = await db.Store.RemoveSlotAsync(projectId, "REV-1", slot.Id, TestContext.Current.CancellationToken);
 
         // Assert: only the real slot changed and went away
@@ -235,6 +237,11 @@ public class ReviewStoreSigningTests
         Assert.False(otherReviewUpdate);
         Assert.False(unknownRemove);
         Assert.False(otherReviewRemove);
+
+        // Assert: the false results left the slot in place with the values of the real update
+        var kept = Assert.Single(afterNotFound);
+        Assert.Equal(slot.Id, kept.Id);
+        Assert.Equal((7, default(int?)), (kept.PrimaryUserId, kept.AlternateUserId));
         Assert.True(removed);
         Assert.Empty(await db.Store.ListSlotsAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
     }
@@ -470,6 +477,147 @@ public class ReviewStoreSigningTests
         // Assert: the rules are named
         Assert.Equal(DomainRule.SlotNotFound, slot.Rule);
         Assert.Equal(DomainRule.ReviewNotFound, review.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a stale digest is refused as a changed record even when a thread is open, so that a reviewer
+    ///     whose view is stale is told to reload and not that signing is not allowed.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddSignatureAsync_StaleDigestAndOpenThread_ThrowsRecordChanged()
+    {
+        // Arrange: a slot, an open thread, and a digest that is not the one of the record
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var slot = await db.Store.AddSlotAsync(NewSlot(projectId), TestContext.Current.CancellationToken);
+        await AddThreadAsync(db, projectId, "Still open");
+        var stale = new string('a', 64);
+
+        // Act: sign with the stale digest
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.AddSignatureAsync(
+            NewSignature(projectId, slot.Id, stale), TestContext.Current.CancellationToken));
+
+        // Assert: the digest is compared first, and nothing is stored
+        Assert.Equal(DomainRule.RecordChanged, exception.Rule);
+        Assert.Empty(await db.Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the store offers only to add and to list signatures: no method that changes or deletes one.
+    /// </summary>
+    [Fact]
+    public void ReviewStore_PublicSurface_Signatures_OffersNoUpdateOrDelete()
+    {
+        // Arrange
+        var storeMethods = typeof(ReviewStore)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Select(m => m.Name);
+        var interfaceMethods = typeof(IReviewStore).GetMethods().Select(m => m.Name);
+
+        // Act: the methods that deal with signatures
+        var names = storeMethods.Concat(interfaceMethods)
+            .Where(name => name.Contains("Signature", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+
+        // Assert
+        Assert.Equal(["AddSignatureAsync", "ListSignaturesAsync"], names.Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that the signatures of a review are listed in the order in which they were added, not in the order of
+    ///     their slots.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ListSignaturesAsync_SeveralSignatures_ReturnsThemInTheOrderAdded()
+    {
+        // Arrange: three slots
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var first = await db.Store.AddSlotAsync(NewSlot(projectId), cancellationToken);
+        var second = await db.Store.AddSlotAsync(NewSlot(projectId, 3, null), cancellationToken);
+        var third = await db.Store.AddSlotAsync(NewSlot(projectId, 4, null), cancellationToken);
+        var digest = await DigestAsync(db, projectId);
+
+        // Act: sign with the second slot, the third and then the first
+        foreach (var slot in new[] { second, third, first })
+        {
+            await db.Store.AddSignatureAsync(NewSignature(projectId, slot.Id, digest), cancellationToken);
+        }
+
+        var listed = await db.Store.ListSignaturesAsync(projectId, "REV-1", cancellationToken);
+
+        // Assert: the order of adding
+        Assert.Equal([second.Id, third.Id, first.Id], listed.Select(s => s.SlotId));
+    }
+
+    /// <summary>
+    ///     Test that the record of a review that has a checklist snapshot carries that snapshot, and that the record
+    ///     of a review without one carries none.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_GetRecordAsync_ReviewWithChecklist_CarriesTheChecklistSnapshot()
+    {
+        // Arrange: a review with a checklist snapshot, and one without
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await db.Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = projectId,
+                Id = "REV-2",
+                Title = "With checklist",
+                State = ReviewState.Draft,
+                Created = _time,
+                ContentFingerprint = TestContent.FingerprintA,
+                Checklist = new ReviewChecklist
+                {
+                    ProjectId = projectId,
+                    ReviewId = "REV-2",
+                    Version = DefaultChecklist.Version,
+                    Definition = DefaultChecklist.Current.ToJson()
+                }
+            },
+            cancellationToken);
+
+        // Act
+        var plain = await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken);
+        var withChecklist = await db.Store.GetRecordAsync(projectId, "REV-2", cancellationToken);
+
+        // Assert
+        Assert.Null(plain!.Checklist);
+        Assert.Equal(DefaultChecklist.Version, withChecklist!.Checklist!.Version);
+        Assert.Equal(DefaultChecklist.Current.ToJson(), withChecklist.Checklist.Definition);
+    }
+
+    /// <summary>
+    ///     Test that the comments of a thread are in the record in the order in which they were posted.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_GetRecordAsync_ThreadWithSeveralComments_ListsCommentsInPostingOrder()
+    {
+        // Arrange: a thread whose comments are posted one after the other at the same time
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var thread = await AddThreadAsync(db, projectId, "First");
+        foreach (var text in new[] { "Second", "Third", "Fourth" })
+        {
+            await db.Store.AddCommentAsync(
+                projectId,
+                "REV-1",
+                thread.Id,
+                new ReviewComment { Author = "Bob", AuthorUsername = "bob", Text = text, Created = _time },
+                cancellationToken);
+        }
+
+        // Act
+        var record = await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken);
+
+        // Assert
+        Assert.Equal(["First", "Second", "Third", "Fourth"], record!.Threads.Single().Comments.Select(c => c.Text));
     }
 
     /// <summary>

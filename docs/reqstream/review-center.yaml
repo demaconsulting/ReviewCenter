@@ -77,6 +77,9 @@ sections:
         children:
           - ReviewCenter-Core-RepositoryReviews
           - ReviewCenter-Storage-RepositoryReviews
+          - ReviewCenter-Storage-RepositoryReviews-FileBaseline
+          - ReviewCenter-Storage-RepositoryReviews-NoContentInReview
+          - ReviewCenter-Storage-RepositoryReviews-BaselineOnRequest
           - ReviewCenter-Web-RepositoryReviews
           - ReviewCenter-Core-Diff
           - ReviewCenter-Web-DiffReview
@@ -122,6 +125,12 @@ sections:
         children:
           - ReviewCenter-Core-DueDate
           - ReviewCenter-Storage-DueDate
+          - ReviewCenter-Storage-DueDate-Default
+          - ReviewCenter-Storage-DueDate-CompareAndSet
+          - ReviewCenter-Storage-DueDate-ApprovedRefused
+          - ReviewCenter-Storage-DueDate-Audit
+          - ReviewCenter-Storage-DueDate-Stale
+          - ReviewCenter-Storage-DueDate-MissingReview
           - ReviewCenter-Web-DueDate
           - ReviewCenter-Api-DueDate
         tests:
@@ -194,6 +203,10 @@ sections:
         children:
           - ReviewCenter-Core-FollowUp
           - ReviewCenter-Storage-FollowUp
+          - ReviewCenter-Storage-FollowUp-CarriedRows
+          - ReviewCenter-Storage-FollowUp-CarryFailsStoresNothing
+          - ReviewCenter-Storage-FollowUp-Record
+          - ReviewCenter-Storage-FollowUp-ReplaceCarried
           - ReviewCenter-Api-FollowUp
           - ReviewCenter-Evidence-FollowUp
           - ReviewCenter-Web-FollowUp
@@ -230,6 +243,12 @@ sections:
         children:
           - ReviewCenter-Core-Inbox
           - ReviewCenter-Storage-Inbox
+          - ReviewCenter-Storage-Inbox-Candidates
+          - ReviewCenter-Storage-Inbox-LightRecords
+          - ReviewCenter-Storage-Inbox-NeverBackwards
+          - ReviewCenter-Storage-Inbox-NoFailure
+          - ReviewCenter-Storage-Inbox-ReviewDeleted
+          - ReviewCenter-Storage-Inbox-UserDeleted
           - ReviewCenter-Web-Inbox
         tests:
           - ReviewCenter_Inbox_AssignedReviewer_SeesToSignItemAndHomeCount_UntilSigned
@@ -259,6 +278,9 @@ sections:
           - ReviewCenter-Web-DeepLinks
           - ReviewCenter-Core-Threads
           - ReviewCenter-Storage-Threads
+          - ReviewCenter-Storage-Threads-State
+          - ReviewCenter-Storage-Threads-Comments
+          - ReviewCenter-Storage-Threads-Report
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
@@ -283,7 +305,16 @@ sections:
           - ReviewCenter-Core-Checklist
           - ReviewCenter-Core-ProjectChecklist
           - ReviewCenter-Storage-Checklist
+          - ReviewCenter-Storage-Checklist-Sections
+          - ReviewCenter-Storage-Checklist-Answers
+          - ReviewCenter-Storage-Checklist-BallotStatus
+          - ReviewCenter-Storage-Checklist-BallotSlotLifecycle
           - ReviewCenter-Storage-ProjectChecklist
+          - ReviewCenter-Storage-ProjectChecklist-Default
+          - ReviewCenter-Storage-ProjectChecklist-CompareAndSet
+          - ReviewCenter-Storage-ProjectChecklist-Audit
+          - ReviewCenter-Storage-ProjectChecklist-Stale
+          - ReviewCenter-Storage-ProjectChecklist-MissingProject
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
@@ -327,6 +358,16 @@ sections:
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Storage-Signatures-Slots
+          - ReviewCenter-Storage-Signatures-Current
+          - ReviewCenter-Storage-Signatures-Outcome
+          - ReviewCenter-Storage-Signatures-StaleRefused
+          - ReviewCenter-Storage-Signatures-UnknownTarget
+          - ReviewCenter-Storage-Signatures-Duplicate
+          - ReviewCenter-Storage-Signatures-SignedSlotKept
+          - ReviewCenter-Storage-Signatures-SubmittedBallot
+          - ReviewCenter-Storage-Signatures-ConclusionText
+          - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Core-BallotConsolidation
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
@@ -364,9 +405,25 @@ sections:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Storage-Signatures-Slots
+          - ReviewCenter-Storage-Signatures-Current
+          - ReviewCenter-Storage-Signatures-Outcome
+          - ReviewCenter-Storage-Signatures-StaleRefused
+          - ReviewCenter-Storage-Signatures-UnknownTarget
+          - ReviewCenter-Storage-Signatures-Duplicate
+          - ReviewCenter-Storage-Signatures-SignedSlotKept
+          - ReviewCenter-Storage-Signatures-SubmittedBallot
+          - ReviewCenter-Storage-Signatures-ConclusionText
+          - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Api-Isolation
           - ReviewCenter-Core-IndependentReviewers
           - ReviewCenter-Storage-ReviewIntegrity
+          - ReviewCenter-Storage-ReviewIntegrity-ApprovedLock
+          - ReviewCenter-Storage-ReviewIntegrity-OpenThreadSigning
+          - ReviewCenter-Storage-ReviewIntegrity-ReopenAudit
+          - ReviewCenter-Storage-ReviewIntegrity-ReopenRefused
+          - ReviewCenter-Storage-ReviewIntegrity-IndependentReviewers
+          - ReviewCenter-Storage-ReviewIntegrity-SettingAudit
           - ReviewCenter-Web-ReviewRules
           - ReviewCenter-Core-BallotVisibility
           - ReviewCenter-Web-BallotExperience
@@ -421,6 +478,10 @@ sections:
           - ReviewCenter-Core-ReviewRuleSwitches
           - ReviewCenter-Core-ReviewRules
           - ReviewCenter-Storage-ReviewRuleSwitches
+          - ReviewCenter-Storage-ReviewRuleSwitches-Default
+          - ReviewCenter-Storage-ReviewRuleSwitches-CompareAndSet
+          - ReviewCenter-Storage-ReviewRuleSwitches-Audit
+          - ReviewCenter-Storage-ReviewRuleSwitches-OtherRulesKept
           - ReviewCenter-Web-ReviewRuleSwitches
           - ReviewCenter-Web-ReviewRuleNotices
         tests:
@@ -475,6 +536,16 @@ sections:
         children:
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Storage-Signatures-Slots
+          - ReviewCenter-Storage-Signatures-Current
+          - ReviewCenter-Storage-Signatures-Outcome
+          - ReviewCenter-Storage-Signatures-StaleRefused
+          - ReviewCenter-Storage-Signatures-UnknownTarget
+          - ReviewCenter-Storage-Signatures-Duplicate
+          - ReviewCenter-Storage-Signatures-SignedSlotKept
+          - ReviewCenter-Storage-Signatures-SubmittedBallot
+          - ReviewCenter-Storage-Signatures-ConclusionText
+          - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Core-Fingerprint
           - ReviewCenter-Core-RepositoryReviews
@@ -512,19 +583,60 @@ sections:
           - ReviewCenter-Core-Reviews
           - ReviewCenter-Core-RepositoryReviews
           - ReviewCenter-Storage-RepositoryReviews
+          - ReviewCenter-Storage-RepositoryReviews-FileBaseline
+          - ReviewCenter-Storage-RepositoryReviews-NoContentInReview
+          - ReviewCenter-Storage-RepositoryReviews-BaselineOnRequest
           - ReviewCenter-Core-Checklist
           - ReviewCenter-Core-ProjectChecklist
           - ReviewCenter-Storage-Checklist
+          - ReviewCenter-Storage-Checklist-Sections
+          - ReviewCenter-Storage-Checklist-Answers
+          - ReviewCenter-Storage-Checklist-BallotStatus
+          - ReviewCenter-Storage-Checklist-BallotSlotLifecycle
           - ReviewCenter-Storage-ProjectChecklist
+          - ReviewCenter-Storage-ProjectChecklist-Default
+          - ReviewCenter-Storage-ProjectChecklist-CompareAndSet
+          - ReviewCenter-Storage-ProjectChecklist-Audit
+          - ReviewCenter-Storage-ProjectChecklist-Stale
+          - ReviewCenter-Storage-ProjectChecklist-MissingProject
           - ReviewCenter-Core-Threads
           - ReviewCenter-Storage-Threads
+          - ReviewCenter-Storage-Threads-State
+          - ReviewCenter-Storage-Threads-Comments
+          - ReviewCenter-Storage-Threads-Report
           - ReviewCenter-Core-Signatures
           - ReviewCenter-Storage-Signatures
+          - ReviewCenter-Storage-Signatures-Slots
+          - ReviewCenter-Storage-Signatures-Current
+          - ReviewCenter-Storage-Signatures-Outcome
+          - ReviewCenter-Storage-Signatures-StaleRefused
+          - ReviewCenter-Storage-Signatures-UnknownTarget
+          - ReviewCenter-Storage-Signatures-Duplicate
+          - ReviewCenter-Storage-Signatures-SignedSlotKept
+          - ReviewCenter-Storage-Signatures-SubmittedBallot
+          - ReviewCenter-Storage-Signatures-ConclusionText
+          - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Core-AuditTrail
           - ReviewCenter-Storage-AuditTrail
+          - ReviewCenter-Storage-AuditTrail-Gate
+          - ReviewCenter-Storage-AuditTrail-Linear
+          - ReviewCenter-Storage-AuditTrail-UniqueSequence
+          - ReviewCenter-Storage-AuditTrail-Immutable
+          - ReviewCenter-Storage-AuditTrail-Pages
+          - ReviewCenter-Storage-AuditTrail-Filter
+          - ReviewCenter-Storage-AuditTrail-Batches
+          - ReviewCenter-Storage-AuditTrail-ProjectOnly
           - ReviewCenter-Storage-Persistence
+          - ReviewCenter-Storage-Persistence-Reviews
+          - ReviewCenter-Storage-Persistence-FileContent
           - ReviewCenter-Core-ApprovalLock
           - ReviewCenter-Storage-ReviewIntegrity
+          - ReviewCenter-Storage-ReviewIntegrity-ApprovedLock
+          - ReviewCenter-Storage-ReviewIntegrity-OpenThreadSigning
+          - ReviewCenter-Storage-ReviewIntegrity-ReopenAudit
+          - ReviewCenter-Storage-ReviewIntegrity-ReopenRefused
+          - ReviewCenter-Storage-ReviewIntegrity-IndependentReviewers
+          - ReviewCenter-Storage-ReviewIntegrity-SettingAudit
           - ReviewCenter-Web-ReviewLock
           - ReviewCenter-Api-LockedReview
         tests:
@@ -563,6 +675,14 @@ sections:
         children:
           - ReviewCenter-Core-AuditTrail
           - ReviewCenter-Storage-AuditTrail
+          - ReviewCenter-Storage-AuditTrail-Gate
+          - ReviewCenter-Storage-AuditTrail-Linear
+          - ReviewCenter-Storage-AuditTrail-UniqueSequence
+          - ReviewCenter-Storage-AuditTrail-Immutable
+          - ReviewCenter-Storage-AuditTrail-Pages
+          - ReviewCenter-Storage-AuditTrail-Filter
+          - ReviewCenter-Storage-AuditTrail-Batches
+          - ReviewCenter-Storage-AuditTrail-ProjectOnly
           - ReviewCenter-Identity-AuditTrail
         tests:
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
@@ -629,6 +749,11 @@ sections:
           - ReviewCenter-Evidence-ContentSettings
           - ReviewCenter-Core-EvidenceSettings
           - ReviewCenter-Storage-EvidenceSettings
+          - ReviewCenter-Storage-EvidenceSettings-Default
+          - ReviewCenter-Storage-EvidenceSettings-CompareAndSet
+          - ReviewCenter-Storage-EvidenceSettings-Audit
+          - ReviewCenter-Storage-EvidenceSettings-Stale
+          - ReviewCenter-Storage-EvidenceSettings-MissingProject
           - ReviewCenter-Web-EvidenceSettings
           - ReviewCenter-Hosting-AttestationServices
           - ReviewCenter-Hosting-AttestationKeyFailure
@@ -715,6 +840,8 @@ sections:
           - ReviewCenter-Identity-OidcSignIn
           - ReviewCenter-Core-ExternalIdentity
           - ReviewCenter-Storage-ExternalIdentity
+          - ReviewCenter-Storage-ExternalIdentity-ExactPair
+          - ReviewCenter-Storage-ExternalIdentity-UniquePair
           - ReviewCenter-Hosting-OidcSignIn
           - ReviewCenter-Web-OidcSignIn
         tests:
@@ -741,6 +868,12 @@ sections:
           - ReviewCenter-Identity-TotpSecondFactor
           - ReviewCenter-Core-TotpSecondFactor
           - ReviewCenter-Storage-TotpSecondFactor
+          - ReviewCenter-Storage-TotpSecondFactor-StepRace
+          - ReviewCenter-Storage-TotpSecondFactor-RecoveryRace
+          - ReviewCenter-Storage-TotpSecondFactor-ConfirmRace
+          - ReviewCenter-Storage-TotpSecondFactor-Remove
+          - ReviewCenter-Storage-TotpSecondFactor-Audit
+          - ReviewCenter-Storage-TotpSecondFactor-UserDeleted
           - ReviewCenter-Hosting-TotpSecondFactor
           - ReviewCenter-Web-TotpSecondFactor
         tests:
@@ -1047,6 +1180,15 @@ sections:
           - ReviewCenter-Api-ProjectAccess
           - ReviewCenter-Evidence-Visibility
           - ReviewCenter-Storage-Memberships
+          - ReviewCenter-Storage-Memberships-OnePerUser
+          - ReviewCenter-Storage-Memberships-UnknownProject
+          - ReviewCenter-Storage-Memberships-UnknownUser
+          - ReviewCenter-Storage-Memberships-ChangeRole
+          - ReviewCenter-Storage-Memberships-Remove
+          - ReviewCenter-Storage-Memberships-Audit
+          - ReviewCenter-Storage-Memberships-LastAdmin
+          - ReviewCenter-Storage-Memberships-NewAccount
+          - ReviewCenter-Storage-Memberships-UserImpact
           - ReviewCenter-Hosting-ProjectAccess
           - ReviewCenter-Identity-AdminClaim
         tests:
@@ -1074,6 +1216,15 @@ sections:
           - ReviewCenter-Core-ProjectAccess
           - ReviewCenter-Web-ProjectAccess
           - ReviewCenter-Storage-Memberships
+          - ReviewCenter-Storage-Memberships-OnePerUser
+          - ReviewCenter-Storage-Memberships-UnknownProject
+          - ReviewCenter-Storage-Memberships-UnknownUser
+          - ReviewCenter-Storage-Memberships-ChangeRole
+          - ReviewCenter-Storage-Memberships-Remove
+          - ReviewCenter-Storage-Memberships-Audit
+          - ReviewCenter-Storage-Memberships-LastAdmin
+          - ReviewCenter-Storage-Memberships-NewAccount
+          - ReviewCenter-Storage-Memberships-UserImpact
         tests:
           - ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers
 
@@ -1096,6 +1247,7 @@ sections:
           - ReviewCenter-Core-Users
           - ReviewCenter-Core-UserImpact
           - ReviewCenter-Storage-Users
+          - ReviewCenter-Storage-Users-UniqueName
           - ReviewCenter-Web-SignIn
         tests:
           - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
@@ -1140,6 +1292,9 @@ sections:
         children:
           - ReviewCenter-Core-Repositories
           - ReviewCenter-Storage-Repositories
+          - ReviewCenter-Storage-Repositories-EncryptedToken
+          - ReviewCenter-Storage-Repositories-ProjectOnlyList
+          - ReviewCenter-Storage-Repositories-UniqueName
           - ReviewCenter-Web-Repositories
           - ReviewCenter-Hosting-RepositoryServices
         tests:
@@ -1276,6 +1431,12 @@ sections:
         children:
           - ReviewCenter-Core-AccessTokens
           - ReviewCenter-Storage-AccessTokens
+          - ReviewCenter-Storage-AccessTokens-CreatorFlag
+          - ReviewCenter-Storage-AccessTokens-Find
+          - ReviewCenter-Storage-AccessTokens-List
+          - ReviewCenter-Storage-AccessTokens-Revoke
+          - ReviewCenter-Storage-AccessTokens-Touch
+          - ReviewCenter-Storage-AccessTokens-Audit
           - ReviewCenter-Web-AccessTokens
           - ReviewCenter-Api-TokenJourney
         tests:
@@ -1465,8 +1626,14 @@ sections:
           - ReviewCenter-Hosting-Database
           - ReviewCenter-Hosting-DatabaseFailure
           - ReviewCenter-Storage-Persistence
+          - ReviewCenter-Storage-Persistence-Reviews
+          - ReviewCenter-Storage-Persistence-FileContent
           - ReviewCenter-Storage-Integrity
+          - ReviewCenter-Storage-Integrity-UnknownProject
           - ReviewCenter-Storage-Configuration
+          - ReviewCenter-Storage-Configuration-Create
+          - ReviewCenter-Storage-Configuration-UnsupportedProvider
+          - ReviewCenter-Storage-Configuration-UnsupportedProviderCreatesNothing
         tests:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart

@@ -22,6 +22,7 @@ N/A - standard test environment (a temporary SQLite database file is created by 
   nothing and write no entry.
 - A use changes only the last-used time, writes no audit entry, and does not undo a revocation.
 - Of several parallel uses that read the same last-used time exactly one writes.
+- A token is not kept and a revocation is not applied when the audit entry cannot be stored.
 
 #### Test Scenarios
 
@@ -54,3 +55,12 @@ by `PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed`.
 database, all having read the same last-used time (none for a token never used, or an earlier time). Exactly one returns
 true and its time is stored; a later use that still holds the old time returns false and changes nothing. This scenario
 is tested by `PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce`.
+
+**PersonalAccessTokenStore_AddAsync_AuditInsertFails_StoresNoToken**: The database refuses every audit entry by a
+trigger and a token is added. The add fails and, after the trigger is dropped, no token and no audit entry exist. This
+scenario is tested by `PersonalAccessTokenStore_AddAsync_AuditInsertFails_StoresNoToken`.
+
+**PersonalAccessTokenStore_RevokeAsync_AuditInsertFails_LeavesTheTokenUnrevoked**: A token is added, then the database
+refuses every audit entry by a trigger and the token is revoked. The revocation fails, the token is still unrevoked, and
+only the creation entry exists. This scenario is tested by
+`PersonalAccessTokenStore_RevokeAsync_AuditInsertFails_LeavesTheTokenUnrevoked`.

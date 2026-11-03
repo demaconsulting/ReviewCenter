@@ -183,11 +183,11 @@ public class RepositoryStoreTests
     }
 
     /// <summary>
-    ///     Test that disabling keeps the registration (nothing is deleted) and that updating an unknown
-    ///     repository names the rule.
+    ///     Test that disabling keeps the registration: the repository is not deleted, it is still listed, and it
+    ///     is disabled.
     /// </summary>
     [Fact]
-    public async Task RepositoryStore_UpdateAsync_DisableAndUnknown()
+    public async Task RepositoryStore_UpdateAsync_Disable_KeepsTheRepository()
     {
         // Arrange: a store with a repository
         var store = Open(out var provider);
@@ -195,14 +195,31 @@ public class RepositoryStoreTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var added = await store.AddAsync(NewRepo("alpha"), r => Draft("repository.created"), cancellationToken);
 
-        // Act: disable it and update an unknown identity
+        // Act: disable it
         var disabled = await store.UpdateAsync(added.Id, new RepositoryUpdate("alpha", added.Location, null, false, TokenChange.Keep, _created), Draft("repository.disabled"), cancellationToken);
+
+        // Assert: still listed, and disabled
+        Assert.False(disabled.Enabled);
+        Assert.False((await store.ListAsync(1, cancellationToken)).Single().Enabled);
+    }
+
+    /// <summary>
+    ///     Test that updating an unknown repository names the repository-not-found rule.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryStore_UpdateAsync_UnknownRepository_ThrowsRepositoryNotFound()
+    {
+        // Arrange: a store with a repository
+        var store = Open(out var provider);
+        using var _ = provider;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await store.AddAsync(NewRepo("alpha"), r => Draft("repository.created"), cancellationToken);
+
+        // Act: update an unknown identity
         var unknown = await Assert.ThrowsAsync<DomainRuleException>(
             () => store.UpdateAsync(999, new RepositoryUpdate("x", "https://example.com/x.git", null, true, TokenChange.Keep, _created), Draft("repository.updated"), cancellationToken));
 
-        // Assert: still listed, disabled, and the unknown one is named
-        Assert.False(disabled.Enabled);
-        Assert.False((await store.ListAsync(1, cancellationToken)).Single().Enabled);
+        // Assert: the rule is named
         Assert.Equal(DomainRule.RepositoryNotFound, unknown.Rule);
     }
 
@@ -277,5 +294,131 @@ public class RepositoryStoreTests
 
         // Act and Assert: nothing named like a token except the flag
         Assert.DoesNotContain(names, n => n.Contains("Token", StringComparison.Ordinal) && n != nameof(SourceRepository.HasToken));
+    }
+
+    /// <summary>
+    ///     Test that a change of a repository stores exactly one audit entry, besides the one of the creation.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryStore_UpdateAsync_Change_StoresOneAuditEntry()
+    {
+        // Arrange: a store with a repository
+        var store = Open(out var provider);
+        using var _ = provider;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var added = await store.AddAsync(NewRepo("alpha"), r => Draft("repository.created"), cancellationToken);
+
+        // Act: rename the repository
+        await store.UpdateAsync(
+            added.Id,
+            new RepositoryUpdate("alpha2", added.Location, null, true, TokenChange.Keep, _created.AddHours(1)),
+            Draft("repository.updated"),
+            cancellationToken);
+
+        // Assert: the creation and one update entry exist
+        await using var context = await provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>().CreateDbContextAsync(cancellationToken);
+        Assert.Equal(
+            ["repository.created", "repository.updated"],
+            await context.AuditEntries.OrderBy(e => e.Sequence).Select(e => e.Action).ToArrayAsync(cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a refused add and a refused rename leave the stored repositories as they were.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryStore_NameTaken_AddAndRename_LeaveTheDataUnchanged()
+    {
+        // Arrange: a store with two repositories
+        var store = Open(out var provider);
+        using var _ = provider;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await store.AddAsync(NewRepo("alpha"), r => Draft("repository.created"), cancellationToken);
+        var beta = await store.AddAsync(NewRepo("beta"), r => Draft("repository.created"), cancellationToken);
+        var before = await store.ListAsync(1, cancellationToken);
+
+        // Act: add a duplicate name and rename the other repository to a duplicate name
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => store.AddAsync(NewRepo("ALPHA"), r => Draft("repository.created"), cancellationToken));
+        await Assert.ThrowsAsync<DomainRuleException>(
+            () => store.UpdateAsync(
+                beta.Id,
+                new RepositoryUpdate("Alpha", beta.Location, null, false, TokenChange.Keep, _created.AddHours(1)),
+                Draft("repository.updated"),
+                cancellationToken));
+        var after = await store.ListAsync(1, cancellationToken);
+
+        // Assert: the same two repositories, unchanged
+        Assert.Equal(before, after);
+    }
+
+    /// <summary>
+    ///     Test that no repository is stored when the audit entry of its creation cannot be stored.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryStore_AddAsync_AuditInsertFails_StoresNoRepository()
+    {
+        // Arrange: a store over a database that refuses every audit entry
+        var store = Open(out var provider);
+        using var _ = provider;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await ExecuteSqlAsync(provider, RefuseAuditSql, cancellationToken);
+
+        // Act: add a repository
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => store.AddAsync(NewRepo("alpha"), r => Draft("repository.created"), cancellationToken));
+        await ExecuteSqlAsync(provider, "DROP TRIGGER refuse_audit", cancellationToken);
+
+        // Assert: no repository and no entry were kept
+        Assert.Empty(await store.ListAsync(1, cancellationToken));
+        await using var context = await provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>().CreateDbContextAsync(cancellationToken);
+        Assert.Equal(0, await context.AuditEntries.CountAsync(cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a repository stays as it was when the audit entry of its change cannot be stored.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryStore_UpdateAsync_AuditInsertFails_LeavesTheRepositoryUnchanged()
+    {
+        // Arrange: a store with a repository, then a database that refuses every audit entry
+        var store = Open(out var provider);
+        using var _ = provider;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var added = await store.AddAsync(NewRepo("alpha", "cipher"), r => Draft("repository.created"), cancellationToken);
+        await ExecuteSqlAsync(provider, RefuseAuditSql, cancellationToken);
+
+        // Act: rename it, disable it, and clear its token
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => store.UpdateAsync(
+                added.Id,
+                new RepositoryUpdate("alpha2", added.Location, null, false, TokenChange.Clear, _created.AddHours(1)),
+                Draft("repository.updated"),
+                cancellationToken));
+        await ExecuteSqlAsync(provider, "DROP TRIGGER refuse_audit", cancellationToken);
+
+        // Assert: the repository and its token are as they were, and only the creation entry exists
+        Assert.Equal(added, await store.GetAsync(added.Id, cancellationToken));
+        Assert.Equal("cipher", await store.GetEncryptedTokenAsync(added.Id, cancellationToken));
+        await using var context = await provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>().CreateDbContextAsync(cancellationToken);
+        Assert.Equal(1, await context.AuditEntries.CountAsync(cancellationToken));
+    }
+
+    /// <summary>
+    ///     The statement that makes the database refuse every audit entry.
+    /// </summary>
+    private const string RefuseAuditSql =
+        "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;";
+
+    /// <summary>
+    ///     Runs one SQL statement against the database of the provider.
+    /// </summary>
+    /// <param name="provider">The provider that owns the database factory.</param>
+    /// <param name="sql">The statement.</param>
+    /// <param name="cancellationToken">A token to cancel the work.</param>
+    /// <returns>A task that completes when the statement ran.</returns>
+    private static async Task ExecuteSqlAsync(ServiceProvider provider, string sql, CancellationToken cancellationToken)
+    {
+        await using var context = await provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>().CreateDbContextAsync(cancellationToken);
+        await context.Database.ExecuteSqlRawAsync(sql, cancellationToken);
     }
 }

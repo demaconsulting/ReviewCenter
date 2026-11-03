@@ -4,16 +4,10 @@
 
 The `Storage` subsystem is verified by subsystem tests defined in `StorageSubsystemTests.cs`. The tests build the
 real `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `RepositoryStore`, and
-`PersonalAccessTokenStore` over a real SQLite
-database file, and
-run the real
-`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
-`RepositoryService`, and `PersonalAccessTokenService` of the `Core`
-subsystem over
-them, so that
-the subsystem is
-verified in the way
-the application uses it. Each test uses a new database file in a private temporary folder, supplied by the test
+`PersonalAccessTokenStore` over a real SQLite database file, and run the real `ProjectService`, `ReviewService`,
+`ThreadService`, `ChecklistService`, `UserService`, `SigningService`, `RepositoryService`, and
+`PersonalAccessTokenService` of the `Core` subsystem over them, so that the subsystem is verified in the way the
+application uses it. Each test uses a new database file in a private temporary folder, supplied by the test
 helper `TestDatabase`. The units are verified in detail by their own unit tests, which also use real SQLite
 databases; no database substitute is used anywhere, because the behavior of the database (keys, constraints,
 ordering, and binary content) is part of what is verified. The only substitutes are the fast test password hasher of
@@ -27,61 +21,94 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 
 ### Acceptance Criteria
 
+The acceptance criteria follow the requirements of the subsystem, grouped by topic: the subsystem tests verify the
+persistence across a restart, and the unit tests verify the detailed rules on the real database.
+
 - All subsystem tests pass with zero failures.
-- Data written through the services is still present, byte for byte and with the same fingerprint, after the
-  database is closed and opened again.
-- A duplicate review identifier is refused and the original review is unchanged.
-- Comment threads, their comments (in posting order), their anchors, and their state, written through the services,
-  are still present after the database is closed and opened again, and each comment keeps the user name of its author.
-- Users written through the user service, including the system administrator flag, and a changed password, are still
-  present after the database is closed and opened again; the user signs in with the changed password only.
-- The checklist snapshot of a review, its answers, and its section decisions, written through the services, are
-  still present after the database is closed and opened again.
-- A reviewer slot and the signature made for it, written through the services, are still present after the database
-  is closed and opened again, and the signature is still current, so the review is still approved. The outcome of a
-  signature is kept too: a rejection is still a rejection, and the review is still concluded as rejected and locked.
-- A review for a project that does not exist is refused, by the services and by the database itself, and the stored
-  data is unchanged.
-- A registered repository of a project, with its token flag and its disabled state, written through the service, is
-  still present after the database is closed and opened again, and a disabled repository is not offered for selection.
-- An unsupported provider is refused with an error that names it, and no database is created.
-- Project memberships are stored, kept unique per user and project, audited with the project, and refused for an
-  unknown project; the last enabled project administrator cannot be removed or demoted when the caller requires another
-  administrator, also when two changes race; and an account is stored with its membership and its audit entry together
-  or not at all; these are verified in the unit tests of `ReviewStore` and `UserStore` on the real database.
-- An account of an identity provider is stored with its issuer and subject, is found only by the exact pair, and a
-  second account with the same pair is refused; this is verified in the unit tests of `UserStore` on the real database.
-- The evidence settings of a project are stored with the project (the defaults for a new project), are changed only
-  when the stored settings still equal the expected ones, and are stored with their audit entry or not at all; this is
-  verified in the unit tests of `ReviewStore` on the real database.
-- The checklist definition of a project is stored with the project (none for a new project, which stands for the
-  default), is changed only when the hash of the stored text still equals the expected one, is stored with its audit
-  entry or not at all, and of two simultaneous changes from the same hash exactly one succeeds; this is verified in the
-  unit tests of `ReviewStore` on the real database.
-- The approval lock and the reopen history survive a restart: a review that was approved, reopened by an administrator,
-  and signed again is read back after the database is closed and opened again with its reopen (who, why, and the
-  previous digest), its old and new signatures, and the approval; the store itself refuses a thread, a checklist
-  answer, and a slot change on an approved review with `ReviewLocked`, without the services in between, and stores
-  nothing; the `RequireIndependentReviewers` setting of a project is stored with the project.
-- Personal access tokens written through the service, with one of them revoked, are still present after the database is
-  closed and opened again: the value of the kept token still authenticates its owner, the revoked token is refused,
-  and no
-  row holds a token value.
-- A review from a repository, with its source and the change kind and baseline content of each file, is stored and
-  read back without file bytes in the review, and its baseline content is read on request; the scenario is verified
-  by the unit tests of `ReviewStore` on the real database (`ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`
-  and `ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`); the review-set a review was planned
+- Persistence (`ReviewCenter-Storage-Persistence`, `-Reviews`, `-FileContent`): the project, the review with its
+  fingerprint and files, and the exact bytes of a file, written through the services, are still present, byte for
+  byte, after the database is closed and opened again.
+- Integrity (`ReviewCenter-Storage-Integrity`, `-UnknownProject`): a duplicate review identifier is refused and the
+  original review is unchanged; a review for a project that does not exist is refused, by the services and by the
+  database itself, and the stored data is unchanged.
+- Configuration (`ReviewCenter-Storage-Configuration`, `-Create`, `-UnsupportedProvider`,
+  `-UnsupportedProviderCreatesNothing`): the database named by the settings is opened and is still there after it is
+  closed and opened again; a database file and its tables are created on first use; an unsupported provider is
+  refused with an error that names it, and no database is created.
+- Threads (`ReviewCenter-Storage-Threads`, `-State`, `-Comments`): comment threads, their anchors, their state, and
+  their comments (in posting order, each with the user name of its author), written through the services, are still
+  present after the database is closed and opened again. The rules of the report (`-Report`) are verified in the unit
+  tests of `ReviewStore`.
+- Users (`ReviewCenter-Storage-Users`, `-UniqueName`): users written through the user service, including the system
+  administrator flag, and a changed password, are still present after the database is closed and opened again, and the
+  user signs in with the changed password only; a second user whose name differs only in letter case is refused.
+- Checklist (`ReviewCenter-Storage-Checklist`, `-Sections`, `-Answers`): the checklist snapshot of a review, its
+  answers, and its section decisions, written through the services, are still present after the database is closed
+  and opened again. The status and the slot lifecycle of the ballots (`-BallotStatus`, `-BallotSlotLifecycle`) are
+  verified in the unit tests of `ReviewStore`.
+- Signatures (`ReviewCenter-Storage-Signatures`, `-Current`, `-Outcome`): a reviewer slot and the signature made for
+  it are still present after the database is closed and opened again, and the signature is still current, so the
+  review is still approved; a rejection is still a rejection, and the review is still concluded as rejected and
+  locked. The refusals (`-StaleRefused`, `-UnknownTarget`, `-Duplicate`, `-SignedSlotKept`, `-SubmittedBallot`), the
+  slots, the conclusion text, and the batch read (`-Slots`, `-ConclusionText`, `-Batch`) are verified in the unit
+  tests of `ReviewStore` on the real database.
+- Audit trail (`ReviewCenter-Storage-AuditTrail` and its aspects): every audited change is stored together with its
+  audit entry or not at all; changes made at the same moment through different stores give one linear, intact chain;
+  a duplicate sequence number is refused; the audit store offers no update or delete; and the pages, the filters, the
+  ordered batches, and the single-project read are verified in the unit tests of `AuditStore` on the real database.
+- Repositories (`ReviewCenter-Storage-Repositories` and its aspects): a registered repository of a project, with its
+  token flag and its disabled state, written through the service, is still present after the database is closed and
+  opened again, and a disabled repository is not offered for selection; the unique names, the project-only lists,
+  and the encrypted token are verified in the unit tests of `RepositoryStore`.
+- Memberships (`ReviewCenter-Storage-Memberships` and its aspects): memberships are stored, kept unique per user
+  and project, audited with the project, and refused for an unknown project or user; the last enabled project
+  administrator cannot be removed or demoted when the caller requires another administrator, also when two changes
+  race; and an account is stored with its membership and its audit entry together or not at all; these are verified
+  in the unit tests of `ReviewStore` and `UserStore` on the real database.
+- Evidence settings (`ReviewCenter-Storage-EvidenceSettings` and its aspects), project checklist
+  (`ReviewCenter-Storage-ProjectChecklist` and its aspects), and due date (`ReviewCenter-Storage-DueDate` and its
+  aspects): the value is stored with its project or review (the default or none when none was given), is changed only
+  when the stored value still equals the expected one, is stored with its audit entry or not at all, and of two
+  simultaneous changes from the same value exactly one succeeds; a change of a missing project or review changes
+  nothing; these are verified in the unit tests of `ReviewStore` on the real database.
+- Progress (`ReviewCenter-Storage-Progress`): the time of the newest audit entry of each review of a project is read
+  from the audit trail; this is verified in the unit tests of `AuditStore`.
+- Follow-up review (`ReviewCenter-Storage-FollowUp` and its aspects): the followed review, the carried counts, and
+  the carried rows are stored in the one transaction of the review, a carry that fails creates nothing, and a new
+  answer replaces a carried one without its marker; this is verified in the unit tests of `ReviewStore`.
+- Review integrity (`ReviewCenter-Storage-ReviewIntegrity` and its aspects): a review that was approved, reopened by
+  an administrator, and signed again is read back after the database is closed and opened again with its reopen
+  (who, why, and the previous digest), its old and new signatures, and the approval; the store itself refuses a
+  thread, a checklist answer, and a slot change on an approved review with `ReviewLocked`, without the services in
+  between, and stores nothing; the `RequireIndependentReviewers` setting of a project is stored with the project.
+- Review rule switches (`ReviewCenter-Storage-ReviewRuleSwitches` and its aspects): the two further review rules of a
+  project are on by default, survive a restart, are changed only against the value the caller saw, are audited, and
+  a change of one rule changes no other.
+- Repository reviews (`ReviewCenter-Storage-RepositoryReviews` and its aspects): a review from a repository, with its
+  source and the change kind and baseline content of each file, is stored and read back without file bytes in the
+  review, and its baseline content is read on request; this is verified by the unit tests of `ReviewStore` on the
+  real database (`ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes` and
+  `ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`); the review-set a review was planned
   for is stored with it (`ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips`).
-- Every audited change is stored together with its audit entry; changes made at the same moment through different
-  stores give one linear, intact chain, and the audit store offers no update or delete.
-- The second factor of a user (the encrypted secret, the accepted step, the recovery code hashes, and the pending
-  enrollment) is stored with its audit entry or not at all; a step is accepted once and a recovery code is consumed
-  once, also when thirty-two requests race; this is verified in the unit tests of `TotpStore` on the real database.
-- The e-mail address of a user for notifications, with its pending confirmation, is stored with its audit entry or not
-  at all, and a confirmation of the address is made by exactly one of several parallel requests; a confirmation mail
-  is reserved only when the pause and the limits of the user, the address, and the server allow it, with exactly one
+- Access tokens (`ReviewCenter-Storage-AccessTokens` and its aspects): personal access tokens written through the
+  service, with one of them revoked, are still present after the database is closed and opened again; the value of
+  the kept token still authenticates its owner, the revoked token is refused, and no row holds a token value.
+- External identity (`ReviewCenter-Storage-ExternalIdentity` and its aspects): an account of an identity provider is
+  stored with its issuer and subject, is found only by the exact pair, and a second account with the same pair is
+  refused; this is verified in the unit tests of `UserStore` on the real database.
+- Second factor (`ReviewCenter-Storage-TotpSecondFactor` and its aspects): the enrollment, the accepted step, the
+  recovery code hashes, and the pending enrollment are stored, each change with its audit entry or not at all; a step
+  is accepted once and a recovery code is consumed once, also when thirty-two requests race; this is verified in the
+  unit tests of `TotpStore` on the real database.
+- E-mail notification address (`ReviewCenter-Storage-NotificationPreferences` and the other `Notification` parents): the
+  e-mail address of a user for notifications, with its pending confirmation, is stored with its audit entry or not at
+  all, and a confirmation of the address is made by exactly one of several parallel requests; a confirmation mail is
+  reserved only when the pause and the limits of the user, the address, and the server allow it, with exactly one
   winner among parallel requests, and at most the limit of attempts at a code are counted; this is verified in the unit
   tests of `NotificationStore` on the real database.
+- Inbox (`ReviewCenter-Storage-Inbox` and its aspects): what a user has seen of a review is still present, and still
+  honored, after the database is closed and opened again; the candidate reviews and the race rules are verified in
+  the unit tests of `InboxStore`.
 
 ### Test Scenarios
 
@@ -155,6 +182,16 @@ This scenario is tested by `StorageSubsystem_AccessTokens_PersistAcrossReopen`.
 the provider name `Oracle` and a new file path; an `InvalidOperationException` that names the provider is thrown
 and the file does not exist. This scenario is tested by
 `StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing`.
+
+**StorageSubsystem_NewDatabase_FirstUse_CreatesFileAndTables**: A database is opened with a connection string for a
+file that does not exist yet. A project is then created and listed through the services, the file exists after the
+first use, and the project is listed, so the tables were created on first use. This scenario is tested by
+`StorageSubsystem_NewDatabase_FirstUse_CreatesFileAndTables`.
+
+**StorageSubsystem_Users_UsernameOtherCase_IsRefused**: A system administrator named `Root` is created over a new
+database, and a second user whose name differs only in letter case is created through `UserService`. A
+`DomainRuleException` for `UserNameTaken` is thrown and `Root` is the only stored user. This scenario is tested by
+`StorageSubsystem_Users_UsernameOtherCase_IsRefused`.
 
 **StorageSubsystem_ServicesOverDatabase_DuplicateReviewId_IsRefusedAndKeepsOriginal**: A second review with the id
 of an existing review in the same project is created through the services; a `DomainRuleException` for

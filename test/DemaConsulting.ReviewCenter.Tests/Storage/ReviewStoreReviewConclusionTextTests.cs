@@ -170,6 +170,60 @@ public class ReviewStoreReviewConclusionTextTests
     }
 
     /// <summary>
+    ///     Test that a change of the review conclusion text of one review leaves the text of another review of the
+    ///     same project as it was, and that the audit chain still verifies.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_UpdateReviewConclusionTextAsync_Change_ChangesOnlyThatReviewAndKeepsTheChainIntact()
+    {
+        // Arrange: REV-1 without text, and REV-2 with its own text
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await db.Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = projectId,
+                Id = "REV-2",
+                Title = "Other",
+                State = ReviewState.Draft,
+                Created = _time,
+                ContentFingerprint = Fingerprint.Compute([TestContent.B]),
+                Files =
+                [
+                    new ReviewFile
+                    {
+                        ProjectId = projectId,
+                        ReviewId = "REV-2",
+                        Path = "b.txt",
+                        Content = TestContent.B,
+                        Size = TestContent.B.Length,
+                        Sha256 = TestContent.HashB
+                    }
+                ]
+            },
+            cancellationToken);
+        await db.Store.UpdateReviewConclusionTextAsync(
+            projectId,
+            "REV-2",
+            null,
+            "Other text.",
+            AuditDraft.By(TestActors.Ann, ChecklistService.ReviewConclusionTextChangedAction, "x", projectId, "REV-2"),
+            cancellationToken);
+
+        // Act: change the text of REV-1
+        var stored = await db.Store.UpdateReviewConclusionTextAsync(
+            projectId, "REV-1", null, "Looks good.", Draft(projectId), cancellationToken);
+
+        // Assert
+        Assert.True(stored);
+        Assert.Equal("Looks good.", await ReadTextAsync(db, projectId));
+        var other = await db.Store.GetReviewAsync(projectId, "REV-2", cancellationToken);
+        Assert.Equal("Other text.", other!.ReviewConclusionText);
+        Assert.True(AuditChain.Verify(await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).IsIntact);
+    }
+
+    /// <summary>
     ///     Test that a missing review changes nothing and is reported as a stale expectation.
     /// </summary>
     [Fact]

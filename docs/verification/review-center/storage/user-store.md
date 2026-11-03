@@ -28,7 +28,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   while any number of local users without a pair is stored.
 - A user added to a project is stored with its must-change-password flag, its membership with the given role, and
   exactly one audit entry that names the project; a user name that is taken, or a project that does not exist, stores
-  no account, no membership, and no entry, and leaves the gate free for the next change.
+  no account, no membership, and no entry, and leaves the gate free for the next change; an audit entry that cannot be
+  stored leaves no account and no membership.
+- The must-change-password flag is stored and can be cleared.
+- A refused name stores no audit entry, and a user update whose audit entry cannot be stored changes nothing.
 
 #### Test Scenarios
 
@@ -78,4 +81,22 @@ shows that the unique index of the pair allows many local users. This scenario i
 
 **Audit drafts**: The store takes an audit draft with the creation of a user and with an update; an update without a
 draft is allowed and is not audited. The tests of this unit build the store with the real `AuditAppender`. The
-transaction that stores a change with its audit entry is verified in the tests of `AuditStore`.
+transaction that stores a change with its audit entry is verified in the tests of `AuditStore`, and, for a refused
+name or an audit entry that cannot be stored, in the scenarios below.
+
+**UserStore_UpdateAsync_MustChangePassword_IsStoredAndCleared**: A user whose must-change-password flag is set is
+added and read back with the flag; an update that clears it is read back without it. This scenario is tested by
+`UserStore_UpdateAsync_MustChangePassword_IsStoredAndCleared`.
+
+**UserStore_AddAsync_NameTakenWithDraft_StoresNoAuditEntry**: A user "Ann" is added with an audit draft; adding "ANN"
+with an audit draft throws `UserNameTaken`, and only the entry of the first user exists. This scenario is tested by
+`UserStore_AddAsync_NameTakenWithDraft_StoresNoAuditEntry`.
+
+**UserStore_UpdateAsync_AuditInsertFails_LeavesTheUserUnchanged**: A user is added with an audit draft, then a trigger
+makes the database refuse every audit entry and the user is disabled with an audit draft. The update fails and, after
+the trigger is dropped, the user is still enabled and only the creation entry exists. This scenario is tested by
+`UserStore_UpdateAsync_AuditInsertFails_LeavesTheUserUnchanged`.
+
+**UserStore_AddToProjectAsync_AuditInsertFails_StoresNothing**: A trigger makes the database refuse every audit entry
+and a new user is added to a project. The addition fails and, after the trigger is dropped, there is no account, no
+membership, and no audit entry. This scenario is tested by `UserStore_AddToProjectAsync_AuditInsertFails_StoresNothing`.

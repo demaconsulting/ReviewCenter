@@ -28,7 +28,8 @@ N/A - standard test environment (a temporary SQLite database file is created by 
   same step exactly one wins.
 - A recovery code is spent once with one audit entry; unknown and foreign codes are refused without an entry; of
   parallel requests with the same code exactly one wins.
-- Replacing the recovery codes removes all old codes and is refused without a confirmed enrollment.
+- Replacing the recovery codes removes all old codes and is refused without a confirmed enrollment; a replacement
+  writes one audit entry.
 - Removing deletes the enrollment and its codes with one audit entry, removing a pending enrollment leaves a confirmed
   one alone, and removing nothing records nothing.
 - Every change keeps the audit hash chain intact, and deleting a user deletes the enrollment and its codes.
@@ -81,6 +82,11 @@ recovery code; exactly one wins and exactly one audit entry exists. This scenari
 **TotpStore_ReplaceRecoveryCodesAsync_ReplacesAllOldCodes**: Replacing gives the user the new codes only, an old code
 no longer works, a new code does, another user is untouched, and a user with only a pending enrollment is refused.
 This scenario is tested by `TotpStore_ReplaceRecoveryCodesAsync_ReplacesAllOldCodes`.
+
+**TotpStore_ReplaceRecoveryCodesAsync_Replaced_StoresOneAuditEntry**: The recovery codes of a confirmed user are
+replaced and a replacement is tried for a user with a pending enrollment. Exactly one audit entry exists, for the
+replacement that happened. This scenario is tested by
+`TotpStore_ReplaceRecoveryCodesAsync_Replaced_StoresOneAuditEntry`.
 
 **TotpStore_RemoveAsync_DeletesEverythingOnceWithOneAuditEntry**: Removing deletes the enrollment and the codes with one
 audit entry; a second removal returns false and records nothing. This scenario is tested by

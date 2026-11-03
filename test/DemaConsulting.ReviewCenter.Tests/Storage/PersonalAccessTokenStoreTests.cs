@@ -21,6 +21,7 @@
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace DemaConsulting.ReviewCenter.Tests.Storage;
@@ -88,6 +89,20 @@ public class PersonalAccessTokenStoreTests
     /// <param name="start">The first character.</param>
     /// <returns>The hash.</returns>
     private static string Hash(char start) => start + new string('0', 63);
+
+    /// <summary>
+    ///     Runs one SQL statement against the database file of the test store.
+    /// </summary>
+    /// <param name="db">The test database.</param>
+    /// <param name="sql">The statement.</param>
+    private static void Execute(TestStore db, string sql)
+    {
+        using var connection = new SqliteConnection(db.ConnectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
 
     /// <summary>
     ///     Test that a token round-trips with every field, a database-assigned identity and its audit entry saved
@@ -281,6 +296,53 @@ public class PersonalAccessTokenStoreTests
         // A late caller that still holds the old value changes nothing
         Assert.False(await db.Tokens.TouchAsync(token.Id, seen, _created.AddHours(20), cancellationToken));
         Assert.Equal(read.LastUsed, (await db.Tokens.FindByHashAsync(Hash('a'), cancellationToken))!.LastUsed);
+    }
+
+    /// <summary>
+    ///     Test that a token is not kept when the audit entry of its creation cannot be stored.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenStore_AddAsync_AuditInsertFails_StoresNoToken()
+    {
+        // Arrange: a user, and a database that refuses every audit entry
+        using var db = new TestStore();
+        var userId = await AddUserAsync(db);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var auditCountBefore = await CountAuditAsync(db);
+        Execute(db, "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;");
+
+        // Act: add a token
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => db.Tokens.AddAsync(NewToken(userId, Hash('a')), t => Draft(t, "token.created"), cancellationToken));
+        Execute(db, "DROP TRIGGER refuse_audit");
+
+        // Assert: neither the token nor an entry was kept
+        Assert.Empty(await db.Tokens.ListForUserAsync(userId, cancellationToken));
+        Assert.Equal(auditCountBefore, await CountAuditAsync(db));
+    }
+
+    /// <summary>
+    ///     Test that a token stays unrevoked when the audit entry of its revocation cannot be stored.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenStore_RevokeAsync_AuditInsertFails_LeavesTheTokenUnrevoked()
+    {
+        // Arrange: a token, and a database that then refuses every audit entry
+        using var db = new TestStore();
+        var ann = await AddUserAsync(db);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var token = await db.Tokens.AddAsync(NewToken(ann, Hash('a')), t => Draft(t, "token.created"), cancellationToken);
+        var auditCountBefore = await CountAuditAsync(db);
+        Execute(db, "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;");
+
+        // Act: revoke the token
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => db.Tokens.RevokeAsync(token.Id, ann, _created.AddHours(1), t => Draft(t, "token.revoked"), cancellationToken));
+        Execute(db, "DROP TRIGGER refuse_audit");
+
+        // Assert: the token is not revoked and no entry was added
+        Assert.Null((await db.Tokens.FindByHashAsync(Hash('a'), cancellationToken))!.Revoked);
+        Assert.Equal(auditCountBefore, await CountAuditAsync(db));
     }
 
     /// <summary>

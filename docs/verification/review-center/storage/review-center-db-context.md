@@ -5,10 +5,12 @@
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
 `UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`,
 `ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, `ProjectChecklistStoreTests.cs`,
-`TotpStoreTests.cs`, `NotificationStoreTests.cs`, and `DatabaseSetupTests.cs`, which
-exercise the context through the units that use it. The context has no behavior that can be reached without a
-database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
-private temporary folder. No mocking or in-memory substitute is applied. Each test uses its own database file.
+`TotpStoreTests.cs`, `NotificationStoreTests.cs`, and `DatabaseSetupTests.cs`, which exercise the context through the
+units that use it, and with
+`ReviewCenterDbContextTests.cs`, which writes to the context directly where no store reaches a rule of the schema. The
+context has no behavior that can be reached without a database, and its job is to produce the right schema, so the
+tests run against real SQLite database files in a private temporary folder. No mocking or in-memory substitute is
+applied. Each test uses its own database file.
 
 #### Test Environment
 
@@ -70,8 +72,13 @@ be loadable on the test platform.
   creator that the inbox query uses (`DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`); the
   rows of the read state are removed together with their review or user, and the real store is verified in the tests of
   the `InboxStore` unit.
-- The table of the audit trail has the four indexes of its reads, which a new database creates
-  (`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`, listed under the `AuditStore` unit).
+- The table of the audit trail has the four indexes of its reads, which a new database creates; the index of the review
+  and the sequence is tested by `ReviewCenterDbContext_AuditEntries_NewDatabase_HasTheReviewSequenceIndex`, and the
+  other three by `AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence` of the `AuditStore` unit.
+- The relationships that the schema enforces are tested one by one: what the database refuses (a thread, a signature,
+  a repository, a membership, a second-factor enrollment, and a reopening that point at nothing), what it deletes with
+  its parent (comments, checklist rows, ballot status rows, memberships, and reopenings), and what it keeps (a
+  follow-up review of a deleted review, and an audit entry of a deleted project).
 
 #### Test Scenarios
 
@@ -211,7 +218,9 @@ that was created before them must be deleted and recreated (see the design of th
 
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
 of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a
-schema that includes it.
+schema that includes it. The index of the review and the sequence is tested by
+`ReviewCenterDbContext_AuditEntries_NewDatabase_HasTheReviewSequenceIndex`, defined in `ReviewCenterDbContextTests.cs`,
+which reads the indexes of the table from a database that is created from scratch.
 
 **ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns**: A review with a creator and the API flag is stored
 and read back, and the model of the token table is read. The review keeps its creator and the flag; the index on the
@@ -270,3 +279,80 @@ unit.
 read state of the inbox and the indexes of the slot reviewers and of the review creator, and the table is empty. This
 scenario is tested by `DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`, which is defined in
 `DatabaseSetupTests.cs`.
+
+**ReviewCenterDbContext_Comment_ThreadDeleted_DeletesItsComments**: Arrange a thread with a comment; act by deleting the
+thread; assert that its comment is gone. This scenario is tested by
+`ReviewCenterDbContext_Comment_ThreadDeleted_DeletesItsComments`.
+
+**ReviewCenterDbContext_Thread_SideNotGiven_DefaultsToHeadText**: Arrange a thread row inserted without a side; act by
+reading it back; assert that the side is Head and is stored as text. This scenario is tested by
+`ReviewCenterDbContext_Thread_SideNotGiven_DefaultsToHeadText`.
+
+**ReviewCenterDbContext_Thread_Table_HasNoKindColumn**: Arrange a new database; act by reading the columns of the thread
+table; assert that there is no kind column. This scenario is tested by
+`ReviewCenterDbContext_Thread_Table_HasNoKindColumn`.
+
+**ReviewCenterDbContext_Checklist_ReviewDeleted_DeletesSnapshotAnswersAndSectionStates**: Arrange a review with a
+checklist snapshot, an answer, and a section state; act by deleting the review; assert that all three are gone. This
+scenario is tested by `ReviewCenterDbContext_Checklist_ReviewDeleted_DeletesSnapshotAnswersAndSectionStates`.
+
+**ReviewCenterDbContext_Ballot_ReviewDeleted_DeletesTheStatusRows**: Arrange a review with a ballot status row; act by
+deleting the review; assert that the row is gone. This scenario is tested by
+`ReviewCenterDbContext_Ballot_ReviewDeleted_DeletesTheStatusRows`.
+
+**ReviewCenterDbContext_Review_FollowedReviewDeleted_KeepsTheFollowUp**: Arrange a review that follows another; act by
+deleting the followed review; assert that the follow-up review remains. This scenario is tested by
+`ReviewCenterDbContext_Review_FollowedReviewDeleted_KeepsTheFollowUp`.
+
+**ReviewCenterDbContext_Signature_UnknownReview_IsRefusedByDatabase**: Arrange an empty database; act by adding a
+signature of a review that does not exist; assert that the database refuses it. This scenario is tested by
+`ReviewCenterDbContext_Signature_UnknownReview_IsRefusedByDatabase`.
+
+**ReviewCenterDbContext_Signature_UnknownSlot_IsRefusedByDatabase**: Arrange a review; act by adding a signature of a
+slot that does not exist; assert that the database refuses it. This scenario is tested by
+`ReviewCenterDbContext_Signature_UnknownSlot_IsRefusedByDatabase`.
+
+**ReviewCenterDbContext_AuditEntry_ProjectDeleted_KeepsTheEntry**: Arrange an audit entry about a review; act by
+deleting the project; assert that the review is gone and the entry is unchanged. This scenario is tested by
+`ReviewCenterDbContext_AuditEntry_ProjectDeleted_KeepsTheEntry`.
+
+**ReviewCenterDbContext_Repository_UnknownProject_IsRefusedByDatabase**: Arrange an empty database; act by adding a
+repository of a project that does not exist; assert that the database refuses it. This scenario is tested by
+`ReviewCenterDbContext_Repository_UnknownProject_IsRefusedByDatabase`.
+
+**ReviewCenterDbContext_Membership_Role_IsStoredByName**: Arrange a membership; act by reading the stored value with a
+raw query; assert that it is the name of the role. This scenario is tested by
+`ReviewCenterDbContext_Membership_Role_IsStoredByName`.
+
+**ReviewCenterDbContext_Membership_UnknownUser_IsRefusedByDatabase**: Arrange a project; act by adding a membership of a
+user that does not exist; assert that the database refuses it. This scenario is tested by
+`ReviewCenterDbContext_Membership_UnknownUser_IsRefusedByDatabase`.
+
+**ReviewCenterDbContext_Membership_ProjectDeleted_DeletesItsMemberships**: Arrange a membership; act by deleting the
+project; assert that the membership is gone. This scenario is tested by
+`ReviewCenterDbContext_Membership_ProjectDeleted_DeletesItsMemberships`.
+
+**ReviewCenterDbContext_Membership_UserDeleted_DeletesTheMemberships**: Arrange a membership; act by deleting the user;
+assert that the membership is gone. This scenario is tested by
+`ReviewCenterDbContext_Membership_UserDeleted_DeletesTheMemberships`.
+
+**ReviewCenterDbContext_UserTotp_SecondEnrollmentOfUser_IsRefusedByDatabase**: Arrange a user with an enrollment; act by
+adding a second enrollment of the same user; assert that the database refuses it. This scenario is tested by
+`ReviewCenterDbContext_UserTotp_SecondEnrollmentOfUser_IsRefusedByDatabase`.
+
+**ReviewCenterDbContext_Project_AddedWithIndependentReviewersOff_ReadsBackOff**: Arrange a project added with the
+setting that requires independent reviewers off; act by reading it back; assert that it is off. This scenario is
+tested by
+`ReviewCenterDbContext_Project_AddedWithIndependentReviewersOff_ReadsBackOff`.
+
+**ReviewCenterDbContext_ReviewReopen_UnknownReview_IsRefusedByDatabase**: Arrange an empty database; act by adding a
+reopening of a review that does not exist; assert that the database refuses it. This scenario is tested by
+`ReviewCenterDbContext_ReviewReopen_UnknownReview_IsRefusedByDatabase`.
+
+**ReviewCenterDbContext_ReviewReopen_ReviewDeleted_DeletesTheReopenings**: Arrange a review with a reopening; act by
+deleting the review; assert that the reopening is gone. This scenario is tested by
+`ReviewCenterDbContext_ReviewReopen_ReviewDeleted_DeletesTheReopenings`.
+
+**ReviewCenterDbContext_Review_DueDate_IsStoredAsCalendarDayText**: Arrange a review with a due date; act by reading the
+stored value with a raw query; assert that it is the day as yyyy-MM-dd text. This scenario is tested by
+`ReviewCenterDbContext_Review_DueDate_IsStoredAsCalendarDayText`.

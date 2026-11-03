@@ -3,6 +3,9 @@
 #
 # The DatabaseSetup class turns the database settings into a provider and connection, and creates the database
 # on first use.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: DatabaseSetup Unit Requirements
@@ -10,63 +13,166 @@ sections:
       - id: ReviewCenter-DatabaseSetup-Location
         title: >-
           The DatabaseSetup class shall default the database file to reviewcenter.db in a ReviewCenter folder of
-          the per-user application data folder, or in a data folder beside the application when the system has
-          no application data folder.
+          the per-user application data folder.
         justification: |
           A new installation must store its data in a predictable place that the user can write to, without any
-          configuration. Some service accounts have no home folder, so a fallback is needed.
+          configuration.
         tests:
           - DatabaseSetup_GetDefaultDatabasePath_WithDataFolder_UsesAppDataSubfolder
+
+      - id: ReviewCenter-DatabaseSetup-Location-Fallback
+        title: >-
+          The DatabaseSetup class shall default the database file to a data folder beside the application when the
+          system has no application data folder.
+        justification: |
+          Some service accounts have no home folder, so a fallback is needed.
+        tests:
           - DatabaseSetup_GetDefaultDatabasePath_WithoutDataFolder_FallsBackToBaseDirectory
 
       - id: ReviewCenter-DatabaseSetup-Connection
         title: >-
-          The DatabaseSetup class shall use the default database file when no connection string is configured,
-          shall treat a configured value without an equals sign as a database file path, shall use any
-          other configured value as the full connection string, and shall reject an in-memory database with an
-          error that asks for a file path.
+          The DatabaseSetup class shall use the default database file when no connection string is configured.
         justification: |
-          Operators need the simplest setting for the common case, a file path, and the full connection string
-          for options such as pooling. An in-memory SQLite database gives every connection its own empty
-          database, so accepting it would start a server that cannot serve any data.
+          Operators need a setting that works without any configuration.
         tests:
           - DatabaseSetup_ResolveConnectionString_Empty_UsesDefaultFile
+
+      - id: ReviewCenter-DatabaseSetup-Connection-PlainPath
+        title: >-
+          The DatabaseSetup class shall treat a configured value without an equals sign as the path of the database
+          file.
+        justification: |
+          Operators need the simplest setting for the common case, a file path.
+        tests:
           - DatabaseSetup_ResolveConnectionString_PlainPath_BecomesDataSource
+
+      - id: ReviewCenter-DatabaseSetup-Connection-FullString
+        title: >-
+          The DatabaseSetup class shall use any other configured value unchanged as the full connection string.
+        justification: |
+          Operators need the full connection string for options such as pooling.
+        tests:
           - DatabaseSetup_ResolveConnectionString_FullConnectionString_IsUsedAsIs
+
+      - id: ReviewCenter-DatabaseSetup-Connection-InMemoryRejected
+        title: >-
+          The DatabaseSetup class shall reject an in-memory database with an error that asks for a file path.
+        justification: |
+          An in-memory SQLite database gives every connection its own empty database, so accepting it would start a
+          server that cannot serve any data.
+        tests:
           - DatabaseSetup_ResolveConnectionString_InMemory_ThrowsClearError
 
       - id: ReviewCenter-DatabaseSetup-Provider
         title: >-
-          The DatabaseSetup class shall accept the provider name Sqlite in any letter case and shall reject any
-          other provider with an error that names it and lists the supported providers.
+          The DatabaseSetup class shall accept the provider name Sqlite in any letter case.
         justification: |
-          SQLite is the only implemented provider. Failing clearly for any other name prevents data from going
-          to a database the operator did not intend, and leaves one place to extend for other providers.
+          SQLite is the only implemented provider, and operators should not fail on the case of its name.
+        tests:
+          - DatabaseSetup_Configure_ProviderInOtherCase_IsAccepted
+
+      - id: ReviewCenter-DatabaseSetup-Provider-Unsupported
+        title: >-
+          The DatabaseSetup class shall reject any other provider with an error that names it and lists the supported
+          providers.
+        justification: |
+          Failing clearly for any other name prevents data from going to a database the operator did not intend.
         tests:
           - DatabaseSetup_Configure_UnsupportedProvider_ThrowsClearError
-          - DatabaseSetup_Configure_ProviderInOtherCase_IsAccepted
+
+      - id: ReviewCenter-DatabaseSetup-Provider-UnsupportedCreatesNothing
+        title: >-
+          The DatabaseSetup class shall create no folder or file when the provider is not supported.
+        justification: |
+          A start with a wrong provider must not leave a database behind that the operator did not intend.
+        tests:
           - DatabaseSetup_EnsureCreated_UnsupportedProvider_ThrowsAndCreatesNothing
 
       - id: ReviewCenter-DatabaseSetup-Create
         title: >-
-          The DatabaseSetup class shall create the database folder, file, and tables when they do not exist, and shall
-          tell without creating anything whether the configured database file is missing, and shall give the connection
-          string of the database with the open mode forced to read-only.
+          The DatabaseSetup class shall create the database folder when it does not exist.
         justification: |
-          A new installation must work on first start without manual database setup, while a command that only reads
-          the data (the audit check) must be able to tell that the file is not there, and must open it in a way that
-          cannot create it, instead of creating an empty database.
+          A new installation must work on first start without the operator creating the data folder by hand.
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+
+      - id: ReviewCenter-DatabaseSetup-Create-File
+        title: >-
+          The DatabaseSetup class shall create the database file when it does not exist.
+        justification: |
+          Without a database file on first start, the first request would fail instead of finding an empty database.
+        tests:
+          - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+
+      - id: ReviewCenter-DatabaseSetup-Create-Tables
+        title: >-
+          The DatabaseSetup class shall create the tables of the database when they do not exist.
+        justification: |
+          A database file without its tables cannot hold any review, so the schema must be there before the first
+          request.
+        tests:
+          - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+          - DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes
+
+      - id: ReviewCenter-DatabaseSetup-Create-MissingFile
+        title: >-
+          The DatabaseSetup class shall report the full path of the configured database file when that file does not
+          exist.
+        justification: |
+          A command that only reads the data (the audit check) must be able to tell that the file is not there.
+        tests:
           - DatabaseSetup_TryGetMissingDatabaseFile_MissingExistingAndUnsupported_ReportsWithoutCreating
+
+      - id: ReviewCenter-DatabaseSetup-Create-MissingFileNoCreate
+        title: >-
+          The DatabaseSetup class shall create no folder or file while it checks whether the configured database file
+          is missing.
+        justification: |
+          The check exists to avoid creating an empty database by mistake.
+        tests:
+          - DatabaseSetup_TryGetMissingDatabaseFile_MissingExistingAndUnsupported_ReportsWithoutCreating
+
+      - id: ReviewCenter-DatabaseSetup-Create-ExistingFile
+        title: >-
+          The DatabaseSetup class shall report nothing when the configured database file exists.
+        justification: |
+          Only a file that is missing is a problem for a command that reads the data.
+        tests:
+          - DatabaseSetup_TryGetMissingDatabaseFile_MissingExistingAndUnsupported_ReportsWithoutCreating
+
+      - id: ReviewCenter-DatabaseSetup-Create-ReadOnly
+        title: >-
+          The DatabaseSetup class shall give the connection string of the database with the open mode forced to
+          read-only and the data source kept.
+        justification: |
+          A command that only reads the data must open it in a way that cannot change it.
+        tests:
+          - DatabaseSetup_ResolveReadOnlyConnectionString_MissingFile_IsReadOnlyAndNeverCreates
+
+      - id: ReviewCenter-DatabaseSetup-Create-ReadOnlyNoCreate
+        title: >-
+          The DatabaseSetup class shall give a read-only connection string that fails to open a missing database file
+          without creating it.
+        justification: |
+          Opening a missing file for reading must not create an empty database.
+        tests:
           - DatabaseSetup_ResolveReadOnlyConnectionString_MissingFile_IsReadOnlyAndNeverCreates
 
       - id: ReviewCenter-DatabaseSetup-DataDirectory
         title: >-
-          The DatabaseSetup class shall give the folder of the configured database file, or the folder of the default
-          database file when the settings name no usable file, as the base for the other data of the server.
+          The DatabaseSetup class shall give the folder of the configured database file as the base for the other data
+          of the server.
         justification: |
           The encryption keys and the git cache belong with the database, so that moving or backing up the data folder
           keeps them together, without further configuration.
+        tests:
+          - DatabaseSetup_ResolveDataDirectory_Configured_IsFolderOfTheDatabaseFile
+
+      - id: ReviewCenter-DatabaseSetup-DataDirectory-Default
+        title: >-
+          The DatabaseSetup class shall give the folder of the default database file as the base for the other data of
+          the server when the settings name no usable file.
+        justification: |
+          A server without a configured file must still keep its other data beside its database.
         tests:
           - DatabaseSetup_ResolveDataDirectory_Configured_IsFolderOfTheDatabaseFile

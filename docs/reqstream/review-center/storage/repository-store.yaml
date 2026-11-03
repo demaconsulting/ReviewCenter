@@ -2,8 +2,11 @@
 # Software Unit Requirements for the RepositoryStore Class
 #
 # The RepositoryStore class persists the registry of git repositories: the registration (which belongs to one
-# project), the encrypted token, and the
-# audit entry of each change, which is stored in the same transaction as the change.
+# project), the encrypted token, and the audit entry of each change, which is stored in the same transaction as the
+# change.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: RepositoryStore Unit Requirements
@@ -11,57 +14,201 @@ sections:
       - id: ReviewCenter-RepositoryStore-Persist
         title: >-
           The RepositoryStore class shall store a repository with every field, including the project it belongs to,
-          and an identity assigned by the
-          database, read it back unchanged, and list the repositories of one project, and of no other project,
-          ordered by name without regard to letter case.
+          and read it back unchanged.
         justification: |
-          The registry must survive a restart, the page that shows the repositories of a project needs a stable
-          order, and a list must never hold the repositories of another project.
+          The registry must survive a restart.
         tests:
           - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
-          - RepositoryStore_ListAsync_OrdersByNameIgnoringCase
+
+      - id: ReviewCenter-RepositoryStore-Persist-AssignedId
+        title: >-
+          The RepositoryStore class shall give each stored repository an identity assigned by the database.
+        justification: |
+          The identity is what the rest of the system refers to a repository by, so the caller must not choose it.
+        tests:
+          - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
+
+      - id: ReviewCenter-RepositoryStore-Persist-ListProject
+        title: >-
+          The RepositoryStore class shall list the repositories of one project and no repository of another project.
+        justification: |
+          A list must never hold the repositories of another project.
+        tests:
           - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
+
+      - id: ReviewCenter-RepositoryStore-Persist-ListOrder
+        title: >-
+          The RepositoryStore class shall list the repositories of a project ordered by name without regard to letter
+          case.
+        justification: |
+          The page that shows the repositories of a project needs a stable order.
+        tests:
+          - RepositoryStore_ListAsync_OrdersByNameIgnoringCase
 
       - id: ReviewCenter-RepositoryStore-Unique
         title: >-
-          The RepositoryStore class shall refuse a repository name that is already used in the same project,
-          regardless of letter case, when adding and when renaming, reporting that the name is taken and leaving the
-          data and the audit trail unchanged, and shall accept the same name in another project.
+          The RepositoryStore class shall refuse to add a repository whose name is already used in the same project,
+          regardless of letter case, reporting that the name is taken.
         justification: |
           The database is the last defense against two repositories with the same name in a project when two
-          requests overlap. A name is taken only within its project, so that a refusal never tells a user that
-          another project has a repository of that name.
+          requests overlap.
         tests:
           - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+
+      - id: ReviewCenter-RepositoryStore-Unique-Rename
+        title: >-
+          The RepositoryStore class shall refuse to rename a repository to a name that is already used in the same
+          project, regardless of letter case, reporting that the name is taken.
+        justification: |
+          A rename must not bypass the uniqueness of the names.
+        tests:
+          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+
+      - id: ReviewCenter-RepositoryStore-Unique-DataUnchanged
+        title: >-
+          The RepositoryStore class shall leave the stored repositories unchanged when it refuses a name that is taken.
+        justification: |
+          A refused change must not leave a half-done change behind.
+        tests:
+          - RepositoryStore_NameTaken_AddAndRename_LeaveTheDataUnchanged
+
+      - id: ReviewCenter-RepositoryStore-Unique-NoEntry
+        title: >-
+          The RepositoryStore class shall record nothing in the audit trail when it refuses a name that is taken.
+        justification: |
+          A refused change did not happen, so the trail must not claim it.
+        tests:
+          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+
+      - id: ReviewCenter-RepositoryStore-Unique-OtherProject
+        title: >-
+          The RepositoryStore class shall accept a repository name that is used only in another project.
+        justification: |
+          A name is taken only within its project, so that a refusal never tells a user that another project has a
+          repository of that name.
+        tests:
           - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
 
       - id: ReviewCenter-RepositoryStore-Token
         title: >-
-          The RepositoryStore class shall keep the encrypted token apart from the data it shows, return it only
-          through a dedicated read, and keep, replace, or clear it as an update asks.
+          The RepositoryStore class shall return the encrypted token of a repository through a dedicated read.
         justification: |
-          A token that is part of every read could reach a page by mistake. Keeping it behind one dedicated read makes
-          the ways to reach it few and easy to review.
+          Keeping the token behind one dedicated read makes the ways to reach it few and easy to review.
         tests:
           - RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText
-          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+
+      - id: ReviewCenter-RepositoryStore-Token-None
+        title: >-
+          The RepositoryStore class shall return no token for a repository that has none and for an unknown repository.
+        justification: |
+          A caller must be able to tell that no credential is to be used.
+        tests:
+          - RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText
+
+      - id: ReviewCenter-RepositoryStore-Token-HiddenFromRecord
+        title: >-
+          The RepositoryStore class shall expose in the repository record only whether a token exists, not the token.
+        justification: |
+          A token that is part of every read could reach a page by mistake.
+        tests:
           - RepositoryStore_ReadModel_HasNoTokenMember
+
+      - id: ReviewCenter-RepositoryStore-Token-Keep
+        title: >-
+          The RepositoryStore class shall keep the stored token when an update asks to keep it.
+        justification: |
+          An update of the name or the location must not lose the credential.
+        tests:
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+
+      - id: ReviewCenter-RepositoryStore-Token-Replace
+        title: >-
+          The RepositoryStore class shall store the new token when an update asks to replace it.
+        justification: |
+          A credential that changed must be replaceable.
+        tests:
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+
+      - id: ReviewCenter-RepositoryStore-Token-Clear
+        title: >-
+          The RepositoryStore class shall remove the stored token when an update asks to clear it.
+        justification: |
+          A repository that becomes public must not keep a credential.
+        tests:
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
 
       - id: ReviewCenter-RepositoryStore-Update
         title: >-
-          The RepositoryStore class shall change and disable a repository in place, deleting nothing, and report an
-          unknown repository by its rule.
+          The RepositoryStore class shall change a repository in place.
+        justification: |
+          Reviews made from a repository keep their reference to it, so it must change in place.
+        tests:
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+
+      - id: ReviewCenter-RepositoryStore-Update-UpdateTime
+        title: >-
+          The RepositoryStore class shall set the update time of a repository when it changes it.
+        justification: |
+          The update time tells an administrator when a registration or its credential was last touched.
+        tests:
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+
+      - id: ReviewCenter-RepositoryStore-Update-CreationKept
+        title: >-
+          The RepositoryStore class shall keep the creation time of a repository when it changes it.
+        justification: |
+          The creation time records when the registration was made, so a later change must not rewrite it.
+        tests:
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+
+      - id: ReviewCenter-RepositoryStore-Update-Disable
+        title: >-
+          The RepositoryStore class shall disable a repository without deleting it.
         justification: |
           Reviews made from a repository keep their reference to it, so a registration is retired by disabling it.
         tests:
-          - RepositoryStore_UpdateAsync_DisableAndUnknown
+          - RepositoryStore_UpdateAsync_Disable_KeepsTheRepository
+
+      - id: ReviewCenter-RepositoryStore-Update-Unknown
+        title: >-
+          The RepositoryStore class shall report an update of an unknown repository as a repository that was not found.
+        justification: |
+          A caller must be able to tell a missing repository from other failures.
+        tests:
+          - RepositoryStore_UpdateAsync_UnknownRepository_ThrowsRepositoryNotFound
 
       - id: ReviewCenter-RepositoryStore-Audit
         title: >-
-          The RepositoryStore class shall store each change of the registry together with its audit entry in one
-          transaction, so that both or neither are stored.
+          The RepositoryStore class shall store an audit entry for the creation of a repository.
         justification: |
-          An entry without its change, or a change without its entry, would make the history untrue.
+          A repository registered without the trail entry of its creation would exist with no record of who made
+          it and when, and the trail would claim a history that did not happen.
         tests:
           - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
-          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+
+      - id: ReviewCenter-RepositoryStore-Audit-Update
+        title: >-
+          The RepositoryStore class shall store an audit entry for each change of a repository.
+        justification: |
+          A location, name, or credential change of a repository that leaves no entry could not be traced to the
+          person who made it.
+        tests:
+          - RepositoryStore_UpdateAsync_Change_StoresOneAuditEntry
+
+      - id: ReviewCenter-RepositoryStore-Audit-Atomic
+        title: >-
+          The RepositoryStore class shall store no repository when the audit entry of its creation cannot be stored.
+        justification: |
+          An entry that survives although its creation failed would report a repository that does not exist.
+        tests:
+          - RepositoryStore_AddAsync_AuditInsertFails_StoresNoRepository
+
+      - id: ReviewCenter-RepositoryStore-Audit-AtomicUpdate
+        title: >-
+          The RepositoryStore class shall leave a repository unchanged when the audit entry of its change cannot be
+          stored.
+        justification: |
+          A change that was stored although its entry was not would alter a registration or credential with no
+          trace of who altered it.
+        tests:
+          - RepositoryStore_UpdateAsync_AuditInsertFails_LeavesTheRepositoryUnchanged

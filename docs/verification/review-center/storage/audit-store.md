@@ -46,7 +46,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - The store offers no update or delete operation beyond the reads listed in the public surface test.
 - The newest sequence is 0 for an empty trail and the highest sequence otherwise; the matching read honors the filter,
   returns ascending keyset batches after a sequence and up to a snapshot sequence, never returns an entry above the
-  snapshot, and never returns an entry without a project for a project filter.
+  snapshot, and never returns an entry without a project for a project filter; it applies the actor text, action,
+  action prefix, and review of the filter.
 
 #### Test Scenarios
 
@@ -128,9 +129,11 @@ the matching entries are visited, each once. This scenario is tested by
 actor, action, and dates; each page is no larger than requested and the read takes well under the loose bound. This
 scenario is tested by `AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded`.
 
-**StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes**: A database that is created now has the indexes on project and
-sequence, actor and sequence, action and sequence, and project, review, and sequence. This scenario is tested by
-`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`.
+**AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence**: A database that is created now has the
+indexes on project and sequence, actor and sequence, and action and sequence. This scenario is tested by
+`AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence`; the subsystem test
+`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes` checks all four indexes of the audit table in the subsystem
+verification.
 
 **AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject**: Entries of two reviews of project one, one entry of
 the project without a review, and one entry of another project are appended. The last activity of project one names the
@@ -157,3 +160,8 @@ sequence below the newest; the batches are ascending, bounded, hold only the pro
 newest sequence of an empty trail is 0 and of a filled trail the highest sequence. This scenario is tested by
 `AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches` and
 `AuditStore_LatestSequenceAsync_EmptyThenFilled_ReturnsHighestSequence`.
+
+**AuditStore_ReadMatchingAsync_ActorActionAndReviewFilters_ReturnOnlyMatches**: Four entries of one project with
+different actors, actions, and reviews are read for an export, once with each of the actor text, the action, the action
+prefix, and the review; each read returns only the matching entries in ascending order. This scenario is tested by
+`AuditStore_ReadMatchingAsync_ActorActionAndReviewFilters_ReturnOnlyMatches`.

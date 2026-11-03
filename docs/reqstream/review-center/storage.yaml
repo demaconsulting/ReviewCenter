@@ -8,445 +8,1966 @@
 # - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, reviews,
 #   checklists, comment threads, reviewer slots, signatures, project memberships, the evidence settings of projects,
 #   the audit trail, git repositories, and the e-mail address for notifications
+# - Each requirement states one obligation; the main requirement of a topic keeps its original identifier, and
+#   every further obligation of that topic has its own requirement named <identifier>-<Aspect>
 
 sections:
   - title: Storage Subsystem Requirements
     requirements:
       - id: ReviewCenter-Storage-Persistence
         title: >-
-          The Storage subsystem shall keep projects, reviews, and the exact bytes of review files in a database
-          file, so that they are all still there, unchanged, when the database is opened again.
+          The Storage subsystem shall keep projects in a database file, so that they are still there, unchanged,
+          when the database is opened again.
         justification: |
-          Review records are evidence and must outlive the process that created them. Keeping the exact bytes
-          means the fingerprint of a stored review can always be reproduced from what is stored.
+          Review records are evidence and must outlive the process that created them. The schema is created
+          without migrations, so a development database that was created before a column existed has to be
+          recreated.
         children:
           - ReviewCenter-ReviewStore-Projects
-          - ReviewCenter-ReviewStore-Reviews
-          - ReviewCenter-ReviewStore-Metadata
+          - ReviewCenter-ReviewStore-Projects-IdAssigned
+          - ReviewCenter-ReviewStore-Projects-Unknown
+          - ReviewCenter-ReviewStore-Projects-List
           - ReviewCenter-DbContext-Schema
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
+
+      - id: ReviewCenter-Storage-Persistence-Reviews
+        title: >-
+          The Storage subsystem shall keep reviews, with their content fingerprints and files, in a database
+          file, so that they are still there, unchanged, when the database is opened again.
+        justification: |
+          A review is the unit of evidence that is signed, so it must outlive the process that created it, and
+          the same review identifier in two projects must stay two different reviews.
+        children:
+          - ReviewCenter-ReviewStore-Reviews
+          - ReviewCenter-ReviewStore-Reviews-ProjectScope
+          - ReviewCenter-ReviewStore-Reviews-List
+          - ReviewCenter-ReviewStore-Reviews-ListOrder
+          - ReviewCenter-ReviewStore-Metadata
+          - ReviewCenter-ReviewStore-Metadata-UnknownReview
+          - ReviewCenter-ReviewStore-Metadata-UnknownFile
+          - ReviewCenter-DbContext-Schema-ReviewKey
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
+
+      - id: ReviewCenter-Storage-Persistence-FileContent
+        title: >-
+          The Storage subsystem shall keep the exact bytes of review files in a database file, so that they are
+          still there, unchanged, when the database is opened again.
+        justification: |
+          Keeping the exact bytes means the fingerprint of a stored review can always be reproduced from what is
+          stored, including for binary files, files with other line endings, and empty files.
+        children:
+          - ReviewCenter-ReviewStore-Metadata-FileContent
           - ReviewCenter-DbContext-Content
+          - ReviewCenter-DbContext-Content-Empty
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
 
       - id: ReviewCenter-Storage-Integrity
         title: >-
-          The Storage subsystem shall refuse a second review with the same identifier in a project, and a
-          review for a project that does not exist, leaving the stored data unchanged.
+          The Storage subsystem shall refuse a second review with the same identifier in a project, leaving the
+          stored data unchanged.
         justification: |
           The database is the last line of defense for the review record: two requests made at the same moment
-          can both pass a check made before saving, so the database itself must enforce uniqueness and the
-          project relationship.
+          can both pass a check made before saving, so the database itself must enforce the uniqueness.
         children:
           - ReviewCenter-ReviewStore-Duplicate
           - ReviewCenter-DbContext-Integrity
         tests:
           - StorageSubsystem_ServicesOverDatabase_DuplicateReviewId_IsRefusedAndKeepsOriginal
+
+      - id: ReviewCenter-Storage-Integrity-UnknownProject
+        title: >-
+          The Storage subsystem shall refuse a review for a project that does not exist, leaving the stored data
+          unchanged.
+        justification: |
+          A review without its project could never be shown or signed in a project, and two requests made at the
+          same moment can both pass a check made before saving, so the database itself must enforce the project
+          relationship.
+        children:
+          - ReviewCenter-DbContext-Integrity-UnknownProject
+        tests:
           - StorageSubsystem_ServicesOverDatabase_UnknownProject_IsRefusedAndKeepsData
 
       - id: ReviewCenter-Storage-Configuration
         title: >-
-          The Storage subsystem shall open the database named by its provider and connection settings, create
-          the database and its tables on first use, and refuse an unsupported provider with an error that names
-          it, without creating a database.
+          The Storage subsystem shall open the database named by its provider and connection settings.
         justification: |
-          Operators choose where the data lives. A new installation must work without manual database setup,
-          while a mistyped or not yet supported provider must fail loudly instead of quietly using something
-          else.
+          Operators choose where the data lives, so the location comes from the settings and not from the code.
         children:
           - ReviewCenter-DatabaseSetup-Location
+          - ReviewCenter-DatabaseSetup-Location-Fallback
           - ReviewCenter-DatabaseSetup-Connection
+          - ReviewCenter-DatabaseSetup-Connection-PlainPath
+          - ReviewCenter-DatabaseSetup-Connection-FullString
+          - ReviewCenter-DatabaseSetup-Connection-InMemoryRejected
           - ReviewCenter-DatabaseSetup-Provider
-          - ReviewCenter-DatabaseSetup-Create
           - ReviewCenter-DatabaseSetup-DataDirectory
+          - ReviewCenter-DatabaseSetup-DataDirectory-Default
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
+
+      - id: ReviewCenter-Storage-Configuration-Create
+        title: >-
+          The Storage subsystem shall create the database file and its tables on first use.
+        justification: |
+          A new installation must work without manual database setup.
+        children:
+          - ReviewCenter-DatabaseSetup-Create
+          - ReviewCenter-DatabaseSetup-Create-File
+          - ReviewCenter-DatabaseSetup-Create-Tables
+          - ReviewCenter-DatabaseSetup-Create-MissingFile
+          - ReviewCenter-DatabaseSetup-Create-MissingFileNoCreate
+          - ReviewCenter-DatabaseSetup-Create-ExistingFile
+          - ReviewCenter-DatabaseSetup-Create-ReadOnly
+          - ReviewCenter-DatabaseSetup-Create-ReadOnlyNoCreate
+        tests:
+          - StorageSubsystem_NewDatabase_FirstUse_CreatesFileAndTables
+
+      - id: ReviewCenter-Storage-Configuration-UnsupportedProvider
+        title: >-
+          The Storage subsystem shall refuse an unsupported provider with an error that names it.
+        justification: |
+          A mistyped or not yet supported provider must fail loudly instead of quietly using something else.
+        children:
+          - ReviewCenter-DatabaseSetup-Provider-Unsupported
+        tests:
+          - StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing
+
+      - id: ReviewCenter-Storage-Configuration-UnsupportedProviderCreatesNothing
+        title: >-
+          The Storage subsystem shall create no database when it refuses an unsupported provider.
+        justification: |
+          A refused provider must leave nothing behind that a later start could mistake for the real database.
+        children:
+          - ReviewCenter-DatabaseSetup-Provider-UnsupportedCreatesNothing
+        tests:
           - StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing
 
       - id: ReviewCenter-Storage-Threads
         title: >-
-          The Storage subsystem shall keep comment threads with their anchors, states, and comments in the
-          database file, so that they are all still there, unchanged and in order, when the database is opened
-          again.
+          The Storage subsystem shall keep comment threads with their anchors in a database file, so that they are
+          still there, unchanged, when the database is opened again.
         justification: |
-          Review comments are part of the review record and must outlive the process that created them. A
-          thread can only exist for a file of an existing review, and the database enforces that.
+          Review comments are part of the review record and must outlive the process that created them. A thread
+          can only exist for an existing review, and the database enforces that.
         children:
           - ReviewCenter-ReviewStore-Threads
-          - ReviewCenter-DbContext-Threads
+          - ReviewCenter-ReviewStore-Threads-Ids
+          - ReviewCenter-ReviewStore-Threads-List
+          - ReviewCenter-ReviewStore-Threads-ListIsolation
+          - ReviewCenter-ReviewStore-Threads-Side
           - ReviewCenter-ReviewStore-CheckThreads
+          - ReviewCenter-ReviewStore-CheckThreads-NoFile
+          - ReviewCenter-ReviewStore-CheckThreads-BothOrNeither
+          - ReviewCenter-ReviewStore-CheckThreads-MissingFile
+          - ReviewCenter-ReviewStore-CheckThreads-NothingSaved
           - ReviewCenter-ReviewStore-ThreadCreation
+          - ReviewCenter-ReviewStore-ThreadCreation-NoComment
+          - ReviewCenter-ReviewStore-ThreadCreation-NothingSaved
+          - ReviewCenter-ReviewStore-ThreadCreation-NoAuditEntry
+          - ReviewCenter-DbContext-Threads
+          - ReviewCenter-DbContext-Threads-ReviewForeignKey
+          - ReviewCenter-DbContext-Threads-ReviewCascade
+          - ReviewCenter-DbContext-Threads-CheckItem
+          - ReviewCenter-DbContext-Threads-CheckNoFile
+          - ReviewCenter-DbContext-Threads-Side
+          - ReviewCenter-DbContext-Threads-SideDefault
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+
+      - id: ReviewCenter-Storage-Threads-State
+        title: >-
+          The Storage subsystem shall keep the state of each comment thread in a database file, so that it is
+          still there, unchanged, when the database is opened again.
+        justification: |
+          Whether a finding is still open decides whether a review may be signed, so the state must outlive the
+          process that created it. The kind of a thread is derived from its starting comment and is not stored
+          a second time.
+        children:
+          - ReviewCenter-ReviewStore-Threads-Reopen
+          - ReviewCenter-ReviewStore-Threads-UnknownReopen
+          - ReviewCenter-ReviewStore-Threads-ThreadKind
+          - ReviewCenter-DbContext-Threads-KindNotStored
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+
+      - id: ReviewCenter-Storage-Threads-Comments
+        title: >-
+          The Storage subsystem shall keep the comments of each thread, with their authors, in a database file, so
+          that they are still there, unchanged and in order, when the database is opened again.
+        justification: |
+          The discussion is part of the review record and must outlive the process that created it; the order
+          and the author of each comment are what makes it readable later.
+        children:
+          - ReviewCenter-ReviewStore-Threads-AddComment
+          - ReviewCenter-ReviewStore-Threads-UnknownComment
+          - ReviewCenter-ReviewStore-Threads-UnknownCommentNothingStored
+          - ReviewCenter-ReviewStore-Threads-Author
+          - ReviewCenter-ReviewStore-Threads-CommentKind
+          - ReviewCenter-ReviewStore-Threads-ReportFlag
+          - ReviewCenter-ReviewStore-Record-CommentOrder
+          - ReviewCenter-DbContext-Threads-CommentCascade
+          - ReviewCenter-DbContext-Threads-CommentKind
+          - ReviewCenter-DbContext-Threads-ReportFlag
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+
+      - id: ReviewCenter-Storage-Threads-Report
+        title: >-
+          The Storage subsystem shall store the resolution of a thread, the kind of a thread, and the report flag
+          of a comment only as the rules of the report allow, and refuse the change of a concluded review.
+        justification: |
+          What is included in the review report is evidence, so the database layer applies the rules of the
+          report itself and keeps a record that was read earlier from being changed behind a signature.
+        children:
+          - ReviewCenter-ReviewStore-ThreadReport
+          - ReviewCenter-ReviewStore-ThreadReport-KindChanged
+          - ReviewCenter-ReviewStore-ThreadReport-KindChangedNothingStored
+          - ReviewCenter-ReviewStore-ThreadReport-NoteRequired
+          - ReviewCenter-ReviewStore-ThreadReport-NoteRequiredNothingStored
+          - ReviewCenter-ReviewStore-ThreadReport-PromoteNoteRequired
+          - ReviewCenter-ReviewStore-ThreadReport-PromoteNoteRequiredNothingStored
+          - ReviewCenter-ReviewStore-ThreadReport-OnlyResolve
+          - ReviewCenter-ReviewStore-ThreadReport-OnlyResolve-ReopenNotResolve
+          - ReviewCenter-ReviewStore-ThreadReport-AlreadyResolved
+          - ReviewCenter-ReviewStore-ThreadReport-AlreadyResolvedNoComment
+          - ReviewCenter-ReviewStore-ThreadReport-Promote
+          - ReviewCenter-ReviewStore-ThreadReport-Demote
+          - ReviewCenter-ReviewStore-ThreadReport-DemoteRepliesKept
+          - ReviewCenter-ReviewStore-ThreadReport-ReplyFlag
+          - ReviewCenter-ReviewStore-ThreadReport-ReplyFlagRefused
+          - ReviewCenter-ReviewStore-ThreadReport-Locked
+        tests:
+          - ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits
+          - ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments
+          - ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused
+          - ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked
 
       - id: ReviewCenter-Storage-Users
         title: >-
           The Storage subsystem shall keep users, with their system administrator flags, enabled states, password
-          hashes, must-change-password flags, lockout state, and last sign-in times, in the database file, so that
-          they are all still
-          there, unchanged, when the database is opened again, and shall keep user names unique regardless of letter
-          case.
+          hashes, must-change-password flags, lockout state, and last sign-in times, in a database file, so that
+          they are still there, unchanged, when the database is opened again.
         justification: |
           Users must survive a restart, or nobody could sign in again. The lockout state is kept with the user so
-          that a restart does not give an attacker a fresh set of tries, and the flag of a temporary password is kept
-          so that a restart does not lift its confinement.
+          that a restart does not give an attacker a fresh set of tries, and the flag of a temporary password is
+          kept so that a restart does not lift its confinement.
         children:
           - ReviewCenter-UserStore-Persist
-          - ReviewCenter-UserStore-Unique
-          - ReviewCenter-UserStore-AddToProject
+          - ReviewCenter-UserStore-Persist-AssignedId
+          - ReviewCenter-UserStore-Persist-FindByName
+          - ReviewCenter-UserStore-Persist-FindByNameUnknown
+          - ReviewCenter-UserStore-Persist-Update
+          - ReviewCenter-UserStore-Persist-MustChangePassword
+          - ReviewCenter-UserStore-Persist-MustChangePasswordCleared
+          - ReviewCenter-UserStore-Persist-List
+          - ReviewCenter-UserStore-Persist-LastSignInEmpty
+          - ReviewCenter-UserStore-Persist-LastSignIn
+          - ReviewCenter-UserStore-Persist-LastSignInCleared
           - ReviewCenter-DbContext-Users
+          - ReviewCenter-DbContext-Users-Flags
+          - ReviewCenter-DbContext-Users-LastSignIn
+          - ReviewCenter-DbContext-Users-CommentAuthorName
+          - ReviewCenter-DbContext-Users-AnswerAuthorName
+          - ReviewCenter-DbContext-Users-SectionSetterName
         tests:
           - StorageSubsystem_Users_PersistAcrossReopen
 
+      - id: ReviewCenter-Storage-Users-UniqueName
+        title: >-
+          The Storage subsystem shall keep user names unique regardless of letter case.
+        justification: |
+          Two accounts whose names differ only in letter case would be taken for each other by people and could
+          be used to impersonate one another.
+        children:
+          - ReviewCenter-UserStore-Unique
+          - ReviewCenter-UserStore-Unique-LookupIgnoresCase
+        tests:
+          - StorageSubsystem_Users_UsernameOtherCase_IsRefused
+
       - id: ReviewCenter-Storage-Checklist
         title: >-
-          The Storage subsystem shall keep the checklist snapshot of each review, the applicability of its
-          sections, and the answers to its checks in the database file, so that they are all still there,
-          unchanged, when the database is opened again.
+          The Storage subsystem shall keep the checklist snapshot of each review in a database file, so that it
+          is still there, unchanged, when the database is opened again.
         justification: |
           The checklist is part of the review record and must outlive the process that created it. The snapshot
           is stored with the review so that the questions never change under the answers.
         children:
           - ReviewCenter-ReviewStore-Checklist
-          - ReviewCenter-ReviewStore-Ballots
-          - ReviewCenter-ReviewStore-RecordBallots
-          - ReviewCenter-ReviewStore-LegacyBaseline
-          - ReviewCenter-ReviewStore-SignOwnBallot
-          - ReviewCenter-ReviewStore-BallotSubmit
-          - ReviewCenter-ReviewStore-BallotSlotLifecycle
+          - ReviewCenter-ReviewStore-Checklist-NoSnapshot
+          - ReviewCenter-ReviewStore-Checklist-UnknownReview
+          - ReviewCenter-ReviewStore-Record-Checklist
           - ReviewCenter-DbContext-Checklist
-          - ReviewCenter-DbContext-Ballots
+          - ReviewCenter-DbContext-Checklist-Snapshot
+          - ReviewCenter-DbContext-Checklist-ReviewCascade
         tests:
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
 
+      - id: ReviewCenter-Storage-Checklist-Sections
+        title: >-
+          The Storage subsystem shall keep the applicability of each checklist section in a database file, so
+          that it is still there, unchanged, when the database is opened again.
+        justification: |
+          A section that does not apply is a decision with a reason, and the reason is part of the evidence.
+        children:
+          - ReviewCenter-ReviewStore-Checklist-SectionReplaced
+          - ReviewCenter-ReviewStore-Checklist-SectionRoundTrip
+          - ReviewCenter-DbContext-Checklist-SectionState
+        tests:
+          - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
+
+      - id: ReviewCenter-Storage-Checklist-Answers
+        title: >-
+          The Storage subsystem shall keep the answers of each reviewer to the checks of a review in a database
+          file, so that they are still there, unchanged, when the database is opened again.
+        justification: |
+          The answers are the evidence of what each reviewer checked and must outlive the process that created
+          them; each reviewer has an own answer to a check, and answering again replaces the earlier answer.
+        children:
+          - ReviewCenter-ReviewStore-Checklist-AnswerReplaced
+          - ReviewCenter-ReviewStore-Checklist-AnswerRoundTrip
+          - ReviewCenter-ReviewStore-Ballots
+          - ReviewCenter-ReviewStore-Ballots-Replaced
+          - ReviewCenter-ReviewStore-Ballots-Sections
+          - ReviewCenter-ReviewStore-Ballots-OwnRows
+          - ReviewCenter-ReviewStore-Ballots-SlotOrder
+          - ReviewCenter-ReviewStore-Ballots-NotStarted
+          - ReviewCenter-ReviewStore-Ballots-SlotNotInReview
+          - ReviewCenter-ReviewStore-Ballots-SlotNotInReviewNothingStored
+          - ReviewCenter-ReviewStore-Ballots-IdentityZero
+          - ReviewCenter-ReviewStore-Ballots-IdentityZeroNothingStored
+          - ReviewCenter-ReviewStore-Ballots-Locked
+          - ReviewCenter-ReviewStore-Ballots-LockedNothingStored
+          - ReviewCenter-ReviewStore-Ballots-ReviewLevelRows
+          - ReviewCenter-ReviewStore-RecordBallots
+          - ReviewCenter-ReviewStore-RecordBallots-DraftsIncluded
+          - ReviewCenter-ReviewStore-RecordBallots-SlotOrder
+          - ReviewCenter-ReviewStore-RecordBallots-Batch
+          - ReviewCenter-ReviewStore-RecordBallots-NoBallot
+          - ReviewCenter-ReviewStore-LegacyBaseline
+          - ReviewCenter-ReviewStore-LegacyBaseline-SlotIdentity
+          - ReviewCenter-ReviewStore-LegacyBaseline-CarriedReplaced
+          - ReviewCenter-ReviewStore-LegacyBaseline-CarriedReplacedNoSecondRow
+          - ReviewCenter-ReviewStore-LegacyBaseline-CarriedRowKept
+          - ReviewCenter-DbContext-Ballots
+          - ReviewCenter-DbContext-Ballots-ReviewLevel
+          - ReviewCenter-DbContext-Ballots-SlotCascade
+          - ReviewCenter-DbContext-Ballots-ReviewCascade
+        tests:
+          - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
+          - ReviewStore_SetBallotAnswerAsync_SameItemTwoSlots_StoresOneRowPerSlot
+          - ReviewStore_SetBallotAnswerAsync_SameSlotAgain_ReplacesTheAnswer
+
+      - id: ReviewCenter-Storage-Checklist-BallotStatus
+        title: >-
+          The Storage subsystem shall keep the status of the ballot of each reviewer, draft or submitted, in a
+          database file, so that it is still there, unchanged, when the database is opened again.
+        justification: |
+          A reviewer's answers count only once the ballot is submitted, so the status must outlive the process
+          that created it; each change of the status is stored together with its audit entry, so that the
+          history stays true.
+        children:
+          - ReviewCenter-ReviewStore-Ballots-Status
+          - ReviewCenter-ReviewStore-Ballots-SubmittedBy
+          - ReviewCenter-ReviewStore-Ballots-EditRevertsSubmitted
+          - ReviewCenter-ReviewStore-Ballots-SingleSlotAutoSubmit
+          - ReviewCenter-ReviewStore-Ballots-SingleSlotEditStaysSubmitted
+          - ReviewCenter-ReviewStore-Ballots-SeveralSlotsNoAutoSubmit
+          - ReviewCenter-ReviewStore-Ballots-RevertAudit
+          - ReviewCenter-ReviewStore-Ballots-AutoSubmitAudit
+          - ReviewCenter-ReviewStore-Ballots-StatusAuditDetail
+          - ReviewCenter-ReviewStore-Ballots-StatusAuditChain
+          - ReviewCenter-ReviewStore-BallotSubmit
+          - ReviewCenter-ReviewStore-BallotSubmit-Audit
+          - ReviewCenter-ReviewStore-BallotSubmit-Incomplete
+          - ReviewCenter-ReviewStore-BallotSubmit-IncompleteNothingStored
+          - ReviewCenter-ReviewStore-BallotSubmit-Idempotent
+          - ReviewCenter-ReviewStore-BallotSubmit-IdempotentNoCompletenessCheck
+          - ReviewCenter-ReviewStore-BallotSubmit-IdempotentNoEntry
+          - ReviewCenter-ReviewStore-BallotSubmit-NothingToAnswer
+          - ReviewCenter-DbContext-Ballots-Status
+        tests:
+          - ReviewStore_SetBallotAnswerAsync_FirstAnswer_CreatesDraftBallot
+          - ReviewStore_SubmitBallotAsync_CompleteDraft_SubmitsWithAudit
+          - ReviewStore_SetBallotAnswerAsync_SubmittedBallot_RevertsToDraftWithAudit
+          - ReviewStore_SetBallotAnswerAsync_SingleSlotCompleteBallot_AutoSubmitsWithAudit
+
+      - id: ReviewCenter-Storage-Checklist-BallotSlotLifecycle
+        title: >-
+          The Storage subsystem shall keep the ballot of a reviewer slot in step with the slot, seeding it from the
+          baseline of a follow-up review, and removing the own answers of a reviewer who leaves the slot.
+        justification: |
+          A ballot belongs to a slot, so a reviewer who takes over a slot must not inherit the answers of the
+          one who left, and carried answers of the earlier review must not be lost.
+        children:
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-NoBaseline
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-DepartingRows
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-CarriedKept
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-CarriedKeptNoReassignEntry
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-RevertsToDraft
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-ReassignEntry
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-RoleSwapKeeps
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-RoleSwapKeepsNoReassignEntry
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-RemovedSlot
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-SignedSlotKept
+        tests:
+          - ReviewStore_AddSlotAsync_FollowUpBaseline_SeedsDraftBallotWithCarriedRows
+          - ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft
+          - ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows
+
       - id: ReviewCenter-Storage-Signatures
         title: >-
-          The Storage subsystem shall keep the reviewer slots of each review and the signatures made for them in
-          the database file, so that they are all still there, unchanged, when the database is opened again, and
-          a signature is still current for a record that has not changed, together with the outcome (Approved or
-          Rejected) that each signature records, and shall never let a signature be
-          stored for a record that has changed or a signed slot be deleted.
+          The Storage subsystem shall keep the signatures made for the reviewer slots of a review in a database
+          file, so that they are still there, unchanged, when the database is opened again.
         justification: |
-          Signatures are the evidence that a review was approved and must outlive the process that created them.
-          The database itself must refuse a signature of a stale record and the deletion of a signed slot, so
-          that the evidence cannot be broken by overlapping requests.
+          Signatures are the evidence that a review was approved and must outlive the process that created them;
+          they are only ever added, never changed or deleted.
         children:
-          - ReviewCenter-ReviewStore-Slots
-          - ReviewCenter-ReviewStore-Record
-          - ReviewCenter-ReviewStore-ReviewConclusionText
           - ReviewCenter-ReviewStore-Signatures
-          - ReviewCenter-ReviewStore-SnapshotBatch
-          - ReviewCenter-DbContext-Signatures
-          - ReviewCenter-DbContext-ReviewConclusionText
+          - ReviewCenter-ReviewStore-Signatures-IdAssigned
+          - ReviewCenter-ReviewStore-Signatures-AppendOnly
+          - ReviewCenter-ReviewStore-Signatures-ListOrder
+          - ReviewCenter-DbContext-Signatures-RoundTrip
         tests:
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
+          - ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips
+
+      - id: ReviewCenter-Storage-Signatures-Slots
+        title: >-
+          The Storage subsystem shall keep the reviewer slots of each review in a database file, so that they are
+          still there, unchanged, when the database is opened again.
+        justification: |
+          A slot names who has to sign a review, so it must outlive the process that created it, and a slot can
+          only exist for an existing review.
+        children:
+          - ReviewCenter-ReviewStore-Slots
+          - ReviewCenter-ReviewStore-Slots-IdAssigned
+          - ReviewCenter-ReviewStore-Slots-List
+          - ReviewCenter-ReviewStore-Slots-ListIsolation
+          - ReviewCenter-ReviewStore-Slots-UnknownReview
+          - ReviewCenter-ReviewStore-Slots-Update
+          - ReviewCenter-ReviewStore-Slots-Remove
+          - ReviewCenter-ReviewStore-Slots-UpdateNotFound
+          - ReviewCenter-ReviewStore-Slots-UpdateNothingChanged
+          - ReviewCenter-ReviewStore-Slots-RemoveNotFound
+          - ReviewCenter-ReviewStore-Slots-RemoveNothingRemoved
+          - ReviewCenter-DbContext-Signatures
+        tests:
+          - ReviewStore_AddSlotAsync_TwoSlots_AssignsIdsAndListsInOrderPerReview
+          - ReviewStore_UpdateAndRemoveSlotAsync_ExistingAndUnknown_ChangesOrReturnsFalse
+          - ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase
+
+      - id: ReviewCenter-Storage-Signatures-Current
+        title: >-
+          The Storage subsystem shall keep a signature current for a review record that has not changed, when the
+          database is opened again.
+        justification: |
+          Approval is derived from the signatures of the stored record, so a restart must neither lose an
+          approval nor invent one.
+        children:
+          - ReviewCenter-ReviewStore-Record
+          - ReviewCenter-ReviewStore-Record-Ballots
+          - ReviewCenter-ReviewStore-Record-Threads
+          - ReviewCenter-ReviewStore-Record-Unknown
+          - ReviewCenter-ReviewStore-Record-Source
+          - ReviewCenter-ReviewStore-Record-UploadSource
+          - ReviewCenter-ReviewStore-Record-Snapshot
+          - ReviewCenter-ReviewStore-Record-SnapshotDigestAgrees
+          - ReviewCenter-ReviewStore-Record-SnapshotUnknown
+        tests:
+          - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
+          - ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures
+
+      - id: ReviewCenter-Storage-Signatures-Outcome
+        title: >-
+          The Storage subsystem shall keep the outcome, Approved or Rejected, that each signature records, so that
+          it is still there, unchanged, when the database is opened again.
+        justification: |
+          A rejection is as much evidence as an approval, and the conclusion of a review is derived from the
+          outcomes, so a restart must not turn one into the other.
+        children:
+          - ReviewCenter-ReviewStore-Signatures-Outcome
+          - ReviewCenter-DbContext-Signatures-Outcome
+        tests:
           - StorageSubsystem_Signatures_OutcomePersistsAcrossReopen
+
+      - id: ReviewCenter-Storage-Signatures-StaleRefused
+        title: >-
+          The Storage subsystem shall refuse a signature for a record that has changed, in the transaction that
+          stores the signature.
+        justification: |
+          The database itself must refuse the signature of a stale record, so that the evidence cannot be broken
+          by overlapping requests.
+        children:
+          - ReviewCenter-ReviewStore-Signatures-StaleDigest
+          - ReviewCenter-ReviewStore-Signatures-StaleDigestNothingStored
+          - ReviewCenter-ReviewStore-Signatures-OutcomeMismatch
+          - ReviewCenter-ReviewStore-Signatures-OutcomeMismatchNothingStored
+          - ReviewCenter-ReviewStore-Signatures-Concurrent
+        tests:
+          - ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing
+          - ReviewStore_AddSignatureAsync_OutcomeDiffersFromRecord_ThrowsRecordChangedAndStoresNothing
+          - ReviewStore_AddSignatureAsync_RacingWithWrite_WriteStartedFirst_EndsConsistent
+
+      - id: ReviewCenter-Storage-Signatures-UnknownTarget
+        title: >-
+          The Storage subsystem shall refuse a signature for a review or a slot that does not exist.
+        justification: |
+          A signature that points to nothing could never be verified, so the database refuses it.
+        children:
+          - ReviewCenter-ReviewStore-Signatures-UnknownSlot
+          - ReviewCenter-ReviewStore-Signatures-UnknownReview
+          - ReviewCenter-DbContext-Signatures-SignatureReview
+          - ReviewCenter-DbContext-Signatures-SignatureSlot
+        tests:
+          - ReviewStore_AddSignatureAsync_UnknownSlotOrReview_IsRefused
+          - ReviewCenterDbContext_Signature_UnknownReview_IsRefusedByDatabase
+          - ReviewCenterDbContext_Signature_UnknownSlot_IsRefusedByDatabase
+
+      - id: ReviewCenter-Storage-Signatures-Duplicate
+        title: >-
+          The Storage subsystem shall refuse a second signature of the same slot for the same record.
+        justification: |
+          Signing twice adds no evidence, and two requests made at the same moment could both pass a check made
+          before saving, so the database refuses the duplicate.
+        children:
+          - ReviewCenter-ReviewStore-Signatures-Duplicate
+          - ReviewCenter-DbContext-Signatures-SameDigest
+        tests:
+          - ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed
+
+      - id: ReviewCenter-Storage-Signatures-SignedSlotKept
+        title: >-
+          The Storage subsystem shall never let a signed reviewer slot be deleted.
+        justification: |
+          Deleting a signed slot would delete the evidence of who signed, so the database itself refuses it, even
+          when two requests overlap.
+        children:
+          - ReviewCenter-DbContext-Signatures-SignedSlotKept
+        tests:
+          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
+          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedAndKeepsBallotRows
+
+      - id: ReviewCenter-Storage-Signatures-SubmittedBallot
+        title: >-
+          The Storage subsystem shall store the signature of a reviewer only when the own ballot of the reviewer
+          is submitted, where the review has a checklist.
+        justification: |
+          A signature without a submitted ballot would approve a review whose checks the reviewer has not
+          finished, so the check is repeated in the transaction that stores the signature.
+        children:
+          - ReviewCenter-ReviewStore-SignOwnBallot
+          - ReviewCenter-ReviewStore-SignOwnBallot-NoBallot
+          - ReviewCenter-ReviewStore-SignOwnBallot-NothingStored
+          - ReviewCenter-ReviewStore-SignOwnBallot-StoredWhenSubmitted
+        tests:
+          - ReviewStore_AddSignatureAsync_OwnBallotDraft_ThrowsBallotNotSubmitted
+          - ReviewStore_AddSignatureAsync_NoBallotInReviewWithChecklist_ThrowsBallotNotSubmitted
+
+      - id: ReviewCenter-Storage-Signatures-ConclusionText
+        title: >-
+          The Storage subsystem shall keep the optional conclusion text of each review with the review in a
+          database file, so that it is still there, unchanged, when the database is opened again.
+        justification: |
+          The conclusion text is part of the evidence a signature covers, so it must outlive the process that
+          created it, be changed only against the text the caller started from, and never change once the
+          review is concluded.
+        children:
+          - ReviewCenter-ReviewStore-ReviewConclusionText
+          - ReviewCenter-ReviewStore-ReviewConclusionText-Default
+          - ReviewCenter-ReviewStore-ReviewConclusionText-Record
+          - ReviewCenter-ReviewStore-ReviewConclusionText-CompareAndSet
+          - ReviewCenter-ReviewStore-ReviewConclusionText-CompareAndSetReported
+          - ReviewCenter-ReviewStore-ReviewConclusionText-Remove
+          - ReviewCenter-ReviewStore-ReviewConclusionText-OnlyThatReview
+          - ReviewCenter-ReviewStore-ReviewConclusionText-Audit
+          - ReviewCenter-ReviewStore-ReviewConclusionText-ChainIntact
+          - ReviewCenter-ReviewStore-ReviewConclusionText-Stale
+          - ReviewCenter-ReviewStore-ReviewConclusionText-StaleKept
+          - ReviewCenter-ReviewStore-ReviewConclusionText-Missing
+          - ReviewCenter-ReviewStore-ReviewConclusionText-NoEntryWhenNotChanged
+          - ReviewCenter-ReviewStore-ReviewConclusionText-Locked
+          - ReviewCenter-ReviewStore-ReviewConclusionText-LockedNothingChanged
+          - ReviewCenter-DbContext-ReviewConclusionText
+          - ReviewCenter-DbContext-ReviewConclusionText-Limit
+          - ReviewCenter-DbContext-ReviewConclusionText-RoundTrip
+        tests:
+          - ReviewStore_UpdateReviewConclusionTextAsync_StoresTextAndAuditAndRecord
+          - ReviewStore_UpdateReviewConclusionTextAsync_CompareAndSet_RefusesStaleExpectation
+          - ReviewStore_UpdateReviewConclusionTextAsync_ConcludedReview_ThrowsReviewLocked
+
+      - id: ReviewCenter-Storage-Signatures-Batch
+        title: >-
+          The Storage subsystem shall read the signature records of many reviews together with a number of queries
+          that does not grow with the number of reviews.
+        justification: |
+          Lists of reviews show the approval state of every review, so reading them one review at a time would
+          make a page slower with every review that is added.
+        children:
+          - ReviewCenter-ReviewStore-SnapshotBatch
+          - ReviewCenter-ReviewStore-SnapshotBatch-Reopens
+          - ReviewCenter-ReviewStore-SnapshotBatch-NeverReopened
+          - ReviewCenter-ReviewStore-SnapshotBatch-QueryCount
+          - ReviewCenter-ReviewStore-SnapshotBatch-ReopensQueryCount
+          - ReviewCenter-ReviewStore-SnapshotBatch-UnknownLeftOut
+          - ReviewCenter-ReviewStore-SnapshotBatch-DuplicateOnce
+          - ReviewCenter-ReviewStore-SnapshotBatch-EmptyIds
+          - ReviewCenter-ReviewStore-SnapshotBatch-EmptyNoQuery
+          - ReviewCenter-ReviewStore-SnapshotBatch-ManyReviews
+        tests:
+          - ReviewStore_ListSnapshotsAsync_SeveralReviews_EqualsSingleReadsAndReopenHistory
+          - ReviewStore_ListSnapshotsAsync_MoreReviews_SendsTheSameNumberOfQueries
 
       - id: ReviewCenter-Storage-AuditTrail
         title: >-
           The Storage subsystem shall store every audited change together with its audit entry in one Serializable
-          transaction, through one process-wide gate shared by all stores, so that both or neither are stored and
-          the sequence of entries has no gap and no fork, refuse a second entry with the same sequence number,
-          offer no way to update or delete an entry, and read the entries in pages and in ordered batches, also for
-          one project only.
+          transaction, so that both or neither are stored.
         justification: |
-          The hash chain is only as good as the order of its entries. Appending inside the transaction of the
+          The history must stay true even when the process stops in the middle of a change, so a change is never
+          stored without its entry and an entry is never stored for a change that failed or changed nothing.
+        children:
+          - ReviewCenter-AuditStore-Atomic
+          - ReviewCenter-AuditStore-Atomic-NoEntryForFailedChange
+          - ReviewCenter-AuditStore-Atomic-NoEntryForNoOp
+          - ReviewCenter-AuditStore-Atomic-DraftFails
+          - ReviewCenter-AuditStore-Atomic-EntryFailure
+          - ReviewCenter-AuditStore-Atomic-WithoutDraft
+          - ReviewCenter-ReviewStore-Audit
+          - ReviewCenter-ReviewStore-Audit-RollbackOnFailure
+          - ReviewCenter-ReviewStore-Audit-NoEntryForNoOp
+          - ReviewCenter-ReviewStore-ThreadReport-AlreadyResolvedNoAudit
+          - ReviewCenter-ReviewStore-ThreadReport-AuditResolve
+          - ReviewCenter-ReviewStore-ThreadReport-AuditKind
+          - ReviewCenter-ReviewStore-ThreadReport-AuditFlag
+          - ReviewCenter-UserStore-Audit
+          - ReviewCenter-UserStore-Audit-Update
+          - ReviewCenter-UserStore-Audit-RollbackOnFailure
+          - ReviewCenter-UserStore-Audit-RollbackUpdate
+          - ReviewCenter-UserStore-Audit-RefusedNoEntry
+          - ReviewCenter-UserStore-Audit-NoEntryWithoutDraft
+          - ReviewCenter-RepositoryStore-Audit
+          - ReviewCenter-RepositoryStore-Audit-Update
+          - ReviewCenter-RepositoryStore-Audit-Atomic
+          - ReviewCenter-RepositoryStore-Audit-AtomicUpdate
+        tests:
+          - ReviewStore_AddProjectAsync_WithDraft_StoresProjectAndEntryTogether
+          - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
+          - ReviewStore_NoOpChanges_RecordNothing
+          - ReviewStore_ResolveThreadAsync_AlreadyResolved_ReturnsFalseAndAddsNothing
+          - UserStore_UpdateAsync_AuditInsertFails_LeavesTheUserUnchanged
+          - RepositoryStore_AddAsync_AuditInsertFails_StoresNoRepository
+
+      - id: ReviewCenter-Storage-AuditTrail-Gate
+        title: >-
+          The Storage subsystem shall store audited changes through one process-wide gate shared by all stores,
+          which a failed change releases.
+        justification: |
+          One gate keeps the changes of all stores in one order, and a gate that a failed change kept would stop
+          every later change.
+        children:
+          - ReviewCenter-AuditStore-Atomic-GateRelease
+          - ReviewCenter-UserStore-Audit-GateRelease
+        tests:
+          - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
+
+      - id: ReviewCenter-Storage-AuditTrail-Linear
+        title: >-
+          The Storage subsystem shall keep the sequence of audit entries without a gap and without a fork, also
+          when several stores add entries at the same time.
+        justification: |
+          The hash chain is only as good as the order of its entries; appending inside the transaction of the
           change, under one gate, keeps the chain linear and the history true even when several users act at the
-          same time or the process stops in the middle of a change.
+          same time.
         children:
           - ReviewCenter-AuditStore-Append
-          - ReviewCenter-AuditStore-Atomic
+          - ReviewCenter-AuditStore-Append-Predecessor
+          - ReviewCenter-AuditStore-Append-Actor
+          - ReviewCenter-AuditStore-Append-UnknownActor
+          - ReviewCenter-AuditStore-Append-Text
+          - ReviewCenter-AuditStore-Append-Time
           - ReviewCenter-AuditStore-Concurrency
-          - ReviewCenter-AuditStore-Read
-          - ReviewCenter-AuditStore-Filter
-          - ReviewCenter-AuditStore-ReadMatching
-          - ReviewCenter-ReviewStore-Audit
-          - ReviewCenter-ReviewStore-ThreadReport
-          - ReviewCenter-UserStore-Audit
-          - ReviewCenter-RepositoryStore-Audit
+          - ReviewCenter-AuditStore-Concurrency-DifferentStores
+          - ReviewCenter-AuditStore-Filter-UtcText
+          - ReviewCenter-AuditStore-Filter-HashUnchanged
           - ReviewCenter-DbContext-AuditEntries
+          - ReviewCenter-DbContext-AuditEntries-NoRelationships
         tests:
           - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
+          - AuditStore_AppendAsync_ConcurrentAppends_ProduceLinearChain
+          - AuditStore_AppendAsync_SequentialAppends_GapFreeLinkedAndVerifiable
+
+      - id: ReviewCenter-Storage-AuditTrail-UniqueSequence
+        title: >-
+          The Storage subsystem shall refuse a second audit entry with the same sequence number.
+        justification: |
+          A fork in the chain would make two histories equally valid, so the database itself refuses a duplicate
+          sequence number.
+        children:
+          - ReviewCenter-AuditStore-Concurrency-DuplicateSequence
+        tests:
+          - AuditStore_Database_DuplicateSequence_IsRefusedByUniqueKey
+
+      - id: ReviewCenter-Storage-AuditTrail-Immutable
+        title: >-
+          The Storage subsystem shall offer no way to update or delete an audit entry.
+        justification: |
+          An audit trail that could be edited would prove nothing.
+        children:
+          - ReviewCenter-AuditStore-Read-Immutable
+        tests:
           - AuditStore_PublicSurface_OffersNoUpdateOrDelete
+
+      - id: ReviewCenter-Storage-AuditTrail-Pages
+        title: >-
+          The Storage subsystem shall read audit entries in pages, newest first, in time that does not grow with
+          the size of the trail.
+        justification: |
+          The trail only grows, so every view of it must read a bounded page and not the whole trail.
+        children:
+          - ReviewCenter-AuditStore-Read
+          - ReviewCenter-AuditStore-Read-Review
+          - ReviewCenter-AuditStore-Read-Before
+          - ReviewCenter-AuditStore-Read-After
+          - ReviewCenter-AuditStore-Filter-Cursors
+          - ReviewCenter-AuditStore-Filter-Indexes
+          - ReviewCenter-AuditStore-Filter-PageBounded
+          - ReviewCenter-DbContext-AuditEntries-ReviewIndex
+        tests:
+          - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+          - AuditStore_ListAsync_FilterWithCursors_PagesThroughMatchesOnly
+          - AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded
+
+      - id: ReviewCenter-Storage-AuditTrail-Filter
+        title: >-
+          The Storage subsystem shall select audit entries by actor, action, review, project, and date range, all
+          of which must match when combined.
+        justification: |
+          Auditors look for what one person did or what happened to one review, so the filters must select exactly
+          the entries that match, and the user input is matched literally.
+        children:
+          - ReviewCenter-AuditStore-Filter
+          - ReviewCenter-AuditStore-Filter-ActorText
+          - ReviewCenter-AuditStore-Filter-ActorTextLiteral
+          - ReviewCenter-AuditStore-Filter-Action
+          - ReviewCenter-AuditStore-Filter-ActionPrefix
+          - ReviewCenter-AuditStore-Filter-ActionPrefixLiteral
+          - ReviewCenter-AuditStore-Filter-Review
+          - ReviewCenter-AuditStore-Filter-DateRange
+          - ReviewCenter-AuditStore-Filter-Combined
+        tests:
+          - AuditStore_ListAsync_EachField_SelectsMatchingEntries
+          - AuditStore_ListAsync_ActorText_MatchesLiterallyAndIgnoresCase
+          - AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive
+          - AuditStore_ListAsync_CombinedFields_AllMustMatch
+          - StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes
+
+      - id: ReviewCenter-Storage-AuditTrail-Batches
+        title: >-
+          The Storage subsystem shall read audit entries in ordered batches, ascending by sequence number.
+        justification: |
+          Verification and export read the whole trail, so they read it in bounded batches that continue where
+          the last one ended.
+        children:
+          - ReviewCenter-AuditStore-Read-Batches
+          - ReviewCenter-AuditStore-Read-Ascending
+          - ReviewCenter-AuditStore-ReadMatching
+          - ReviewCenter-AuditStore-ReadMatching-Ascending
+          - ReviewCenter-AuditStore-ReadMatching-Batches
+          - ReviewCenter-AuditStore-ReadMatching-UpperBound
+          - ReviewCenter-AuditStore-ReadMatching-Filter
+          - ReviewCenter-AuditStore-ReadMatching-LatestSequence
+          - ReviewCenter-AuditStore-ReadMatching-LatestSequenceEmpty
+        tests:
+          - AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded
+          - AuditStore_ReadMatchingAsync_FilterAndSnapshot_AscendingKeysetBatches
+          - AuditStore_LatestSequenceAsync_EmptyThenFilled_ReturnsHighestSequence
+
+      - id: ReviewCenter-Storage-AuditTrail-ProjectOnly
+        title: >-
+          The Storage subsystem shall read the audit entries of one project without the entries of other
+          projects.
+        justification: |
+          A project administrator may see the history of the own project only, so the entries of other projects
+          and global entries must never be returned.
+        children:
+          - ReviewCenter-AuditStore-Read-Project
+          - ReviewCenter-AuditStore-Filter-Project
+          - ReviewCenter-AuditStore-ReadMatching-ProjectFilter
+        tests:
+          - AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies
+          - AuditStore_ListAsync_ProjectFilter_NeverReturnsGlobalEntries
 
       - id: ReviewCenter-Storage-Repositories
         title: >-
           The Storage subsystem shall keep the registered git repositories, each belonging to exactly one project,
-          with their locations, user names, enabled states, and encrypted tokens, in the database file, so that they
-          are all still there, unchanged, when the database is opened again, list the repositories of one project
-          only, and shall keep repository names unique within a project regardless of letter case.
+          with their locations, user names, and enabled states, in a database file, so that they are still there,
+          unchanged, when the database is opened again.
         justification: |
-          The registry must survive a restart, or every stored token would have to be entered again. The token is
-          kept only in its encrypted form, so a copy of the database does not reveal it. A repository belongs to
-          one project, so a list never holds the repositories of another project, and a name that is taken in one
-          project says nothing about the repositories of another.
+          The registry must survive a restart, or every repository would have to be entered again. A repository
+          belongs to one project, and the database enforces that.
         children:
           - ReviewCenter-RepositoryStore-Persist
-          - ReviewCenter-RepositoryStore-Unique
-          - ReviewCenter-RepositoryStore-Token
+          - ReviewCenter-RepositoryStore-Persist-AssignedId
+          - ReviewCenter-RepositoryStore-Persist-ListOrder
           - ReviewCenter-RepositoryStore-Update
+          - ReviewCenter-RepositoryStore-Update-UpdateTime
+          - ReviewCenter-RepositoryStore-Update-CreationKept
+          - ReviewCenter-RepositoryStore-Update-Disable
+          - ReviewCenter-RepositoryStore-Update-Unknown
           - ReviewCenter-DbContext-Repositories
+          - ReviewCenter-DbContext-Repositories-UnknownProject
         tests:
           - StorageSubsystem_Repositories_PersistAcrossReopen
+
+      - id: ReviewCenter-Storage-Repositories-EncryptedToken
+        title: >-
+          The Storage subsystem shall keep the access token of a repository only in its encrypted form, and keep,
+          replace, or clear it only as an update of the repository says.
+        justification: |
+          A copy of the database must not reveal a token, and an update that does not mention the token must not
+          lose it.
+        children:
+          - ReviewCenter-RepositoryStore-Token
+          - ReviewCenter-RepositoryStore-Token-None
+          - ReviewCenter-RepositoryStore-Token-HiddenFromRecord
+          - ReviewCenter-RepositoryStore-Token-Keep
+          - ReviewCenter-RepositoryStore-Token-Replace
+          - ReviewCenter-RepositoryStore-Token-Clear
+          - ReviewCenter-DbContext-Repositories-EncryptedToken
+        tests:
+          - RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+          - RepositoryStore_ReadModel_HasNoTokenMember
+
+      - id: ReviewCenter-Storage-Repositories-ProjectOnlyList
+        title: >-
+          The Storage subsystem shall list the repositories of one project only.
+        justification: |
+          A repository belongs to one project, so a list never holds the repositories of another project.
+        children:
+          - ReviewCenter-RepositoryStore-Persist-ListProject
+        tests:
+          - StorageSubsystem_Repositories_PersistAcrossReopen
+          - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
+
+      - id: ReviewCenter-Storage-Repositories-UniqueName
+        title: >-
+          The Storage subsystem shall keep repository names unique within a project regardless of letter case.
+        justification: |
+          Two repositories whose names differ only in letter case would be taken for each other, while a name that
+          is taken in one project says nothing about the repositories of another.
+        children:
+          - ReviewCenter-RepositoryStore-Unique
+          - ReviewCenter-RepositoryStore-Unique-Rename
+          - ReviewCenter-RepositoryStore-Unique-DataUnchanged
+          - ReviewCenter-RepositoryStore-Unique-NoEntry
+          - ReviewCenter-RepositoryStore-Unique-OtherProject
+          - ReviewCenter-DbContext-Repositories-UniqueName
+          - ReviewCenter-DbContext-Repositories-NameInOtherProject
+        tests:
+          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+          - RepositoryStore_NameTaken_AddAndRename_LeaveTheDataUnchanged
           - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
 
       - id: ReviewCenter-Storage-Memberships
         title: >-
           The Storage subsystem shall keep the membership of a user in a project, with its role of project
-          administrator or user, in the database file, so that it is still there, unchanged, when the database is
-          opened again, allow a user at most one membership in a project, refuse a membership for a project or a user
-          that does not exist, change the role and remove a membership, report whether it existed, and store each
-          change together with its audit entry, which names the project, in one transaction, and, when told to, refuse
-          to remove or demote the last enabled project administrator in that same transaction, and store a new
-          account with its membership and its audit entry together.
+          administrator or user, in a database file, so that it is still there, unchanged, when the database is
+          opened again.
         justification: |
-          Memberships decide which projects a user may see, so they must outlive the process that created them and
-          must stay true when two requests overlap. A change that is stored without its audit entry, or the other way
-          round, would leave the history of who had access untrue. Only a check inside the transaction keeps two
-          administrators who act at the same moment from leaving a project without an administrator.
+          Memberships decide which projects a user may see, so they must outlive the process that created them.
         children:
           - ReviewCenter-ReviewStore-Memberships
-          - ReviewCenter-ReviewStore-LastAdmin
-          - ReviewCenter-ReviewStore-UserImpact
-          - ReviewCenter-UserStore-AddToProject
+          - ReviewCenter-ReviewStore-Memberships-ListByProject
+          - ReviewCenter-ReviewStore-Memberships-ListByUser
           - ReviewCenter-DbContext-Memberships
+          - ReviewCenter-DbContext-Memberships-RoleName
+          - ReviewCenter-DbContext-Memberships-ProjectCascade
+          - ReviewCenter-DbContext-Memberships-UserCascade
         tests:
           - ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed
+
+      - id: ReviewCenter-Storage-Memberships-OnePerUser
+        title: >-
+          The Storage subsystem shall allow a user at most one membership in a project.
+        justification: |
+          Two memberships with two roles would leave it open which role counts.
+        children:
+          - ReviewCenter-ReviewStore-Memberships-Exists
+          - ReviewCenter-ReviewStore-Memberships-ExistsRoleKept
+        tests:
           - ReviewStore_AddMembershipAsync_SecondMembership_IsRejected
-          - ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound
-          - ReviewStore_Membership_Changes_AreAuditedWithTheProject
+
+      - id: ReviewCenter-Storage-Memberships-UnknownProject
+        title: >-
+          The Storage subsystem shall refuse a membership for a project that does not exist.
+        justification: |
+          A membership of nothing would grant nothing, and two requests made at the same moment could both pass a
+          check made before saving, so the database refuses it.
+        children:
+          - ReviewCenter-DbContext-Memberships-UnknownProject
+        tests:
           - ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase
+
+      - id: ReviewCenter-Storage-Memberships-UnknownUser
+        title: >-
+          The Storage subsystem shall refuse a membership for a user that does not exist.
+        justification: |
+          A membership of nobody would grant nothing, so the database refuses it.
+        children:
+          - ReviewCenter-DbContext-Memberships-UnknownUser
+        tests:
+          - ReviewCenterDbContext_Membership_UnknownUser_IsRefusedByDatabase
+
+      - id: ReviewCenter-Storage-Memberships-ChangeRole
+        title: >-
+          The Storage subsystem shall change the role of a membership and report whether the membership existed.
+        justification: |
+          A caller must know whether a role was changed or the membership was not there.
+        children:
+          - ReviewCenter-ReviewStore-Memberships-ChangeRole
+          - ReviewCenter-ReviewStore-Memberships-ChangeRoleReportsTrue
+          - ReviewCenter-ReviewStore-Memberships-ChangeRoleNotFound
+        tests:
+          - ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound
+
+      - id: ReviewCenter-Storage-Memberships-Remove
+        title: >-
+          The Storage subsystem shall remove a membership and report whether the membership existed.
+        justification: |
+          A caller must know whether a membership was removed or was not there.
+        children:
+          - ReviewCenter-ReviewStore-Memberships-Remove
+          - ReviewCenter-ReviewStore-Memberships-RemoveReportsTrue
+          - ReviewCenter-ReviewStore-Memberships-RemoveNotFound
+        tests:
+          - ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound
+
+      - id: ReviewCenter-Storage-Memberships-Audit
+        title: >-
+          The Storage subsystem shall store each membership change together with its audit entry, which names the
+          project, in one transaction.
+        justification: |
+          A change that is stored without its audit entry, or the other way round, would leave the history of who
+          had access untrue.
+        children:
+          - ReviewCenter-ReviewStore-Memberships-Audit
+          - ReviewCenter-ReviewStore-Memberships-AuditProject
+          - ReviewCenter-ReviewStore-Memberships-NoEntryWhenNotFound
+        tests:
+          - ReviewStore_Membership_Changes_AreAuditedWithTheProject
+
+      - id: ReviewCenter-Storage-Memberships-LastAdmin
+        title: >-
+          The Storage subsystem shall, when told to, refuse to remove or demote the last enabled project
+          administrator, in the transaction of the change.
+        justification: |
+          Only a check inside the transaction keeps two administrators who act at the same moment from leaving a
+          project without an administrator.
+        children:
+          - ReviewCenter-ReviewStore-LastAdmin
+          - ReviewCenter-ReviewStore-LastAdmin-Demote
+          - ReviewCenter-ReviewStore-LastAdmin-DisabledAdminNotCounted
+          - ReviewCenter-ReviewStore-LastAdmin-RemoveRacesRemove
+          - ReviewCenter-ReviewStore-LastAdmin-RemoveRacesRemoveLeavesOne
+          - ReviewCenter-ReviewStore-LastAdmin-RemoveRacesDemote
+          - ReviewCenter-ReviewStore-LastAdmin-RemoveRacesDemoteLeavesOne
+          - ReviewCenter-ReviewStore-LastAdmin-NothingStored
+          - ReviewCenter-ReviewStore-LastAdmin-NoAuditEntry
+          - ReviewCenter-ReviewStore-LastAdmin-ExemptSystemAdmin
+        tests:
+          - ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnlessExempt
           - ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds
+
+      - id: ReviewCenter-Storage-Memberships-NewAccount
+        title: >-
+          The Storage subsystem shall store a new account with its membership and its audit entry together.
+        justification: |
+          An account that is stored without its membership, or without the entry that records it, would be a
+          user nobody can reach or a history that misses a change.
+        children:
+          - ReviewCenter-UserStore-AddToProject
+          - ReviewCenter-UserStore-AddToProject-Audit
+          - ReviewCenter-UserStore-AddToProject-EntryFromStoredUser
+          - ReviewCenter-UserStore-AddToProject-NameTaken
+          - ReviewCenter-UserStore-AddToProject-ProjectMissing
+          - ReviewCenter-UserStore-AddToProject-AllOrNothing
+          - ReviewCenter-UserStore-AddToProject-GateRelease
+        tests:
           - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
+          - UserStore_AddToProjectAsync_Failure_StoresNothing
+
+      - id: ReviewCenter-Storage-Memberships-UserImpact
+        title: >-
+          The Storage subsystem shall report the reviewer slots a user holds and the projects in which the user
+          is the only enabled project administrator.
+        justification: |
+          Before an account is disabled or removed, an administrator must see which reviews would lose a reviewer
+          and which projects would lose their only administrator.
+        children:
+          - ReviewCenter-ReviewStore-UserImpact
+          - ReviewCenter-ReviewStore-UserImpact-Order
+          - ReviewCenter-ReviewStore-UserImpact-OtherUsersSlots
+          - ReviewCenter-ReviewStore-UserImpact-NoSlots
+          - ReviewCenter-ReviewStore-UserImpact-SoleAdmin
+          - ReviewCenter-ReviewStore-UserImpact-SoleAdminOrder
+          - ReviewCenter-ReviewStore-UserImpact-SharedAdminLeftOut
+          - ReviewCenter-ReviewStore-UserImpact-NotAdminLeftOut
+          - ReviewCenter-ReviewStore-UserImpact-DisabledAdminNotCounted
+          - ReviewCenter-ReviewStore-UserImpact-OrdinaryMemberNotCounted
+          - ReviewCenter-ReviewStore-UserImpact-DisabledUserNotReported
+        tests:
+          - ReviewStore_ListSlotsOfUserAsync_PrimaryAndAlternate_AreFoundInOrder
+          - ReviewStore_ListSoleAdminProjectsAsync_OnlyEnabledAdministrator_IsFound
 
       - id: ReviewCenter-Storage-EvidenceSettings
         title: >-
-          The Storage subsystem shall keep the evidence settings of each project with the project in the database
-          file, with the default settings for a project that was not given others, so that they are still there,
-          unchanged, when the database is opened again, change them only by an atomic compare-and-set against the
-          settings the caller started from, store each change together with its audit entry in one transaction, and
-          change nothing and record nothing for a project that does not exist or settings that were changed
-          meanwhile. The schema is created without a migration, so a development database that was created before
-          the settings existed has to be recreated.
+          The Storage subsystem shall keep the evidence settings of each project with the project in a database
+          file, so that they are still there, unchanged, when the database is opened again.
         justification: |
-          The settings decide who may read the evidence, so they must survive a restart and must not be lost when two
-          administrators save at the same time. The history of a change must stay true, so the entry is stored with
-          the change or not at all.
+          The settings decide who may read the evidence, so they must survive a restart. The schema is created
+          without migrations, so a development database that was created before the settings existed has to be
+          recreated.
         children:
           - ReviewCenter-ReviewStore-EvidenceSettings
+          - ReviewCenter-ReviewStore-EvidenceSettings-Listed
+          - ReviewCenter-ReviewStore-EvidenceSettings-OnlyThatProject
           - ReviewCenter-DbContext-EvidenceSettings
+          - ReviewCenter-DbContext-EvidenceSettings-Defaults
+          - ReviewCenter-DbContext-EvidenceSettings-Change
+        tests:
+          - ReviewStore_AddProjectAsync_GivenEvidenceSettings_AreStoredAndReturned
+          - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+
+      - id: ReviewCenter-Storage-EvidenceSettings-Default
+        title: >-
+          The Storage subsystem shall give a project that was not given evidence settings the default settings.
+        justification: |
+          A new project must start with settings that are safe without anybody choosing them.
+        children:
+          - ReviewCenter-ReviewStore-EvidenceSettings-Default
         tests:
           - ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings
+
+      - id: ReviewCenter-Storage-EvidenceSettings-CompareAndSet
+        title: >-
+          The Storage subsystem shall change the evidence settings of a project only by an atomic compare-and-set
+          against the settings the caller started from.
+        justification: |
+          Two administrators who save at the same time must not silently overwrite each other.
+        children:
+          - ReviewCenter-ReviewStore-EvidenceSettings-CompareAndSet
+          - ReviewCenter-ReviewStore-EvidenceSettings-CompareAndSetReported
+        tests:
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+
+      - id: ReviewCenter-Storage-EvidenceSettings-Audit
+        title: >-
+          The Storage subsystem shall store each change of the evidence settings together with its audit entry in
+          one transaction.
+        justification: |
+          A change of the evidence settings that is stored without its entry, or an entry without its change,
+          would hide who opened or narrowed what the evidence shows.
+        children:
+          - ReviewCenter-ReviewStore-EvidenceSettings-Audit
+          - ReviewCenter-ReviewStore-EvidenceSettings-ChainIntact
+        tests:
+          - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+
+      - id: ReviewCenter-Storage-EvidenceSettings-Stale
+        title: >-
+          The Storage subsystem shall change nothing and record nothing when the evidence settings were changed
+          meanwhile.
+        justification: |
+          A caller that saw old settings must learn that and decide again.
+        children:
+          - ReviewCenter-ReviewStore-EvidenceSettings-Stale
+          - ReviewCenter-ReviewStore-EvidenceSettings-StaleKept
+          - ReviewCenter-ReviewStore-EvidenceSettings-NoEntryWhenNotChanged
+        tests:
+          - ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing
+
+      - id: ReviewCenter-Storage-EvidenceSettings-MissingProject
+        title: >-
+          The Storage subsystem shall change nothing and record nothing for the evidence settings of a project
+          that does not exist.
+        justification: |
+          A change of settings of nothing must not leave an entry in the history.
+        children:
+          - ReviewCenter-ReviewStore-EvidenceSettings-Missing
+        tests:
           - ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing
 
       - id: ReviewCenter-Storage-ProjectChecklist
         title: >-
-          The Storage subsystem shall keep the checklist definition of each project with the project in the
-          database file, with no definition for a project that was not given one, so that it is still there,
-          unchanged, when the database is opened again, change it only by an atomic compare-and-set against the
-          definition the caller started from, store each change together with its audit entry in one transaction,
-          and change nothing and record nothing for a project that does not exist or a definition that was changed
-          meanwhile. The schema is created without a migration, so a development database that was created before
-          the column existed has to be recreated.
+          The Storage subsystem shall keep the checklist definition of each project with the project in a
+          database file, so that it is still there, unchanged, when the database is opened again.
         justification: |
-          The definition decides the wording of the checklist of every review created later, so it must survive a
-          restart and must not be lost when two administrators save at the same time. The history of a change must
-          stay true, so the entry is stored with the change or not at all.
+          The definition decides the wording of the checklist of every review created later, so it must survive
+          a restart. The schema is created without migrations, so a development database that was created before
+          the column existed has to be recreated.
         children:
           - ReviewCenter-ReviewStore-ProjectChecklist
+          - ReviewCenter-ReviewStore-ProjectChecklist-LargeText
+          - ReviewCenter-ReviewStore-ProjectChecklist-Listed
           - ReviewCenter-DbContext-ProjectChecklist
+          - ReviewCenter-DbContext-ProjectChecklist-None
+          - ReviewCenter-DbContext-ProjectChecklist-Stored
+          - ReviewCenter-DbContext-ProjectChecklist-Unbounded
         tests:
           - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
           - ReviewStore_UpdateChecklistDefinitionAsync_LargeText_RoundTripsThroughTheColumn
+
+      - id: ReviewCenter-Storage-ProjectChecklist-Default
+        title: >-
+          The Storage subsystem shall keep no checklist definition for a project that was not given one.
+        justification: |
+          A project without a definition uses the default checklist, so the absence must be stored as such.
+        children:
+          - ReviewCenter-ReviewStore-ProjectChecklist-Default
+        tests:
+          - ReviewStore_AddProjectAsync_ChecklistDefinition_IsNullByDefaultAndKeptWhenGiven
+
+      - id: ReviewCenter-Storage-ProjectChecklist-CompareAndSet
+        title: >-
+          The Storage subsystem shall change the checklist definition of a project only by an atomic
+          compare-and-set against the definition the caller started from.
+        justification: |
+          Two administrators who save at the same time must not silently overwrite each other, so exactly one of
+          two overlapping changes wins.
+        children:
+          - ReviewCenter-ReviewStore-ProjectChecklist-CompareAndSet
+          - ReviewCenter-ReviewStore-ProjectChecklist-CompareAndSetReported
+          - ReviewCenter-ReviewStore-ProjectChecklist-Reset
+          - ReviewCenter-ReviewStore-ProjectChecklist-OnlyThatProject
+          - ReviewCenter-ReviewStore-ProjectChecklist-Concurrent
+          - ReviewCenter-ReviewStore-ProjectChecklist-ConcurrentWinnerStored
+        tests:
           - ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited
-          - ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateChecklistDefinitionAsync_ConcurrentWriters_ExactlyOneWins
+
+      - id: ReviewCenter-Storage-ProjectChecklist-Audit
+        title: >-
+          The Storage subsystem shall store each change of the checklist definition together with its audit entry
+          in one transaction.
+        justification: |
+          A change of the checklist definition that is stored without its entry, or an entry without its change,
+          would hide who altered the checklists that later reviews are made from.
+        children:
+          - ReviewCenter-ReviewStore-ProjectChecklist-Audit
+          - ReviewCenter-ReviewStore-ProjectChecklist-ChainIntact
+        tests:
+          - ReviewStore_UpdateChecklistDefinitionAsync_ChangeAndReset_ArePersistedAndAudited
+
+      - id: ReviewCenter-Storage-ProjectChecklist-Stale
+        title: >-
+          The Storage subsystem shall change nothing and record nothing when the checklist definition was changed
+          meanwhile.
+        justification: |
+          A caller that saw an old definition must learn that and decide again.
+        children:
+          - ReviewCenter-ReviewStore-ProjectChecklist-Stale
+          - ReviewCenter-ReviewStore-ProjectChecklist-StaleKept
+          - ReviewCenter-ReviewStore-ProjectChecklist-NoEntryWhenNotChanged
+        tests:
+          - ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing
+
+      - id: ReviewCenter-Storage-ProjectChecklist-MissingProject
+        title: >-
+          The Storage subsystem shall change nothing and record nothing for the checklist definition of a project
+          that does not exist.
+        justification: |
+          A change of the definition of nothing must not leave an entry in the history.
+        children:
+          - ReviewCenter-ReviewStore-ProjectChecklist-Missing
+        tests:
+          - ReviewStore_UpdateChecklistDefinitionAsync_ExpectedDiffers_ChangesNothing
 
       - id: ReviewCenter-Storage-DueDate
         title: >-
-          The Storage subsystem shall keep the optional due date of each review with the review in the database file,
-          so that it is still there, unchanged, when the database is opened again, change it only by an atomic
-          compare-and-set against the date the caller started from, refuse the change of an approved review inside
-          the transaction, store each change together with its audit entry in one transaction, and change nothing and
-          record nothing for a review that does not exist or a date that was changed meanwhile. The schema is created
-          without a migration, so a development database that was created before the column existed has to be
-          recreated.
+          The Storage subsystem shall keep the optional due date of each review, as a calendar day, with the
+          review in a database file, so that it is still there, unchanged, when the database is opened again.
         justification: |
-          The date is a commitment that must survive a restart and must not be lost when two people save at the same
-          time. The history of a change must stay true, so the entry is stored with the change or not at all.
+          The date is a commitment that must survive a restart. The schema is created without migrations, so a
+          development database that was created before the column existed has to be recreated.
         children:
           - ReviewCenter-ReviewStore-DueDate
           - ReviewCenter-DbContext-DueDate
         tests:
           - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
+
+      - id: ReviewCenter-Storage-DueDate-Default
+        title: >-
+          The Storage subsystem shall keep no due date for a review that was not given one.
+        justification: |
+          A review without a date has no deadline, so the absence must be stored as such.
+        children:
+          - ReviewCenter-ReviewStore-DueDate-Default
+          - ReviewCenter-DbContext-DueDate-None
+        tests:
+          - ReviewStore_AddReviewAsync_DueDate_RoundTripsAsCalendarDay
+
+      - id: ReviewCenter-Storage-DueDate-CompareAndSet
+        title: >-
+          The Storage subsystem shall change the due date of a review only by an atomic compare-and-set against
+          the date the caller started from.
+        justification: |
+          Two people who save at the same time must not silently overwrite each other, so exactly one of two
+          overlapping changes wins.
+        children:
+          - ReviewCenter-ReviewStore-DueDate-CompareAndSet
+          - ReviewCenter-ReviewStore-DueDate-CompareAndSetReported
+          - ReviewCenter-ReviewStore-DueDate-Clear
+          - ReviewCenter-ReviewStore-DueDate-OnlyThatReview
+          - ReviewCenter-ReviewStore-DueDate-Concurrent
+          - ReviewCenter-ReviewStore-DueDate-ConcurrentWinnerStored
+        tests:
           - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
-          - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
           - ReviewStore_UpdateDueDateAsync_ConcurrentWriters_ExactlyOneWins
+
+      - id: ReviewCenter-Storage-DueDate-ApprovedRefused
+        title: >-
+          The Storage subsystem shall refuse the change of the due date of an approved review inside the
+          transaction of the change.
+        justification: |
+          A due date that moves after approval would change what the approved record promised, even when the
+          change overlaps the approval.
+        tests:
           - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
+
+      - id: ReviewCenter-Storage-DueDate-Audit
+        title: >-
+          The Storage subsystem shall store each change of the due date together with its audit entry in one
+          transaction.
+        justification: |
+          A due date moved without its entry, or an entry without the move, would hide who postponed or removed
+          the deadline of a review.
+        children:
+          - ReviewCenter-ReviewStore-DueDate-Audit
+          - ReviewCenter-ReviewStore-DueDate-ChainIntact
+        tests:
+          - ReviewStore_UpdateDueDateAsync_ChangeAndClear_ArePersistedAndAudited
+
+      - id: ReviewCenter-Storage-DueDate-Stale
+        title: >-
+          The Storage subsystem shall change nothing and record nothing when the due date was changed meanwhile.
+        justification: |
+          A caller that saw an old date must learn that and decide again.
+        children:
+          - ReviewCenter-ReviewStore-DueDate-Stale
+          - ReviewCenter-ReviewStore-DueDate-StaleKept
+          - ReviewCenter-ReviewStore-DueDate-NoEntryWhenNotChanged
+        tests:
+          - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
+
+      - id: ReviewCenter-Storage-DueDate-MissingReview
+        title: >-
+          The Storage subsystem shall change nothing and record nothing for the due date of a review that does
+          not exist.
+        justification: |
+          A change of the date of nothing must not leave an entry in the history.
+        children:
+          - ReviewCenter-ReviewStore-DueDate-Missing
+        tests:
+          - ReviewStore_UpdateDueDateAsync_ExpectedDiffers_ChangesNothing
 
       - id: ReviewCenter-Storage-Progress
         title: >-
-          The Storage subsystem shall return the time of the newest audit entry of each review of a project with one
-          query, so that the last activity of a review comes from the audit trail and not from a copy that could
-          differ from it.
+          The Storage subsystem shall return the time of the newest audit entry of each review of a project, so
+          that the last activity of a review comes from the audit trail and not from a copy that could differ
+          from it.
         justification: |
-          The audit trail already records every change of a review and is tamper evident. Reading the last activity
-          from it adds no second record to keep true and no work to every change.
+          The audit trail already records every change of a review and is tamper evident. Reading the last
+          activity from it adds no second record to keep true and no work to every change.
         children:
           - ReviewCenter-AuditStore-LastActivity
+          - ReviewCenter-AuditStore-LastActivity-NoReview
+          - ReviewCenter-AuditStore-LastActivity-OtherProject
+          - ReviewCenter-AuditStore-LastActivity-ReadOnly
         tests:
           - AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject
 
       - id: ReviewCenter-Storage-FollowUp
         title: >-
-          The Storage subsystem shall keep the review that a follow-up review follows, the numbers of answers and
-          threads it carried, and the answers, sections and threads it carried with the review they came from, in the
-          database file, so that they are still there, unchanged, when the database is opened again, store them in the
-          one transaction that stores the review, so that a carry that fails stores nothing, load them into the record
-          that a signature covers, and store an answer that replaces a carried one without the mark. The schema is
-          created without a migration, so a development database that was created before the columns existed has to be
-          recreated.
+          The Storage subsystem shall keep the review that a follow-up review follows, in a database file, so that
+          it is still there, unchanged, when the database is opened again.
         justification: |
-          The follow-up and the carried answers are part of what the reviewers approve, so they must survive a restart
-          and exist together with the review or not at all. The schema is created from the model and not migrated
-          while the product is not released, so development databases are recreated.
+          The follow-up relationship is part of what the reviewers approve, so it must survive a restart. The
+          schema is created without migrations, so a development database that was created before the columns
+          existed has to be recreated.
         children:
           - ReviewCenter-ReviewStore-FollowUp
+          - ReviewCenter-ReviewStore-FollowUp-None
           - ReviewCenter-DbContext-FollowUp
+          - ReviewCenter-DbContext-FollowUp-None
+          - ReviewCenter-DbContext-FollowUp-Index
+          - ReviewCenter-DbContext-FollowUp-NoForeignKey
+          - ReviewCenter-DbContext-FollowUp-CarriedFrom
         tests:
           - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+
+      - id: ReviewCenter-Storage-FollowUp-CarriedRows
+        title: >-
+          The Storage subsystem shall keep the numbers of answers and threads a follow-up review carried, and the
+          answers, sections, and threads it carried, with the review they came from, in a database file.
+        justification: |
+          The carried answers and threads are part of what the reviewers approve, so they must survive a
+          restart.
+        children:
+          - ReviewCenter-ReviewStore-FollowUp-CarriedAnswers
+          - ReviewCenter-ReviewStore-FollowUp-CarriedSections
+          - ReviewCenter-ReviewStore-FollowUp-CarriedThreads
+          - ReviewCenter-ReviewStore-FollowUp-CarriedFlags
+          - ReviewCenter-ReviewStore-FollowUp-ThreadNumbers
+          - ReviewCenter-DbContext-FollowUp-CarriedRowsNotMapped
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+          - ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind
+
+      - id: ReviewCenter-Storage-FollowUp-CarryFailsStoresNothing
+        title: >-
+          The Storage subsystem shall store a follow-up review with its carried rows in one transaction, so that
+          a carry that fails stores nothing.
+        justification: |
+          A follow-up review with only some of its carried answers would be approved on less than the earlier
+          review showed.
+        children:
+          - ReviewCenter-ReviewStore-FollowUp-Atomic
+          - ReviewCenter-ReviewStore-FollowUp-AtomicNoEntry
+        tests:
           - ReviewStore_AddReviewAsync_FollowUpCarryFails_CreatesNothing
+
+      - id: ReviewCenter-Storage-FollowUp-Record
+        title: >-
+          The Storage subsystem shall load the carried answers, sections, and threads of a follow-up review into
+          the record that a signature covers.
+        justification: |
+          A signature covers the record, so what a follow-up review carried must be part of the record the
+          reviewers sign.
+        children:
+          - ReviewCenter-ReviewStore-FollowUp-Record
+          - ReviewCenter-ReviewStore-FollowUp-NoCarriedBallotRows
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
+
+      - id: ReviewCenter-Storage-FollowUp-ReplaceCarried
+        title: >-
+          The Storage subsystem shall store an answer that replaces a carried answer without the mark of a carried
+          answer.
+        justification: |
+          A reviewer who answers again has decided anew, so the answer must no longer look as if it was carried.
+        children:
+          - ReviewCenter-ReviewStore-FollowUp-ReplacedAnswer
+        tests:
+          - ReviewStore_SetBallotAnswerAndSectionState_CarriedRows_AreReplacedWithoutMarker
 
       - id: ReviewCenter-Storage-ReviewIntegrity
         title: >-
-          The Storage subsystem shall keep the reopenings of a review, with the reason and the digest of the approved
-          record, and the setting of a project that requires independent reviewers in the database file, so that they
-          are still there, unchanged, when the database is opened again, shall refuse, inside the transaction of the
-          change, every change of the content or the reviewers of a review that is approved, with the same rule as the
-          Core services, and shall store the reopening and the change of the setting each together with its audit
-          entry in one transaction. The schema is created without a migration, so a development database that was
-          created before the table and the column existed has to be recreated.
+          The Storage subsystem shall keep the reopenings of a review, with the reason and the digest of the
+          approved record, in a database file, so that they are still there, unchanged, when the database is
+          opened again.
         justification: |
-          The approval lock must hold even when two requests overlap, so the database layer repeats the check in the
-          transaction of the change. The history of reopenings and the setting that decides who may sign are
-          evidence about the review and must survive a restart and stay true.
+          The history of reopenings is evidence about the review and must survive a restart and stay true. The
+          schema is created without migrations, so a development database that was created before the table
+          existed has to be recreated.
         children:
-          - ReviewCenter-ReviewStore-ApprovalLockInTransaction
-          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck
           - ReviewCenter-ReviewStore-ReopenHistory
-          - ReviewCenter-ReviewStore-ReopenRefusal
+          - ReviewCenter-ReviewStore-ReopenHistory-AuditEntry
+          - ReviewCenter-ReviewStore-ReopenHistory-Row
+          - ReviewCenter-ReviewStore-ReopenHistory-SignaturesKept
+          - ReviewCenter-ReviewStore-ReopenHistory-ListOrder
+          - ReviewCenter-ReviewStore-ReopenHistory-Scoped
           - ReviewCenter-ReviewStore-ReopenCount
-          - ReviewCenter-ReviewStore-IndependentReviewers
-          - ReviewCenter-DbContext-ReviewRules
           - ReviewCenter-DbContext-ReviewReopens
+          - ReviewCenter-DbContext-ReviewReopens-ReviewKey
+          - ReviewCenter-DbContext-ReviewReopens-ReviewCascade
         tests:
           - StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction
 
+      - id: ReviewCenter-Storage-ReviewIntegrity-ApprovedLock
+        title: >-
+          The Storage subsystem shall refuse, inside the transaction of the change, every change of the content
+          or the reviewers of a review that is approved, with the same rule as the Core services.
+        justification: |
+          The approval lock must hold even when two requests overlap, so the database layer repeats the check in
+          the transaction of the change.
+        children:
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-NothingStored
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-NoAuditEntry
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-LiftedByReopen
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-UnknownReview
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-UnknownReviewNothingStored
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-SignatureFirst
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-SignatureFirst-Stored
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-WriteFirst
+          - ReviewCenter-ReviewStore-ApprovalLockInTransaction-WriteFirst-Stored
+        tests:
+          - StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction
+          - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
+
+      - id: ReviewCenter-Storage-ReviewIntegrity-OpenThreadSigning
+        title: >-
+          The Storage subsystem shall refuse a signature while a thread of the review is open, checking that
+          again in the transaction that stores the signature.
+        justification: |
+          A thread can be opened between the check of the service and the saving of the signature, so the
+          database layer repeats the check in the transaction.
+        children:
+          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck
+          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck-NothingStored
+          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck-DigestFirst
+          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck-Concluded
+          - ReviewCenter-ReviewStore-OpenThreadSigningRecheck-ConcludedWhenResolved
+          - ReviewCenter-ReviewStore-CheckThreads-SignatureBlocked
+        tests:
+          - ReviewStore_AddSignatureAsync_OpenThread_ThrowsSigningNotAllowedAndStoresNothing
+          - ReviewStore_AddSignatureAsync_ThreadOpenedBeforeFinalSignature_IsRefused
+          - ReviewStore_Conclude_OpenCheckThread_IsRefusedInTheTransaction
+
+      - id: ReviewCenter-Storage-ReviewIntegrity-ReopenAudit
+        title: >-
+          The Storage subsystem shall store the reopening of a review together with its audit entry in one
+          transaction.
+        justification: |
+          The history of reopenings must stay true, so the entry is stored with the reopening or not at all.
+        children:
+          - ReviewCenter-ReviewStore-ReopenHistory-Atomic
+        tests:
+          - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
+          - ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen
+
+      - id: ReviewCenter-Storage-ReviewIntegrity-ReopenRefused
+        title: >-
+          The Storage subsystem shall refuse to reopen a review that is not approved or does not exist, storing
+          nothing, and let only one of two overlapping reopenings succeed.
+        justification: |
+          Two reopenings of one approval would record the same approval twice, so the check is made in the
+          transaction of the reopening.
+        children:
+          - ReviewCenter-ReviewStore-ReopenRefusal
+          - ReviewCenter-ReviewStore-ReopenRefusal-NotFound
+          - ReviewCenter-ReviewStore-ReopenRefusal-NothingStored
+          - ReviewCenter-ReviewStore-ReopenRefusal-NoAuditEntry
+          - ReviewCenter-ReviewStore-ReopenRefusal-OneWinner
+          - ReviewCenter-ReviewStore-ReopenRefusal-StoredOnce
+        tests:
+          - ReviewStore_ReopenReviewAsync_NotApprovedOrUnknown_IsRefusedAndStoresNothing
+          - ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds
+
+      - id: ReviewCenter-Storage-ReviewIntegrity-IndependentReviewers
+        title: >-
+          The Storage subsystem shall keep the setting of a project that requires independent reviewers in a
+          database file, so that it is still there, unchanged, when the database is opened again.
+        justification: |
+          The setting that decides who may sign is evidence about the review and must survive a restart. The
+          schema is created without migrations, so a development database that was created before the column
+          existed has to be recreated.
+        children:
+          - ReviewCenter-ReviewStore-IndependentReviewers
+          - ReviewCenter-ReviewStore-IndependentReviewers-Default
+          - ReviewCenter-ReviewStore-IndependentReviewers-CompareAndSet
+          - ReviewCenter-ReviewStore-IndependentReviewers-CompareAndSetReported
+          - ReviewCenter-ReviewStore-IndependentReviewers-Stale
+          - ReviewCenter-ReviewStore-IndependentReviewers-StaleKept
+          - ReviewCenter-ReviewStore-IndependentReviewers-Missing
+          - ReviewCenter-ReviewStore-IndependentReviewers-NoEntryWhenNotChanged
+          - ReviewCenter-DbContext-ReviewRules
+          - ReviewCenter-DbContext-ReviewRules-Default
+          - ReviewCenter-DbContext-ReviewRules-Changed
+          - ReviewCenter-DbContext-ReviewRules-StoredOff
+        tests:
+          - StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction
+          - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
+
+      - id: ReviewCenter-Storage-ReviewIntegrity-SettingAudit
+        title: >-
+          The Storage subsystem shall store each change of the setting that requires independent reviewers
+          together with its audit entry in one transaction.
+        justification: |
+          A switch of independent review that is stored without its entry, or an entry without its switch, would
+          hide who allowed a reviewer to sign off a record that the reviewer worked on.
+        children:
+          - ReviewCenter-ReviewStore-IndependentReviewers-Audit
+        tests:
+          - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
+
       - id: ReviewCenter-Storage-ReviewRuleSwitches
         title: >-
-          The Storage subsystem shall keep the two further review rules of a project (authors answering the checklist
-          of their own review, and the person who reopened a review signing it again) in the database file, on for a
-          project that does not say otherwise, so that they are still there, unchanged, when the database is opened
-          again, and shall change each rule only when it still has the value the caller saw, together with its audit
-          entry in one transaction, without changing another rule. The schema is created without a migration, so a
-          development database that was created before the columns existed has to be recreated.
+          The Storage subsystem shall keep the two further review rules of a project (authors answering the
+          checklist of their own review, and the person who reopened a review signing it again) in a database
+          file, so that they are still there, unchanged, when the database is opened again.
         justification: |
           A rule that is chosen for a project is evidence about how its reviews were run, so it must survive a
-          restart, must not be lost when the project is read or listed, and must not be overwritten by a caller that
-          saw an old value; the change and its audit entry are one step so that the history never misses a change.
+          restart and must not be lost when the project is read or listed. The schema is created without
+          migrations, so a development database that was created before the columns existed has to be recreated.
         children:
           - ReviewCenter-ReviewStore-ReviewRuleSwitches
           - ReviewCenter-DbContext-ReviewRuleColumns
+          - ReviewCenter-DbContext-ReviewRuleColumns-Default
+          - ReviewCenter-DbContext-ReviewRuleColumns-StoredOff
+          - ReviewCenter-DbContext-ReviewRuleColumns-Changed
         tests:
           - StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet
 
+      - id: ReviewCenter-Storage-ReviewRuleSwitches-Default
+        title: >-
+          The Storage subsystem shall keep each of the two further review rules on for a project that does not say
+          otherwise.
+        justification: |
+          A project that says nothing must get the strict behavior, so that a rule is never off by accident.
+        children:
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-Default
+        tests:
+          - StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet
+
+      - id: ReviewCenter-Storage-ReviewRuleSwitches-CompareAndSet
+        title: >-
+          The Storage subsystem shall change a review rule only when it still has the value the caller saw.
+        justification: |
+          A caller that saw an old value must not overwrite a newer one, and a change of nothing must not leave
+          an entry in the history.
+        children:
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-CompareAndSet
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-CompareAndSetReported
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-Stale
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-StaleKept
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-Missing
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-NoEntryWhenNotChanged
+        tests:
+          - StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet
+
+      - id: ReviewCenter-Storage-ReviewRuleSwitches-Audit
+        title: >-
+          The Storage subsystem shall store each change of a review rule together with its audit entry in one
+          transaction.
+        justification: |
+          A rule switch that is stored without its entry, or an entry without its switch, would hide who relaxed
+          the rule on authors or on those who reopen a review.
+        children:
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-Audit
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-ChainIntact
+        tests:
+          - StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet
+
+      - id: ReviewCenter-Storage-ReviewRuleSwitches-OtherRulesKept
+        title: >-
+          The Storage subsystem shall change only the review rule that was named, without changing another rule.
+        justification: |
+          A change of one rule must not turn another rule on or off.
+        children:
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-ChangesOnlyNamed
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-UndefinedRule
+          - ReviewCenter-ReviewStore-ReviewRuleSwitches-UndefinedRuleNoAuditEntry
+        tests:
+          - StorageSubsystem_ReviewRuleSwitches_SurviveRestartAndAreCompareAndSet
+          - ReviewStore_UpdateReviewRuleAsync_ChangesOnlyTheNamedRule
+
       - id: ReviewCenter-Storage-RepositoryReviews
         title: >-
-          The Storage subsystem shall keep the source of a review from a repository (including the review-set it was
-          planned for) and, for each file, its change kind
-          and its frozen baseline content in the database file, return them without file content in the review, and
-          return the baseline content of one file on request.
+          The Storage subsystem shall keep the source of a review from a repository, including the review-set it
+          was planned for, in a database file.
         justification: |
-          The frozen copies replace the repository for everything that is read later, so they must be stored with the
-          review and read as cheaply as the head content.
+          The source tells where the content of a review came from, so it must be stored with the review.
         children:
           - ReviewCenter-ReviewStore-Source
           - ReviewCenter-DbContext-Source
+          - ReviewCenter-DbContext-Source-Upload
         tests:
           - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
-          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
           - ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips
+
+      - id: ReviewCenter-Storage-RepositoryReviews-FileBaseline
+        title: >-
+          The Storage subsystem shall keep, for each file of a review from a repository, its change kind and its
+          frozen baseline content in a database file.
+        justification: |
+          The frozen copies replace the repository for everything that is read later, so they must be stored with
+          the review.
+        children:
+          - ReviewCenter-ReviewStore-Source-FileChange
+          - ReviewCenter-DbContext-Source-FileBaseline
+        tests:
+          - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
+
+      - id: ReviewCenter-Storage-RepositoryReviews-NoContentInReview
+        title: >-
+          The Storage subsystem shall return the review of a repository without the file content.
+        justification: |
+          The review is read for every list and every page, so it must not carry the bytes of every file.
+        children:
+          - ReviewCenter-ReviewStore-Source-NoContent
+        tests:
+          - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
+
+      - id: ReviewCenter-Storage-RepositoryReviews-BaselineOnRequest
+        title: >-
+          The Storage subsystem shall return the baseline content of one file on request.
+        justification: |
+          The baseline is read as cheaply as the head content, and only for the file that is shown.
+        children:
+          - ReviewCenter-ReviewStore-Source-BaselineContent
+          - ReviewCenter-ReviewStore-Source-NoBaseline
+          - ReviewCenter-DbContext-Source-BaselineContent
+          - ReviewCenter-DbContext-Source-BaselineEmpty
+        tests:
+          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
 
       - id: ReviewCenter-Storage-AccessTokens
         title: >-
-          The Storage subsystem shall keep the personal access tokens of the users (the hash, never the value) in the
-          database file together with the creator of a review and whether it was created through the API, find a
-          token by its hash, list the tokens of a user, mark a token as revoked or used, and write the audit record of
-          a creation or a revocation in the same transaction.
+          The Storage subsystem shall keep the personal access tokens of the users, the hash and never the value,
+          in a database file, so that they are still there, unchanged, when the database is opened again.
         justification: |
-          Tokens must survive a restart so that scripts keep working, and a change of a token without its audit record
-          would leave the history untrue.
+          Tokens must survive a restart so that scripts keep working, and the value must never be stored, so a
+          copy of the database does not reveal it.
         children:
           - ReviewCenter-PersonalAccessTokenStore-Persist
-          - ReviewCenter-PersonalAccessTokenStore-Find
-          - ReviewCenter-PersonalAccessTokenStore-Revoke
-          - ReviewCenter-PersonalAccessTokenStore-Touch
+          - ReviewCenter-PersonalAccessTokenStore-Persist-DuplicateHash
           - ReviewCenter-DbContext-Tokens
         tests:
           - StorageSubsystem_AccessTokens_PersistAcrossReopen
+          - PersonalAccessTokenStore_AddAsync_Token_RoundTripsAndAudits
+
+      - id: ReviewCenter-Storage-AccessTokens-CreatorFlag
+        title: >-
+          The Storage subsystem shall keep with each review the creator of the review and whether it was created
+          through the API.
+        justification: |
+          The inbox and the audit trail need to know who created a review and by which way.
+        children:
+          - ReviewCenter-DbContext-Tokens-ReviewCreator
+        tests:
+          - ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns
+
+      - id: ReviewCenter-Storage-AccessTokens-Find
+        title: >-
+          The Storage subsystem shall find a personal access token by its hash.
+        justification: |
+          A request that presents a token is recognized by its hash, so the lookup must find the token with its
+          owner and nothing else.
+        children:
+          - ReviewCenter-PersonalAccessTokenStore-Find
+          - ReviewCenter-PersonalAccessTokenStore-Find-Unknown
+        tests:
+          - PersonalAccessTokenStore_FindByHashAsync_Hash_FindsTokenWithOwner
+
+      - id: ReviewCenter-Storage-AccessTokens-List
+        title: >-
+          The Storage subsystem shall list the tokens of a user without the value of any token.
+        justification: |
+          A user manages the own tokens, so the list holds those tokens only, and the value of a token can
+          never be shown again.
+        children:
+          - ReviewCenter-PersonalAccessTokenStore-Find-List
+          - ReviewCenter-PersonalAccessTokenStore-Find-ListNewestFirst
+          - ReviewCenter-PersonalAccessTokenStore-Find-ListOwnOnly
+        tests:
+          - StorageSubsystem_AccessTokens_PersistAcrossReopen
+          - PersonalAccessTokenStore_ListForUserAsync_Tokens_AreOwnedAndNewestFirst
+
+      - id: ReviewCenter-Storage-AccessTokens-Revoke
+        title: >-
+          The Storage subsystem shall mark a personal access token of a user as revoked, once, and no token of
+          another user.
+        justification: |
+          A revoked token must stay revoked after a restart, and a user must not be able to revoke the tokens of
+          others.
+        children:
+          - ReviewCenter-PersonalAccessTokenStore-Revoke
+          - ReviewCenter-PersonalAccessTokenStore-Revoke-Once
+          - ReviewCenter-PersonalAccessTokenStore-Revoke-OtherUsers
+        tests:
+          - StorageSubsystem_AccessTokens_PersistAcrossReopen
+          - PersonalAccessTokenStore_RevokeAsync_OwnToken_RevokesOnceAndAudits
+
+      - id: ReviewCenter-Storage-AccessTokens-Touch
+        title: >-
+          The Storage subsystem shall mark a personal access token as used by changing only its last-used time,
+          only against the time the caller saw.
+        justification: |
+          Every request with a token marks it as used, so the write must be cheap, must not disturb the other
+          values, and must not produce an audit entry for every request.
+        children:
+          - ReviewCenter-PersonalAccessTokenStore-Touch
+          - ReviewCenter-PersonalAccessTokenStore-Touch-OtherValuesKept
+          - ReviewCenter-PersonalAccessTokenStore-Touch-NoAudit
+          - ReviewCenter-PersonalAccessTokenStore-Touch-CompareAndSet
+          - ReviewCenter-PersonalAccessTokenStore-Touch-OneWriter
+        tests:
+          - PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed
+          - PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce
+
+      - id: ReviewCenter-Storage-AccessTokens-Audit
+        title: >-
+          The Storage subsystem shall write the audit record of the creation or the revocation of a personal
+          access token in the same transaction as the change.
+        justification: |
+          A change of a token without its audit record would leave the history untrue.
+        children:
+          - ReviewCenter-PersonalAccessTokenStore-Persist-Audit
+          - ReviewCenter-PersonalAccessTokenStore-Persist-AuditAtomic
+          - ReviewCenter-PersonalAccessTokenStore-Persist-DuplicateHashNoEntry
+          - ReviewCenter-PersonalAccessTokenStore-Revoke-Audit
+          - ReviewCenter-PersonalAccessTokenStore-Revoke-AuditAtomic
+          - ReviewCenter-PersonalAccessTokenStore-Revoke-NoEntryWhenUnchanged
+        tests:
+          - PersonalAccessTokenStore_AddAsync_AuditInsertFails_StoresNoToken
+          - PersonalAccessTokenStore_RevokeAsync_AuditInsertFails_LeavesTheTokenUnrevoked
+          - PersonalAccessTokenStore_AddAsync_DuplicateHash_IsRefusedAndNothingIsAudited
 
       - id: ReviewCenter-Storage-ExternalIdentity
         title: >-
-          The Storage subsystem shall keep the issuer and the subject of the identity of a user at a provider in the
-          database file, find the user by the exact pair, and allow only one user for a pair.
+          The Storage subsystem shall keep the issuer and the subject of the identity of a user at a provider in
+          a database file.
         justification: |
-          The account of a person must be the same account at every sign-in, and no sign-in may open two accounts.
+          The account of a person must be the same account at every sign-in, so the identity must outlive the
+          process; a local user has none.
         children:
           - ReviewCenter-UserStore-ExternalIdentity
+          - ReviewCenter-UserStore-ExternalIdentity-LocalHasNone
           - ReviewCenter-DbContext-ExternalIdentity
+          - ReviewCenter-DbContext-ExternalIdentity-LocalUsers
         tests:
           - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
+
+      - id: ReviewCenter-Storage-ExternalIdentity-ExactPair
+        title: >-
+          The Storage subsystem shall find the user of an external identity by the exact pair of issuer and
+          subject.
+        justification: |
+          A subject is only unique within its issuer, so a lookup by the subject alone could open the account of
+          somebody else.
+        children:
+          - ReviewCenter-UserStore-ExternalIdentity-ExactPair
+        tests:
+          - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
+
+      - id: ReviewCenter-Storage-ExternalIdentity-UniquePair
+        title: >-
+          The Storage subsystem shall allow only one user for a pair of issuer and subject.
+        justification: |
+          No sign-in may open two accounts, so the database itself refuses a second user for the same identity.
+        children:
+          - ReviewCenter-UserStore-ExternalIdentity-DuplicateRefused
+          - ReviewCenter-DbContext-ExternalIdentity-UniquePair
+        tests:
           - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused
 
       - id: ReviewCenter-Storage-TotpSecondFactor
         title: >-
-          The Storage subsystem shall keep the enrollment of the second factor and the recovery codes of a user in the
-          database file, decide every race between requests (the next time step, the spending of a recovery code, the
-          confirmation of a setup) with one conditional change so that exactly one request wins, write the audit entry
-          with each change, and delete everything of a user with the user.
+          The Storage subsystem shall keep the enrollment of the second factor and the recovery codes of a user
+          in a database file, so that they are still there, unchanged, when the database is opened again.
         justification: |
-          The replay protection and the single use of a recovery code are only as strong as the store that decides
-          them. Keeping the decision in the database makes it right for any number of requests, and the audit entry
-          in the same transaction keeps the history true.
+          The second factor must survive a restart, or every user would have to enroll again. A pending
+          enrollment is replaced by a new start but never overwrites a confirmed one, and a recovery code hash
+          is unique for one user but may repeat for another.
         children:
           - ReviewCenter-TotpStore-Pending
-          - ReviewCenter-TotpStore-ConfirmAtomic
-          - ReviewCenter-TotpStore-AtomicStep
-          - ReviewCenter-TotpStore-RecoverySingleUse
-          - ReviewCenter-TotpStore-Remove
-          - ReviewCenter-TotpStore-Cascade
+          - ReviewCenter-TotpStore-Pending-Replace
+          - ReviewCenter-TotpStore-Pending-RefuseConfirmed
+          - ReviewCenter-TotpStore-Pending-RefuseConfirmedKept
+          - ReviewCenter-TotpStore-Pending-RemovePending
+          - ReviewCenter-TotpStore-Pending-KeepConfirmed
+          - ReviewCenter-TotpStore-ConfirmAtomic-DuplicateHashRolledBack
+          - ReviewCenter-TotpStore-ConfirmAtomic-SameHashOtherUsers
+          - ReviewCenter-TotpStore-InputValidation
           - ReviewCenter-DbContext-TotpTables
+          - ReviewCenter-DbContext-TotpTables-RecoveryCodeHash
+          - ReviewCenter-DbContext-TotpTables-SameHashOtherUsers
+        tests:
+          - TotpStore_SavePendingAsync_RoundTripsAndReplacesAPendingEnrollment
+          - TotpStore_RemovePendingAsync_RemovesPendingOnly
+          - TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack
+
+      - id: ReviewCenter-Storage-TotpSecondFactor-StepRace
+        title: >-
+          The Storage subsystem shall decide every race between requests for the next time step of the second
+          factor with one conditional change, so that exactly one request wins.
+        justification: |
+          The replay protection is only as strong as the store that decides it; keeping the decision in the
+          database makes it right for any number of requests.
+        children:
+          - ReviewCenter-TotpStore-AtomicStep
+          - ReviewCenter-TotpStore-AtomicStep-NotLater
+          - ReviewCenter-TotpStore-AtomicStep-OnlyConfirmed
+          - ReviewCenter-TotpStore-AtomicStep-OneWinner
         tests:
           - TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner
+          - TotpStore_TryAdvanceStepAsync_OnlyForwardAndOnlyWhenConfirmed
+
+      - id: ReviewCenter-Storage-TotpSecondFactor-RecoveryRace
+        title: >-
+          The Storage subsystem shall decide every race between requests to spend a recovery code with one
+          conditional change, so that exactly one request wins.
+        justification: |
+          A recovery code must work once, however many requests present it at the same moment.
+        children:
+          - ReviewCenter-TotpStore-RecoverySingleUse
+          - ReviewCenter-TotpStore-RecoverySingleUse-UnknownRefused
+          - ReviewCenter-TotpStore-RecoverySingleUse-RefusedNoEntry
+          - ReviewCenter-TotpStore-RecoverySingleUse-OneWinner
+          - ReviewCenter-TotpStore-RecoverySingleUse-Replace
+          - ReviewCenter-TotpStore-RecoverySingleUse-Count
+        tests:
           - TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner
+          - TotpStore_TryConsumeRecoveryCodeAsync_SpendsOnceAndAuditsOnce
+
+      - id: ReviewCenter-Storage-TotpSecondFactor-ConfirmRace
+        title: >-
+          The Storage subsystem shall decide every race between requests to start or confirm the setup of the
+          second factor, so that a confirmed setup is never overwritten and the confirmation happens once.
+        justification: |
+          A start of the setup that overlaps with its confirmation must not undo the confirmation, and the
+          confirmation must store the recovery codes and the step together.
+        children:
+          - ReviewCenter-TotpStore-Pending-ConcurrentStarts
+          - ReviewCenter-TotpStore-Pending-ConcurrentOneRow
+          - ReviewCenter-TotpStore-Pending-ConcurrentWithConfirm
+          - ReviewCenter-TotpStore-Pending-ConcurrentWithConfirmNotOverwritten
+          - ReviewCenter-TotpStore-ConfirmAtomic
+          - ReviewCenter-TotpStore-ConfirmAtomic-RecoveryCodes
+          - ReviewCenter-TotpStore-ConfirmAtomic-Step
+          - ReviewCenter-TotpStore-ConfirmAtomic-Once
+          - ReviewCenter-TotpStore-ConfirmAtomic-NothingPending
+        tests:
+          - TotpStore_SavePendingAsync_ConcurrentWithConfirm_NoExceptionAndConfirmedStaysConfirmed
+          - TotpStore_SavePendingAsync_ManyConcurrentStarts_NoExceptionAndOneCoherentPendingRow
+          - TotpStore_ConfirmAsync_ActivatesStoresCodesAndAuditsOnce
+
+      - id: ReviewCenter-Storage-TotpSecondFactor-Remove
+        title: >-
+          The Storage subsystem shall delete the enrollment and the recovery codes of a user when the user
+          removes the second factor, and report whether anything was removed.
+        justification: |
+          A user who has lost a device must be able to leave no trace of the old second factor.
+        children:
+          - ReviewCenter-TotpStore-Remove
+          - ReviewCenter-TotpStore-Remove-NothingRemoved
+        tests:
+          - TotpStore_RemoveAsync_DeletesEverythingOnceWithOneAuditEntry
+
+      - id: ReviewCenter-Storage-TotpSecondFactor-Audit
+        title: >-
+          The Storage subsystem shall write the audit entry of each change of the second factor in the same
+          transaction as the change.
+        justification: |
+          The history of a change of a security setting must stay true, so the entry is stored with the change or
+          not at all.
+        children:
+          - ReviewCenter-TotpStore-ConfirmAtomic-Audit
+          - ReviewCenter-TotpStore-Remove-Audit
+          - ReviewCenter-TotpStore-Remove-ChainIntact
+          - ReviewCenter-TotpStore-RecoverySingleUse-Audit
+          - ReviewCenter-TotpStore-RecoverySingleUse-ReplaceAudit
+        tests:
+          - TotpStore_ConfirmAsync_ActivatesStoresCodesAndAuditsOnce
+          - TotpStore_RemoveAsync_DeletesEverythingOnceWithOneAuditEntry
+          - TotpStore_ReplaceRecoveryCodesAsync_Replaced_StoresOneAuditEntry
+          - TotpStore_Changes_KeepTheAuditChainIntact
+
+      - id: ReviewCenter-Storage-TotpSecondFactor-UserDeleted
+        title: >-
+          The Storage subsystem shall delete the enrollment and the recovery codes of a user with the user.
+        justification: |
+          A second factor secret that outlives its user would stay in the database with nobody who can use it.
+        children:
+          - ReviewCenter-TotpStore-Cascade
+          - ReviewCenter-TotpStore-Cascade-RecoveryCodes
+          - ReviewCenter-DbContext-TotpTables-UserCascade
+        tests:
+          - TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes
 
       - id: ReviewCenter-Storage-Inbox
         title: >-
-          The Storage subsystem shall keep what each user has seen of each review in the database, find the reviews
-          in which a user is a reviewer or the creator without loading their files, decide every race between visits
-          so that the stored values only grow and none of them fails, and delete the rows with the review or the user.
+          The Storage subsystem shall keep what each user has seen of each review in a database file, so that it
+          is still there, unchanged, when the database is opened again.
         justification: |
-          The inbox is built on every visit of the home page, so the lookup must be cheap, and two tabs of one user
-          must not lose the newer value. One table serves as the list of notifications, so the schema stays small.
+          The inbox must show what is new since the last visit also after a restart. One table serves as the list
+          of notifications, so the schema stays small.
+        children:
+          - ReviewCenter-InboxStore-UserState
+          - ReviewCenter-InboxStore-UserState-FirstVisit
+          - ReviewCenter-InboxStore-UserState-Update
+          - ReviewCenter-InboxStore-UserState-OwnRowsOnly
+          - ReviewCenter-InboxStore-InputValidation
+          - ReviewCenter-DbContext-ReviewUserState
+          - ReviewCenter-DbContext-ReviewUserState-Fields
+        tests:
+          - StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems
+          - InboxStore_MarkSeenAsync_InsertsThenUpdatesAndNeverMovesBackwards
+
+      - id: ReviewCenter-Storage-Inbox-Candidates
+        title: >-
+          The Storage subsystem shall find the reviews in which a user is a reviewer or the creator.
+        justification: |
+          The inbox lists the reviews that need the user, so the lookup must find the reviews of the reviewers and
+          of the creator and no others; the indexes keep the lookup cheap.
         children:
           - ReviewCenter-InboxStore-Candidates
-          - ReviewCenter-InboxStore-UserState
-          - ReviewCenter-InboxStore-Cascade
-          - ReviewCenter-DbContext-ReviewUserState
+          - ReviewCenter-InboxStore-Candidates-CreatorCase
+          - ReviewCenter-InboxStore-Candidates-Uninvolved
           - ReviewCenter-DbContext-InboxIndexes
         tests:
           - StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems
+          - InboxStore_ListInvolvedReviewsAsync_PrimaryAlternateAndCreator_AreFound
+
+      - id: ReviewCenter-Storage-Inbox-LightRecords
+        title: >-
+          The Storage subsystem shall find the reviews of a user for the inbox without loading their files.
+        justification: |
+          The inbox is built on every visit of the home page, so the lookup must be cheap.
+        children:
+          - ReviewCenter-InboxStore-Candidates-LightRecords
+        tests:
+          - InboxStore_ListInvolvedReviewsAsync_DoesNotLoadFiles_ReturnsLightRecords
+
+      - id: ReviewCenter-Storage-Inbox-NeverBackwards
+        title: >-
+          The Storage subsystem shall decide every race between visits of a user so that the stored values only
+          grow.
+        justification: |
+          Two tabs of one user must not lose the newer value.
+        children:
+          - ReviewCenter-InboxStore-UserState-NeverBackwards
+          - ReviewCenter-InboxStore-UserState-ParallelHighest
+        tests:
           - InboxStore_MarkSeenAsync_ParallelCalls_NoExceptionAndHighestWins
+          - InboxStore_MarkSeenAsync_InsertsThenUpdatesAndNeverMovesBackwards
+
+      - id: ReviewCenter-Storage-Inbox-NoFailure
+        title: >-
+          The Storage subsystem shall not fail any of several simultaneous visits of a user.
+        justification: |
+          A visit that fails because another visit was faster would show the user an error for no reason.
+        children:
+          - ReviewCenter-InboxStore-UserState-ParallelNoFailure
+        tests:
+          - InboxStore_MarkSeenAsync_ParallelCalls_NoExceptionAndHighestWins
+
+      - id: ReviewCenter-Storage-Inbox-ReviewDeleted
+        title: >-
+          The Storage subsystem shall delete what users have seen of a review with the review.
+        justification: |
+          Nothing of a deleted review may stay behind.
+        children:
+          - ReviewCenter-InboxStore-Cascade
+          - ReviewCenter-DbContext-ReviewUserState-ReviewCascade
+        tests:
+          - InboxStore_DeletingTheReview_DeletesTheStates
+
+      - id: ReviewCenter-Storage-Inbox-UserDeleted
+        title: >-
+          The Storage subsystem shall delete what a user has seen of reviews with the user.
+        justification: |
+          Reading history of a deleted person would stay in the inbox table after the person is gone.
+        children:
+          - ReviewCenter-InboxStore-Cascade-User
+          - ReviewCenter-DbContext-ReviewUserState-UserCascade
+        tests:
+          - InboxStore_DeletingTheUser_DeletesTheStates
 
       - id: ReviewCenter-Storage-NotificationPreferences
         title: >-

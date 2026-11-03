@@ -851,6 +851,49 @@ public class ReviewStoreBallotTests
     }
 
     /// <summary>
+    ///     Test that the store refuses a signature of a slot that has no ballot at all in a review that has a
+    ///     checklist, and stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddSignatureAsync_NoBallotInReviewWithChecklist_ThrowsBallotNotSubmitted()
+    {
+        // Arrange: a review with a checklist and one slot that never answered
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var project = await db.Store.AddProjectAsync(new Project { Name = "P", Created = _time }, cancellationToken);
+        var checklist = new ReviewChecklist
+        {
+            ProjectId = project.Id,
+            ReviewId = "REV-1",
+            Version = DefaultChecklist.Version,
+            Definition = DefaultChecklist.Current.ToJson()
+        };
+        await db.Store.AddReviewAsync(NewReview(project.Id, "REV-1", checklist: checklist), cancellationToken);
+        var slotId = await AddSlotAsync(db, project.Id);
+        var record = await db.Store.GetRecordAsync(project.Id, "REV-1", cancellationToken);
+        var signature = new ReviewSignature
+        {
+            ProjectId = project.Id,
+            ReviewId = "REV-1",
+            SlotId = slotId,
+            UserId = 1,
+            DisplayName = "Ann",
+            Role = SlotRole.Primary,
+            SignedAt = _time,
+            RecordDigest = RecordDigest.Compute(record!),
+            Meaning = SigningService.MeaningText
+        };
+
+        // Act: sign without a ballot
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => db.Store.AddSignatureAsync(signature, cancellationToken));
+
+        // Assert: refused with the rule, and nothing is stored
+        Assert.Equal(DomainRule.BallotNotSubmitted, refused.Rule);
+        Assert.Empty(await db.Store.ListSignaturesAsync(project.Id, "REV-1", cancellationToken));
+    }
+
+    /// <summary>
     ///     Adds a project with a review whose checklist has one section and one check, one slot, and a submitted
     ///     ballot of that slot that answers the check.
     /// </summary>
@@ -1063,6 +1106,34 @@ public class ReviewStoreBallotTests
         Assert.Equal("REQ-02", Assert.Single(ballot.Answers).ItemId);
         Assert.Single(ballot.SectionStates);
         Assert.Equal(RecordDigest.Compute(after), RecordDigest.Compute(snapshot!.Record));
+    }
+
+    /// <summary>
+    ///     Test that the record carries the draft ballots as well as the submitted ones, in slot order, and none for a
+    ///     slot that has not started.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_GetRecordAsync_DraftAndSubmittedBallots_AreAllInTheRecordInSlotOrder()
+    {
+        // Arrange: three slots; the ballots are started in the order third, second, and the second is handed in
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var first = await AddSlotAsync(db, projectId);
+        var second = await AddSlotAsync(db, projectId, 2);
+        var third = await AddSlotAsync(db, projectId, 3);
+        await SetAsync(db, NewAnswer(projectId, third));
+        await SetAsync(db, NewAnswer(projectId, second));
+        await SubmitAsync(db, projectId, second);
+
+        // Act
+        var record = await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken);
+
+        // Assert: the ballots of the second and third slot, in slot order, with their statuses; none for the first
+        Assert.Equal(
+            [(second, BallotStatus.Submitted), (third, BallotStatus.Draft)],
+            record!.Ballots.Select(b => (b.SlotId, b.Status)));
+        Assert.DoesNotContain(record.Ballots, b => b.SlotId == first);
     }
 
     /// <summary>

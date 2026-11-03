@@ -432,6 +432,28 @@ public class TotpStoreTests
     }
 
     /// <summary>
+    ///     Test that replacing the recovery codes stores exactly one audit entry, and a refused replacement none.
+    /// </summary>
+    [Fact]
+    public async Task TotpStore_ReplaceRecoveryCodesAsync_Replaced_StoresOneAuditEntry()
+    {
+        // Arrange: ann confirmed with a code; bob only pending
+        using var db = new TestStore();
+        var ann = await AddUserAsync(db);
+        var bob = await AddUserAsync(db, "bob");
+        await EnrollAsync(db, ann, 1, Hash('a'));
+        Assert.True(await PendingAsync(db, bob));
+
+        // Act: replace the codes of ann, and try for bob
+        Assert.True(await db.Totp.ReplaceRecoveryCodesAsync(ann, [Hash('d'), Hash('e')], _now, Draft("auth.totp-recovery-regenerated"), Token));
+        Assert.False(await db.Totp.ReplaceRecoveryCodesAsync(bob, [Hash('g')], _now, Draft("auth.totp-recovery-regenerated"), Token));
+
+        // Assert: one entry for the replacement that happened
+        await using var context = await db.Factory.CreateDbContextAsync(Token);
+        Assert.Single(await context.AuditEntries.Where(e => e.Action == "auth.totp-recovery-regenerated").ToListAsync(Token));
+    }
+
+    /// <summary>
     ///     Test that removing deletes the enrollment and its codes with one audit entry, and that removing nothing
     ///     records nothing.
     /// </summary>
@@ -569,7 +591,7 @@ public class TotpStoreTests
     }
 
     /// <summary>
-    ///     Test that the stored secret column holds exactly what the store was given, and null arguments are refused.
+    ///     Test that null arguments of the store operations are refused.
     /// </summary>
     [Fact]
     public async Task TotpStore_NullArguments_Throw()
