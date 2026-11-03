@@ -288,10 +288,11 @@ one slot changes the fingerprint, and changing only the display name of the answ
 by `RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot`, and covers
 `ReviewCenter-RecordDigest-BallotFingerprint`.
 
-**RecordDigest_CanonicalizeBallots_RepeatedAnswerAndSectionState_LastRowCountsAndLinesAreSorted**: A check that was
-answered twice in a ballot is written once with the last row, the answer lines are sorted by check identifier, and a
-section marked not applicable has a `section` line. This scenario is tested by
-`RecordDigest_CanonicalizeBallots_RepeatedAnswerAndSectionState_LastRowCountsAndLinesAreSorted`, and covers
+**RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted**: A check that was answered twice in
+a ballot is written once with the last row, the answer lines are sorted by check identifier, and a section marked not
+applicable has one `section` line. The scenario does not repeat a section state, because the store keeps one row per
+section, so there is no last row to choose there. This scenario is tested by
+`RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted`, and covers
 `ReviewCenter-RecordDigest-BallotFingerprint`.
 
 **RecordDigest_CanonicalizeBallots_NullRecord_Throws**: A null record is passed. `ArgumentNullException` is raised. This

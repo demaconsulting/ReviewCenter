@@ -75,8 +75,9 @@ sections:
           - InboxService_GetInboxAsync_QuestionAnsweredOrOwn_ShowsNoQuestionForYouRow
           - InboxService_GetInboxAsync_QuestionForStranger_ShowsNothing
           - InboxService_GetInboxAsync_QuestionForSlotHolderWhoMayNotContribute_ShowsNoRowAndNoCount
+          - InboxService_GetInboxAsync_QuestionForApiToken_ShowsNoQuestionForYouRow
           - InboxService_GetInboxAsync_QuestionOnCheckHiddenViewer_ShowsNoRowAndNoBallotData
-          - InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView
+          - InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView
           - InboxRules_QuestionsForYou_OpenQuestionOfOthers_OnlyThoseNotAnswered
           - InboxRules_Texts_QuestionSignatureLostWaitingAndDisputed_AreWorded
 
@@ -232,7 +233,7 @@ sections:
           - InboxService_GetInboxAsync_NonMemberOrRemovedMember_GetsEmptyView
           - InboxService_GetInboxAsync_DisabledUser_GetsEmptyView
           - InboxService_GetInboxAsync_TemporaryPasswordUser_GetsEmptyView
-          - InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView
+          - InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView
           - InboxService_GetInboxAsync_ApprovedReview_HasNoActionItems
           - InboxService_GetInboxAsync_RejectedByOther_ShowsRejectedUpdateNotAction
           - InboxService_GetInboxAsync_Sysadmin_SeesOnlyOwnSlotsAndAuthoredReviews

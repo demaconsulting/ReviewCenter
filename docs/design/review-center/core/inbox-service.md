@@ -64,7 +64,10 @@ are assigned in posting order and never reused, so one integer per review tells 
     question or counts several ("2 open questions from others. You can answer them.") and never quotes the text or
     names a ballot answer. The row has `OpensReview`, so it links to the review page, where the thread is. It is unread
     without a read-state row or while a comment of someone else is newer than `LastSeenCommentId`. The author is
-    left out, because Replies waiting already lists every open thread whose last comment is by someone else.
+    left out, because Replies waiting already lists every open thread whose last comment is by someone else. An API
+    token never gets this row (`ReviewContext.ViaApiToken`): a token acts as its user for what the user started, wrote
+    or holds as a slot, but never as the lead, an auditor or an administrator, and being asked a question is for a
+    person, so the check sits next to the author check. The other rows of the inbox are not changed for a token.
   - *Disputed*: the user has handed in the ballot, may see the other ballots (see `BallotVisibility`), and some
     checks or sections are disputed. The chip is "{n} disputed". The detail names the disputed checks (their
     identifiers in checklist order, then the disputed sections as `section "Title"`; up to five, then "and n more"),
