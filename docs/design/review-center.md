@@ -326,7 +326,8 @@ flowchart TD
     ServerHost --> NotificationOptions
     ServerHost --> NotificationStore
     ServerHost --> NotificationPreferenceService
-    NotificationOptions --> SecretSource    AuditStore --> AuditChain
+    NotificationOptions --> SecretSource
+    AuditStore --> AuditChain
     AuditStore --> ReviewCenterDbContext
     RepositoryService --> RepositoryStore
     RepositoryService --> CredentialProtector
