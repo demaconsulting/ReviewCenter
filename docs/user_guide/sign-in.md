@@ -215,7 +215,7 @@ dark setting of your device; **Light** and **Dark** always use that theme. The c
 it and is remembered in this browser only: it is not an account setting, so another browser or device starts with
 **System** again.
 
-![A review in the dark theme, with a Question and a Finding thread in the side-by-side diff.](images/review-diff-dark.png)
+![A review in the dark theme, with a Question and a Finding thread in the diff.](images/review-diff-dark.png)
 
 To change your password, enter the current password and the new
 password, and press the change button. If your account has a second factor (see

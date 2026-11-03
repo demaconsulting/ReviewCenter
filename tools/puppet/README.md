@@ -128,8 +128,11 @@ Seed one project ("Warehouse Inventory") with a Git repository and three reviews
 - A review that is fully answered and handed in by both reviewers. It fills the inbox.
 - A review that is only partly answered, with a justified N/A answer. It gives the checklist picture.
 - A review whose ballots differ on one check, with a Question and a Finding thread in the diff. It gives the status
-  panel and both diff pictures; resolve the threads, sign with both slots, and it becomes the approved review with the
-  attestation PDF.
+  panel (take that picture while the dispute and the threads are still open) and both diff pictures. Then settle it:
+  resolve the threads; because a disputed check blocks signing, the reviewer whose answer differs changes it to the
+  other answer (not a Fail, which would make the review Rejected) and hands the ballot in again with **Submit ballot**
+  (an edit turns a handed-in ballot back into a draft); then sign with both slots. It becomes the approved review
+  with the attestation PDF.
 
 Take each picture with `puppet screenshot <file> --full` in the light theme (plus the diff with `puppet theme dark`,
 after a pause of about a second). Crop each picture to its content and shrink it, for example

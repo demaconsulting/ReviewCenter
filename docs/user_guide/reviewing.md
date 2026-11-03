@@ -325,7 +325,7 @@ It shows:
   has not handed in a ballot still sees each change with its time and who made it, but the details of hidden answers,
   comments and discussions about checks are replaced by one neutral sentence until the ballot is handed in.
 
-![The Where are we? panel of a review: two reviewers handed in, a dispute, open threads, and the next step.](images/review-status-panel.png)
+![The Where are we? panel: two ballots in, a dispute, open threads, and the next step.](images/review-status-panel.png)
 
 ## Review Comments
 
@@ -473,7 +473,7 @@ a "Next unanswered check" button that opens the section of the first unanswered 
 Below that, every section is listed with its progress (for example "3 of 8"); only one section is open at a time,
 and the first section with unanswered checks is open when you arrive.
 
-![The checklist page of a draft ballot: two sections done, one in progress, and a justified N/A answer.](images/checklist-partial.png)
+![The checklist of a draft ballot: two sections done, one in progress, a justified N/A.](images/checklist-partial.png)
 
 **You answer in the ballot of your reviewer slot.** The checklist is answered by the reviewers of the slots of the
 review (the primary and the alternate of a slot share its ballot). A project member who has no slot can add a new slot
@@ -758,7 +758,7 @@ are open"). When the only thing missing is the conclusion text, the slot says "A
 stating the reasons". Each signature records your name, your role in the slot (primary or alternate), the UTC time, the
 outcome you signed (Approved or Rejected), and the statement.
 
-![The signing form of a reviewer slot, with the outcome you are signing, the statement, and password confirmation.](images/signature-confirmation.png)
+![The signing form: the outcome you sign, the statement, and password confirmation.](images/signature-confirmation.png)
 
 **What a signature covers.** A signature is bound to the record as it was when you signed. The record is the content
 fingerprint of the files, the wording of every checklist question, the consolidated standing of the submitted ballots
@@ -979,7 +979,7 @@ fingerprint**, a SHA-256 value of those ballots, so that a later change of a bal
 for a concluded review, because only then every slot has handed in its ballot, and never as a draft. The reviewer names
 and the checklist wording follow the evidence settings (see below).
 
-![An approved review with the Where are we? panel, the resolved finding, and the Download attestation (PDF) button.](images/review-signed.png)
+![An approved review with the status panel, the resolved finding, and the attestation button.](images/review-signed.png)
 
 **What the PDF contains follows the evidence settings of the project.** Every attestation PDF of a project, whoever
 downloads it, honors the five content switches of the project: the review discussion threads (the findings), the
