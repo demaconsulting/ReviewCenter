@@ -116,8 +116,13 @@ has already read, so the review page does not read them a second time.
 **ReviewChangeRules.Derive**: Explains, from the audit trail, what changed after a signature.
 
 - *Signature*: `IReadOnlyList<ReviewChange> Derive(IReadOnlyList<AuditEntry> entries, IReadOnlyList<AuditEntry> shown,
-  DateTimeOffset after)`.
-- *Algorithm*: Replay all entries of the review, oldest first, to follow the kind of every thread. An entry after the
+  DateTimeOffset after, IReadOnlyList<ReviewThread>? threads = null)`.
+- *Parameters*: `threads` — the threads of the record that the status reads, or `null` when they are not known.
+- *Algorithm*: First seed the kind of every thread that was carried over from the followed review
+  (`CarriedFromReviewId` is set), because the audit trail of this review holds no entry that started it: the seed is
+  Finding when the first `thread.kind-changed` entry of the thread says that it changed from a Finding, else the
+  current kind of the thread. Then replay all entries of the review, oldest first, to follow the kind of every thread.
+  An entry after the
   signature is listed when its action is one of a fixed set: a ballot handed in, taken back, or given to another
   reviewer; a change of the conclusion text; a thread started in the report; a reply added to the report; a Finding
   resolved with a note; a change of the kind of a thread; a comment put in the report or taken out of it. A reply or a
@@ -126,7 +131,8 @@ has already read, so the review page does not read them a second time.
   sentence.
 - *Postconditions*: The reasons are fixed sentences that never contain text of the entry. The list explains the usual
   reasons a signature no longer matches; it is not a proof, because the signature check compares the digest of the
-  record and an entry may have changed nothing in the end. The page says so.
+  record and an entry may have changed nothing in the end. The page says so. The seeding only reads the threads of the
+  record: it writes nothing to the audit trail and changes neither the audit entries nor the record digest.
 
 #### Error Handling
 

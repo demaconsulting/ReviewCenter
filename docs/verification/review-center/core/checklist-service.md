@@ -47,9 +47,9 @@ N/A - standard test environment.
   or a concluded review (a review with several slots that is not concluded gives such a viewer a masked state, see the
   verification of *BallotVisibility*); the ballot view names, for every viewer of the project, the other reviewers who
   have not handed in, and gives the justifications of the others, the differing checks and the failed count only to a
-  viewer who may see the others and may view the project (never to a viewer who has not handed in, an API token or a
-  stranger); the API reads the consolidated standing with `GetConsolidatedAsync`, which
-  requires a viewer and masks for an API token.
+  viewer who may see the others and may view the project (never to a viewer who has not handed in, an API token, even
+  one whose owner has handed in, or a stranger); the API reads the consolidated standing with `GetConsolidatedAsync`,
+  which requires a viewer and masks for an API token unless the owner of the token has handed in.
 - On an approved review, answering a check and changing the applicability of a section are refused with
   `ReviewLocked`, and nothing is stored.
 - While the project does not let authors answer the checklist (the default, also for projects that existed before the
@@ -234,6 +234,13 @@ where both fail the check, the view has no differing check and counts one failed
 and bob has a draft Fail. The ballot view for bob, for a member without a slot, for that member through an API token and
 for a user outside the project has no differing check and no failed check, and its serialized form does not contain the
 reason. This scenario is tested by `ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck`.
+
+**ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck**: Ann and bob handed in, and
+they differ on a check with a reason. The ballot view for an API token of ann, whose owner has handed in, is masked,
+has no differing check and no failed check, and its serialized form does not contain the reason, while the view for ann
+herself holds the dispute. The consolidated standing read with `GetConsolidatedAsync` is not masked for the token,
+because that read gives the standing of a submitted owner. This scenario is tested by
+`ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck`.
 
 **ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers**: In a review with a single slot
 that ann failed, the view for ann counts one failed check and the view for a user outside the project counts none and

@@ -148,6 +148,24 @@ This scenario is tested by `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThou
 rule learns from the entries that start a thread or change its kind, also those before the signature. This scenario is
 tested by `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`.
 
+**ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed**: A Finding that was carried over from the followed
+review has no starting entry in this review; with the carried thread passed in, a resolution note after the signature is
+listed. This scenario is tested by `ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed`.
+
+**ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange**: A carried thread that is a Question
+now because an entry of this review changed its kind from a Finding is seeded as the Finding it was: a resolution note
+before that change is listed together with the change, and one after it is not. This scenario is tested by
+`ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange`.
+
+**ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed**: A carried Question resolved with a note is not
+listed, because a resolution note counts only for a Finding. This scenario is tested by
+`ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed`.
+
+**ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed**: In a follow-up review, a reviewer signs,
+the lead reopens the review and resolves the carried Finding with a note; the status of the reviewer lists "Resolved a
+finding with a note that goes in the report". This scenario is tested by
+`ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed`.
+
 **ReviewStatus_Reopener_SignAfterSignatureOutOfDate_DependsOnProjectRule**: A reviewer who reopened an approved review
 and whose signature no longer matches is told to wait while the project forbids a reopener to sign again, and to look at
 the changes and sign again when it does not; a reviewer who did not reopen is always asked to sign again. This scenario
@@ -192,4 +210,8 @@ project and gives nothing for a missing review. This scenario is tested by
   `ReviewStatus_ChangesSinceSigning_ListsDigestAffectingEntriesOnly`,
   `ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches`,
   `ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries`,
-  `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries`
+  `ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries`,
+  `ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed`,
+  `ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange`,
+  `ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed`,
+  `ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed`

@@ -16,6 +16,11 @@ checklist state of one ballot. Progress, blockers, the inbox, the attestation, a
 the checklist through it, and `RecordDigest` consolidates the same submitted ballots, so each of them sees the same
 agreed standing.
 
+The unit also holds `BallotEdits`, a third static class of pure functions that compute the record or the ballot that a
+ballot edit or a slot change would lead to, so that the services can ask the signature impact rules which signatures
+the change would make out of date before anything is stored. It mirrors in memory the rules that the store applies to
+the stored rows, and never changes its input.
+
 #### Data Model
 
 **Ballot** (record): the answers of one reviewer slot.
@@ -43,6 +48,10 @@ agreed standing.
 - **Agreed**, **Disputed**, **Pending**, **Failed**: `int` — the counts of checks (a disputed section counts as one
   dispute, so that the first three add up to the listed checks plus the disputed sections).
 - **BallotsSubmitted**, **BallotsTotal**: `int`.
+
+The record is immutable all the way down: the check list and the section list are read-only wrappers, and the
+**Outcomes** map of every check is a read-only dictionary that keeps the ascending slot order, so a caller cannot change
+the result through a cast.
 
 **ConsolidatedView** (record): the consolidated standing of a record together with the checklist state that reads
 from it.
@@ -121,6 +130,47 @@ the agreed standing.
 - *Preconditions*: `definition` is not null.
 - *Postconditions*: No consolidation is attached to the state, and it never holds the rows of another slot.
 
+**BallotEdits.WithBallot**: Gives the record with the ballot of a slot replaced or added.
+
+- *Signature*: `ReviewRecord WithBallot(ReviewRecord record, Ballot ballot)`.
+- *Parameters*: `record` — the record; `ballot` — the ballot to put in the record.
+- *Returns*: `ReviewRecord` — a copy of the record whose ballots are those of the other slots plus the new ballot,
+  ordered by slot identity.
+- *Preconditions*: Neither argument is null.
+- *Postconditions*: The input record is unchanged.
+
+**BallotEdits.WithoutBallot**: Gives the record without the ballot of a slot.
+
+- *Signature*: `ReviewRecord WithoutBallot(ReviewRecord record, int slotId)`.
+- *Returns*: `ReviewRecord` — a copy of the record without the ballot of the slot; the other ballots are as they were,
+  also when the slot has none.
+- *Preconditions*: `record` is not null.
+
+**BallotEdits.WithAnswer**: Gives the ballot a slot would have after an answer is stored.
+
+- *Signature*: `Ballot WithAnswer(Ballot? current, int slotId, ChecklistAnswer answer)`.
+- *Parameters*: `current` — the ballot as stored, or `null` when the slot has none yet; `slotId`; `answer` — the answer
+  row.
+- *Returns*: `Ballot` — a draft of the slot (no hand-in time or user) whose answers are the earlier answers except the
+  one for the same check, plus the new answer, ordered by check identifier; the section states are kept.
+- *Preconditions*: `answer` is not null.
+
+**BallotEdits.WithSectionState**: Gives the ballot a slot would have after a section state is stored.
+
+- *Signature*: `Ballot WithSectionState(Ballot? current, int slotId, ChecklistSectionState state)`.
+- *Returns*: `Ballot` — a draft of the slot whose section states are the earlier states except the one for the same
+  section, plus the new state, ordered by section identifier; the answers are kept.
+- *Preconditions*: `state` is not null.
+
+**BallotEdits.Reassign**: Gives the ballot a slot would have after a reviewer leaves it.
+
+- *Signature*: `Ballot Reassign(Ballot ballot, IReadOnlyCollection<string> departingUsernames)`.
+- *Parameters*: `ballot` — the ballot as stored; `departingUsernames` — the user names of the reviewers who leave.
+- *Returns*: `Ballot` — a draft of the slot without the answers and section states that a departing reviewer gave. A
+  row carried from an earlier review is kept whoever it names, because it keeps the user name of the earlier author.
+  User names are compared ignoring case.
+- *Preconditions*: Neither argument is null.
+
 #### Error Handling
 
 `Consolidate` and `IsComplete` raise `ArgumentNullException` for a null argument, and `Consolidate` raises
@@ -128,12 +178,14 @@ the agreed standing.
 other combination of ballots has a defined standing. Should a ballot repeat the answer to a check or the state of a
 section, the last entry wins. `BallotProjection.Consolidate` raises `ArgumentNullException` for a null record and
 `BallotProjection.ForBallot` for a null definition; the projection otherwise adds the errors of `Consolidate`, and
-`IsComplete` as they are.
+`IsComplete` as they are. Every `BallotEdits` function raises `ArgumentNullException` for a null record, ballot, answer,
+section state, or list of departing user names (the current ballot of `WithAnswer` and `WithSectionState` may be null);
+it has no other error.
 
 #### Dependencies
 
 - **ChecklistDefinition**, **ChecklistAnswer**, **ChecklistSectionState**, **ChecklistOutcome** — Core.
-- **ReviewRecord**, **ReviewChecklist**, and **ChecklistState** — Core; read by `BallotProjection`.
+- **ReviewRecord**, **ReviewChecklist**, and **ChecklistState** — Core; read by `BallotProjection` and `BallotEdits`.
 
 #### Callers
 
@@ -144,3 +196,5 @@ section, the last entry wins. `BallotProjection.Consolidate` raises `ArgumentNul
   shows a reviewer the reviewer's own ballot.
 - **Ballot storage and the review pages** — consolidate the ballots that are stored for a review and test a ballot
   before it is submitted (`IsComplete`), through `ChecklistService`.
+- **BallotEdits** — called by `ChecklistService` and `SigningService` to preview the record that a ballot edit, a
+  hand-in, a ballot taken back, or a slot change would lead to, before the signature impact is computed.

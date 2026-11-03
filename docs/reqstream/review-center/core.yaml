@@ -682,6 +682,7 @@ sections:
           - ReviewCenter-BallotConsolidation-BallotState
           - ReviewCenter-BallotConsolidation-Arguments
           - ReviewCenter-BallotConsolidation-Projection
+          - ReviewCenter-BallotConsolidation-Edits
         tests:
           - BallotConsolidation_Consolidate_SubmittedEqual_Agreed
           - BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts

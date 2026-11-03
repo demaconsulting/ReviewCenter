@@ -56,6 +56,12 @@ not see the others, so that a page shows a note in place of the standing.
   - Everybody else, a project member who holds no slot included, sees the others only when the own ballot is
     `Submitted`.
 - *Preconditions*: `snapshot` is not null for the overload.
+- *Precedence*: The rule is pure and knows nothing of project access or of API tokens. "Shows everything" therefore
+  means "for a viewer who may view the project": every service first checks that the viewer may view the project (a
+  stranger is refused or gets nothing, whatever the rule says), and only then asks the rule. An API token is passed to
+  the rule as a viewer who does not see everything (`SeesAllInProjectAsync` and `SeesAllInReviewAsync` are false for it),
+  and `ChecklistService.GetBallotViewAsync` additionally never gives a token the differing checks or the failed count,
+  not even when its owner has handed in.
 
 **BallotVisibility.SeesAllInProjectAsync** and **SeesAllInReviewAsync**: The facts of `seesAll`. The first is true for a
 viewer who may audit the project (a system administrator, a project administrator, or an Auditor) and is not an API
@@ -65,7 +71,8 @@ token. The second adds the lead of the review.
 
 - *Parameters*: `Actor? viewer`, `int projectId`, `string reviewId`.
 - *Returns*: `BallotView?` — `null` when the review or its checklist does not exist.
-- *Algorithm*: Read one snapshot; decide the visibility; when the viewer may see the others, consolidate the submitted
+- *Algorithm*: Read one snapshot; decide the visibility (the viewer must be able to view the project, and an API token
+  is always masked); when the viewer may see the others, consolidate the submitted
   ballots and list, in slot order, the answers of every check on which they differ; count the submitted ballots; decide
   `CanAssignMe` (the viewer may contribute, is enabled, holds no slot, is not the author while independent reviewers are
   required, and is a user or project administrator member) and `CanSubmitAndSign` (the viewer's ballot is a complete

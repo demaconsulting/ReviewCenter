@@ -7,7 +7,9 @@ build a small checklist and ballots in memory, call `Consolidate` and `IsComplet
 checks and sections, the counts, and the derived outcome. Separate tests check that only submitted ballots count, that
 wording never creates a dispute, that the order of the ballots does not matter, and that null input is refused.
 `BallotProjection` is verified with tests defined in `BallotProjectionTests.cs`, in the same way: the tests build a
-record with a checklist and ballots in memory and call `Consolidate` and `ForBallot` directly.
+record with a checklist and ballots in memory and call `Consolidate` and `ForBallot` directly. `BallotEdits` is verified
+with tests defined in `BallotEditsTests.cs`, in the same way: the tests build a record and ballots in memory, call each
+function, and check the record or ballot it gives and that the input is unchanged.
 
 #### Test Environment
 
@@ -36,6 +38,12 @@ N/A - standard test environment.
 - `BallotProjection.ForBallot` shows the rows of the viewer's own ballot, a draft included, marked as the viewer's own,
   and an empty state that has not been started when the slot has no ballot.
 - Missing arguments of the projection are refused.
+- The lists and the outcome maps of a consolidation result are read-only, so the result cannot be changed through a
+  cast, and the outcomes of a check still enumerate in ascending slot order.
+- `BallotEdits` replaces or adds the ballot of a slot in slot order and removes it, puts an answer or a section state
+  in a ballot as a draft (also when the slot has no ballot yet), reverts the ballot of a slot that a reviewer leaves to
+  a draft that drops the rows the departing reviewer gave (user names compared ignoring case) and keeps the carried
+  rows, never changes its input, and refuses missing arguments.
 
 #### Test Scenarios
 
@@ -107,6 +115,11 @@ This scenario is tested by `BallotConsolidation_Consolidate_BallotOrder_DoesNotM
 This scenario is tested by
 `BallotConsolidation_NullArguments_Throws`.
 
+**BallotConsolidation_Consolidate_ResultCollections_CannotBeMutated**: The check list, the section list, and the outcome
+map of a check are read-only when cast to their mutable interfaces (a change raises `NotSupportedException`), and the
+outcomes enumerate in ascending slot order although the ballots were given in descending order. This scenario is tested
+by `BallotConsolidation_Consolidate_ResultCollections_CannotBeMutated`.
+
 **BallotConsolidation_BallotState_DraftAndSubmitted_ReflectsStatus**: The state of a ballot is submitted or draft
 according to its status. This scenario is tested by `BallotConsolidation_BallotState_DraftAndSubmitted_ReflectsStatus`.
 
@@ -148,3 +161,32 @@ the slot, and the state draft, and is marked as the viewer's own ballot. This sc
 
 **BallotProjection_ForBallot_NoBallot_IsNotStarted**: A slot without a ballot gets an empty state that is not started
 and is marked as the viewer's own. This scenario is tested by `BallotProjection_ForBallot_NoBallot_IsNotStarted`.
+
+**BallotEdits_WithBallot_ExistingSlot_ReplacesTheBallotInSlotOrder**: A new ballot for a slot that has one replaces it,
+the other ballots stay in slot order, and the input record is unchanged. This scenario is tested by
+`BallotEdits_WithBallot_ExistingSlot_ReplacesTheBallotInSlotOrder`.
+
+**BallotEdits_WithBallot_NewSlot_AddsTheBallotInSlotOrder**: A ballot for a slot that has none is added in slot order.
+This scenario is tested by `BallotEdits_WithBallot_NewSlot_AddsTheBallotInSlotOrder`.
+
+**BallotEdits_WithoutBallot_RemovesOnlyThatSlot**: Only the ballot of the named slot is removed, and nothing is removed
+for a slot that has no ballot. This scenario is tested by `BallotEdits_WithoutBallot_RemovesOnlyThatSlot`.
+
+**BallotEdits_WithAnswer_ReplacesTheAnswerAndRevertsToDraft**: A stored answer replaces the earlier answer for the same
+check, keeps the others in check order, and makes a submitted ballot a draft, without changing the input ballot. This
+scenario is tested by `BallotEdits_WithAnswer_ReplacesTheAnswerAndRevertsToDraft`.
+
+**BallotEdits_WithAnswer_NoBallotYet_CreatesADraftWithTheAnswer**: An answer for a slot without a ballot gives a draft
+that holds just that answer. This scenario is tested by `BallotEdits_WithAnswer_NoBallotYet_CreatesADraftWithTheAnswer`.
+
+**BallotEdits_WithSectionState_ReplacesTheStateAndRevertsToDraft**: A stored section state replaces the earlier state
+for the same section, keeps the answers, and makes the ballot a draft (also when the slot has no ballot yet), without
+changing the input ballot. This scenario is tested by `BallotEdits_WithSectionState_ReplacesTheStateAndRevertsToDraft`.
+
+**BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows**: A ballot of a slot that a reviewer leaves
+becomes a draft that drops the answers and section states of the departing reviewer (user names compared ignoring
+case) and keeps the rows of other reviewers and the rows carried from an earlier review, without changing the input
+ballot. This scenario is tested by `BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows`.
+
+**BallotEdits_NullArguments_Throw**: A missing record, ballot, answer, section state, or list of departing user names is
+refused with an `ArgumentNullException`. This scenario is tested by `BallotEdits_NullArguments_Throw`.

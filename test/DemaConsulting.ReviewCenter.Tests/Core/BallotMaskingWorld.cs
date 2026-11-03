@@ -188,11 +188,12 @@ internal sealed class BallotMaskingWorld
     ///     Seats a user as the primary reviewer of a new slot, as the lead of the review.
     /// </summary>
     /// <param name="username">The user name of the reviewer.</param>
+    /// <param name="reviewId">The review the slot is added to.</param>
     /// <returns>The slot.</returns>
-    public Task<ReviewerSlot> SeatAsync(string username)
+    public Task<ReviewerSlot> SeatAsync(string username, string reviewId = ReviewId)
     {
         return Signing.AddSlotAsync(
-            ActorOf("lead"), ProjectId, ReviewId, Ids[username], null, TestContext.Current.CancellationToken);
+            ActorOf("lead"), ProjectId, reviewId, Ids[username], null, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -200,8 +201,9 @@ internal sealed class BallotMaskingWorld
     /// </summary>
     /// <param name="username">The user name of the reviewer, who holds a slot.</param>
     /// <param name="first">The answer to the first check.</param>
+    /// <param name="reviewId">The review that is answered.</param>
     /// <returns>A task that completes when the answers are stored.</returns>
-    public async Task AnswerAsync(string username, ChecklistOutcome first = ChecklistOutcome.Pass)
+    public async Task AnswerAsync(string username, ChecklistOutcome first = ChecklistOutcome.Pass, string reviewId = ReviewId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var actor = ActorOf(username);
@@ -209,7 +211,7 @@ internal sealed class BallotMaskingWorld
         {
             var outcome = item.Id == FirstItemId ? first : ChecklistOutcome.Pass;
             var justification = outcome == ChecklistOutcome.Pass ? null : "A reason";
-            await Checklists.SetAnswerAsync(ProjectId, ReviewId, item.Id, outcome, justification, actor, cancellationToken);
+            await Checklists.SetAnswerAsync(ProjectId, reviewId, item.Id, outcome, justification, actor, cancellationToken);
         }
     }
 
@@ -217,10 +219,11 @@ internal sealed class BallotMaskingWorld
     ///     Hands in the ballot of a reviewer.
     /// </summary>
     /// <param name="username">The user name of the reviewer.</param>
+    /// <param name="reviewId">The review whose ballot is handed in.</param>
     /// <returns>A task that completes when the ballot is handed in.</returns>
-    public Task SubmitAsync(string username)
+    public Task SubmitAsync(string username, string reviewId = ReviewId)
     {
-        return Checklists.SubmitBallotAsync(ProjectId, ReviewId, ActorOf(username), TestContext.Current.CancellationToken);
+        return Checklists.SubmitBallotAsync(ProjectId, reviewId, ActorOf(username), TestContext.Current.CancellationToken);
     }
 
     /// <summary>

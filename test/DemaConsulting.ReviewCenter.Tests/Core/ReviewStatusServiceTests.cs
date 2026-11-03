@@ -844,6 +844,158 @@ public class ReviewStatusServiceTests
     }
 
     /// <summary>
+    ///     Test that a Finding carried over from the followed review has no start entry in the trail, but a resolution
+    ///     note on it after the signature is still listed.
+    /// </summary>
+    [Fact]
+    public void ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed()
+    {
+        // Arrange: a carried Finding with no start entry, resolved with a note after the signature
+        var at = new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+        var entries = new List<AuditEntry>
+        {
+            Entry(1, at, "ballot.submitted", "slot 1"),
+            Entry(2, at.AddMinutes(2), "thread.resolved", "thread 5; note sha256 bb")
+        };
+        var threads = new List<ReviewThread> { CarriedThread(5, includeInReport: true) };
+
+        // Act
+        var changes = ReviewChangeRules.Derive(entries, entries, at.AddSeconds(90), threads);
+
+        // Assert
+        var change = Assert.Single(changes);
+        Assert.Equal("Resolved a finding with a note that goes in the report", change.Reason);
+    }
+
+    /// <summary>
+    ///     Test that a carried Finding that is turned into a question after the signature still counted as a Finding
+    ///     before the change, and not after it.
+    /// </summary>
+    [Fact]
+    public void ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange()
+    {
+        // Arrange: the thread is a question now; the trail says it was a finding until the change
+        var at = new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+        var threads = new List<ReviewThread> { CarriedThread(5, includeInReport: false) };
+        var noteBefore = new List<AuditEntry>
+        {
+            Entry(1, at.AddMinutes(2), "thread.resolved", "thread 5; note sha256 bb"),
+            Entry(2, at.AddMinutes(3), "thread.kind-changed", "thread 5: finding -> question")
+        };
+        var noteAfter = new List<AuditEntry>
+        {
+            Entry(1, at.AddMinutes(2), "thread.kind-changed", "thread 5: finding -> question"),
+            Entry(2, at.AddMinutes(3), "thread.resolved", "thread 5; note sha256 bb")
+        };
+
+        // Act
+        var before = ReviewChangeRules.Derive(noteBefore, noteBefore, at, threads);
+        var after = ReviewChangeRules.Derive(noteAfter, noteAfter, at, threads);
+
+        // Assert: the note counts while the thread is a finding, the kind change always counts, and the note does not
+        // count once the thread is a question
+        Assert.Equal(
+            ["Resolved a finding with a note that goes in the report", "Turned a finding into a question"],
+            before.Select(c => c.Reason));
+        Assert.Equal(["Turned a finding into a question"], after.Select(c => c.Reason));
+    }
+
+    /// <summary>
+    ///     Test that a resolution note on a carried Question is not listed.
+    /// </summary>
+    [Fact]
+    public void ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed()
+    {
+        // Arrange: a carried Question with no start entry, resolved with a note after the signature
+        var at = new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+        var entries = new List<AuditEntry> { Entry(1, at.AddMinutes(2), "thread.resolved", "thread 5; note sha256 bb") };
+        var threads = new List<ReviewThread> { CarriedThread(5, includeInReport: false) };
+
+        // Act
+        var changes = ReviewChangeRules.Derive(entries, entries, at, threads);
+
+        // Assert
+        Assert.Empty(changes);
+    }
+
+    /// <summary>
+    ///     Test that, end to end, a Finding carried into a follow-up review and resolved with a note after a reviewer
+    ///     signed the follow-up is listed in the changes since signing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed()
+    {
+        // Arrange: a Finding in rev-1, a follow-up rev-2 that carries it, and two reviewers of whom only ann signs
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.Threads.StartThreadAsync(
+            world.ProjectId,
+            BallotMaskingWorld.ReviewId,
+            new ThreadAnchor("a.txt"),
+            BallotMaskingWorld.ActorOf("ann"),
+            "Fix this",
+            Token,
+            includeInReport: true);
+        await world.Reviews.CreateDraftAsync(
+            world.ProjectId,
+            "rev-2",
+            "Second",
+            [new UploadedFile("a.txt", [1, 2, 3])],
+            BallotMaskingWorld.ActorOf("lead"),
+            Token,
+            followsReviewId: BallotMaskingWorld.ReviewId);
+        var slot = await world.SeatAsync("ann", "rev-2");
+        await world.SeatAsync("bob", "rev-2");
+        foreach (var name in new[] { "ann", "bob" })
+        {
+            await world.AnswerAsync(name, reviewId: "rev-2");
+            await world.SubmitAsync(name, "rev-2");
+        }
+        var lead = BallotMaskingWorld.ActorOf("lead");
+        var carried = Assert.Single(
+            await world.Threads.ListAsync(lead, world.ProjectId, "rev-2", Token),
+            thread => thread.CarriedFromReviewId is not null);
+
+        // A review cannot be signed with an open finding, so the carried Finding is resolved (with a note) first
+        await world.Threads.ResolveAsync(world.ProjectId, "rev-2", carried.Id, lead, Token, null, "First note");
+        var moved = await FlushAsync(world, 0);
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        var ann = BallotMaskingWorld.ActorOf("ann");
+        var approval = await world.Signing.GetApprovalAsync(ann, world.ProjectId, "rev-2", Token);
+        await world.Signing.SignAsync(ann, world.ProjectId, "rev-2", slot.Id, approval!.Digest, BallotMaskingWorld.Password, Token);
+        moved = await FlushAsync(world, moved);
+
+        // Act: the lead reopens the carried Finding and resolves it again with a new note, which changes what ann signed
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Threads.ReopenAsync(world.ProjectId, "rev-2", carried.Id, lead, Token, [slot.Id]);
+        world.Clock.Advance(TimeSpan.FromMinutes(1));
+        await world.Threads.ResolveAsync(world.ProjectId, "rev-2", carried.Id, lead, Token, [slot.Id], "Second note");
+        await FlushAsync(world, moved);
+        var status = await world.Status.GetStatusAsync(ann, world.ProjectId, "rev-2", Token);
+
+        // Assert: the note on the carried Finding is among the changes
+        Assert.NotNull(status);
+        var signed = Assert.Single(status.ChangesSinceSigning);
+        Assert.Contains("Resolved a finding with a note that goes in the report", signed.Changes.Select(c => c.Reason));
+    }
+
+    /// <summary>
+    ///     Builds a thread that was carried over from a followed review.
+    /// </summary>
+    /// <param name="id">The identity of the thread.</param>
+    /// <param name="includeInReport">Whether the starting comment goes in the report (a Finding).</param>
+    /// <returns>The thread.</returns>
+    private static ReviewThread CarriedThread(int id, bool includeInReport)
+    {
+        return new ReviewThread
+        {
+            Id = id,
+            CarriedFromReviewId = "rev-1",
+            CarriedFromThreadId = 1,
+            Comments = [new ReviewComment { Id = id, ThreadId = id, IncludeInReport = includeInReport }]
+        };
+    }
+
+    /// <summary>
     ///     Builds an audit entry for the pure rules.
     /// </summary>
     /// <param name="sequence">The sequence.</param>

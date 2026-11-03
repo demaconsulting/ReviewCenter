@@ -1273,10 +1273,17 @@ reviews:
       - "docs/design/review-center/core/ballot-consolidation.md"
       - "docs/verification/review-center/core/ballot-consolidation.md"
       - "docs/sysml2/model/review-center/core/ballot-consolidation.sysml"
-      - "src/DemaConsulting.ReviewCenter.Core/Ballot*.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/Ballot.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotConsolidation.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotConsolidationResult.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotEdits.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotProjection.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/BallotStatus.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewOutcome.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewConclusion.cs"
       - "test/**/Core/BallotConsolidationTests.cs"
+      - "test/**/Core/BallotEditsTests.cs"
       - "test/**/Core/BallotProjectionTests.cs"
 
   - id: ReviewCenter-Core-BallotVisibility
