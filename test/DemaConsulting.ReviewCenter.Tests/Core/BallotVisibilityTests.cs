@@ -111,4 +111,30 @@ public class BallotVisibilityTests
         // Assert
         Assert.True(result);
     }
+
+    /// <summary>
+    ///     Test that a viewer the rule does not know is treated as one who has not handed in: in a review with several
+    ///     slots the others stay hidden, although a slot owner who handed in sees them.
+    /// </summary>
+    [Fact]
+    public void BallotVisibility_CanSeeOthers_UnknownViewer_Masked()
+    {
+        // Arrange: two slots, the first owner (user 7) has handed in
+        var ballot = new Ballot(1, BallotStatus.Submitted, DateTimeOffset.UnixEpoch, "ann", [], []);
+        var record = new ReviewRecord("fp", null, [ballot], [], ReviewSource.Upload);
+        var slots = new[]
+        {
+            new ReviewerSlot { Id = 1, PrimaryUserId = 7 },
+            new ReviewerSlot { Id = 2, PrimaryUserId = 8 }
+        };
+        var snapshot = new ReviewSnapshot(record, slots, []);
+
+        // Act
+        var unknown = BallotVisibility.CanSeeOthers(false, snapshot, null);
+        var owner = BallotVisibility.CanSeeOthers(false, snapshot, 7);
+
+        // Assert
+        Assert.False(unknown);
+        Assert.True(owner);
+    }
 }

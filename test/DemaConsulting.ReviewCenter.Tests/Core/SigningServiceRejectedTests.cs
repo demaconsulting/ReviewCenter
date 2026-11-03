@@ -295,6 +295,26 @@ public class SigningServiceRejectedTests
     }
 
     /// <summary>
+    ///     Test that the refusal of a rejection without a conclusion text carries the message that says the reasons are
+    ///     needed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_RejectedNoText_MessageStatesTheReasonsAreNeeded()
+    {
+        // Arrange: the ballots agree on a Fail but no text is written
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await RejectedWorldAsync(withText: false);
+        var approval = await world.ApprovalAsync();
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            SignedReviewWorld.ActorOf("rita"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[0].Id, approval.Digest, Password, cancellationToken));
+
+        // Assert
+        Assert.Equal("A rejected review needs a conclusion stating the reasons.", ex.Message);
+    }
+
+    /// <summary>
     ///     Test that a blank conclusion text counts as no text.
     /// </summary>
     [Fact]

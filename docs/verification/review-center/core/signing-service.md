@@ -260,6 +260,11 @@ the slot is Signed by the alternate, the review is approved, and both signatures
 `SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable`; it covers the change of the record by a
 reopening only.
 
+**SigningService_SignAsync_ResignAfterReopen_KeepsEarlierSignatureUnchanged**: After ann has signed, the review is
+reopened, which changes the record, and bob signs the slot again. The signature of ann is still stored, with the same
+slot, user, display name, role, time, digest, outcome, and meaning text as when it was made. This scenario is tested by
+`SigningService_SignAsync_ResignAfterReopen_KeepsEarlierSignatureUnchanged`.
+
 **SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable**: A theory over a checklist
 answer
 that is changed and an included comment that is added. On a review with two slots, the first is signed, so the review
@@ -304,6 +309,16 @@ never read. This scenario is tested by `SigningService_GetApprovalsAsync_NoRevie
 member of the project, the candidates are the other enabled members. This scenario is tested by
 `SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly`.
 
+**SigningService_ListCandidatesAsync_Candidates_ExposeNoPasswordData**: The candidates of a project whose members all
+have a password and a stored password hash are serialized as a client receives them. There are candidates, and the
+serialized text contains neither the password nor the stored hash of any user. This scenario is tested by
+`SigningService_ListCandidatesAsync_Candidates_ExposeNoPasswordData`.
+
+**SigningService_ListCandidatesAsync_ActorWithoutViewAccess_ThrowsProjectNotFound**: Under the real access rules, a user
+who is outside the project is refused the candidates with `ProjectNotFound`, as if the project did not exist, while a
+project administrator is offered the members of the project. This scenario is tested by
+`SigningService_ListCandidatesAsync_ActorWithoutViewAccess_ThrowsProjectNotFound`.
+
 **SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable**: An Auditor member is not among the candidates, and
 `AddSlotAsync` and `UpdateSlotAsync` refuse the Auditor as primary or alternate with `SlotUserInvalid`. This scenario is
 tested by `SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable`.
@@ -317,6 +332,11 @@ alternate reviewer who are both members; a control read marks both as members. A
 from the fake store, the single read and the batch read keep the slot assigned to the same users and mark the primary
 and the alternate as no longer members. This scenario is tested by
 `SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember`.
+
+**SigningService_GetApprovalAsync_DisabledAssignee_IsMarkedNotEnabled**: A slot has a primary and an alternate
+reviewer whose accounts are enabled; a control read marks both as enabled. After the account of the primary is
+disabled, the single read and the batch read mark the primary as not enabled and the alternate as still enabled. This
+scenario is tested by `SigningService_GetApprovalAsync_DisabledAssignee_IsMarkedNotEnabled`.
 
 **SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid**: A user who is not a member of the project, even a
 system administrator, is refused as primary and as alternate with `SlotUserInvalid`, and no slot is stored. This
@@ -363,6 +383,12 @@ the author is accepted as the primary reviewer of a slot. This scenario is teste
 the requirement is off, and the requirement is then switched on. The author signing the ready review, with the right
 password, is refused with `ReviewerNotIndependent` and nothing is signed. This scenario is tested by
 `SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent`.
+
+**SigningService_SignAsync_AuthorWhoReopened_ThrowsReviewerNotIndependentFirst**: The author of a review is put into a
+slot as primary reviewer, with an alternate, while the requirement is off; the alternate signs and the author reopens
+the review. The requirement is then switched on again. The author signing, with the right password and digest, is
+refused with `ReviewerNotIndependent` and not with `ReopenerCannotSign`, because the independence check comes first.
+This scenario is tested by `SigningService_SignAsync_AuthorWhoReopened_ThrowsReviewerNotIndependentFirst`.
 
 **SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword**: An approved review, in a slot
 with a primary and an alternate, is reopened by the primary. The primary then tries six wrong passwords; each refusal is
@@ -636,6 +662,28 @@ ballot of sam is made a draft again without changing what it says, so the consol
 they were. Sam asks to sign with the right password; the request is refused with `BallotNotSubmitted` and no signature
 is stored for the slot. This scenario is tested by `SigningService_SignAsync_OwnBallotDraft_ThrowsBallotNotSubmitted`.
 
+**SigningService_SignAsync_OwnBallotDraftAndStaleDigest_ThrowsRecordChanged**: The ballot of sam is a draft and the
+digest is read; tess then hands in a ballot that disagrees, which changes the digest. Sam signs with the digest that was
+read; the request is refused with `RecordChanged` and not with `BallotNotSubmitted`, and nothing is signed.
+This scenario is tested by `SigningService_SignAsync_OwnBallotDraftAndStaleDigest_ThrowsRecordChanged`.
+
+**SigningService_SignAsync_OwnBallotDraftAndAlreadySigned_ThrowsSigningNotAllowedAsSigned**: A signature of the current
+record is stored for slot 2, then the ballot of sam is made a draft again without changing what it says, so the
+digest is as it was. Sam asks to sign; the request is refused with `SigningNotAllowed` and the message that the slot
+already has a
+signature, not with `BallotNotSubmitted`. This scenario is tested by
+`SigningService_SignAsync_OwnBallotDraftAndAlreadySigned_ThrowsSigningNotAllowedAsSigned`.
+
+**SigningService_SignAsync_OwnBallotDraftAndOpenThread_ThrowsBallotNotSubmitted**: In a review with three slots the
+ballot of sam is a draft and a chat thread is open, so the status lists a blocker. Sam asks to sign; the request is
+refused with `BallotNotSubmitted`, not with `SigningNotAllowed`. This scenario is tested by
+`SigningService_SignAsync_OwnBallotDraftAndOpenThread_ThrowsBallotNotSubmitted`.
+
+**SigningService_SignAsync_SingleSlotDraftAndOpenThread_NamesBlockersBeforeTheBallot**: Slots 2 and 3 are removed, the
+ballot of rita in slot 1 is a draft and a chat thread is open. Rita asks to sign; the request is refused with
+`SigningNotAllowed`. After the thread is resolved, the same request is refused with `BallotNotSubmitted`. This scenario
+is tested by `SigningService_SignAsync_SingleSlotDraftAndOpenThread_NamesBlockersBeforeTheBallot`.
+
 **SigningService_SignAsync_EarlySign_OtherSlotNotSubmitted_Succeeds**: The ballot of tess is a draft again while the
 ballots of rita and sam are handed in. Rita signs; the signature is current, and the review is not approved because
 the slot of tess has not handed in and signed. This scenario is tested by
@@ -649,6 +697,11 @@ signature of rita is out of date and the review is not approved. This scenario i
 **SigningService_SignAsync_Disputed_BlocksSigning**: Sam disagrees with the others on a check. Signing is refused with
 `SigningNotAllowed`, the message names the disputed check, and the status counts it in `DisputedChecks`. This
 scenario is tested by `SigningService_SignAsync_Disputed_BlocksSigning`.
+
+**SigningService_SignAsync_Disputed_MessageNamesTheNumberOfDisputedChecks**: Sam disagrees with the others on one
+check. Tess asks to sign; the message of the refusal is exactly "The review cannot be signed yet: 1 checklist check is
+disputed between the ballots." This scenario is tested by
+`SigningService_SignAsync_Disputed_MessageNamesTheNumberOfDisputedChecks`.
 
 **SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered**: Two reviewers answer one check
 differently and hand in. The next step names "1 check disputed between the ballots" once and does not count the same check
@@ -711,6 +764,11 @@ changes the consolidated standing, is refused with `SignaturesWouldBecomeOutOfDa
 signed slot acknowledged, the removal succeeds and the ballot goes with the slot. This scenario is tested by
 `SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement`.
 
+**SigningService_RemoveSlotAsync_SubmittedBallot_RemovesTheBallotOfTheSlot**: On a review with three slots, each with a
+submitted ballot and nothing signed, the second slot is removed without an acknowledgement. The record then holds no
+ballot of the removed slot and still holds the ballots of the other two slots. This scenario is tested by
+`SigningService_RemoveSlotAsync_SubmittedBallot_RemovesTheBallotOfTheSlot`.
+
 **SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgement**: Alex, the alternate of
 slot 1, hands in a ballot that disagrees on the first check, and a signature given at that standing is stored straight
 into the store for slot 2. Removing alex from slot 1 takes the dissenting rows out of the ballot, which becomes a draft,
@@ -723,9 +781,21 @@ alex leaves slot 1, which sends its ballot back to a draft, but the other ballot
 was. The change succeeds without any acknowledgement and the signature of slot 2 stays current. This scenario is tested
 by `SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgement`.
 
+**SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement**: Slot 2 signs while every ballot agrees;
+slot 3, whose submitted ballot agrees with the others, is removed without any acknowledgement. The consolidated
+standing and the digest are as they were, so the removal succeeds and the signature of slot 2 stays current. This
+scenario is tested by `SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement`.
+
 **SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved**: Rita and sam have signed while tess holds a
 draft, so the review is not approved. Tess hands in again, with the agreed standing as it was, and signs; the review is
 approved. This scenario is tested by `SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved`.
+
+**SigningService_GetApprovalAsync_ConclusionAndIsConcluded_MatchTheStandingInEveryStanding**: Four standings are
+read with the status: nothing signed, one of three slots signed, all three signed (Approved), and, in a second review,
+all three signed while a check is disputed. The `Conclusion` and `IsConcluded` of the status are compared with fixed
+expected values, not with another computation: not concluded for nothing signed, one signed, and the dispute, and
+concluded as Approved for all signed. This scenario is tested by
+`SigningService_GetApprovalAsync_ConclusionAndIsConcluded_MatchTheStandingInEveryStanding`.
 
 **SigningService_NextStep_NoSlots_PointsToTheUnansweredChecks**: A review without a slot has the next step of its
 unanswered checks, not "Add a reviewer slot.", because blockers decide the hint first. This scenario is tested by
@@ -762,6 +832,10 @@ Approved". This scenario is tested by `SigningService_SignAsync_Approved_StoresA
 is written. Signing is refused with `ConclusionRequired`, the status sets `ConclusionRequired`, lists
 `SigningService.ConclusionRequiredText` as a blocker, the next step asks for a conclusion, and no slot is signed. This
 scenario is tested by `SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired`.
+
+**SigningService_SignAsync_RejectedNoText_MessageStatesTheReasonsAreNeeded**: The ballots agree on a Fail but no
+conclusion text is written. The message of the refusal is exactly "A rejected review needs a conclusion stating the
+reasons." This scenario is tested by `SigningService_SignAsync_RejectedNoText_MessageStatesTheReasonsAreNeeded`.
 
 **SigningService_SignAsync_RejectedBlankText_ThrowsConclusionRequired**: A conclusion text of white space only counts as
 no text; signing is refused with `ConclusionRequired`. This scenario is tested by

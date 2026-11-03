@@ -86,6 +86,109 @@ public class SigningServiceBallotTests
     }
 
     /// <summary>
+    ///     Test that the digest comparison comes before the check of the own ballot: a reviewer whose ballot is a draft
+    ///     and who signs for a record that has changed since is told that the record changed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_OwnBallotDraftAndStaleDigest_ThrowsRecordChanged()
+    {
+        // Arrange: sam's ballot is a draft; the digest is read, then tess changes the agreed standing
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await MakeDraftAsync(world, "sam");
+        var staleDigest = (await world.ApprovalAsync()).Digest;
+        await DissentAsync(world, "tess");
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            SignedReviewWorld.ActorOf("sam"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[1].Id, staleDigest, Password, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.RecordChanged, ex.Rule);
+        Assert.Empty(await world.SignedSlotIdsAsync());
+    }
+
+    /// <summary>
+    ///     Test that the check for an existing signature comes before the check of the own ballot: a slot that holds a
+    ///     signature of the current record is told so, although its ballot is a draft.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_OwnBallotDraftAndAlreadySigned_ThrowsSigningNotAllowedAsSigned()
+    {
+        // Arrange: slot 2 holds a signature of the current record, then sam's ballot is a draft with the standing as it was
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.StoreSignatureAsync(2);
+        await MakeDraftAsync(world, "sam");
+        var digest = (await world.ApprovalAsync()).Digest;
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            SignedReviewWorld.ActorOf("sam"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[1].Id, digest, Password, cancellationToken));
+
+        // Assert: the refusal is the signed one, not the ballot one
+        Assert.Equal(DomainRule.SigningNotAllowed, ex.Rule);
+        Assert.Contains("already has a signature", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the check of the own ballot comes before the blockers in a review with several slots: a reviewer
+    ///     whose ballot is a draft is told to hand it in, although a thread is open as well.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_OwnBallotDraftAndOpenThread_ThrowsBallotNotSubmitted()
+    {
+        // Arrange: sam's ballot is a draft and a chat thread is open
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await MakeDraftAsync(world, "sam");
+        await world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, new ThreadAnchor("a.txt"), SignedReviewWorld.ActorOf("rita"), "Look", cancellationToken);
+        var approval = await world.ApprovalAsync();
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            SignedReviewWorld.ActorOf("sam"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[1].Id, approval.Digest, Password, cancellationToken));
+
+        // Assert: the thread is a blocker, yet the ballot is what is named
+        Assert.NotEmpty(approval.Blockers);
+        Assert.Equal(DomainRule.BallotNotSubmitted, ex.Rule);
+    }
+
+    /// <summary>
+    ///     Test that in a review with a single slot the blockers are named before the own ballot: the reviewer whose
+    ///     ballot is a draft and who has a thread open is told what blocks the signature, and told to hand the ballot
+    ///     in once nothing else blocks.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_SingleSlotDraftAndOpenThread_NamesBlockersBeforeTheBallot()
+    {
+        // Arrange: rita's ballot is made a draft while there are several slots (a single slot would hand it in at
+        // once), then only slot 1 is left, and a chat thread is open
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var rita = SignedReviewWorld.ActorOf("rita");
+        await MakeDraftAsync(world, "rita");
+        await world.Signing.RemoveSlotAsync(rita, world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[1].Id, cancellationToken);
+        await world.Signing.RemoveSlotAsync(rita, world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[2].Id, cancellationToken);
+        var thread = await world.Threads.StartThreadAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, new ThreadAnchor("a.txt"), rita, "Look", cancellationToken);
+        var approval = await world.ApprovalAsync();
+
+        // Act: sign with the thread open, then again after it is resolved
+        var withBlocker = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            rita, world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[0].Id, approval.Digest, Password, cancellationToken));
+        await world.Threads.ResolveAsync(world.ProjectId, SignedReviewWorld.ReviewId, thread.Id, rita, cancellationToken);
+        var digest = (await world.ApprovalAsync()).Digest;
+        var withoutBlocker = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            rita, world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[0].Id, digest, Password, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.SigningNotAllowed, withBlocker.Rule);
+        Assert.Equal(DomainRule.BallotNotSubmitted, withoutBlocker.Rule);
+    }
+
+    /// <summary>
     ///     Test that a reviewer whose ballot is handed in may sign while the ballot of another slot is still a draft.
     /// </summary>
     [Fact]
@@ -146,6 +249,26 @@ public class SigningServiceBallotTests
     }
 
     /// <summary>
+    ///     Test that the refusal of a signature while a check is disputed says how many checks are disputed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_Disputed_MessageNamesTheNumberOfDisputedChecks()
+    {
+        // Arrange: sam disagrees with the others on one check
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await DissentAsync(world, "sam");
+        var approval = await world.ApprovalAsync();
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.SignAsync(
+            SignedReviewWorld.ActorOf("tess"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[2].Id, approval.Digest, Password, cancellationToken));
+
+        // Assert: the message is the one sentence about the dispute, with its count
+        Assert.Equal("The review cannot be signed yet: 1 checklist check is disputed between the ballots.", ex.Message);
+    }
+
+    /// <summary>
     ///     Test that the review is approved only when every slot has handed in, nothing is disputed and every slot
     ///     holds a current signature.
     /// </summary>
@@ -168,6 +291,39 @@ public class SigningServiceBallotTests
         // Assert
         Assert.False(beforeSubmit.IsApproved);
         Assert.True(after.IsApproved);
+    }
+
+    /// <summary>
+    ///     Test that the status says whether the review is concluded, and how, as the standing of the signatures and
+    ///     the ballots requires: concluded as Approved only when all submitted ballots agree and every slot has signed.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_ConclusionAndIsConcluded_MatchTheStandingInEveryStanding()
+    {
+        // Arrange and act: read the status for a review with nothing signed, a part signed and all signed, and for a
+        // second review with all signed while a check is disputed
+        var world = await SignedReviewWorld.CreateAsync();
+        var disputedWorld = await SignedReviewWorld.CreateAsync();
+        var standings = new List<ReviewApproval>
+        {
+            await world.ApprovalAsync(),
+        };
+        await world.StoreSignatureAsync(1);
+        standings.Add(await world.ApprovalAsync());
+        await world.StoreSignatureAsync(2);
+        await world.StoreSignatureAsync(3);
+        standings.Add(await world.ApprovalAsync());
+        await DissentAsync(disputedWorld, "sam");
+        await disputedWorld.StoreSignatureAsync(1);
+        await disputedWorld.StoreSignatureAsync(2);
+        await disputedWorld.StoreSignatureAsync(3);
+        standings.Add(await disputedWorld.ApprovalAsync());
+
+        // Assert: nothing signed, one of three signed and a dispute are not concluded; all signed and agreed is
+        Assert.Equal(
+            [ReviewConclusion.None, ReviewConclusion.None, ReviewConclusion.Approved, ReviewConclusion.None],
+            standings.Select(s => s.Conclusion));
+        Assert.Equal([false, false, true, false], standings.Select(s => s.IsConcluded));
     }
 
     /// <summary>
@@ -195,6 +351,28 @@ public class SigningServiceBallotTests
         Assert.Equal(DomainRule.SignaturesWouldBecomeOutOfDate, ex.Rule);
         Assert.Equal(3, stillThere);
         Assert.Equal(2, (await world.Store.GetSnapshotAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.Slots.Count);
+    }
+
+    /// <summary>
+    ///     Test that removing an unsigned slot also removes the ballot of that slot, while the ballots of the other
+    ///     slots stay.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_RemoveSlotAsync_SubmittedBallot_RemovesTheBallotOfTheSlot()
+    {
+        // Arrange: three slots, each with a submitted ballot, and nothing signed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        var removed = world.Slots[1];
+
+        // Act: remove the second slot
+        await world.Signing.RemoveSlotAsync(
+            SignedReviewWorld.ActorOf("rita"), world.ProjectId, SignedReviewWorld.ReviewId, removed.Id, cancellationToken);
+
+        // Assert: the ballot of the removed slot is gone and the ballots of the other two slots remain
+        var record = (await world.Store.GetSnapshotAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.Record;
+        Assert.DoesNotContain(record.Ballots, ballot => ballot.SlotId == removed.Id);
+        Assert.Equal([world.Slots[0].Id, world.Slots[2].Id], record.Ballots.Select(ballot => ballot.SlotId).Order());
     }
 
     /// <summary>
@@ -250,6 +428,27 @@ public class SigningServiceBallotTests
 
         // Assert: stored, and the signature of slot 2 is still current
         Assert.Null((await world.Store.GetSnapshotAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.Slots[0].AlternateUserId);
+        Assert.Equal([world.Slots[1].Id], await world.SignedSlotIdsAsync());
+    }
+
+    /// <summary>
+    ///     Test that removing a slot whose submitted ballot agrees with the others leaves the digest as it is, so the
+    ///     signatures of the other slots stay current and need no acknowledgement.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement()
+    {
+        // Arrange: slot 2 signs while every ballot agrees
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(2);
+
+        // Act: remove slot 3, whose ballot agrees, without any acknowledgement
+        await world.Signing.RemoveSlotAsync(
+            SignedReviewWorld.ActorOf("rita"), world.ProjectId, SignedReviewWorld.ReviewId, world.Slots[2].Id, cancellationToken);
+
+        // Assert: removed, and the signature of slot 2 is still current
+        Assert.Equal(2, (await world.Store.GetSnapshotAsync(world.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!.Slots.Count);
         Assert.Equal([world.Slots[1].Id], await world.SignedSlotIdsAsync());
     }
 

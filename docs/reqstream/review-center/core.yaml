@@ -72,6 +72,9 @@ sections:
           - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-ProjectService-AuditorRole
           - ReviewCenter-SigningService-AuditorNotReviewer
+          - ReviewCenter-SigningService-AuditorNotReviewer-Assign
+          - ReviewCenter-SigningService-AuditorNotReviewer-Sign
+          - ReviewCenter-SigningService-AuditorNotReviewer-NothingStored
           - ReviewCenter-RepositoryService-Ownership
           - ReviewCenter-ThreadService-Access
           - ReviewCenter-ChecklistService-Access
@@ -339,25 +342,118 @@ sections:
           - ReviewCenter-RecordDigest-Outcome
           - ReviewCenter-RecordDigest-BallotFingerprint
           - ReviewCenter-SigningService-Slots
+          - ReviewCenter-SigningService-Slots-Members
+          - ReviewCenter-SigningService-Slots-Numbering
+          - ReviewCenter-SigningService-Slots-Unsigned
+          - ReviewCenter-SigningService-Slots-ReviewExists
           - ReviewCenter-SigningService-SlotUsers
+          - ReviewCenter-SigningService-SlotUsers-Enabled
+          - ReviewCenter-SigningService-SlotUsers-Member
+          - ReviewCenter-SigningService-SlotUsers-AdminMember
+          - ReviewCenter-SigningService-SlotUsers-Different
+          - ReviewCenter-SigningService-SlotUsers-OneSlot
+          - ReviewCenter-SigningService-SlotUsers-Candidates
+          - ReviewCenter-SigningService-SlotUsers-NoPassword
+          - ReviewCenter-SigningService-SlotUsers-CandidateAccess
           - ReviewCenter-SigningService-SlotEdit
+          - ReviewCenter-SigningService-SlotEdit-Remove
+          - ReviewCenter-SigningService-SlotEdit-Ballot
+          - ReviewCenter-SigningService-SlotEdit-Signed
+          - ReviewCenter-SigningService-SlotEdit-Exists
           - ReviewCenter-SigningService-Actor
+          - ReviewCenter-SigningService-Actor-Sign
+          - ReviewCenter-SigningService-Actor-Reopen
+          - ReviewCenter-SigningService-Actor-ProjectMissing
+          - ReviewCenter-SigningService-Actor-ProjectHidden
+          - ReviewCenter-SigningService-Actor-ViewAccess
+          - ReviewCenter-SigningService-Actor-Signer
+          - ReviewCenter-SigningService-Actor-SignerMember
           - ReviewCenter-SigningService-Blockers
+          - ReviewCenter-SigningService-Blockers-Disputed
+          - ReviewCenter-SigningService-Blockers-OpenThread
+          - ReviewCenter-SigningService-Blockers-RejectedNoConclusion
+          - ReviewCenter-SigningService-Blockers-Listed
+          - ReviewCenter-SigningService-Blockers-FailNotBlocker
+          - ReviewCenter-SigningService-Blockers-NotApplicable
+          - ReviewCenter-SigningService-Blockers-MissingChecklist
           - ReviewCenter-SigningService-Sign
+          - ReviewCenter-SigningService-Sign-Alternate
+          - ReviewCenter-SigningService-Sign-Role
+          - ReviewCenter-SigningService-Sign-DisplayName
+          - ReviewCenter-SigningService-Sign-Time
+          - ReviewCenter-SigningService-Sign-Digest
+          - ReviewCenter-SigningService-Sign-OutcomeApproved
+          - ReviewCenter-SigningService-Sign-OutcomeRejected
+          - ReviewCenter-SigningService-Sign-Meaning
+          - ReviewCenter-SigningService-Sign-Immutable
           - ReviewCenter-SigningService-Reauthenticate
+          - ReviewCenter-SigningService-Reauthenticate-LastCheck
+          - ReviewCenter-SigningService-Reauthenticate-SameFailure
+          - ReviewCenter-SigningService-Reauthenticate-SharedLockout
           - ReviewCenter-SigningService-Current
+          - ReviewCenter-SigningService-Current-AlreadySigned
           - ReviewCenter-SigningService-Status
+          - ReviewCenter-SigningService-Status-NotSigned
+          - ReviewCenter-SigningService-Status-Signed
+          - ReviewCenter-SigningService-Status-OutOfDate
+          - ReviewCenter-SigningService-Status-Approved
+          - ReviewCenter-SigningService-Status-Conclusion
+          - ReviewCenter-SigningService-Status-Blockers
+          - ReviewCenter-SigningService-Status-NextStep
+          - ReviewCenter-SigningService-Status-MissingReview
+          - ReviewCenter-SigningService-Status-AssigneeMembership
+          - ReviewCenter-SigningService-Status-AssigneeKept
+          - ReviewCenter-SigningService-Status-BatchSame
+          - ReviewCenter-SigningService-Status-BatchStore
+          - ReviewCenter-SigningService-Status-BatchUsers
+          - ReviewCenter-SigningService-Status-BatchEmpty
           - ReviewCenter-SigningService-SignatureImpact
+          - ReviewCenter-SigningService-SignatureImpact-SlotNumbers
+          - ReviewCenter-SigningService-SignatureImpact-Signer
+          - ReviewCenter-SigningService-SignatureImpact-Refused
+          - ReviewCenter-SigningService-SignatureImpact-NothingStored
+          - ReviewCenter-SigningService-SignatureImpact-Acknowledged
+          - ReviewCenter-SigningService-SignatureImpact-DigestUnchanged
+          - ReviewCenter-SigningService-SignatureImpact-NoSignature
+          - ReviewCenter-SigningService-SignatureImpact-OwnSlotExcluded
           - ReviewCenter-ChecklistService-SignatureImpact
           - ReviewCenter-ChecklistService-BallotImpact
           - ReviewCenter-SigningService-OwnBallotSubmitted
+          - ReviewCenter-SigningService-OwnBallotSubmitted-NothingStored
+          - ReviewCenter-SigningService-OwnBallotSubmitted-AfterDigest
+          - ReviewCenter-SigningService-OwnBallotSubmitted-AfterSigned
+          - ReviewCenter-SigningService-OwnBallotSubmitted-BeforeBlockers
+          - ReviewCenter-SigningService-OwnBallotSubmitted-SingleSlot
           - ReviewCenter-SigningService-EarlySigning
+          - ReviewCenter-SigningService-EarlySigning-LaterChange
           - ReviewCenter-SigningService-DisputedBlocker
+          - ReviewCenter-SigningService-DisputedBlocker-MessageCount
+          - ReviewCenter-SigningService-DisputedBlocker-Listed
+          - ReviewCenter-SigningService-DisputedBlocker-Count
           - ReviewCenter-SigningService-NextStepWording
+          - ReviewCenter-SigningService-NextStepWording-RejectedConclusion
+          - ReviewCenter-SigningService-NextStepWording-SignersAwaited
+          - ReviewCenter-SigningService-NextStepWording-OutOfDateSigner
+          - ReviewCenter-SigningService-NextStepWording-ActualSigner
           - ReviewCenter-SigningService-FailedChecksMasked
+          - ReviewCenter-SigningService-FailedChecksMasked-RejectionNote
+          - ReviewCenter-SigningService-FailedChecksMasked-SignatureWording
+          - ReviewCenter-SigningService-FailedChecksMasked-HandInFirst
           - ReviewCenter-SigningService-SlotBallotImpact
+          - ReviewCenter-SigningService-SlotBallotImpact-Departure
+          - ReviewCenter-SigningService-SlotBallotImpact-StandingKept
+          - ReviewCenter-SigningService-SlotBallotImpact-RemoveKept
           - ReviewCenter-SigningService-SlotBallotState
+          - ReviewCenter-SigningService-SlotBallotState-NoChecklist
+          - ReviewCenter-SigningService-SlotBallotState-Masked
           - ReviewCenter-SigningService-RejectedOutcome
+          - ReviewCenter-SigningService-RejectedOutcome-Approved
+          - ReviewCenter-SigningService-RejectedOutcome-ConclusionRequired
+          - ReviewCenter-SigningService-RejectedOutcome-Message
+          - ReviewCenter-SigningService-RejectedOutcome-ListsBlockers
+          - ReviewCenter-SigningService-RejectedOutcome-Locks
+          - ReviewCenter-SigningService-RejectedOutcome-Reopen
+          - ReviewCenter-SigningService-RejectedOutcome-AuditOutcome
           - ReviewCenter-ThreadService-SignatureImpact
         tests:
           - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
@@ -380,12 +476,48 @@ sections:
           project, keeps the record that was signed the record that exists, and keeps the history of approvals complete.
         children:
           - ReviewCenter-SigningService-ApprovalLock
+          - ReviewCenter-SigningService-ApprovalLock-SlotChanges
+          - ReviewCenter-SigningService-ApprovalLock-Sign
+          - ReviewCenter-SigningService-ApprovalLock-Message
+          - ReviewCenter-SigningService-ApprovalLock-Derived
           - ReviewCenter-SigningService-Concluded
+          - ReviewCenter-SigningService-Concluded-NoOpenChecks
+          - ReviewCenter-SigningService-Concluded-AllSigned
+          - ReviewCenter-SigningService-Concluded-SameOutcome
+          - ReviewCenter-SigningService-Concluded-ConclusionText
+          - ReviewCenter-SigningService-Concluded-NoOpenThread
+          - ReviewCenter-SigningService-Concluded-ApprovedOnly
+          - ReviewCenter-SigningService-Concluded-ReviewLockDefinition
+          - ReviewCenter-SigningService-Concluded-BlockerHint
           - ReviewCenter-SigningService-Reopen
+          - ReviewCenter-SigningService-Reopen-SystemAdmin
+          - ReviewCenter-SigningService-Reopen-OthersRefused
+          - ReviewCenter-SigningService-Reopen-NoApiToken
+          - ReviewCenter-SigningService-Reopen-ReasonRequired
+          - ReviewCenter-SigningService-Reopen-ReasonLimit
+          - ReviewCenter-SigningService-Reopen-NotLocked
+          - ReviewCenter-SigningService-Reopen-OpenThread
+          - ReviewCenter-SigningService-Reopen-MissingReview
+          - ReviewCenter-SigningService-Reopen-Stored
+          - ReviewCenter-SigningService-Reopen-Audit
+          - ReviewCenter-SigningService-Reopen-AuditAtomic
+          - ReviewCenter-SigningService-Reopen-KeepsSignatures
+          - ReviewCenter-SigningService-Reopen-FreshSignatures
+          - ReviewCenter-SigningService-Reopen-BallotsStay
+          - ReviewCenter-SigningService-Reopen-CountInvalidates
           - ReviewCenter-ThreadService-ApprovalLock
           - ReviewCenter-ThreadService-ConcludedRefusal
           - ReviewCenter-SigningService-OpenThreadRule
+          - ReviewCenter-SigningService-OpenThreadRule-OpenThreadBlocks
+          - ReviewCenter-SigningService-OpenThreadRule-NotApproved
+          - ReviewCenter-SigningService-OpenThreadRule-SignRefused
+          - ReviewCenter-SigningService-OpenThreadRule-ChatKeepsSignatures
+          - ReviewCenter-SigningService-OpenThreadRule-ResolvedConcludes
+          - ReviewCenter-SigningService-OpenThreadRule-NoConclusionAudit
           - ReviewCenter-SigningService-OpenCheckThread
+          - ReviewCenter-SigningService-OpenCheckThread-NotConcluded
+          - ReviewCenter-SigningService-OpenCheckThread-ResolvedAllowsSign
+          - ReviewCenter-SigningService-OpenCheckThread-ResolvedConcludes
           - ReviewCenter-ChecklistService-ApprovalLock
           - ReviewCenter-RecordDigest-ReopenCount
         tests:
@@ -408,6 +540,9 @@ sections:
           not to the authors of the commits, which the tool cannot know.
         children:
           - ReviewCenter-SigningService-IndependentReviewers
+          - ReviewCenter-SigningService-IndependentReviewers-Update
+          - ReviewCenter-SigningService-IndependentReviewers-Signing
+          - ReviewCenter-SigningService-IndependentReviewers-SettingOff
           - ReviewCenter-ProjectService-IndependentReviewersSetting
         tests:
           - CoreSubsystem_IndependentReviewers_AuthorCannotBeSlotReviewerOrSign
@@ -446,8 +581,19 @@ sections:
         children:
           - ReviewCenter-ChecklistService-AuthorRule
           - ReviewCenter-SigningService-ReopenerRule
+          - ReviewCenter-SigningService-ReopenerRule-AnyEarlierReopen
+          - ReviewCenter-SigningService-ReopenerRule-AfterIndependence
+          - ReviewCenter-SigningService-ReopenerRule-BeforePassword
+          - ReviewCenter-SigningService-ReopenerRule-NoFailedAttempt
+          - ReviewCenter-SigningService-ReopenerRule-RuleOff
           - ReviewCenter-ChecklistService-ReopenerBallot
           - ReviewCenter-SigningService-StrandedSlot
+          - ReviewCenter-SigningService-StrandedSlot-NamesSlots
+          - ReviewCenter-SigningService-StrandedSlot-BothReviewers
+          - ReviewCenter-SigningService-StrandedSlot-ReopenBlocked
+          - ReviewCenter-SigningService-StrandedSlot-NothingStored
+          - ReviewCenter-SigningService-StrandedSlot-RuleOff
+          - ReviewCenter-SigningService-StrandedSlot-SlotKeepsSomebody
         tests:
           - CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff
 
@@ -490,10 +636,21 @@ sections:
           - ReviewCenter-ThreadService-CheckThreadAudit
           - ReviewCenter-ChecklistService-Audit
           - ReviewCenter-SigningService-Audit
+          - ReviewCenter-SigningService-Audit-SlotChanged
+          - ReviewCenter-SigningService-Audit-SlotRemoved
+          - ReviewCenter-SigningService-Audit-SignatureAdded
+          - ReviewCenter-SigningService-Audit-Atomic
+          - ReviewCenter-SigningService-Audit-Actor
+          - ReviewCenter-SigningService-Audit-SlotNumber
+          - ReviewCenter-SigningService-Audit-Reviewers
+          - ReviewCenter-SigningService-Audit-SignatureDetail
+          - ReviewCenter-SigningService-Audit-RefusedNothing
           - ReviewCenter-UserService-Audit
           - ReviewCenter-UserService-SignInAudit
           - ReviewCenter-UserService-ReauthAudit
           - ReviewCenter-SigningService-ReauthAudit
+          - ReviewCenter-SigningService-ReauthAudit-Locked
+          - ReviewCenter-SigningService-ReauthAudit-NoPassword
           - ReviewCenter-RepositoryService-Audit
         tests:
           - AuditService_RecordAsync_Draft_StoresEntryThatVerifies
@@ -638,6 +795,11 @@ sections:
           - ReviewCenter-ReviewProgressService-KindCounts
           - ReviewCenter-ReviewProgressService-BallotProgress
           - ReviewCenter-SigningService-ProgressCounts
+          - ReviewCenter-SigningService-ProgressCounts-Unanswered
+          - ReviewCenter-SigningService-ProgressCounts-Failed
+          - ReviewCenter-SigningService-ProgressCounts-Disputed
+          - ReviewCenter-SigningService-ProgressCounts-SameAsSentences
+          - ReviewCenter-SigningService-ProgressCounts-AccountEnabled
         tests:
           - ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage
           - ReviewProgressService_GetProgressAsync_BlockerCounts_EqualTheApprovalBlockers
@@ -702,10 +864,44 @@ sections:
           rule is enforced where the data is read, and the stored record and its signatures are untouched.
         children:
           - ReviewCenter-BallotVisibility-Rule
+          - ReviewCenter-BallotVisibility-Rule-LeadAdminAuditor
+          - ReviewCenter-BallotVisibility-Rule-Concluded
+          - ReviewCenter-BallotVisibility-Rule-HiddenFromOthers
+          - ReviewCenter-BallotVisibility-Rule-SingleSlot
+          - ReviewCenter-BallotVisibility-Rule-UnknownViewer
           - ReviewCenter-BallotVisibility-BallotView
+          - ReviewCenter-BallotVisibility-BallotView-MissingReview
+          - ReviewCenter-BallotVisibility-BallotView-OnlyWhenVisible
+          - ReviewCenter-BallotVisibility-BallotView-HandInCounts
+          - ReviewCenter-BallotVisibility-BallotView-AssignShortcut
+          - ReviewCenter-BallotVisibility-BallotView-SubmitAndSign
+          - ReviewCenter-BallotVisibility-BallotView-HiddenState
+          - ReviewCenter-BallotVisibility-BallotView-TokenMasked
+          - ReviewCenter-BallotVisibility-BallotView-ViewerRequired
           - ReviewCenter-BallotVisibility-NoDisputeLeak
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-ApprovalOutcome
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-Progress
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-Inbox
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-ProgressSameForAll
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-ApprovalBallotState
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-FixedSentence
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-DiscussionNotNews
+          - ReviewCenter-BallotVisibility-NoDisputeLeak-BatchSameAsSingle
           - ReviewCenter-BallotVisibility-Discussions
+          - ReviewCenter-BallotVisibility-Discussions-FileThreadsStay
+          - ReviewCenter-BallotVisibility-Discussions-StartAllowed
+          - ReviewCenter-BallotVisibility-Discussions-StartRefused
           - ReviewCenter-BallotVisibility-AuditMasking
+          - ReviewCenter-BallotVisibility-AuditMasking-Applicability
+          - ReviewCenter-BallotVisibility-AuditMasking-CheckDiscussionStart
+          - ReviewCenter-BallotVisibility-AuditMasking-LaterEntries
+          - ReviewCenter-BallotVisibility-AuditMasking-UnknownThread
+          - ReviewCenter-BallotVisibility-AuditMasking-FileThreadKept
+          - ReviewCenter-BallotVisibility-AuditMasking-MetadataKept
+          - ReviewCenter-BallotVisibility-AuditMasking-OwnEntries
+          - ReviewCenter-BallotVisibility-AuditMasking-VisibleViewerUnchanged
+          - ReviewCenter-BallotVisibility-AuditMasking-UnknownViewer
+          - ReviewCenter-BallotVisibility-AuditMasking-NullRefused
         tests:
           - BallotVisibility_CanSeeOthers_PlainContributorWithoutSlot_Masked
           - SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome
@@ -762,6 +958,8 @@ sections:
           - ReviewCenter-ReviewService-FollowUpCheckThreads
           - ReviewCenter-ChecklistService-CarriedMarking
           - ReviewCenter-SigningService-CarriedRecord
+          - ReviewCenter-SigningService-CarriedRecord-OpenThreads
+          - ReviewCenter-SigningService-CarriedRecord-CreatorIsAuthor
           - ReviewCenter-RecordDigest-FollowUp
         tests:
           - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
@@ -824,6 +1022,11 @@ sections:
           - ReviewCenter-PersonalAccessTokenService-TemporaryPassword
           - ReviewCenter-PersonalAccessTokenService-Audit
           - ReviewCenter-SigningService-ApiToken
+          - ReviewCenter-SigningService-ApiToken-Message
+          - ReviewCenter-SigningService-ApiToken-SlotChange
+          - ReviewCenter-SigningService-ApiToken-FirstCheck
+          - ReviewCenter-SigningService-ApiToken-NoPasswordCount
+          - ReviewCenter-SigningService-ApiToken-NoAudit
           - ReviewCenter-ReviewService-CreatedVia
         tests:
           - CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner
@@ -846,6 +1049,17 @@ sections:
           - ReviewCenter-UserService-UsernameCollision
           - ReviewCenter-UserService-ExternalNoPassword
           - ReviewCenter-SigningService-ExternalReauth
+          - ReviewCenter-SigningService-ExternalReauth-Binding
+          - ReviewCenter-SigningService-ExternalReauth-Spent
+          - ReviewCenter-SigningService-ExternalReauth-SpentLast
+          - ReviewCenter-SigningService-ExternalReauth-KeptOnRefusal
+          - ReviewCenter-SigningService-ExternalReauth-NoProof
+          - ReviewCenter-SigningService-ExternalReauth-Expired
+          - ReviewCenter-SigningService-ExternalReauth-NoStore
+          - ReviewCenter-SigningService-ExternalReauth-FailedAudit
+          - ReviewCenter-SigningService-ExternalReauth-HasProof
+          - ReviewCenter-SigningService-ExternalReauth-ConfirmableReviewer
+          - ReviewCenter-SigningService-ExternalReauth-ConfirmableRefused
           - ReviewCenter-ReauthProofStore-SingleUse
           - ReviewCenter-ReauthProofStore-Binding
           - ReviewCenter-ReauthProofStore-Expiry
@@ -886,6 +1100,17 @@ sections:
           - ReviewCenter-UserService-SecondFactorRequired
           - ReviewCenter-UserService-SecondFactorLockout
           - ReviewCenter-SigningService-TotpReauth
+          - ReviewCenter-SigningService-TotpReauth-PasswordFirst
+          - ReviewCenter-SigningService-TotpReauth-RecoveryRefused
+          - ReviewCenter-SigningService-TotpReauth-ReplayRefused
+          - ReviewCenter-SigningService-TotpReauth-ApiToken
+          - ReviewCenter-SigningService-TotpReauth-ApiTokenKeepsCode
+          - ReviewCenter-SigningService-TotpReauth-LockoutCount
+          - ReviewCenter-SigningService-TotpReauth-LockoutAudit
+          - ReviewCenter-SigningService-TotpReauth-FailClosed
+          - ReviewCenter-SigningService-TotpReauth-NoSecondFactor
+          - ReviewCenter-SigningService-TotpReauth-ProviderUser
+          - ReviewCenter-SigningService-TotpReauth-AfterReset
         tests:
           - TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds
           - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
