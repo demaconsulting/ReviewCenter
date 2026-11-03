@@ -13,7 +13,11 @@
 
 Web service and command-line tool for formal code reviews with a tamper-evident audit trail
 
-![A review as a side-by-side diff with a discussion thread][image-review-diff-thread]
+![A reviewer's inbox with the reviews to answer and the reviews ready to sign][image-review-inbox]
+
+![A review page with the Where are we? status panel and its next step][image-review-status-panel]
+
+![A side-by-side diff with a Question thread and a Finding thread][image-review-diff-thread]
 
 ![An approved review with the signed attestation PDF download][image-review-signed]
 
@@ -137,6 +141,8 @@ By contributing to this project, you agree that your contributions will be licen
 [badge-security]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=security_rating
 
 <!-- Image References -->
+[image-review-inbox]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-inbox.png
+[image-review-status-panel]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-status-panel.png
 [image-review-diff-thread]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-diff-thread.png
 [image-review-signed]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-signed.png
 

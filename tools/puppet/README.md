@@ -118,14 +118,37 @@ Actions fail after about 5 seconds so a wrong selector costs little.
 
 The screenshots in `docs/user_guide/images/` are taken with Puppet against a throwaway instance, never against real
 data. Point `Database__ConnectionString`, `DataProtection__KeysPath`, `Attestation__SelfSignedFolder`, and
-`Git__CachePath` at a temporary folder outside the repository, create two or three users with `user add`, run `serve`,
-and start Puppet with `--viewport 1280x800`. Seed a small project with a repository (or an upload), threaded comments,
-a partly answered checklist, and a signed review through the UI, then take each picture with
-`puppet screenshot <file> --full` in the light theme (plus one review with `puppet theme dark`). Crop each picture to
-its content and shrink it, for example
+`Git__CachePath` at a temporary folder outside the repository, create three users with `user add` (one administrator
+and two reviewers, for example Carol Chen, Alice Adams, and Bob Baker), run `serve`, and start Puppet with
+`--viewport 1280x800`. Use one Puppet daemon for each person at a time (at most two): give each its own
+`REVIEWCENTER_PUPPET_CONTROL_FILE` so that two people can be signed in side by side.
+
+Seed one project ("Warehouse Inventory") with a Git repository and three reviews through the UI:
+
+- A review that is fully answered and handed in by both reviewers. It fills the inbox.
+- A review that is only partly answered, with a justified N/A answer. It gives the checklist picture.
+- A review whose ballots differ on one check, with a Question and a Finding thread in the diff. It gives the status
+  panel (take that picture while the dispute and the threads are still open) and both diff pictures. Then settle it:
+  resolve the threads; because a disputed check blocks signing, the reviewer whose answer differs changes it to the
+  other answer (not a Fail, which would make the review Rejected) and hands the ballot in again with **Submit ballot**
+  (an edit turns a handed-in ballot back into a draft); then sign with both slots. It becomes the approved review
+  with the attestation PDF.
+
+Take each picture with `puppet screenshot <file> --full` in the light theme (plus the diff with `puppet theme dark`,
+after a pause of about a second). Crop each picture to its content and shrink it, for example
 `magick raw.png -crop 1280x700+0+120 +repage -strip -colors 256 +dither PNG8:out.png`
 (at most about 150 KB each, 1280 pixels wide), leave the page footer out, and stop the server and Puppet by process ID
-afterward.
+afterward. No script is kept for this: the data is small, and the pictures change only when the pages do.
+
+| Picture | Page |
+| ------- | ---- |
+| `review-inbox.png` | Inbox of a reviewer |
+| `review-status-panel.png` | Review with open threads and a dispute |
+| `review-diff-thread.png`, `review-diff-dark.png` | Diff with a Question and a Finding |
+| `review-signed.png`, `review-signatures.png` | Approved review |
+| `signature-confirmation.png` | Signing form, password typed, not yet signed |
+| `checklist-partial.png` | Checklist of the partly answered review |
+| `home-after-sign-in.png`, `audit-trail.png` | Home page and Audit page of the administrator |
 
 ## Known limitation
 

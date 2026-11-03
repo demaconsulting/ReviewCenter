@@ -43,7 +43,7 @@ never prints the password. Further users are created on the Users page by a syst
 be created (the user name is taken, the password is too short, no password was provided, or the database cannot be
 used) it prints an error and exits with a non-zero exit code.
 
-![The home page after first sign-in, with links to Projects, Audit, and Users.](images/home-after-sign-in.png)
+![The home page after first sign-in, with links to Inbox, Projects, Audit, and Users.](images/home-after-sign-in.png)
 
 ## Sign In and Out
 
@@ -215,7 +215,7 @@ dark setting of your device; **Light** and **Dark** always use that theme. The c
 it and is remembered in this browser only: it is not an account setting, so another browser or device starts with
 **System** again.
 
-![A review in the dark theme, with a resolved thread open in the side-by-side diff.](images/review-diff-dark.png)
+![A review in the dark theme, with a Question and a Finding thread in the diff.](images/review-diff-dark.png)
 
 To change your password, enter the current password and the new
 password, and press the change button. If your account has a second factor (see
