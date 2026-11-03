@@ -4,8 +4,9 @@
 # The BallotConsolidation class turns the ballots that the reviewer slots of a review hand in into one agreed standing
 # of every check and section of the checklist, the outcome that standing leads to, and a test of whether one ballot
 # answers everything it has to. It also covers the Ballot record, the stored and displayed ballot states, and the
-# outcome types that a later signature attests, and the BallotProjection class, which projects the ballots of a record
-# into the views that the services, the pages, and the follow-up carry-over read.
+# outcome types that a later signature attests, the BallotProjection class, which projects the ballots of a record
+# into the views that the services, the pages, and the follow-up carry-over read, and the BallotEdits class, which
+# gives the record or ballot that a ballot edit or a slot change would lead to.
 
 sections:
   - title: BallotConsolidation Unit Requirements
@@ -150,3 +151,25 @@ sections:
           - BallotProjection_Consolidate_Sections_AgreedNotApplicableAndDisputed
           - BallotProjection_ForBallot_ShowsTheOwnDraft
           - BallotProjection_ForBallot_NoBallot_IsNotStarted
+
+      - id: ReviewCenter-BallotConsolidation-Edits
+        title: >-
+          The BallotEdits class shall give the record or ballot that a ballot edit or a slot change would lead to
+          without changing its input: it shall replace or add the ballot of a slot in slot order, remove the ballot of
+          a slot, put an answer or a section state in a ballot as a draft, and revert the ballot of a slot that a
+          reviewer leaves to a draft that drops the rows the departing reviewer gave (user names compared ignoring
+          case) while keeping the rows carried from an earlier review, and shall refuse missing arguments.
+        justification: |
+          The signature impact of a ballot edit is computed before anything is stored, so the preview must follow the
+          same rules as the stored rows: an edit that reverts a ballot to a draft, or a reviewer who leaves a slot, must
+          show the same signatures as out of date that the stored change will. Leaving the input untouched keeps the
+          preview from changing the record that the caller still holds.
+        tests:
+          - BallotEdits_WithBallot_ExistingSlot_ReplacesTheBallotInSlotOrder
+          - BallotEdits_WithBallot_NewSlot_AddsTheBallotInSlotOrder
+          - BallotEdits_WithoutBallot_RemovesOnlyThatSlot
+          - BallotEdits_WithAnswer_ReplacesTheAnswerAndRevertsToDraft
+          - BallotEdits_WithAnswer_NoBallotYet_CreatesADraftWithTheAnswer
+          - BallotEdits_WithSectionState_ReplacesTheStateAndRevertsToDraft
+          - BallotEdits_Reassign_DepartingReviewer_DropsOwnRowsAndKeepsCarriedRows
+          - BallotEdits_NullArguments_Throw

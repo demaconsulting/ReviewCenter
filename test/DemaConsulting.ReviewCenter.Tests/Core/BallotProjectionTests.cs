@@ -121,11 +121,14 @@ public class BallotProjectionTests
     [Fact]
     public void BallotProjection_Consolidate_NoChecklist_ReturnsNull()
     {
-        // Arrange
+        // Arrange: a record without a checklist
         var record = new ReviewRecord("fp", null, [], [], ReviewSource.Upload);
 
-        // Act and assert
-        Assert.Null(BallotProjection.Consolidate(record));
+        // Act: consolidate it
+        var result = BallotProjection.Consolidate(record);
+
+        // Assert: there is no consolidated view
+        Assert.Null(result);
     }
 
     /// <summary>
@@ -134,8 +137,17 @@ public class BallotProjectionTests
     [Fact]
     public void BallotProjection_NullArguments_Throw()
     {
-        Assert.Throws<ArgumentNullException>(() => BallotProjection.Consolidate(null!));
-        Assert.Throws<ArgumentNullException>(() => BallotProjection.ForBallot(null!, 1, null));
+        // Arrange: the calls that pass a missing record
+        var consolidate = () => _ = BallotProjection.Consolidate(null!);
+        var forBallot = () => _ = BallotProjection.ForBallot(null!, 1, null);
+
+        // Act: run both
+        var consolidateError = Xunit.Record.Exception(consolidate);
+        var forBallotError = Xunit.Record.Exception(forBallot);
+
+        // Assert: both refuse the missing record
+        Assert.IsType<ArgumentNullException>(consolidateError);
+        Assert.IsType<ArgumentNullException>(forBallotError);
     }
 
     /// <summary>

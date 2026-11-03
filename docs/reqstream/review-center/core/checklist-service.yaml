@@ -321,6 +321,7 @@ sections:
           - ChecklistService_GetBallotView_SubmittedViewer_GetsReasonsOwnSlotAndFailedCount
           - ChecklistService_GetBallotView_HiddenViewers_LearnNoReasonDisputeOrFailedCheck
           - ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers
+          - ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck
 
       - id: ReviewCenter-ChecklistService-BallotImpact
         title: >-

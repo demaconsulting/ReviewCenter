@@ -70,10 +70,10 @@ progress text and the blocker sentence name both kinds ("2 open findings, 1 open
 counts words the open threads as threads. This scenario is tested by
 `ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads`.
 
-**ThreadCounts_MaskedViewer_NeverCountsCheckThreads**: A discussion about a check that was promoted to a Finding is
-not counted for a viewer who may not see the other ballots (progress, approval, and capabilities), while the lead's
-progress counts it. This scenario is tested by `ThreadCounts_MaskedViewer_NeverCountsCheckThreads`, defined in
-`BallotMaskingServiceTests.cs`.
+**ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads**: A discussion about a check that was promoted
+to a Finding is not counted for a viewer who may not see the other ballots (progress, approval, and capabilities), while
+the lead's progress counts it. This scenario is tested by `ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads`,
+defined in `BallotMaskingServiceTests.cs`.
 
 **ReviewProgressService_GetProgressAsync_SlotsAndSignatures_DeriveTheStage**: Three reviews: one without a slot, one with
 an unsigned slot, and one signed by its only reviewer after the checklist was answered. The list is ordered by identifier

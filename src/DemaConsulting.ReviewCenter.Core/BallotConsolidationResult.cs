@@ -85,7 +85,8 @@ public sealed record SectionConsolidation(string SectionId, SectionConsensus Con
 ///     outcome it leads to, and counts for a summary.
 /// </summary>
 /// <remarks>
-///     The record is immutable. <paramref name="Agreed"/> + <paramref name="Disputed"/> + <paramref name="Pending"/>
+///     The record is immutable, and the lists and the outcome maps it holds are read-only wrappers that cannot be
+///     changed through a cast. <paramref name="Agreed"/> + <paramref name="Disputed"/> + <paramref name="Pending"/>
 ///     equals the number of <paramref name="Checks"/> plus the number of disputed sections, because the checks of a
 ///     disputed section are not listed and the dispute of the section counts once.
 /// </remarks>

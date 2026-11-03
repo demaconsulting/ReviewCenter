@@ -17,8 +17,9 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- A viewer sees the answers of the other reviewers of a review with a single slot, of a concluded review, and when the
-  viewer leads the review, administers the project or the system, or is an Auditor.
+- A viewer who may view the project sees the answers of the other reviewers of a review with a single slot, of a
+  concluded review, and when the viewer leads the review, administers the project or the system, or is an Auditor. A
+  user who may not view the project sees nothing of them, whatever the rule says.
 - A project member without a slot, and a slot owner whose ballot is not submitted, do not see them; a slot owner whose
   ballot is submitted does.
 - The ballot view lists the differing checks with the answers in slot order only for a viewer who may see the others,
@@ -31,6 +32,8 @@ N/A - standard test environment.
 - A viewer who is not known is treated as one who has not handed in, in a review with several slots only.
 - An API token is treated like any other viewer, so it is masked in the consolidated checklist read of the API and in
   the progress of a review with several slots that is not concluded; there is no consolidated read without a viewer.
+  In the ballot view a token is always masked and never gets the differing checks or the failed count, even when its
+  owner has handed in.
 - The discussions about checks are left out of the list for a viewer who may not see the others, and the capabilities
   follow the rules for starting them.
 - The audit masking hides only the detail of entries that name an answer, a change of applicability, or a discussion
@@ -113,6 +116,16 @@ for a complete draft only while nothing but the hand-in blocks the signature. Th
 
 **ChecklistService_GetBallotView_UnknownReview_ReturnsNull**: An unknown review gives no view. This scenario is tested
 by `ChecklistService_GetBallotView_UnknownReview_ReturnsNull`.
+
+**ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers**: In a review with a single slot,
+whose ballots the rule shows to every viewer of the project, a user who may not view the project gets no failed count
+and no differing check. This scenario is tested by
+`ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers`.
+
+**ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck**: An API token of a reviewer who
+has handed in gets a masked ballot view with no differing check, no failed count and no justification, while the
+reviewer gets them. This scenario is tested by
+`ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck`.
 
 **ChecklistService_GetAsync_ViewerWithoutSlotAndBallot_ReturnsMaskedState**: A member without a slot gets an empty,
 masked state in place of the standing. This scenario is tested by

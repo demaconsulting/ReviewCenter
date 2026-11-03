@@ -16,13 +16,16 @@ sections:
           several reviewer slots only when the viewer has handed in their own ballot, or leads the review,
           administers the project, is a system administrator or an auditor, or when the review is concluded, shall
           hide them from every other viewer, a project member who holds no slot included, shall never hide anything
-          in a review with one slot or none, and shall treat a viewer it does not know as one who has not handed in.
+          from a viewer who may view the project in a review with one slot or none, and shall treat a viewer it does not
+          know as one who has not handed in.
         justification: |
           Independent judgment is the point of having several reviewers: an answer that is read before the own
           answer is given turns two verdicts into one. The rule is one pure test that every reader of ballots asks,
           so that no page or service decides on its own. People who steer or audit the review need the full picture,
           and once the review is concluded nothing is left to influence. A single reviewer has nobody to be
-          influenced by.
+          influenced by. The rule knows nothing of project access: whether a viewer may view the project at all is a
+          separate precondition that every service checks first, so "never hide anything" holds for a viewer of the
+          project and a stranger still learns nothing.
         tests:
           - BallotVisibility_CanSeeOthers_SingleSlot_AlwaysSeesAll
           - BallotVisibility_CanSeeOthers_PlainContributorWithoutSlot_Masked
@@ -55,6 +58,8 @@ sections:
           - ChecklistService_GetBallotView_CanAssignMe_OnlyForMemberWithoutSlot
           - ChecklistService_GetBallotView_CompleteDraft_OffersSubmitAndSignOnlyWhenNothingBlocks
           - ChecklistService_GetBallotView_UnknownReview_ReturnsNull
+          - ChecklistService_GetBallotView_StrangerOnSingleSlotReview_LearnsNothingOfTheAnswers
+          - ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck
           - ChecklistService_GetAsync_ViewerWithoutSlotAndBallot_ReturnsMaskedState
           - ChecklistService_GetConsolidatedAsync_TokenViewer_IsMasked
           - ChecklistService_GetConsolidatedAsync_LeadAdminAuditorViaToken_IsMasked

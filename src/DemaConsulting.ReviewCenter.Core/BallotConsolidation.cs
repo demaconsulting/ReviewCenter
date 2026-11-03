@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Collections.ObjectModel;
+
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
@@ -108,8 +110,8 @@ public static class BallotConsolidation
         var failed = checks.Count(check => check.Outcome == ChecklistOutcome.Fail);
 
         return new BallotConsolidationResult(
-            checks,
-            sections,
+            checks.AsReadOnly(),
+            sections.AsReadOnly(),
             DeriveOutcome(submitted.Count, pending, disputed, failed),
             agreed,
             disputed,
@@ -217,16 +219,18 @@ public static class BallotConsolidation
             }
         }
 
+        // The record is documented as immutable, so what it holds must not be mutable through a cast
+        var shown = new ReadOnlyDictionary<int, ChecklistOutcome>(outcomes);
         if (unanswered)
         {
-            return new CheckConsolidation(itemId, sectionId, CheckConsensus.Pending, null, outcomes);
+            return new CheckConsolidation(itemId, sectionId, CheckConsensus.Pending, null, shown);
         }
 
         // Every submitted ballot answered: equal outcomes agree, any difference is a dispute
         var distinct = outcomes.Values.Distinct().ToList();
         return distinct.Count == 1
-            ? new CheckConsolidation(itemId, sectionId, CheckConsensus.Agreed, distinct[0], outcomes)
-            : new CheckConsolidation(itemId, sectionId, CheckConsensus.Disputed, null, outcomes);
+            ? new CheckConsolidation(itemId, sectionId, CheckConsensus.Agreed, distinct[0], shown)
+            : new CheckConsolidation(itemId, sectionId, CheckConsensus.Disputed, null, shown);
     }
 
     /// <summary>

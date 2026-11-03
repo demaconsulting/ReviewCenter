@@ -249,7 +249,8 @@ public sealed class ChecklistService
     ///     review with one slot offers neither, because its ballot is handed in with the last answer. The names of the
     ///     other reviewers who have not handed in are listed for every viewer who may view the project (progress, never
     ///     an answer); the differing answers and the number of agreed Fail checks are given only while the view is not
-    ///     masked and the viewer may view the project.
+    ///     masked and the viewer may view the project. An API token is always masked: it never receives the differing
+    ///     answers, their reasons or the number of failed checks, even when its owner has handed in.
     /// </remarks>
     public async Task<BallotView?> GetBallotViewAsync(
         Actor? viewer,
@@ -270,7 +271,10 @@ public sealed class ChecklistService
         var own = ReviewActorRoles.FindOwnSlot(user?.Id, snapshot.Slots);
         var seesAll = review is not null
                       && await BallotVisibility.SeesAllInReviewAsync(_access, viewer, review, cancellationToken);
-        var canSee = BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id);
+        // An API token never learns the differing answers, their reasons or the number of failed checks, even when its
+        // owner has handed in: it sees the standing only through the masked consolidated view
+        var tokenActor = viewer is { ViaApiToken: true };
+        var canSee = !tokenActor && BallotVisibility.CanSeeOthers(seesAll, snapshot, user?.Id);
         var concluded = ReviewLock.IsConcluded(snapshot.Record, snapshot.Slots, snapshot.Signatures);
         var consolidated = BallotProjection.Consolidate(snapshot.Record, snapshot.Slots.Count)!;
 

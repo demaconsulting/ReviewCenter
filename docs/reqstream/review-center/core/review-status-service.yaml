@@ -101,10 +101,10 @@ sections:
           The ReviewStatusService class shall list, for each slot whose signature no longer matches the report, the
           audit entries after the signature that can change the report (a ballot handed in, reopened or reassigned,
           the conclusion text, a thread in the report that was started, answered, made a Finding or a Question,
-          added to the report or taken out, and a Finding resolved with a note), each with the time, the person and a
-          reason in plain words, shall leave out every other entry, shall read the whole audit trail of the review,
-          however long, shall list nothing for a signature that still matches, and shall give the details of an entry
-          only as the audit masking allows the viewer.
+          added to the report or taken out, and a Finding resolved with a note, also a Finding that was carried over
+          from the followed review), each with the time, the person and a reason in plain words, shall leave out every
+          other entry, shall read the whole audit trail of the review, however long, shall list nothing for a signature
+          that still matches, and shall give the details of an entry only as the audit masking allows the viewer.
         justification: |
           A signed reviewer who is told to look again wants to know what happened. The list is derived from the audit
           trail by a fixed set of actions; it explains and does not prove: the signature check itself compares the
@@ -115,3 +115,7 @@ sections:
           - ReviewStatus_ChangesSinceSigning_EmptyWhenSignatureStillMatches
           - ReviewStatus_ChangeRules_FollowThreadKindFromEarlierEntries
           - ReviewStatus_ChangesSinceSigning_ReadsPastTwentyThousandEntries
+          - ReviewStatus_ChangeRules_CarriedFinding_ResolvedWithNote_IsListed
+          - ReviewStatus_ChangeRules_CarriedFindingDemotedLater_UsesTheKindBeforeTheChange
+          - ReviewStatus_ChangeRules_CarriedQuestion_ResolvedWithNote_IsNotListed
+          - ReviewStatus_ChangesSinceSigning_CarriedFindingResolvedWithNote_IsListed

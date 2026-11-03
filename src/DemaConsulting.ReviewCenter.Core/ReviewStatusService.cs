@@ -480,7 +480,7 @@ public sealed class ReviewStatusService
                 continue;
             }
 
-            var changes = ReviewChangeRules.Derive(entries, shown, signature.SignedAt);
+            var changes = ReviewChangeRules.Derive(entries, shown, signature.SignedAt, snapshot.Record.Threads);
             result.Add(new SignatureChanges(slot.SlotId, slot.Number, signature.DisplayName, signature.SignedAt, changes));
         }
 

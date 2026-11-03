@@ -274,6 +274,33 @@ public class BallotMaskingServiceTests
     }
 
     /// <summary>
+    ///     Test that an API token whose owner has handed in is still masked in the ballot view: it learns no reason, no
+    ///     disputed check and no failed check, although it may read the consolidated standing through the API read.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_GetBallotView_SubmittedApiToken_LearnsNoReasonDisputeOrFailedCheck()
+    {
+        // Arrange: ann Pass and bob Fail with a reason, both handed in
+        var world = await BallotMaskingWorld.CreateAsync();
+        await world.ArrangeDisputeAsync();
+        var token = new Actor("ann", "ann") { ApiTokenId = "tok-1" };
+
+        // Act: read the ballot view as the token of ann, who has handed in, and the consolidated standing
+        var view = await world.Checklists.GetBallotViewAsync(token, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+        var consolidated = await world.Checklists.GetConsolidatedAsync(token, world.ProjectId, BallotMaskingWorld.ReviewId, Token);
+
+        // Assert: the view is masked and holds nothing of the answers; the consolidated read is not masked for the token
+        Assert.NotNull(view);
+        Assert.NotNull(consolidated);
+        Assert.Multiple(
+            () => Assert.True(view.IsMasked),
+            () => Assert.Empty(view.Differing),
+            () => Assert.Equal(0, view.FailedChecks),
+            () => Assert.DoesNotContain("A reason", System.Text.Json.JsonSerializer.Serialize(view), StringComparison.Ordinal),
+            () => Assert.False(consolidated.IsMasked));
+    }
+
+    /// <summary>
     ///     Test that a stranger gets no differing answers and no failed count even where the ballots are open to every
     ///     viewer (a review with a single slot).
     /// </summary>
@@ -1041,10 +1068,12 @@ public class BallotMaskingServiceTests
 
     /// <summary>
     ///     Test that a viewer who has not handed in never gets a count, a blocker or a per-thread action for a
-    ///     discussion about a check (a Finding here), while the lead and a reviewer who handed in do.
+    ///     discussion about a check (a Finding here), while the lead and a reviewer who handed in do. The primary
+    ///     subject is the progress count of <see cref="ReviewProgressService"/>; the approval blockers and the thread
+    ///     capabilities are checked with it.
     /// </summary>
     [Fact]
-    public async Task ThreadCounts_MaskedViewer_NeverCountsCheckThreads()
+    public async Task ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads()
     {
         // Arrange: the lead starts a discussion about a check and promotes it; bob has not handed in
         var world = await BallotMaskingWorld.CreateAsync();

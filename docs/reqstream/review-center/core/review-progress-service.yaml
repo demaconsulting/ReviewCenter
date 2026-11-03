@@ -159,7 +159,7 @@ sections:
         tests:
           - ReviewProgressService_GetProgressAsync_CountsOpenQuestionsAndFindings
           - ReviewProgress_OpenThreadsText_WithoutKindCounts_FallsBackToThreads
-          - ThreadCounts_MaskedViewer_NeverCountsCheckThreads
+          - ReviewProgressService_GetProgress_MaskedViewer_DoesNotCountCheckThreads
 
       - id: ReviewCenter-ReviewProgressService-BallotProgress
         title: >-

@@ -226,8 +226,10 @@ and comments are not affected by the rule.
 - *Returns*: `Task<BallotView?>` — null when the review does not exist.
 - *Postconditions*: `IsMasked` is true when the viewer may not see the others. `Differing` (the checks the submitted
   ballots answer differently, each with the answer, and the justification, of every slot) and `FailedChecks` (how many
-  checks the submitted ballots agree on as Fail) are filled only when the viewer may see the others *and* may view the
-  project; for any other viewer they are empty and 0, so a stranger learns neither a dispute nor a failed check.
+  checks the submitted ballots agree on as Fail) are filled only when the viewer may see the others, may view the
+  project, *and* is not an API token; for any other viewer they are empty and 0, so a stranger learns neither a dispute
+  nor a failed check, and a token never does, not even when its owner has handed in (a token is always masked in the
+  ballot view, `IsMasked` is true).
   `OwnSlotNumber` is the position of the viewer's own slot (null without a slot), so the page does not repeat the
   viewer's own justification. `MissingBallotNames` lists the display names of the other slots whose ballot is not
   handed in (a draft, or none yet), in slot order; it shows who has not handed in, which is progress and never an

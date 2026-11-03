@@ -38,7 +38,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         concluded, and for the lead of the review, a project or system administrator and an Auditor, who steer or
 ///         check the review. A person without a slot (a plain contributor) is hidden from the others' answers like a
 ///         reviewer with a draft. The rules are pure (no I/O); the services gather the facts and these rules alone
-///         decide. The class is stateless and thread-safe.
+///         decide. The rules know nothing of project access: the services first require that the viewer may view the
+///         project, then apply these rules. The class is stateless and thread-safe.
 ///     </para>
 /// </remarks>
 public static class BallotVisibility

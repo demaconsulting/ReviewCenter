@@ -34,7 +34,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <para>
 ///         A reply or a comment alters the digest only when it is included in the report, and the audit text says so,
 ///         so it is listed only then. A resolution note counts only for a Finding; the audit text does not name the kind,
-///         so the kind of every thread is replayed from the entries that start a thread or change its kind. The reasons
+///         so the kind of every thread is replayed from the entries that start a thread or change its kind. A thread
+///         carried over from a followed review has no start entry, so its kind at carry time is seeded from the thread
+///         itself (read-side only; the audit trail and the digest are unchanged). The reasons
 ///         are fixed sentences that never contain text of the entry, and an entry that the audit masking hides from the
 ///         viewer gets one neutral sentence, so the list reveals nothing the viewer may not see. The class is pure and
 ///         thread-safe.
@@ -66,13 +68,18 @@ internal static class ReviewChangeRules
     ///     different object than the entry it replaces.
     /// </param>
     /// <param name="after">The moment of the signature; only later entries are listed.</param>
+    /// <param name="threads">
+    ///     The threads of the review as they are now; the ones carried over from a followed review have no start entry
+    ///     in the trail, so their kind at carry time is seeded from here. <c>null</c> seeds nothing.
+    /// </param>
     /// <returns>The changes after <paramref name="after"/> that alter the report, oldest first.</returns>
     public static IReadOnlyList<ReviewChange> Derive(
         IReadOnlyList<AuditEntry> entries,
         IReadOnlyList<AuditEntry> shown,
-        DateTimeOffset after)
+        DateTimeOffset after,
+        IReadOnlyList<ReviewThread>? threads = null)
     {
-        var findings = new Dictionary<int, bool>();
+        var findings = SeedCarriedThreads(entries, threads);
         var changes = new List<ReviewChange>();
         for (var i = 0; i < entries.Count; i++)
         {
@@ -89,6 +96,45 @@ internal static class ReviewChangeRules
         }
 
         return changes;
+    }
+
+    /// <summary>
+    ///     Seeds the kind of the threads that were carried over from a followed review.
+    /// </summary>
+    /// <param name="entries">All entries of the review, oldest first.</param>
+    /// <param name="threads">The threads of the review as they are now; <c>null</c> when none are known.</param>
+    /// <returns>Whether each carried thread was a Finding at carry time, by thread identity.</returns>
+    /// <remarks>
+    ///     A carried thread has no <c>thread.started</c> entry in the follow-up's trail. Its kind at carry time is the
+    ///     kind named before the arrow of its first <c>thread.kind-changed</c> entry, or its current kind when the
+    ///     kind never changed. The audit trail itself is not altered.
+    /// </remarks>
+    private static Dictionary<int, bool> SeedCarriedThreads(
+        IReadOnlyList<AuditEntry> entries,
+        IReadOnlyList<ReviewThread>? threads)
+    {
+        var findings = new Dictionary<int, bool>();
+        if (threads is null)
+        {
+            return findings;
+        }
+
+        foreach (var thread in threads)
+        {
+            if (thread.CarriedFromReviewId is null)
+            {
+                continue;
+            }
+
+            var prefix = $"thread {thread.Id}: ";
+            var first = entries.FirstOrDefault(e =>
+                e.Action == "thread.kind-changed" && e.Detail.StartsWith(prefix, StringComparison.Ordinal));
+            findings[thread.Id] = first is null
+                ? thread.Kind == ThreadKind.Finding
+                : first.Detail.StartsWith(prefix + ThreadKindRules.KindText(ThreadKind.Finding) + " ->", StringComparison.Ordinal);
+        }
+
+        return findings;
     }
 
     /// <summary>

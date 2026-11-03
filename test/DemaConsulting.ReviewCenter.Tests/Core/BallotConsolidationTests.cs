@@ -583,6 +583,33 @@ public class BallotConsolidationTests
     }
 
     /// <summary>
+    ///     Test that the lists and the outcome maps of a result are read-only, so the immutable result cannot be changed
+    ///     through a cast, and that the outcome maps still enumerate in ascending slot order.
+    /// </summary>
+    [Fact]
+    public void BallotConsolidation_Consolidate_ResultCollections_CannotBeMutated()
+    {
+        // Arrange: two submitted ballots, given in descending slot order
+        var ballots = new[] { Full(2, BallotStatus.Submitted), Full(1, BallotStatus.Submitted, outcome3: ChecklistOutcome.Fail) };
+
+        // Act: consolidate them
+        var result = BallotConsolidation.Consolidate(_definition, ballots);
+        var checks = (IList<CheckConsolidation>)result.Checks;
+        var sections = (IList<SectionConsolidation>)result.Sections;
+        var outcomes = (IDictionary<int, ChecklistOutcome>)CheckOf(result, "i3").Outcomes;
+
+        // Assert: every collection is read-only, refuses a change, and the outcomes stay in ascending slot order
+        Assert.Multiple(
+            () => Assert.True(checks.IsReadOnly),
+            () => Assert.Throws<NotSupportedException>(() => checks.Add(checks[0])),
+            () => Assert.True(sections.IsReadOnly),
+            () => Assert.Throws<NotSupportedException>(() => sections.Add(sections[0])),
+            () => Assert.True(outcomes.IsReadOnly),
+            () => Assert.Throws<NotSupportedException>(() => outcomes[3] = ChecklistOutcome.Pass),
+            () => Assert.Equal([1, 2], outcomes.Keys));
+    }
+
+    /// <summary>
     ///     Describes the checks of a result in one line for comparison.
     /// </summary>
     /// <param name="result">The result.</param>

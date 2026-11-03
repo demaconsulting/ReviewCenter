@@ -41,12 +41,13 @@ public sealed record BallotAnswerView(int SlotNumber, string ReviewerName, Check
 /// </remarks>
 /// <param name="IsMasked">
 ///     <c>true</c> when the viewer may not see the answers of the other reviewers yet; the review has more than one slot
-///     and the viewer has not handed in their own ballot (and sees everything for no other reason).
+///     and the viewer has not handed in their own ballot (and sees everything for no other reason). An API token is
+///     always masked.
 /// </param>
 /// <param name="Differing">
 ///     The checks that the submitted ballots answer differently, by check identifier, each with the answer of every
-///     submitted ballot in slot order; empty while <paramref name="IsMasked"/> is <c>true</c>, and for a viewer who may not
-///     view the project.
+///     submitted ballot in slot order; empty while <paramref name="IsMasked"/> is <c>true</c>, for a viewer who may not
+///     view the project, and for an API token (which is always masked).
 /// </param>
 /// <param name="BallotsSubmitted">The number of ballots handed in; who has handed in is not hidden.</param>
 /// <param name="BallotsTotal">The number of reviewer slots.</param>
@@ -65,8 +66,8 @@ public sealed record BallotAnswerView(int SlotNumber, string ReviewerName, Check
 /// </param>
 /// <param name="FailedChecks">
 ///     The number of checks of applicable sections the submitted ballots agree on as Fail; always zero while
-///     <paramref name="IsMasked"/> is <c>true</c> (and for a viewer who may not view the project), because the count
-///     reveals how the other reviewers voted.
+///     <paramref name="IsMasked"/> is <c>true</c> (and for a viewer who may not view the project, and for an API token),
+///     because the count reveals how the other reviewers voted.
 /// </param>
 /// <param name="OwnSlotNumber">
 ///     The position of the viewer's own slot among the slots of the review, starting at 1 (the numbering of
