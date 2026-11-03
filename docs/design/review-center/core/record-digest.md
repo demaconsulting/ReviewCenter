@@ -176,7 +176,8 @@ Notation and rules:
   signatures out of date.
 - **Preconditions of the claims above**: (1) The order independence holds for lists whose sort keys are unique; this is
   an assumption about the input, not something the digest enforces. The keys are unique in a stored record, because the
-  store keys the answers and the section states of a ballot by check id and section id, a review has one ballot per
+  store keys the answers and the section states of a ballot by check id and section id (one current row per section,
+  replaced by a write, so no stale section state sits beside the current one), a review has one ballot per
   slot, and files (and so changes) are keyed by path within a review, and
   a checklist definition is expected to use unique section and check identifiers (`ChecklistDefinition.FromJson` does
   not reject duplicates, so a definition with duplicates is outside the claim). The sort is stable, so input that broke
@@ -375,8 +376,11 @@ digest; and that a second ballot that agrees leaves the digest as it was while t
   carried from or `-`), and one `section` line per section state sorted by section identifier (identifier, `applicable`
   or `not-applicable`, reason, user name of who set it, UTC ticks, carried-from or `-`). Strings are written with the same
   escaping as the digest, so a delimiter inside a text cannot be mistaken for the separator. When a check was answered
-  more than once in a ballot, the last row counts. A record with no submitted ballot gives only the header. A draft ballot
-  never takes part, and display names are not written.
+  more than once in a ballot, the last row counts. The store keeps one current row per section of a slot (the key is
+  the project, review, slot and section, and a write replaces the row), so a section state is never repeated and needs
+  no such reduction; grouping the answers is a defensive step, and a repeated section id, which the store cannot
+  produce, would be written in the order it was given. A record with no submitted ballot gives only the header. A
+  draft ballot never takes part, and display names are not written.
 - *Preconditions*: The record is not null.
 
 **ComputeBallotFingerprint**: Calculates the fingerprint of the submitted ballots.

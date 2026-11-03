@@ -349,5 +349,5 @@ sections:
           - RecordDigest_ComputeBallotFingerprint_Record_IsSha256OfCanonicalTextInLowercaseHex
           - RecordDigest_CanonicalizeBallots_SlotIdentities_NumbersBallotsByOrdinalInSlotOrder
           - RecordDigest_ComputeBallotFingerprint_ChangedAnswer_ChangesFingerprintButDisplayNameDoesNot
-          - RecordDigest_CanonicalizeBallots_RepeatedAnswerAndSectionState_LastRowCountsAndLinesAreSorted
+          - RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted
           - RecordDigest_CanonicalizeBallots_NullRecord_Throws

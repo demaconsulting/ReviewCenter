@@ -217,10 +217,11 @@ public class RecordDigestBallotFingerprintTests
 
     /// <summary>
     ///     Test that when a check was answered more than once in a ballot only the last row counts, that the answer
-    ///     lines are sorted by check id, and that a section marked not applicable has a line of its own.
+    ///     lines are sorted by check id, and that a section marked not applicable has a line of its own (the store keeps
+    ///     one row per section, so there is no repeated section state to reduce).
     /// </summary>
     [Fact]
-    public void RecordDigest_CanonicalizeBallots_RepeatedAnswerAndSectionState_LastRowCountsAndLinesAreSorted()
+    public void RecordDigest_CanonicalizeBallots_RepeatedAnswer_LastRowCountsAndLinesAreSorted()
     {
         // Arrange: b-01 first, then a-01 twice (Fail, then Pass), and section b marked not applicable
         var ballot = new Ballot(

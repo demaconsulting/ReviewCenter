@@ -262,6 +262,7 @@ public sealed class InboxService
                     right.Member,
                     hidden,
                     InboxRules.AuthorBlocked(project, candidate.CreatedBy, user.Username),
+                    actor is { ViaApiToken: true },
                     names),
                 cancellationToken);
         }
@@ -507,8 +508,9 @@ public sealed class InboxService
 
                 // A question for me: someone else asked and I have not written in the thread. The author's replies
                 // waiting already list every such thread, and the threads are the ones I may know of (see above), so
-                // no check discussion of a hidden user is ever named
-                IReadOnlyList<ReviewThread> questions = isAuthor || (mine.Count > 0 && !review.Member)
+                // no check discussion of a hidden user is ever named. An API token acts for its user elsewhere, but it
+                // is never asked a question: it gets no such row
+                IReadOnlyList<ReviewThread> questions = isAuthor || review.ViaApiToken || (mine.Count > 0 && !review.Member)
                     ? []
                     : InboxRules.QuestionsForYou(threads, username);
                 if (questions.Count > 0)
@@ -983,6 +985,7 @@ public sealed class InboxService
     /// <param name="AuthorBlocked">
     ///     Whether the user created the review and the project does not let the author answer its checklist.
     /// </param>
+    /// <param name="ViaApiToken">Whether the actor is an API token of the user; a token never gets a Question for you row.</param>
     /// <param name="Names">The display names of the users, read once and only when a row needs them.</param>
     private sealed record ReviewContext(
         User User,
@@ -995,6 +998,7 @@ public sealed class InboxService
         bool Member,
         bool Hidden,
         bool AuthorBlocked,
+        bool ViaApiToken,
         UserNames Names);
 
     /// <summary>

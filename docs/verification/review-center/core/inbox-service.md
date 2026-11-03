@@ -114,9 +114,14 @@ scenario is tested by `InboxService_GetInboxAsync_DisabledUser_GetsEmptyView`.
 **InboxService_GetInboxAsync_TemporaryPasswordUser_GetsEmptyView**: A user who still has a temporary password gets the
 empty view. This scenario is tested by `InboxService_GetInboxAsync_TemporaryPasswordUser_GetsEmptyView`.
 
-**InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView**: No actor, the command line, and a name that is
-no user give the empty view and no error. This scenario is tested by
-`InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView`.
+**InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView**: No actor, the command line, and a name
+that is no user give the empty view and no error. This scenario is tested by
+`InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView`.
+
+**InboxService_GetInboxAsync_QuestionForApiToken_ShowsNoQuestionForYouRow**: A slot holder has an open question of
+another reviewer that was not answered; the person gets the Question for you row, while an API token of that user gets
+no Question for you row. This scenario is tested by
+`InboxService_GetInboxAsync_QuestionForApiToken_ShowsNoQuestionForYouRow`.
 
 **InboxService_GetInboxAsync_LatestCommentByOther_IAnswered_ShowsRepliesWaiting**: A thread in which the user wrote and
 that someone else answered last is a reply waiting, with the chip "1 waiting". This scenario is tested by

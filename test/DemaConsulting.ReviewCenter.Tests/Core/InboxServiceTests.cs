@@ -293,7 +293,7 @@ public class InboxServiceTests
     ///     Test that no actor, the command line and a name that is no user give the empty view and no error.
     /// </summary>
     [Fact]
-    public async Task InboxService_GetInboxAsync_AnonymousOrTokenOnlyActor_GetsEmptyView()
+    public async Task InboxService_GetInboxAsync_AnonymousCommandLineOrUnknownActor_GetsEmptyView()
     {
         // Arrange: a review with work for ann
         var world = await InboxTestWorld.CreateAsync();
@@ -1584,6 +1584,31 @@ public class InboxServiceTests
         Assert.Equal(0, stranger.ActionCount);
         Assert.DoesNotContain(auditor.Items, item => item.Chip == InboxService.QuestionChip);
         Assert.Equal(0, await world.Inbox.CountAsync(InboxTestWorld.ActorOf("out"), Ct));
+    }
+
+    /// <summary>
+    ///     Test that an API token of a slot holder gets no Question for you row, while the person the token belongs to
+    ///     does get the row for the same open question.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_GetInboxAsync_QuestionForApiToken_ShowsNoQuestionForYouRow()
+    {
+        // Arrange: ann holds a slot and bob asks a question she has not written in
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        await world.AddSlotAsync("r1", "ann");
+        await world.AddSlotAsync("r1", "bob");
+        await world.StartThreadAsync("r1", "bob", "Why is this here?");
+        var token = InboxTestWorld.ActorOf("ann") with { ApiTokenId = "tok-1" };
+
+        // Act
+        var person = await world.InboxOfAsync("ann");
+        var viaToken = await world.Inbox.GetInboxAsync(token, Ct);
+
+        // Assert: the person gets the row, the token does not (the token still has the other rows of the user)
+        var row = Assert.Single(person.Items, item => item.Chip == InboxService.QuestionChip);
+        Assert.Equal(InboxSection.ToAnswer, row.Section);
+        Assert.DoesNotContain(viaToken.Items, item => item.Chip == InboxService.QuestionChip);
     }
 
     /// <summary>
