@@ -4,10 +4,10 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Storage subsystem
 # - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore,
-#   InboxStore, and DatabaseSetup units
+#   InboxStore, NotificationStore, and DatabaseSetup units
 # - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, reviews,
 #   checklists, comment threads, reviewer slots, signatures, project memberships, the evidence settings of projects,
-#   the audit trail, and git repositories
+#   the audit trail, git repositories, and the e-mail address for notifications
 
 sections:
   - title: Storage Subsystem Requirements
@@ -447,3 +447,119 @@ sections:
         tests:
           - StorageSubsystem_InboxOverDatabase_ReopenedDatabase_KeepsStateAndShowsItems
           - InboxStore_MarkSeenAsync_ParallelCalls_NoExceptionAndHighestWins
+
+      - id: ReviewCenter-Storage-NotificationPreferences
+        title: >-
+          The Storage subsystem shall keep the e-mail address of a user for notifications until the user removes it.
+        justification: |
+          The address and its pending confirmation decide where the server sends mail, so they are kept in the database
+          file and survive a restart. The tables are created from the model without a migration, so a database that
+          was created before them has to be recreated.
+        children:
+          - ReviewCenter-NotificationStore-Available
+          - ReviewCenter-NotificationStore-UnavailableOldDatabase
+          - ReviewCenter-NotificationStore-AvailableFailurePropagates
+          - ReviewCenter-NotificationStore-NoRow
+          - ReviewCenter-NotificationStore-ReservePending
+          - ReviewCenter-NotificationStore-ReservePendingCode
+          - ReviewCenter-NotificationStore-ReserveKeepsConfirmed
+          - ReviewCenter-NotificationStore-AbortClearsPending
+          - ReviewCenter-NotificationStore-AbortOtherCode
+          - ReviewCenter-NotificationStore-ConfirmMoves
+          - ReviewCenter-NotificationStore-ConfirmClearsPending
+          - ReviewCenter-NotificationStore-ConfirmOtherCode
+          - ReviewCenter-NotificationStore-ConfirmExpired
+          - ReviewCenter-NotificationStore-RemoveRow
+          - ReviewCenter-DbContext-NotificationPreferencesTable
+          - ReviewCenter-DbContext-NotificationSendLogTable
+        tests:
+          - NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit
+          - NotificationStore_ReserveConfirmationAsync_AfterConfirmed_KeepsConfirmedAndResetsAttempts
+
+      - id: ReviewCenter-Storage-NotificationAudit
+        title: >-
+          The Storage subsystem shall record an audit entry for each change of the notification address of a user.
+        justification: |
+          An audit entry must exist exactly when the change happened, which only the database can guarantee for any
+          number of requests.
+        children:
+          - ReviewCenter-NotificationStore-ReserveAudit
+          - ReviewCenter-NotificationStore-ConfirmAudit
+          - ReviewCenter-NotificationStore-RemoveAudit
+          - ReviewCenter-NotificationStore-ConfirmNoAuditOtherCode
+          - ReviewCenter-NotificationStore-ConfirmNoAuditExpired
+        tests:
+          - NotificationStore_ReserveConfirmationAsync_Reserved_StoresPendingLogAndAudit
+          - NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit
+          - NotificationStore_RemoveAsync_DeletesRowWithAuditOnce
+          - NotificationStore_ConfirmAsync_OtherCode_ChangesNothing
+
+      - id: ReviewCenter-Storage-NotificationConfirmOneWinner
+        title: >-
+          When several confirmations of the same address arrive at the same time, the Storage subsystem shall confirm
+          the address once.
+        justification: |
+          A code must confirm an address once, and a second confirmation must not write a second audit entry.
+        children:
+          - ReviewCenter-NotificationStore-ConfirmOneWinner
+        tests:
+          - NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner
+
+      - id: ReviewCenter-Storage-NotificationLimits
+        title: >-
+          The Storage subsystem shall refuse to reserve a confirmation mail that exceeds a sending limit.
+        justification: |
+          The sending limits are the pause between mails of one user, the mails per user and per address in a day, and
+          the mails of the server in an hour. They protect mailboxes and the mail server from abuse. The send log is
+          kept when an address is removed, so removing and entering an address again does not get around the limits.
+        children:
+          - ReviewCenter-NotificationStore-ReserveLog
+          - ReviewCenter-NotificationStore-ReserveResetsAttempts
+          - ReviewCenter-NotificationStore-ReserveCooldown
+          - ReviewCenter-NotificationStore-ReserveUserLimit
+          - ReviewCenter-NotificationStore-ReserveAddressLimit
+          - ReviewCenter-NotificationStore-ReserveServerLimit
+          - ReviewCenter-NotificationStore-AbortRemovesLog
+          - ReviewCenter-NotificationStore-RemoveKeepsLog
+        tests:
+          - NotificationStore_ReserveConfirmationAsync_WithinCooldown_ReturnsTooSoon
+          - NotificationStore_ReserveConfirmationAsync_UserLimit_ReturnsUserLimitReached
+          - NotificationStore_ReserveConfirmationAsync_AddressLimit_ReturnsAddressLimitReached
+          - NotificationStore_ReserveConfirmationAsync_ServerLimit_ReturnsGlobalLimitReached
+
+      - id: ReviewCenter-Storage-NotificationReserveOneWinner
+        title: >-
+          When several requests for the same user arrive at the same time, the Storage subsystem shall reserve one
+          confirmation mail.
+        justification: |
+          Parallel requests must not pass the limits together and cause more mails than the limits allow.
+        children:
+          - ReviewCenter-NotificationStore-ReserveOneWinner
+        tests:
+          - NotificationStore_ReserveConfirmationAsync_Concurrent_HasExactlyOneWinner
+
+      - id: ReviewCenter-Storage-NotificationAttemptLimit
+        title: >-
+          When several attempts to type a code arrive at the same time, the Storage subsystem shall count no more
+          attempts than the limit.
+        justification: |
+          Parallel guesses must not get more tries than the limit, because a six digit code has only one million
+          values.
+        children:
+          - ReviewCenter-NotificationStore-CountAttempts
+          - ReviewCenter-NotificationStore-AttemptLimit
+          - ReviewCenter-NotificationStore-AttemptsOneByOne
+        tests:
+          - NotificationStore_TryCountAttemptAsync_Concurrent_NeverExceedsTheLimit
+          - NotificationStore_TryCountAttemptAsync_CountsUpToTheLimitForTheCurrentCode
+
+      - id: ReviewCenter-Storage-NotificationLogRetention
+        title: >-
+          The Storage subsystem shall keep a send log entry for no longer than one day after the next confirmation
+          request.
+        justification: |
+          The send log holds the target address of each mail, and no limit counts an entry that is older than a day.
+        children:
+          - ReviewCenter-NotificationStore-PruneLog
+        tests:
+          - NotificationStore_ReserveConfirmationAsync_OldLogEntries_AreDeleted

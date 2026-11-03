@@ -81,6 +81,11 @@ public abstract class PageTestBase : BunitContext
         Challenges = new TotpChallengeStore(Time);
         Totp = new TotpService(TotpStore, new TotpAlgorithm(), new FakeTotpSecretProtector(), Users, Challenges, Time);
         Services.AddSingleton(Totp);
+        NotificationStore = new FakeNotificationStore();
+        NotificationSender = new FakeNotificationSender();
+        Notifications = new NotificationPreferenceService(
+            NotificationStore, NotificationSender, Users, NotificationSettings.Off, Time);
+        Services.AddSingleton(Notifications);
         TokenStore = new FakePersonalAccessTokenStore(userStore);
         Proofs = new ReauthProofStore(Time);
         Tokens = new PersonalAccessTokenService(TokenStore, userStore, Time);
@@ -220,6 +225,37 @@ public abstract class PageTestBase : BunitContext
             new TotpSettings(false, TotpSettings.DefaultIssuer));
         Services.RemoveAll<TotpService>();
         Services.AddSingleton(Totp);
+    }
+
+    /// <summary>
+    ///     Gets the in-memory store of notification addresses behind the services.
+    /// </summary>
+    internal FakeNotificationStore NotificationStore { get; }
+
+    /// <summary>
+    ///     Gets the sender that records the mails instead of sending them.
+    /// </summary>
+    internal FakeNotificationSender NotificationSender { get; }
+
+    /// <summary>
+    ///     Gets the notification address service the pages use (the feature is switched off).
+    /// </summary>
+    protected NotificationPreferenceService Notifications { get; private set; }
+
+    /// <summary>
+    ///     Switches e-mail notifications on for the pages, as the server settings do.
+    /// </summary>
+    /// <remarks>Call it before the first render; the stored addresses stay in the store.</remarks>
+    protected void SwitchNotificationsOn()
+    {
+        Notifications = new NotificationPreferenceService(
+            NotificationStore,
+            NotificationSender,
+            Users,
+            new NotificationSettings(true, "Test Center", NotificationSettings.DefaultMaxMailsPerHour),
+            Time);
+        Services.RemoveAll<NotificationPreferenceService>();
+        Services.AddSingleton(Notifications);
     }
 
     /// <summary>

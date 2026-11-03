@@ -1,0 +1,237 @@
+---
+# Software Unit Requirements for the SmtpNotificationSender Class
+#
+# The SmtpNotificationSender class delivers one e-mail through an SMTP server. A send that fails is reported as a send
+# error whose message holds no password, no address and no text from the server.
+
+sections:
+  - title: SmtpNotificationSender Unit Requirements
+    requirements:
+      - id: ReviewCenter-SmtpNotificationSender-IsConfigured
+        title: >-
+          The SmtpNotificationSender class shall report that a mail transport is configured.
+        justification: |
+          The rest of the server asks the sender whether mail can be delivered; a working transport answers yes.
+        tests:
+          - SmtpNotificationSender_IsConfigured_IsTrue
+
+      - id: ReviewCenter-SmtpNotificationSender-Delivery
+        title: >-
+          The SmtpNotificationSender class shall deliver a message to the SMTP server of the settings.
+        justification: |
+          Delivering the mail is the purpose of the transport.
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+
+      - id: ReviewCenter-SmtpNotificationSender-EnvelopeSender
+        title: >-
+          The SmtpNotificationSender class shall give the sender address of the settings to the server as the sender of
+          the mail.
+        justification: |
+          The server decides whether to accept the mail by the sender it is given, so it must be the configured one.
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+
+      - id: ReviewCenter-SmtpNotificationSender-EnvelopeRecipient
+        title: >-
+          The SmtpNotificationSender class shall give the recipient address of the message to the server as the
+          recipient of the mail.
+        justification: |
+          The mail must reach the person it is meant for.
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+
+      - id: ReviewCenter-SmtpNotificationSender-Subject
+        title: >-
+          The SmtpNotificationSender class shall deliver the subject of the message as the subject of the mail.
+        justification: |
+          The subject is what a person reads first.
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+
+      - id: ReviewCenter-SmtpNotificationSender-SenderName
+        title: >-
+          The SmtpNotificationSender class shall deliver the sender name of the settings as the display name of the
+          sender of the mail.
+        justification: |
+          People recognize the mail of an installation by the name it carries.
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+
+      - id: ReviewCenter-SmtpNotificationSender-TextPart
+        title: >-
+          The SmtpNotificationSender class shall deliver the plain text body of the message as the text part of the
+          mail.
+        justification: |
+          Mail clients that show no formatted text must still show the content.
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+
+      - id: ReviewCenter-SmtpNotificationSender-HtmlPart
+        title: >-
+          The SmtpNotificationSender class shall deliver the HTML body of the message as the HTML part of the mail.
+        justification: |
+          Mail clients that show formatted text use the HTML part.
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+
+      - id: ReviewCenter-SmtpNotificationSender-SenderNameIsolated
+        title: >-
+          The SmtpNotificationSender class shall keep a sender name that contains special characters inside the sender
+          header of the mail.
+        justification: |
+          A name with a comma, quotes or angle brackets must not turn into a second sender or a second header.
+        tests:
+          - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+      - id: ReviewCenter-SmtpNotificationSender-SubjectIsolated
+        title: >-
+          The SmtpNotificationSender class shall keep a subject that contains the text of a header line inside the
+          subject header of the mail.
+        justification: |
+          A subject must never add a header such as a hidden recipient to the mail.
+        tests:
+          - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+      - id: ReviewCenter-SmtpNotificationSender-SubjectCharacters
+        title: >-
+          The SmtpNotificationSender class shall deliver a subject that contains characters outside ASCII unchanged.
+        justification: |
+          Names and words of many languages appear in subjects and must reach the reader unchanged.
+        tests:
+          - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+      - id: ReviewCenter-SmtpNotificationSender-SingleRecipient
+        title: >-
+          The SmtpNotificationSender class shall give the server no recipient other than the recipient of the message.
+        justification: |
+          A mail that goes to somebody else would disclose review information.
+        tests:
+          - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+      - id: ReviewCenter-SmtpNotificationSender-Authentication
+        title: >-
+          The SmtpNotificationSender class shall sign in to the server with the credentials of the settings when a user
+          name is set.
+        justification: |
+          The credentials are the user name and the password. Mail servers of an organization accept mail only from a
+          known user.
+        tests:
+          - SmtpNotificationSender_Send_WithCredentials_Authenticates
+
+      - id: ReviewCenter-SmtpNotificationSender-AuthenticationRefused
+        title: >-
+          The SmtpNotificationSender class shall report a send error when the server refuses the credentials.
+        justification: |
+          A mail that was not accepted must not be taken for a delivered mail.
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+
+      - id: ReviewCenter-SmtpNotificationSender-RecipientRefused
+        title: >-
+          The SmtpNotificationSender class shall report a send error when the server refuses the recipient.
+        justification: |
+          A mail that was not accepted must not be taken for a delivered mail.
+        tests:
+          - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+
+      - id: ReviewCenter-SmtpNotificationSender-Unreachable
+        title: >-
+          The SmtpNotificationSender class shall report a send error when the server cannot be reached.
+        justification: |
+          The caller must be able to tell that no mail was sent, and to try again later.
+        tests:
+          - SmtpNotificationSender_Send_ServerUnreachable_Throws
+
+      - id: ReviewCenter-SmtpNotificationSender-ErrorNoPassword
+        title: >-
+          The SmtpNotificationSender class shall not put the password in the message of a send error.
+        justification: |
+          The message of an error reaches pages and logs; a password there would be leaked.
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+          - SmtpNotificationSender_Send_Failure_LogsNoRecipientOrPassword
+
+      - id: ReviewCenter-SmtpNotificationSender-ErrorNoAddress
+        title: >-
+          The SmtpNotificationSender class shall not put the recipient address in the message of a send error.
+        justification: |
+          The message of an error reaches pages and logs; the address of a person is personal data.
+        tests:
+          - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+          - SmtpNotificationSender_Send_Failure_LogsNoRecipientOrPassword
+
+      - id: ReviewCenter-SmtpNotificationSender-ErrorNoServerText
+        title: >-
+          The SmtpNotificationSender class shall not put text from the server in the message of a send error.
+        justification: |
+          Text from a server can hold addresses and other details that must not reach pages and logs.
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+          - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+
+      - id: ReviewCenter-SmtpNotificationSender-NothingDeliveredOnFailure
+        title: >-
+          The SmtpNotificationSender class shall deliver no message to the server when the server refuses the
+          credentials.
+        justification: |
+          A refused login must not leave a half-sent mail behind.
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+
+      - id: ReviewCenter-SmtpNotificationSender-Cancellation
+        title: >-
+          The SmtpNotificationSender class shall end a send with a cancellation when its cancellation token is
+          canceled.
+        justification: |
+          A server that stops must not wait for a mail server; a cancellation is not a failure of the mail server.
+        tests:
+          - SmtpNotificationSender_Send_Canceled_ThrowsOperationCanceled
+
+      - id: ReviewCenter-SmtpNotificationSender-CanceledNothingSent
+        title: >-
+          The SmtpNotificationSender class shall deliver no message when its cancellation token is already canceled.
+        justification: |
+          A canceled send must have no effect.
+        tests:
+          - SmtpNotificationSender_Send_Canceled_ThrowsOperationCanceled
+
+      - id: ReviewCenter-SmtpNotificationSender-NullMessage
+        title: >-
+          The SmtpNotificationSender class shall reject a missing message with an argument error.
+        justification: |
+          A missing message is a mistake of the caller, which must show at once.
+        tests:
+          - SmtpNotificationSender_Send_NullMessage_ThrowsArgumentNull
+
+      - id: ReviewCenter-SmtpNotificationSender-TlsNone
+        title: >-
+          The SmtpNotificationSender class shall use an unencrypted connection for the TLS mode None.
+        justification: |
+          The mode None is meant for a mail server on the local machine and must not secretly use encryption.
+        tests:
+          - SmtpNotificationSender_MapTls_MapsEveryMode
+
+      - id: ReviewCenter-SmtpNotificationSender-TlsUpgrade
+        title: >-
+          The SmtpNotificationSender class shall upgrade the connection to TLS for the TLS mode StartTls.
+        justification: |
+          This is how a submission service on port 587 expects to be used.
+        tests:
+          - SmtpNotificationSender_MapTls_MapsEveryMode
+
+      - id: ReviewCenter-SmtpNotificationSender-TlsImplicit
+        title: >-
+          The SmtpNotificationSender class shall use TLS from the first byte for the TLS mode Implicit.
+        justification: |
+          This is how a service on port 465 expects to be used.
+        tests:
+          - SmtpNotificationSender_MapTls_MapsEveryMode
+
+      - id: ReviewCenter-SmtpNotificationSender-TlsUndefined
+        title: >-
+          The SmtpNotificationSender class shall reject a TLS mode that is not defined.
+        justification: |
+          An unknown mode must never fall back to a weaker protection.
+        tests:
+          - SmtpNotificationSender_MapTls_MapsEveryMode

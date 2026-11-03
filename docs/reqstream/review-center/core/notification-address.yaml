@@ -1,0 +1,251 @@
+---
+# Software Unit Requirements for the NotificationAddress Class
+#
+# The NotificationAddress class decides whether a text is exactly one plain e-mail address that may be used for
+# notifications, and gives the address in a normal form. Each requirement states one rule, so that each refused form of
+# an address can be traced to its own test case.
+
+sections:
+  - title: NotificationAddress Unit Requirements
+    requirements:
+      - id: ReviewCenter-NotificationAddress-Accept
+        title: >-
+          The NotificationAddress class shall accept an ordinary address such as ann@example.com.
+        justification: |
+          People type the address they want the mail to go to, so an ordinary address must work.
+        tests:
+          - NotificationAddress_TryNormalize_PlainAddress_Succeeds
+
+      - id: ReviewCenter-NotificationAddress-AcceptPlusTag
+        title: >-
+          The NotificationAddress class shall accept a plus tag in the local part of an address.
+        justification: |
+          Many people use plus tags to sort their mail, and refusing them would lock those people out.
+        tests:
+          - NotificationAddress_TryNormalize_PlusTagInLocalPart_Succeeds
+
+      - id: ReviewCenter-NotificationAddress-LowerCase
+        title: >-
+          The NotificationAddress class shall give an accepted address in lower case.
+        justification: |
+          Mail systems treat the address without regard to case, and one form makes two addresses comparable by a
+          plain comparison, which the limits on mails per address need.
+        tests:
+          - NotificationAddress_TryNormalize_MixedCaseWithSpaces_ReturnsTrimmedLowerCase
+
+      - id: ReviewCenter-NotificationAddress-TrimWhiteSpace
+        title: >-
+          The NotificationAddress class shall ignore white space around an address.
+        justification: |
+          A pasted address often carries a trailing space or line break that is not part of the address.
+        tests:
+          - NotificationAddress_TryNormalize_MixedCaseWithSpaces_ReturnsTrimmedLowerCase
+
+      - id: ReviewCenter-NotificationAddress-RefuseNoAtSign
+        title: >-
+          The NotificationAddress class shall refuse a text that has no at sign.
+        justification: |
+          Without an at sign the text names no mailbox.
+        tests:
+          - NotificationAddress_TryNormalize_NoAtSign_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseTwoAtSigns
+        title: >-
+          The NotificationAddress class shall refuse a text that has more than one at sign.
+        justification: |
+          A second at sign makes the mailbox ambiguous.
+        tests:
+          - NotificationAddress_TryNormalize_TwoAtSigns_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseList
+        title: >-
+          The NotificationAddress class shall refuse a text that holds more than one address.
+        justification: |
+          A list would make the server mail a second recipient who never asked for the mail.
+        tests:
+          - NotificationAddress_TryNormalize_MoreThanOneAddress_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseDisplayName
+        title: >-
+          The NotificationAddress class shall refuse an address that comes with a display name.
+        justification: |
+          Only the plain address is wanted, and a display name is text that ends up in the header of the mail.
+        tests:
+          - NotificationAddress_TryNormalize_NotAPlainAddress_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseComment
+        title: >-
+          The NotificationAddress class shall refuse an address that comes with a comment.
+        justification: |
+          A comment is free text that ends up in the header of the mail.
+        tests:
+          - NotificationAddress_TryNormalize_NotAPlainAddress_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseQuotedLocalPart
+        title: >-
+          The NotificationAddress class shall refuse an address whose local part is in quotation marks.
+        justification: |
+          A quoted local part may hold characters that change the meaning of the header of the mail.
+        tests:
+          - NotificationAddress_TryNormalize_NotAPlainAddress_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseIpLiteral
+        title: >-
+          The NotificationAddress class shall refuse an address whose domain is an IP address in brackets.
+        justification: |
+          A mail to a raw network address can be aimed at a machine of the internal network.
+        tests:
+          - NotificationAddress_TryNormalize_NotAPlainAddress_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseLineBreak
+        title: >-
+          The NotificationAddress class shall refuse an address that has a line break inside it.
+        justification: |
+          A line break in a value that is put into the header of a mail starts a new header line, for example a
+          second recipient.
+        tests:
+          - NotificationAddress_TryNormalize_ControlCharacter_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseControlCharacter
+        title: >-
+          The NotificationAddress class shall refuse an address that has a control character inside it.
+        justification: |
+          No control character belongs to an address, and each one is a way to disturb the mail or the log.
+        tests:
+          - NotificationAddress_TryNormalize_ControlCharacter_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseNonAscii
+        title: >-
+          The NotificationAddress class shall refuse an address that has a character outside the ASCII range.
+        justification: |
+          Not every mail server accepts such an address, and look-alike characters could hide the real recipient.
+        tests:
+          - NotificationAddress_TryNormalize_NonAscii_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseDomainWithoutDot
+        title: >-
+          The NotificationAddress class shall refuse an address whose domain has only one label.
+        justification: |
+          A bare host name, such as localhost, names a machine of the own network and not a public mailbox.
+        tests:
+          - NotificationAddress_TryNormalize_DomainWithoutDot_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseLeadingDot
+        title: >-
+          The NotificationAddress class shall refuse an address whose local part starts with a dot.
+        justification: |
+          Such an address is malformed, and mail systems refuse it.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseTrailingDot
+        title: >-
+          The NotificationAddress class shall refuse an address whose local part ends with a dot.
+        justification: |
+          Such an address is malformed, and mail systems refuse it.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseDoubleDot
+        title: >-
+          The NotificationAddress class shall refuse an address that has two dots in a row.
+        justification: |
+          An empty part between two dots is malformed, in the local part as well as in the domain.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseEmptyLabel
+        title: >-
+          The NotificationAddress class shall refuse an address whose domain starts with a dot.
+        justification: |
+          A domain with an empty first label is malformed.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseHyphenAtLabelStart
+        title: >-
+          The NotificationAddress class shall refuse an address that has a domain label that starts with a hyphen.
+        justification: |
+          Such a label is not a valid name in the domain name system.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseHyphenAtLabelEnd
+        title: >-
+          The NotificationAddress class shall refuse an address that has a domain label that ends with a hyphen.
+        justification: |
+          Such a label is not a valid name in the domain name system.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseEmptyLocalPart
+        title: >-
+          The NotificationAddress class shall refuse an address that has nothing before the at sign.
+        justification: |
+          Without a local part the address names no mailbox.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseEmptyDomain
+        title: >-
+          The NotificationAddress class shall refuse an address that has nothing after the at sign.
+        justification: |
+          Without a domain the address names no mail server.
+        tests:
+          - NotificationAddress_TryNormalize_MalformedDots_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseEmpty
+        title: >-
+          The NotificationAddress class shall refuse an empty text.
+        justification: |
+          Nothing was entered, so there is no address.
+        tests:
+          - NotificationAddress_TryNormalize_EmptyOrNull_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseMissing
+        title: >-
+          The NotificationAddress class shall refuse a missing text.
+        justification: |
+          A form that sends no value must be handled in the same way as an empty one.
+        tests:
+          - NotificationAddress_TryNormalize_EmptyOrNull_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseWhiteSpaceOnly
+        title: >-
+          The NotificationAddress class shall refuse a text that has only white space.
+        justification: |
+          After the white space is ignored, nothing is left, so there is no address.
+        tests:
+          - NotificationAddress_TryNormalize_EmptyOrNull_Fails
+
+      - id: ReviewCenter-NotificationAddress-AcceptMaxLength
+        title: >-
+          The NotificationAddress class shall accept an address of 254 characters.
+        justification: |
+          254 characters is the longest address that the mail standard allows, and a valid address must not be refused.
+        tests:
+          - NotificationAddress_TryNormalize_LengthBoundary_AcceptsMaximumAndRefusesMore
+
+      - id: ReviewCenter-NotificationAddress-RefuseTooLong
+        title: >-
+          The NotificationAddress class shall refuse an address of more than 254 characters.
+        justification: |
+          A longer address can not be valid, and the stored column has a fixed length.
+        tests:
+          - NotificationAddress_TryNormalize_LengthBoundary_AcceptsMaximumAndRefusesMore
+
+      - id: ReviewCenter-NotificationAddress-AcceptLongestLocalPart
+        title: >-
+          The NotificationAddress class shall accept a local part of 64 characters.
+        justification: |
+          64 characters is the longest local part that the mail standard allows.
+        tests:
+          - NotificationAddress_TryNormalize_LongLocalPart_Fails
+
+      - id: ReviewCenter-NotificationAddress-RefuseLongLocalPart
+        title: >-
+          The NotificationAddress class shall refuse a local part of more than 64 characters.
+        justification: |
+          A longer local part can not be valid.
+        tests:
+          - NotificationAddress_TryNormalize_LongLocalPart_Fails

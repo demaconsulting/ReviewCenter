@@ -99,6 +99,13 @@ includes:
   - docs/reqstream/review-center/core/ballot-consolidation.yaml
   - docs/reqstream/review-center/core/ballot-visibility.yaml
   - docs/reqstream/review-center/core/review-status-service.yaml
+  - docs/reqstream/review-center/core/notification-address.yaml
+  - docs/reqstream/review-center/core/notification-message.yaml
+  - docs/reqstream/review-center/core/notification-preference-service.yaml
+  - docs/reqstream/review-center/messaging.yaml
+  - docs/reqstream/review-center/messaging/notification-options.yaml
+  - docs/reqstream/review-center/messaging/smtp-notification-sender.yaml
+  - docs/reqstream/review-center/messaging/file-notification-sender.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
@@ -109,6 +116,7 @@ includes:
   - docs/reqstream/review-center/storage/personal-access-token-store.yaml
   - docs/reqstream/review-center/storage/totp-store.yaml
   - docs/reqstream/review-center/storage/inbox-store.yaml
+  - docs/reqstream/review-center/storage/notification-store.yaml
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml
   - docs/reqstream/review-center-puppet/puppet-program.yaml
@@ -139,3 +147,4 @@ includes:
   - docs/reqstream/ots/openidconnect.yaml
   - docs/reqstream/ots/openiddict.yaml
   - docs/reqstream/ots/otpnet.yaml
+  - docs/reqstream/ots/mailkit.yaml

@@ -21,10 +21,11 @@ suite (they start git, a database, a signer and a web host):
   endpoint variable, `DOTNET_ENVIRONMENT` and `Database__*` settings, sentinel paths, and a private
   `TEMP`/`TMP`: the run must pass, the host must bind a loopback port that is not the poisoned one, the sentinels must
   not be created, and the private temporary folder must be empty afterwards.
-- The opt-in `ConfiguredDatabase` and `ConfiguredKeys` checks are run directly against temporary databases and key
+- The opt-in `ConfiguredDatabase`, `ConfiguredKeys` and `ConfiguredNotifications` checks are run directly against
+  temporary databases and key
   rings that the test creates with the production schema and the production protectors (in-memory certificates; no
   DPAPI, certificate store, or home directory), and against the process configuration, which the test sets
-  through the `Database__*` and `DataProtection__*` environment variables and
+  through the `Database__*`, `DataProtection__*` and `Notifications__*` environment variables and
   restores afterwards.
 
 No check is replaced by a test double: the production services, the production git source, the
@@ -50,7 +51,14 @@ every supported platform provides, and no network beyond it.
   current schema without changing the file, fails naming the missing table for a database with a
   table dropped, fails for a missing file without creating it, and fails naming an unsupported
   provider; none of its messages contains the folder or the connection string.
-- The default run never creates the configured database and never runs `ConfiguredDatabase` or `ConfiguredKeys`.
+- The default run never creates the configured database and never runs `ConfiguredDatabase`, `ConfiguredKeys` or
+  `ConfiguredNotifications`.
+- `ConfiguredNotifications` is skipped, naming `Notifications:Enabled`, while notifications are off. For a complete SMTP
+  setting with a password file it reports the server and port, the protection, and that the password comes from a
+  file, with no warning, no password, and no folder path, and it does so for a server name that does not exist, so it
+  opens no connection. For an inline password it reports a warning that names the password file setting and does not
+  show the password. For the file sender it reports the sender and no folder path. It fails naming
+  `Notifications:Smtp:Host` for a missing host, and fails without showing the value for a port that is not a number.
 - `ConfiguredKeys` is skipped when nothing is configured, when the database file is missing (and nothing is created),
   and when the key folder is missing and the database holds no secret (the folder is not created). It passes for a
   ring that matches the database, also with a certificate ring, reports the mode, the file counts and the secret
@@ -219,7 +227,28 @@ test of the same name.
 certificate and `Attestation:RequireTrustedKey` is true. The check fails and names that setting. This scenario is tested
 by the test of the same name.
 
-The hermetic behavior of the default run is verified at the subsystem level by
+**ValidationChecks_ConfiguredNotifications_NotEnabled_IsSkipped**: `Notifications__Enabled` is `false`. The check
+throws the skipped exception whose reason names `Notifications:Enabled`. This scenario is tested by the test of the
+same name.
+
+**ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret**: A complete SMTP configuration with the
+host `mail.example.com`, port 587, `StartTls`, a user name, and a password file holding a known secret. The report
+holds "SMTP", "mail.example.com:587" and "password from a file", and neither the secret, nor the folder of the file,
+nor a warning. The host does not exist, so the check passes only because it opens no connection. This scenario is
+tested by the test of the same name.
+
+**ValidationChecks_ConfiguredNotifications_InlinePassword_WarnsWithoutShowingIt**: The same configuration with an
+inline password. The report holds a warning, the name `PasswordFile`, and "inline in the configuration", and not the
+password. This scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredNotifications_FileSender_ReportsFileSender**: The File sender with a folder. The report
+holds "Sender File" and not the folder. This scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredNotifications_MissingHost_FailsAndNamesSetting**: SMTP without a host. The check fails
+with a message that holds `Notifications:Smtp:Host`. This scenario is tested by the test of the same name.
+
+**ValidationChecks_ConfiguredNotifications_WrongType_FailsWithoutShowingValue**: `Notifications__Smtp__Port` is text.
+The check fails and the message does not hold that text. This scenario is tested by the test of the same name.
 `SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic`.
 
 **ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient**: The child process

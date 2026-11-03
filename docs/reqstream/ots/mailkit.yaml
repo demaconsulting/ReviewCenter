@@ -1,0 +1,175 @@
+---
+# MailKit OTS Software Requirements
+#
+# Requirements for MailKit (with MimeKit, which it brings), which connects to an SMTP server, signs in, and sends a
+# mail message, and which builds and writes the MIME messages of the e-mail notifications.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: MailKit Requirements
+        requirements:
+          - id: ReviewCenter-OTS-MailKit-Smtp
+            title: >-
+              MailKit shall deliver a mail message to an SMTP server.
+            justification: |
+              The e-mail notifications reach people only when the library really hands the message to the mail server.
+              A passing test that sends a message through the product code to a server on the local machine and reads
+              back what the server received confirms this.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_DeliversMessageToServer
+
+          - id: ReviewCenter-OTS-MailKit-EnvelopeSender
+            title: >-
+              MailKit shall give the SMTP server the sender address that the message holds.
+            justification: |
+              The server decides about acceptance by the sender, so the library must pass on exactly the address that
+              it is given.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_DeliversMessageToServer
+
+          - id: ReviewCenter-OTS-MailKit-EnvelopeRecipient
+            title: >-
+              MailKit shall give the SMTP server the recipient address that the message holds.
+            justification: |
+              The server decides about routing by the recipient, so the library must pass on exactly the address that
+              it is given.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_DeliversMessageToServer
+
+          - id: ReviewCenter-OTS-MailKit-Auth
+            title: >-
+              MailKit shall sign in to an SMTP server with a user name and a password.
+            justification: |
+              Mail servers of an organization accept mail only from known users, so the library must present the
+              credentials that it is given.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_WithCredentials_Authenticates
+
+          - id: ReviewCenter-OTS-MailKit-AuthRefused
+            title: >-
+              MailKit shall report an error when an SMTP server refuses the credentials.
+            justification: |
+              A wrong password must never look like a delivered mail.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+
+          - id: ReviewCenter-OTS-MailKit-RecipientRefused
+            title: >-
+              MailKit shall report an error when an SMTP server refuses the recipient.
+            justification: |
+              A mail that was not accepted must never look like a delivered mail.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+
+          - id: ReviewCenter-OTS-MailKit-Unreachable
+            title: >-
+              MailKit shall report an error when an SMTP server cannot be reached.
+            justification: |
+              The product must be able to tell that no mail was sent.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_ServerUnreachable_Throws
+
+          - id: ReviewCenter-OTS-MailKit-Cancellation
+            title: >-
+              MailKit shall end a send with a cancellation when the cancellation token is canceled.
+            justification: |
+              A server that stops must not wait for a mail server.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_Canceled_ThrowsOperationCanceled
+
+          - id: ReviewCenter-OTS-MailKit-Tls
+            title: >-
+              MailKit shall provide a connection option for each TLS mode of the settings.
+            justification: |
+              The operator chooses how the connection is protected, so the library must offer an option for each
+              choice. The mapping is verified by a test; the encryption itself is the work of the library and of the
+              runtime and is not repeated by a test.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_MapTls_MapsEveryMode
+
+          - id: ReviewCenter-OTS-MailKit-MimeSubject
+            title: >-
+              MailKit shall write a mail message that parses back with the subject that it was given.
+            justification: |
+              The file transport writes a message to a file that a mail client opens, so the message must be a valid
+              mail message that keeps the subject.
+            tags: [ots]
+            tests:
+              - FileNotificationSender_Send_WritesParseableEmlFile
+
+          - id: ReviewCenter-OTS-MailKit-MimeRecipient
+            title: >-
+              MailKit shall write a mail message that parses back with the recipient that it was given.
+            justification: |
+              The recipient is what makes a mail a mail for a person.
+            tags: [ots]
+            tests:
+              - FileNotificationSender_Send_WritesParseableEmlFile
+
+          - id: ReviewCenter-OTS-MailKit-MimeSender
+            title: >-
+              MailKit shall write a mail message that parses back with the sender that it was given.
+            justification: |
+              The sender shows where a mail came from.
+            tags: [ots]
+            tests:
+              - FileNotificationSender_Send_WritesParseableEmlFile
+              - SmtpNotificationSender_Send_DeliversMessageToServer
+
+          - id: ReviewCenter-OTS-MailKit-MimeText
+            title: >-
+              MailKit shall write a mail message that parses back with the plain text part that it was given.
+            justification: |
+              Mail clients that show no formatted text use the text part.
+            tags: [ots]
+            tests:
+              - FileNotificationSender_Send_WritesParseableEmlFile
+              - SmtpNotificationSender_Send_DeliversMessageToServer
+
+          - id: ReviewCenter-OTS-MailKit-MimeHtml
+            title: >-
+              MailKit shall write a mail message that parses back with the HTML part that it was given.
+            justification: |
+              Mail clients that show formatted text use the HTML part.
+            tags: [ots]
+            tests:
+              - FileNotificationSender_Send_WritesParseableEmlFile
+              - SmtpNotificationSender_Send_DeliversMessageToServer
+
+          - id: ReviewCenter-OTS-MailKit-MimeSenderName
+            title: >-
+              MailKit shall keep a sender name that contains special characters inside the sender header.
+            justification: |
+              Names with commas, quotes or angle brackets are common, and they must neither be changed nor add a
+              second sender to the mail message.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+          - id: ReviewCenter-OTS-MailKit-MimeSubjectEncoding
+            title: >-
+              MailKit shall keep a subject that contains characters outside ASCII unchanged.
+            justification: |
+              Subjects in many languages are common, and they must reach the reader unchanged.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader
+
+          - id: ReviewCenter-OTS-MailKit-MimeSubjectHeader
+            title: >-
+              MailKit shall keep a subject that contains the text of a header line inside the subject header.
+            justification: |
+              A subject must never add a header such as a hidden recipient to the mail message.
+            tags: [ots]
+            tests:
+              - SmtpNotificationSender_Send_SpecialCharacters_DoNotLeaveTheirHeader

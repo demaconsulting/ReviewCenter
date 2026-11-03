@@ -11,7 +11,7 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains twenty-four units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains thirty-one units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
@@ -41,7 +41,10 @@ of notifications) and the read state that marks what is new;
 `BallotConsolidation`, the agreed standing of the submitted ballots of a review and the outcome it leads to; and
 `BallotVisibility`, who may see the answers of the other reviewers of a review before the own ballot is handed in, with
 the masking of what would reveal them; and `ReviewStatusService`, where a review stands for one viewer, the one next
-action, and what changed since a reviewer signed. The
+action, and what changed since a reviewer signed; `NotificationAddress`, the check that a text is exactly one plain
+e-mail address; `NotificationMessage`, an e-mail message that refuses a line break in a header part, with the
+sender contract; and `NotificationPreferenceService`, the confirmation of the optional e-mail address for
+notifications by a code that is mailed to it. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
@@ -58,14 +61,17 @@ revisions and selection a creation request names, before they are resolved), `Ch
 types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the second factor types
 (`UserTotp`, `TotpRecoveryCode`, `TotpSettings`, `TotpEnrollment`, `TotpStatus`, `TotpSignInOutcome`,
 `TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the inbox types (`InboxSection`, `InboxItem`, `InboxView`,
-`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the offboarding types (`UserImpact`, `UserOpenWork`,
+`InboxCandidate`, `InboxSeenMark`, and `ReviewUserState`), the notification types (`NotificationSettings`,
+`NotificationPreference`, `NotificationSendLogEntry`, `NotificationAddressStatus`, `ConfirmationRequest`, and
+`ConfirmationReservation`), the offboarding types (`UserImpact`, `UserOpenWork`,
 `SoleAdminProject`, and `UserReviewSlot`), the text and line
 definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IProjectAccess`, `IReviewStore`,
 `IUserStore`,
-`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ITotpStore`, `IInboxStore`, `ITotpAlgorithm`,
+`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ITotpStore`, `IInboxStore`, `INotificationStore`,
+`INotificationSender`, `ITotpAlgorithm`,
 `ITotpSecretProtector`,
 `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
 `IReviewSetParser`, and `IPasswordHasher`) are
@@ -276,6 +282,28 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 - *Constraints*: Every decision with one winner (confirming, advancing the step, spending a code) is one conditional
   change whose result says whether this caller made it, so two requests can never both succeed. A change that is
   audited is stored in the same transaction as its entry. Every read returns a new object.
+
+**INotificationStore**: The store interface the subsystem requires for the e-mail address for notifications, the
+pending confirmation, and the log of the mails that were sent.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `NotificationStore` in the `Storage` subsystem).
+- *Contract*: Tell whether the tables are available, read the preference of a user, reserve a confirmation (the pause and
+  the limits per user, per address, and per server are checked with the change, and the audit entry is stored when
+  it is reserved), abort a reservation after a failed send, count one attempt at the current code up to a limit, confirm
+  the pending address with the hash of the code and an audit entry, and remove the preference with an audit entry.
+- *Constraints*: Every decision with one winner (reserving, counting an attempt, confirming) is one transaction or one
+  conditional change, so two requests can never both succeed. The store never sees a code, only its salted hash. A
+  change that is audited is stored in the same transaction as its entry. The send log is kept when an address is
+  removed.
+
+**INotificationSender**: The contract of the unit that delivers an e-mail message. It is implemented by the host.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented in the host, and by `NoNotificationSender` when no mail server is set up).
+- *Contract*: Report whether it is configured, and send one `NotificationMessage`, failing with a
+  `NotificationSendException` when the message could not be delivered.
+- *Constraints*: A failure never carries a password or another secret in its message.
 
 **InboxService**: The operations the `Web` subsystem uses for the inbox and for the unread markers.
 
@@ -556,6 +584,15 @@ message and keep the entered values, and there is a single, easily tested path f
 | `TotpCodeIncorrect` | A code is wrong, was already used, or the account is locked out |
 | `TotpEnrollmentExpired` | The setup was started more than 15 minutes ago |
 | `TotpSecretUnreadable` | A stored secret cannot be decrypted, for example after the key ring changed |
+| `NotificationsNotAvailable` | E-mail notifications are off, no sender is configured, or the account may not use them |
+| `NotificationAddressInvalid` | The typed text is not exactly one valid e-mail address |
+| `NotificationResendTooSoon` | A new confirmation mail was requested less than 60 seconds after the previous one |
+| `NotificationLimitReached` | The limit of confirmation mails per user, per address, or per server is reached |
+| `NotificationSendFailed` | The confirmation mail could not be sent |
+| `NotificationNothingToConfirm` | No e-mail address is waiting for a code |
+| `NotificationCodeIncorrect` | The typed confirmation code is wrong |
+| `NotificationCodeExpired` | The confirmation code is more than 30 minutes old |
+| `NotificationTooManyAttempts` | Five codes were already typed against the current confirmation code |
 | `AuditFilterInvalid` | An audit filter has a text that is too long, or a From date after the To date |
 
 The checklist of a review is the copy of the checklist of its project (the built-in default checklist when the project has
@@ -650,6 +687,19 @@ as well (`TotpService.ChangeOwnPasswordAsync`; the password-only overload of `Us
 replay rule and counter. The audited changes are stored with their
 entry by the store, which is why `TotpService` takes no `AuditService`. See the `TotpService`, `TotpChallengeStore`,
 `UserService`, and `SigningService` units.
+
+An eighth kind of fact is the optional e-mail address of a user for notifications. It is used only when an
+administrator has switched the feature on and a sender is configured. An address is not used until its owner proves
+it: `NotificationPreferenceService` mails a six digit code to the address and the user types it back, within 30 minutes
+and with at most five wrong codes. A new code can be requested after 60 seconds, at most three times per user and three
+times per address in a day, and within a limit of mails per hour for the whole server (200 by default). Only a salted
+hash of the code is stored, the code appears in the confirmation mail only, the mail holds no link, and the
+confirmed address stays in use while a new address waits. An actor that signed in with an API token, a disabled or
+unknown user, and a user with a temporary password are refused. The three audited changes (`notification.settings-changed`,
+`notification.email-confirmed`, and `notification.email-removed`) carry neither the address nor the code and are stored
+with their entry by the store. `NotificationAddress` accepts only one plain address, and `NotificationMessage` refuses a
+line break in the recipient or the subject. See the `NotificationAddress`, `NotificationMessage`, and
+`NotificationPreferenceService` units.
 
 Access to projects is decided in one place, `ProjectAccess`, and is based on membership. A user is a system
 administrator (the flag `User.IsSystemAdmin`) or a member of a project with the role `User` or `ProjectAdmin`

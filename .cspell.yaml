@@ -45,6 +45,7 @@ words:
   - Blazor
   - TOTP
   - otpnet
+  - mailkit
   - otpauth
   - hmac
   - hmacsha

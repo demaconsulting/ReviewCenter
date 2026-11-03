@@ -1,0 +1,392 @@
+---
+# Messaging Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Messaging subsystem
+# - The Messaging subsystem spans the NotificationOptions, SmtpNotificationSender, and FileNotificationSender units
+# - Subsystem requirements describe the externally visible behavior of the delivery of e-mail: which transport the
+#   settings of the Notifications section select, what happens while notifications are off, and what happens to
+#   settings that are not valid
+
+sections:
+  - title: Messaging Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Messaging-Off
+        title: >-
+          While e-mail notifications are not enabled (the Enabled setting of the Notifications section is false), the
+          Messaging subsystem shall report that no mail transport is configured.
+        justification: |
+          The default installation must not depend on a mail server; the rest of the server needs a plain answer to
+          the question whether mail can be sent. E-mail notifications are enabled when the Enabled setting of the
+          Notifications section is true and not enabled otherwise; this is the only term used for that state.
+        children:
+          - ReviewCenter-NotificationOptions-DefaultOff
+          - ReviewCenter-NotificationOptions-DisabledAcceptsAll
+        tests:
+          - MessagingSubsystem_NotificationsOff_SenderIsNotConfiguredAndSendFails
+
+      - id: ReviewCenter-Messaging-OffRefusesSend
+        title: >-
+          While e-mail notifications are not enabled, the Messaging subsystem shall reject every attempt to send a
+          message with a send error.
+        justification: |
+          A message that is not delivered must never be mistaken for a delivered one.
+        children:
+          - ReviewCenter-NotificationOptions-DefaultSender
+        tests:
+          - MessagingSubsystem_NotificationsOff_SenderIsNotConfiguredAndSendFails
+
+      - id: ReviewCenter-Messaging-OffSettings
+        title: >-
+          While e-mail notifications are not enabled, the Messaging subsystem shall report the notification settings
+          as not enabled.
+        justification: |
+          The pages of the server must not offer notifications that cannot be delivered.
+        children:
+          - ReviewCenter-NotificationOptions-DefaultOff
+        tests:
+          - MessagingSubsystem_NotificationsOff_SenderIsNotConfiguredAndSendFails
+
+      - id: ReviewCenter-Messaging-FileTransport
+        title: >-
+          When the file transport is selected with valid settings, the Messaging subsystem shall deliver a message as
+          one file in the folder named in the settings.
+        justification: |
+          Demonstrations, development and tests need mail that works without a mail server.
+        children:
+          - ReviewCenter-NotificationOptions-AcceptFile
+          - ReviewCenter-NotificationOptions-BindingFile
+          - ReviewCenter-FileNotificationSender-OneFile
+          - ReviewCenter-FileNotificationSender-Extension
+          - ReviewCenter-FileNotificationSender-CreateFolder
+          - ReviewCenter-FileNotificationSender-Subject
+          - ReviewCenter-FileNotificationSender-Recipient
+          - ReviewCenter-FileNotificationSender-Sender
+          - ReviewCenter-FileNotificationSender-TextPart
+          - ReviewCenter-FileNotificationSender-HtmlPart
+          - ReviewCenter-FileNotificationSender-NewFileEachTime
+          - ReviewCenter-FileNotificationSender-Concurrent
+          - ReviewCenter-FileNotificationSender-OnlyEmlAfterSend
+          - ReviewCenter-OTS-MailKit-MimeSubject
+          - ReviewCenter-OTS-MailKit-MimeRecipient
+          - ReviewCenter-OTS-MailKit-MimeSender
+          - ReviewCenter-OTS-MailKit-MimeText
+          - ReviewCenter-OTS-MailKit-MimeHtml
+          - ReviewCenter-OTS-MailKit-MimeSenderName
+          - ReviewCenter-OTS-MailKit-MimeSubjectEncoding
+          - ReviewCenter-OTS-MailKit-MimeSubjectHeader
+        tests:
+          - MessagingSubsystem_FileTransport_SettingsChooseFileSenderThatDeliversMessage
+
+      - id: ReviewCenter-Messaging-FileEnabled
+        title: >-
+          When the file transport is selected with valid settings, the Messaging subsystem shall report the
+          notification settings as enabled.
+        justification: |
+          The pages of the server offer notifications only when mail can be delivered.
+        children:
+          - ReviewCenter-NotificationOptions-AcceptFile
+          - ReviewCenter-NotificationOptions-BindingGeneral
+        tests:
+          - MessagingSubsystem_FileTransport_SettingsChooseFileSenderThatDeliversMessage
+
+      - id: ReviewCenter-Messaging-SmtpTransport
+        title: >-
+          When the SMTP transport is selected with valid settings, the Messaging subsystem shall report that a mail
+          transport is configured.
+        justification: |
+          Production installations deliver mail through the mail server of the organization.
+        children:
+          - ReviewCenter-NotificationOptions-AcceptSmtp
+          - ReviewCenter-NotificationOptions-BindingSmtp
+          - ReviewCenter-SmtpNotificationSender-IsConfigured
+          - ReviewCenter-OTS-MailKit-Smtp
+          - ReviewCenter-OTS-MailKit-EnvelopeSender
+          - ReviewCenter-OTS-MailKit-EnvelopeRecipient
+          - ReviewCenter-OTS-MailKit-Auth
+          - ReviewCenter-OTS-MailKit-AuthRefused
+          - ReviewCenter-OTS-MailKit-RecipientRefused
+          - ReviewCenter-OTS-MailKit-Unreachable
+          - ReviewCenter-OTS-MailKit-Cancellation
+          - ReviewCenter-OTS-MailKit-Tls
+        tests:
+          - MessagingSubsystem_SmtpTransport_SettingsChooseSmtpSender
+
+      - id: ReviewCenter-Messaging-InvalidSettings
+        title: >-
+          While e-mail notifications are enabled, the Messaging subsystem shall refuse to provide a mail transport when
+          the notification settings are not valid.
+        justification: |
+          A wrong configuration must stop the start of the server and not show up when the first mail fails.
+        children:
+          - ReviewCenter-NotificationOptions-SmtpHostRequired
+          - ReviewCenter-NotificationOptions-SenderRequired
+          - ReviewCenter-NotificationOptions-FromAddressRequired
+          - ReviewCenter-NotificationOptions-BaseUrlRequired
+          - ReviewCenter-NotificationOptions-FromAddressLineBreak
+          - ReviewCenter-NotificationOptions-FromNameLineBreak
+          - ReviewCenter-NotificationOptions-BaseUrlAbsolute
+          - ReviewCenter-NotificationOptions-BaseUrlQuery
+          - ReviewCenter-NotificationOptions-BaseUrlFragment
+          - ReviewCenter-NotificationOptions-BaseUrlUserInfo
+          - ReviewCenter-NotificationOptions-BaseUrlHttpRemote
+          - ReviewCenter-NotificationOptions-SmtpHostSpace
+          - ReviewCenter-NotificationOptions-SmtpPortRange
+          - ReviewCenter-NotificationOptions-SmtpTlsUnknown
+          - ReviewCenter-NotificationOptions-SmtpTimeoutRange
+          - ReviewCenter-NotificationOptions-UsernameNeedsPassword
+          - ReviewCenter-NotificationOptions-PasswordNeedsUsername
+          - ReviewCenter-NotificationOptions-PasswordExclusive
+          - ReviewCenter-NotificationOptions-PasswordFileMissing
+          - ReviewCenter-NotificationOptions-CredentialsRemoteClear
+          - ReviewCenter-NotificationOptions-FileDirectoryRequired
+          - ReviewCenter-NotificationOptions-DigestHourRange
+          - ReviewCenter-NotificationOptions-TimeZoneUnknown
+          - ReviewCenter-NotificationOptions-BatchWindowRange
+          - ReviewCenter-NotificationOptions-PollIntervalRange
+          - ReviewCenter-NotificationOptions-MaxMailsRange
+        tests:
+          - MessagingSubsystem_InvalidSettings_AreRefusedNamingTheSetting
+
+      - id: ReviewCenter-Messaging-SettingsDefaults
+        title: >-
+          While a setting of the Notifications section is not given, the Messaging subsystem shall use the default
+          value of that setting.
+        justification: |
+          An operator should have to give only the settings that differ from the usual ones.
+        children:
+          - ReviewCenter-NotificationOptions-DefaultSmtpPort
+          - ReviewCenter-NotificationOptions-DefaultTls
+          - ReviewCenter-NotificationOptions-DefaultDigestHour
+          - ReviewCenter-NotificationOptions-DefaultTimeZone
+          - ReviewCenter-NotificationOptions-DefaultBatchWindow
+          - ReviewCenter-NotificationOptions-DefaultPollInterval
+          - ReviewCenter-NotificationOptions-DefaultTitles
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-Messaging-PasswordFile
+        title: >-
+          When a password file is named in the settings, the Messaging subsystem shall read the SMTP password from that
+          file.
+        justification: |
+          A password in a file keeps it out of the configuration and lets the operator rotate it without a change of
+          the settings.
+        children:
+          - ReviewCenter-NotificationOptions-PasswordFileRead
+          - ReviewCenter-NotificationOptions-PasswordFileTrimmed
+        tests:
+          - NotificationOptions_ResolvePassword_FromFile_ReturnsTrimmedPassword
+
+      - id: ReviewCenter-Messaging-Warnings
+        title: >-
+          When the SMTP password is given inline in the settings, the Messaging subsystem shall report a warning.
+        justification: |
+          A password in the configuration or the environment is easier to leak than a password in a file, so the
+          operator should see the warning.
+        children:
+          - ReviewCenter-NotificationOptions-WarningInlinePassword
+        tests:
+          - NotificationOptions_GetWarnings_InlinePassword_WarnsWithoutValue
+
+      - id: ReviewCenter-Messaging-WarningClearRemote
+        title: >-
+          When the SMTP connection to another machine is not protected by TLS, the Messaging subsystem shall report a
+          warning.
+        justification: |
+          The mail then crosses the network in clear text, which an operator should do only knowingly.
+        children:
+          - ReviewCenter-NotificationOptions-WarningClearRemote
+        tests:
+          - NotificationOptions_GetWarnings_NoTlsToRemoteHost_Warns
+
+      - id: ReviewCenter-Messaging-WarningNoPassword
+        title: >-
+          The Messaging subsystem shall not put the SMTP password in a warning.
+        justification: |
+          A warning must not become a new place where a password leaks.
+        children:
+          - ReviewCenter-NotificationOptions-WarningNoPasswordValue
+        tests:
+          - NotificationOptions_GetWarnings_InlinePassword_WarnsWithoutValue
+
+      - id: ReviewCenter-Messaging-WarningNoneForGoodSettings
+        title: >-
+          When the notification settings give no cause for a warning, the Messaging subsystem shall report no warning.
+        justification: |
+          A warning that is always there is ignored; it must mean something.
+        children:
+          - ReviewCenter-NotificationOptions-WarningNoneForGood
+        tests:
+          - NotificationOptions_GetWarnings_GoodOrDisabled_IsEmpty
+
+      - id: ReviewCenter-Messaging-WarningNoneWhenNotEnabled
+        title: >-
+          While e-mail notifications are not enabled, the Messaging subsystem shall report no warning.
+        justification: |
+          Settings of a feature that is not enabled do not matter and must not cause noise.
+        children:
+          - ReviewCenter-NotificationOptions-WarningNoneWhenOff
+        tests:
+          - NotificationOptions_GetWarnings_GoodOrDisabled_IsEmpty
+
+      - id: ReviewCenter-Messaging-LoopbackBaseUrl
+        title: >-
+          The Messaging subsystem shall accept an http base address for the local machine.
+        justification: |
+          A test installation on the local machine has no certificate.
+        children:
+          - ReviewCenter-NotificationOptions-BaseUrlHttpLoopback
+        tests:
+          - NotificationOptionsValidator_HttpBaseUrlForLoopback_IsAccepted
+
+      - id: ReviewCenter-Messaging-LoopbackCredentials
+        title: >-
+          The Messaging subsystem shall accept a login without TLS to an SMTP server on the local machine.
+        justification: |
+          A test mail server on the local machine needs no certificate, and the password does not cross a network.
+        children:
+          - ReviewCenter-NotificationOptions-CredentialsLoopbackClear
+        tests:
+          - NotificationOptionsValidator_CredentialsWithoutTlsToLoopback_AreAccepted
+
+      - id: ReviewCenter-Messaging-SmtpDelivery
+        title: >-
+          When the SMTP transport is used, the Messaging subsystem shall hand the message that it is given to the
+          SMTP server.
+        justification: |
+          A mail that is not handed to the server is never delivered.
+        children:
+          - ReviewCenter-SmtpNotificationSender-Delivery
+          - ReviewCenter-SmtpNotificationSender-EnvelopeSender
+          - ReviewCenter-SmtpNotificationSender-EnvelopeRecipient
+          - ReviewCenter-SmtpNotificationSender-Subject
+          - ReviewCenter-SmtpNotificationSender-SenderName
+          - ReviewCenter-SmtpNotificationSender-TextPart
+          - ReviewCenter-SmtpNotificationSender-HtmlPart
+          - ReviewCenter-SmtpNotificationSender-SenderNameIsolated
+          - ReviewCenter-SmtpNotificationSender-SubjectIsolated
+          - ReviewCenter-SmtpNotificationSender-SubjectCharacters
+          - ReviewCenter-SmtpNotificationSender-SingleRecipient
+          - ReviewCenter-SmtpNotificationSender-Authentication
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+          - SmtpNotificationSender_Send_WithCredentials_Authenticates
+
+      - id: ReviewCenter-Messaging-SmtpTls
+        title: >-
+          When the SMTP transport is used, the Messaging subsystem shall connect to the SMTP server with the TLS mode
+          of the settings.
+        justification: |
+          The operator decides how the connection to the mail server is protected.
+        children:
+          - ReviewCenter-SmtpNotificationSender-TlsNone
+          - ReviewCenter-SmtpNotificationSender-TlsUpgrade
+          - ReviewCenter-SmtpNotificationSender-TlsImplicit
+          - ReviewCenter-SmtpNotificationSender-TlsUndefined
+        tests:
+          - SmtpNotificationSender_MapTls_MapsEveryMode
+
+      - id: ReviewCenter-Messaging-FileConfigured
+        title: >-
+          While the file transport is selected, the Messaging subsystem shall report that a mail transport is
+          configured.
+        justification: |
+          The rest of the server needs a plain answer to the question whether mail can be sent.
+        children:
+          - ReviewCenter-FileNotificationSender-IsConfigured
+        tests:
+          - FileNotificationSender_IsConfigured_IsTrue
+
+      - id: ReviewCenter-Messaging-SendFailure
+        title: >-
+          When the delivery of a message fails, the Messaging subsystem shall report a send error.
+        justification: |
+          A message that was not delivered must never be mistaken for a delivered one.
+        children:
+          - ReviewCenter-SmtpNotificationSender-AuthenticationRefused
+          - ReviewCenter-SmtpNotificationSender-RecipientRefused
+          - ReviewCenter-SmtpNotificationSender-Unreachable
+          - ReviewCenter-SmtpNotificationSender-NothingDeliveredOnFailure
+          - ReviewCenter-FileNotificationSender-WriteFailure
+          - ReviewCenter-FileNotificationSender-FailedNoFile
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+          - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
+
+      - id: ReviewCenter-Messaging-SendErrorNoPassword
+        title: >-
+          The message of a send error of the Messaging subsystem shall not contain the SMTP password.
+        justification: |
+          An error message reaches logs and pages, so it must never be a place where a password leaks.
+        children:
+          - ReviewCenter-SmtpNotificationSender-ErrorNoPassword
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+
+      - id: ReviewCenter-Messaging-SendErrorNoAddress
+        title: >-
+          The message of a send error of the Messaging subsystem shall not contain the address of the recipient.
+        justification: |
+          An address is personal data that must not spread into logs and pages through an error message.
+        children:
+          - ReviewCenter-SmtpNotificationSender-ErrorNoAddress
+        tests:
+          - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+
+      - id: ReviewCenter-Messaging-SendErrorNoServerText
+        title: >-
+          The message of a send error of the Messaging subsystem shall not contain text that the SMTP server sent.
+        justification: |
+          The text of a server is outside the control of the product and may repeat an address or a secret.
+        children:
+          - ReviewCenter-SmtpNotificationSender-ErrorNoServerText
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+          - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+
+      - id: ReviewCenter-Messaging-SendErrorNoPath
+        title: >-
+          The message of a send error of the file transport shall not contain the path of the folder.
+        justification: |
+          The path of a folder shows the layout of the server and must not reach a page.
+        children:
+          - ReviewCenter-FileNotificationSender-ErrorNoPath
+        tests:
+          - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
+
+      - id: ReviewCenter-Messaging-Cancellation
+        title: >-
+          When the cancellation token is canceled, the Messaging subsystem shall end the send with a cancellation.
+        justification: |
+          A server that stops must not wait for a mail server.
+        children:
+          - ReviewCenter-SmtpNotificationSender-Cancellation
+          - ReviewCenter-SmtpNotificationSender-CanceledNothingSent
+          - ReviewCenter-FileNotificationSender-CanceledNoFile
+        tests:
+          - SmtpNotificationSender_Send_Canceled_ThrowsOperationCanceled
+
+      - id: ReviewCenter-Messaging-NullMessage
+        title: >-
+          When no message is given, the Messaging subsystem shall refuse the send with an argument error.
+        justification: |
+          A call without a message is a mistake of the caller that must show at once.
+        children:
+          - ReviewCenter-SmtpNotificationSender-NullMessage
+          - ReviewCenter-FileNotificationSender-NullMessage
+        tests:
+          - SmtpNotificationSender_Send_NullMessage_ThrowsArgumentNull
+          - FileNotificationSender_Send_NullMessage_ThrowsArgumentNull
+
+      - id: ReviewCenter-Messaging-InvalidSettingsNamed
+        title: >-
+          When the notification settings are not valid, the Messaging subsystem shall name the invalid setting in the
+          message of the rejection.
+        justification: |
+          An operator can only fix a configuration when the message says which setting is wrong.
+        children:
+          - ReviewCenter-NotificationOptions-MessagesNameSetting
+          - ReviewCenter-NotificationOptions-MessagesNoPassword
+        tests:
+          - MessagingSubsystem_InvalidSettings_AreRefusedNamingTheSetting

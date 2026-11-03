@@ -437,6 +437,142 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that invalid e-mail notification settings stop the build with an error that names the setting and
+    ///     never contains the password.
+    /// </summary>
+    /// <param name="name">The setting under <c>Notifications</c>.</param>
+    /// <param name="value">The invalid value.</param>
+    [Theory]
+    [InlineData("FromAddress", "not an address")]
+    [InlineData("BaseUrl", "")]
+    [InlineData("Smtp:Host", "")]
+    [InlineData("Smtp:Port", "70000")]
+    [InlineData("DigestHour", "24")]
+    [InlineData("TimeZone", "No/Such_Zone")]
+    public void ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret(
+        string name,
+        string value)
+    {
+        // Arrange: valid enabled SMTP settings with one invalid value, and a password that must stay out
+        using var context = Context.Create(["serve", "--silent"]);
+        var settings = ValidNotificationSettings();
+        settings[$"Notifications:{name}"] = value;
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(settings);
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message is the notification settings error, names the setting and has no password
+        Assert.Contains("Invalid notification settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"Notifications:{name}", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the notification settings are not checked while notifications are off, and that valid settings
+    ///     build the application and log a warning for an inline password.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword()
+    {
+        // Arrange
+        using var context = Context.Create(["serve", "--silent"]);
+        var logs = new CapturingLoggerProvider();
+        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Logging.AddProvider(logs);
+                extra["Database:ConnectionString"] = TestDatabase.NewConnectionString();
+                builder.Configuration.AddInMemoryCollection(extra);
+            }
+        };
+
+        // Act: off with garbage, and on with valid settings
+        using var off = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
+        {
+            ["Notifications:FromAddress"] = "garbage"
+        }));
+        using var on = ServerHost.CreateApplication(context, Options(ValidNotificationSettings()));
+
+        // Assert: both build, and only the second warns, without the password
+        Assert.NotNull(off);
+        Assert.NotNull(on);
+        var warning = Assert.Single(
+            logs.Entries,
+            entry => entry.Level == LogLevel.Warning && entry.Message.Contains("Notification settings", StringComparison.Ordinal));
+        Assert.Contains("Notifications:Smtp:PasswordFile", warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret", warning.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a database created before the feature stops the start while notifications are on, and does not
+    ///     while they are off.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn()
+    {
+        // Arrange: a database file that already has a table, so the server does not create the model
+        using var folder = new TemporaryDirectory();
+        var connectionString = $"Data Source={folder.GetFilePath("old.db")};Pooling=False";
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE Old (Id INTEGER)";
+            command.ExecuteNonQuery();
+        }
+
+        using var context = Context.Create(["serve", "--silent"]);
+        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                extra["Database:ConnectionString"] = connectionString;
+                builder.Configuration.AddInMemoryCollection(extra);
+            }
+        };
+
+        // Act: notifications on
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ServerHost.CreateApplication(context, Options(ValidNotificationSettings())));
+
+        // Assert: the message tells to recreate the database; with notifications off the start works
+        Assert.Contains("no notification tables", exception.Message, StringComparison.Ordinal);
+        using var off = ServerHost.CreateApplication(context, Options([]));
+        Assert.NotNull(off);
+    }
+
+    /// <summary>
+    ///     Gets valid enabled SMTP notification settings with an inline password.
+    /// </summary>
+    /// <returns>A new, modifiable dictionary of settings.</returns>
+    private static Dictionary<string, string?> ValidNotificationSettings() => new()
+    {
+        ["Notifications:Enabled"] = "true",
+        ["Notifications:Sender"] = "Smtp",
+        ["Notifications:FromAddress"] = "reviewcenter@example.com",
+        ["Notifications:BaseUrl"] = "https://reviewcenter.example.com/",
+        ["Notifications:Smtp:Host"] = "mail.example.com",
+        ["Notifications:Smtp:Port"] = "587",
+        ["Notifications:Smtp:Tls"] = "StartTls",
+        ["Notifications:Smtp:Username"] = "rc-mailer",
+        ["Notifications:Smtp:Password"] = "top-secret-value"
+    };
+
+    /// <summary>
     ///     Test that a client secret file that is missing, or that is set together with an inline client secret, stops
     ///     the build with an error that names the settings and never contains the secret.
     /// </summary>

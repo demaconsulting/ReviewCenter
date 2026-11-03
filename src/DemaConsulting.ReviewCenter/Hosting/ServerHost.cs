@@ -26,6 +26,7 @@ using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Identity;
+using DemaConsulting.ReviewCenter.Messaging;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.DataProtection;
@@ -158,6 +159,7 @@ internal static class ServerHost
         ValidateAuthOptions(app);
         ValidateOidcOptions(app);
         ValidateTotpOptions(app);
+        ValidateNotificationOptions(app);
         ValidateGitOptions(app);
         ValidateDataProtection(app);
         ValidateAttestation(app);
@@ -291,6 +293,12 @@ internal static class ServerHost
         services.AddSingleton<ITotpSecretProtector, TotpSecretProtector>();
         services.AddSingleton<TotpChallengeStore>();
         services.AddSingleton<TotpService>();
+
+        // The optional e-mail notifications: the settings (read at start-up), the sender they choose, the store and
+        // the service for the notification address. They are off by default; no background work is registered here
+        services.AddNotifications(configuration);
+        services.AddSingleton<INotificationStore, NotificationStore>();
+        services.AddSingleton<NotificationPreferenceService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IProjectAccess, ProjectAccess>();
         services.AddSingleton<ProjectService>();
@@ -652,6 +660,59 @@ internal static class ServerHost
         {
             ((IDisposable)app).Dispose();
             throw new InvalidOperationException($"Invalid two-factor sign-in settings: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Reads the e-mail notification settings once so an invalid value stops the start-up with a clear message,
+    ///     logs what is doubtful, and checks that the database has the tables of the feature when it is on.
+    /// </summary>
+    /// <param name="app">The built application whose services provide the settings and the store.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the <c>Notifications</c> settings are invalid, or when notifications are enabled and the
+    ///     database was created before the feature (it must then be deleted and recreated); the application is
+    ///     disposed before the exception is thrown. The message names the setting, never a secret.
+    /// </exception>
+    /// <remarks>
+    ///     While notifications are off nothing here touches the notification tables, so an existing database keeps
+    ///     working unchanged.
+    /// </remarks>
+    private static void ValidateNotificationOptions(WebApplication app)
+    {
+        NotificationOptions options;
+        try
+        {
+            options = app.Services.GetRequiredService<IOptions<NotificationOptions>>().Value;
+            _ = app.Services.GetRequiredService<NotificationSettings>();
+            _ = app.Services.GetRequiredService<INotificationSender>();
+        }
+        catch (Exception ex) when (ex is OptionsValidationException or InvalidOperationException)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException($"Invalid notification settings: {ex.Message}", ex);
+        }
+
+        if (!options.Enabled)
+        {
+            return;
+        }
+
+        // Warn about settings that work but that an operator should reconsider; the sentences hold no value
+        var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(ServerHost).FullName!);
+        foreach (var warning in options.GetWarnings())
+        {
+            logger.LogWarning("Notification settings: {Warning}", warning);
+        }
+
+        // A database from before the feature lacks its tables; say so now instead of failing on the first page view
+        var available = app.Services.GetRequiredService<INotificationStore>().IsAvailableAsync().GetAwaiter().GetResult();
+        if (!available)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException(
+                "Invalid notification settings: the database has no notification tables because it was created " +
+                "before e-mail notifications existed; delete it and let the server create it again, or set " +
+                "Notifications:Enabled to false.");
         }
     }
 

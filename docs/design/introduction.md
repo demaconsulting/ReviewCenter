@@ -21,7 +21,8 @@ does not restate requirements; it explains how they are realized.
 Local items:
 
 - **ReviewCenter**: the distributed software system. It is divided into the Program unit and the
-  Cli, Hosting, Identity, Web, Core, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities subsystems.
+  Cli, Hosting, Identity, Web, Core, Messaging, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities
+  subsystems.
 - **ReviewCenterPuppet**: a separate software system, a development tool that is built and reviewed
   in this repository but is not part of the distributed ReviewCenter package. It has no
   subsystems; its units are PuppetProgram, ControlChannel, BrowserDaemon, SelectorResolver, and
@@ -37,6 +38,7 @@ OTS items:
 - **Microsoft.AspNetCore.Authentication.OpenIdConnect**: integration and usage design (used for sign-in with an OpenID
   Connect provider).
 - **Microsoft.AspNetCore.OpenApi**: integration and usage design (used to generate the OpenAPI document of the API).
+- **MailKit**: integration and usage design (used to send e-mail through an SMTP server and to build the messages).
 - **OpenIddict**: integration and usage design (used only by the tests as a fake identity provider).
 - **Otp.NET**: integration and usage design (used to compute and check the one-time codes of the second factor).
 - **Pandoc**: integration and usage design.
@@ -55,7 +57,7 @@ OTS items:
 The following topics are out of scope:
 
 - Design documents are not produced for the test projects or build pipeline CI configuration
-- Subsystems of the target architecture that are not implemented yet (Messaging) have no design documents yet
+- Subsystems of the target architecture that are not implemented yet have no design documents yet
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
 ## Software Structure
@@ -91,7 +93,7 @@ The ReviewCenter system is divided as follows:
   RepositoriesPage unit, and the InboxPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
   users, personal access tokens, second factor enrollments, reviewer signatures, the inbox and read state of a user,
-  the hash-chained audit trail, and the
+  the e-mail address of a user for notifications and its confirmation, the hash-chained audit trail, and the
   registry of git
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
   ProjectService, EvidenceSettingsService, ProjectChecklistService, ReviewProgressService, ReviewService, ThreadService,
@@ -100,15 +102,19 @@ The ReviewCenter system is divided as follows:
   PersonalAccessTokenService,
   SigningService, ReauthProofStore, TotpService, TotpChallengeStore, RepositoryService, SelectionMatcher,
   RevisionValidator, ReviewPlanner, LineDiff, InboxService, UserImpactService, BallotConsolidation,
-  BallotVisibility, and ReviewStatusService
+  BallotVisibility, ReviewStatusService, NotificationAddress, NotificationMessage, and NotificationPreferenceService
   units
+- **Messaging** (subsystem): the optional sending of e-mail: the settings of the `Notifications` section, the sender
+  that delivers a message through an SMTP server, and the sender that writes the message to a file for development
+  and demonstrations; contains the NotificationOptions, SmtpNotificationSender, and FileNotificationSender units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
-  tokens, second factor enrollments, reviewer slots, signatures, the read state of the inbox, the audit trail, and the
+  tokens, second factor enrollments, reviewer slots, signatures, the read state of the inbox, the notification address
+  of a user, the audit trail, and the
   registered repositories in a
   database
   through Entity
   Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, PersonalAccessTokenStore, AuditStore,
-  RepositoryStore, TotpStore, InboxStore, and DatabaseSetup units
+  RepositoryStore, TotpStore, InboxStore, NotificationStore, and DatabaseSetup units
 - **ContentSources** (subsystem): reads content from outside the system, currently from git repositories, and protects
   the access tokens of private repositories; contains the GitRunner, GitSource, ReviewSetParser, and CredentialProtector
   units
@@ -126,9 +132,10 @@ The ReviewCenterPuppet system is a flat set of units that drive one persistent h
 invocation, against a ReviewCenter server and write screenshots.
 
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
-Cli, Hosting, Identity, Web, Core, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities subsystems, and the
-Puppet system. The Messaging subsystem of the target architecture (`architecture.md`) is planned and deferred; it will be
-added to the model, with its requirements and design documents, as it is implemented.
+Cli, Hosting, Identity, Web, Core, Messaging, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities
+subsystems, and the Puppet system. The notification worker of the target architecture (`architecture.md`) is planned
+and deferred; it will be added to the Messaging subsystem, with its requirements and design documents, as it is
+implemented.
 
 ## Folder Layout
 
@@ -138,6 +145,7 @@ added to the model, with its requirements and design documents, as it is impleme
     - **Hosting/** - web host subsystem
     - **Identity/** - local accounts, cookie sign-in, and authorization subsystem
     - **Web/** - Blazor Server user interface subsystem (Razor components)
+    - **Messaging/** - e-mail notification settings and senders subsystem
     - **Storage/** - database persistence subsystem
     - **ContentSources/** - git content source and token protection subsystem
     - **Evidence/** - signed PDF attestation subsystem

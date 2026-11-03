@@ -142,7 +142,9 @@ UploadSource keeps uploaded bytes verbatim. GitSource uses the git CLI and a bar
 completed reviews and never modifies them.
 
 **Messaging** delivers notifications to the in-app inbox and, with built-in templates and per-user opt-out, by SMTP
-email. It consumes domain events and has no other inputs.
+email. It consumes domain events and has no other inputs. The first part of the e-mail side is implemented: the
+settings, the SMTP and file senders, and the confirmation of an address with a code (see Implementation Status); the
+mails about reviews are not.
 
 **Hosting** composes the application: startup, appsettings binding with startup validation, forwarded-headers
 handling, structured logging, and the command-line verbs (`serve` now; `migrate` reserved for later).
@@ -393,7 +395,19 @@ from the target design, an implementation note says so:
   enforced inside the store's serializable audit transaction. A project audit trail page (`/projects/{id}/audit`)
   shows the events of that project only, and the review page marks an assignee who is no longer a member. Development
   databases created before this slice must be recreated (no migrations; the new `Users.MustChangePassword` column).
-- **Planned and deferred**: Messaging, database migrations, further database providers, and the rest of Core and
+- **Implemented (e-mail notifications, first part)**: the Messaging subsystem has the settings of the `Notifications`
+  section (off by default, and not read while off; every value is bounded and checked at the start, with a message that
+  names the setting and never the password), two senders (SMTP, and a file sender that writes `.eml` files for
+  demonstrations), and the confirmation of an e-mail address: a user enters an address on the Account page, the server
+  mails a six-digit code (stored only as a salted hash, valid for 30 minutes, 5 attempts, 60 seconds between mails,
+  at most 3 mails a day for a user and for an address), and the user types it back. The address is visible only to its
+  owner; the audit trail records that an address was entered, confirmed, or removed, without the address or the code.
+  Two new tables hold this, `NotificationPreferences` and `NotificationSendLog`; the schema is still created directly,
+  so a database that was created before this slice must be recreated before notifications are turned on (the server
+  refuses to start with notifications on and without the tables). The opt-in `ReviewCenter_ConfiguredNotifications`
+  check of `--validate --check-config` examines the settings without any network. No mail about a review is sent yet.
+- **Planned and deferred**: the mails about reviews (the notification mode of a user, the worker that sends them, and
+  the daily summary), database migrations, further database providers, and the rest of Core and
   Storage that the target design describes. They have no code, requirements,
   design documents, or verification documents yet (the Api subsystem and the review lifecycle, with ballots, signing,
   and conclusion, are implemented), so the

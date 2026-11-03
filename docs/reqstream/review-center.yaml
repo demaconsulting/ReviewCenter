@@ -748,6 +748,263 @@ sections:
           - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
           - TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds
 
+      - id: ReviewCenter-System-NotificationsOffByDefault
+        title: >-
+          While e-mail notifications are not enabled in the configuration, the tool shall offer a user no notification
+          settings.
+        tags: [system]
+        justification: |
+          The default installation must work without a mail server, and a page must never offer a setting that has no
+          effect. E-mail notifications are enabled when the Enabled setting of the Notifications section is true and
+          not enabled otherwise; this is the only term used for that state.
+        children:
+          - ReviewCenter-Messaging-Off
+          - ReviewCenter-Messaging-OffRefusesSend
+          - ReviewCenter-Messaging-OffSettings
+          - ReviewCenter-Hosting-NotificationSettings
+          - ReviewCenter-Hosting-NotificationTables
+          - ReviewCenter-Hosting-NotificationNotEnabledSkipsChecks
+          - ReviewCenter-Web-NotificationCard
+        tests:
+          - AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore
+          - MessagingSubsystem_NotificationsOff_SenderIsNotConfiguredAndSendFails
+
+      - id: ReviewCenter-System-NotificationAddressConfirmation
+        title: >-
+          The tool shall treat the e-mail address of a user as confirmed only after the user has typed the code that
+          was mailed to that address.
+        tags: [system]
+        justification: |
+          A mail must reach only the person who owns the address, so a typed address alone must never be enough to
+          receive mail.
+        children:
+          - ReviewCenter-Core-NotificationAddress
+          - ReviewCenter-Core-NotificationConfirmation
+          - ReviewCenter-Storage-NotificationPreferences
+          - ReviewCenter-Storage-NotificationConfirmOneWinner
+        tests:
+          - NotificationPreferenceService_Confirm_RightCode_ConfirmsAddress
+          - AccountPage_Confirm_RightCode_ShowsConfirmedAddress
+
+      - id: ReviewCenter-System-NotificationLimits
+        title: >-
+          The tool shall refuse a request for a confirmation mail when a limit on the number of such mails is reached.
+        tags: [system]
+        justification: |
+          The confirmation mail goes to an address that a user types, so without a limit the feature could be used to
+          flood a third person or the mail server.
+        children:
+          - ReviewCenter-Core-NotificationLimits
+          - ReviewCenter-Storage-NotificationLimits
+          - ReviewCenter-Storage-NotificationReserveOneWinner
+          - ReviewCenter-Storage-NotificationAttemptLimit
+          - ReviewCenter-Storage-NotificationLogRetention
+        tests:
+          - NotificationPreferenceService_RequestConfirmation_UserDailyLimit_ThrowsLimitReached
+          - NotificationStore_ReserveConfirmationAsync_Concurrent_HasExactlyOneWinner
+
+      - id: ReviewCenter-System-NotificationAccess
+        title: >-
+          The tool shall let only a person who is signed in through a session manage the notification settings of the
+          account.
+        tags: [system]
+        justification: |
+          A script with an API token must never be able to turn on mail or read an address, and no other person may
+          change the settings of an account.
+        children:
+          - ReviewCenter-Core-NotificationAccess
+          - ReviewCenter-Web-NotificationCard
+        tests:
+          - NotificationPreferenceService_Actions_ApiTokenActor_AreRefused
+          - AccountPage_Render_TemporaryPassword_HidesNotificationsCard
+
+      - id: ReviewCenter-System-NotificationAudit
+        title: >-
+          The tool shall record each change of the notification settings of an account in the audit trail.
+        tags: [system]
+        justification: |
+          A change of the address that receives mail is a change of an account that an administrator may have to trace
+          (21 CFR Part 11 section 11.10(e), audit trail).
+        children:
+          - ReviewCenter-Core-NotificationAudit
+          - ReviewCenter-Core-NotificationAuditNoAddress
+          - ReviewCenter-Core-NotificationAuditNoCode
+          - ReviewCenter-Storage-NotificationAudit
+        tests:
+          - NotificationPreferenceService_Changes_AreAuditedWithoutAddressOrCode
+
+      - id: ReviewCenter-System-NotificationMessageSafety
+        title: >-
+          The tool shall refuse to build a mail message whose recipient could add a header line to the message.
+        tags: [system, security]
+        justification: |
+          A line break in a value that a person typed must never let that person add a recipient or a header to a mail
+          that the server sends.
+        children:
+          - ReviewCenter-Core-NotificationMessage
+        tests:
+          - NotificationMessage_Constructor_InvalidRecipient_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-System-NotificationSubjectSafety
+        title: >-
+          The tool shall refuse to build a mail message whose subject could add a header line to the message.
+        tags: [system, security]
+        justification: |
+          A line break in a value that a person typed must never let that person add a recipient or a header to a mail
+          that the server sends.
+        children:
+          - ReviewCenter-Core-NotificationMessage
+        tests:
+          - NotificationMessage_Constructor_ControlCharacterInSubject_ThrowsWithoutEchoingTheValue
+
+      - id: ReviewCenter-System-NotificationSmtpDelivery
+        title: >-
+          When the SMTP transport is selected in the settings, the tool shall deliver a notification message through
+          the SMTP server of the settings.
+        tags: [system]
+        justification: |
+          Production installations send mail through the mail server of the organization.
+        children:
+          - ReviewCenter-Messaging-SmtpTransport
+          - ReviewCenter-Messaging-SmtpDelivery
+          - ReviewCenter-Messaging-SmtpTls
+        tests:
+          - SmtpNotificationSender_Send_DeliversMessageToServer
+          - MessagingSubsystem_SmtpTransport_SettingsChooseSmtpSender
+
+      - id: ReviewCenter-System-NotificationFileDelivery
+        title: >-
+          When the file transport is selected in the settings, the tool shall deliver a notification message as a file
+          in the folder named in the settings.
+        tags: [system]
+        justification: |
+          Demonstrations, development, and automatic tests need mail without a mail server.
+        children:
+          - ReviewCenter-Messaging-FileTransport
+          - ReviewCenter-Messaging-FileEnabled
+          - ReviewCenter-Messaging-FileConfigured
+        tests:
+          - FileNotificationSender_Send_WritesParseableEmlFile
+          - MessagingSubsystem_FileTransport_SettingsChooseFileSenderThatDeliversMessage
+
+      - id: ReviewCenter-System-NotificationSettingsSection
+        title: >-
+          The tool shall let an operator configure e-mail notifications in the Notifications section of the
+          configuration.
+        tags: [system]
+        justification: |
+          A mail server, a sender, and the limits differ for every installation, so they must be configurable in the
+          place where the operator configures the rest of the server.
+        children:
+          - ReviewCenter-Messaging-SettingsDefaults
+          - ReviewCenter-Messaging-PasswordFile
+          - ReviewCenter-Messaging-Warnings
+          - ReviewCenter-Messaging-WarningClearRemote
+          - ReviewCenter-Messaging-WarningNoPassword
+          - ReviewCenter-Messaging-WarningNoneForGoodSettings
+          - ReviewCenter-Messaging-WarningNoneWhenNotEnabled
+          - ReviewCenter-Messaging-LoopbackBaseUrl
+          - ReviewCenter-Messaging-LoopbackCredentials
+        tests:
+          - NotificationOptions_Bind_ReadsAllSections
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-System-NotificationSendFailure
+        title: >-
+          When a notification message cannot be delivered, the tool shall report a send error.
+        tags: [system]
+        justification: |
+          A message that was not delivered must never be mistaken for a delivered one.
+        children:
+          - ReviewCenter-Messaging-SendFailure
+          - ReviewCenter-Messaging-Cancellation
+          - ReviewCenter-Messaging-NullMessage
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+          - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
+
+      - id: ReviewCenter-System-NotificationErrorNoPassword
+        title: >-
+          The tool shall not put the SMTP password into the message of a send error.
+        tags: [system, security]
+        justification: |
+          An error message reaches logs and pages, so it must not leak a secret.
+        children:
+          - ReviewCenter-Messaging-SendErrorNoPassword
+        tests:
+          - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
+
+      - id: ReviewCenter-System-NotificationErrorNoAddress
+        title: >-
+          The tool shall not put the address of the recipient into the message of a send error.
+        tags: [system, security]
+        justification: |
+          An address is personal data that must not spread into logs and pages.
+        children:
+          - ReviewCenter-Messaging-SendErrorNoAddress
+        tests:
+          - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+
+      - id: ReviewCenter-System-NotificationErrorNoServerText
+        title: >-
+          The tool shall not put text that the mail server sent into the message of a send error.
+        tags: [system, security]
+        justification: |
+          The text of a server is outside the control of the product and may repeat an address or a secret.
+        children:
+          - ReviewCenter-Messaging-SendErrorNoServerText
+        tests:
+          - SmtpNotificationSender_Send_RecipientRefused_ThrowsWithoutAddress
+
+      - id: ReviewCenter-System-NotificationErrorNoPath
+        title: >-
+          The tool shall not put the path of the folder of the file transport into the message of a send error.
+        tags: [system, security]
+        justification: |
+          The path of a folder shows the layout of the server and must not reach a page.
+        children:
+          - ReviewCenter-Messaging-SendErrorNoPath
+        tests:
+          - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
+
+      - id: ReviewCenter-System-NotificationSettingsRejected
+        title: >-
+          While e-mail notifications are enabled, the tool shall refuse to start the server when the notification
+          settings are not valid.
+        tags: [system]
+        justification: |
+          A wrong mail configuration must show at the start of the server and not at the first mail that fails.
+        children:
+          - ReviewCenter-Messaging-InvalidSettings
+          - ReviewCenter-Messaging-InvalidSettingsNamed
+        tests:
+          - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
+          - MessagingSubsystem_InvalidSettings_AreRefusedNamingTheSetting
+
+      - id: ReviewCenter-System-NotificationConfigCheck
+        title: >-
+          When the check-config flag is provided, the tool shall report whether the notification settings are valid.
+        tags: [system]
+        justification: |
+          An operator must be able to test the mail configuration before the start of the server.
+        children:
+          - ReviewCenter-SelfTest-ConfiguredNotifications
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+          - ValidationChecks_ConfiguredNotifications_MissingHost_FailsAndNamesSetting
+
+      - id: ReviewCenter-System-NotificationConfigCheckNoNetwork
+        title: >-
+          When the check-config flag is provided, the tool shall open no network connection while it checks the
+          notification settings.
+        tags: [system]
+        justification: |
+          The test of the mail configuration must not send mail or depend on the network.
+        children:
+          - ReviewCenter-SelfTest-ConfiguredNotificationsNoNetwork
+        tests:
+          - ValidationChecks_ConfiguredNotifications_SmtpSettings_ReportsWithoutSecret
+
       - id: ReviewCenter-System-Authorization
         title: >-
           The tool shall send a request without a signed-in user for a project, review, checklist, account, or

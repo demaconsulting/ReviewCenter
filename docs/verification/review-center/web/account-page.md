@@ -10,7 +10,10 @@ signed-in user of the tests is `ann`, set by the test authentication state of th
 `reviewCenter.getTheme`, `reviewCenter.setTheme`, and `reviewCenter.copyText` are recorded or scripted instead of
 run; the application of the
 stored appearance before the first paint is verified by the `App` unit. Tests locate elements by their `data-testid`
-attributes. The real database is covered by the `Storage` subsystem and the sign-in by the `Identity` subsystem.
+attributes. The real database is covered by the `Storage` subsystem and the sign-in by the `Identity` subsystem. The
+notification card is verified in `AccountNotificationPageTests.cs`, which renders the page over the real
+`NotificationPreferenceService` with an in-memory notification store, a recording sender, and the test clock; the mail
+transport is covered by the `Messaging` subsystem.
 
 #### Test Environment
 
@@ -19,6 +22,10 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All component tests pass with zero failures.
+- While e-mail notifications are not set up the notification card shows one sentence and no field, button, or
+  explanation, and the page reads nothing from the notification store; with them on, the card offers the address form,
+  the code form, and the confirmed address with a remove button in turn, never shows the code, is absent for a
+  temporary password, and is shown to a user of an identity provider.
 - The page shows the form for the current, new, and repeated new password and the change button, and no message.
 - The page shows the appearance options System, Light, and Dark with System selected when nothing is stored; choosing
   one is applied through the browser script at once and shown as selected; a stored choice is shown as selected.
@@ -173,3 +180,29 @@ off, which is tested by `AccountPage_Disable_RecoveryCode_TurnsItOff`. The right
 that differ from the old ones, empty the fields, and the codes are gone after dismissal, which is tested by
 `AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce`. A wrong code shows the generic message and no codes,
 which is tested by `AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes`.
+
+**AccountPage e-mail notification scenarios**: The tests of the card are in `AccountNotificationPageTests.cs`, rendered
+with bUnit over the real `NotificationPreferenceService`, an in-memory notification store, a recording sender, and a
+test clock; a test switches the feature on by setting the notification settings of the test host.
+While the feature is not set up the card shows exactly one sentence, "E-mail notifications are not set up by your
+administrator.", has no field, no button, and no explanation, and the store was not called once, which is tested by
+`AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore`. With the feature on and no address the
+card shows the explanation (it says an e-mail never contains review text), the address field and the send button, and
+no code form, no remove button, and no unavailable sentence, which is tested by
+`AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm`. A user whose session carries the
+temporary-password claim does not see the card, which is tested by
+`AccountPage_Render_TemporaryPassword_HidesNotificationsCard`. A valid address (typed in mixed case) sends exactly one
+mail to the lower-case address, and the card shows the waiting address, the code field, and the notice that a code was
+sent, and no confirmed address, which is tested by `AccountPage_SendCode_ValidAddress_MailsCodeAndShowsConfirmForm`. An
+invalid address shows an error, sends nothing, and shows no code form, which is tested by
+`AccountPage_SendCode_InvalidAddress_ShowsErrorAndMailsNothing`. The code from the mail confirms the address: the card
+shows it as confirmed, shows "Your e-mail address is confirmed.", has no code form, and offers the remove button, which
+is tested by `AccountPage_Confirm_RightCode_ShowsConfirmedAddress`. A wrong code shows an error, keeps the code form,
+shows no confirmed address, and empties the code field, which is tested by
+`AccountPage_Confirm_WrongCode_ShowsErrorAndKeepsForm`. Asking for a new code at once shows an error and sends no
+second mail; after the clock passes the 60 seconds a second mail is sent and no error is shown, which is tested by
+`AccountPage_Resend_TooSoonThenAfterCooldown_ShowsErrorThenMailsAgain`. Removing a confirmed address shows no confirmed
+address, the address form again, and "Your e-mail address was removed.", which is tested by
+`AccountPage_Remove_ConfirmedAddress_ShowsAddressFormAgain`. The text of the card never contains the code of a waiting
+address, which is tested by `AccountPage_Render_PendingAddress_NeverShowsTheCode`. An account of an identity provider
+sees the address form, which is tested by `AccountPage_Render_ExternalUser_ShowsAddressForm`.

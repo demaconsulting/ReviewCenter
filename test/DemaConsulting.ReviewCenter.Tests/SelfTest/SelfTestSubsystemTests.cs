@@ -101,6 +101,8 @@ public partial class SelfTestSubsystemTests
         Assert.DoesNotContain("ReviewCenter_ConfiguredDatabase", run.Trx);
         Assert.DoesNotContain("ReviewCenter_ConfiguredKeys", run.Log);
         Assert.DoesNotContain("ReviewCenter_ConfiguredKeys", run.Trx);
+        Assert.DoesNotContain("ReviewCenter_ConfiguredNotifications", run.Log);
+        Assert.DoesNotContain("ReviewCenter_ConfiguredNotifications", run.Trx);
     }
 
     /// <summary>

@@ -8,7 +8,9 @@
    valid while the page is open. A user who still has a temporary password (set by the person who created the
    account) sees only a banner and the change-password form; after the change the user is sent to the login page to
    sign in again with the new password. A user of an identity provider has no password: the change-password card is
-   replaced by a sentence that says who manages it. *@
+   replaced by a sentence that says who manages it. The e-mail notification card shows one sentence and no field while
+   the feature is not set up, and then does not read the notification tables; otherwise it shows the address
+   steps: enter an address, confirm it with the code that was mailed, change or remove it. *@
 @page "/account"
 @rendermode InteractiveServer
 @attribute [Authorize]
@@ -234,6 +236,85 @@
         }
     </section>
     }
+
+    <section class="card" data-testid="notifications-card">
+        <h2>E-mail notifications</h2>
+        @if (!Notifications.IsAvailable)
+        {
+            <p class="muted" data-testid="notifications-unavailable">
+                E-mail notifications are not set up by your administrator.
+            </p>
+        }
+        else if (NotificationInfo is not null)
+        {
+            <p class="muted hint" data-testid="notifications-explanation">
+                ReviewCenter sends e-mail only to an address you have confirmed with a code. An e-mail never contains
+                review text, comments or file contents; it only tells you that something happened and where to look.
+                Apart from the confirmation code, no e-mail contains a code or a password. No page of ReviewCenter
+                shows your address to other users or to administrators.
+            </p>
+
+            @if (NotificationError is not null)
+            {
+                <p class="error" role="alert" data-testid="notifications-error">@NotificationError</p>
+            }
+            @if (NotificationNotice is not null)
+            {
+                <p class="notice" role="status" data-testid="notifications-message">@NotificationNotice</p>
+            }
+
+            @if (NotificationInfo.ConfirmedAddress is not null)
+            {
+                <p>
+                    Confirmed address:
+                    <strong data-testid="notifications-confirmed-address">@NotificationInfo.ConfirmedAddress</strong>
+                </p>
+            }
+
+            @if (NotificationInfo.PendingAddress is not null)
+            {
+                <form data-testid="notifications-confirm-form" @onsubmit="ConfirmNotificationAddressAsync">
+                    <p>
+                        A code was sent to
+                        <strong data-testid="notifications-pending-address">@NotificationInfo.PendingAddress</strong>.
+                        @(NotificationInfo.PendingExpired ? "The code has expired; send a new one." : $"It is valid for {NotificationPreferenceService.CodeLifetime.TotalMinutes:0} minutes.")
+                    </p>
+                    <div class="field">
+                        <label for="notifications-code">Enter the 6-digit code from the e-mail</label>
+                        <input id="notifications-code" type="text" inputmode="numeric" maxlength="6"
+                               autocomplete="one-time-code" data-testid="notifications-code-input"
+                               @bind="NotificationCode" @bind:event="oninput" />
+                    </div>
+                    <button type="submit" data-testid="notifications-confirm-button">Confirm address</button>
+                    <button type="button" class="outline" data-testid="notifications-resend-button"
+                            @onclick="ResendNotificationCodeAsync">Send a new code</button>
+                </form>
+            }
+            else
+            {
+                <form data-testid="notifications-address-form" @onsubmit="SendNotificationCodeAsync">
+                    <div class="field">
+                        <label for="notifications-address">
+                            @(NotificationInfo.ConfirmedAddress is null ? "E-mail address" : "Use a different address")
+                        </label>
+                        <input id="notifications-address" type="email" autocomplete="email"
+                               maxlength="@NotificationAddress.MaxLength" spellcheck="false"
+                               data-testid="notifications-address-input" @bind="NotificationAddressText"
+                               @bind:event="oninput" />
+                    </div>
+                    <button type="submit" data-testid="notifications-send-code-button">Send confirmation code</button>
+                </form>
+            }
+
+            @if (NotificationInfo.ConfirmedAddress is not null || NotificationInfo.PendingAddress is not null)
+            {
+                <p>
+                    <button type="button" class="outline small" data-testid="notifications-remove-button"
+                            @onclick="RemoveNotificationAddressAsync">Remove my address</button>
+                </p>
+            }
+        }
+    </section>
 
     <section class="card" data-testid="tokens-card">
         <h2 id="tokens-heading">API tokens</h2>

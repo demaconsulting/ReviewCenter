@@ -1,0 +1,440 @@
+---
+# Software Unit Requirements for the NotificationOptions Class
+#
+# The NotificationOptions class holds the settings of e-mail notifications (the Notifications section of the
+# configuration), checks them when the server starts, lists the settings that work but deserve a second look, and
+# resolves the password of the SMTP server. A setting is "rejected" when the check reports it as invalid with a message
+# that names the setting; the server then does not start.
+
+sections:
+  - title: NotificationOptions Unit Requirements
+    requirements:
+      - id: ReviewCenter-NotificationOptions-DefaultOff
+        title: >-
+          The NotificationOptions class shall have e-mail notifications not enabled by default.
+        justification: |
+          An installation that never heard of the feature must not start to send mail or to ask for a mail server.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultSender
+        title: >-
+          The NotificationOptions class shall have no mail transport selected by default.
+        justification: |
+          The operator must choose how mail leaves the server; no transport is ever assumed.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultSmtpPort
+        title: >-
+          The NotificationOptions class shall use port 587 for the SMTP server by default.
+        justification: |
+          Port 587 is the standard port of the mail submission service, so most servers need no port setting.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultTls
+        title: >-
+          The NotificationOptions class shall protect the connection to the SMTP server by an upgrade to TLS by
+          default.
+        justification: |
+          Mail and passwords must not cross the network in clear text unless an operator chooses that explicitly.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultDigestHour
+        title: >-
+          The NotificationOptions class shall send the daily summary at hour 8 by default.
+        justification: |
+          A documented default makes the schedule predictable without any setting.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultTimeZone
+        title: >-
+          The NotificationOptions class shall use the time zone UTC for the hour of the daily summary by default.
+        justification: |
+          UTC is known to every operating system and does not depend on the place of the server.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultBatchWindow
+        title: >-
+          The NotificationOptions class shall collect changes for 300 seconds before one mail is sent by default.
+        justification: |
+          A short collection window turns a burst of changes into one mail instead of many.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultPollInterval
+        title: >-
+          The NotificationOptions class shall look for changes to mail every 60 seconds by default.
+        justification: |
+          A documented default keeps the load of the polling low and predictable.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-DefaultTitles
+        title: >-
+          The NotificationOptions class shall allow the titles of reviews in mails by default.
+        justification: |
+          Titles make a mail useful; an operator who must keep them out of mail can switch them off.
+        tests:
+          - NotificationOptions_Defaults_AreOffAndDocumented
+
+      - id: ReviewCenter-NotificationOptions-BindingGeneral
+        title: >-
+          The NotificationOptions class shall read the general settings from the Notifications section of the
+          configuration.
+        justification: |
+          Operators give settings in the configuration file or in environment variables; both end in the same section.
+        tests:
+          - NotificationOptions_Bind_ReadsAllSections
+
+      - id: ReviewCenter-NotificationOptions-BindingSmtp
+        title: >-
+          The NotificationOptions class shall read the settings of the SMTP server from the Notifications:Smtp section
+          of the configuration.
+        justification: |
+          The mail server is an operator decision and must be set without a change to the program.
+        tests:
+          - NotificationOptions_Bind_ReadsAllSections
+
+      - id: ReviewCenter-NotificationOptions-BindingFile
+        title: >-
+          The NotificationOptions class shall read the folder of the file transport from the Notifications:File section
+          of the configuration.
+        justification: |
+          The folder of the mail files is an operator decision and must be set without a change to the program.
+        tests:
+          - NotificationOptions_Bind_ReadsAllSections
+
+      - id: ReviewCenter-NotificationOptions-DisabledAcceptsAll
+        title: >-
+          While e-mail notifications are not enabled, the NotificationOptions class shall accept every value of every
+          other setting.
+        justification: |
+          An installation that does not use the feature must start, whatever the other settings hold.
+        tests:
+          - NotificationOptionsValidator_Disabled_AcceptsAnything
+
+      - id: ReviewCenter-NotificationOptions-AcceptSmtp
+        title: >-
+          The NotificationOptions class shall accept complete settings of the SMTP transport.
+        justification: |
+          A correct configuration must not be rejected.
+        tests:
+          - NotificationOptionsValidator_CompleteSmtpSettings_AreAccepted
+
+      - id: ReviewCenter-NotificationOptions-AcceptFile
+        title: >-
+          The NotificationOptions class shall accept complete settings of the file transport.
+        justification: |
+          A correct configuration must not be rejected.
+        tests:
+          - NotificationOptionsValidator_CompleteFileSettings_AreAccepted
+
+      - id: ReviewCenter-NotificationOptions-SenderRequired
+        title: >-
+          The NotificationOptions class shall reject enabled settings that select no mail transport.
+        justification: |
+          Notifications that are enabled without a transport can never deliver a mail; the operator must hear of it at
+          start-up and not when the first user asks for a mail.
+        tests:
+          - NotificationOptionsValidator_NoSender_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-FromAddressRequired
+        title: >-
+          The NotificationOptions class shall reject enabled settings that have no sender address.
+        justification: |
+          A mail without a sender address is refused by mail servers.
+        tests:
+          - NotificationOptionsValidator_MissingFromAddress_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-FromAddressLineBreak
+        title: >-
+          The NotificationOptions class shall reject a sender address that contains a line break.
+        justification: |
+          A line break in an address could add a header line to every mail that the server sends.
+        tests:
+          - NotificationOptionsValidator_FromAddressWithLineBreak_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-FromNameLineBreak
+        title: >-
+          The NotificationOptions class shall reject a sender name that contains a line break.
+        justification: |
+          A line break in a name could add a header line to every mail that the server sends.
+        tests:
+          - NotificationOptionsValidator_FromNameWithLineBreak_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BaseUrlRequired
+        title: >-
+          The NotificationOptions class shall reject enabled settings that have no base address of the installation.
+        justification: |
+          The links in mails start with the base address; without it the mails would hold no usable link.
+        tests:
+          - NotificationOptionsValidator_MissingBaseUrl_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BaseUrlAbsolute
+        title: >-
+          The NotificationOptions class shall reject a base address that is not absolute.
+        justification: |
+          A relative address cannot be followed from a mail client.
+        tests:
+          - NotificationOptionsValidator_RelativeBaseUrl_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BaseUrlQuery
+        title: >-
+          The NotificationOptions class shall reject a base address that has a query.
+        justification: |
+          Links are built by appending a path to the base address; a query would break every link.
+        tests:
+          - NotificationOptionsValidator_BaseUrlWithExtras_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BaseUrlFragment
+        title: >-
+          The NotificationOptions class shall reject a base address that has a fragment.
+        justification: |
+          Links are built by appending a path to the base address; a fragment would break every link.
+        tests:
+          - NotificationOptionsValidator_BaseUrlWithExtras_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BaseUrlUserInfo
+        title: >-
+          The NotificationOptions class shall reject a base address that has user information.
+        justification: |
+          User information in a link is a credential that would be written into every mail.
+        tests:
+          - NotificationOptionsValidator_BaseUrlWithExtras_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BaseUrlHttpRemote
+        title: >-
+          The NotificationOptions class shall reject a base address that uses http for another machine.
+        justification: |
+          Links in mails must not lead through an unencrypted connection.
+        tests:
+          - NotificationOptionsValidator_HttpBaseUrlForAnotherHost_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BaseUrlHttpLoopback
+        title: >-
+          The NotificationOptions class shall accept a base address that uses http for the local machine.
+        justification: |
+          A developer must be able to try the feature on the local machine without a certificate.
+        tests:
+          - NotificationOptionsValidator_HttpBaseUrlForLoopback_IsAccepted
+
+      - id: ReviewCenter-NotificationOptions-SmtpHostRequired
+        title: >-
+          The NotificationOptions class shall reject settings of the SMTP transport that have no host.
+        justification: |
+          Without a host the server cannot reach any mail server.
+        tests:
+          - NotificationOptionsValidator_SmtpWithoutHost_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-SmtpHostSpace
+        title: >-
+          The NotificationOptions class shall reject an SMTP host that contains a space.
+        justification: |
+          A space is never part of a host name; it shows a typing mistake.
+        tests:
+          - NotificationOptionsValidator_SmtpHostWithSpace_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-SmtpPortRange
+        title: >-
+          The NotificationOptions class shall reject an SMTP port that is outside the range 1 to 65535.
+        justification: |
+          Only the numbers of that range are ports.
+        tests:
+          - NotificationOptionsValidator_SmtpPortOutOfRange_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-SmtpTlsUnknown
+        title: >-
+          The NotificationOptions class shall reject a TLS mode that is not one of the defined modes.
+        justification: |
+          An unknown mode would leave open how the connection is protected.
+        tests:
+          - NotificationOptionsValidator_UnknownTlsMode_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-SmtpTimeoutRange
+        title: >-
+          The NotificationOptions class shall reject an SMTP time-out that is outside the range 5 to 120 seconds.
+        justification: |
+          A shorter time-out fails on a slow server and a longer one lets a stuck server hold a request for minutes.
+        tests:
+          - NotificationOptionsValidator_SmtpTimeoutOutOfRange_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-UsernameNeedsPassword
+        title: >-
+          The NotificationOptions class shall reject an SMTP user name that has no password.
+        justification: |
+          Half a login can never work; the operator must hear of it at start-up.
+        tests:
+          - NotificationOptionsValidator_UsernameWithoutPassword_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-PasswordNeedsUsername
+        title: >-
+          The NotificationOptions class shall reject an SMTP password that has no user name.
+        justification: |
+          Half a login can never work; the operator must hear of it at start-up.
+        tests:
+          - NotificationOptionsValidator_PasswordWithoutUsername_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-PasswordExclusive
+        title: >-
+          The NotificationOptions class shall reject settings that give the SMTP password from two sources.
+        justification: |
+          The two sources are the inline value and the password file. They could disagree, and silently preferring one
+          would hide a mistake.
+        tests:
+          - NotificationOptionsValidator_PasswordAndPasswordFile_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-PasswordFileMissing
+        title: >-
+          The NotificationOptions class shall reject a password file that does not exist.
+        justification: |
+          A wrong path must be found at start-up and not at the first mail.
+        tests:
+          - NotificationOptionsValidator_MissingPasswordFile_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-PasswordFileRead
+        title: >-
+          The NotificationOptions class shall read the SMTP password from the password file.
+        justification: |
+          A password in a file that only the server can read is safer than a password in the configuration.
+        tests:
+          - NotificationOptions_ResolvePassword_FromFile_ReturnsTrimmedPassword
+
+      - id: ReviewCenter-NotificationOptions-PasswordFileTrimmed
+        title: >-
+          The NotificationOptions class shall remove the trailing line break of the password file from the password.
+        justification: |
+          Editors and shell commands add a line break to a file; it is not part of the password.
+        tests:
+          - NotificationOptions_ResolvePassword_FromFile_ReturnsTrimmedPassword
+
+      - id: ReviewCenter-NotificationOptions-CredentialsRemoteClear
+        title: >-
+          The NotificationOptions class shall reject an SMTP user name for another machine when the connection is not
+          protected by TLS.
+        justification: |
+          A password must never cross the network in clear text.
+        tests:
+          - NotificationOptionsValidator_CredentialsWithoutTlsToRemoteHost_AreRejected
+
+      - id: ReviewCenter-NotificationOptions-CredentialsLoopbackClear
+        title: >-
+          The NotificationOptions class shall accept an SMTP user name for the local machine when the connection is not
+          protected by TLS.
+        justification: |
+          A conversation with the local machine never leaves it, so a local test mail server needs no certificate.
+        tests:
+          - NotificationOptionsValidator_CredentialsWithoutTlsToLoopback_AreAccepted
+
+      - id: ReviewCenter-NotificationOptions-FileDirectoryRequired
+        title: >-
+          The NotificationOptions class shall reject settings of the file transport that have no folder.
+        justification: |
+          Without a folder the file transport has nowhere to write.
+        tests:
+          - NotificationOptionsValidator_FileWithoutDirectory_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-DigestHourRange
+        title: >-
+          The NotificationOptions class shall reject a digest hour that is outside the range 0 to 23.
+        justification: |
+          Only the numbers of that range are hours of a day.
+        tests:
+          - NotificationOptionsValidator_DigestHourOutOfRange_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-TimeZoneUnknown
+        title: >-
+          The NotificationOptions class shall reject a time zone that the operating system does not know.
+        justification: |
+          The hour of the daily summary cannot be placed in a zone that does not exist.
+        tests:
+          - NotificationOptionsValidator_UnknownTimeZone_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-BatchWindowRange
+        title: >-
+          The NotificationOptions class shall reject a batch window that is outside the range 30 to 3600 seconds.
+        justification: |
+          A shorter window gives no batching and a longer one holds changes back for too long.
+        tests:
+          - NotificationOptionsValidator_BatchWindowOutOfRange_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-PollIntervalRange
+        title: >-
+          The NotificationOptions class shall reject a poll interval that is outside the range 10 to 3600 seconds.
+        justification: |
+          A shorter interval loads the database for no gain and a longer one delays every mail.
+        tests:
+          - NotificationOptionsValidator_PollSecondsOutOfRange_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-MaxMailsRange
+        title: >-
+          The NotificationOptions class shall reject an hourly mail limit that is outside the range 1 to 10000.
+        justification: |
+          A limit of zero sends nothing and an unbounded limit gives no protection against a flood of mail.
+        tests:
+          - NotificationOptionsValidator_MaxMailsPerHourOutOfRange_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-MessagesNameSetting
+        title: >-
+          The NotificationOptions class shall name the rejected setting in the message of every rejection.
+        justification: |
+          An operator can only fix a configuration when the message says which setting is wrong.
+        tests:
+          - NotificationOptionsValidator_NoSender_IsRejected
+          - NotificationOptionsValidator_MissingFromAddress_IsRejected
+          - NotificationOptionsValidator_SmtpWithoutHost_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-MessagesNoPassword
+        title: >-
+          The NotificationOptions class shall not put the SMTP password in the message of a rejection.
+        justification: |
+          A message reaches logs and consoles; a password there would be leaked.
+        tests:
+          - NotificationOptionsValidator_Messages_NeverContainThePassword
+          - NotificationOptionsValidator_PasswordWithoutUsername_IsRejected
+          - NotificationOptionsValidator_PasswordAndPasswordFile_IsRejected
+
+      - id: ReviewCenter-NotificationOptions-WarningInlinePassword
+        title: >-
+          The NotificationOptions class shall warn about a password that is given inline.
+        justification: |
+          A password in the configuration or the environment is easier to leak than a password in a file.
+        tests:
+          - NotificationOptions_GetWarnings_InlinePassword_WarnsWithoutValue
+
+      - id: ReviewCenter-NotificationOptions-WarningNoPasswordValue
+        title: >-
+          The NotificationOptions class shall not put the SMTP password in a warning.
+        justification: |
+          A warning is written to the log; a password there would be leaked.
+        tests:
+          - NotificationOptions_GetWarnings_InlinePassword_WarnsWithoutValue
+
+      - id: ReviewCenter-NotificationOptions-WarningClearRemote
+        title: >-
+          The NotificationOptions class shall warn about an SMTP connection to another machine that is not protected
+          by TLS.
+        justification: |
+          The mail then crosses the network in clear text, which an operator should do only knowingly.
+        tests:
+          - NotificationOptions_GetWarnings_NoTlsToRemoteHost_Warns
+
+      - id: ReviewCenter-NotificationOptions-WarningNoneForGood
+        title: >-
+          The NotificationOptions class shall give no warning for good settings.
+        justification: |
+          A warning that is always there is ignored; it must mean something.
+        tests:
+          - NotificationOptions_GetWarnings_GoodOrDisabled_IsEmpty
+
+      - id: ReviewCenter-NotificationOptions-WarningNoneWhenOff
+        title: >-
+          While e-mail notifications are not enabled, the NotificationOptions class shall give no warning.
+        justification: |
+          Settings of a feature that is not enabled do not matter and must not cause noise.
+        tests:
+          - NotificationOptions_GetWarnings_GoodOrDisabled_IsEmpty

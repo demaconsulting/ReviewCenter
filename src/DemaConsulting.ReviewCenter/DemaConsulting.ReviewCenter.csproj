@@ -40,6 +40,10 @@
     <!-- Entity Framework Core with the SQLite provider stores projects and reviews. The native SQLite library
          (e_sqlite3 / libe_sqlite3.so) is published as a side file next to the single-file executable. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+    <!-- MailKit (MIT; depends on MimeKit) is the SMTP client and the MIME message builder for the optional e-mail
+         notifications; only the SmtpNotificationSender and FileNotificationSender units use it, and Core stays free
+         of it. -->
+    <PackageReference Include="MailKit" Version="4.18.2" />
     <!-- Microsoft.AspNetCore.OpenApi generates the OpenAPI document of the /api endpoints. It is not part of the
          ASP.NET Core shared framework, so the package is needed to compile and to run. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />

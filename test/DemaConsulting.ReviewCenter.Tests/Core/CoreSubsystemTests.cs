@@ -119,7 +119,24 @@ public class CoreSubsystemTests
     ///     fails the test instead of going unnoticed. The rules that only the git content source reports are
     ///     excluded here; the content sources subsystem and git tests cover them.
     /// </summary>
-    public static TheoryData<DomainRule> AllRules => [.. Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule) && !StoreOnlyRules.Contains(rule))];
+    public static TheoryData<DomainRule> AllRules => [.. Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule) && !StoreOnlyRules.Contains(rule) && !NotificationRules.Contains(rule))];
+
+    /// <summary>
+    ///     The rules reported only by the notification preference service, whose scenarios need the sender and the
+    ///     notification store; every one of them is covered by <c>NotificationPreferenceServiceTests</c>.
+    /// </summary>
+    private static readonly DomainRule[] NotificationRules =
+    [
+        DomainRule.NotificationsNotAvailable,
+        DomainRule.NotificationAddressInvalid,
+        DomainRule.NotificationResendTooSoon,
+        DomainRule.NotificationLimitReached,
+        DomainRule.NotificationSendFailed,
+        DomainRule.NotificationNothingToConfirm,
+        DomainRule.NotificationCodeIncorrect,
+        DomainRule.NotificationCodeExpired,
+        DomainRule.NotificationTooManyAttempts
+    ];
 
     /// <summary>
     ///     The rules that only the store reports until a service enforces them; the ballot service of a later change

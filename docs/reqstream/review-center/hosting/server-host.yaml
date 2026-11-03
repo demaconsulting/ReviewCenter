@@ -327,3 +327,85 @@ sections:
         tests:
           - ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError
           - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings
+
+      - id: ReviewCenter-ServerHost-NotificationInvalidStopsStart
+        title: >-
+          While e-mail notifications are enabled, the ServerHost class shall stop the start with an error when a
+          notification setting is invalid.
+        justification: |
+          An administrator who enabled notifications must learn at the start that the settings cannot work, not when
+          the first person asks for a mail.
+        tests:
+          - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-NotificationInvalidNamesSetting
+        title: >-
+          The ServerHost class shall name the invalid setting in the error that stops the start because of an invalid
+          notification setting.
+        justification: |
+          The administrator must be able to find the value that is wrong without searching the whole configuration.
+        tests:
+          - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-NotificationInvalidNoSecret
+        title: >-
+          The ServerHost class shall not show the SMTP password in the error that stops the start because of an invalid
+          notification setting.
+        justification: |
+          A start-up error reaches logs and terminals, and a password that is written there is leaked.
+        tests:
+          - ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-ServerHost-NotificationOffNotChecked
+        title: >-
+          While e-mail notifications are not enabled, the ServerHost class shall not check the notification settings.
+        justification: |
+          A server that does not use the feature must start as it did before, whatever the unused settings say.
+        tests:
+          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+
+      - id: ReviewCenter-ServerHost-NotificationValidBuilds
+        title: >-
+          While e-mail notifications are enabled, the ServerHost class shall build the application when the
+          notification settings are valid.
+        justification: |
+          Valid settings must not stop the start.
+        tests:
+          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+
+      - id: ReviewCenter-ServerHost-NotificationInlinePasswordWarning
+        title: >-
+          While e-mail notifications are enabled, the ServerHost class shall write a warning to the log at the start
+          when the SMTP password is set inline in the settings.
+        justification: |
+          A password that sits in a settings file or in the environment leaks more easily than one in a file that only
+          the server can read, so the administrator is told to move it.
+        tests:
+          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+
+      - id: ReviewCenter-ServerHost-NotificationWarningNoSecret
+        title: >-
+          The ServerHost class shall not show the SMTP password in the warning about an inline password.
+        justification: |
+          The warning goes to the log, and a log that holds the password defeats the purpose of the warning.
+        tests:
+          - ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword
+
+      - id: ReviewCenter-ServerHost-NotificationTablesMissingStopsStart
+        title: >-
+          While e-mail notifications are enabled, the ServerHost class shall stop the start with an error when the
+          database has no notification tables.
+        justification: |
+          The database is created once and not migrated, so a database from before the feature lacks the tables, and the
+          administrator must learn it at the start instead of at the first page view.
+        tests:
+          - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn
+
+      - id: ReviewCenter-ServerHost-NotificationTablesMissingOffStarts
+        title: >-
+          While e-mail notifications are not enabled, the ServerHost class shall start the server when the database
+          has no notification tables.
+        justification: |
+          A database that was created before the feature must keep working for an administrator who does not use it.
+        tests:
+          - ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn

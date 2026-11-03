@@ -404,6 +404,12 @@ codes once and no secret, which is tested by `AccountPage_Confirm_RightCode_Show
 other states of the pages are tested in the unit tests of `TotpLoginPage`, `LoginPage`, `AccountPage`, `UsersPage`,
 `ReviewPage`, and `HelpPage`.
 
+**E-mail notification card**: The account page of a user with e-mail notifications switched on shows the explanation
+and the address form, which is tested by `AccountPage_Render_NotificationsOnNoAddress_ShowsExplanationAndAddressForm`,
+and the right code shows the confirmed address, which is tested by
+`AccountPage_Confirm_RightCode_ShowsConfirmedAddress`. The other states of the card are tested in the unit tests of
+`AccountPage`.
+
 **Inbox**: A visitor who is not signed in is sent to the login page by the inbox route and sees nothing of the inbox,
 which is tested by `WebSubsystem_InboxPage_Unauthenticated_IsChallenged`. The groups, the markers, and Mark all as read
 are tested in the unit tests of `InboxPage`, the unread markers of the review in those of `ReviewPage`, the card in

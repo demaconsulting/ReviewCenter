@@ -593,6 +593,17 @@ scenario is tested by `ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd`.
 expiry, the limit, and the revocation) are verified in the `Core` subsystem, the table in the `Storage` subsystem, and
 the card on the account page in the `Web` subsystem.
 
+**E-mail notifications**: While the notifications are not enabled, the account page shows one sentence and no field,
+which is tested by `AccountPage_Render_NotificationsNotSetUp_ShowsOneSentenceAndTouchesNoStore`, and the sender refuses
+every message, which is tested by `MessagingSubsystem_NotificationsOff_SenderIsNotConfiguredAndSendFails`. An address
+is confirmed by the code that was mailed to it, which is tested by
+`NotificationPreferenceService_Confirm_RightCode_ConfirmsAddress` and
+`AccountPage_Confirm_RightCode_ShowsConfirmedAddress`. The limits on confirmation mails, the refusal of an API token,
+the audit entries, and the refusal of a header injection are verified in the `Core` and `Storage` subsystems, the
+delivery through an SMTP server and into a folder in the `Messaging` subsystem, the card on the account page in the
+`Web` subsystem, and the check of the settings in the `Hosting` and `SelfTest` subsystems. The hermetic self-test and
+the Puppet end-to-end test were not extended for this slice.
+
 **API under /api**: With a token, a script creates a draft review from files, reads it back (it is flagged as created
 through the API and is not approved), finds that the attestation of a draft is refused with 409, and downloads the
 attestation PDF of a complete review. This scenario is tested by

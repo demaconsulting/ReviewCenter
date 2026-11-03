@@ -757,6 +757,7 @@ reviews:
       - "src/**/Web/AccountPage.razor.cs"
       - "test/**/Web/AccountPageTests.cs"
       - "test/**/Web/AccountTotpPageTests.cs"
+      - "test/**/Web/AccountNotificationPageTests.cs"
       - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-UsersPage
@@ -873,6 +874,8 @@ reviews:
       - "test/**/Core/FakeAuditStore.cs"
       - "test/**/Core/FakeRepositoryStore.cs"
       - "test/**/Core/FakeInboxStore.cs"
+      - "test/**/Core/FakeNotificationSender.cs"
+      - "test/**/Core/FakeNotificationStore.cs"
       - "test/**/Core/AuditTestExtensions.cs"
       - "test/**/Core/SignatureTestExtensions.cs"
       - "test/**/Core/AllowAllProjectAccess.cs"
@@ -1326,6 +1329,58 @@ reviews:
       - "test/**/Core/ReviewNextActionTests.cs"
       - "test/**/Core/ReviewStatusServiceTests.cs"
 
+  - id: ReviewCenter-Core-NotificationAddress
+    title: Review of ReviewCenter NotificationAddress unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/notification-address.yaml"
+      - "docs/design/review-center/core/notification-address.md"
+      - "docs/verification/review-center/core/notification-address.md"
+      - "docs/sysml2/model/review-center/core/notification-address.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationAddress.cs"
+      - "test/**/Core/NotificationAddressTests.cs"
+
+  - id: ReviewCenter-Core-NotificationMessage
+    title: Review of ReviewCenter NotificationMessage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/notification-message.yaml"
+      - "docs/design/review-center/core/notification-message.md"
+      - "docs/verification/review-center/core/notification-message.md"
+      - "docs/sysml2/model/review-center/core/notification-message.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationMessage.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/INotificationSender.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NoNotificationSender.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationSendException.cs"
+      - "test/**/Core/NotificationMessageTests.cs"
+
+  - id: ReviewCenter-Core-NotificationPreferenceService
+    title: Review of ReviewCenter NotificationPreferenceService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/notification-preference-service.yaml"
+      - "docs/design/review-center/core/notification-preference-service.md"
+      - "docs/verification/review-center/core/notification-preference-service.md"
+      - "docs/sysml2/model/review-center/core/notification-preference-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationPreferenceService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationSettings.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationPreference.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/NotificationSendLogEntry.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/INotificationStore.cs"
+      - "test/**/Core/NotificationPreferenceServiceTests.cs"
+
   - id: ReviewCenter-Core-ReviewPlanner
     title: Review of ReviewCenter ReviewPlanner unit implementation
     context:
@@ -1450,6 +1505,66 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/UserImpactService.cs"
       - "src/DemaConsulting.ReviewCenter.Core/UserImpact.cs"
       - "test/**/Core/UserImpactServiceTests.cs"
+
+  # ReviewCenter - Messaging
+  - id: ReviewCenter-Messaging
+    title: Review of ReviewCenter Messaging subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/messaging.yaml"
+      - "docs/design/review-center/messaging.md"
+      - "docs/verification/review-center/messaging.md"
+      - "docs/sysml2/model/review-center/messaging.sysml"
+      - "test/**/Messaging/MessagingSubsystemTests.cs"
+
+  - id: ReviewCenter-Messaging-NotificationOptions
+    title: Review of ReviewCenter NotificationOptions unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/messaging.md
+      - docs/reqstream/review-center/messaging.yaml
+    paths:
+      - "docs/reqstream/review-center/messaging/notification-options.yaml"
+      - "docs/design/review-center/messaging/notification-options.md"
+      - "docs/verification/review-center/messaging/notification-options.md"
+      - "docs/sysml2/model/review-center/messaging/notification-options.sysml"
+      - "src/**/Messaging/NotificationOptions.cs"
+      - "src/**/Messaging/NotificationRegistration.cs"
+      - "test/**/Messaging/NotificationOptionsTests.cs"
+
+  - id: ReviewCenter-Messaging-SmtpNotificationSender
+    title: Review of ReviewCenter SmtpNotificationSender unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/messaging.md
+      - docs/reqstream/review-center/messaging.yaml
+    paths:
+      - "docs/reqstream/review-center/messaging/smtp-notification-sender.yaml"
+      - "docs/design/review-center/messaging/smtp-notification-sender.md"
+      - "docs/verification/review-center/messaging/smtp-notification-sender.md"
+      - "docs/sysml2/model/review-center/messaging/smtp-notification-sender.sysml"
+      - "src/**/Messaging/SmtpNotificationSender.cs"
+      - "test/**/Messaging/SmtpNotificationSenderTests.cs"
+      - "test/**/Messaging/FakeSmtpServer.cs"
+
+  - id: ReviewCenter-Messaging-FileNotificationSender
+    title: Review of ReviewCenter FileNotificationSender unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/messaging.md
+      - docs/reqstream/review-center/messaging.yaml
+    paths:
+      - "docs/reqstream/review-center/messaging/file-notification-sender.yaml"
+      - "docs/design/review-center/messaging/file-notification-sender.md"
+      - "docs/verification/review-center/messaging/file-notification-sender.md"
+      - "docs/sysml2/model/review-center/messaging/file-notification-sender.sysml"
+      - "src/**/Messaging/FileNotificationSender.cs"
+      - "test/**/Messaging/FileNotificationSenderTests.cs"
 
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
@@ -1613,6 +1728,21 @@ reviews:
       - "docs/sysml2/model/review-center/storage/inbox-store.sysml"
       - "src/**/Storage/InboxStore.cs"
       - "test/**/Storage/InboxStoreTests.cs"
+
+  - id: ReviewCenter-Storage-NotificationStore
+    title: Review of ReviewCenter NotificationStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/notification-store.yaml"
+      - "docs/design/review-center/storage/notification-store.md"
+      - "docs/verification/review-center/storage/notification-store.md"
+      - "docs/sysml2/model/review-center/storage/notification-store.sysml"
+      - "src/**/Storage/NotificationStore.cs"
+      - "test/**/Storage/NotificationStoreTests.cs"
 
   # ReviewCenter - ContentSources
   - id: ReviewCenter-ContentSources
@@ -2091,6 +2221,13 @@ reviews:
       - "docs/reqstream/ots/otpnet.yaml"
       - "docs/design/ots/otpnet.md"
       - "docs/verification/ots/otpnet.md"
+
+  - id: OTS-MailKit
+    title: Review of MailKit OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/mailkit.yaml"
+      - "docs/design/ots/mailkit.md"
+      - "docs/verification/ots/mailkit.md"
 
   - id: OTS-Pandoc
     title: Review of Pandoc OTS verification evidence

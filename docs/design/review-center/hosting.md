@@ -9,7 +9,8 @@ command line, and verifies the audit trail from the command line. It owns
 the composition of the ASP.NET Core application behind the `serve` verb: the listen address,
 the logging configuration, the health endpoint, the sign-in configuration and endpoints of the `Identity`
 subsystem (including the optional sign-in with an OpenID Connect provider, off unless `Identity:Oidc:Enabled` is
-true), the optional second factor for password accounts, the mapping of the user interface provided
+true), the optional second factor for password accounts, the optional e-mail notifications (off unless
+`Notifications:Enabled` is true), the mapping of the user interface provided
 by the `Web` subsystem, the registration and mapping of the JSON API of the `Api` subsystem, and the connection of
 the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
@@ -126,6 +127,17 @@ and the settings), `TotpSignIn` and `TotpOptions` (the second step of a sign-in,
   The server validates the settings at start-up and maps the login-code endpoint only while it is enabled.
 - *Constraints*: An invalid setting stops the start-up with an error that names it.
 
+**Notifications settings**: The `Notifications` configuration section, described in the `Messaging` design.
+
+- *Type*: Configuration (`appsettings.json` and environment variables such as `Notifications__Enabled`).
+- *Role*: Consumer.
+- *Contract*: Off by default. The server registers the settings, the sender they choose, the notification store, and the
+  service of the notification address, and checks them at start-up only while `Enabled` is true: it logs a warning for
+  a password written inline, and it checks that the database has the notification tables.
+- *Constraints*: An invalid setting stops the start-up with an error that names it and never shows a secret. A database
+  that was created before the feature has no notification tables and stops the start while the feature is on; it must
+  be deleted and created again, because the database has no migrations. No background work is registered.
+
 **Identity:Oidc settings**: The `Identity:Oidc` configuration section, described in the `Identity` design.
 
 - *Type*: Configuration (`appsettings.json` and environment variables such as `Identity__Oidc__Enabled`).
@@ -136,9 +148,10 @@ and the settings), `TotpSignIn` and `TotpOptions` (the second step of a sign-in,
   secret.
 
 **Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`,
-`RepositoryStore`, `PersonalAccessTokenStore`, `TotpStore`, and `AuditAppender` of the
+`RepositoryStore`, `PersonalAccessTokenStore`, `TotpStore`, `NotificationStore`, and `AuditAppender` of the
 `Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`,
 `SigningService`, `AuditService`, `RepositoryService`, `PersonalAccessTokenService`, `TotpService`,
+`NotificationPreferenceService`,
 `TotpChallengeStore`, and the store, hasher, second factor, and
 `IProjectAccess` interfaces
 of the `Core` subsystem, and `PersonalAccessTokenStore` of the `Storage` subsystem.
@@ -270,7 +283,16 @@ settings: ...". `MapTotpSignIn` maps
 factor sign in with the password alone, which is a documented trade-off for an administrator who lost access. The
 second factor services (`TotpSignIn.AddTotpSignIn` for the settings, `TotpStore`, `TotpAlgorithm`,
 `TotpSecretProtector`, `TotpChallengeStore`, and `TotpService`)
-are registered by `AddServices`, so the command-line verbs get the same services. The git setting `Git:TimeoutSeconds`
+are registered by `AddServices`, so the command-line verbs get the same services. The settings of the e-mail
+notifications (`ValidateNotificationOptions`) are read once next: the options, the settings that the services use, and
+the sender are resolved, so an invalid value stops the start-up with "Invalid notification settings: ...", which names
+the setting and never a secret. While `Notifications:Enabled` is false nothing is checked and nothing touches the
+notification tables. While it is true the start-up logs one warning for each doubtful setting (a password written
+inline, an unencrypted connection to another machine) without a value, and asks the notification store whether the
+database has its tables; a database that was created before the feature stops the start with a message that says to
+delete it and let the server create it again, or to turn the feature off. `AddServices` registers the settings and the
+sender (`AddNotifications`), the `NotificationStore`, and the `NotificationPreferenceService`; no background work is
+registered. The git setting `Git:TimeoutSeconds`
 is checked the same
 way and must be from 1 to 3600:
 any other number stops the start-up with "Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600

@@ -509,6 +509,147 @@ off. The read state behind the **New** marker is stored for each user and review
 part of the signed record, so reading a review never makes the signers sign again. Administrators cannot read the inbox
 of another user, and deleting a user or a review deletes the read state that belongs to it.
 
+## E-mail Notifications
+
+ReviewCenter can send e-mail to its users. This is **off by default**: with no `Notifications` settings the server
+sends no mail, the Account page says that e-mail notifications are not set up by the administrator, and nothing else
+about the server changes. In this release the only mail that is sent is the **confirmation mail**, which carries the
+six-digit code that a user types back on the Account page to confirm an e-mail address. The mails that tell users about
+reviews, and the daily summary, are not sent yet.
+
+A mail never holds review content. The confirmation mail names the installation and the code, and says that the code
+is valid for 30 minutes. It holds no review, project, file, comment, or user name.
+
+### Settings
+
+Configure the `Notifications` section of the `appsettings.json` file that sits beside the executable, or use
+environment variables (which take precedence; a nested name uses two underscores, for example
+`Notifications__Smtp__Host`). Every value is checked when the server starts, and an invalid value stops the start
+with a message that names the setting and never shows a password. While `Notifications:Enabled` is false, nothing in
+the section is read or checked.
+
+| Setting                             | Default        | Meaning                                                  |
+| ----------------------------------- | -------------- | -------------------------------------------------------- |
+| `Notifications:Enabled`             | `false`        | Switches e-mail notifications on                         |
+| `Notifications:Sender`              | `None`         | `None`, `Smtp`, or `File`; `Smtp` or `File` when on      |
+| `Notifications:FromAddress`         | (none)         | The one address mails come from; required when on        |
+| `Notifications:FromName`            | `ReviewCenter` | The installation name in mails, 80 characters at most    |
+| `Notifications:BaseUrl`             | (none)         | The address of this installation; required when on       |
+| `Notifications:Smtp:Host`           | (none)         | The mail server; required for the `Smtp` sender          |
+| `Notifications:Smtp:Port`           | `587`          | The port of the mail server, 1 to 65535                  |
+| `Notifications:Smtp:Tls`            | `StartTls`     | `None`, `StartTls`, or `Implicit` (see below)            |
+| `Notifications:Smtp:Username`       | (none)         | The user name; set it together with a password           |
+| `Notifications:Smtp:Password`       | (none)         | The password inline; prefer the password file            |
+| `Notifications:Smtp:PasswordFile`   | (none)         | The path of a file that holds the password               |
+| `Notifications:Smtp:TimeoutSeconds` | `30`           | How long the mail server may take to answer, 5 to 120    |
+| `Notifications:File:Directory`      | (none)         | The folder for the `File` sender; required for it        |
+| `Notifications:MaxMailsPerHour`     | `200`          | The most mails in one hour over all users, 1 to 10000    |
+| `Notifications:DigestHour`          | `8`            | Reserved (see below); 0 to 23                            |
+| `Notifications:TimeZone`            | `UTC`          | Reserved (see below)                                     |
+| `Notifications:BatchWindowSeconds`  | `300`          | Reserved (see below); 30 to 3600                         |
+| `Notifications:PollSeconds`         | `60`           | Reserved (see below); 10 to 3600                         |
+| `Notifications:IncludeTitles`       | `true`         | Reserved (see below)                                     |
+
+`BaseUrl` must start with `https`, or with `http` for a loopback address only. The server checks it now and uses it for
+the links of the mails of a later release; the confirmation mail holds no link. `DigestHour`, `TimeZone`,
+`BatchWindowSeconds`, `PollSeconds`, and `IncludeTitles` are **reserved for the notification mails of a later
+release**: they are accepted and checked now, so that a configuration written today stays valid, but they change nothing
+in this release. `TimeZone` must be a time zone that the operating system knows, such as `UTC` or `Europe/Berlin`.
+
+The `Tls` values mean:
+
+- `StartTls`: the connection starts in clear text and is switched to an encrypted one before the user name and the
+  password are sent. This is the usual choice for port 587.
+- `Implicit`: the connection is encrypted from the first byte, as on port 465.
+- `None`: no encryption. Use it only for a mail server on the same machine. For another machine the server refuses it
+  together with a user name, and logs a warning without one.
+
+### Keep the Password in a File
+
+Set `Notifications:Smtp:PasswordFile` to the path of a file that holds only the password, and keep the file where only
+the service account can read it. The file is read each time a mail is sent, so a changed password is picked up without
+a restart. Setting both `Password` and `PasswordFile` is refused. An inline `Notifications:Smtp:Password` works, but
+it is written into the configuration, which ends up in backups and tickets, so the server logs a warning at the start
+and `--validate --check-config` repeats it. Neither shows the password.
+
+### Examples
+
+These three examples are for illustration only. They have **not been verified** against the services, whose settings
+change over time, and an account may need an option (an app password, or permission for SMTP sign-in) before it
+works. Check them with the provider's own documentation. Replace every address, the user name, and the password file.
+
+```bash
+# Microsoft 365 (illustration, unverified)
+Notifications__Enabled=true
+Notifications__Sender=Smtp
+Notifications__FromAddress=reviewcenter@example.com
+Notifications__BaseUrl=https://reviewcenter.example.com
+Notifications__Smtp__Host=smtp.office365.com
+Notifications__Smtp__Port=587
+Notifications__Smtp__Tls=StartTls
+Notifications__Smtp__Username=reviewcenter@example.com
+Notifications__Smtp__PasswordFile=/etc/reviewcenter/smtp-password
+```
+
+For Gmail (illustration, unverified) use the host `smtp.gmail.com`, port `587`, `StartTls`, and an app password in the
+password file. For a generic mail relay of your own organization use the host name and the port that its administrator
+gives you, `StartTls` where it is offered, and a user name and a password file only if the relay asks for a sign-in.
+
+### The File Sender for Demonstrations and Development
+
+With `Notifications:Sender` set to `File` and `Notifications:File:Directory` set to a folder, no mail leaves the
+machine: the server writes each message as one `.eml` file into the folder (it creates the folder when needed), which
+a mail program or a text editor can open. Use it to try the confirmation flow without a mail server. The folder holds
+the confirmation codes in clear text, so do not use the File sender for real users.
+
+### What Users See
+
+A user confirms an address on the **Account** page (see Account in the Users and Sign-in chapter):
+
+1. The user types an e-mail address and asks for a code. The server mails a six-digit code to that address.
+2. The user types the code back on the page. The code is valid for 30 minutes and works only once, and only the newest
+   code works.
+3. A wrong code is refused. A code can be tried 5 times; after that the user asks for a new one.
+4. A new code can be requested at the earliest 60 seconds after the last mail. Each user, and each address, can have 3
+   confirmation mails per day.
+5. The user can remove the address again. That removes it from the server.
+
+The confirmation code never appears on a page or in the audit trail. The audit trail records that an address was
+entered, confirmed, or removed, without the address.
+
+### Privacy and Limits
+
+- Administrators cannot see or change the e-mail address of a user. No page shows it to anybody but its owner, and an
+  administrator cannot confirm an address for a user.
+- Personal access tokens cannot be used for the e-mail settings: only a person who is signed in on the Account page can
+  enter, confirm, or remove an address.
+- A user who signs in with a temporary password has to choose a new password first and sees no notification card until
+  then.
+- The server sends at most `Notifications:MaxMailsPerHour` mails in an hour, over all users.
+- The send log keeps the target address of each confirmation mail in clear text, because the limits need it. A
+  confirmation request deletes the entries that are older than one day, so an address stays in the log for about a day
+  after the next request; removing the address on the Account page does not delete its log rows at once.
+
+### Check the Settings Without Sending Mail
+
+```bash
+dotnet ReviewCenter.dll --validate --check-config
+```
+
+The `ReviewCenter_ConfiguredNotifications` check, the last of the twelve, reads the settings the way the server does,
+applies the checks of the server start, and reports the sender, for the `Smtp` sender the server, the port, the
+protection, and whether the password comes from a file, and every warning. It never connects to a mail server, never
+sends a mail, and never prints a password, a path, or an address. While notifications are off it is skipped. See
+Checking the Configured Database, Keys, and E-mail Settings in the Command-Line Reference.
+
+### Database Tables for Notifications
+
+The mail settings of a user and the log of sent mails need two tables, `NotificationPreferences` and
+`NotificationSendLog`. ReviewCenter does not migrate a database, so a database that was created by an earlier build
+does not have them. The server refuses to start with notifications on when they are missing. Recreate the database
+first (see Database and the Upgrade section of the Deployment chapter), and only then turn notifications on. With
+notifications off, an older database keeps working.
+
 ## Audit Trail
 
 ReviewCenter records every change that the application makes to projects, reviews, comments, checklists, reviewer

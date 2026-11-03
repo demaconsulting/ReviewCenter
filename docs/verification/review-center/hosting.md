@@ -34,6 +34,10 @@ N/A - standard test environment.
   behavior is verified in the unit tests of `ServerHost`.
 - Second factor settings: an invalid setting stops the start-up with an error that names it, and valid settings are
   provided to the services; the behavior is verified in the unit tests of `ServerHost`.
+- Notification settings: while notifications are on, an invalid setting or a database without the notification tables
+  stops the start-up with an error that names the problem and never shows the SMTP password, an inline password is
+  logged as a warning, and valid settings build the application; while they are off nothing is checked; the behavior is
+  verified in the unit tests of `ServerHost`.
 
 ### Test Scenarios
 
@@ -123,3 +127,13 @@ provider off, its endpoints answer 404, which is tested by `OidcSignIn_Disabled_
 `InvalidOperationException` that names the setting, which is tested by
 `ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError`; valid settings are provided to the services, which
 is tested by `ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings`; both are unit tests of `ServerHost`.
+
+**Notification settings**: Starting the real pipeline with notifications on and an invalid setting throws an
+`InvalidOperationException` that says the notification settings are invalid, names the setting, and does not contain the
+password, which is tested by `ServerHost_CreateApplication_InvalidNotificationSettings_ThrowsClearErrorWithoutSecret`.
+With notifications off and an invalid address the application is built, and with valid settings and an inline password
+it is built and logs a warning that names the password file setting and does not contain the password, which is tested
+by `ServerHost_CreateApplication_NotificationsOffOrValid_BuildsAndWarnsAboutInlinePassword`. A database that already has
+a table but no notification tables stops the start while notifications are on and does not while they are off, which is
+tested by `ServerHost_CreateApplication_DatabaseWithoutNotificationTables_FailsOnlyWhenNotificationsAreOn`; all three
+are unit tests of `ServerHost`.
