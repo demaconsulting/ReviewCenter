@@ -160,6 +160,15 @@ and a viewer who may not see the project is refused like a missing project. This
 a token actor holds no failed or disputed count and no outcome before the conclusion. This scenario is tested by
 `ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer`.
 
+**ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding**: The token of a reviewer who has
+handed in a ballot gets the consolidated standing in the progress (one disputed check), as its owner does on the pages,
+while the token of the lead is still masked. This scenario is tested by
+`ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding`.
+
+**ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked**: The token of a reviewer whose ballot is still a
+draft is masked and shows the ballot progress only, and the token of the reviewer who handed in does not count the draft
+answers of the other. This scenario is tested by `ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked`.
+
 **SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome**: The blockers of a masked viewer hold no
 count of disputed or failed checks, no outcome, and no conclusion text, only the fixed sentence. This scenario is tested
 by `SigningService_GetApproval_MaskedViewer_ShowsNoDisputeCountOrOutcome`.
@@ -174,6 +183,16 @@ read. This scenario is tested by `SigningService_GetApprovals_MaskedViewer_Match
 **SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch**: A list read of three reviews of the lead makes
 the same number of membership reads as a list read of one, the creator sees all of each review, and an API token of the
 creator sees none of it. This scenario is tested by `SigningService_GetApprovals_ManyReviews_LooksRoleUpOncePerBatch`.
+
+**SigningService_GetApprovals_GivenReviews_RecognizesLeadWithoutListingReviews**: A list read that is given the reviews
+of the project finds the lead of a review in them and lists no reviews itself, masks a plain member, and gives the same
+masking as the read without them, which lists the reviews once. This scenario is tested by
+`SigningService_GetApprovals_GivenReviews_RecognizesLeadWithoutListingReviews`.
+
+**SigningService_GetApprovals_GivenReviewsMissingTheReview_FailsClosed**: A list read that is given reviews that do not
+include the review has no creator to find, so it masks the review even for its lead, which is never less masked than
+the read that lists the reviews. This scenario is tested by
+`SigningService_GetApprovals_GivenReviewsMissingTheReview_FailsClosed`.
 
 **ReviewProgressService_GetProgress_MaskedViewer_HidesDisputedAndFailedCounts**: The progress of a masked viewer shows
 no disputed or failed count. This scenario is tested by

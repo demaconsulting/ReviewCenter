@@ -117,6 +117,21 @@ sections:
           - ReviewStore_AddThreadAsync_ThreadWithBothOrNeitherAnchor_IsRefused
           - ReviewStore_Conclude_OpenCheckThread_IsRefusedInTheTransaction
 
+      - id: ReviewCenter-ReviewStore-ThreadCreation
+        title: >-
+          The ReviewStore class shall refuse with an ArgumentException a new thread that is not open or that has no
+          comment, with nothing saved and no audit entry recorded, so that a thread can be resolved only through the
+          resolve method.
+        justification: |
+          The rules of resolving a thread (the note, the kind, the lock of a concluded review) and the Resolution
+          comment live only in the resolve method, so a thread that arrives resolved would bypass all of them. A
+          thread without a comment cannot be reported, audited, or given a kind, which all start from its first
+          comment.
+        tests:
+          - ReviewStore_AddThreadAsync_CheckThread_RoundTripsCheckItemId
+          - ReviewStore_AddThreadAsync_ResolvedThread_IsRefusedAndStoresNothing
+          - ReviewStore_AddThreadAsync_ThreadWithoutComment_IsRefusedAndStoresNothing
+
       - id: ReviewCenter-ReviewStore-ThreadReport
         title: >-
           The ReviewStore class shall resolve a thread in one transaction together with the Resolution comment that

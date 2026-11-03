@@ -48,7 +48,8 @@ N/A - standard test environment.
 - The progress of a project with 300 reviews reads the audit trail once, is complete, and is produced within a loose time
   bound of ten seconds (a guard against one query per review, not a benchmark).
 - The overload that is given the review list returns the same progress as the one that lists the reviews, makes no
-  further read of the review list, uses exactly the given list (a subset, in the given order; an empty list gives an
+  further read of the review list (also for a masked viewer, whose creator check uses the given list), uses exactly the
+  given list (a subset, in the given order; an empty list gives an
   empty answer without reading the last activity), still checks the access, and refuses a null list.
 - A null collaborator is refused with an argument exception.
 - The open threads are split into open questions and open findings (their sum is the open threads), the progress texts
@@ -57,7 +58,8 @@ N/A - standard test environment.
   not handed in (none for a concluded review or a review without a checklist); these are the same for every viewer,
   and a viewer who may not see the other ballots gets `IsMasked` and no dispute count.
 - An actor that came through an API token is masked like any viewer who is not the lead, an administrator, or an
-  auditor: `IsMasked` is true and there are no disputed or failed counts, while the ballot progress is shown.
+  auditor (a token acts as its owner, so it is unmasked only when its owner holds a slot whose ballot is handed in): a
+  token otherwise has `IsMasked` true and no disputed or failed counts, while the ballot progress is shown.
 
 #### Test Scenarios
 
@@ -160,6 +162,13 @@ given the list, over a `FakeReviewStore` that counts the list reads. The two ans
 made one list read and the second none. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList`.
 
+**ReviewProgressService_GetProgressAsync_GivenListMaskedViewer_ReadsNoReviewList**: Two reviews with two slots each are
+read, over a `FakeReviewStore` that counts the list reads, as a plain member (who is masked) and as the creator of the
+reviews (the lead, who is not), once with the overload that is given the list and once with the one that lists the
+reviews. The overload that is given the list makes no list read for either viewer and recognizes the lead from that
+list, the other makes exactly one read (the list is not read a second time to find the creator), and the rows are equal.
+This scenario is tested by `ReviewProgressService_GetProgressAsync_GivenListMaskedViewer_ReadsNoReviewList`.
+
 **ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder**: A list of two of three reviews, the
 later one first, gives exactly those two in that order. This scenario is tested by
 `ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder`.
@@ -209,3 +218,15 @@ ballots are handed in and differ, once as an API token actor and once as the per
 viewer: `IsMasked` is true, the disputed and failed counts are 0, and the ballots show 2 of 2; the person is not masked
 and sees one disputed check. This scenario is tested by `ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer`,
 defined in `BallotMaskingServiceTests.cs`.
+
+**ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding**: Two ballots are handed in and
+differ. The token of one of the two reviewers (a token acts as its owner, who holds a slot whose ballot is handed in)
+is not masked and sees one disputed check, with the ballots 2 of 2, while the token of the lead, who holds no slot, is
+still masked with no disputed count. The progress carries only counts, never the answer or reason of a reviewer. This
+scenario is tested by `ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding`, defined in
+`BallotMaskingServiceTests.cs`.
+
+**ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked**: One ballot is handed in and the other is still a
+draft that answers Fail. The token of the owner of the draft is masked, with no disputed or failed count and the ballots
+1 of 2, and the token of the reviewer who handed in is not masked and counts only the handed-in ballot. This scenario is
+tested by `ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked`, defined in `BallotMaskingServiceTests.cs`.

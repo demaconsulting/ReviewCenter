@@ -798,12 +798,12 @@ internal static class ApiEndpoints
             s.SignerName,
             s.SignedAt)).ToList() ?? [];
 
-        // Only the conclusion is an outcome here, never the provisional one; the conclusion text is hidden exactly when
-        // the approval is masked, as the review page does
+        // Only the conclusion is an outcome here, never the provisional one; the conclusion text, which can be written
+        // before the review is concluded, is shown like the outcome: only once the review is concluded and not masked
         var outcome = !masked && approval is { IsConcluded: true } ? approval.Conclusion.ToString() : null;
-        var conclusionText = masked || string.IsNullOrWhiteSpace(review.ReviewConclusionText)
-            ? null
-            : review.ReviewConclusionText;
+        var conclusionText = !masked && approval is { IsConcluded: true } && !string.IsNullOrWhiteSpace(review.ReviewConclusionText)
+            ? review.ReviewConclusionText
+            : null;
         return new ReviewDetailDto(
             review.Id,
             review.Title,

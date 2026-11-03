@@ -422,18 +422,23 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Stores a new thread together with its first comment and assigns their identities.
+    ///     Stores a new thread, open, together with its first comment and assigns their identities.
     /// </summary>
     /// <param name="thread">
     ///     The thread to store, with its comments. Must not be null; the identities of the thread and its
     ///     comments are ignored, their <see cref="ReviewComment.IncludeInReport"/> and <see cref="ReviewComment.Kind"/>
-    ///     are stored as given. A thread on a file must name a file that exists in the review; a thread about a check
-    ///     (<see cref="ReviewThread.CheckItemId"/> set) names no file.
+    ///     are stored as given. A new thread is <see cref="ReviewThreadState.Open"/> and has at least its first
+    ///     comment; a thread is resolved only through <see cref="ResolveThreadAsync"/>. A thread on a file must name a
+    ///     file that exists in the review; a thread about a check (<see cref="ReviewThread.CheckItemId"/> set) names no
+    ///     file.
     /// </param>
     /// <param name="audit">Builds the audit draft from the stored thread (so the draft can name the assigned identities). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored thread, including the assigned identities.</returns>
-    /// <exception cref="ArgumentException">The thread names both a file and a check, or neither.</exception>
+    /// <exception cref="ArgumentException">
+    ///     The thread names both a file and a check, or neither; or it is not open; or it has no comment. Nothing is
+    ///     saved and no audit entry is recorded.
+    /// </exception>
     /// <exception cref="InvalidOperationException">The thread names a file that is not in the review.</exception>
     Task<ReviewThread> AddThreadAsync(
         ReviewThread thread,

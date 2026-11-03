@@ -733,6 +733,18 @@ internal sealed class FakeReviewStore : IReviewStore
             throw new ArgumentException("A thread is anchored to exactly one of a file or a check.", nameof(thread));
         }
 
+        if (thread.State != ReviewThreadState.Open)
+        {
+            throw new ArgumentException(
+                "A new thread is stored open; a thread is resolved only through ResolveThreadAsync.",
+                nameof(thread));
+        }
+
+        if (thread.Comments is null || thread.Comments.Count == 0)
+        {
+            throw new ArgumentException("A thread is stored with its first comment.", nameof(thread));
+        }
+
         // Like the real store, a file thread must name a file of its review (when the review is known to the fake)
         var known = _reviews.FirstOrDefault(review => review.ProjectId == thread.ProjectId && review.Id == thread.ReviewId);
         if (!isCheck && known is not null && known.Files.All(f => f.Path != thread.FilePath))
@@ -751,7 +763,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Side = thread.Side,
             StartLine = thread.StartLine,
             EndLine = thread.EndLine,
-            State = thread.State,
+            State = ReviewThreadState.Open,
             Created = thread.Created,
             Comments = thread.Comments.Select(comment => Copy(comment, id)).ToList()
         };

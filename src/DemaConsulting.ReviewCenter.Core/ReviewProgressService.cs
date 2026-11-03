@@ -35,9 +35,10 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <para>
 ///         A project overview needs a constant number of reads however many reviews the project has: one read of the
 ///         review list (none when a caller that already has the list passes it to the overload that takes it), one
-///         batch read of all approvals (<see cref="SigningService.GetApprovalsAsync(Actor?, int, IEnumerable{string}, CancellationToken)"/>, itself one
+///         batch read of all approvals (<see cref="SigningService.GetApprovalsAsync(Actor?, int, IEnumerable{string}, CancellationToken, IReadOnlyList{Review})"/>, itself one
 ///         set-based read of the snapshots of all reviews, <see cref="IReviewStore.ListSnapshotsAsync"/>, plus one of
-///         the reopen history of the reviews that were reopened) and one read
+///         the reopen history of the reviews that were reopened; the list of reviews is handed to that batch read, so
+///         it never lists the reviews a second time to find the creator of a review) and one read
 ///         of the last activity of all reviews (<see cref="IAuditStore.LastActivityAsync"/>). Reading is open to
 ///         everyone who may see the project (members, auditors and system administrators); a stranger gets the same
 ///         "no such project" refusal as everywhere else. The service holds no state and is safe for concurrent use
@@ -163,7 +164,8 @@ public sealed class ReviewProgressService
 
         // A constant number of reads, however many reviews the project has
         var ids = reviews.Select(r => r.Id);
-        var approvals = await _signing.GetApprovalsAsync(actor, projectId, ids, cancellationToken);
+        // The reviews already in hand are handed on, so the batch does not list them again to find a creator
+        var approvals = await _signing.GetApprovalsAsync(actor, projectId, ids, cancellationToken, reviews);
         var activity = await _audit.LastActivityAsync(projectId, cancellationToken);
 
         var result = new List<ReviewProgress>(reviews.Count);

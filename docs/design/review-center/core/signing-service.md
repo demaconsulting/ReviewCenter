@@ -441,6 +441,9 @@ not found.
   of the reviews whose record counts a reopen from one `ListReopensAsync` call for those reviews. The status of each
   review is built by the same private step (`BuildApproval`) as the single read, so the two cannot differ. A duplicated
   identifier is read once.
+- *Viewer-aware form*: the overload that is given the viewer takes, as an optional last argument, the reviews of the
+  project when the caller already holds them. They serve to find the creator of a review that has to be masked, so no list
+  of the reviews is read for it; the masking rules are those of `BallotVisibility`.
 
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 

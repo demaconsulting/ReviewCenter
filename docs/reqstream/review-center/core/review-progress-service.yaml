@@ -119,21 +119,26 @@ sections:
           - ReviewProgressService_GetProgressAsync_ActorKinds_AreAllowedOrNotFound
           - ReviewProgressService_GetProgressAsync_GivenList_ChecksAccessAndRefusesNullList
           - ReviewProgressService_GetProgress_TokenActor_IsMaskedLikeAnyViewer
+          - ReviewProgressService_GetProgress_TokenOfSubmittedSlotOwner_SeesConsolidatedStanding
+          - ReviewProgressService_GetProgress_TokenOfDraftSlotOwner_IsMasked
 
       - id: ReviewCenter-ReviewProgressService-Performance
         title: >-
           The ReviewProgressService class shall need a number of reads that does not grow with the number of reviews
           of the project: one read of the reviews (none when the caller already has the list and passes it in), one
-          batch read of the approval statuses (itself one set-based read of the snapshots of all the reviews), and
+          batch read of the approval statuses (itself one set-based read of the snapshots of all the reviews, given
+          the reviews that are already in hand so that it reads no list of them), and
           one read of the last
           activity, so that a project with 300 reviews is answered within a loose time bound on a test database.
         justification: |
           The overview is the page that every user opens first. A read per review would make it slow exactly for the
           projects that most need an overview. A caller that needs the list itself, such as the API list, passes it
-          in so that the reviews are still read once.
+          in so that the reviews are still read once, and the batch read of the approvals finds the creator of a
+          review in that same list instead of listing the reviews again.
         tests:
           - ReviewProgressService_GetProgressAsync_ManyReviews_ReadsActivityOnceAndIsFast
           - ReviewProgressService_GetProgressAsync_GivenList_EqualsOriginalAndReadsNoList
+          - ReviewProgressService_GetProgressAsync_GivenListMaskedViewer_ReadsNoReviewList
           - ReviewProgressService_GetProgressAsync_GivenSubset_ReturnsOnlyThoseInGivenOrder
           - ReviewProgressService_GetProgressAsync_GivenEmptyList_IsEmptyAndReadsNothingElse
 

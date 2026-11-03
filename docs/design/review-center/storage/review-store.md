@@ -244,7 +244,11 @@ check of the frozen checklist (`CheckItemId` set, empty `FilePath`, no lines, th
 caller error and raises `ArgumentException` before the database is touched. The database has no foreign key from a
 thread to a file, because a thread about a check has no file row, so the store checks inside the transaction that a
 file thread names a file of its review and otherwise raises `InvalidOperationException` and stores nothing. The foreign
-key of a thread points at its review, so a thread for a review that does not exist is refused by the database.
+key of a thread points at its review, so a thread for a review that does not exist is refused by the database. A new
+thread is stored open and with at least its first comment (the state of the entity is always `Open`); a thread that is
+not open, or that has no comment, is a caller error and raises `ArgumentException` before the database is touched, with
+nothing saved and no audit entry, because a thread is resolved only through `ResolveThreadAsync`, which applies the rules
+of resolving.
 
 **AddCommentAsync**: Appends a comment to a thread, with the display name, the user name of its author, and its report
 flag. It first

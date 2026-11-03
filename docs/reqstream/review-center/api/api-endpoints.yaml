@@ -50,6 +50,7 @@ sections:
           - ApiEndpoints_GetReview_TokenOfSubmittedSlotOwner_SeesConsolidatedCounts
           - ApiEndpoints_GetReview_Concluded_ShowsOutcomeConclusionTextAndCounts
           - ApiEndpoints_GetReview_SingleSlot_UnmaskedAndNotConcludedHasNoOutcome
+          - ApiEndpoints_GetReview_SingleSlotNotConcludedWithStoredText_HidesConclusionText
           - ApiEndpoints_CreateReview_ResponseIsMaskedLikeTheDetails
           - ApiEndpoints_ReviewDetail_NoPerSlotBallotOrDisputeFields
           - ApiEndpoints_GetReview_AnonymousOrNonMember_Unchanged
