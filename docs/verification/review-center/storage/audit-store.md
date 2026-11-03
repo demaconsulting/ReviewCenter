@@ -129,9 +129,11 @@ the matching entries are visited, each once. This scenario is tested by
 actor, action, and dates; each page is no larger than requested and the read takes well under the loose bound. This
 scenario is tested by `AuditStore_ListAsync_LargeTrail_FilteredPagesAreFastAndBounded`.
 
-**StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes**: A database that is created now has the indexes on project and
-sequence, actor and sequence, action and sequence, and project, review, and sequence. This scenario is tested by
-`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`.
+**AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence**: A database that is created now has the
+indexes on project and sequence, actor and sequence, and action and sequence. This scenario is tested by
+`AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence`; the subsystem test
+`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes` checks all four indexes of the audit table in the subsystem
+verification.
 
 **AuditStore_LastActivityAsync_Entries_NewestPerReviewOfOneProject**: Entries of two reviews of project one, one entry of
 the project without a review, and one entry of another project are appended. The last activity of project one names the

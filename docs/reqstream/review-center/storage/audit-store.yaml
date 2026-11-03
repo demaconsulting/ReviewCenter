@@ -29,6 +29,8 @@ sections:
           The links make an edited or a deleted entry visible, because the hash of every later entry no longer fits.
         tests:
           - AuditStore_AppendAsync_SequentialAppends_GapFreeLinkedAndVerifiable
+          - AuditStore_Verification_EditedRow_ReportsThatSequence
+          - AuditStore_Verification_DeletedRow_ReportsThatSequence
 
       - id: ReviewCenter-AuditStore-Append-Actor
         title: >-
@@ -425,7 +427,7 @@ sections:
         justification: |
           A filter that scans the whole trail is slow on a trail that only grows.
         tests:
-          - StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes
+          - AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence
 
       - id: ReviewCenter-AuditStore-Filter-PageBounded
         title: >-

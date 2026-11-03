@@ -43,6 +43,51 @@ public class ReviewCenterDbContextTests
     private static readonly string _digest = new('a', 64);
 
     /// <summary>
+    ///     Test that the audit entries have the index of the review, and the sequence after it, in a database
+    ///     created from scratch.
+    /// </summary>
+    [Fact]
+    public void ReviewCenterDbContext_AuditEntries_NewDatabase_HasTheReviewSequenceIndex()
+    {
+        // Arrange: a freshly created database
+        using var db = new TestStore();
+
+        // Act: read the columns of every index of the audit table from the database itself
+        var indexes = new List<string>();
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection(db.ConnectionString))
+        {
+            connection.Open();
+            var names = new List<string>();
+            using (var list = connection.CreateCommand())
+            {
+                list.CommandText = "SELECT name FROM pragma_index_list('AuditEntries')";
+                using var reader = list.ExecuteReader();
+                while (reader.Read())
+                {
+                    names.Add(reader.GetString(0));
+                }
+            }
+
+            foreach (var name in names)
+            {
+                using var info = connection.CreateCommand();
+                info.CommandText = $"SELECT name FROM pragma_index_info('{name}') ORDER BY seqno";
+                using var reader = info.ExecuteReader();
+                var columns = new List<string>();
+                while (reader.Read())
+                {
+                    columns.Add(reader.GetString(0));
+                }
+
+                indexes.Add(string.Join(",", columns));
+            }
+        }
+
+        // Assert
+        Assert.Contains("ProjectId,ReviewId,Sequence", indexes);
+    }
+
+    /// <summary>
     ///     Adds a project with the review <c>REV-1</c> of the file <c>a.txt</c>.
     /// </summary>
     /// <param name="db">The database.</param>

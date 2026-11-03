@@ -624,7 +624,7 @@ sections:
           The entries of one review are read in order of their sequence, and the index keeps that from reading
           all entries.
         tests:
-          - StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes
+          - ReviewCenterDbContext_AuditEntries_NewDatabase_HasTheReviewSequenceIndex
 
       - id: ReviewCenter-DbContext-Repositories
         title: >-

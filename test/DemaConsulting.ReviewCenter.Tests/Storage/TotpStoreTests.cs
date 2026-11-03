@@ -591,7 +591,7 @@ public class TotpStoreTests
     }
 
     /// <summary>
-    ///     Test that the stored secret column holds exactly what the store was given, and null arguments are refused.
+    ///     Test that null arguments of the store operations are refused.
     /// </summary>
     [Fact]
     public async Task TotpStore_NullArguments_Throw()

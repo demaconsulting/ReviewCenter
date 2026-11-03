@@ -121,3 +121,13 @@ sections:
           The data of a deleted user should not outlive the user.
         tests:
           - InboxStore_DeletingTheUser_DeletesTheStates
+
+      - id: ReviewCenter-InboxStore-InputValidation
+        title: >-
+          The InboxStore class shall refuse a missing argument or an empty review identifier of an operation with an
+          argument exception.
+        justification: |
+          A misuse by a caller must be refused at the store with an error that names the argument, and must not become
+          a database failure or a stored row.
+        tests:
+          - InboxStore_NullArguments_Throw

@@ -319,3 +319,12 @@ sections:
           Left-over recovery codes would apply to a new user that gets the same identity.
         tests:
           - TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes
+
+      - id: ReviewCenter-TotpStore-InputValidation
+        title: >-
+          The TotpStore class shall refuse a missing argument of an operation with an argument-null exception.
+        justification: |
+          A misuse by a caller must be refused at the store with an error that names the argument, and must not become
+          a database failure or a stored row of the second factor.
+        tests:
+          - TotpStore_NullArguments_Throw

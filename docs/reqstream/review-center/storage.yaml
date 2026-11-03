@@ -762,6 +762,7 @@ sections:
           - AuditStore_ListAsync_ActorText_MatchesLiterallyAndIgnoresCase
           - AuditStore_ListAsync_DateRange_DayBoundariesAreInclusive
           - AuditStore_ListAsync_CombinedFields_AllMustMatch
+          - StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes
 
       - id: ReviewCenter-Storage-AuditTrail-Batches
         title: >-
@@ -1772,6 +1773,7 @@ sections:
           - ReviewCenter-TotpStore-Pending-KeepConfirmed
           - ReviewCenter-TotpStore-ConfirmAtomic-DuplicateHashRolledBack
           - ReviewCenter-TotpStore-ConfirmAtomic-SameHashOtherUsers
+          - ReviewCenter-TotpStore-InputValidation
           - ReviewCenter-DbContext-TotpTables
           - ReviewCenter-DbContext-TotpTables-RecoveryCodeHash
           - ReviewCenter-DbContext-TotpTables-SameHashOtherUsers
@@ -1890,6 +1892,7 @@ sections:
           - ReviewCenter-InboxStore-UserState-FirstVisit
           - ReviewCenter-InboxStore-UserState-Update
           - ReviewCenter-InboxStore-UserState-OwnRowsOnly
+          - ReviewCenter-InboxStore-InputValidation
           - ReviewCenter-DbContext-ReviewUserState
           - ReviewCenter-DbContext-ReviewUserState-Fields
         tests:

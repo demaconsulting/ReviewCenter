@@ -72,8 +72,9 @@ be loadable on the test platform.
   creator that the inbox query uses (`DatabaseSetup_EnsureCreated_CreatesReviewUserStateTableAndInboxIndexes`); the
   rows of the read state are removed together with their review or user, and the real store is verified in the tests of
   the `InboxStore` unit.
-- The table of the audit trail has the four indexes of its reads, which a new database creates
-  (`StorageSubsystem_NewDatabase_HasTheAuditEntryIndexes`, listed under the `AuditStore` unit).
+- The table of the audit trail has the four indexes of its reads, which a new database creates; the index of the review
+  and the sequence is tested by `ReviewCenterDbContext_AuditEntries_NewDatabase_HasTheReviewSequenceIndex`, and the
+  other three by `AuditStore_Indexes_NewDatabase_CoverProjectActorAndActionWithSequence` of the `AuditStore` unit.
 - The relationships that the schema enforces are tested one by one: what the database refuses (a thread, a signature,
   a repository, a membership, a second-factor enrollment, and a reopening that point at nothing), what it deletes with
   its parent (comments, checklist rows, ballot status rows, memberships, and reopenings), and what it keeps (a
@@ -217,7 +218,9 @@ that was created before them must be deleted and recreated (see the design of th
 
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
 of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a
-schema that includes it.
+schema that includes it. The index of the review and the sequence is tested by
+`ReviewCenterDbContext_AuditEntries_NewDatabase_HasTheReviewSequenceIndex`, defined in `ReviewCenterDbContextTests.cs`,
+which reads the indexes of the table from a database that is created from scratch.
 
 **ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns**: A review with a creator and the API flag is stored
 and read back, and the model of the token table is read. The review keeps its creator and the flag; the index on the
