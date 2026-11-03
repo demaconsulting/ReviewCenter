@@ -458,6 +458,7 @@ sections:
         children:
           - ReviewCenter-NotificationStore-Available
           - ReviewCenter-NotificationStore-UnavailableOldDatabase
+          - ReviewCenter-NotificationStore-AvailableFailurePropagates
           - ReviewCenter-NotificationStore-NoRow
           - ReviewCenter-NotificationStore-ReservePending
           - ReviewCenter-NotificationStore-ReservePendingCode
@@ -467,6 +468,7 @@ sections:
           - ReviewCenter-NotificationStore-ConfirmMoves
           - ReviewCenter-NotificationStore-ConfirmClearsPending
           - ReviewCenter-NotificationStore-ConfirmOtherCode
+          - ReviewCenter-NotificationStore-ConfirmExpired
           - ReviewCenter-NotificationStore-RemoveRow
           - ReviewCenter-DbContext-NotificationPreferencesTable
           - ReviewCenter-DbContext-NotificationSendLogTable
@@ -485,6 +487,7 @@ sections:
           - ReviewCenter-NotificationStore-ConfirmAudit
           - ReviewCenter-NotificationStore-RemoveAudit
           - ReviewCenter-NotificationStore-ConfirmNoAuditOtherCode
+          - ReviewCenter-NotificationStore-ConfirmNoAuditExpired
         tests:
           - NotificationStore_ReserveConfirmationAsync_Reserved_StoresPendingLogAndAudit
           - NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit

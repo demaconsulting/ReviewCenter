@@ -107,8 +107,10 @@ public class AccountNotificationPageTests : PageTestBase
         // Act: render the page
         var cut = Render<AccountPage>();
 
-        // Assert: no card
+        // Assert: the page rendered its temporary-password banner, and the card is absent (also no field of it)
+        Assert.NotEmpty(cut.FindAll("[data-testid='password-change-required-banner']"));
         Assert.Empty(cut.FindAll("[data-testid='notifications-card']"));
+        Assert.Empty(cut.FindAll("[data-testid='notifications-address-input']"));
     }
 
     /// <summary>

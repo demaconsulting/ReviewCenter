@@ -31,8 +31,10 @@ namespace DemaConsulting.ReviewCenter.Messaging;
 ///     <para>
 ///     The file holds the same MIME message that <see cref="SmtpNotificationSender"/> would send (built by
 ///     <see cref="SmtpNotificationSender.BuildMessage"/>), so a mail client can open it. Every file has a new name
-///     made of the UTC time and a random identifier and is created exclusively, so an existing file is never
-///     overwritten and concurrent sends never collide. The folder is created when it does not exist.
+///     made of the UTC time and a random identifier and is never overwritten, so concurrent sends never collide. The
+///     message is written to a temporary file in the same folder and renamed to the final <c>.eml</c> name when it is
+///     complete, so the folder never holds a partial message; a failed or cancelled send leaves no file. The folder
+///     is created when it does not exist.
 ///     </para>
 ///     <para>
 ///     The class holds no mutable state and is thread-safe. A failure to write surfaces as a
@@ -63,12 +65,29 @@ internal sealed class FileNotificationSender(NotificationOptions options, ILogge
             var directory = Directory.CreateDirectory(_options.File.Directory.Trim());
             var name = string.Create(
                 CultureInfo.InvariantCulture,
-                $"{DateTimeOffset.UtcNow.UtcTicks:D19}-{Guid.NewGuid():N}.eml");
-            var path = Path.Combine(directory.FullName, name);
+                $"{DateTimeOffset.UtcNow.UtcTicks:D19}-{Guid.NewGuid():N}");
+            var path = Path.Combine(directory.FullName, name + ".eml");
+            var temporaryPath = Path.Combine(directory.FullName, name + ".tmp");
 
-            // CreateNew never overwrites a file
-            await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            await mime.WriteToAsync(stream, cancellationToken);
+            // The message is written to a temporary file that is not an .eml file, so a reader of the folder never
+            // sees a partial message; the finished file gets its final name in one step. CreateNew never overwrites a
+            // file, and the move does not overwrite one either
+            try
+            {
+                await using (var stream = new FileStream(
+                                 temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    await mime.WriteToAsync(stream, cancellationToken);
+                }
+
+                File.Move(temporaryPath, path, overwrite: false);
+            }
+            catch
+            {
+                // A failed or cancelled send leaves neither a message file nor a temporary file
+                TryDelete(temporaryPath);
+                throw;
+            }
         }
         catch (OperationCanceledException)
         {
@@ -84,6 +103,22 @@ internal sealed class FileNotificationSender(NotificationOptions options, ILogge
             logger.LogWarning("Writing an e-mail file failed ({ExceptionType}).", ex.GetType().Name);
 #pragma warning restore S6667
             throw new NotificationSendException("The e-mail file could not be written.", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Deletes a file and ignores a failure to do so, because the original failure is the one to report.
+    /// </summary>
+    /// <param name="path">The file to delete.</param>
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Nothing more can be done; the original failure is reported
         }
     }
 }

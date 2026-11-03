@@ -21,6 +21,7 @@
 using System.Globalization;
 using DemaConsulting.ReviewCenter.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace DemaConsulting.ReviewCenter.Storage;
 
@@ -416,9 +417,9 @@ internal sealed class ReviewCenterDbContext : DbContext
 
         // Notification e-mail addresses: one row per user (the user id is the key), kept apart from the user row for
         // the same reason as the second factor. The confirmation code is stored only as a salted hash. The send log
-        // exists only to count mails against the limits; its timestamp uses the fixed-width UTC text form of the audit
-        // trail, because the SQLite provider cannot compare an unconverted DateTimeOffset and the limits compare
-        // times. Both tables go away with the user
+        // exists only to count mails against the limits; its timestamp and the expiry of the code use the
+        // fixed-width UTC text form of the audit trail, because the SQLite provider cannot compare an unconverted
+        // DateTimeOffset and the limits and the confirmation compare times. Both tables go away with the user
         modelBuilder.Entity<NotificationPreference>(preference =>
         {
             preference.HasKey(p => p.UserId);
@@ -427,6 +428,13 @@ internal sealed class ReviewCenterDbContext : DbContext
             preference.Property(p => p.PendingEmail).HasMaxLength(NotificationAddress.MaxLength);
             preference.Property(p => p.PendingCodeHash).HasMaxLength(Sha256HexColumnLength);
             preference.Property(p => p.PendingCodeSalt).HasMaxLength(Sha256HexColumnLength);
+            preference.Property(p => p.PendingCodeExpiresUtc).HasConversion(
+                new ValueConverter<DateTimeOffset, string>(
+                    value => value.UtcDateTime.ToString(TimestampFormat, CultureInfo.InvariantCulture),
+                    text => DateTimeOffset.Parse(
+                        text,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)));
             preference.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 

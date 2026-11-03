@@ -26,6 +26,16 @@ sections:
         tests:
           - NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse
 
+      - id: ReviewCenter-NotificationStore-AvailableFailurePropagates
+        title: >-
+          The NotificationStore class shall raise a database failure that is not a missing table when it checks whether
+          it is available.
+        justification: |
+          A locked, read-only, or corrupt database is a real fault that an operator must see, and it must not be
+          mistaken for an old database without the tables.
+        tests:
+          - NotificationStore_IsAvailableAsync_OtherDatabaseFailure_Propagates
+
       - id: ReviewCenter-NotificationStore-NoRow
         title: >-
           The NotificationStore class shall give no preference for a user who has none.
@@ -186,6 +196,7 @@ sections:
           This is the step that starts the notifications for the address.
         tests:
           - NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit
+          - NotificationStore_ConfirmAsync_LastInstantBeforeExpiry_Confirms
 
       - id: ReviewCenter-NotificationStore-ConfirmClearsPending
         title: >-
@@ -210,6 +221,24 @@ sections:
           A wrong or an old code must not confirm anything.
         tests:
           - NotificationStore_ConfirmAsync_OtherCode_ChangesNothing
+
+      - id: ReviewCenter-NotificationStore-ConfirmExpired
+        title: >-
+          The NotificationStore class shall change nothing when the code has expired at the time of the confirmation.
+        justification: |
+          A request that was delayed after the code was read must not confirm a code that expired in the meantime, so
+          the expiry is checked in the same step that makes the change.
+        tests:
+          - NotificationStore_ConfirmAsync_ExpiredCode_ChangesNothing
+
+      - id: ReviewCenter-NotificationStore-ConfirmNoAuditExpired
+        title: >-
+          The NotificationStore class shall save no audit entry when the code has expired at the time of the
+          confirmation.
+        justification: |
+          An entry for a change that did not happen would mislead a reader of the audit trail.
+        tests:
+          - NotificationStore_ConfirmAsync_ExpiredCode_ChangesNothing
 
       - id: ReviewCenter-NotificationStore-ConfirmNoAuditOtherCode
         title: >-

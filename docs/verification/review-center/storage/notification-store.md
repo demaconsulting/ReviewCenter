@@ -18,7 +18,8 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- A new database reports the store as available, and a database without the tables reports it as not available.
+- A new database reports the store as available, and a database without the tables reports it as not available; any
+  other database failure propagates to the caller.
 - A user without a row has no preference.
 - A reservation stores the pending address, the hash, the salt, the expiry, the send time, and zero attempts, adds a log
   entry, and writes one audit entry; a confirmed address is kept and the attempts are reset.
@@ -30,7 +31,8 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 - Attempts are counted up to the limit for the current code only; of ten parallel attempts with a limit of five exactly
   five succeed.
 - A confirmation with the right hash moves the pending address to the confirmed one and writes one audit entry; another
-  hash changes nothing and writes no entry; of parallel confirmations exactly one wins.
+  hash changes nothing and writes no entry; a code at the moment it expires, or after it, changes nothing and writes
+  no entry, and a code one tick before its expiry is still confirmed; of parallel confirmations exactly one wins.
 - Removing deletes the row with one audit entry, removing again records nothing, and the send log is kept.
 - A reservation deletes the log entries that are older than one day and keeps the newer ones.
 
@@ -41,6 +43,11 @@ available. This scenario is tested by `NotificationStore_IsAvailableAsync_NewDat
 
 **NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse**: After the tables are dropped, the store reports that
 it is not available. This scenario is tested by `NotificationStore_IsAvailableAsync_TablesMissing_ReturnsFalse`.
+
+**NotificationStore_IsAvailableAsync_OtherDatabaseFailure_Propagates**: The database file is replaced by a file that is
+not a database, so the check fails with an error other than a missing table. The store raises the database exception
+instead of answering false. This scenario is tested by
+`NotificationStore_IsAvailableAsync_OtherDatabaseFailure_Propagates`.
 
 **NotificationStore_GetAsync_NoRow_ReturnsNull**: A user without a row has no preference. This scenario is tested by
 `NotificationStore_GetAsync_NoRow_ReturnsNull`.
@@ -97,6 +104,15 @@ by `NotificationStore_ConfirmAsync_MovesPendingToConfirmedWithAudit`.
 
 **NotificationStore_ConfirmAsync_OtherCode_ChangesNothing**: A confirmation with another hash returns false, leaves the
 address unconfirmed, and writes no entry. This scenario is tested by `NotificationStore_ConfirmAsync_OtherCode_ChangesNothing`.
+
+**NotificationStore_ConfirmAsync_ExpiredCode_ChangesNothing**: With a code that lives for 30 minutes, a confirmation at
+exactly 30 minutes and one at 31 minutes (a theory with both values) return false, leave the address unconfirmed and
+the pending fields in place, and write no entry. This scenario is tested by
+`NotificationStore_ConfirmAsync_ExpiredCode_ChangesNothing`.
+
+**NotificationStore_ConfirmAsync_LastInstantBeforeExpiry_Confirms**: A confirmation one tick before the code expires
+returns true and the address is confirmed. This scenario is tested by
+`NotificationStore_ConfirmAsync_LastInstantBeforeExpiry_Confirms`.
 
 **NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner**: Parallel confirmations with the same hash give one
 success and one audit entry. This scenario is tested by `NotificationStore_ConfirmAsync_Concurrent_HasExactlyOneWinner`.

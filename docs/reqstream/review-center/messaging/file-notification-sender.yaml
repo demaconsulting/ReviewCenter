@@ -109,6 +109,30 @@ sections:
         tests:
           - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
 
+      - id: ReviewCenter-FileNotificationSender-OnlyEmlAfterSend
+        title: >-
+          The FileNotificationSender class shall leave only the eml file in the folder after a successful send.
+        justification: |
+          A reader of the folder must see only complete messages, so no helper file may remain after a send.
+        tests:
+          - FileNotificationSender_Send_Success_LeavesOnlyTheEmlFile
+
+      - id: ReviewCenter-FileNotificationSender-FailedNoFile
+        title: >-
+          The FileNotificationSender class shall leave no file in the folder when a send fails.
+        justification: |
+          A message that was not delivered must not appear in the folder, not even as a partial file.
+        tests:
+          - FileNotificationSender_Send_Failure_LeavesNoMessageOrTemporaryFile
+
+      - id: ReviewCenter-FileNotificationSender-CanceledNoFile
+        title: >-
+          The FileNotificationSender class shall leave no file in the folder when a send is canceled.
+        justification: |
+          A canceled send must not leave a partial message that a reader of the folder could take for a mail.
+        tests:
+          - FileNotificationSender_Send_Cancelled_LeavesNoFile
+
       - id: ReviewCenter-FileNotificationSender-ErrorNoPath
         title: >-
           The FileNotificationSender class shall not put the path of the folder in the message of a send error.

@@ -19,7 +19,10 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Storage;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DemaConsulting.ReviewCenter.Tests.Storage;
 
@@ -75,6 +78,26 @@ public class NotificationStoreTests
 
         // Assert: not available
         Assert.False(available);
+    }
+
+    /// <summary>
+    ///     Test that a database failure that is not a missing table is not reported as "not available".
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_IsAvailableAsync_OtherDatabaseFailure_Propagates()
+    {
+        // Arrange: a file that is not a database, so every statement fails with an error other than a missing table
+        var connectionString = TestDatabase.NewConnectionString();
+        var path = new SqliteConnectionStringBuilder(connectionString).DataSource;
+        await File.WriteAllTextAsync(path, new string('x', 4096), Token);
+        using var provider = new ServiceCollection()
+            .AddDbContextFactory<ReviewCenterDbContext>(builder => builder.UseSqlite(connectionString))
+            .BuildServiceProvider();
+        var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+        var store = new NotificationStore(factory, new AuditAppender(TimeProvider.System));
+
+        // Act and Assert: the failure surfaces instead of the answer false
+        await Assert.ThrowsAsync<SqliteException>(() => store.IsAvailableAsync(Token));
     }
 
     /// <summary>
@@ -434,6 +457,55 @@ public class NotificationStoreTests
         Assert.Null((await db.Notifications.GetAsync(userId, Token))!.Email);
         await using var context = await db.Factory.CreateDbContextAsync(Token);
         Assert.Equal(0, await context.AuditEntries.CountAsync(a => a.Action == "notification.email-confirmed", Token));
+    }
+
+    /// <summary>
+    ///     Test that a code that has expired at the time of the update is not confirmed, even though it was valid when it
+    ///     was read, and that nothing changes and no audit entry is written.
+    /// </summary>
+    /// <param name="minutesAfterReserve">The minutes between the reservation and the confirmation.</param>
+    [Theory]
+    [InlineData(30)]
+    [InlineData(31)]
+    public async Task NotificationStore_ConfirmAsync_ExpiredCode_ChangesNothing(int minutesAfterReserve)
+    {
+        // Arrange: a pending address whose code lives for 30 minutes
+        using var db = new TestStore();
+        var userId = await AddUserAsync(db);
+        await ReserveAsync(db, userId, "ann@example.com", 'a', _now);
+
+        // Act: confirm at the moment the code expires, and after it
+        var confirmed = await db.Notifications.ConfirmAsync(
+            userId, Hash('a'), _now.AddMinutes(minutesAfterReserve), Draft("notification.email-confirmed"), Token);
+
+        // Assert: refused, still pending with the same code, no confirmed address, no confirmed audit entry
+        Assert.False(confirmed);
+        var row = await db.Notifications.GetAsync(userId, Token);
+        Assert.Null(row!.Email);
+        Assert.Equal("ann@example.com", row.PendingEmail);
+        Assert.Equal(Hash('a'), row.PendingCodeHash);
+        await using var context = await db.Factory.CreateDbContextAsync(Token);
+        Assert.Equal(0, await context.AuditEntries.CountAsync(a => a.Action == "notification.email-confirmed", Token));
+    }
+
+    /// <summary>
+    ///     Test that a code that is still valid one tick before it expires is confirmed.
+    /// </summary>
+    [Fact]
+    public async Task NotificationStore_ConfirmAsync_LastInstantBeforeExpiry_Confirms()
+    {
+        // Arrange: a pending address whose code lives for 30 minutes
+        using var db = new TestStore();
+        var userId = await AddUserAsync(db);
+        await ReserveAsync(db, userId, "ann@example.com", 'a', _now);
+
+        // Act: confirm one tick before the code expires
+        var confirmed = await db.Notifications.ConfirmAsync(
+            userId, Hash('a'), _now.AddMinutes(30).AddTicks(-1), Draft("notification.email-confirmed"), Token);
+
+        // Assert: confirmed
+        Assert.True(confirmed);
+        Assert.Equal("ann@example.com", (await db.Notifications.GetAsync(userId, Token))!.Email);
     }
 
     /// <summary>

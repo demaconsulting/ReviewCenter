@@ -14,7 +14,8 @@ The unit keeps only the settings that it is given (`NotificationOptions`) and a 
 sends, so
 the class is thread-safe. `IsConfigured` is always true. Each file has a new name made of the UTC time and a random
 identifier, for example `20260101T120000000-0123456789abcdef0123456789abcdef.eml`, and holds the MIME message built by
-`SmtpNotificationSender.BuildMessage`.
+`SmtpNotificationSender.BuildMessage`. While a message is being written it lives in a temporary file with the same name
+and the extension `.tmp`, in the same folder, so the folder never holds a partial `.eml` file.
 
 #### Key Methods
 
@@ -22,10 +23,13 @@ identifier, for example `20260101T120000000-0123456789abcdef0123456789abcdef.eml
 
 - *Parameters*: The message, which must not be null, and a cancellation token.
 - *Returns*: A task that completes when the file is written.
-- *Postconditions*: The folder of the settings is created when it does not exist. The file is created exclusively
-  (`CreateNew`), so an existing file is never overwritten and sends at the same moment never collide. The file parses
-  back as a mail message with the sender of the settings, the recipient and the subject of the message, and its text and
-  HTML parts.
+- *Postconditions*: The folder of the settings is created when it does not exist. The message is written to the
+  temporary file (created with `CreateNew`), the stream is closed, and the file is then renamed to its final `.eml`
+  name in one step without overwriting, so an existing file is never overwritten, sends at the same moment never
+  collide, and a reader of the folder never sees a partial message. When the write or the rename fails, or the send is
+  canceled, the temporary file is deleted and no `.eml` file is left. After a success only the `.eml` file is left. The
+  file parses back as a mail message with the sender of the settings, the recipient and the subject of the message, and
+  its text and HTML parts.
 - *Errors*: A failure to create the folder or to write the file (input and output, access, an unsupported or an invalid
   path, or a security failure) is written to the operator log as the exception type and is reported as a
   `NotificationSendException` with the fixed text "The e-mail file could not be written."; the text holds no path. A

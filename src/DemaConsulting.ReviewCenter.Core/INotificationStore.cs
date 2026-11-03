@@ -176,15 +176,18 @@ public interface INotificationStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Makes the pending address the confirmed address, only while the pending code is the given one, together
-    ///     with the audit entry.
+    ///     Makes the pending address the confirmed address, only while the pending code is the given one and has not
+    ///     expired at the given time, together with the audit entry.
     /// </summary>
     /// <param name="userId">The user.</param>
     /// <param name="codeHash">The hash of the code that was typed correctly.</param>
-    /// <param name="now">The current time (UTC).</param>
+    /// <param name="now">The current time (UTC); a code that expires at or before it is not confirmed.</param>
     /// <param name="audit">The audit entry saved with the change. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns><c>true</c> when the address was confirmed by this call; <c>false</c> when the pending state changed.</returns>
+    /// <returns>
+    ///     <c>true</c> when the address was confirmed by this call; <c>false</c> when the pending state changed or the
+    ///     code has expired.
+    /// </returns>
     Task<bool> ConfirmAsync(
         int userId,
         string codeHash,

@@ -66,6 +66,7 @@ sections:
           - ReviewCenter-FileNotificationSender-HtmlPart
           - ReviewCenter-FileNotificationSender-NewFileEachTime
           - ReviewCenter-FileNotificationSender-Concurrent
+          - ReviewCenter-FileNotificationSender-OnlyEmlAfterSend
           - ReviewCenter-OTS-MailKit-MimeSubject
           - ReviewCenter-OTS-MailKit-MimeRecipient
           - ReviewCenter-OTS-MailKit-MimeSender
@@ -308,6 +309,7 @@ sections:
           - ReviewCenter-SmtpNotificationSender-Unreachable
           - ReviewCenter-SmtpNotificationSender-NothingDeliveredOnFailure
           - ReviewCenter-FileNotificationSender-WriteFailure
+          - ReviewCenter-FileNotificationSender-FailedNoFile
         tests:
           - SmtpNotificationSender_Send_WrongPassword_ThrowsWithoutSecret
           - FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath
@@ -361,6 +363,7 @@ sections:
         children:
           - ReviewCenter-SmtpNotificationSender-Cancellation
           - ReviewCenter-SmtpNotificationSender-CanceledNothingSent
+          - ReviewCenter-FileNotificationSender-CanceledNoFile
         tests:
           - SmtpNotificationSender_Send_Canceled_ThrowsOperationCanceled
 

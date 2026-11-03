@@ -123,6 +123,67 @@ public sealed class FileNotificationSenderTests : IDisposable
     }
 
     /// <summary>
+    ///     Test that a send leaves exactly one <c>.eml</c> file and no temporary file in the folder.
+    /// </summary>
+    [Fact]
+    public async Task FileNotificationSender_Send_Success_LeavesOnlyTheEmlFile()
+    {
+        // Arrange: a sender
+        var sender = new FileNotificationSender(Options(), NullLogger<FileNotificationSender>.Instance);
+
+        // Act: send
+        await sender.SendAsync(
+            new NotificationMessage("ann@example.com", "S", "t", "<p>t</p>"),
+            TestContext.Current.CancellationToken);
+
+        // Assert: the folder holds exactly the one message file
+        var file = Assert.Single(Directory.GetFileSystemEntries(_folder));
+        Assert.EndsWith(".eml", file, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a cancelled send leaves neither a message file nor a temporary file.
+    /// </summary>
+    [Fact]
+    public async Task FileNotificationSender_Send_Cancelled_LeavesNoFile()
+    {
+        // Arrange: a sender and a token that is already cancelled
+        var sender = new FileNotificationSender(Options(), NullLogger<FileNotificationSender>.Instance);
+        using var source = new CancellationTokenSource();
+        await source.CancelAsync();
+
+        // Act: send
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sender.SendAsync(
+            new NotificationMessage("ann@example.com", "S", "t", "<p>t</p>"), source.Token));
+
+        // Assert: the folder is empty
+        Assert.Empty(Directory.GetFileSystemEntries(_folder));
+    }
+
+    /// <summary>
+    ///     Test that a failed send leaves neither a message file nor a temporary file in the folder that holds the
+    ///     blocking entry.
+    /// </summary>
+    [Fact]
+    public async Task FileNotificationSender_Send_Failure_LeavesNoMessageOrTemporaryFile()
+    {
+        // Arrange: a regular file where the folder should be
+        Directory.CreateDirectory(_folder);
+        var blocker = Path.Combine(_folder, "blocker");
+        await File.WriteAllTextAsync(blocker, "x", TestContext.Current.CancellationToken);
+        var options = Options();
+        options.File.Directory = blocker;
+        var sender = new FileNotificationSender(options, NullLogger<FileNotificationSender>.Instance);
+
+        // Act: send
+        await Assert.ThrowsAsync<NotificationSendException>(
+            () => sender.SendAsync(new NotificationMessage("ann@example.com", "S", "t", "<p>t</p>"), TestContext.Current.CancellationToken));
+
+        // Assert: only the blocking file is left
+        Assert.Equal(blocker, Assert.Single(Directory.GetFileSystemEntries(_folder)));
+    }
+
+    /// <summary>
     ///     Test that a missing message is a programming error.
     /// </summary>
     [Fact]

@@ -220,7 +220,8 @@ internal sealed class FakeNotificationStore : INotificationStore
     {
         lock (_lock)
         {
-            if (!_rows.TryGetValue(userId, out var row) || row.PendingCodeHash != codeHash || row.PendingEmail is null)
+            if (!_rows.TryGetValue(userId, out var row) || row.PendingCodeHash != codeHash || row.PendingEmail is null
+                || !(row.PendingCodeExpiresUtc > now))
             {
                 return Task.FromResult(false);
             }

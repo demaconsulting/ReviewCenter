@@ -33,15 +33,21 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     the answer, so two requests that race can not both succeed. The sending limits are counted and the pending
 ///     state is stored in one serialized transaction together with the audit entry (see
 ///     <see cref="AuditAppender"/>), so two requests can not both slip under a limit. The conditions use only
-///     equality, null checks and integer comparison, except the limit counts, which compare the fixed-width UTC text
-///     form of the send time (see <see cref="ReviewCenterDbContext"/>). A database from before e-mail notifications
-///     lacks the tables; <see cref="IsAvailableAsync"/> reports that instead of failing.
+///     equality, null checks and integer comparison, except the limit counts and the expiry of a confirmation code,
+///     which compare the fixed-width UTC text form of a time (see <see cref="ReviewCenterDbContext"/>). A database
+///     from before e-mail notifications lacks the tables; <see cref="IsAvailableAsync"/> reports that instead of
+///     failing, and lets every other database failure propagate.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
 /// <param name="appender">The appender that runs each change together with its audit entry.</param>
 internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext> factory, AuditAppender appender)
     : INotificationStore
 {
+    /// <summary>
+    ///     The SQLite error code that reports a missing table (<c>SQLITE_ERROR</c>).
+    /// </summary>
+    private const int MissingTableErrorCode = 1;
+
     /// <summary>
     ///     The window of the limits per user and per address.
     /// </summary>
@@ -63,10 +69,22 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
             _ = await context.NotificationSendLog.AsNoTracking().AnyAsync(cancellationToken);
             return true;
         }
-        catch (SqliteException)
+        catch (SqliteException ex) when (IsMissingTable(ex))
         {
             return false;
         }
+    }
+
+    /// <summary>
+    ///     Tells whether a database failure is the one of a missing table (SQLite error 1, "no such table"), which is
+    ///     what a database from before e-mail notifications reports. Every other failure is a real fault.
+    /// </summary>
+    /// <param name="exception">The failure.</param>
+    /// <returns><c>true</c> when a table does not exist.</returns>
+    private static bool IsMissingTable(SqliteException exception)
+    {
+        return exception.SqliteErrorCode == MissingTableErrorCode
+               && exception.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <inheritdoc />
@@ -221,9 +239,14 @@ internal sealed class NotificationStore(IDbContextFactory<ReviewCenterDbContext>
             factory,
             async context =>
             {
-                // The waiting address becomes the confirmed one, only for the code that waits and only once
+                // The waiting address becomes the confirmed one, only for the code that waits, only once, and only
+                // while the code has not expired at this moment (the expiry is stored as sortable text, so it can be
+                // compared in the same conditional update that makes the change)
                 var changed = await context.NotificationPreferences
-                    .Where(p => p.UserId == userId && p.PendingCodeHash == codeHash && p.PendingEmail != null)
+                    .Where(p => p.UserId == userId
+                                && p.PendingCodeHash == codeHash
+                                && p.PendingEmail != null
+                                && p.PendingCodeExpiresUtc > now)
                     .ExecuteUpdateAsync(
                         setters => setters
                             .SetProperty(p => p.Email, p => p.PendingEmail)

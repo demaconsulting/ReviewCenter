@@ -6,7 +6,7 @@
 
 The ReviewCenter is an ASP.NET Core web service with a companion command-line interface,
 built on .NET. It is structured as one system containing one top-level unit (`Program`) and
-eleven subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Messaging`, `Storage`,
+twelve subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Messaging`, `Storage`,
 `ContentSources`, `Evidence`, `Api`):
 
 ```mermaid

@@ -19,6 +19,8 @@ N/A - standard test environment (a temporary folder is created by each test and 
   the sender, the text part, and the HTML part.
 - Messages that are sent at the same moment never overwrite each other and never fail.
 - A folder that cannot be created gives a send error whose message holds no path.
+- A successful send leaves only the `.eml` file, and a failed or a canceled send leaves neither an `.eml` file nor a
+  temporary file.
 - A missing message is refused.
 
 #### Test Scenarios
@@ -40,6 +42,18 @@ moment. The folder holds five files with different names and no send failed. Thi
 The send raises a
 send error and the message of the error does not contain the path. This scenario is tested by
 `FileNotificationSender_Send_FolderIsAFile_ThrowsWithoutPath`.
+
+**FileNotificationSender_Send_Success_LeavesOnlyTheEmlFile**: A message is sent. The folder holds exactly one entry,
+and it is the `.eml` file, so no temporary file is left. This scenario is tested by
+`FileNotificationSender_Send_Success_LeavesOnlyTheEmlFile`.
+
+**FileNotificationSender_Send_Cancelled_LeavesNoFile**: A message is sent with a token that is already canceled. The
+send raises a cancellation and the folder is empty. This scenario is tested by
+`FileNotificationSender_Send_Cancelled_LeavesNoFile`.
+
+**FileNotificationSender_Send_Failure_LeavesNoMessageOrTemporaryFile**: A regular file is named as the folder. The send
+raises a send error and the only entry left in the folder that holds the blocking file is that file. This scenario is
+tested by `FileNotificationSender_Send_Failure_LeavesNoMessageOrTemporaryFile`.
 
 **FileNotificationSender_Send_NullMessage_ThrowsArgumentNull**: A missing message raises `ArgumentNullException`. This
 scenario is tested by `FileNotificationSender_Send_NullMessage_ThrowsArgumentNull`.
