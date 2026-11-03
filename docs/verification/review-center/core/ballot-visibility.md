@@ -62,6 +62,10 @@ scenario is tested by `BallotVisibility_CanSeeOthers_LeadAdminAuditor_SeeAll`.
 **BallotVisibility_CanSeeOthers_Concluded_SeesAll**: Once the review is concluded everybody sees everything. This
 scenario is tested by `BallotVisibility_CanSeeOthers_Concluded_SeesAll`.
 
+**BallotVisibility_CanSeeOthers_UnknownViewer_Masked**: A viewer the rule does not know (no identity) is treated as one
+who has not handed in, so the others stay hidden in a review with several slots, while the slot owner who handed in sees
+them. This scenario is tested by `BallotVisibility_CanSeeOthers_UnknownViewer_Masked`.
+
 **AuditMasking_ForViewer_OtherAnswer_HidesDetailKeepsActorAndHash**: The answer entry of another user shows the fixed
 sentence, with the actor and the hashes as stored. This scenario is tested by
 `AuditMasking_ForViewer_OtherAnswer_HidesDetailKeepsActorAndHash`.

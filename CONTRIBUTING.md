@@ -284,7 +284,9 @@ When creating a pull request, include:
 - **Motivation**: Why are these changes needed?
 - **Related Issues**: Link to any related issues
 - **Testing**: How have you tested these changes?
-- **Checklist**:
+
+- #### Checklist
+
   - [ ] Tests added/updated
   - [ ] Documentation updated
   - [ ] All tests pass
@@ -299,6 +301,87 @@ ReviewCenter uses [DemaConsulting.ReqStream][reqstream] for requirements traceab
 - Each requirement should be linked to test cases
 - Run `dotnet reqstream` to generate requirements documentation
 - Use the `--enforce` flag to ensure all requirements have test coverage
+
+### Atomic Requirements
+
+Every requirement states one testable criterion (formal-review check REQ-07). A requirement that bundles several
+behaviors is split, and nothing is lost: every old id stays, every behavior stays covered by a test.
+
+#### Rules
+
+- One `shall` is one criterion: one observable outcome, one reason for a test to fail.
+- Do not join separate obligations with "and" or "or". A condition that defines the single behavior ("when the
+  project requires independent reviewers") stays in the sentence.
+- Separately testable alternatives, exceptions, error cases, and side effects (an audit entry, nothing stored)
+  are their own requirements.
+- An enumeration of items that share one condition and one outcome, and are checked by one parameterized test
+  (for example "add, change, or remove a slot"), is one criterion. So are the fields of one stored or shown record
+  (for example the user, time, and reason in one audit entry) that one test checks together.
+- Split on what the old text states. Do not invent obligations that the code and the tests do not support, and do
+  not split what the unit cannot tell apart. Report real gaps instead of hiding them.
+- Never delete a requirement or drop a criterion.
+
+#### Naming
+
+- The first or main criterion keeps the old id, so parent `children` lists, prose, and review reports stay valid.
+- Every other criterion gets `<OldId>-<Aspect>`: a short PascalCase noun phrase, usually one to three words, unique
+  within the file (for example `ReviewCenter-SigningService-Sign-Alternate`).
+- Title: one sentence, "The <Class> class shall ...". Each requirement has its own short `justification`.
+
+#### Test linking
+
+- Link each requirement only to existing own-level tests that really verify that criterion. One test may be linked
+  to several requirements, and every old test link must stay linked by at least one new requirement.
+- When a criterion has no dedicated test, add a small focused test named `{Class}_{Method}_{Scenario}_{Expected}`
+  and a scenario entry for it in the verification document. Do not change source code.
+- Do not turn tests that merely exist into requirements. Link them to the nearest stated criterion.
+
+#### Parents and references
+
+- In every parent requirement (in `docs/reqstream/**`, for example `core.yaml`), list the new ids in `children`
+  next to the old id. Links flow downward only. `requirements.yaml` only includes files and does not change.
+- A prose reference such as "see the Concluded requirement" names the exact new id.
+- Parent and system-level requirements bundle behaviors too. Split them last, so that every new child keeps a
+  parent, and keep each child under at least one parent.
+
+#### Before and after
+
+```yaml
+# Before: one requirement, two criteria
+- id: ReviewCenter-Example-Slots
+  title: >-
+    The Example class shall number slots in the order added and reject a slot for a missing review.
+  tests: [Example_AddSlot_Valid_Numbered, Example_AddSlot_MissingReview_Throws]
+
+# After: the old id keeps the main criterion
+- id: ReviewCenter-Example-Slots
+  title: The Example class shall number slots in the order in which they were added.
+  justification: The reviewers refer to a slot by its number.
+  tests: [Example_AddSlot_Valid_Numbered]
+- id: ReviewCenter-Example-Slots-ReviewExists
+  title: The Example class shall reject a slot for a review that does not exist.
+  justification: A slot without a review would be lost.
+  tests: [Example_AddSlot_MissingReview_Throws]
+```
+
+#### Agent checklist
+
+1. Read the old requirement and list its criteria. Look for "and", "or", commas, "even when", "except",
+   "otherwise", "also", and "at the same time".
+2. Read the linked tests and decide which criterion each one verifies.
+3. Write the atomic requirements, then add the new ids to every parent `children` list.
+4. Add focused tests only for real gaps, plus their verification scenarios.
+5. Run `dotnet reqstream --requirements requirements.yaml --lint`, the targeted tests, and
+   `--tests "artifacts/*.trx" --enforce`. No id of the unit may be unsatisfied.
+6. Run `pwsh ./fix.ps1` then `pwsh ./lint.ps1`.
+
+#### Common pitfalls
+
+- Test names in the TRX file of parameterized tests carry their arguments, so compare by method name.
+- A unit's tests can live in several test classes. Include each class when running the targeted tests.
+- Check the indentation of `children` lists after each edit. A wrong indent shows as many "unknown child" errors.
+- Files made with the `create` tool may use CRLF, but the repository uses LF. Edit existing files where possible.
+- Linking one broad test to many criteria hides gaps. Prefer a small focused test.
 
 ## Release Process
 

@@ -935,6 +935,32 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that a stored signature is never changed or removed when the record changes and the slot is signed
+    ///     again: the earlier signature keeps its signer, time, digest, outcome and meaning.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_ResignAfterReopen_KeepsEarlierSignatureUnchanged()
+    {
+        // Arrange: a slot signed by ann; what the stored signature says is noted
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateReadyAsync();
+        var digest = (await ApprovalAsync(fixture)).Digest;
+        await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken);
+        var before = (await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", cancellationToken)).Single();
+        var noted = (before.SlotId, before.UserId, before.DisplayName, before.Role, before.SignedAt, before.RecordDigest, before.Outcome, before.Meaning);
+
+        // Act: the review is reopened, which changes the record, and the slot is signed again by bob
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "One more thing", cancellationToken);
+        await fixture.Signing.SignAsync(
+            TestActors.Bob, fixture.ProjectId, "rev-1", slot.Id, (await ApprovalAsync(fixture)).Digest, Password, cancellationToken);
+        var after = (await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", cancellationToken))
+            .Single(signature => signature.UserId == before.UserId);
+
+        // Assert: the earlier signature is still stored exactly as it was
+        Assert.Equal(noted, (after.SlotId, after.UserId, after.DisplayName, after.Role, after.SignedAt, after.RecordDigest, after.Outcome, after.Meaning));
+    }
+
+    /// <summary>
     ///     Test that a change of the content of a review that is not approved yet, a checklist answer or a comment,
     ///     makes a current signature out of date and the review not approved, without removing the signature, and
     ///     that the slot can be signed again for the new record.
@@ -1240,6 +1266,50 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that a candidate of a slot carries nothing secret: the serialized candidates contain neither a password
+    ///     nor the stored password hash of any user.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ListCandidatesAsync_Candidates_ExposeNoPasswordData()
+    {
+        // Arrange: a project whose members all have a password and a stored hash
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        var hashes = (await fixture.Users.ListAsync(cancellationToken)).Select(user => user.PasswordHash).ToList();
+
+        // Act: list the candidates and serialize them as a client would receive them
+        var candidates = await fixture.Signing.ListCandidatesAsync(Cyd, fixture.ProjectId, cancellationToken);
+        var serialized = System.Text.Json.JsonSerializer.Serialize(candidates);
+
+        // Assert: there are candidates, and no password and no hash is in them
+        Assert.NotEmpty(candidates);
+        Assert.NotEmpty(hashes);
+        Assert.DoesNotContain(Password, serialized, StringComparison.Ordinal);
+        Assert.All(hashes, hash => Assert.DoesNotContain(hash, serialized, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test, with the real access rules, that a user who cannot see the project is refused the candidates as if
+    ///     the project did not exist, while a project administrator is offered them.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ListCandidatesAsync_ActorWithoutViewAccess_ThrowsProjectNotFound()
+    {
+        // Arrange: a project with a plain member, and a user outside the project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await CreateRealAccessWorldAsync(approve: false);
+
+        // Act: the outsider asks, then the project administrator
+        var failure = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.ListCandidatesAsync(
+            new Actor("out", "out"), world.ProjectId, cancellationToken));
+        var candidates = await world.Signing.ListCandidatesAsync(new Actor("pro", "pro"), world.ProjectId, cancellationToken);
+
+        // Assert: the outsider is told the project does not exist, the administrator gets the members
+        Assert.Equal(DomainRule.ProjectNotFound, failure.Rule);
+        Assert.Equal(["mem", "pro"], candidates.Select(c => c.Username).Order());
+    }
+
+    /// <summary>
     ///     Test that a slot can only be given to enabled members of the project: a user who is not a member, even a
     ///     system administrator, is refused as primary and as alternate, and nothing is stored.
     /// </summary>
@@ -1315,6 +1385,32 @@ public class SigningServiceTests
         Assert.False(single.Alternate!.IsMember);
         Assert.False(batch.Primary.IsMember);
         Assert.False(batch.Alternate!.IsMember);
+    }
+
+    /// <summary>
+    ///     Test that the approval status says for the primary and for the alternate reviewer of a slot whether the
+    ///     account is enabled, in the single read and in the batch read.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_DisabledAssignee_IsMarkedNotEnabled()
+    {
+        // Arrange: a slot with primary ann and alternate bob; the control read shows both as enabled
+        var (fixture, _) = await CreateReadyAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var control = (await ApprovalAsync(fixture)).Slots.Single();
+        await fixture.Users.SetEnabledAsync("ann", false, cancellationToken);
+
+        // Act
+        var single = (await ApprovalAsync(fixture)).Slots.Single();
+        var batch = (await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-1"], cancellationToken))["rev-1"].Slots.Single();
+
+        // Assert: only the disabled primary is marked, in both reads
+        Assert.True(control.Primary.Enabled);
+        Assert.True(control.Alternate!.Enabled);
+        Assert.False(single.Primary.Enabled);
+        Assert.True(single.Alternate!.Enabled);
+        Assert.False(batch.Primary.Enabled);
+        Assert.True(batch.Alternate!.Enabled);
     }
 
     /// <summary>
@@ -1943,6 +2039,36 @@ public class SigningServiceTests
         // Assert
         Assert.Equal(fixture.Ids["cyd"], signature.UserId);
         Assert.True((await ApprovalAsync(fixture)).IsApproved);
+    }
+
+    /// <summary>
+    ///     Test that the independence check comes before the check of the reopener: the author of a review who also
+    ///     reopened it is refused with <see cref="DomainRule.ReviewerNotIndependent"/>, not with
+    ///     <see cref="DomainRule.ReopenerCannotSign"/>, although both rules are on and apply to the author.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_AuthorWhoReopened_ThrowsReviewerNotIndependentFirst()
+    {
+        // Arrange: ann created rev-2 and was seated while independence was off, with dee as alternate who signs; ann
+        // reopens the review, and independence is switched on again
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        await CreateAuthoredReviewAsync(fixture, TestActors.Ann);
+        var projects = TestServices.Projects(fixture.Store, fixture.Clock);
+        await projects.SetRequireIndependentReviewersAsync(Cyd, fixture.ProjectId, true, false, cancellationToken);
+        var slot = await AddSlotAsync(fixture, "rev-2", "ann", "dee");
+        await fixture.Signing.SignAsync(
+            TestActors.Dee, fixture.ProjectId, "rev-2", slot.Id, (await ApprovalAsync(fixture, "rev-2")).Digest, Password, cancellationToken);
+        await fixture.Signing.ReopenReviewAsync(TestActors.Ann, fixture.ProjectId, "rev-2", "Look again.", cancellationToken);
+        await projects.SetRequireIndependentReviewersAsync(Cyd, fixture.ProjectId, false, true, cancellationToken);
+        var digest = (await ApprovalAsync(fixture, "rev-2")).Digest;
+
+        // Act: ann, who is the author and the reopener, tries to sign
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-2", slot.Id, digest, Password, cancellationToken));
+
+        // Assert: the independence rule is the one named
+        Assert.Equal(DomainRule.ReviewerNotIndependent, ex.Rule);
     }
 
     /// <summary>

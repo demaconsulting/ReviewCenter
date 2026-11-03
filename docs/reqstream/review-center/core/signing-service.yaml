@@ -4,529 +4,1848 @@
 # The SigningService class manages the reviewer slots of a review, decides whether a review can be signed, signs it for
 # a reviewer after the reviewer confirms the password again, and computes whether each slot, and the review, has a
 # current signature.
+#
+# Every requirement states one criterion. The first criterion of a topic keeps the original id; the further criteria of
+# the same topic are named <original id>-<Aspect>.
 
 sections:
   - title: SigningService Unit Requirements
     requirements:
+      # ---------------------------------------------------------------------------------------------------------------
+      # Slots: the reviewers who are named for a review
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Slots
         title: >-
-          The SigningService class shall let a review have any number of reviewer slots, including none, each
-          with a primary reviewer and an optional alternate, numbered in the order in which they were added, none
-          of them signed when added, and shall reject a slot in a review that does not exist.
+          The SigningService class shall let a review have any number of reviewer slots, including none.
         justification: |
-          A review is approved by the reviewers who are named for it. A slot names the person responsible and
-          optionally a stand-in, and a review that has not yet named anybody is simply not approved yet.
+          A review is approved by the reviewers who are named for it, and a review that has not yet named anybody is
+          simply not approved yet.
         tests:
           - SigningService_AddSlotAsync_Valid_AddsNumberedUnsignedSlot
-          - SigningService_AddSlotAsync_MissingReview_ThrowsReviewNotFound
           - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
 
+      - id: ReviewCenter-SigningService-Slots-Members
+        title: >-
+          The SigningService class shall give each reviewer slot a primary reviewer and an optional alternate.
+        justification: |
+          A slot names the person responsible and optionally a stand-in who may sign when the primary cannot.
+        tests:
+          - SigningService_AddSlotAsync_Valid_AddsNumberedUnsignedSlot
+
+      - id: ReviewCenter-SigningService-Slots-Numbering
+        title: >-
+          The SigningService class shall number the slots of a review in the order in which they were added.
+        justification: |
+          The reviewers and the audit trail refer to a slot by its number on the review page, so the number must follow
+          the order in which the slots were added.
+        tests:
+          - SigningService_AddSlotAsync_Valid_AddsNumberedUnsignedSlot
+
+      - id: ReviewCenter-SigningService-Slots-Unsigned
+        title: >-
+          The SigningService class shall add every slot without a signature.
+        justification: |
+          Naming a reviewer is not an approval. A slot counts as signed only after its reviewer has signed.
+        tests:
+          - SigningService_AddSlotAsync_Valid_AddsNumberedUnsignedSlot
+
+      - id: ReviewCenter-SigningService-Slots-ReviewExists
+        title: >-
+          The SigningService class shall reject a slot for a review that does not exist with the ReviewNotFound rule.
+        justification: |
+          A slot belongs to a review. Storing one for a review that is not there would leave a slot that nobody can
+          reach.
+        tests:
+          - SigningService_AddSlotAsync_MissingReview_ThrowsReviewNotFound
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # SlotUsers: who may be named in a slot, and who is offered
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-SlotUsers
         title: >-
-          The SigningService class shall require that the primary reviewer and the alternate of a slot are
-          existing, enabled users who are members of the project of the review, even when a user is a system
-          administrator, that they are different users, and that no user is in two slots of one review, and shall
-          offer only the enabled members of the project, without their passwords, as candidates to an actor who may
-          see the project.
+          The SigningService class shall require that the primary reviewer and the alternate of a slot are existing
+          users.
         justification: |
-          A signature must come from a known, active person who belongs to the project, because only the members
-          are meant to review its work. One person holding two slots would let a single reviewer fill every place
-          that is meant to bring independent reviewers.
+          A signature must come from a known person, so a slot can only name a user that exists.
+        tests:
+          - SigningService_AddSlotAsync_UnknownOrDisabledUser_ThrowsSlotUserInvalid
+
+      - id: ReviewCenter-SigningService-SlotUsers-Enabled
+        title: >-
+          The SigningService class shall require that the primary reviewer and the alternate of a slot are enabled
+          users.
+        justification: |
+          A signature must come from an active person, so a disabled account cannot be named in a slot.
+        tests:
+          - SigningService_AddSlotAsync_UnknownOrDisabledUser_ThrowsSlotUserInvalid
+
+      - id: ReviewCenter-SigningService-SlotUsers-Member
+        title: >-
+          The SigningService class shall require that the primary reviewer and the alternate of a slot are members of
+          the project of the review.
+        justification: |
+          Only the members of a project are meant to review its work.
+        tests:
+          - SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid
+
+      - id: ReviewCenter-SigningService-SlotUsers-AdminMember
+        title: >-
+          The SigningService class shall refuse a system administrator who is not a member of the project as primary
+          reviewer or alternate of a slot.
+        justification: |
+          The rights of a system administrator do not replace the membership, so the signatures stay with the members
+          of the project.
+        tests:
+          - SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid
+
+      - id: ReviewCenter-SigningService-SlotUsers-Different
+        title: >-
+          The SigningService class shall require that the primary reviewer and the alternate of a slot are different
+          users.
+        justification: |
+          A stand-in who is the same person as the primary reviewer stands in for nobody.
         tests:
           - SigningService_AddSlotAsync_SameUserTwice_ThrowsSlotUserInvalid
+
+      - id: ReviewCenter-SigningService-SlotUsers-OneSlot
+        title: >-
+          The SigningService class shall refuse a user who is already in another slot of the same review as primary
+          reviewer or alternate of a slot.
+        justification: |
+          One person holding two slots would let a single reviewer fill every place that is meant to bring independent
+          reviewers. A slot may keep the users it already has when it is changed.
+        tests:
           - SigningService_AddSlotAsync_UserInOtherSlot_ThrowsSlotUserInvalid
-          - SigningService_AddSlotAsync_UnknownOrDisabledUser_ThrowsSlotUserInvalid
-          - SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid
           - SigningService_UpdateSlotAsync_KeepOwnUsers_Succeeds
+
+      - id: ReviewCenter-SigningService-SlotUsers-Candidates
+        title: >-
+          The SigningService class shall offer only the enabled members of the project as candidates for a slot.
+        justification: |
+          The page offers exactly the people who can be named, so that nobody picks a user that the slot would refuse.
+        tests:
           - SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly
 
+      - id: ReviewCenter-SigningService-SlotUsers-NoPassword
+        title: >-
+          The SigningService class shall offer the candidates for a slot without their passwords.
+        justification: |
+          The list of candidates goes to the page of every reviewer, so it must carry no secret of the users.
+        tests:
+          - SigningService_ListCandidatesAsync_Candidates_ExposeNoPasswordData
+
+      - id: ReviewCenter-SigningService-SlotUsers-CandidateAccess
+        title: >-
+          The SigningService class shall offer the candidates for a slot only to an actor who may see the project.
+        justification: |
+          The members of a project are not shown to a user who cannot see the project; for that user the project does
+          not exist.
+        tests:
+          - SigningService_ListCandidatesAsync_ActorWithoutViewAccess_ThrowsProjectNotFound
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # SlotEdit: changing and removing a slot
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-SlotEdit
         title: >-
-          The SigningService class shall let a slot that has never been signed be changed or removed, shall take the
-          ballot of a removed slot out of the record together with the slot, shall refuse to change or remove a slot
-          that has any signature, current or out of date, and shall reject a slot that does not exist in the review.
+          The SigningService class shall let a slot that has never been signed be changed.
         justification: |
-          A signature must always point to a slot that still says who the signer was. Allowing a signed slot to be
-          reassigned or removed would let the record claim that someone else approved. The ballot belongs to its slot,
-          so it leaves with it.
+          A slot that carries no signature yet may still be given to another reviewer, because no signature depends on
+          who was named in it.
         tests:
           - SigningService_UpdateAndRemoveSlotAsync_Unsigned_Succeed
-          - SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned
-          - SigningService_UpdateAndRemoveSlotAsync_UnknownSlot_ThrowsSlotNotFound
+
+      - id: ReviewCenter-SigningService-SlotEdit-Remove
+        title: >-
+          The SigningService class shall let a slot that has never been signed be removed.
+        justification: |
+          A slot that carries no signature yet may be taken away again, because no signature depends on it.
+        tests:
+          - SigningService_UpdateAndRemoveSlotAsync_Unsigned_Succeed
+
+      - id: ReviewCenter-SigningService-SlotEdit-Ballot
+        title: >-
+          The SigningService class shall take the ballot of a removed slot out of the record together with the slot.
+        justification: |
+          The ballot belongs to its slot, so it leaves with it and no answer of a reviewer who is no longer named
+          remains in the record.
+        tests:
+          - SigningService_RemoveSlotAsync_SubmittedBallot_RemovesTheBallotOfTheSlot
           - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement
 
+      - id: ReviewCenter-SigningService-SlotEdit-Signed
+        title: >-
+          The SigningService class shall refuse to change or remove a slot that has any signature, current or out of
+          date, with the SlotSigned rule.
+        justification: |
+          A signature must always point to a slot that still says who the signer was. Allowing a signed slot to be
+          reassigned or removed would let the record claim that someone else approved.
+        tests:
+          - SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned
+
+      - id: ReviewCenter-SigningService-SlotEdit-Exists
+        title: >-
+          The SigningService class shall reject a slot that does not exist in the review with the SlotNotFound rule.
+        justification: |
+          A change or removal that names no slot of the review is a mistake of the caller, and it must not touch
+          another slot.
+        tests:
+          - SigningService_UpdateAndRemoveSlotAsync_UnknownSlot_ThrowsSlotNotFound
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Actor: who may arrange the slots, sign, and reopen
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Actor
         title: >-
-          The SigningService class shall allow a slot to be added, changed, removed, or signed, and a review to be
-          reopened, only for a signed-in user that still exists and is enabled, shall refuse every one of them for a
-          project that does not exist or that the actor may not see with the ProjectNotFound rule, shall let any actor
-          who may see the project, a member or a system administrator who is not a member, add, change, and remove
-          slots, shall allow a slot to be signed only by its primary reviewer or its alternate who is still a member of
-          the project, and shall refuse a system administrator who is not a member the right to sign.
+          The SigningService class shall allow a slot to be added, changed, or removed only for a signed-in user that
+          still exists and is enabled.
         justification: |
           The page shows who is signed in, but the rules must hold even if the page or a browser session is out of
-          date. A user who has been disabled or removed from the project since signing in must not be able to
-          change or approve a review, and a signature is only meaningful when the signer is the person the slot
-          names and belongs to the project. Arranging the slots needs no membership, so that a system administrator
-          can set up a review, because only a member can be named in a slot and only a member can sign, which keeps
-          the signatures with the members.
+          date. A user who has been disabled or removed since signing in must not be able to change a review.
         tests:
           - SigningService_AddSlotAsync_ActorDisabledOrUnknown_ThrowsActorNotAllowed
           - SigningService_UpdateRemoveAndReopen_ActorDisabledOrUnknown_ThrowsActorNotAllowed
-          - SigningService_SlotSignAndReopenCalls_ProjectNotFound_ThrowsProjectNotFound
-          - SigningService_SlotChanges_RealAccessRules_NeedViewAccessOnly
+
+      - id: ReviewCenter-SigningService-Actor-Sign
+        title: >-
+          The SigningService class shall allow a slot to be signed only by a signed-in user that still exists and is
+          enabled.
+        justification: |
+          A user who has been disabled since signing in must not be able to approve a review.
+        tests:
           - SigningService_SignAsync_ActorDisabled_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-SigningService-Actor-Reopen
+        title: >-
+          The SigningService class shall allow a review to be reopened only by a signed-in user that still exists and
+          is enabled.
+        justification: |
+          A user who has been disabled since signing in must not be able to lift the lock of a review.
+        tests:
+          - SigningService_UpdateRemoveAndReopen_ActorDisabledOrUnknown_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-SigningService-Actor-ProjectMissing
+        title: >-
+          The SigningService class shall refuse to add, change, or remove a slot, to sign, and to reopen a review for a
+          project that does not exist with the ProjectNotFound rule.
+        justification: |
+          The project is looked at first, so that a call for a project that is not there is told so and learns nothing
+          about reviews.
+        tests:
+          - SigningService_SlotSignAndReopenCalls_ProjectNotFound_ThrowsProjectNotFound
+
+      - id: ReviewCenter-SigningService-Actor-ProjectHidden
+        title: >-
+          The SigningService class shall refuse to add, change, or remove a slot, and to reopen a review, for an actor
+          who may not see the project with the ProjectNotFound rule.
+        justification: |
+          A user who cannot see a project is told that it does not exist, so that the existence of the project is not
+          revealed.
+        tests:
+          - SigningService_SlotChanges_RealAccessRules_NeedViewAccessOnly
+          - SigningService_ReopenReviewAsync_RealAccessRules_ReopensOnlyForAdministrators
+
+      - id: ReviewCenter-SigningService-Actor-ViewAccess
+        title: >-
+          The SigningService class shall let any actor who may see the project, a member or a system administrator who
+          is not a member, add, change, and remove slots.
+        justification: |
+          Arranging the slots needs no membership, so that a system administrator can set up a review, because only a
+          member can be named in a slot and only a member can sign.
+        tests:
+          - SigningService_SlotChanges_RealAccessRules_NeedViewAccessOnly
+
+      - id: ReviewCenter-SigningService-Actor-Signer
+        title: >-
+          The SigningService class shall allow a slot to be signed only by its primary reviewer or its alternate.
+        justification: |
+          A signature is only meaningful when the signer is the person the slot names.
+        tests:
           - SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-SigningService-Actor-SignerMember
+        title: >-
+          The SigningService class shall refuse to let a reviewer of a slot sign who is not a member of the project,
+          also a system administrator, with the ActorNotAllowed rule.
+        justification: |
+          A reviewer who was removed from the project since the slot was filled may not approve its work, and the
+          rights of a system administrator do not replace the membership, which keeps the signatures with the members.
+        tests:
           - SigningService_SignAsync_NotAMember_IsRefused
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # AuditorNotReviewer: an Auditor reads and signs nothing
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-AuditorNotReviewer
         title: >-
-          The SigningService class shall not offer a member whose role is Auditor as a candidate for a reviewer slot,
-          shall refuse to name an Auditor as the primary or the alternate reviewer of a slot with the slot-user-invalid
-          rule, and shall refuse to let an Auditor sign, even when a slot still names the Auditor, with the
-          actor-not-allowed rule, and shall store nothing in each case.
+          The SigningService class shall not offer a member whose role is Auditor as a candidate for a reviewer slot.
         justification: |
-          An auditor reads and changes nothing. Naming an auditor in a slot would make a review wait for somebody who
-          may not sign, and a signature of an auditor would break the rule that only those who work in a project
-          approve what it reviews.
+          An auditor reads and changes nothing. Offering an auditor for a slot would make a review wait for somebody who
+          may not sign.
+        tests:
+          - SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable
+
+      - id: ReviewCenter-SigningService-AuditorNotReviewer-Assign
+        title: >-
+          The SigningService class shall refuse to name an Auditor as the primary or the alternate reviewer of a slot
+          with the SlotUserInvalid rule.
+        justification: |
+          Naming an auditor in a slot would make a review wait for somebody who may not sign.
+        tests:
+          - SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable
+
+      - id: ReviewCenter-SigningService-AuditorNotReviewer-Sign
+        title: >-
+          The SigningService class shall refuse to let an Auditor sign, even when a slot still names the Auditor, with
+          the ActorNotAllowed rule.
+        justification: |
+          A signature of an auditor would break the rule that only those who work in a project approve what it
+          reviews, and a user can become an auditor while a slot still names them.
+        tests:
+          - SigningService_SignAsync_AuditorStillNamedInASlot_IsRefused
+
+      - id: ReviewCenter-SigningService-AuditorNotReviewer-NothingStored
+        title: >-
+          The SigningService class shall store nothing when it refuses to name an Auditor in a slot or to let an
+          Auditor sign.
+        justification: |
+          A refused call must leave the review as it was, so that no slot and no signature of an auditor exist.
         tests:
           - SigningService_Slots_Auditor_IsNeitherCandidateNorAssignable
           - SigningService_SignAsync_AuditorStillNamedInASlot_IsRefused
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Blockers: what stops a signature
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Blockers
         title: >-
           The SigningService class shall refuse to sign a review while a check in a section that applies is
-          unanswered or disputed in the consolidated ballots, a thread is open (chat or included in the report), or
-          the review concludes as Rejected without a conclusion text, shall list each of these as a blocker, and shall
-          not treat a check answered Fail as a blocker, in a section that applies or not.
+          unanswered, with the SigningNotAllowed rule.
         justification: |
           A signature records the outcome that the signer reached about the record, and the record covers the
-          consolidation of the submitted ballots. That is not possible while checks are unanswered or disputed, or a
-          discussion is still open, and a rejection that states no reasons is of no use to the author. A failed check
-          is a finding, and the outcome that follows from it is a rejection, not a refusal to sign.
+          consolidation of the submitted ballots. That is not possible while a check has no answer.
         tests:
           - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
-          - SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock
-          - SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence
+
+      - id: ReviewCenter-SigningService-Blockers-Disputed
+        title: >-
+          The SigningService class shall refuse to sign a review while a check in a section that applies is disputed in
+          the consolidated ballots, with the SigningNotAllowed rule.
+        justification: |
+          While the reviewers disagree on a check there is no one standing of the checklist to sign.
+        tests:
+          - SigningService_SignAsync_Disputed_BlocksSigning
+
+      - id: ReviewCenter-SigningService-Blockers-OpenThread
+        title: >-
+          The SigningService class shall refuse to sign a review while a thread is open, whether chat or included in
+          the report, with the SigningNotAllowed rule.
+        justification: |
+          An unanswered question is not a finished review, so a discussion that still waits for an answer stops the
+          signature.
+        tests:
+          - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
           - SigningService_SignAsync_OpenChatThread_ThrowsSigningNotAllowed
+
+      - id: ReviewCenter-SigningService-Blockers-RejectedNoConclusion
+        title: >-
+          The SigningService class shall refuse to sign a review that concludes as Rejected while it has no conclusion
+          text.
+        justification: |
+          A rejection that states no reasons is of no use to the author.
+        tests:
+          - SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired
           - SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth
 
+      - id: ReviewCenter-SigningService-Blockers-Listed
+        title: >-
+          The SigningService class shall list each blocker of a review by name, so that the signer is told what to do.
+        justification: |
+          A refusal that names every cause lets the signer correct all of them at once.
+        tests:
+          - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
+          - SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth
+
+      - id: ReviewCenter-SigningService-Blockers-FailNotBlocker
+        title: >-
+          The SigningService class shall not treat a check answered Fail in a section that applies as a blocker.
+        justification: |
+          A failed check is a finding, and the outcome that follows from it is a rejection, not a refusal to sign.
+        tests:
+          - SigningService_SignAsync_RejectedWithText_StoresRejectedSignature
+
+      - id: ReviewCenter-SigningService-Blockers-NotApplicable
+        title: >-
+          The SigningService class shall not treat a check answered Fail in a section that does not apply as a
+          blocker.
+        justification: |
+          A section that does not apply to the review takes no part in its outcome.
+        tests:
+          - SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock
+
+      - id: ReviewCenter-SigningService-Blockers-MissingChecklist
+        title: >-
+          The SigningService class shall list the sentence "This review has no checklist." as a blocker of a review that
+          has no checklist.
+        justification: |
+          Without a checklist there is nothing to answer, so the signer must be told why the review cannot be signed.
+        tests:
+          - SigningService_GetApprovalAsync_MissingChecklist_FlagMatchesTheBlockerSentence
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Sign: what a signature records
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Sign
         title: >-
-          The SigningService class shall store a signature for a primary reviewer or an alternate of a slot that
-          records the slot, the user, the display name at that time, the role, the time, the digest of the record (which
-          covers the consolidation of the submitted ballots), the agreed outcome (Approved, or Rejected when the
-          ballots agree on at least one Fail), and the fixed meaning text of that outcome, and shall never change or
-          remove a signature that has been stored.
+          The SigningService class shall store a signature for the slot and the user when the primary reviewer of a
+          slot signs.
         justification: |
-          The signature is the evidence of who approved or rejected which record and when. The meaning text says what
-          the signer stated, so an approval and a rejection can never be mistaken for each other. Keeping every
-          signature unchanged means the history of signatures stays reliable after the record changes and is signed
-          again.
+          The signature is the evidence of who approved or rejected which record and when.
+        tests:
+          - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+
+      - id: ReviewCenter-SigningService-Sign-Alternate
+        title: >-
+          The SigningService class shall store a signature for the slot and the user when the alternate of a slot
+          signs.
+        justification: |
+          The alternate is the stand-in of the primary reviewer, so the alternate's signature counts for the slot.
+        tests:
+          - SigningService_SignAsync_Alternate_RecordsAlternateRole
+
+      - id: ReviewCenter-SigningService-Sign-Role
+        title: >-
+          The SigningService class shall record on each signature whether the signer was the primary reviewer or the
+          alternate of the slot.
+        justification: |
+          The history must show whether the named reviewer or the stand-in approved.
+        tests:
+          - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+          - SigningService_SignAsync_Alternate_RecordsAlternateRole
+
+      - id: ReviewCenter-SigningService-Sign-DisplayName
+        title: >-
+          The SigningService class shall record on each signature the display name of the signer at the time of
+          signing.
+        justification: |
+          A user can be renamed later, but the signature must keep saying who signed under which name.
+        tests:
+          - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+
+      - id: ReviewCenter-SigningService-Sign-Time
+        title: >-
+          The SigningService class shall record on each signature the time of signing.
+        justification: |
+          The signature is the evidence of when the record was approved or rejected.
+        tests:
+          - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+
+      - id: ReviewCenter-SigningService-Sign-Digest
+        title: >-
+          The SigningService class shall record on each signature the digest of the record that was signed, which
+          covers the consolidation of the submitted ballots.
+        justification: |
+          The digest ties the signature to exactly the record the signer saw, so a later change of the record can be
+          told from the record that was signed.
+        tests:
+          - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+
+      - id: ReviewCenter-SigningService-Sign-OutcomeApproved
+        title: >-
+          The SigningService class shall record the outcome Approved on a signature when the submitted ballots do not
+          agree on any Fail.
+        justification: |
+          The signature must say what the signer stated about the record, and the outcome follows from the ballots.
+        tests:
+          - SigningService_SignAsync_Approved_StoresApprovedSignature
+
+      - id: ReviewCenter-SigningService-Sign-OutcomeRejected
+        title: >-
+          The SigningService class shall record the outcome Rejected on a signature when the submitted ballots agree
+          on at least one Fail.
+        justification: |
+          A review whose reviewers agree that a check fails is finished as a rejection, and the signature must say so.
+        tests:
+          - SigningService_SignAsync_RejectedWithText_StoresRejectedSignature
+
+      - id: ReviewCenter-SigningService-Sign-Meaning
+        title: >-
+          The SigningService class shall record on each signature the fixed meaning text of its outcome.
+        justification: |
+          The meaning text says what the signer stated, so an approval and a rejection can never be mistaken for each
+          other.
         tests:
           - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
           - SigningService_SignAsync_Approved_StoresApprovedSignature
           - SigningService_SignAsync_RejectedWithText_StoresRejectedSignature
-          - SigningService_SignAsync_Alternate_RecordsAlternateRole
+
+      - id: ReviewCenter-SigningService-Sign-Immutable
+        title: >-
+          The SigningService class shall never change or remove a signature that has been stored.
+        justification: |
+          Keeping every signature unchanged means the history of signatures stays reliable after the record changes and
+          is signed again.
+        tests:
+          - SigningService_SignAsync_ResignAfterReopen_KeepsEarlierSignatureUnchanged
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
           - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Reauthenticate: the password is given again
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Reauthenticate
         title: >-
-          The SigningService class shall store a signature only after the signer has given the password of the
-          account again, shall ask for the password only after every other check has passed, so that a refusal for
-          another reason does not count as a wrong password, shall report a wrong password and a locked account in the
-          same way, and shall count wrong passwords toward the same lockout as signing in.
+          The SigningService class shall store a signature only after the signer has given the password of the account
+          again.
         justification: |
-          A signature must come from the person, not from a session left open at a desk. Reusing the sign-in
-          check gives the same protection against guessing, and one generic answer gives an attacker nothing more
-          than the login page does. Checking the password last means a signer who is told that the record changed or
-          that a thread is open is not locked out for the password typed with the request.
+          A signature must come from the person, not from a session left open at a desk.
+        tests:
+          - SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed
+
+      - id: ReviewCenter-SigningService-Reauthenticate-LastCheck
+        title: >-
+          The SigningService class shall ask for the password only after every other check has passed, so that a
+          refusal for another reason does not count as a wrong password.
+        justification: |
+          A signer who is told that the record changed or that a thread is open is not locked out for the password
+          typed with the request.
+        tests:
+          - SigningService_SignAsync_RefusedBeforePassword_DoesNotCountWrongPasswords
+
+      - id: ReviewCenter-SigningService-Reauthenticate-SameFailure
+        title: >-
+          The SigningService class shall report a wrong password and a locked account in the same way.
+        justification: |
+          One generic answer gives an attacker nothing more than the login page does.
         tests:
           - SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed
           - SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin
-          - SigningService_SignAsync_RefusedBeforePassword_DoesNotCountWrongPasswords
 
+      - id: ReviewCenter-SigningService-Reauthenticate-SharedLockout
+        title: >-
+          The SigningService class shall count wrong passwords of a signature toward the same lockout as signing in.
+        justification: |
+          Reusing the sign-in check gives the same protection against guessing, and the signature page cannot be used
+          to guess where the login page would stop.
+        tests:
+          - SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # ReauthAudit: failed password checks of a signature
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-ReauthAudit
         title: >-
-          The SigningService class shall have the failures of the password check of a signature (wrong password,
-          locked account) recorded in the audit trail as failed re-authentications, without the password, using the
-          re-authentication check of the UserService.
+          The SigningService class shall have a wrong password at the password check of a signature recorded in the
+          audit trail as a failed re-authentication.
         justification: |
           Guessing the password at signing time must be visible in the history, apart from failed sign-ins, so that
           the history shows where the attempt was made.
         tests:
           - SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword
 
+      - id: ReviewCenter-SigningService-ReauthAudit-Locked
+        title: >-
+          The SigningService class shall have a locked account at the password check of a signature recorded in the
+          audit trail as a failed re-authentication.
+        justification: |
+          Attempts on an account that is already locked must show in the history as well.
+        tests:
+          - SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword
+
+      - id: ReviewCenter-SigningService-ReauthAudit-NoPassword
+        title: >-
+          The SigningService class shall record a failed re-authentication of a signature without the password that
+          was typed.
+        justification: |
+          The history is read by many people and must never hold a password, not even a wrong one.
+        tests:
+          - SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Current: the record that the signer saw
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Current
         title: >-
-          The SigningService class shall store a signature only for the digest of the record that the signer
-          saw, and shall refuse with a message that the record changed when the record is not that one any more,
-          and shall refuse to sign a slot that already has a signature for the current record.
+          The SigningService class shall refuse to sign with the RecordChanged rule when the record is not the one
+          that the signer saw.
         justification: |
-          A reviewer who signs a page that is out of date would approve content they have not seen. Signing what
-          was seen keeps the signature honest, and a second signature for the same record would add nothing.
+          A reviewer who signs a page that is out of date would approve content they have not seen. Signing what was
+          seen keeps the signature honest.
         tests:
           - SigningService_SignAsync_StaleExpectedDigest_ThrowsRecordChanged
+
+      - id: ReviewCenter-SigningService-Current-AlreadySigned
+        title: >-
+          The SigningService class shall refuse to sign a slot that already has a signature for the current record.
+        justification: |
+          A second signature for the same record would add nothing.
+        tests:
           - SigningService_SignAsync_AlreadySignedCurrent_ThrowsSigningNotAllowed
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # Status: the approval status of a review
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Status
         title: >-
-          The SigningService class shall give for a review the digest of its record, for each slot whether it is
-          not signed, signed with a current signature (naming the signer and time), or out of date because it was
-          signed only for an earlier record, whether the review is approved or concluded (see the Concluded
-          requirement), the
-          blockers, and one sentence naming the next step, and shall give nothing for a review that does not exist.
-          The status shall also say for the primary and for the alternate reviewer of each slot whether that user is
-          still a member of the project, and shall keep the slot assigned to a user who has been removed from the
-          project.
+          The SigningService class shall give for a review the digest of its record.
         justification: |
-          Approval has to follow the record. Computing it from the signatures and the record each time means a
-          change to the record can never leave a review looking approved, and nothing about the status can be
-          stored out of step with the record. A reviewer who was removed from the project cannot sign, so the
-          people who arrange the review must be able to see that a slot needs another reviewer, while the history of
-          the slot stays intact.
+          Approval has to follow the record. The digest names the record that a signature covers, so a change to the
+          record can be told from the record that was signed.
+        tests:
+          - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
+          - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
+
+      - id: ReviewCenter-SigningService-Status-NotSigned
+        title: >-
+          The SigningService class shall give for a slot that has no signature the state not signed.
+        justification: |
+          A slot that nobody has signed is the work that is still to do.
         tests:
           - SigningService_GetApprovalAsync_TwoSlots_ApprovedOnlyWhenBothSigned
+          - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
+
+      - id: ReviewCenter-SigningService-Status-Signed
+        title: >-
+          The SigningService class shall give for a slot that has a signature of the current record the state signed,
+          naming the signer and the time.
+        justification: |
+          Computing the state from the signatures and the record each time means nothing about the status can be stored
+          out of step with the record.
+        tests:
+          - SigningService_GetApprovalAsync_TwoSlots_ApprovedOnlyWhenBothSigned
+          - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+
+      - id: ReviewCenter-SigningService-Status-OutOfDate
+        title: >-
+          The SigningService class shall give for a slot that was signed only for an earlier record the state out of
+          date.
+        justification: |
+          A change to the record can never leave a review looking approved, because the signature of the earlier record
+          no longer counts.
+        tests:
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
           - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
+
+      - id: ReviewCenter-SigningService-Status-Approved
+        title: >-
+          The SigningService class shall give for a review whether it is approved.
+        justification: |
+          The page and the other services ask one place whether a review is approved, and the answer follows from the
+          signatures and the record.
+        tests:
+          - SigningService_GetApprovalAsync_TwoSlots_ApprovedOnlyWhenBothSigned
+          - SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved
+
+      - id: ReviewCenter-SigningService-Status-Conclusion
+        title: >-
+          The SigningService class shall give for a review whether it is concluded, as defined by the requirement
+          ReviewCenter-SigningService-Concluded.
+        justification: |
+          A review that is rejected is concluded and not approved, so the status must tell the two apart.
+        tests:
+          - SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved
+
+      - id: ReviewCenter-SigningService-Status-Blockers
+        title: >-
+          The SigningService class shall give for a review the blockers that stop a signature.
+        justification: |
+          The people who arrange the review must see what stops it, not only that it is not approved.
+        tests:
           - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
-          - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
-          - SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember
-          - SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce
-          - SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots
-          - SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers
           - SigningService_GetApprovalAsync_OpenThreadAllSigned_IsNotApprovedAndCountsOpenThread
 
+      - id: ReviewCenter-SigningService-Status-NextStep
+        title: >-
+          The SigningService class shall give for a review one sentence that names the next step.
+        justification: |
+          The page tells the reader what to do next without having to work it out from the states.
+        tests:
+          - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
+          - SigningService_GetApprovalAsync_TwoSlots_ApprovedOnlyWhenBothSigned
+
+      - id: ReviewCenter-SigningService-Status-MissingReview
+        title: >-
+          The SigningService class shall give nothing for a review that does not exist.
+        justification: |
+          A caller must be able to tell a review that is not there from a review that is not approved.
+        tests:
+          - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
+
+      - id: ReviewCenter-SigningService-Status-AssigneeMembership
+        title: >-
+          The SigningService class shall say in the status for the primary and for the alternate reviewer of each slot
+          whether that user is still a member of the project.
+        justification: |
+          A reviewer who was removed from the project cannot sign, so the people who arrange the review must be able to
+          see that a slot needs another reviewer.
+        tests:
+          - SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember
+
+      - id: ReviewCenter-SigningService-Status-AssigneeKept
+        title: >-
+          The SigningService class shall keep the slot assigned to a user who has been removed from the project.
+        justification: |
+          The history of the slot stays intact while somebody arranges a replacement.
+        tests:
+          - SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember
+
+      - id: ReviewCenter-SigningService-Status-BatchSame
+        title: >-
+          The SigningService class shall give for each review of a batch read the same status as a single read of that
+          review.
+        justification: |
+          A list of reviews must not show another status than the page of the review.
+        tests:
+          - SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce
+          - SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots
+
+      - id: ReviewCenter-SigningService-Status-BatchStore
+        title: >-
+          The SigningService class shall read the reviews of a batch from the store in one batch read and not review by
+          review.
+        justification: |
+          A list of many reviews must cost one read of the store, not one read for each review.
+        tests:
+          - SigningService_GetApprovalsAsync_SeveralReviews_UsesOneStoreBatchAndNoSingleSnapshots
+
+      - id: ReviewCenter-SigningService-Status-BatchUsers
+        title: >-
+          The SigningService class shall read the users once for a batch read of several reviews.
+        justification: |
+          The members of a project are the same for every review of the batch, so the list of users is read once.
+        tests:
+          - SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce
+
+      - id: ReviewCenter-SigningService-Status-BatchEmpty
+        title: >-
+          The SigningService class shall give an empty result without reading the users for a batch read of no review.
+        justification: |
+          A list that is empty needs no user data.
+        tests:
+          - SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Audit: slots and signatures in the audit trail
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Audit
         title: >-
-          The SigningService class shall record adding, changing, and removing a slot and adding a signature in the
-          audit trail, together with the change, so that a change is never saved without its entry and an entry is never
-          saved without its change, naming the actor, the slot (by its number on the review page, counted from 1, not
-          by its database identifier), the reviewers, and for a signature the role, the outcome, and the
-          record digest, and shall record nothing for a change that is refused.
+          The SigningService class shall record adding a slot in the audit trail.
         justification: |
-          The approval of a review is the most important event of its history, and the history must show who
-          arranged the reviewers and who signed which record. The slot number is the one the reader sees on the page.
+          The history must show who arranged the reviewers of a review.
         tests:
           - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
-          - SigningService_SlotEvents_AfterEarlierSlotRemoved_UsePageNumberNotIdentity
+
+      - id: ReviewCenter-SigningService-Audit-SlotChanged
+        title: >-
+          The SigningService class shall record changing a slot in the audit trail.
+        justification: |
+          The history must show who changed the reviewers of a slot.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+
+      - id: ReviewCenter-SigningService-Audit-SlotRemoved
+        title: >-
+          The SigningService class shall record removing a slot in the audit trail.
+        justification: |
+          The history must show who took a reviewer slot away.
+        tests:
           - SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers
 
+      - id: ReviewCenter-SigningService-Audit-SignatureAdded
+        title: >-
+          The SigningService class shall record adding a signature in the audit trail.
+        justification: |
+          The approval of a review is the most important event of its history, so the history must show who signed.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+
+      - id: ReviewCenter-SigningService-Audit-Atomic
+        title: >-
+          The SigningService class shall save each audit entry of a slot or a signature together with its change, so
+          that a change is never saved without its entry and an entry is never saved without its change.
+        justification: |
+          A history that can miss an approval, or show one that was never saved, cannot be relied on.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+          - SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers
+
+      - id: ReviewCenter-SigningService-Audit-Actor
+        title: >-
+          The SigningService class shall name the actor in each audit entry of a slot or a signature.
+        justification: |
+          The history must show who made each change.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+
+      - id: ReviewCenter-SigningService-Audit-SlotNumber
+        title: >-
+          The SigningService class shall name a slot in the audit entry by its number on the review page, counted from
+          1, and not by its database identifier.
+        justification: |
+          The slot number is the one the reader sees on the page.
+        tests:
+          - SigningService_SlotEvents_AfterEarlierSlotRemoved_UsePageNumberNotIdentity
+
+      - id: ReviewCenter-SigningService-Audit-Reviewers
+        title: >-
+          The SigningService class shall name the reviewers of the slot in the audit entry of a slot.
+        justification: |
+          The history must show who was named in the slot, also when the slot is removed afterwards.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+          - SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers
+
+      - id: ReviewCenter-SigningService-Audit-SignatureDetail
+        title: >-
+          The SigningService class shall name the role, the outcome, and the record digest in the audit entry of a
+          signature.
+        justification: |
+          The history must show which record was signed, by whom in which role, and with which outcome.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+
+      - id: ReviewCenter-SigningService-Audit-RefusedNothing
+        title: >-
+          The SigningService class shall record nothing in the audit trail for a change of a slot or a signature that is
+          refused.
+        justification: |
+          The history shows what happened, and a refused change did not happen.
+        tests:
+          - SigningService_UpdateRemoveAndReopen_ActorDisabledOrUnknown_ThrowsActorNotAllowed
+          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # ApiToken: a token cannot sign or arrange the slots
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-ApiToken
         title: >-
-          The SigningService class shall refuse to sign, and to add, change, or remove a reviewer slot, for an actor
-          that came through a personal access token, with the ActorNotAllowed rule and a message that names the API
-          token, before it checks anything else, and without counting a password or recording an audit entry.
+          The SigningService class shall refuse to sign for an actor that came through a personal access token with
+          the ActorNotAllowed rule.
         justification: |
           A signature must prove that the person was present and knew their password, which a token held by a script
-          does not. Refusing in the service, not only in the routes, keeps a later route or page from giving a token
-          the power to sign.
+          does not.
         tests:
           - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+
+      - id: ReviewCenter-SigningService-ApiToken-Message
+        title: >-
+          The SigningService class shall name the API token in the message of the refusal to sign for an actor that
+          came through a personal access token.
+        justification: |
+          The caller is told why the call was refused, which is that tokens cannot sign.
+        tests:
+          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+
+      - id: ReviewCenter-SigningService-ApiToken-SlotChange
+        title: >-
+          The SigningService class shall refuse to add, change, or remove a reviewer slot for an actor that came
+          through a personal access token with the ActorNotAllowed rule.
+        justification: |
+          Refusing in the service, not only in the routes, keeps a later route or page from giving a token the power
+          to arrange the reviewers.
+        tests:
           - SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused
 
+      - id: ReviewCenter-SigningService-ApiToken-FirstCheck
+        title: >-
+          The SigningService class shall refuse an actor that came through a personal access token before it checks
+          anything else.
+        justification: |
+          The answer then does not depend on the review, the digest, or the password, and tells a script nothing about
+          them.
+        tests:
+          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+
+      - id: ReviewCenter-SigningService-ApiToken-NoPasswordCount
+        title: >-
+          The SigningService class shall not count a password as wrong when it refuses an actor that came through a
+          personal access token.
+        justification: |
+          A script must not be able to lock the account of the person whose token it holds.
+        tests:
+          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+
+      - id: ReviewCenter-SigningService-ApiToken-NoAudit
+        title: >-
+          The SigningService class shall not record an audit entry when it refuses an actor that came through a
+          personal access token.
+        justification: |
+          Nothing happened that the history of the review would need to show.
+        tests:
+          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # ExternalReauth: a user of a provider confirms the identity instead of a password
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-ExternalReauth
         title: >-
-          The SigningService class shall let a user of a provider sign a slot only when a confirmation of identity that
-          was issued for this user, project, review, and slot is still valid, shall use that confirmation up only after
-          every other check has passed, shall keep it when the signature is refused before for another reason, shall
-          refuse the signature, record it as a failed confirmation (a failed re-authentication in the audit trail with
-          the detail oidc: no-proof, without any secret), and sign nothing when there is none, and shall let
-          the page ask whether a confirmation exists without using it up.
+          The SigningService class shall let a user of a provider sign a slot when a confirmation of identity that was
+          issued for this user, project, review, and slot is still valid.
         justification: |
           A user of a provider has no password to type, so the confirmation that the person just signed in again takes
-          its place, and it must be as hard to reuse as a password that has to be typed for every signature. Keeping
-          it when a signature is refused for another reason lets the person correct the cause and sign. The page needs
-          to know whether to offer the signature or the confirmation without spending it.
+          its place.
         tests:
           - SigningService_SignAsync_ExternalUserWithProof_SignsOnce
-          - SigningService_SignAsync_ExternalUserWithoutLiveProof_IsRefused
+
+      - id: ReviewCenter-SigningService-ExternalReauth-Binding
+        title: >-
+          The SigningService class shall refuse a confirmation of identity that was issued for another user, project,
+          review, or slot.
+        justification: |
+          A confirmation is the proof for one signature, so it must not be usable for another one.
+        tests:
           - SigningService_SignAsync_ProofOfOtherBinding_IsRefused
-          - SigningService_SignAsync_ExternalUserWithoutProofStore_IsRefused
+
+      - id: ReviewCenter-SigningService-ExternalReauth-Spent
+        title: >-
+          The SigningService class shall use up the confirmation of identity when the signature of a user of a provider
+          is stored.
+        justification: |
+          The confirmation must be as hard to reuse as a password that has to be typed for every signature.
+        tests:
+          - SigningService_SignAsync_ExternalUserWithProof_SignsOnce
+
+      - id: ReviewCenter-SigningService-ExternalReauth-SpentLast
+        title: >-
+          The SigningService class shall use up the confirmation of identity only after every other check has passed.
+        justification: |
+          A signature that is refused for another reason must not cost the person the confirmation.
+        tests:
           - SigningService_SignAsync_ApiTokenActorWithProof_IsRefusedAndKeepsProof
           - SigningService_SignAsync_RecordChanged_KeepsTheProof
+
+      - id: ReviewCenter-SigningService-ExternalReauth-KeptOnRefusal
+        title: >-
+          The SigningService class shall keep the confirmation of identity when the signature is refused before for
+          another reason.
+        justification: |
+          Keeping it lets the person correct the cause and sign without confirming the identity again.
+        tests:
+          - SigningService_SignAsync_ProofOfOtherBinding_IsRefused
+          - SigningService_SignAsync_ApiTokenActorWithProof_IsRefusedAndKeepsProof
+          - SigningService_SignAsync_RecordChanged_KeepsTheProof
+
+      - id: ReviewCenter-SigningService-ExternalReauth-NoProof
+        title: >-
+          The SigningService class shall refuse the signature of a user of a provider when there is no confirmation of
+          identity.
+        justification: |
+          Without the confirmation there is no proof that the person is present.
+        tests:
+          - SigningService_SignAsync_ExternalUserWithoutLiveProof_IsRefused
+
+      - id: ReviewCenter-SigningService-ExternalReauth-Expired
+        title: >-
+          The SigningService class shall refuse the signature of a user of a provider when the confirmation of identity
+          has expired.
+        justification: |
+          A confirmation that is old no longer shows that the person is present now.
+        tests:
+          - SigningService_SignAsync_ExternalUserWithoutLiveProof_IsRefused
+
+      - id: ReviewCenter-SigningService-ExternalReauth-NoStore
+        title: >-
+          The SigningService class shall refuse the signature of a user of a provider when the service has no store of
+          confirmations.
+        justification: |
+          When the confirmation cannot be checked, the signature must fail closed.
+        tests:
+          - SigningService_SignAsync_ExternalUserWithoutProofStore_IsRefused
+
+      - id: ReviewCenter-SigningService-ExternalReauth-FailedAudit
+        title: >-
+          The SigningService class shall record a refusal for a missing confirmation of identity as a failed
+          re-authentication in the audit trail with the detail oidc: no-proof, without any secret.
+        justification: |
+          A signature that was tried without a confirmation must be visible in the history, and the history must never
+          hold a secret.
+        tests:
+          - SigningService_SignAsync_ExternalUserWithoutLiveProof_IsRefused
+
+      - id: ReviewCenter-SigningService-ExternalReauth-HasProof
+        title: >-
+          The SigningService class shall let the page ask whether a confirmation of identity exists without using it
+          up.
+        justification: |
+          The page needs to know whether to offer the signature or the confirmation without spending the confirmation.
+        tests:
           - SigningService_HasReauthProofAsync_AnswersWithoutSpending
+
+      - id: ReviewCenter-SigningService-ExternalReauth-ConfirmableReviewer
+        title: >-
+          The SigningService class shall accept a request for a confirmation of identity only from a reviewer of the
+          slot.
+        justification: |
+          The page asks for the confirmation before the signature, and a person who could not sign must not be sent
+          through the provider.
+        tests:
           - SigningService_RequireConfirmableAsync_AcceptsOnlyAReviewerOfTheSlot
+
+      - id: ReviewCenter-SigningService-ExternalReauth-ConfirmableRefused
+        title: >-
+          The SigningService class shall refuse a request for a confirmation of identity from a user who is not a
+          reviewer of the slot.
+        justification: |
+          A confirmation that could never be used for a signature must not be issued.
+        tests:
           - SigningService_RequireConfirmableAsync_NotAReviewerOfTheSlot_IsRefused
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # TotpReauth: the second factor of a signer
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-TotpReauth
         title: >-
           The SigningService class shall require, for a signer with a second factor, a fresh code of the authenticator
-          app in addition to the password, check the password first and keep the code when the password is wrong,
-          refuse a recovery code and a code that was already used in the current step with the same message as a wrong
-          password, refuse an actor that came through an API token with the ActorNotAllowed rule and the API token
-          message (see the ApiToken requirement) and keep the code, count wrong codes toward the lockout and record
-          them in the audit trail, fail closed when the second factor cannot be checked, and need no code for a user
-          without a second factor, for a user of a provider, or after an administrator reset.
+          app in addition to the password.
         justification: |
-          A signature is the strongest statement in the product and the person must prove that they are there. A code
-          that was used to sign in cannot be used again, so the person waits for the next one, which is the cost of
-          the replay protection. A recovery code must not sign, as it is for getting back in.
+          A signature is the strongest statement in the product and the person must prove that they are there.
         tests:
           - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
           - SigningService_SignAsync_EnrolledUserWithoutRightCode_IsRefused
+
+      - id: ReviewCenter-SigningService-TotpReauth-PasswordFirst
+        title: >-
+          The SigningService class shall leave the code of a signer with a second factor unused when the password is
+          wrong.
+        justification: |
+          A code that was used cannot be used again, so a person who mistyped the password must not have to wait for the
+          next code.
+        tests:
           - SigningService_SignAsync_WrongPasswordRightCode_IsRefusedAndKeepsTheCode
-          - SigningService_SignAsync_WrongCodes_LockTheAccountForSigningAndSignIn
-          - SigningService_SignAsync_EnrolledUserWithoutTotpService_FailsClosed
-          - SigningService_SignAsync_UserWithoutSecondFactor_NeedsNoCode
-          - SigningService_SignAsync_ExternalUser_IsNotAffectedByTheSecondFactor
+
+      - id: ReviewCenter-SigningService-TotpReauth-RecoveryRefused
+        title: >-
+          The SigningService class shall refuse a recovery code as the code of a signature with the same message as a
+          wrong password.
+        justification: |
+          A recovery code is for getting back in and must not sign.
+        tests:
+          - SigningService_SignAsync_EnrolledUserWithoutRightCode_IsRefused
+
+      - id: ReviewCenter-SigningService-TotpReauth-ReplayRefused
+        title: >-
+          The SigningService class shall refuse a code that was already used in the current step with the same message
+          as a wrong password.
+        justification: |
+          A code that was used to sign in cannot be used again, so the person waits for the next one, which is the cost
+          of the replay protection.
+        tests:
+          - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
+          - SigningService_SignAsync_EnrolledUserWithoutRightCode_IsRefused
+
+      - id: ReviewCenter-SigningService-TotpReauth-ApiToken
+        title: >-
+          The SigningService class shall refuse an actor that came through an API token with the ActorNotAllowed rule
+          and the message of the requirement ReviewCenter-SigningService-ApiToken-Message when the actor gives a
+          password and a code.
+        justification: |
+          A token cannot prove that the person is present, whatever it sends with the request.
+        tests:
           - SigningService_SignAsync_ApiTokenActorWithPasswordAndCode_IsRefusedAndKeepsTheCode
+
+      - id: ReviewCenter-SigningService-TotpReauth-ApiTokenKeepsCode
+        title: >-
+          The SigningService class shall keep the code unused when it refuses an actor that came through an API token.
+        justification: |
+          A script that holds a token must not be able to use up the code of the person.
+        tests:
+          - SigningService_SignAsync_ApiTokenActorWithPasswordAndCode_IsRefusedAndKeepsTheCode
+
+      - id: ReviewCenter-SigningService-TotpReauth-LockoutCount
+        title: >-
+          The SigningService class shall count wrong codes of a signature toward the lockout of the account.
+        justification: |
+          Guessing the code must be stopped like guessing the password.
+        tests:
+          - SigningService_SignAsync_WrongCodes_LockTheAccountForSigningAndSignIn
+
+      - id: ReviewCenter-SigningService-TotpReauth-LockoutAudit
+        title: >-
+          The SigningService class shall record a wrong code of a signature in the audit trail.
+        justification: |
+          Guessing the code at signing time must be visible in the history.
+        tests:
+          - SigningService_SignAsync_WrongCodes_LockTheAccountForSigningAndSignIn
+
+      - id: ReviewCenter-SigningService-TotpReauth-FailClosed
+        title: >-
+          The SigningService class shall refuse the signature of a signer with a second factor when the second factor
+          cannot be checked.
+        justification: |
+          A check that cannot be done must not be skipped, or the second factor could be removed by breaking it.
+        tests:
+          - SigningService_SignAsync_EnrolledUserWithoutTotpService_FailsClosed
+
+      - id: ReviewCenter-SigningService-TotpReauth-NoSecondFactor
+        title: >-
+          The SigningService class shall need no code for the signature of a user without a second factor.
+        justification: |
+          The second factor is the choice of the person, and a signer who has none still signs with the password.
+        tests:
+          - SigningService_SignAsync_UserWithoutSecondFactor_NeedsNoCode
+
+      - id: ReviewCenter-SigningService-TotpReauth-ProviderUser
+        title: >-
+          The SigningService class shall need no code for the signature of a user of a provider.
+        justification: |
+          A user of a provider confirms the identity with the provider, which has its own second factor.
+        tests:
+          - SigningService_SignAsync_ExternalUser_IsNotAffectedByTheSecondFactor
+
+      - id: ReviewCenter-SigningService-TotpReauth-AfterReset
+        title: >-
+          The SigningService class shall need no code for the signature of a user whose second factor an administrator
+          has reset.
+        justification: |
+          After the reset the person has no second factor until a new one is set up.
+        tests:
           - SigningService_SignAsync_AfterAdministratorReset_NeedsNoCode
 
+      # ---------------------------------------------------------------------------------------------------------------
+      # ApprovalLock: a concluded review is locked
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-ApprovalLock
         title: >-
-          The SigningService class shall treat a review that is concluded, as Approved or as Rejected (every slot, at
-          least one, has a signature of the current record with the same outcome, and no thread is open; see the
-          Concluded requirement for the ballots) as locked,
-          shall refuse to add, change, or remove a slot and
-          shall refuse to sign while the review is locked, with the ReviewLocked rule and a message that says the
-          review is concluded and has to be reopened first, and shall compute the lock from the signatures, the
-          threads, and the record each time and not store it.
+          The SigningService class shall treat a review that is concluded, as Approved or as Rejected, as locked, where
+          a review is concluded as defined by the requirement ReviewCenter-SigningService-Concluded.
         justification: |
-          A signature approves the review as it was. If the content, the checklist, or the people who have to sign
-          could still change after the approval, the approval would describe something other than what is on record.
-          Computing the lock from the current record means it can never be out of step with the signatures, and a
-          reviewer who tries to sign again is told the reason instead of a message about an earlier signature.
+          A signature approves the review as it was. If the content, the checklist, or the people who have to sign could
+          still change after the approval, the approval would describe something other than what is on record.
         tests:
-          - SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked
-          - SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked
           - ReviewLock_IsConcluded_AllSignedNoThreads_IsTrue
           - ReviewLock_IsConcluded_AllSignedAllResolved_IsTrue
+          - SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved
 
+      - id: ReviewCenter-SigningService-ApprovalLock-SlotChanges
+        title: >-
+          The SigningService class shall refuse to add, change, or remove a slot while the review is locked, with the
+          ReviewLocked rule.
+        justification: |
+          The people who have to sign must not change after the approval.
+        tests:
+          - SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked
+
+      - id: ReviewCenter-SigningService-ApprovalLock-Sign
+        title: >-
+          The SigningService class shall refuse to sign while the review is locked, with the ReviewLocked rule.
+        justification: |
+          A reviewer who tries to sign again is told the reason instead of a message about an earlier signature.
+        tests:
+          - SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked
+
+      - id: ReviewCenter-SigningService-ApprovalLock-Message
+        title: >-
+          The SigningService class shall say in the message of a refusal because of the lock that the review is
+          concluded and has to be reopened first.
+        justification: |
+          The person is told what to do to make the change, not only that it is refused.
+        tests:
+          - SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked
+
+      - id: ReviewCenter-SigningService-ApprovalLock-Derived
+        title: >-
+          The SigningService class shall compute the lock from the signatures, the threads, and the record each time and
+          not store it.
+        justification: |
+          Computing the lock from the current record means it can never be out of step with the signatures.
+        tests:
+          - SigningService_ResolveLastThreadAfterSlotRemoval_ConcludesReview
+
+      # ---------------------------------------------------------------------------------------------------------------
+      # Reopen: leaving the lock
+      # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-SigningService-Reopen
         title: >-
-          The SigningService class shall let only an administrator of the project or a system administrator reopen a
-          locked (concluded) review, never an actor that came through a personal access token, shall require a reason
-          of one to 250 characters after trimming, shall refuse a review that is not locked, including one whose
-          slots are all signed but that still has an open thread, with the ReviewNotLocked rule, shall
-          store the reopening with the user, the time, the reason, and the digest of the approved record, shall record
-          it in the audit trail as review.reopened, in the same transaction as the change, with the reason and the
-          digest, shall keep every earlier signature as history that is out of date, and shall need fresh signatures
-          from every slot before the review is approved again. The ballots of the slots shall stay as they are, so a
-          submitted ballot stays submitted, and the reopen count of the record, which the digest covers, shall make
-          every earlier signature out of date even though the ballots still say what they said.
+          The SigningService class shall let an administrator of the project reopen a locked (concluded) review.
         justification: |
-          Leaving the lock has to be a deliberate and accountable act that an ordinary reviewer or a script cannot
-          perform. The reason and the digest in the history show who reopened which approval and why, and keeping the
-          earlier signatures, which are out of date from then on, means the approval history stays complete while no
-          old signature can approve the changed record, not even when the content is changed back.
+          Leaving the lock has to be a deliberate and accountable act of somebody who is responsible for the project.
+        tests:
+          - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
+          - SigningService_ReopenReviewAsync_RealAccessRules_ReopensOnlyForAdministrators
+          - SigningService_ReopenReviewAsync_Rejected_ReopensTheReview
+
+      - id: ReviewCenter-SigningService-Reopen-SystemAdmin
+        title: >-
+          The SigningService class shall let a system administrator reopen a locked review.
+        justification: |
+          A system administrator is responsible for every project, also for one that they are not a member of.
+        tests:
+          - SigningService_ReopenReviewAsync_RealAccessRules_ReopensOnlyForAdministrators
+
+      - id: ReviewCenter-SigningService-Reopen-OthersRefused
+        title: >-
+          The SigningService class shall refuse to reopen a review for an actor who is neither an administrator of the
+          project nor a system administrator, with the ActorNotAllowed rule.
+        justification: |
+          An ordinary reviewer must not be able to lift the lock of a review.
         tests:
           - SigningService_ReopenReviewAsync_NotAdmin_ThrowsActorNotAllowed
-          - SigningService_ReopenReviewAsync_InvalidReason_ThrowsReopenReasonInvalid
-          - SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked
-          - SigningService_ReopenReviewAsync_ApiToken_ThrowsActorNotAllowed
-          - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
-          - SigningService_ReopenReviewAsync_MissingReview_ThrowsReviewNotFound
-          - SigningService_ReopenReviewAsync_ReasonAtLimitWithBlanks_IsAcceptedTrimmed
           - SigningService_ReopenReviewAsync_RealAccessRules_ReopensOnlyForAdministrators
-          - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
+
+      - id: ReviewCenter-SigningService-Reopen-NoApiToken
+        title: >-
+          The SigningService class shall refuse to reopen a review for an actor that came through a personal access
+          token, with the ActorNotAllowed rule.
+        justification: |
+          A script must not be able to lift the lock of a review.
+        tests:
+          - SigningService_ReopenReviewAsync_ApiToken_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-SigningService-Reopen-ReasonRequired
+        title: >-
+          The SigningService class shall refuse to reopen a review without a reason of at least one character after
+          trimming, with the ReopenReasonInvalid rule.
+        justification: |
+          The reason shows later why an approval was withdrawn.
+        tests:
+          - SigningService_ReopenReviewAsync_InvalidReason_ThrowsReopenReasonInvalid
+
+      - id: ReviewCenter-SigningService-Reopen-ReasonLimit
+        title: >-
+          The SigningService class shall refuse to reopen a review with a reason of more than 250 characters after
+          trimming, with the ReopenReasonInvalid rule.
+        justification: |
+          The reason goes into the history, which must stay readable.
+        tests:
+          - SigningService_ReopenReviewAsync_InvalidReason_ThrowsReopenReasonInvalid
+          - SigningService_ReopenReviewAsync_ReasonAtLimitWithBlanks_IsAcceptedTrimmed
+
+      - id: ReviewCenter-SigningService-Reopen-NotLocked
+        title: >-
+          The SigningService class shall refuse to reopen a review that is not locked, with the ReviewNotLocked rule.
+        justification: |
+          There is nothing to reopen, and the call must not change a review that is still in progress.
+        tests:
+          - SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked
+
+      - id: ReviewCenter-SigningService-Reopen-OpenThread
+        title: >-
+          The SigningService class shall refuse to reopen a review whose slots are all signed but that still has an open
+          thread, with the ReviewNotLocked rule.
+        justification: |
+          Such a review is not concluded and not locked, so there is nothing to reopen.
+        tests:
           - SigningService_ReopenReviewAsync_AllSignedButThreadOpen_ThrowsReviewNotLocked
+
+      - id: ReviewCenter-SigningService-Reopen-MissingReview
+        title: >-
+          The SigningService class shall refuse to reopen a review that does not exist, with the ReviewNotFound rule.
+        justification: |
+          A call for a review that is not there is a mistake of the caller.
+        tests:
+          - SigningService_ReopenReviewAsync_MissingReview_ThrowsReviewNotFound
+
+      - id: ReviewCenter-SigningService-Reopen-Stored
+        title: >-
+          The SigningService class shall store the reopening with the user, the time, the reason, and the digest of the
+          approved record.
+        justification: |
+          The history shows who reopened which approval, when, and why.
+        tests:
+          - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
+
+      - id: ReviewCenter-SigningService-Reopen-Audit
+        title: >-
+          The SigningService class shall record a reopening in the audit trail as review.reopened, with the reason and
+          the digest.
+        justification: |
+          The audit trail shows who lifted the lock and why.
+        tests:
+          - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
+
+      - id: ReviewCenter-SigningService-Reopen-AuditAtomic
+        title: >-
+          The SigningService class shall save the audit entry of a reopening in the same transaction as the change.
+        justification: |
+          A reopening is never saved without its entry.
+        tests:
+          - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
+
+      - id: ReviewCenter-SigningService-Reopen-KeepsSignatures
+        title: >-
+          The SigningService class shall keep every earlier signature as history that is out of date when a review is
+          reopened.
+        justification: |
+          The approval history stays complete while no old signature can approve the changed record.
+        tests:
+          - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
+          - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
+
+      - id: ReviewCenter-SigningService-Reopen-FreshSignatures
+        title: >-
+          The SigningService class shall need fresh signatures from every slot before a reopened review is approved
+          again.
+        justification: |
+          The reopened review may have changed, so every reviewer must sign what is on record now.
+        tests:
+          - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
+
+      - id: ReviewCenter-SigningService-Reopen-BallotsStay
+        title: >-
+          The SigningService class shall leave the ballots of the slots as they are when a review is reopened, so that
+          a submitted ballot stays submitted.
+        justification: |
+          The reviewers answered the checklist and need not answer it again to have the review signed anew.
+        tests:
           - SigningService_ReopenReviewAsync_BallotsStaySubmitted
-          - SigningService_ReopenReviewAsync_Rejected_ReopensTheReview
+
+      - id: ReviewCenter-SigningService-Reopen-CountInvalidates
+        title: >-
+          The SigningService class shall make every earlier signature out of date through the reopen count of the
+          record, which the digest covers, even though the ballots still say what they said.
+        justification: |
+          No old signature can approve the changed record, not even when the content is changed back.
+        tests:
+          - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
+          - SigningService_ReopenReviewAsync_BallotsStaySubmitted
 
       - id: ReviewCenter-SigningService-OpenThreadRule
         title: >-
-          The SigningService class shall treat a review as concluded only when every slot, at least one, has a
-          signature of the current record and every thread is resolved (besides the ballot rules of the Concluded
-          requirement), so that a review whose slots are all signed
-          but that still has an open thread, chat or included, is not concluded, not locked, and not approved, shall
-          refuse a signature while a thread is open with the SigningNotAllowed rule, as a rule separate from the
-          comparison of the digest, shall keep the signatures that exist valid when a chat thread is started after
-          them, and shall conclude the review, without any further audit entry, when the last open thread is
-          resolved.
+          The SigningService class shall treat a review as concluded only when it has at least one slot and every
+          slot has a signature of the current record.
         justification: |
-          What a signature approves is the report, and chat is not part of it, but an unanswered question is not a
-          finished review. Keeping the open-thread rule apart from the digest lets chat stay free of consequences for
-          existing signatures while no review is concluded with a discussion still waiting for an answer.
+          A review nobody has signed is not finished, and a review without a slot has nobody who could sign it. The
+          ballot rules that come on top of this one are in ReviewCenter-SigningService-Concluded. The inbox of the
+          Core subsystem applies the same rule, which the parity test checks for every combination of states.
         tests:
           - ReviewLock_IsConcluded_AllSignedNoThreads_IsTrue
-          - ReviewLock_IsConcluded_AllSignedOpenChatThread_IsFalse
-          - ReviewLock_IsConcluded_AllSignedAllResolved_IsTrue
           - ReviewLock_IsConcluded_NoSlots_IsFalse
           - ReviewLock_IsConcluded_OneSlotUnsigned_IsFalse
           - ReviewLock_IsConcluded_ParityWithInboxRules_ForAllStateCombinations
-          - SigningService_SignAsync_OpenChatThread_ThrowsSigningNotAllowed
+
+      - id: ReviewCenter-SigningService-OpenThreadRule-OpenThreadBlocks
+        title: >-
+          The SigningService class shall not treat a review as concluded, and so not lock it, while a thread, chat or
+          included, is open, even when every slot is signed.
+        justification: |
+          What a signature approves is the report, and chat is not part of it, but an unanswered question is not a
+          finished review.
+        tests:
+          - ReviewLock_IsConcluded_AllSignedOpenChatThread_IsFalse
+          - SigningService_ReopenReviewAsync_AllSignedButThreadOpen_ThrowsReviewNotLocked
+
+      - id: ReviewCenter-SigningService-OpenThreadRule-NotApproved
+        title: >-
+          The SigningService class shall not call a review approved while a thread is open, even when every slot is
+          signed.
+        justification: |
+          The approval flag is what the users read, and it must agree with the conclusion of the review.
+        tests:
           - SigningService_RemoveSlotAsync_LastUnsignedSlotWithOpenThread_AllSignedButNotConcluded
-          - SigningService_ResolveLastThreadAfterSlotRemoval_ConcludesReview
-          - SigningService_ChatThreadAfterPartialSigning_KeepsSignaturesValidAndBlocksOthers
           - SigningService_GetApprovalAsync_OpenThreadAllSigned_IsNotApprovedAndCountsOpenThread
+
+      - id: ReviewCenter-SigningService-OpenThreadRule-SignRefused
+        title: >-
+          The SigningService class shall refuse a signature with the SigningNotAllowed rule while a thread is open,
+          as a rule separate from the comparison of the digest.
+        justification: |
+          Chat is not covered by the digest, so the digest alone cannot stop a signature while a question is open.
+        tests:
+          - SigningService_SignAsync_OpenChatThread_ThrowsSigningNotAllowed
+
+      - id: ReviewCenter-SigningService-OpenThreadRule-ChatKeepsSignatures
+        title: >-
+          The SigningService class shall keep the signatures that exist valid when a chat thread is started after
+          them.
+        justification: |
+          Chat is free of consequences for existing signatures, so that a question never withdraws an approval.
+        tests:
+          - SigningService_ChatThreadAfterPartialSigning_KeepsSignaturesValidAndBlocksOthers
+
+      - id: ReviewCenter-SigningService-OpenThreadRule-ResolvedConcludes
+        title: >-
+          The SigningService class shall conclude the review when the last open thread is resolved while every slot
+          holds a signature of the current record.
+        justification: |
+          The review needs no further act once nothing stands in the way, so the resolution is what completes it.
+        tests:
+          - ReviewLock_IsConcluded_AllSignedAllResolved_IsTrue
+          - SigningService_ResolveLastThreadAfterSlotRemoval_ConcludesReview
+
+      - id: ReviewCenter-SigningService-OpenThreadRule-NoConclusionAudit
+        title: >-
+          The SigningService class shall record no further audit entry when the resolution of the last open thread
+          concludes the review.
+        justification: |
+          The conclusion is derived from the signatures and the threads that are already on the trail, so an entry of
+          its own would only repeat them.
+        tests:
+          - SigningService_ResolveLastThreadAfterSlotRemoval_ConcludesReview
 
       - id: ReviewCenter-SigningService-OpenCheckThread
         title: >-
-          The SigningService class shall treat an open thread about a check like any other open thread: it shall
-          refuse a signature with the SigningNotAllowed rule while one is open, shall not conclude a review, or
-          call it approved, while one is open, and shall allow the signature and the conclusion once it is
-          resolved.
+          The SigningService class shall refuse a signature with the SigningNotAllowed rule while a thread about a
+          check is open, like it does for any other open thread.
         justification: |
-          A question about a check is as unanswered as a question about a file, and a review must not be concluded
-          while a discussion still waits for an answer, wherever it is anchored.
+          A question about a check is as unanswered as a question about a file, and a review must not be signed while a
+          discussion still waits for an answer, wherever it is anchored.
         tests:
           - SigningService_SignAsync_OpenCheckThread_IsRefused
+
+      - id: ReviewCenter-SigningService-OpenCheckThread-NotConcluded
+        title: >-
+          The SigningService class shall not conclude a review, or call it approved, while a thread about a check is
+          open.
+        justification: |
+          A review must not be concluded while a discussion about a check still waits for an answer.
+        tests:
+          - SigningService_GetApprovalAsync_OpenCheckThread_BlocksConclusion
+
+      - id: ReviewCenter-SigningService-OpenCheckThread-ResolvedAllowsSign
+        title: >-
+          The SigningService class shall allow the signature once the thread about a check is resolved.
+        justification: |
+          A resolved question is answered, so it must not stand in the way of the approval any longer.
+        tests:
           - SigningService_SignAsync_ResolvedCheckThread_IsAllowed
+
+      - id: ReviewCenter-SigningService-OpenCheckThread-ResolvedConcludes
+        title: >-
+          The SigningService class shall allow the conclusion of the review once the thread about a check is
+          resolved.
+        justification: |
+          A resolved question is answered, so the review can be concluded when the other rules are met.
+        tests:
           - SigningService_GetApprovalAsync_OpenCheckThread_BlocksConclusion
 
       - id: ReviewCenter-SigningService-IndependentReviewers
         title: >-
           The SigningService class shall, when the project requires independent reviewers, refuse with the
-          ReviewerNotIndependent rule to put the user who created the review into a slot as primary reviewer or as
-          alternate, when a slot is added or changed, and shall refuse the signature of that user at the time of
-          signing, also for a slot that was filled before the setting was switched on, and shall enforce nothing when
-          the project does not require independent reviewers.
+          ReviewerNotIndependent rule to put the user who created the review into a new slot as primary reviewer or
+          as alternate.
         justification: |
           A review is worth little when the person who made it also approves it. Checking at the assignment gives
-          early feedback, and checking again at signing closes the gap for slots that were filled while the setting
-          was off. The author is the user of Review Center who created the review, because the tool knows nothing
-          about the authors of the commits, which is stated to the users. A project in which one person has to do
-          both may switch the rule off.
+          early feedback. The author is the user of Review Center who created the review, because the tool knows
+          nothing about the authors of the commits, which is stated to the users.
         tests:
           - SigningService_AddSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent
+
+      - id: ReviewCenter-SigningService-IndependentReviewers-Update
+        title: >-
+          The SigningService class shall, when the project requires independent reviewers, refuse with the
+          ReviewerNotIndependent rule to put the user who created the review into an existing slot as primary reviewer
+          or as alternate.
+        justification: |
+          Changing a slot must not be a way around the rule that adding a slot enforces.
+        tests:
           - SigningService_UpdateSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent
-          - SigningService_AddSlotAsync_AuthorAndIndependenceOff_Succeeds
+
+      - id: ReviewCenter-SigningService-IndependentReviewers-Signing
+        title: >-
+          The SigningService class shall, when the project requires independent reviewers, refuse with the
+          ReviewerNotIndependent rule the signature of the user who created the review, also for a slot that was
+          filled before the setting was switched on.
+        justification: |
+          Checking again at signing closes the gap for slots that were filled while the setting was off.
+        tests:
           - SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent
+
+      - id: ReviewCenter-SigningService-IndependentReviewers-SettingOff
+        title: >-
+          The SigningService class shall enforce no independence of the reviewers when the project does not require
+          independent reviewers.
+        justification: |
+          A project in which one person has to do both may switch the rule off.
+        tests:
+          - SigningService_AddSlotAsync_AuthorAndIndependenceOff_Succeeds
 
       - id: ReviewCenter-SigningService-ReopenerRule
         title: >-
           The SigningService class shall, when the project requires that the person who reopened a review does not
-          sign it again, refuse the signature of a user who reopened the review at any time before, with the
-          ReopenerCannotSign rule, after the independence check and before the password is checked, so that no failed
-          attempt is counted or recorded, and shall enforce nothing when the project switched the rule off.
+          sign it again, refuse the signature of a user who reopened the review with the ReopenerCannotSign rule.
         justification: |
           A reopening followed by a signature of the same person would turn the reopening into a re-stamp: the approval
-          that was withdrawn is approved again by the one who withdrew it. Checking before the password means that the
-          refusal is a rule and not a failed login. The rule is on by default and applies to every project, also those
-          created before it was enforced; an administrator can switch it off per project.
+          that was withdrawn is approved again by the one who withdrew it. The rule is on by default and applies to
+          every project, also those created before it was enforced; an administrator can switch it off per project.
         tests:
           - SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword
+
+      - id: ReviewCenter-SigningService-ReopenerRule-AnyEarlierReopen
+        title: >-
+          The SigningService class shall apply the ReopenerCannotSign rule to a user who reopened the review at any
+          time before, not only to the last reopening.
+        justification: |
+          The person who withdrew an approval must not give it back, however many reopenings have happened since.
+        tests:
           - SigningService_SignAsync_EarlierReopener_StaysBlocked
+
+      - id: ReviewCenter-SigningService-ReopenerRule-AfterIndependence
+        title: >-
+          The SigningService class shall check the ReopenerCannotSign rule after the independence check, so that a
+          user who is both the author and a reopener is refused with the ReviewerNotIndependent rule.
+        justification: |
+          The independence rule is the more basic one, and a fixed order gives a stable answer.
+        tests:
+          - SigningService_SignAsync_AuthorWhoReopened_ThrowsReviewerNotIndependentFirst
+
+      - id: ReviewCenter-SigningService-ReopenerRule-BeforePassword
+        title: >-
+          The SigningService class shall check the ReopenerCannotSign rule before the password is checked.
+        justification: |
+          A refusal that comes before the password is a rule and not a failed login, and it does not ask for a secret
+          that cannot help.
+        tests:
+          - SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword
+
+      - id: ReviewCenter-SigningService-ReopenerRule-NoFailedAttempt
+        title: >-
+          The SigningService class shall neither count nor record a failed attempt when it refuses a signature with
+          the ReopenerCannotSign rule.
+        justification: |
+          The refusal is no wrong password, so it must not lock the account or fill the trail with failed
+          re-authentications.
+        tests:
+          - SigningService_SignAsync_ReopenerWhileRuleIsOn_ThrowsReopenerCannotSignBeforePassword
+
+      - id: ReviewCenter-SigningService-ReopenerRule-RuleOff
+        title: >-
+          The SigningService class shall enforce nothing of the ReopenerCannotSign rule when the project switched the
+          rule off.
+        justification: |
+          A project that needs the same person to reopen and sign again may switch the rule off.
+        tests:
           - SigningService_SignAsync_ReopenerWhileRuleIsOff_Signs
 
       - id: ReviewCenter-SigningService-StrandedSlot
         title: >-
           The SigningService class shall, when the project requires that the person who reopened a review does not
-          sign it again, refuse a reopening with the ReopenWouldStrandSlot rule that names the slots, when after it a
-          slot of the review would have nobody who may sign it, counting the primary reviewer and the alternate of every
-          slot and treating the user who reopens and every user who reopened the review before as unable to sign, before
-          anything is stored, and shall reopen when the rule is switched off or every slot keeps somebody.
+          sign it again, refuse a reopening with the ReopenWouldStrandSlot rule when after it a slot of the review
+          would have nobody who may sign it.
         justification: |
           Without this check an administrator who is the only person of a slot could reopen a review that nobody could
           approve again. The pure function that decides which slots would be stranded is separate from the service, so
           that the rule can be tested without a store. Occupants that are disabled or no longer members are not
           considered; the message points to another administrator or to switching the rule off.
         tests:
-          - ReopenRules_StrandedSlots_PrimaryAndAlternate_StrandsOnlyWhenNobodyIsFree
-          - ReopenRules_StrandedSlots_UnorderedSlotsAndNoBlockedUsers_NumbersByIdentity
-          - ReopenRules_StrandedSlots_NullArguments_Throw
-          - ReopenRules_StrandedMessage_OneOrMoreSlots_NamesThem
-          - ReopenRules_StrandedMessage_NullOrEmpty_Throws
           - SigningService_ReopenReviewAsync_WouldStrandSlot_ThrowsAndRecordsNothing
           - SigningService_ReopenReviewAsync_EarlierReopenerCounts_ThrowsForTheLastFreePerson
+          - ReopenRules_StrandedSlots_NullArguments_Throw
+
+      - id: ReviewCenter-SigningService-StrandedSlot-NamesSlots
+        title: >-
+          The SigningService class shall name the stranded slots, by their numbers, in the message of the
+          ReopenWouldStrandSlot rule.
+        justification: |
+          The administrator must see which slots have nobody left, to find another person or to switch the rule off.
+        tests:
+          - ReopenRules_StrandedMessage_OneOrMoreSlots_NamesThem
+          - ReopenRules_StrandedMessage_NullOrEmpty_Throws
+          - ReopenRules_StrandedSlots_UnorderedSlotsAndNoBlockedUsers_NumbersByIdentity
+
+      - id: ReviewCenter-SigningService-StrandedSlot-BothReviewers
+        title: >-
+          The SigningService class shall count the primary reviewer and the alternate of every slot when it decides
+          whether a slot would be stranded.
+        justification: |
+          A slot is not stranded as long as one of its two people may still sign it.
+        tests:
+          - ReopenRules_StrandedSlots_PrimaryAndAlternate_StrandsOnlyWhenNobodyIsFree
+
+      - id: ReviewCenter-SigningService-StrandedSlot-ReopenBlocked
+        title: >-
+          The SigningService class shall treat the user who reopens and every user who reopened the review before as
+          unable to sign when it decides whether a slot would be stranded.
+        justification: |
+          These are the users the reopener rule bars from signing the reopened review.
+        tests:
+          - SigningService_ReopenReviewAsync_EarlierReopenerCounts_ThrowsForTheLastFreePerson
+
+      - id: ReviewCenter-SigningService-StrandedSlot-NothingStored
+        title: >-
+          The SigningService class shall store nothing when it refuses a reopening with the ReopenWouldStrandSlot
+          rule.
+        justification: |
+          A refused reopening must leave the review as it was, locked and with its signatures.
+        tests:
+          - SigningService_ReopenReviewAsync_WouldStrandSlot_ThrowsAndRecordsNothing
+
+      - id: ReviewCenter-SigningService-StrandedSlot-RuleOff
+        title: >-
+          The SigningService class shall reopen the review although a slot would be stranded when the project
+          switched the reopener rule off.
+        justification: |
+          Without the reopener rule nobody is barred from signing, so no slot can be stranded.
+        tests:
           - SigningService_ReopenReviewAsync_WouldStrandSlotWhileRuleIsOff_Reopens
+
+      - id: ReviewCenter-SigningService-StrandedSlot-SlotKeepsSomebody
+        title: >-
+          The SigningService class shall reopen the review when after it every slot keeps somebody who may sign it.
+        justification: |
+          The check refuses only a reopening that leaves a slot without a signer.
+        tests:
+          - ReopenRules_StrandedSlots_PrimaryAndAlternate_StrandsOnlyWhenNobodyIsFree
+          - SigningService_ReopenReviewAsync_EarlierReopenerCounts_ThrowsForTheLastFreePerson
 
       - id: ReviewCenter-SigningService-CarriedRecord
         title: >-
           The SigningService class shall treat the answers that a follow-up review carried from an earlier review as
-          answered checks, so that they do not block approval (they are the consolidated answers of the earlier
-          review and seed draft ballots only, never submitted ones), and the open threads that it carried as open
-          threads, so that they block approval with the same message as any open thread, and shall still treat the
-          user who created the follow-up as its author for the rule of independent reviewers, whoever answered the
-          carried checks.
+          answered checks that do not block approval.
         justification: |
-          A carried answer was given by a reviewer, so it is a real answer, but an open thread is an unresolved
-          finding and must be resolved before approval wherever it was started. The rule of independence concerns the
-          creation of the review, and carrying work over does not change who created it.
+          A carried answer was given by a reviewer, so it is a real answer. Whether a carried answer seeds draft
+          ballots only is a matter of the ReviewService unit and is not covered here.
         tests:
           - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
+
+      - id: ReviewCenter-SigningService-CarriedRecord-OpenThreads
+        title: >-
+          The SigningService class shall treat the open threads that a follow-up review carried as open threads, so
+          that they block approval with the same message as any open thread.
+        justification: |
+          An open thread is an unresolved finding and must be resolved before approval wherever it was started.
+        tests:
+          - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
+
+      - id: ReviewCenter-SigningService-CarriedRecord-CreatorIsAuthor
+        title: >-
+          The SigningService class shall treat the user who created a follow-up review as its author for the rule of
+          independent reviewers, whoever answered the carried checks.
+        justification: |
+          The rule of independence concerns the creation of the review, and carrying work over does not change who
+          created it.
+        tests:
           - ReviewService_FollowUp_CreatorStaysTheAuthorForIndependence
 
       - id: ReviewCenter-SigningService-SignatureImpact
         title: >-
-          The SigningService unit shall compute, from the record of a review and the record that a change would
-          produce, which current signatures the change would make out of date, shall number each affected slot in the
-          order of the slots and name its signer, and shall refuse the change with the SignaturesWouldBecomeOutOfDate
-          rule, before anything is stored, unless the caller has acknowledged every affected slot, with a change that
-          leaves the digest of the record as it is (chat, for example, or a draft ballot that leaves the consolidated
-          standing alone), or a review without a current signature, needing no acknowledgement, and shall leave the
-          signature of the slot of the person who changes the own ballot out of the list when the caller excludes it.
+          The SigningService class shall compute, from the record of a review and the record that a change would
+          produce, which current signatures the change would make out of date.
         justification: |
           Whether a signature stays valid is decided by the digest of the record, so comparing the digest before and
-          after the change finds the affected signatures exactly, without a trial write. Naming the slot number and
-          the signer lets a person see whose approval they are about to withdraw.
+          after the change finds the affected signatures exactly, without a trial write.
+        tests:
+          - SignatureImpact_RequireAcknowledged_DifferingBallot_ListsTheOtherSlot
+          - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
+
+      - id: ReviewCenter-SigningService-SignatureImpact-SlotNumbers
+        title: >-
+          The SigningService class shall number each slot that a change would affect in the order of the slots.
+        justification: |
+          The slot number lets a person see which approval they are about to withdraw.
         tests:
           - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
+
+      - id: ReviewCenter-SigningService-SignatureImpact-Signer
+        title: >-
+          The SigningService class shall name the signer of each slot that a change would affect.
+        justification: |
+          The name lets a person see whose approval they are about to withdraw.
+        tests:
+          - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
+
+      - id: ReviewCenter-SigningService-SignatureImpact-Refused
+        title: >-
+          The SigningService class shall refuse a change that would make a signature out of date with the
+          SignaturesWouldBecomeOutOfDate rule unless the caller has acknowledged every affected slot.
+        justification: |
+          Nobody should withdraw an approval of somebody else by accident, so the caller must say that it knows.
+        tests:
           - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
-          - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
           - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
-          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
-          - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
+
+      - id: ReviewCenter-SigningService-SignatureImpact-NothingStored
+        title: >-
+          The SigningService class shall store nothing when it refuses a change with the
+          SignaturesWouldBecomeOutOfDate rule.
+        justification: |
+          A refused change must leave the record and its signatures as they were.
+        tests:
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
+
+      - id: ReviewCenter-SigningService-SignatureImpact-Acknowledged
+        title: >-
+          The SigningService class shall carry out a change that makes signatures out of date when the caller has
+          acknowledged every affected slot.
+        justification: |
+          The acknowledgement is the caller's informed consent, so nothing else stands in the way of the change.
+        tests:
+          - ThreadService_StartThreadAsync_IncludedAndSigned_NeedsAcknowledgement
           - SignatureImpact_RequireAcknowledged_DifferingBallot_ListsTheOtherSlot
-          - SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgement
+
+      - id: ReviewCenter-SigningService-SignatureImpact-DigestUnchanged
+        title: >-
+          The SigningService class shall need no acknowledgement for a change that leaves the digest of the record as
+          it is, chat or a draft ballot that leaves the consolidated standing alone, for example.
+        justification: |
+          A change that leaves the digest alone makes no signature out of date, so there is nothing to acknowledge.
+        tests:
+          - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
+          - ThreadService_StartThreadAsync_ChatAfterSignature_NeedsNoAcknowledgementAndKeepsSignature
           - SignatureImpact_RequireAcknowledged_SameStanding_NoWarning
+
+      - id: ReviewCenter-SigningService-SignatureImpact-NoSignature
+        title: >-
+          The SigningService class shall need no acknowledgement for a change to a review without a current
+          signature.
+        justification: |
+          Without a signature there is no approval that the change could withdraw.
+        tests:
+          - ChecklistService_Changes_NoSignatureOrNoOp_DoNotThrow
+
+      - id: ReviewCenter-SigningService-SignatureImpact-OwnSlotExcluded
+        title: >-
+          The SigningService class shall leave the signature of the slot of the person who changes the own ballot out
+          of the list of affected slots when the caller excludes it.
+        justification: |
+          A person who changes the own ballot knows about the own signature and needs no warning about it.
+        tests:
+          - SignatureImpact_RequireAcknowledged_OwnSlotExcluded_NeedsNoAcknowledgement
 
       - id: ReviewCenter-SigningService-ProgressCounts
         title: >-
-          The SigningService class shall return with the approval status of a review, besides the sentences that say
-          what blocks the approval, the number of open threads, of unanswered checks, of checks answered Fail (for
-          information only, as a Fail does not block), and of
-          checks on which the submitted ballots disagree, calculated in the same step as the sentences so that each
-          count equals the number it states, and shall return for each person of a slot whether the account is
-          enabled.
+          The SigningService class shall return with the approval status of a review the number of open threads.
         justification: |
           The project overview and any later list of work need the numbers and not the text. Taking them from the
           step that writes the sentences means the two cannot disagree, and no second rule for what blocks a review
-          can drift from the first. A slot whose person cannot sign any more has to be recognizable.
+          can drift from the first.
         tests:
           - SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences
+
+      - id: ReviewCenter-SigningService-ProgressCounts-Unanswered
+        title: >-
+          The SigningService class shall return with the approval status of a review the number of unanswered checks.
+        justification: |
+          The overview needs the number of checks that still wait for an answer.
+        tests:
+          - SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences
+
+      - id: ReviewCenter-SigningService-ProgressCounts-Failed
+        title: >-
+          The SigningService class shall return with the approval status of a review the number of checks answered
+          Fail, for information only, as a Fail does not block.
+        justification: |
+          A failed check is a finding and not a blocker, so the number is shown but is no reason to hold the review.
+        tests:
+          - SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences
+
+      - id: ReviewCenter-SigningService-ProgressCounts-Disputed
+        title: >-
+          The SigningService class shall return with the approval status of a review the number of checks on which
+          the submitted ballots disagree.
+        justification: |
+          The overview needs the number of checks that the reviewers have to settle among themselves.
+        tests:
           - SigningService_SignAsync_Disputed_BlocksSigning
+
+      - id: ReviewCenter-SigningService-ProgressCounts-SameAsSentences
+        title: >-
+          The SigningService class shall calculate each count in the same step as the sentences that say what blocks
+          the approval, so that each count equals the number its sentence states.
+        justification: |
+          Two rules for the same fact would drift apart, and a number that contradicts its sentence is worse than none.
+        tests:
+          - SigningService_GetApprovalAsync_BlockerCounts_EqualTheBlockerSentences
+
+      - id: ReviewCenter-SigningService-ProgressCounts-AccountEnabled
+        title: >-
+          The SigningService class shall return for each person of a slot whether the account is enabled.
+        justification: |
+          A slot whose person cannot sign any more has to be recognizable.
+        tests:
+          - SigningService_GetApprovalAsync_DisabledAssignee_IsMarkedNotEnabled
 
       - id: ReviewCenter-SigningService-NextStepWording
         title: >-
           The SigningService class shall word the next step of a review that is not concluded so that a check on
-          which the ballots disagree is named once, as disputed, and never as unanswered, so that it says in plain
-          words, when the only thing left is the conclusion and the agreed outcome is Rejected, which checks the
-          reviewers failed and that the review will be Rejected, and so that, when nothing blocks, it names who has
-          signed and whose signature is awaited (a signature that went out of date included, named by the person who
-          actually signed, which is the alternate when the alternate signed the slot).
+          which the ballots disagree is named once, as disputed, and never as unanswered.
         justification: |
           The next step is the first thing a reviewer reads. A dispute counted as an unanswered check sends the
-          reviewer to answer a check that is answered, a bare "write the conclusion" does not say why a conclusion is
-          needed, and a line that says "Ready for signatures" after the signer has signed contradicts the status panel.
+          reviewer to answer a check that is answered.
         tests:
           - SigningService_GetApprovalAsync_Disputed_NextStepDoesNotCountItAsUnanswered
-          - SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots
-          - SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt
-          - SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate
-          - SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners
-          - SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner
+          - ReviewApproval_MissingBallotsText_WordsTheNames
+          - ReviewApproval_MissingBallotsText_NullNames_Throws
+
+      - id: ReviewCenter-SigningService-NextStepWording-RejectedConclusion
+        title: >-
+          The SigningService class shall say in the next step, when the only thing left is the conclusion and the
+          agreed outcome is Rejected, which checks the reviewers failed and that the review will be Rejected.
+        justification: |
+          A bare "write the conclusion" does not say why a conclusion is needed.
+        tests:
           - SigningService_GetApprovalAsync_RejectedAgreed_NamesFailedCheckAndRejection
           - SigningService_GetApprovalAsync_RejectedAgreedWithOpenThread_NamesRejectionAndThread
           - SigningService_GetApprovalAsync_NoFail_HasNoFailedCheckIdsAndNoNote
           - ReviewApproval_RejectionNote_WordsReviewersAndChecks
-          - ReviewApproval_MissingBallotsText_WordsTheNames
-          - ReviewApproval_MissingBallotsText_NullNames_Throws
+
+      - id: ReviewCenter-SigningService-NextStepWording-SignersAwaited
+        title: >-
+          The SigningService class shall name in the next step, when nothing blocks, who has signed and whose
+          signature is awaited.
+        justification: |
+          A line that says "Ready for signatures" after the signer has signed contradicts the status panel.
+        tests:
+          - SigningService_GetApprovalAsync_SomeSigned_NextStepNamesSignersAndWaitingSlots
+
+      - id: ReviewCenter-SigningService-NextStepWording-OutOfDateSigner
+        title: >-
+          The SigningService class shall name in the next step the signer of a signature that went out of date, as
+          one whose signature is awaited.
+        justification: |
+          An approval that lapsed has to be given again, so its signer is awaited like any other.
+        tests:
+          - SigningService_GetApprovalAsync_SignatureOutOfDate_NextStepNamesIt
+          - SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners
+
+      - id: ReviewCenter-SigningService-NextStepWording-ActualSigner
+        title: >-
+          The SigningService class shall name in the next step the person who actually signed, which is the alternate
+          when the alternate signed the slot.
+        justification: |
+          The name of the primary reviewer would send the request to somebody who never signed.
+        tests:
+          - SigningService_GetApprovalAsync_AlternateSignatureOutOfDate_NextStepNamesTheAlternate
+          - SigningService_GetApprovalAsync_SeveralSignaturesOutOfDate_NextStepNamesTheSigners
+          - SigningService_GetApprovalAsync_NewestSignatureOutOfDate_LapsedSignerNameIsItsSigner
 
       - id: ReviewCenter-SigningService-FailedChecksMasked
         title: >-
-          The SigningService class shall never give the identifiers of the failed checks, the note on the provisional
-          rejection or any wording that depends on the signatures to a viewer who may not see the standing of the
-          others (a reviewer who has not handed in a ballot, a user without a slot, an API token, or no viewer), and
-          shall start the next step of such a viewer with the request to hand in the own ballot.
+          The SigningService class shall never give the identifiers of the failed checks to a viewer who may not see
+          the standing of the others (a reviewer who has not handed in a ballot, a user without a slot, an API token,
+          or no viewer).
         justification: |
-          The failed checks and the provisional outcome are the verdict of the others. A reviewer who sees them before
-          handing in the own ballot is no longer independent, and the id of a failed check alone gives it away.
+          The failed checks are the verdict of the others. A reviewer who sees them before handing in the own ballot is
+          no longer independent, and the id of a failed check alone gives it away.
         tests:
           - SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote
-          - SigningService_GetApproval_MaskedViewer_NextStepDoesNotDependOnSignatures
+          - ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote
+
+      - id: ReviewCenter-SigningService-FailedChecksMasked-RejectionNote
+        title: >-
+          The SigningService class shall never give the note on the provisional rejection to a viewer who may not see
+          the standing of the others.
+        justification: |
+          The note names the failed checks and the provisional outcome, so it gives the verdict of the others away.
+        tests:
+          - SigningService_GetApproval_MaskedViewersAndTokens_NeverSeeFailedCheckIdsOrRejectionNote
+          - ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote
           - ReviewApproval_RejectionNote_MaskedConcludedOtherOutcomeOrNoIds_IsNull
+
+      - id: ReviewCenter-SigningService-FailedChecksMasked-SignatureWording
+        title: >-
+          The SigningService class shall never give a wording that depends on the signatures to a viewer who may not
+          see the standing of the others.
+        justification: |
+          Who has signed shows how the others answered, so the next step of such a viewer is progress only.
+        tests:
+          - SigningService_GetApproval_MaskedViewer_NextStepDoesNotDependOnSignatures
+          - ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome
+
+      - id: ReviewCenter-SigningService-FailedChecksMasked-HandInFirst
+        title: >-
+          The SigningService class shall start the next step of a viewer who may not see the standing of the others
+          with the request to hand in the own ballot.
+        justification: |
+          Handing in the own ballot is the one step that such a viewer can take, and it opens the view of the others.
+        tests:
           - ReviewApproval_Masked_ClearsFailedCheckIdsAndRejectionNote
           - ReviewApproval_Masked_NextStepLeadsWithHandInAndNamesOpenThreadsOnlyWhenThereAreSome
 
       - id: ReviewCenter-SigningService-OwnBallotSubmitted
         title: >-
           The SigningService class shall refuse a signature of a slot whose own ballot has not been handed in
-          (submitted) with the BallotNotSubmitted rule and store nothing, after the comparison of the digest and the
-          check for an earlier signature and before the blockers, except that in a review with a single slot, where a
-          draft ballot counts for the progress and the blockers, the blockers are named first.
+          (submitted) with the BallotNotSubmitted rule.
         justification: |
           The digest covers only the submitted ballots, so it cannot say whether the signer finished the own answers.
           A signature that binds to the answers of the others while the own ballot is still a draft would approve a
@@ -534,112 +1853,338 @@ sections:
         tests:
           - SigningService_SignAsync_OwnBallotDraft_ThrowsBallotNotSubmitted
 
+      - id: ReviewCenter-SigningService-OwnBallotSubmitted-NothingStored
+        title: >-
+          The SigningService class shall store nothing when it refuses a signature with the BallotNotSubmitted rule.
+        justification: |
+          A refused signature must leave the review as it was.
+        tests:
+          - SigningService_SignAsync_OwnBallotDraft_ThrowsBallotNotSubmitted
+
+      - id: ReviewCenter-SigningService-OwnBallotSubmitted-AfterDigest
+        title: >-
+          The SigningService class shall check the own ballot after the comparison of the digest, so that a signer
+          who signs for a record that has changed is told so first.
+        justification: |
+          A signature of a record that has changed since it was shown must be refused for that reason, whatever else
+          is wrong.
+        tests:
+          - SigningService_SignAsync_OwnBallotDraftAndStaleDigest_ThrowsRecordChanged
+
+      - id: ReviewCenter-SigningService-OwnBallotSubmitted-AfterSigned
+        title: >-
+          The SigningService class shall check the own ballot after the check for an earlier signature of the slot.
+        justification: |
+          A slot that already holds a signature of the current record needs no second one, so that is the answer.
+        tests:
+          - SigningService_SignAsync_OwnBallotDraftAndAlreadySigned_ThrowsSigningNotAllowedAsSigned
+
+      - id: ReviewCenter-SigningService-OwnBallotSubmitted-BeforeBlockers
+        title: >-
+          The SigningService class shall check the own ballot before the blockers of the review.
+        justification: |
+          The own ballot is what the signer can act on first, and the blockers may need the others.
+        tests:
+          - SigningService_SignAsync_OwnBallotDraftAndOpenThread_ThrowsBallotNotSubmitted
+
+      - id: ReviewCenter-SigningService-OwnBallotSubmitted-SingleSlot
+        title: >-
+          The SigningService class shall name the blockers before the own ballot in a review with a single slot.
+        justification: |
+          In a review with one slot a draft ballot counts for the progress and the blockers, so the open checks are the
+          better message and come first.
+        tests:
+          - SigningService_SignAsync_SingleSlotDraftAndOpenThread_NamesBlockersBeforeTheBallot
+
       - id: ReviewCenter-SigningService-SlotBallotState
         title: >-
           The SigningService class shall return with the approval status of a review the state of the ballot of every
-          slot (not started, draft or handed in; none for a review without a checklist), and shall keep it when the
-          status is masked for a viewer who may not see the others, as it says who has handed in and nothing of what
-          was answered.
+          slot: not started, draft or handed in.
         justification: |
           The inbox, the project overview and the review page need to say who has handed in and who has not, and they
           must read it from the same place as the blockers so that they cannot disagree.
         tests:
           - SigningService_GetApprovalAsync_ReportsBallotStatePerSlot
+
+      - id: ReviewCenter-SigningService-SlotBallotState-NoChecklist
+        title: >-
+          The SigningService class shall return no ballot state for the slots of a review without a checklist.
+        justification: |
+          A review without a checklist has no ballots, so a state would say something that does not exist.
+        tests:
+          - SigningService_GetApprovalAsync_ReportsBallotStatePerSlot
+
+      - id: ReviewCenter-SigningService-SlotBallotState-Masked
+        title: >-
+          The SigningService class shall keep the ballot state of every slot when the status is masked for a viewer who
+          may not see the others.
+        justification: |
+          The state says who has handed in and nothing of what was answered, so it gives no verdict away.
+        tests:
           - SigningService_GetApprovalAsync_MaskedApproval_KeepsBallotState
 
       - id: ReviewCenter-SigningService-EarlySigning
         title: >-
           The SigningService class shall let a slot sign as soon as its own ballot is submitted and nothing blocks the
-          review, without waiting for the ballots of the other slots, and shall make that signature out of date,
-          through the digest of the record, when a later ballot changes the consolidated standing, for example by a
-          disagreement.
+          review, without waiting for the ballots of the other slots.
         justification: |
-          A reviewer who has finished should not have to wait for the others. What the signature approves is the
-          consolidated standing, so it stays valid while that standing is the same and ends when another reviewer's
-          ballot disagrees, as the digest rule always decides.
+          A reviewer who has finished should not have to wait for the others.
         tests:
           - SigningService_SignAsync_EarlySign_OtherSlotNotSubmitted_Succeeds
+
+      - id: ReviewCenter-SigningService-EarlySigning-LaterChange
+        title: >-
+          The SigningService class shall make an early signature out of date, through the digest of the record, when a
+          later ballot changes the consolidated standing, for example by a disagreement.
+        justification: |
+          What the signature approves is the consolidated standing, so it stays valid while that standing is the same
+          and ends when another reviewer's ballot disagrees, as the digest rule always decides.
+        tests:
           - SigningService_SignAsync_OtherSlotDisputes_SignatureOutOfDate
 
       - id: ReviewCenter-SigningService-DisputedBlocker
         title: >-
           The SigningService class shall refuse to sign a review while the submitted ballots disagree on a check, with
-          the SigningNotAllowed rule and a message that names the number of checks disputed between the ballots, shall
-          list that number as a blocker, and shall return it as the count of disputed checks of the approval status.
+          the SigningNotAllowed rule.
         justification: |
           A signature approves one standing of the checklist. While reviewers disagree there is no such standing, so
-          nobody can sign until the ballots are settled.
+          nobody can sign until the ballots are settled. This is the signing side of
+          ReviewCenter-SigningService-Blockers-Disputed.
+        tests:
+          - SigningService_SignAsync_Disputed_BlocksSigning
+
+      - id: ReviewCenter-SigningService-DisputedBlocker-MessageCount
+        title: >-
+          The SigningService class shall name in the message of the refusal the number of checks disputed between the
+          ballots.
+        justification: |
+          The signer sees at once how many checks the reviewers still have to settle.
+        tests:
+          - SigningService_SignAsync_Disputed_MessageNamesTheNumberOfDisputedChecks
+
+      - id: ReviewCenter-SigningService-DisputedBlocker-Listed
+        title: >-
+          The SigningService class shall list the number of disputed checks as a blocker of the approval status.
+        justification: |
+          The blockers are what the review page shows as the reasons why nobody can sign yet.
+        tests:
+          - SigningService_SignAsync_Disputed_BlocksSigning
+
+      - id: ReviewCenter-SigningService-DisputedBlocker-Count
+        title: >-
+          The SigningService class shall return the number of disputed checks as the count of disputed checks of the
+          approval status.
+        justification: |
+          The overview needs the number and not the text.
         tests:
           - SigningService_SignAsync_Disputed_BlocksSigning
 
       - id: ReviewCenter-SigningService-SlotBallotImpact
         title: >-
           The SigningService class shall require the acknowledgement of the other signed slots, with the
-          SignaturesWouldBecomeOutOfDate rule and before anything is stored, when removing a slot, or changing the
-          reviewers of a slot so that a reviewer leaves it, would change the consolidated standing, and so the digest,
-          because the ballot of the slot leaves the record, or reverts to a draft without the rows of the departed
-          reviewer, and shall not ask for it when the standing, and so the digest, stays as it is.
+          SignaturesWouldBecomeOutOfDate rule and before anything is stored, when removing a slot would change the
+          consolidated standing, and so the digest.
         justification: |
           The ballot of a slot is part of what the other signatures cover. Removing a slot whose submitted ballot
           disagreed, for example, makes the others agree and so changes the digest; the person who does it has to see
-          whose signature this withdraws. A departing reviewer takes the own rows with them, which can do the same. A
-          change that leaves the standing as it is withdraws nothing, so it needs no confirmation.
+          whose signature this withdraws.
         tests:
           - SigningService_RemoveSlotAsync_SubmittedBallotChangesDigest_RequiresAcknowledgement
+
+      - id: ReviewCenter-SigningService-SlotBallotImpact-Departure
+        title: >-
+          The SigningService class shall require the same acknowledgement, with the same rule and before anything is
+          stored, when a reviewer leaves a slot and the ballot of the slot reverts to a draft without the rows of the
+          departed reviewer, which would change the consolidated standing.
+        justification: |
+          A departing reviewer takes the own rows with them, which can change the standing as the removal of a slot
+          does.
+        tests:
           - SigningService_UpdateSlotAsync_DepartingSubmittedBallotChangesDigest_RequiresAcknowledgement
+
+      - id: ReviewCenter-SigningService-SlotBallotImpact-StandingKept
+        title: >-
+          The SigningService class shall not ask for an acknowledgement when a reviewer leaves a slot and the
+          consolidated standing, and so the digest, stays as it is.
+        justification: |
+          A change that leaves the standing as it is withdraws nothing, so it needs no confirmation.
+        tests:
           - SigningService_UpdateSlotAsync_DepartingBallotKeepsDigest_NoAcknowledgement
+
+      - id: ReviewCenter-SigningService-SlotBallotImpact-RemoveKept
+        title: >-
+          The SigningService class shall not ask for an acknowledgement when a slot is removed and the consolidated
+          standing, and so the digest, stays as it is.
+        justification: |
+          A removal that leaves the standing as it is withdraws nothing, so it needs no confirmation.
+        tests:
+          - SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_NoAcknowledgement
 
       - id: ReviewCenter-SigningService-Concluded
         title: >-
-          The SigningService class shall treat a review as concluded, and locked, only when every slot has a submitted
-          ballot, no check is pending or disputed in the consolidation, every slot has a signature of the current
-          digest with the same outcome (Approved, or Rejected with a conclusion text), and no thread is open, shall
-          treat it as approved only when that outcome is Approved, shall take the one definition of this from
-          ReviewLock, and shall word the next step of a review that has blockers
-          as the hint for them, also when the review has no slot (for example that checks are unanswered).
+          The SigningService class shall treat a review as concluded only when every slot has a submitted ballot.
         justification: |
           A review is concluded only when every reviewer has handed in a ballot, they agree, and each has signed that
-          standing, whether the agreed outcome is approval or rejection. Using one definition keeps the status, the
-          locks, and the store from disagreeing about what is concluded. A review with no slot has no one who can
-          answer its checks, so the open checks are the honest next step.
+          standing, whether the agreed outcome is approval or rejection. The lock that a concluded review gets is
+          stated in ReviewCenter-SigningService-ApprovalLock.
         tests:
-          - SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved
           - ReviewLock_IsConcluded_UnsubmittedBallot_False
-          - ReviewLock_IsConcluded_Disputed_False
           - ReviewLock_IsConcluded_AllSubmittedAgreedSigned_True
+
+      - id: ReviewCenter-SigningService-Concluded-NoOpenChecks
+        title: >-
+          The SigningService class shall treat a review as concluded only when no check is pending or disputed in the
+          consolidation of the ballots.
+        justification: |
+          A check without an agreed answer leaves no standing that the signatures could cover.
+        tests:
+          - ReviewLock_IsConcluded_Disputed_False
+          - ReviewLock_ConcludedOutcome_Disputed_None
+
+      - id: ReviewCenter-SigningService-Concluded-AllSigned
+        title: >-
+          The SigningService class shall treat a review as concluded only when every slot has a signature of the
+          current digest.
+        justification: |
+          Each reviewer has to stand behind the standing as it is now, so a slot without a current signature leaves the
+          review open.
+        tests:
           - ReviewLock_IsConcluded_AgreedBallotsOneSlotUnsigned_False
-          - ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False
+          - ReviewLock_IsConcluded_RejectedOneSlotUnsigned_False
+
+      - id: ReviewCenter-SigningService-Concluded-SameOutcome
+        title: >-
+          The SigningService class shall treat a review as concluded only when the signatures of all slots attest the
+          outcome that the record has now.
+        justification: |
+          A signature of an approval must not conclude a review whose ballots now agree on a rejection, and the other
+          way round.
+        tests:
+          - ReviewLock_IsConcluded_RejectedSignedForApproval_False
+          - SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate
+
+      - id: ReviewCenter-SigningService-Concluded-ConclusionText
+        title: >-
+          The SigningService class shall treat a review whose outcome is Rejected as concluded only when it has a
+          conclusion text that is not blank.
+        justification: |
+          A rejection without stated reasons gives the author nothing to act on.
+        tests:
           - ReviewLock_IsConcluded_RejectedAllSignedWithText_True
           - ReviewLock_IsConcluded_RejectedNoText_False
-          - ReviewLock_IsConcluded_RejectedSignedForApproval_False
-          - ReviewLock_IsConcluded_RejectedOneSlotUnsigned_False
-          - ReviewLock_ConcludedOutcome_AllSubmittedAgreedSigned_Approved
-          - ReviewLock_ConcludedOutcome_Disputed_None
+
+      - id: ReviewCenter-SigningService-Concluded-NoOpenThread
+        title: >-
+          The SigningService class shall treat a review as concluded only when no thread is open.
+        justification: |
+          A review is not finished while a discussion waits for an answer. The rule is stated for the threads in
+          ReviewCenter-SigningService-OpenThreadRule-OpenThreadBlocks.
+        tests:
+          - ReviewLock_IsConcluded_AgreedSignedBallotsOpenThread_False
+
+      - id: ReviewCenter-SigningService-Concluded-ApprovedOnly
+        title: >-
+          The SigningService class shall treat a concluded review as approved only when its outcome is Approved.
+        justification: |
+          A review that is concluded as Rejected is finished but must never be shown or used as approved.
+        tests:
+          - SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved
           - SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved
-          - SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate
+          - ReviewLock_ConcludedOutcome_AllSubmittedAgreedSigned_Approved
+
+      - id: ReviewCenter-SigningService-Concluded-ReviewLockDefinition
+        title: >-
+          The SigningService class shall take from ReviewLock whether a review is concluded and how, as the one
+          definition of this.
+        justification: |
+          Using one definition keeps the status, the locks, and the store from disagreeing about what is concluded.
+        tests:
+          - SigningService_GetApprovalAsync_ConclusionAndIsConcluded_FollowReviewLockInEveryStanding
+
+      - id: ReviewCenter-SigningService-Concluded-BlockerHint
+        title: >-
+          The SigningService class shall word the next step of a review that has blockers as the hint for them, also
+          when the review has no slot.
+        justification: |
+          A review with no slot has no one who can answer its checks, so the open checks are the honest next step, for
+          example that checks are unanswered.
+        tests:
           - SigningService_NextStep_NoSlots_PointsToTheUnansweredChecks
 
       - id: ReviewCenter-SigningService-RejectedOutcome
         title: >-
-          The SigningService class shall record on each signature the outcome that the signer signed, Rejected when the
-          submitted ballots agree on at least one Fail and Approved otherwise, shall require a conclusion text that is
-          not blank before a Rejected outcome is signed, refusing with the ConclusionRequired rule and the message
-          "A rejected review needs a conclusion stating the reasons." when that is the only blocker and otherwise with
-          the SigningNotAllowed rule that lists every blocker, shall lock a review that is concluded as Rejected and
-          let an administrator reopen it as any concluded review, and shall write the outcome into the audit entry of
-          the signature.
+          The SigningService class shall record on a signature the outcome Rejected when the submitted ballots agree on
+          at least one Fail.
         justification: |
           A review whose checklist has a failed check is a finished review when the reviewers agree that the work is
           not acceptable. Recording the outcome on the signature, together with the meaning text of that outcome, lets
-          the history tell an approval from a rejection. A rejection without stated reasons gives the author nothing to
-          act on, so the conclusion is required. Locking and reopening work as for an approval so that a rejected
-          record cannot be changed unnoticed.
+          the history tell an approval from a rejection. This is the same fact as stated in
+          ReviewCenter-SigningService-Sign-OutcomeRejected, seen from the status.
         tests:
           - SigningService_SignAsync_RejectedWithText_StoresRejectedSignature
+          - SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate
+
+      - id: ReviewCenter-SigningService-RejectedOutcome-Approved
+        title: >-
+          The SigningService class shall record on a signature the outcome Approved when the submitted ballots do not
+          agree on a Fail.
+        justification: |
+          The outcome is the other half of the rule above, so every signature attests exactly one of the two. This is
+          stated for the signature in ReviewCenter-SigningService-Sign-OutcomeApproved.
+        tests:
+          - SigningService_SignAsync_Approved_StoresApprovedSignature
+
+      - id: ReviewCenter-SigningService-RejectedOutcome-ConclusionRequired
+        title: >-
+          The SigningService class shall refuse the signature of a Rejected outcome with the ConclusionRequired rule
+          when the conclusion text is blank and that is the only blocker.
+        justification: |
+          A rejection without stated reasons gives the author nothing to act on, so the conclusion is required. A text
+          of white space counts as none.
+        tests:
           - SigningService_SignAsync_RejectedNoText_ThrowsConclusionRequired
           - SigningService_SignAsync_RejectedBlankText_ThrowsConclusionRequired
+
+      - id: ReviewCenter-SigningService-RejectedOutcome-Message
+        title: >-
+          The SigningService class shall give the message "A rejected review needs a conclusion stating the reasons."
+          with the ConclusionRequired rule.
+        justification: |
+          The message tells the signer what to do, without a second step of lookup.
+        tests:
+          - SigningService_SignAsync_RejectedNoText_MessageStatesTheReasonsAreNeeded
+
+      - id: ReviewCenter-SigningService-RejectedOutcome-ListsBlockers
+        title: >-
+          The SigningService class shall refuse the signature of a Rejected outcome with the SigningNotAllowed rule
+          that lists every blocker, the missing conclusion included, when the conclusion is not the only blocker.
+        justification: |
+          The signer sees everything that is in the way at once and not one thing after the other.
+        tests:
           - SigningService_SignAsync_RejectedNoTextAndOpenThread_ThrowsSigningNotAllowedListingBoth
-          - SigningService_GetApprovalAsync_ApprovalSignedThenRejectionAgreed_SignatureOutOfDate
-          - SigningService_ReopenReviewAsync_Rejected_ReopensTheReview
-          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+
+      - id: ReviewCenter-SigningService-RejectedOutcome-Locks
+        title: >-
+          The SigningService class shall lock a review that is concluded as Rejected.
+        justification: |
+          Locking works as for an approval so that a rejected record cannot be changed unnoticed.
+        tests:
           - ReviewLock_IsConcluded_RejectedAllSignedWithText_True
+          - SigningService_GetApprovalAsync_RejectedAllSigned_ConcludedAndNotApproved
+
+      - id: ReviewCenter-SigningService-RejectedOutcome-Reopen
+        title: >-
+          The SigningService class shall let an administrator reopen a review that is concluded as Rejected, as any
+          concluded review.
+        justification: |
+          A rejected review has to be able to continue after the rework, as an approved one does.
+        tests:
+          - SigningService_ReopenReviewAsync_Rejected_ReopensTheReview
+
+      - id: ReviewCenter-SigningService-RejectedOutcome-AuditOutcome
+        title: >-
+          The SigningService class shall write the outcome of a signature into the audit entry of the signature.
+        justification: |
+          The trail must say whether the signer approved or rejected.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
