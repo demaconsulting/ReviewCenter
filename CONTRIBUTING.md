@@ -382,6 +382,9 @@ behaviors is split, and nothing is lost: every old id stays, every behavior stay
 - Check the indentation of `children` lists after each edit. A wrong indent shows as many "unknown child" errors.
 - Files made with the `create` tool may use CRLF, but the repository uses LF. Edit existing files where possible.
 - Linking one broad test to many criteria hides gaps. Prefer a small focused test.
+- A unit requirement states observable behavior of that unit. Do not claim a lower-level property (such as a
+  storage transaction) that only a lower-level test can show, and do not name a helper (HOW). Put helper reuse in
+  the design document and link the storage property at the storage unit.
 
 ## Release Process
 

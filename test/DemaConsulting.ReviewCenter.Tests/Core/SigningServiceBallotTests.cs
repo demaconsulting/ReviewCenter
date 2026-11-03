@@ -294,48 +294,36 @@ public class SigningServiceBallotTests
     }
 
     /// <summary>
-    ///     Test that the status takes whether the review is concluded, and how, from the one definition of
-    ///     <see cref="ReviewLock"/>, whatever the standing of the signatures and the ballots.
+    ///     Test that the status says whether the review is concluded, and how, as the standing of the signatures and
+    ///     the ballots requires: concluded as Approved only when all submitted ballots agree and every slot has signed.
     /// </summary>
     [Fact]
-    public async Task SigningService_GetApprovalAsync_ConclusionAndIsConcluded_FollowReviewLockInEveryStanding()
+    public async Task SigningService_GetApprovalAsync_ConclusionAndIsConcluded_MatchTheStandingInEveryStanding()
     {
-        // Arrange and act: read the status and the definition in turn for a review with nothing signed, a part signed
-        // and all signed, and for a second review with all signed while a check is disputed
-        var cancellationToken = TestContext.Current.CancellationToken;
+        // Arrange and act: read the status for a review with nothing signed, a part signed and all signed, and for a
+        // second review with all signed while a check is disputed
         var world = await SignedReviewWorld.CreateAsync();
         var disputedWorld = await SignedReviewWorld.CreateAsync();
-        var standings = new List<(string Name, ReviewApproval Approval, ReviewConclusion Definition)>();
-
-        async Task RecordStandingAsync(string name, SignedReviewWorld target)
+        var standings = new List<ReviewApproval>
         {
-            var approval = await target.ApprovalAsync();
-            var snapshot = (await target.Store.GetSnapshotAsync(target.ProjectId, SignedReviewWorld.ReviewId, cancellationToken))!;
-            standings.Add((name, approval, ReviewLock.ConcludedOutcome(snapshot.Record, snapshot.Slots, snapshot.Signatures)));
-        }
-
-        await RecordStandingAsync("nothing signed", world);
+            await world.ApprovalAsync(),
+        };
         await world.StoreSignatureAsync(1);
-        await RecordStandingAsync("one of three signed", world);
+        standings.Add(await world.ApprovalAsync());
         await world.StoreSignatureAsync(2);
         await world.StoreSignatureAsync(3);
-        await RecordStandingAsync("all signed", world);
+        standings.Add(await world.ApprovalAsync());
         await DissentAsync(disputedWorld, "sam");
         await disputedWorld.StoreSignatureAsync(1);
         await disputedWorld.StoreSignatureAsync(2);
         await disputedWorld.StoreSignatureAsync(3);
-        await RecordStandingAsync("all signed with a dispute", disputedWorld);
+        standings.Add(await disputedWorld.ApprovalAsync());
 
-        // Assert: in every standing the status says what the definition says, and the standings differ
-        foreach (var (name, approval, definition) in standings)
-        {
-            Assert.True(approval.Conclusion == definition, name);
-            Assert.True(approval.IsConcluded == (definition != ReviewConclusion.None), name);
-        }
-
+        // Assert: nothing signed, one of three signed and a dispute are not concluded; all signed and agreed is
         Assert.Equal(
             [ReviewConclusion.None, ReviewConclusion.None, ReviewConclusion.Approved, ReviewConclusion.None],
-            standings.Select(s => s.Definition));
+            standings.Select(s => s.Conclusion));
+        Assert.Equal([false, false, true, false], standings.Select(s => s.IsConcluded));
     }
 
     /// <summary>

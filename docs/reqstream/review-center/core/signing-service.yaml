@@ -761,10 +761,11 @@ sections:
 
       - id: ReviewCenter-SigningService-Audit-Atomic
         title: >-
-          The SigningService class shall save each audit entry of a slot or a signature together with its change, so
-          that a change is never saved without its entry and an entry is never saved without its change.
+          The SigningService class shall give the store the audit entry of a slot or a signature change in the same call
+          that stores the change.
         justification: |
-          A history that can miss an approval, or show one that was never saved, cannot be relied on.
+          The store can save a change and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-Audit states and verifies that the two are saved in one transaction.
         tests:
           - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
           - SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers
@@ -1144,8 +1145,8 @@ sections:
 
       - id: ReviewCenter-SigningService-ApprovalLock-Derived
         title: >-
-          The SigningService class shall compute the lock from the signatures, the threads, and the record each time and
-          not store it.
+          The SigningService class shall lock a review exactly while its current signatures, threads, and record
+          conclude it.
         justification: |
           Computing the lock from the current record means it can never be out of step with the signatures.
         tests:
@@ -1255,9 +1256,12 @@ sections:
 
       - id: ReviewCenter-SigningService-Reopen-AuditAtomic
         title: >-
-          The SigningService class shall save the audit entry of a reopening in the same transaction as the change.
+          The SigningService class shall give the store the audit entry of a reopening in the same call that stores the
+          reopening.
         justification: |
-          A reopening is never saved without its entry.
+          The store can save a reopening and its entry together only when it receives both in one call. The store
+          requirement ReviewCenter-ReviewStore-ReopenHistory states and verifies that the two are saved in one
+          transaction.
         tests:
           - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
 
@@ -1291,10 +1295,11 @@ sections:
 
       - id: ReviewCenter-SigningService-Reopen-CountInvalidates
         title: >-
-          The SigningService class shall make every earlier signature out of date through the reopen count of the
-          record, which the digest covers, even though the ballots still say what they said.
+          The SigningService class shall make every earlier signature out of date when a review is reopened, even though
+          the ballots still say what they said.
         justification: |
-          No old signature can approve the changed record, not even when the content is changed back.
+          No old signature can approve the changed record, not even when the content is changed back. The design
+          document states that the reopen count of the record, which the digest covers, does this.
         tests:
           - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
           - SigningService_ReopenReviewAsync_BallotsStaySubmitted
@@ -1608,8 +1613,8 @@ sections:
 
       - id: ReviewCenter-SigningService-SignatureImpact
         title: >-
-          The SigningService class shall compute, from the record of a review and the record that a change would
-          produce, which current signatures the change would make out of date.
+          The SigningService class shall name the current signatures that a change would make out of date, before the
+          change is stored.
         justification: |
           Whether a signature stays valid is decided by the digest of the record, so comparing the digest before and
           after the change finds the affected signatures exactly, without a trial write.
@@ -1934,8 +1939,8 @@ sections:
 
       - id: ReviewCenter-SigningService-EarlySigning-LaterChange
         title: >-
-          The SigningService class shall make an early signature out of date, through the digest of the record, when a
-          later ballot changes the consolidated standing, for example by a disagreement.
+          The SigningService class shall make an early signature out of date when a later ballot changes the
+          consolidated standing, for example by a disagreement.
         justification: |
           What the signature approves is the consolidated standing, so it stays valid while that standing is the same
           and ends when another reviewer's ballot disagrees, as the digest rule always decides.
@@ -2094,12 +2099,14 @@ sections:
 
       - id: ReviewCenter-SigningService-Concluded-ReviewLockDefinition
         title: >-
-          The SigningService class shall take from ReviewLock whether a review is concluded and how, as the one
-          definition of this.
+          The SigningService class shall report in the status of a review whether the review is concluded and with
+          which outcome.
         justification: |
-          Using one definition keeps the status, the locks, and the store from disagreeing about what is concluded.
+          The page, the locks, and the reader of the status need one answer to what is concluded. The design
+          document states that the answer is taken from ReviewLock, so that the status, the locks, and the store
+          cannot disagree.
         tests:
-          - SigningService_GetApprovalAsync_ConclusionAndIsConcluded_FollowReviewLockInEveryStanding
+          - SigningService_GetApprovalAsync_ConclusionAndIsConcluded_MatchTheStandingInEveryStanding
 
       - id: ReviewCenter-SigningService-Concluded-BlockerHint
         title: >-

@@ -790,12 +790,12 @@ scenario is tested by `SigningService_RemoveSlotAsync_AgreeingBallotKeepsDigest_
 draft, so the review is not approved. Tess hands in again, with the agreed standing as it was, and signs; the review is
 approved. This scenario is tested by `SigningService_GetApprovalAsync_AllSubmittedAgreedSigned_Approved`.
 
-**SigningService_GetApprovalAsync_ConclusionAndIsConcluded_FollowReviewLockInEveryStanding**: Four standings are
-read with the status and with `ReviewLock.ConcludedOutcome` on the stored data: nothing signed, one of three slots
-signed, all
-three signed (Approved), and, in a second review, all three signed while a check is disputed. In every standing the
-`Conclusion` and `IsConcluded` of the status equal what `ReviewLock` says. This scenario is tested by
-`SigningService_GetApprovalAsync_ConclusionAndIsConcluded_FollowReviewLockInEveryStanding`.
+**SigningService_GetApprovalAsync_ConclusionAndIsConcluded_MatchTheStandingInEveryStanding**: Four standings are
+read with the status: nothing signed, one of three slots signed, all three signed (Approved), and, in a second review,
+all three signed while a check is disputed. The `Conclusion` and `IsConcluded` of the status are compared with fixed
+expected values, not with another computation: not concluded for nothing signed, one signed, and the dispute, and
+concluded as Approved for all signed. This scenario is tested by
+`SigningService_GetApprovalAsync_ConclusionAndIsConcluded_MatchTheStandingInEveryStanding`.
 
 **SigningService_NextStep_NoSlots_PointsToTheUnansweredChecks**: A review without a slot has the next step of its
 unanswered checks, not "Add a reviewer slot.", because blockers decide the hint first. This scenario is tested by

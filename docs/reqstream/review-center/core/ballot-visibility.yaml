@@ -86,9 +86,17 @@ sections:
           slots, what each submitted ballot answered for every check the submitted ballots answer differently.
         justification: |
           A reviewer who has handed in wants to compare, so the differences are listed with the names of those who
-          answered. A review that has no checklist has no ballot view.
+          answered.
         tests:
           - ChecklistService_GetBallotView_SubmittedViewer_ListsDifferingChecksInSlotOrder
+
+      - id: ReviewCenter-BallotVisibility-BallotView-MissingReview
+        title: >-
+          The ChecklistService class shall give no ballot view for a review that does not exist.
+        justification: |
+          A page for a review that was removed or never existed has no ballots to compare, and the caller must be
+          able to tell this from an empty list of differences.
+        tests:
           - ChecklistService_GetBallotView_UnknownReview_ReturnsNull
 
       - id: ReviewCenter-BallotVisibility-BallotView-OnlyWhenVisible

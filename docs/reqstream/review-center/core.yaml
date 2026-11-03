@@ -870,6 +870,7 @@ sections:
           - ReviewCenter-BallotVisibility-Rule-SingleSlot
           - ReviewCenter-BallotVisibility-Rule-UnknownViewer
           - ReviewCenter-BallotVisibility-BallotView
+          - ReviewCenter-BallotVisibility-BallotView-MissingReview
           - ReviewCenter-BallotVisibility-BallotView-OnlyWhenVisible
           - ReviewCenter-BallotVisibility-BallotView-HandInCounts
           - ReviewCenter-BallotVisibility-BallotView-AssignShortcut
