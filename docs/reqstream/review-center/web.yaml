@@ -244,7 +244,11 @@ sections:
           be shared.
         children:
           - ReviewCenter-ProjectPage-Show
+          - ReviewCenter-ProjectPage-Show-Missing
+          - ReviewCenter-ProjectPage-Show-Hidden
+          - ReviewCenter-ProjectPage-Show-NewReviewHidden
           - ReviewCenter-ProjectPage-Reviews
+          - ReviewCenter-ProjectPage-Reviews-NoStateBadge
           - ReviewCenter-ProjectPage-NewReview
           - ReviewCenter-App-FormRoutes
         tests:
@@ -288,6 +292,9 @@ sections:
           The answer for a project the user may not see must not reveal that the project exists.
         children:
           - ReviewCenter-ProjectPage-Show
+          - ReviewCenter-ProjectPage-Show-Missing
+          - ReviewCenter-ProjectPage-Show-Hidden
+          - ReviewCenter-ProjectPage-Show-NewReviewHidden
         tests:
           - ProjectPage_Render_NonMember_LooksLikeAMissingProject
 
@@ -309,7 +316,23 @@ sections:
           Who may work on a project is decided by the people who answer for it, and nobody else.
         children:
           - ReviewCenter-ProjectPage-Members
+          - ReviewCenter-ProjectPage-Members-Hidden
+          - ReviewCenter-ProjectPage-Members-RoleButton
+          - ReviewCenter-ProjectPage-Members-RemoveButton
+          - ReviewCenter-ProjectPage-Members-AddButton
+          - ReviewCenter-ProjectPage-Members-AddButtonHidden
+          - ReviewCenter-ProjectPage-Members-AuditLink
+          - ReviewCenter-ProjectPage-Members-AuditLinkHidden
+          - ReviewCenter-ProjectPage-Members-Empty
+          - ReviewCenter-ProjectPage-Members-NoUserList
           - ReviewCenter-ProjectPage-MemberChange
+          - ReviewCenter-ProjectPage-MemberChange-Remove
+          - ReviewCenter-ProjectPage-MemberChange-Outcome
+          - ReviewCenter-ProjectPage-MemberChange-LastAdmin
+          - ReviewCenter-ProjectPage-MemberChange-SelfRemoval
+          - ReviewCenter-ProjectPage-MemberChange-NoRight
+          - ReviewCenter-ProjectPage-MemberChange-DropMembers
+          - ReviewCenter-ProjectPage-MemberChange-NotFound
         tests:
           - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
           - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
@@ -321,6 +344,14 @@ sections:
           The three roles separate who administers a project, who only reads it, and who works in it.
         children:
           - ReviewCenter-ProjectPage-MemberRoles
+          - ReviewCenter-ProjectPage-MemberRoles-ExplicitChange
+          - ReviewCenter-ProjectPage-MemberRoles-AddPageAuditor
+          - ReviewCenter-ProjectPage-MemberRoles-AccountPageAuditor
+          - ReviewCenter-ProjectPage-MemberRoles-AddPageCombination
+          - ReviewCenter-ProjectPage-MemberRoles-AccountPageCombination
+          - ReviewCenter-ProjectPage-MemberRoles-OpenWork
+          - ReviewCenter-ProjectPage-MemberRoles-LastAdmin
+          - ReviewCenter-ProjectPage-MemberRoles-OwnRole
         tests:
           - ProjectPage_MemberRoles_ThreeRoles_AreNamedAndChangedExplicitly
           - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
@@ -333,8 +364,20 @@ sections:
           read-only and offer no control that writes.
         children:
           - ReviewCenter-ReviewPage-ReadOnly
+          - ReviewCenter-ReviewPage-ReadOnly-Notice
+          - ReviewCenter-ReviewPage-ReadOnly-SlotForms
+          - ReviewCenter-ReviewPage-ReadOnly-ThreadForms
+          - ReviewCenter-ReviewPage-ReadOnly-SigningForm
+          - ReviewCenter-ReviewPage-ReadOnly-LineControls
+          - ReviewCenter-ReviewPage-ReadOnly-HeadLineControls
+          - ReviewCenter-ReviewPage-ReadOnly-Hint
+          - ReviewCenter-ReviewPage-ReadOnly-NoComposer
+          - ReviewCenter-ReviewPage-ReadOnly-RoleChange
+          - ReviewCenter-ReviewPage-ReadOnly-RoleChangeDraft
           - ReviewCenter-ChecklistPage-ReadOnly
+          - ReviewCenter-ChecklistPage-ReadOnly-Controls
           - ReviewCenter-PlanPage-ReadOnly
+          - ReviewCenter-PlanPage-ReadOnly-NoRepositoryRead
         tests:
           - ReviewPage_Render_Auditor_ShowsReadOnlyNoticeAndNoWriteControls
           - ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl
@@ -349,6 +392,17 @@ sections:
           administrator already knows.
         children:
           - ReviewCenter-ProjectPage-AddMember
+          - ReviewCenter-ProjectPage-AddMember-CancelButton
+          - ReviewCenter-ProjectPage-AddMember-AccountButton
+          - ReviewCenter-ProjectPage-AddMember-NoUserList
+          - ReviewCenter-ProjectPage-AddMember-AddsUser
+          - ReviewCenter-ProjectPage-AddMember-ReturnsToProject
+          - ReviewCenter-ProjectPage-AddMember-UnusableName
+          - ReviewCenter-ProjectPage-AddMember-NameKept
+          - ReviewCenter-ProjectPage-AddMember-AlreadyMember
+          - ReviewCenter-ProjectPage-AddMember-NotFound
+          - ReviewCenter-ProjectPage-AddMember-RightLost
+          - ReviewCenter-ProjectPage-AddMember-OtherProject
         tests:
           - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
 
@@ -360,6 +414,18 @@ sections:
           A project admin who brings in a person without an account would otherwise need a system administrator.
         children:
           - ReviewCenter-ProjectPage-CreateAccount
+          - ReviewCenter-ProjectPage-CreateAccount-BackButton
+          - ReviewCenter-ProjectPage-CreateAccount-CreatesAccount
+          - ReviewCenter-ProjectPage-CreateAccount-TempPassword
+          - ReviewCenter-ProjectPage-CreateAccount-DoneHides
+          - ReviewCenter-ProjectPage-CreateAccount-DoneReturns
+          - ReviewCenter-ProjectPage-CreateAccount-CopyButton
+          - ReviewCenter-ProjectPage-CreateAccount-CopyFailure
+          - ReviewCenter-ProjectPage-CreateAccount-UnusableName
+          - ReviewCenter-ProjectPage-CreateAccount-NotFound
+          - ReviewCenter-ProjectPage-CreateAccount-RightLost
+          - ReviewCenter-ProjectPage-CreateAccount-PasswordDropped
+          - ReviewCenter-ProjectPage-CreateAccount-OtherProject
         tests:
           - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
 
@@ -373,6 +439,7 @@ sections:
           - ReviewCenter-RepositoriesPage-Admin
           - ReviewCenter-RepositoriesPage-Admin-NotFound
           - ReviewCenter-ProjectPage-RepositoriesLink
+          - ReviewCenter-ProjectPage-RepositoriesLink-Hidden
         tests:
           - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
           - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
@@ -384,7 +451,25 @@ sections:
           A review must not read the source code of a repository that belongs to another project.
         children:
           - ReviewCenter-ProjectPage-RepositoryForm
+          - ReviewCenter-ProjectPage-RepositoryForm-ThisProjectOnly
+          - ReviewCenter-ProjectPage-RepositoryForm-Revisions
+          - ReviewCenter-ProjectPage-RepositoryForm-Creates
+          - ReviewCenter-ProjectPage-RepositoryForm-NoBaseline
+          - ReviewCenter-ProjectPage-RepositoryForm-SkippedEntries
           - ReviewCenter-PlanPage-Form
+          - ReviewCenter-PlanPage-Form-ProjectName
+          - ReviewCenter-PlanPage-Form-EnabledOnly
+          - ReviewCenter-PlanPage-Form-NoSecrets
+          - ReviewCenter-PlanPage-Form-Head
+          - ReviewCenter-PlanPage-Form-Baseline
+          - ReviewCenter-PlanPage-Form-BaselineDefault
+          - ReviewCenter-PlanPage-Form-BaselineInput
+          - ReviewCenter-PlanPage-Form-NotFound
+          - ReviewCenter-PlanPage-Form-NoRepository
+          - ReviewCenter-PlanPage-Form-MissingRepository
+          - ReviewCenter-PlanPage-Form-MissingHead
+          - ReviewCenter-PlanPage-Form-MissingBaseline
+          - ReviewCenter-PlanPage-Form-NoGitRead
         tests:
           - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
 
@@ -397,9 +482,30 @@ sections:
           reading through it.
         children:
           - ReviewCenter-ReviewPage-Access
+          - ReviewCenter-ReviewPage-Access-NoData
+          - ReviewCenter-ReviewPage-Access-SelectFile
+          - ReviewCenter-ReviewPage-Access-SelectThread
+          - ReviewCenter-ReviewPage-Access-FilterIndex
+          - ReviewCenter-ReviewPage-Access-Reply
+          - ReviewCenter-ReviewPage-Access-ReplyNothingStored
+          - ReviewCenter-ReviewPage-Access-RevealRun
+          - ReviewCenter-ReviewPage-Access-NewThread
           - ReviewCenter-ChecklistPage-Access
+          - ReviewCenter-ChecklistPage-Access-NoData
+          - ReviewCenter-ChecklistPage-Access-Answer
+          - ReviewCenter-ChecklistPage-Access-Section
+          - ReviewCenter-ChecklistPage-Access-NotStored
           - ReviewCenter-PlanPage-Access
+          - ReviewCenter-PlanPage-Access-NothingShown
+          - ReviewCenter-PlanPage-Access-RevokedPlan
+          - ReviewCenter-PlanPage-Access-RevokedPlanNoRead
+          - ReviewCenter-PlanPage-Access-RevokedCreate
+          - ReviewCenter-PlanPage-Access-RevokedCreateNothing
           - ReviewCenter-HistoryPage-Access
+          - ReviewCenter-HistoryPage-Access-Hidden
+          - ReviewCenter-HistoryPage-Access-SignedOut
+          - ReviewCenter-HistoryPage-Access-Revoked
+          - ReviewCenter-HistoryPage-Access-PlainText
         tests:
           - ProjectViewGuard_GuardView_Member_ReturnsTrueWithoutCallback
           - ProjectViewGuard_GuardView_MembershipRemovedBetweenChecks_SecondCheckReturnsFalse
@@ -413,9 +519,30 @@ sections:
           page had loaded.
         children:
           - ReviewCenter-ReviewPage-Access
+          - ReviewCenter-ReviewPage-Access-NoData
+          - ReviewCenter-ReviewPage-Access-SelectFile
+          - ReviewCenter-ReviewPage-Access-SelectThread
+          - ReviewCenter-ReviewPage-Access-FilterIndex
+          - ReviewCenter-ReviewPage-Access-Reply
+          - ReviewCenter-ReviewPage-Access-ReplyNothingStored
+          - ReviewCenter-ReviewPage-Access-RevealRun
+          - ReviewCenter-ReviewPage-Access-NewThread
           - ReviewCenter-ChecklistPage-Access
+          - ReviewCenter-ChecklistPage-Access-NoData
+          - ReviewCenter-ChecklistPage-Access-Answer
+          - ReviewCenter-ChecklistPage-Access-Section
+          - ReviewCenter-ChecklistPage-Access-NotStored
           - ReviewCenter-PlanPage-Access
+          - ReviewCenter-PlanPage-Access-NothingShown
+          - ReviewCenter-PlanPage-Access-RevokedPlan
+          - ReviewCenter-PlanPage-Access-RevokedPlanNoRead
+          - ReviewCenter-PlanPage-Access-RevokedCreate
+          - ReviewCenter-PlanPage-Access-RevokedCreateNothing
           - ReviewCenter-HistoryPage-Access
+          - ReviewCenter-HistoryPage-Access-Hidden
+          - ReviewCenter-HistoryPage-Access-SignedOut
+          - ReviewCenter-HistoryPage-Access-Revoked
+          - ReviewCenter-HistoryPage-Access-PlainText
         tests:
           - ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce
           - ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce
@@ -486,7 +613,11 @@ sections:
           the component tests of the page units.
         children:
           - ReviewCenter-ProjectPage-Selection
+          - ReviewCenter-ProjectPage-Selection-Replacement
+          - ReviewCenter-ProjectPage-Selection-OtherProject
+          - ReviewCenter-ProjectPage-Selection-OtherProjectReset
           - ReviewCenter-ProjectPage-Create
+          - ReviewCenter-ProjectPage-Create-ShowsReview
           - ReviewCenter-ProjectPage-Interactive
 
       - id: ReviewCenter-Web-Reviews-ProjectLink
@@ -505,8 +636,21 @@ sections:
           server from a review too large to store.
         children:
           - ReviewCenter-ProjectPage-Limits
+          - ReviewCenter-ProjectPage-Limits-FileSize
+          - ReviewCenter-ProjectPage-Limits-TotalSize
+          - ReviewCenter-ProjectPage-Limits-ReceivedBytes
+          - ReviewCenter-ProjectPage-Limits-BeforeReading
+          - ReviewCenter-ProjectPage-Limits-NoSelectionKept
+          - ReviewCenter-ProjectPage-Limits-NothingCreated
           - ReviewCenter-ProjectPage-ReservedId
+          - ReviewCenter-ProjectPage-ReservedId-NothingCreated
           - ReviewCenter-ProjectPage-Error
+          - ReviewCenter-ProjectPage-Error-NoFiles
+          - ReviewCenter-ProjectPage-Error-DuplicateId
+          - ReviewCenter-ProjectPage-Error-DuplicateFileNames
+          - ReviewCenter-ProjectPage-Error-SessionEnded
+          - ReviewCenter-ProjectPage-Error-AccessLost
+          - ReviewCenter-ProjectPage-Error-NothingCreated
 
       - id: ReviewCenter-Web-Reviews-Page
         title: >-
@@ -515,6 +659,12 @@ sections:
           A review is the unit of work of the product, and a plain address lets the team share and bookmark it.
         children:
           - ReviewCenter-ReviewPage-Show
+          - ReviewCenter-ReviewPage-Show-Title
+          - ReviewCenter-ReviewPage-Show-Fingerprint
+          - ReviewCenter-ReviewPage-Show-NoState
+          - ReviewCenter-ReviewPage-Show-ProjectLink
+          - ReviewCenter-ReviewPage-Show-NotFound
+          - ReviewCenter-ReviewPage-Show-OtherReview
           - ReviewCenter-ReviewPage-Interactive
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
@@ -527,6 +677,11 @@ sections:
           A reader must see how far the review has got before reading the files.
         children:
           - ReviewCenter-ReviewPage-Summary
+          - ReviewCenter-ReviewPage-Summary-Reviewers
+          - ReviewCenter-ReviewPage-Summary-SignedCount
+          - ReviewCenter-ReviewPage-Summary-OpenThreads
+          - ReviewCenter-ReviewPage-Summary-ResolvedThreads
+          - ReviewCenter-ReviewPage-Summary-Position
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
@@ -539,9 +694,20 @@ sections:
           The content is what a reviewer reads, so it comes first, and the technical identifiers follow.
         children:
           - ReviewCenter-ReviewPage-Files
+          - ReviewCenter-ReviewPage-Files-Hash
+          - ReviewCenter-ReviewPage-Files-ButtonName
+          - ReviewCenter-ReviewPage-Files-Highlight
           - ReviewCenter-ReviewPage-Content
+          - ReviewCenter-ReviewPage-Content-NoSelection
+          - ReviewCenter-ReviewPage-Content-ExactText
+          - ReviewCenter-ReviewPage-Content-PlainText
+          - ReviewCenter-ReviewPage-Content-EmptyFile
+          - ReviewCenter-ReviewPage-Content-OtherFile
           - ReviewCenter-ReviewPage-Binary
+          - ReviewCenter-ReviewPage-Binary-InvalidUtf8
           - ReviewCenter-ReviewPage-Layout
+          - ReviewCenter-ReviewPage-Layout-Collapsed
+          - ReviewCenter-ReviewPage-Layout-Content
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
 
@@ -553,6 +719,8 @@ sections:
           opened.
         children:
           - ReviewCenter-ReviewPage-Layout
+          - ReviewCenter-ReviewPage-Layout-Collapsed
+          - ReviewCenter-ReviewPage-Layout-Content
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
@@ -566,8 +734,37 @@ sections:
           verified by the component tests of the page unit.
         children:
           - ReviewCenter-ReviewPage-ThreadStart
+          - ReviewCenter-ReviewPage-ThreadStart-Author
+          - ReviewCenter-ReviewPage-ThreadStart-NoAuthorField
+          - ReviewCenter-ReviewPage-ThreadStart-LineButton
+          - ReviewCenter-ReviewPage-ThreadStart-Error
+          - ReviewCenter-ReviewPage-ThreadStart-KeepValues
+          - ReviewCenter-ReviewPage-ThreadStart-Clear
+          - ReviewCenter-ReviewPage-ThreadStart-CtrlEnter
+          - ReviewCenter-ReviewPage-ThreadStart-ReplyShortcut
+          - ReviewCenter-ReviewPage-ThreadStart-ShortcutHint
+          - ReviewCenter-ReviewPage-ThreadStart-BinaryWholeFile
+          - ReviewCenter-ReviewPage-ThreadStart-BinaryRange
+          - ReviewCenter-ReviewPage-ThreadStart-SessionEnded
           - ReviewCenter-ReviewPage-ThreadComposer
+          - ReviewCenter-ReviewPage-ThreadComposer-Finding
+          - ReviewCenter-ReviewPage-ThreadComposer-SingleSlot
+          - ReviewCenter-ReviewPage-ThreadComposer-Check
+          - ReviewCenter-ReviewPage-ThreadComposer-ReplyReport
+          - ReviewCenter-ReviewPage-ThreadComposer-ReplyChat
+          - ReviewCenter-ReviewPage-ThreadComposer-Error
           - ReviewCenter-ReviewPage-ThreadKinds
+          - ReviewCenter-ReviewPage-ThreadKinds-Finding
+          - ReviewCenter-ReviewPage-ThreadKinds-InReport
+          - ReviewCenter-ReviewPage-ThreadKinds-DistinctIcons
+          - ReviewCenter-ReviewPage-ThreadKinds-Card
+          - ReviewCenter-ReviewPage-ThreadKinds-CheckCard
+          - ReviewCenter-ReviewPage-ThreadKinds-DiffMarkers
+          - ReviewCenter-ReviewPage-ThreadKinds-MarkerCount
+          - ReviewCenter-ReviewPage-ThreadKinds-MarkerName
+          - ReviewCenter-ReviewPage-ThreadKinds-MixedRow
+          - ReviewCenter-ReviewPage-ThreadKinds-NoMarker
+          - ReviewCenter-ReviewPage-ThreadKinds-NotColorAlone
 
       - id: ReviewCenter-Web-Comments-Reply
         title: >-
@@ -576,7 +773,26 @@ sections:
           A discussion is a sequence of answers, so a thread must accept replies.
         children:
           - ReviewCenter-ReviewPage-ThreadUpdate
+          - ReviewCenter-ReviewPage-ThreadUpdate-Author
+          - ReviewCenter-ReviewPage-ThreadUpdate-NoAuthorField
+          - ReviewCenter-ReviewPage-ThreadUpdate-Error
+          - ReviewCenter-ReviewPage-ThreadUpdate-Resolve
+          - ReviewCenter-ReviewPage-ThreadUpdate-Reopen
+          - ReviewCenter-ReviewPage-ThreadUpdate-Counts
           - ReviewCenter-ReviewPage-ThreadActions
+          - ReviewCenter-ReviewPage-ThreadActions-Demote
+          - ReviewCenter-ReviewPage-ThreadActions-ReportToggle
+          - ReviewCenter-ReviewPage-ThreadActions-ReplyReport
+          - ReviewCenter-ReviewPage-ThreadActions-Auditor
+          - ReviewCenter-ReviewPage-ThreadActions-Concluded
+          - ReviewCenter-ReviewPage-ThreadActions-ChatBubble
+          - ReviewCenter-ReviewPage-ThreadActions-InReportMark
+          - ReviewCenter-ReviewPage-ThreadActions-NoteFinding
+          - ReviewCenter-ReviewPage-ThreadActions-NoteQuestion
+          - ReviewCenter-ReviewPage-ThreadActions-NoteCancel
+          - ReviewCenter-ReviewPage-ThreadActions-SignatureWarning
+          - ReviewCenter-ReviewPage-ThreadActions-CancelStoresNothing
+          - ReviewCenter-ReviewPage-ThreadActions-KeepNote
 
       - id: ReviewCenter-Web-Comments-Resolve
         title: >-
@@ -585,6 +801,19 @@ sections:
           A thread that is settled must be marked so that the open ones stand out.
         children:
           - ReviewCenter-ReviewPage-ThreadActions
+          - ReviewCenter-ReviewPage-ThreadActions-Demote
+          - ReviewCenter-ReviewPage-ThreadActions-ReportToggle
+          - ReviewCenter-ReviewPage-ThreadActions-ReplyReport
+          - ReviewCenter-ReviewPage-ThreadActions-Auditor
+          - ReviewCenter-ReviewPage-ThreadActions-Concluded
+          - ReviewCenter-ReviewPage-ThreadActions-ChatBubble
+          - ReviewCenter-ReviewPage-ThreadActions-InReportMark
+          - ReviewCenter-ReviewPage-ThreadActions-NoteFinding
+          - ReviewCenter-ReviewPage-ThreadActions-NoteQuestion
+          - ReviewCenter-ReviewPage-ThreadActions-NoteCancel
+          - ReviewCenter-ReviewPage-ThreadActions-SignatureWarning
+          - ReviewCenter-ReviewPage-ThreadActions-CancelStoresNothing
+          - ReviewCenter-ReviewPage-ThreadActions-KeepNote
 
       - id: ReviewCenter-Web-Comments-Reopen
         title: >-
@@ -593,6 +822,19 @@ sections:
           A thread resolved too early must be able to come back.
         children:
           - ReviewCenter-ReviewPage-ThreadActions
+          - ReviewCenter-ReviewPage-ThreadActions-Demote
+          - ReviewCenter-ReviewPage-ThreadActions-ReportToggle
+          - ReviewCenter-ReviewPage-ThreadActions-ReplyReport
+          - ReviewCenter-ReviewPage-ThreadActions-Auditor
+          - ReviewCenter-ReviewPage-ThreadActions-Concluded
+          - ReviewCenter-ReviewPage-ThreadActions-ChatBubble
+          - ReviewCenter-ReviewPage-ThreadActions-InReportMark
+          - ReviewCenter-ReviewPage-ThreadActions-NoteFinding
+          - ReviewCenter-ReviewPage-ThreadActions-NoteQuestion
+          - ReviewCenter-ReviewPage-ThreadActions-NoteCancel
+          - ReviewCenter-ReviewPage-ThreadActions-SignatureWarning
+          - ReviewCenter-ReviewPage-ThreadActions-CancelStoresNothing
+          - ReviewCenter-ReviewPage-ThreadActions-KeepNote
 
       - id: ReviewCenter-Web-Comments-NextStep
         title: >-
@@ -601,6 +843,12 @@ sections:
           A reviewer should be told what to do next instead of having to work it out from the cards.
         children:
           - ReviewCenter-ReviewPage-NextStep
+          - ReviewCenter-ReviewPage-NextStep-Threads
+          - ReviewCenter-ReviewPage-NextStep-Checklist
+          - ReviewCenter-ReviewPage-NextStep-Ready
+          - ReviewCenter-ReviewPage-NextStep-Approved
+          - ReviewCenter-ReviewPage-NextStep-Current
+          - ReviewCenter-ReviewPage-NextStep-HiddenNotice
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
 
@@ -611,7 +859,23 @@ sections:
           A reviewer must find every discussion of the review without opening each file.
         children:
           - ReviewCenter-ReviewPage-ThreadIndex
+          - ReviewCenter-ReviewPage-ThreadIndex-AnchorWording
+          - ReviewCenter-ReviewPage-ThreadIndex-Filters
+          - ReviewCenter-ReviewPage-ThreadIndex-DefaultOpen
+          - ReviewCenter-ReviewPage-ThreadIndex-DefaultAllResolved
+          - ReviewCenter-ReviewPage-ThreadIndex-DefaultAllConcluded
+          - ReviewCenter-ReviewPage-ThreadIndex-SelectFile
+          - ReviewCenter-ReviewPage-ThreadIndex-Highlight
+          - ReviewCenter-ReviewPage-ThreadIndex-Scroll
+          - ReviewCenter-ReviewPage-ThreadIndex-DiffView
+          - ReviewCenter-ReviewPage-ThreadIndex-Version
           - ReviewCenter-ReviewPage-ThreadKindIndex
+          - ReviewCenter-ReviewPage-ThreadKindIndex-KindCounts
+          - ReviewCenter-ReviewPage-ThreadKindIndex-Combined
+          - ReviewCenter-ReviewPage-ThreadKindIndex-StateCounts
+          - ReviewCenter-ReviewPage-ThreadKindIndex-Badge
+          - ReviewCenter-ReviewPage-ThreadKindIndex-SummaryQuestions
+          - ReviewCenter-ReviewPage-ThreadKindIndex-SummaryFindings
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
 
@@ -622,8 +886,28 @@ sections:
           The comments are read next to the file that they are about.
         children:
           - ReviewCenter-ReviewPage-ThreadShow
+          - ReviewCenter-ReviewPage-ThreadShow-Order
+          - ReviewCenter-ReviewPage-ThreadShow-Markers
+          - ReviewCenter-ReviewPage-ThreadShow-PlainText
+          - ReviewCenter-ReviewPage-ThreadShow-Empty
           - ReviewCenter-ReviewPage-CheckThreads
+          - ReviewCenter-ReviewPage-CheckThreads-Card
+          - ReviewCenter-ReviewPage-CheckThreads-Apart
+          - ReviewCenter-ReviewPage-CheckThreads-PlainText
+          - ReviewCenter-ReviewPage-CheckThreads-Reply
+          - ReviewCenter-ReviewPage-CheckThreads-Resolve
+          - ReviewCenter-ReviewPage-CheckThreads-DeepLink
+          - ReviewCenter-ReviewPage-CheckThreads-DeepLinkNoFile
+          - ReviewCenter-ReviewPage-CheckThreads-NoFile
+          - ReviewCenter-ReviewPage-CheckThreads-NoForm
           - ReviewCenter-ReviewPage-ConclusionFindings
+          - ReviewCenter-ReviewPage-ConclusionFindings-Outcome
+          - ReviewCenter-ReviewPage-ConclusionFindings-Text
+          - ReviewCenter-ReviewPage-ConclusionFindings-Signers
+          - ReviewCenter-ReviewPage-ConclusionFindings-NoFindings
+          - ReviewCenter-ReviewPage-ConclusionFindings-InProgress
+          - ReviewCenter-ReviewPage-ConclusionFindings-Empty
+          - ReviewCenter-ReviewPage-ConclusionFindings-Masked
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
 
@@ -634,6 +918,9 @@ sections:
           Settled discussions must not crowd out the open ones.
         children:
           - ReviewCenter-ReviewPage-ThreadCollapse
+          - ReviewCenter-ReviewPage-ThreadCollapse-Toggle
+          - ReviewCenter-ReviewPage-ThreadCollapse-OpenExpanded
+          - ReviewCenter-ReviewPage-ThreadCollapse-OnResolve
 
       - id: ReviewCenter-Web-Comments-Counts
         title: >-
@@ -643,6 +930,8 @@ sections:
           served from the database.
         children:
           - ReviewCenter-ReviewPage-ThreadSummary
+          - ReviewCenter-ReviewPage-ThreadSummary-Resolved
+          - ReviewCenter-ReviewPage-ThreadSummary-FileCount
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
 
@@ -654,6 +943,10 @@ sections:
           The checklist is worked through on its own page, and the review page shows how far it has got.
         children:
           - ReviewCenter-ReviewPage-Checklist
+          - ReviewCenter-ReviewPage-Checklist-Link
+          - ReviewCenter-ReviewPage-Checklist-Failed
+          - ReviewCenter-ReviewPage-Checklist-MaskedFailed
+          - ReviewCenter-ReviewPage-Checklist-None
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
 
@@ -664,7 +957,17 @@ sections:
           A plain address lets a reviewer return to the checklist and share it.
         children:
           - ReviewCenter-ChecklistPage-Show
+          - ReviewCenter-ChecklistPage-Show-Complete
+          - ReviewCenter-ChecklistPage-Show-Progress
+          - ReviewCenter-ChecklistPage-Show-NotApplicable
+          - ReviewCenter-ChecklistPage-Show-SectionProgress
+          - ReviewCenter-ChecklistPage-Show-FirstOpen
+          - ReviewCenter-ChecklistPage-Show-NotFound
+          - ReviewCenter-ChecklistPage-Show-NoChecklist
           - ReviewCenter-ChecklistPage-Interactive
+          - ReviewCenter-ChecklistPage-Interactive-TestId
+          - ReviewCenter-ChecklistPage-Interactive-WarningTestId
+          - ReviewCenter-ChecklistPage-Interactive-Marker
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
 
@@ -675,6 +978,13 @@ sections:
           A reviewer who sees what remains can finish the checklist without counting.
         children:
           - ReviewCenter-ChecklistPage-Show
+          - ReviewCenter-ChecklistPage-Show-Complete
+          - ReviewCenter-ChecklistPage-Show-Progress
+          - ReviewCenter-ChecklistPage-Show-NotApplicable
+          - ReviewCenter-ChecklistPage-Show-SectionProgress
+          - ReviewCenter-ChecklistPage-Show-FirstOpen
+          - ReviewCenter-ChecklistPage-Show-NotFound
+          - ReviewCenter-ChecklistPage-Show-NoChecklist
 
       - id: ReviewCenter-Web-Checklist-Answer
         title: >-
@@ -685,6 +995,19 @@ sections:
           subsystem test covers that the answers survive a reload; answering needs a live connection.
         children:
           - ReviewCenter-ChecklistPage-Answer
+          - ReviewCenter-ChecklistPage-Answer-Label
+          - ReviewCenter-ChecklistPage-Answer-Pass
+          - ReviewCenter-ChecklistPage-Answer-PassNoJustification
+          - ReviewCenter-ChecklistPage-Answer-Fail
+          - ReviewCenter-ChecklistPage-Answer-NotApplicable
+          - ReviewCenter-ChecklistPage-Answer-Required
+          - ReviewCenter-ChecklistPage-Answer-Save
+          - ReviewCenter-ChecklistPage-Answer-SaveNotApplicable
+          - ReviewCenter-ChecklistPage-Answer-OwnSlot
+          - ReviewCenter-ChecklistPage-Answer-AnsweredBy
+          - ReviewCenter-ChecklistPage-Answer-User
+          - ReviewCenter-ChecklistPage-Answer-NoNameField
+          - ReviewCenter-ChecklistPage-Answer-Violation
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
 
@@ -695,6 +1018,16 @@ sections:
           A section that does not apply to the change must not demand an answer for each of its checks.
         children:
           - ReviewCenter-ChecklistPage-Applicability
+          - ReviewCenter-ChecklistPage-Applicability-Save
+          - ReviewCenter-ChecklistPage-Applicability-Shown
+          - ReviewCenter-ChecklistPage-Applicability-NoChecks
+          - ReviewCenter-ChecklistPage-Applicability-Totals
+          - ReviewCenter-ChecklistPage-Applicability-Violation
+          - ReviewCenter-ChecklistPage-Applicability-Required
+          - ReviewCenter-ChecklistPage-Applicability-Reapply
+          - ReviewCenter-ChecklistPage-Applicability-Pending
+          - ReviewCenter-ChecklistPage-Applicability-Hint
+          - ReviewCenter-ChecklistPage-Applicability-NothingStored
 
       - id: ReviewCenter-Web-Checklist-SubmitBallot
         title: >-
@@ -703,6 +1036,15 @@ sections:
           Handing in the ballot is the step after which the reviewer sees how the others answered.
         children:
           - ReviewCenter-ChecklistPage-SubmitBallot
+          - ReviewCenter-ChecklistPage-SubmitBallot-HandIn
+          - ReviewCenter-ChecklistPage-SubmitBallot-NotAnswered
+          - ReviewCenter-ChecklistPage-SubmitBallot-Draft
+          - ReviewCenter-ChecklistPage-SubmitBallot-Counted
+          - ReviewCenter-ChecklistPage-SubmitBallot-Incomplete
+          - ReviewCenter-ChecklistPage-SubmitBallot-AfterHandIn
+          - ReviewCenter-ChecklistPage-SubmitBallot-Disabled
+          - ReviewCenter-ChecklistPage-SubmitBallot-SingleSlot
+          - ReviewCenter-ChecklistPage-SubmitBallot-Carried
 
       - id: ReviewCenter-Web-Checklist-NextUnanswered
         title: >-
@@ -711,6 +1053,14 @@ sections:
           A reviewer who works through a long checklist must not have to search for the place to continue.
         children:
           - ReviewCenter-ChecklistPage-NextUnanswered
+          - ReviewCenter-ChecklistPage-NextUnanswered-Open
+          - ReviewCenter-ChecklistPage-NextUnanswered-Scroll
+          - ReviewCenter-ChecklistPage-NextUnanswered-SkipPending
+          - ReviewCenter-ChecklistPage-NextUnanswered-OnlyPending
+          - ReviewCenter-ChecklistPage-NextUnanswered-SectionEnd
+          - ReviewCenter-ChecklistPage-NextUnanswered-SectionEndBack
+          - ReviewCenter-ChecklistPage-NextUnanswered-Complete
+          - ReviewCenter-ChecklistPage-NextUnanswered-NoNext
 
       - id: ReviewCenter-Web-Checklist-JoinNotice
         title: >-
@@ -719,6 +1069,11 @@ sections:
           A user who sees a checklist but cannot answer it must be told why and what to do.
         children:
           - ReviewCenter-ChecklistPage-NoSlot
+          - ReviewCenter-ChecklistPage-NoSlot-NoBallotStatus
+          - ReviewCenter-ChecklistPage-NoSlot-NoSubmit
+          - ReviewCenter-ChecklistPage-NoSlot-Disabled
+          - ReviewCenter-ChecklistPage-NoSlot-SingleStanding
+          - ReviewCenter-ChecklistPage-NoSlot-ConcludedStanding
 
       - id: ReviewCenter-Web-Checklist-Standing
         title: >-
@@ -729,6 +1084,11 @@ sections:
           stays hidden, the ballot requirement of the Web subsystem governs.
         children:
           - ReviewCenter-ChecklistPage-NoSlot
+          - ReviewCenter-ChecklistPage-NoSlot-NoBallotStatus
+          - ReviewCenter-ChecklistPage-NoSlot-NoSubmit
+          - ReviewCenter-ChecklistPage-NoSlot-Disabled
+          - ReviewCenter-ChecklistPage-NoSlot-SingleStanding
+          - ReviewCenter-ChecklistPage-NoSlot-ConcludedStanding
 
       - id: ReviewCenter-Web-Signatures
         title: >-
@@ -740,8 +1100,48 @@ sections:
           the record changes.
         children:
           - ReviewCenter-ReviewPage-Reviewers
+          - ReviewCenter-ReviewPage-Reviewers-NotSigned
+          - ReviewCenter-ReviewPage-Reviewers-SignedStatus
+          - ReviewCenter-ReviewPage-Reviewers-OutOfDate
+          - ReviewCenter-ReviewPage-Reviewers-AddSlot
+          - ReviewCenter-ReviewPage-Reviewers-EnabledOnly
+          - ReviewCenter-ReviewPage-Reviewers-AddRefusal
+          - ReviewCenter-ReviewPage-Reviewers-ChangeSlot
+          - ReviewCenter-ReviewPage-Reviewers-RemoveSlot
+          - ReviewCenter-ReviewPage-Reviewers-ChangeRefusal
+          - ReviewCenter-ReviewPage-Reviewers-EditWarning
+          - ReviewCenter-ReviewPage-Reviewers-EditConfirm
+          - ReviewCenter-ReviewPage-Reviewers-RemoveWarning
+          - ReviewCenter-ReviewPage-Reviewers-RemoveConfirm
+          - ReviewCenter-ReviewPage-Reviewers-SignedNoChange
+          - ReviewCenter-ReviewPage-Reviewers-PlainName
+          - ReviewCenter-ReviewPage-Reviewers-NonMemberBadge
+          - ReviewCenter-ReviewPage-Reviewers-NonMemberHint
+          - ReviewCenter-ReviewPage-Reviewers-MemberUnmarked
+          - ReviewCenter-ReviewPage-Reviewers-DisabledChoice
+          - ReviewCenter-ReviewPage-Reviewers-NonMemberChoice
+          - ReviewCenter-ReviewPage-Reviewers-NoExtraOption
+          - ReviewCenter-ReviewPage-Reviewers-AuthorChoice
+          - ReviewCenter-ReviewPage-Reviewers-BallotNote
+          - ReviewCenter-ReviewPage-Reviewers-ApprovedBadge
+          - ReviewCenter-ReviewPage-Reviewers-InReviewBadge
           - ReviewCenter-ReviewPage-SignatureWarning
+          - ReviewCenter-ReviewPage-SignatureWarning-SignatureKept
+          - ReviewCenter-ReviewPage-SignatureWarning-Question
+          - ReviewCenter-ReviewPage-SignatureWarning-ResolveNote
+          - ReviewCenter-ReviewPage-SignatureWarning-RefusalMessage
           - ReviewCenter-ChecklistPage-SignatureWarning
+          - ReviewCenter-ChecklistPage-SignatureWarning-TakenBack
+          - ReviewCenter-ChecklistPage-SignatureWarning-Applicability
+          - ReviewCenter-ChecklistPage-SignatureWarning-NothingStored
+          - ReviewCenter-ChecklistPage-SignatureWarning-Confirm
+          - ReviewCenter-ChecklistPage-SignatureWarning-OutOfDate
+          - ReviewCenter-ChecklistPage-SignatureWarning-Merged
+          - ReviewCenter-ChecklistPage-SignatureWarning-Cancel
+          - ReviewCenter-ChecklistPage-SignatureWarning-KeepChoice
+          - ReviewCenter-ChecklistPage-SignatureWarning-Revert
+          - ReviewCenter-ChecklistPage-SignatureWarning-Draft
+          - ReviewCenter-ChecklistPage-SignatureWarning-SwitchOff
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
 
@@ -753,6 +1153,19 @@ sections:
           A signature is the statement of a person, so the person confirms the password before it is recorded.
         children:
           - ReviewCenter-ReviewPage-Sign
+          - ReviewCenter-ReviewPage-Sign-ApprovedOutcome
+          - ReviewCenter-ReviewPage-Sign-RejectedOutcome
+          - ReviewCenter-ReviewPage-Sign-Signature
+          - ReviewCenter-ReviewPage-Sign-StaleRecord
+          - ReviewCenter-ReviewPage-Sign-StaleMessage
+          - ReviewCenter-ReviewPage-Sign-Blockers
+          - ReviewCenter-ReviewPage-Sign-ConclusionBlocker
+          - ReviewCenter-ReviewPage-Sign-OthersNoForm
+          - ReviewCenter-ReviewPage-Sign-WrongPassword
+          - ReviewCenter-ReviewPage-Sign-PasswordHidden
+          - ReviewCenter-ReviewPage-Sign-NoSecondForm
+          - ReviewCenter-ReviewPage-Sign-ApprovedResult
+          - ReviewCenter-ReviewPage-Sign-RejectedResult
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
 
@@ -764,6 +1177,19 @@ sections:
           A review that finds the work not acceptable must be able to end with a rejection that says why.
         children:
           - ReviewCenter-ReviewPage-Sign
+          - ReviewCenter-ReviewPage-Sign-ApprovedOutcome
+          - ReviewCenter-ReviewPage-Sign-RejectedOutcome
+          - ReviewCenter-ReviewPage-Sign-Signature
+          - ReviewCenter-ReviewPage-Sign-StaleRecord
+          - ReviewCenter-ReviewPage-Sign-StaleMessage
+          - ReviewCenter-ReviewPage-Sign-Blockers
+          - ReviewCenter-ReviewPage-Sign-ConclusionBlocker
+          - ReviewCenter-ReviewPage-Sign-OthersNoForm
+          - ReviewCenter-ReviewPage-Sign-WrongPassword
+          - ReviewCenter-ReviewPage-Sign-PasswordHidden
+          - ReviewCenter-ReviewPage-Sign-NoSecondForm
+          - ReviewCenter-ReviewPage-Sign-ApprovedResult
+          - ReviewCenter-ReviewPage-Sign-RejectedResult
 
       - id: ReviewCenter-Web-Signatures-Conclusion
         title: >-
@@ -772,6 +1198,14 @@ sections:
           The conclusion is the shared statement of the reviewers, so it has a card where they write it together.
         children:
           - ReviewCenter-ReviewPage-ConclusionCard
+          - ReviewCenter-ReviewPage-ConclusionCard-EmptyState
+          - ReviewCenter-ReviewPage-ConclusionCard-Write
+          - ReviewCenter-ReviewPage-ConclusionCard-AlternateWrite
+          - ReviewCenter-ReviewPage-ConclusionCard-Warning
+          - ReviewCenter-ReviewPage-ConclusionCard-ConfirmSave
+          - ReviewCenter-ReviewPage-ConclusionCard-NoEditor
+          - ReviewCenter-ReviewPage-ConclusionCard-Concluded
+          - ReviewCenter-ReviewPage-ConclusionCard-Refusal
 
       - id: ReviewCenter-Web-Signatures-Status
         title: >-
@@ -789,6 +1223,7 @@ sections:
           The digest identifies the exact record that was signed, so a reader can check it outside the tool.
         children:
           - ReviewCenter-ReviewPage-Digest
+          - ReviewCenter-ReviewPage-Digest-FullValue
 
       - id: ReviewCenter-Web-Signatures-ProjectStatus
         title: >-
@@ -797,6 +1232,10 @@ sections:
           A lead must see which reviews are approved without opening each one.
         children:
           - ReviewCenter-ProjectPage-Approval
+          - ReviewCenter-ProjectPage-Approval-Setup
+          - ReviewCenter-ProjectPage-Approval-Rejected
+          - ReviewCenter-ProjectPage-Approval-InReview
+          - ReviewCenter-ProjectPage-Approval-Current
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
 
@@ -809,6 +1248,17 @@ sections:
           and why, so that a user is not left with controls that fail for no visible reason.
         children:
           - ReviewCenter-ReviewPage-Locked
+          - ReviewCenter-ReviewPage-Locked-Banner
+          - ReviewCenter-ReviewPage-Locked-NoNewThread
+          - ReviewCenter-ReviewPage-Locked-NoReply
+          - ReviewCenter-ReviewPage-Locked-DiffHint
+          - ReviewCenter-ReviewPage-Locked-LineButtons
+          - ReviewCenter-ReviewPage-Locked-DiffButtons
+          - ReviewCenter-ReviewPage-Locked-NoResolve
+          - ReviewCenter-ReviewPage-Locked-SlotsNoControls
+          - ReviewCenter-ReviewPage-Locked-SlotsNote
+          - ReviewCenter-ReviewPage-Locked-ThreadsAll
+          - ReviewCenter-ReviewPage-Locked-Reading
         tests:
           - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
 
@@ -820,6 +1270,8 @@ sections:
           A reviewer who opens the checklist of a concluded review must be told why nothing can be changed.
         children:
           - ReviewCenter-ChecklistPage-Locked
+          - ReviewCenter-ChecklistPage-Locked-Controls
+          - ReviewCenter-ChecklistPage-Locked-Readable
 
       - id: ReviewCenter-Web-ReviewLock-Controls
         title: >-
@@ -828,7 +1280,20 @@ sections:
           A control that is offered but refused is confusing, so the controls of a locked review are disabled.
         children:
           - ReviewCenter-ReviewPage-Locked
+          - ReviewCenter-ReviewPage-Locked-Banner
+          - ReviewCenter-ReviewPage-Locked-NoNewThread
+          - ReviewCenter-ReviewPage-Locked-NoReply
+          - ReviewCenter-ReviewPage-Locked-DiffHint
+          - ReviewCenter-ReviewPage-Locked-LineButtons
+          - ReviewCenter-ReviewPage-Locked-DiffButtons
+          - ReviewCenter-ReviewPage-Locked-NoResolve
+          - ReviewCenter-ReviewPage-Locked-SlotsNoControls
+          - ReviewCenter-ReviewPage-Locked-SlotsNote
+          - ReviewCenter-ReviewPage-Locked-ThreadsAll
+          - ReviewCenter-ReviewPage-Locked-Reading
           - ReviewCenter-ChecklistPage-Locked
+          - ReviewCenter-ChecklistPage-Locked-Controls
+          - ReviewCenter-ChecklistPage-Locked-Readable
 
       - id: ReviewCenter-Web-ReviewLock-Reopen
         title: >-
@@ -838,6 +1303,14 @@ sections:
           The way out of a lock is offered only to those who may take it, and the reason keeps the record honest.
         children:
           - ReviewCenter-ReviewPage-Reopen
+          - ReviewCenter-ReviewPage-Reopen-ProjectAdmin
+          - ReviewCenter-ReviewPage-Reopen-NobodyElse
+          - ReviewCenter-ReviewPage-Reopen-ReasonLimit
+          - ReviewCenter-ReviewPage-Reopen-Refusal
+          - ReviewCenter-ReviewPage-Reopen-StaysLocked
+          - ReviewCenter-ReviewPage-Reopen-InReview
+          - ReviewCenter-ReviewPage-Reopen-History
+          - ReviewCenter-ReviewPage-Reopen-HistoryOrder
         tests:
           - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
 
@@ -848,6 +1321,14 @@ sections:
           A reader must see that a review was reopened, when, and why.
         children:
           - ReviewCenter-ReviewPage-Reopen
+          - ReviewCenter-ReviewPage-Reopen-ProjectAdmin
+          - ReviewCenter-ReviewPage-Reopen-NobodyElse
+          - ReviewCenter-ReviewPage-Reopen-ReasonLimit
+          - ReviewCenter-ReviewPage-Reopen-Refusal
+          - ReviewCenter-ReviewPage-Reopen-StaysLocked
+          - ReviewCenter-ReviewPage-Reopen-InReview
+          - ReviewCenter-ReviewPage-Reopen-History
+          - ReviewCenter-ReviewPage-Reopen-HistoryOrder
         tests:
           - WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen
 
@@ -860,6 +1341,9 @@ sections:
           that fail.
         children:
           - ReviewCenter-ReviewPage-Independence
+          - ReviewCenter-ReviewPage-Independence-AuthorHint
+          - ReviewCenter-ReviewPage-Independence-HintAuthorOnly
+          - ReviewCenter-ReviewPage-Independence-Off
 
       - id: ReviewCenter-Web-ReviewRules
         title: >-
@@ -870,6 +1354,15 @@ sections:
           project may relax a rule that protects its reviews.
         children:
           - ReviewCenter-ProjectPage-ReviewRules
+          - ReviewCenter-ProjectPage-ReviewRules-SystemAdmin
+          - ReviewCenter-ProjectPage-ReviewRules-Hidden
+          - ReviewCenter-ProjectPage-ReviewRules-Explanation
+          - ReviewCenter-ProjectPage-ReviewRules-Save
+          - ReviewCenter-ProjectPage-ReviewRules-Confirmation
+          - ReviewCenter-ProjectPage-ReviewRules-Audit
+          - ReviewCenter-ProjectPage-ReviewRules-Conflict
+          - ReviewCenter-ProjectPage-ReviewRules-ConflictShowsStored
+          - ReviewCenter-ProjectPage-ReviewRules-ConflictNothingRecorded
         tests:
           - WebSubsystem_ProjectAdmin_TogglesIndependentReviewers
 
@@ -880,6 +1373,15 @@ sections:
           Only the people who administer the project may see and change a rule that protects its reviews.
         children:
           - ReviewCenter-ProjectPage-ReviewRules
+          - ReviewCenter-ProjectPage-ReviewRules-SystemAdmin
+          - ReviewCenter-ProjectPage-ReviewRules-Hidden
+          - ReviewCenter-ProjectPage-ReviewRules-Explanation
+          - ReviewCenter-ProjectPage-ReviewRules-Save
+          - ReviewCenter-ProjectPage-ReviewRules-Confirmation
+          - ReviewCenter-ProjectPage-ReviewRules-Audit
+          - ReviewCenter-ProjectPage-ReviewRules-Conflict
+          - ReviewCenter-ProjectPage-ReviewRules-ConflictShowsStored
+          - ReviewCenter-ProjectPage-ReviewRules-ConflictNothingRecorded
         tests:
           - WebSubsystem_ProjectAdmin_TogglesIndependentReviewers
 
@@ -891,6 +1393,15 @@ sections:
           Only the people who administer the project may change a rule that protects its reviews.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-DefaultOn
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Hidden
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-EnforcementHints
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Save
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Confirmation
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Audit
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Conflict
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictShowsStored
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictNothingRecorded
         tests:
           - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
 
@@ -902,6 +1413,15 @@ sections:
           Only the people who administer the project may change a rule that protects its reviews.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-DefaultOn
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Hidden
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-EnforcementHints
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Save
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Confirmation
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Audit
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Conflict
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictShowsStored
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictNothingRecorded
         tests:
           - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
 
@@ -914,6 +1434,15 @@ sections:
           without saying so would hide that an existing project is affected too.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-DefaultOn
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Hidden
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-EnforcementHints
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Save
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Confirmation
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Audit
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Conflict
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictShowsStored
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictNothingRecorded
 
       - id: ReviewCenter-Web-ReviewRuleSwitches-Hidden
         title: >-
@@ -922,6 +1451,15 @@ sections:
           Only the people who administer the project may see and change a rule that protects its reviews.
         children:
           - ReviewCenter-ProjectPage-ReviewRuleSwitches
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-DefaultOn
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Hidden
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-EnforcementHints
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Save
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Confirmation
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Audit
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-Conflict
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictShowsStored
+          - ReviewCenter-ProjectPage-ReviewRuleSwitches-ConflictNothingRecorded
         tests:
           - WebSubsystem_ProjectAdmin_SavesStoredReviewRuleSwitches
 
@@ -934,6 +1472,13 @@ sections:
           instead of being left with controls that fail for no visible reason.
         children:
           - ReviewCenter-ChecklistPage-AuthorBlocked
+          - ReviewCenter-ChecklistPage-AuthorBlocked-Controls
+          - ReviewCenter-ChecklistPage-AuthorBlocked-OtherUser
+          - ReviewCenter-ChecklistPage-AuthorBlocked-OtherControls
+          - ReviewCenter-ChecklistPage-AuthorBlocked-RuleOff
+          - ReviewCenter-ChecklistPage-AuthorBlocked-Locked
+          - ReviewCenter-ChecklistPage-AuthorBlocked-Refusal
+          - ReviewCenter-ChecklistPage-AuthorBlocked-NotStored
         tests:
           - WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers
 
@@ -945,6 +1490,13 @@ sections:
           A control that the rules refuse must not be offered.
         children:
           - ReviewCenter-ChecklistPage-AuthorBlocked
+          - ReviewCenter-ChecklistPage-AuthorBlocked-Controls
+          - ReviewCenter-ChecklistPage-AuthorBlocked-OtherUser
+          - ReviewCenter-ChecklistPage-AuthorBlocked-OtherControls
+          - ReviewCenter-ChecklistPage-AuthorBlocked-RuleOff
+          - ReviewCenter-ChecklistPage-AuthorBlocked-Locked
+          - ReviewCenter-ChecklistPage-AuthorBlocked-Refusal
+          - ReviewCenter-ChecklistPage-AuthorBlocked-NotStored
         tests:
           - WebSubsystem_ChecklistPage_AuthorSeesNoticeAndNonAuthorAnswers
 
@@ -956,6 +1508,9 @@ sections:
           A user must be told what to do instead of being offered a form that the rules refuse.
         children:
           - ReviewCenter-ReviewPage-ReopenerBlocked
+          - ReviewCenter-ReviewPage-ReopenerBlocked-OtherOccupants
+          - ReviewCenter-ReviewPage-ReopenerBlocked-RuleOff
+          - ReviewCenter-ReviewPage-ReopenerBlocked-StrandRefusal
 
       - id: ReviewCenter-Web-ReviewRuleNotices-ReopenRefused
         title: >-
@@ -965,6 +1520,9 @@ sections:
           A refused reopening must say why, so that the user can fix the cause.
         children:
           - ReviewCenter-ReviewPage-ReopenerBlocked
+          - ReviewCenter-ReviewPage-ReopenerBlocked-OtherOccupants
+          - ReviewCenter-ReviewPage-ReopenerBlocked-RuleOff
+          - ReviewCenter-ReviewPage-ReopenerBlocked-StrandRefusal
 
       - id: ReviewCenter-Web-SignIn
         title: >-
@@ -1317,7 +1875,17 @@ sections:
           Participants need to see who did what to a review and when, from the review itself.
         children:
           - ReviewCenter-HistoryPage-Display
+          - ReviewCenter-HistoryPage-Display-OnlyReview
+          - ReviewCenter-HistoryPage-Display-Newest
+          - ReviewCenter-HistoryPage-Display-Columns
+          - ReviewCenter-HistoryPage-Display-Empty
+          - ReviewCenter-HistoryPage-Display-NotFound
+          - ReviewCenter-HistoryPage-Display-BackLink
           - ReviewCenter-HistoryPage-Access
+          - ReviewCenter-HistoryPage-Access-Hidden
+          - ReviewCenter-HistoryPage-Access-SignedOut
+          - ReviewCenter-HistoryPage-Access-Revoked
+          - ReviewCenter-HistoryPage-Access-PlainText
         tests:
           - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
           - Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries
@@ -1329,6 +1897,12 @@ sections:
           The latest change is what a reader looks for first.
         children:
           - ReviewCenter-HistoryPage-Display
+          - ReviewCenter-HistoryPage-Display-OnlyReview
+          - ReviewCenter-HistoryPage-Display-Newest
+          - ReviewCenter-HistoryPage-Display-Columns
+          - ReviewCenter-HistoryPage-Display-Empty
+          - ReviewCenter-HistoryPage-Display-NotFound
+          - ReviewCenter-HistoryPage-Display-BackLink
         tests:
           - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
 
@@ -1339,6 +1913,8 @@ sections:
           A long history must stay quick to load and easy to read.
         children:
           - ReviewCenter-HistoryPage-Paging
+          - ReviewCenter-HistoryPage-Paging-Older
+          - ReviewCenter-HistoryPage-Paging-Newer
 
       - id: ReviewCenter-Web-AuditHistory-Link
         title: >-
@@ -1355,6 +1931,10 @@ sections:
           Entries contain text that users typed, and markup in it must not be interpreted.
         children:
           - ReviewCenter-HistoryPage-Access
+          - ReviewCenter-HistoryPage-Access-Hidden
+          - ReviewCenter-HistoryPage-Access-SignedOut
+          - ReviewCenter-HistoryPage-Access-Revoked
+          - ReviewCenter-HistoryPage-Access-PlainText
 
       - id: ReviewCenter-Web-AuditPage
         title: >-
@@ -1363,11 +1943,29 @@ sections:
           The whole trail names every user and action, so only the people who run the tool may read all of it.
         children:
           - ReviewCenter-AuditPage-Display
+          - ReviewCenter-AuditPage-Display-Newest
+          - ReviewCenter-AuditPage-Display-Columns
+          - ReviewCenter-AuditPage-Display-PageSize
+          - ReviewCenter-AuditPage-Display-Paging
+          - ReviewCenter-AuditPage-Display-Empty
+          - ReviewCenter-AuditPage-Display-PlainText
           - ReviewCenter-AuditPage-Admin
+          - ReviewCenter-AuditPage-Admin-Refused
+          - ReviewCenter-AuditPage-Admin-Role
+          - ReviewCenter-AuditPage-Admin-Enabled
+          - ReviewCenter-AuditPage-Admin-NoEntries
+          - ReviewCenter-AuditPage-Admin-NoRead
+          - ReviewCenter-AuditPage-Admin-Verify
+          - ReviewCenter-AuditPage-Admin-VerifyNoEntries
+          - ReviewCenter-AuditPage-Admin-VerifyNoRead
           - ReviewCenter-AuditPage-Paging
+          - ReviewCenter-AuditPage-Paging-Size
+          - ReviewCenter-AuditPage-Paging-Escaped
           - ReviewCenter-AuditPage-ShortHash
+          - ReviewCenter-AuditPage-ShortHash-Tooltip
         tests:
           - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
+          - Routes_Render_AdminOpensAuditRoute_ShowsAuditPage
 
       - id: ReviewCenter-Web-AuditPage-HeaderLink
         title: >-
@@ -1384,6 +1982,9 @@ sections:
           A trail that cannot be checked proves nothing, so the check is offered next to the trail.
         children:
           - ReviewCenter-AuditPage-Verify
+          - ReviewCenter-AuditPage-Verify-HeadHash
+          - ReviewCenter-AuditPage-Verify-Broken
+          - ReviewCenter-AuditPage-Verify-BrokenHeadHash
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
 
@@ -1395,6 +1996,9 @@ sections:
           newest entries.
         children:
           - ReviewCenter-AuditPage-Verify
+          - ReviewCenter-AuditPage-Verify-HeadHash
+          - ReviewCenter-AuditPage-Verify-Broken
+          - ReviewCenter-AuditPage-Verify-BrokenHeadHash
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
 
@@ -1405,6 +2009,9 @@ sections:
           A system administrator who learns that the trail was altered needs to know where to look first.
         children:
           - ReviewCenter-AuditPage-Verify
+          - ReviewCenter-AuditPage-Verify-HeadHash
+          - ReviewCenter-AuditPage-Verify-Broken
+          - ReviewCenter-AuditPage-Verify-BrokenHeadHash
 
       - id: ReviewCenter-Web-AuditPage-Filter
         title: >-
@@ -1414,6 +2021,24 @@ sections:
           A trail is read to answer a question, and the question names a project, a person, an action, or a time.
         children:
           - ReviewCenter-AuditPage-Filter
+          - ReviewCenter-AuditPage-Filter-ProjectPage
+          - ReviewCenter-AuditPage-Filter-Actor
+          - ReviewCenter-AuditPage-Filter-Action
+          - ReviewCenter-AuditPage-Filter-Group
+          - ReviewCenter-AuditPage-Filter-Review
+          - ReviewCenter-AuditPage-Filter-Project
+          - ReviewCenter-AuditPage-Filter-ProjectScope
+          - ReviewCenter-AuditPage-Filter-Dates
+          - ReviewCenter-AuditPage-Filter-PageSize
+          - ReviewCenter-AuditPage-Filter-Address
+          - ReviewCenter-AuditPage-Filter-Fallback
+          - ReviewCenter-AuditPage-Filter-FallbackSize
+          - ReviewCenter-AuditPage-Filter-Reversed
+          - ReviewCenter-AuditPage-Filter-ReversedMessage
+          - ReviewCenter-AuditPage-Filter-Cut
+          - ReviewCenter-AuditPage-Filter-Encoded
+          - ReviewCenter-AuditPage-Filter-Clear
+          - ReviewCenter-AuditPage-Filter-NoMatch
 
       - id: ReviewCenter-Web-AuditPage-ExportCsv
         title: >-
@@ -1423,6 +2048,15 @@ sections:
           An auditor must be able to take the trail into a spreadsheet.
         children:
           - ReviewCenter-AuditPage-Export
+          - ReviewCenter-AuditPage-Export-Json
+          - ReviewCenter-AuditPage-Export-GlobalTarget
+          - ReviewCenter-AuditPage-Export-ProjectTarget
+          - ReviewCenter-AuditPage-Export-Filter
+          - ReviewCenter-AuditPage-Export-Project
+          - ReviewCenter-AuditPage-Export-Escaped
+          - ReviewCenter-AuditPage-Export-NoPaging
+          - ReviewCenter-AuditPage-Export-Note
+          - ReviewCenter-AuditPage-Export-Chain
 
       - id: ReviewCenter-Web-AuditPage-ExportJson
         title: >-
@@ -1432,6 +2066,15 @@ sections:
           An auditor must be able to take the trail into a tool that reads structured data.
         children:
           - ReviewCenter-AuditPage-Export
+          - ReviewCenter-AuditPage-Export-Json
+          - ReviewCenter-AuditPage-Export-GlobalTarget
+          - ReviewCenter-AuditPage-Export-ProjectTarget
+          - ReviewCenter-AuditPage-Export-Filter
+          - ReviewCenter-AuditPage-Export-Project
+          - ReviewCenter-AuditPage-Export-Escaped
+          - ReviewCenter-AuditPage-Export-NoPaging
+          - ReviewCenter-AuditPage-Export-Note
+          - ReviewCenter-AuditPage-Export-Chain
 
       - id: ReviewCenter-Web-AuditPage-ProjectTrail
         title: >-
@@ -1441,6 +2084,19 @@ sections:
           Project admins answer for their project, so they see its trail, and only that.
         children:
           - ReviewCenter-AuditPage-ProjectView
+          - ReviewCenter-AuditPage-ProjectView-SystemAdmin
+          - ReviewCenter-AuditPage-ProjectView-Auditor
+          - ReviewCenter-AuditPage-ProjectView-Newest
+          - ReviewCenter-AuditPage-ProjectView-PageSize
+          - ReviewCenter-AuditPage-ProjectView-Paging
+          - ReviewCenter-AuditPage-ProjectView-Empty
+          - ReviewCenter-AuditPage-ProjectView-NotFoundMember
+          - ReviewCenter-AuditPage-ProjectView-NotFoundOutsider
+          - ReviewCenter-AuditPage-ProjectView-NotFoundMissing
+          - ReviewCenter-AuditPage-ProjectView-Revoked
+          - ReviewCenter-AuditPage-ProjectView-Demoted
+          - ReviewCenter-AuditPage-ProjectView-SessionEnded
+          - ReviewCenter-AuditPage-ProjectView-Interactive
         tests:
           - ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents
 
@@ -1451,6 +2107,19 @@ sections:
           The trail of a project names its members and their actions, so it is not for other users.
         children:
           - ReviewCenter-AuditPage-ProjectView
+          - ReviewCenter-AuditPage-ProjectView-SystemAdmin
+          - ReviewCenter-AuditPage-ProjectView-Auditor
+          - ReviewCenter-AuditPage-ProjectView-Newest
+          - ReviewCenter-AuditPage-ProjectView-PageSize
+          - ReviewCenter-AuditPage-ProjectView-Paging
+          - ReviewCenter-AuditPage-ProjectView-Empty
+          - ReviewCenter-AuditPage-ProjectView-NotFoundMember
+          - ReviewCenter-AuditPage-ProjectView-NotFoundOutsider
+          - ReviewCenter-AuditPage-ProjectView-NotFoundMissing
+          - ReviewCenter-AuditPage-ProjectView-Revoked
+          - ReviewCenter-AuditPage-ProjectView-Demoted
+          - ReviewCenter-AuditPage-ProjectView-SessionEnded
+          - ReviewCenter-AuditPage-ProjectView-Interactive
 
       - id: ReviewCenter-Web-Repositories
         title: >-
@@ -1466,6 +2135,7 @@ sections:
           - ReviewCenter-RepositoriesPage-Display-OptionalFields
           - ReviewCenter-RepositoriesPage-Display-NoDelete
           - ReviewCenter-ProjectPage-RepositoriesLink
+          - ReviewCenter-ProjectPage-RepositoriesLink-Hidden
         tests:
           - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
 
@@ -1559,6 +2229,11 @@ sections:
           Reviewing a change means seeing what it replaces, so a review can start from a repository and a baseline.
         children:
           - ReviewCenter-ProjectPage-RepositoryForm
+          - ReviewCenter-ProjectPage-RepositoryForm-ThisProjectOnly
+          - ReviewCenter-ProjectPage-RepositoryForm-Revisions
+          - ReviewCenter-ProjectPage-RepositoryForm-Creates
+          - ReviewCenter-ProjectPage-RepositoryForm-NoBaseline
+          - ReviewCenter-ProjectPage-RepositoryForm-SkippedEntries
         tests:
           - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
 
@@ -1570,6 +2245,8 @@ sections:
           A disabled repository must not be read, and the page never shows how the server reaches a repository.
         children:
           - ReviewCenter-ProjectPage-SourceChoice
+          - ReviewCenter-ProjectPage-SourceChoice-RepositoryOffered
+          - ReviewCenter-ProjectPage-SourceChoice-NoRepositoryHint
 
       - id: ReviewCenter-Web-RepositoryReviews-Reason
         title: >-
@@ -1578,6 +2255,9 @@ sections:
           A user who is refused must be told why, in words and not as raw git output.
         children:
           - ReviewCenter-ProjectPage-RepositoryError
+          - ReviewCenter-ProjectPage-RepositoryError-BadRevision
+          - ReviewCenter-ProjectPage-RepositoryError-NoneChosen
+          - ReviewCenter-ProjectPage-RepositoryError-Disabled
 
       - id: ReviewCenter-Web-RepositoryReviews-ChangeKind
         title: >-
@@ -1586,6 +2266,9 @@ sections:
           A reviewer must see at once which files were added, changed, or deleted.
         children:
           - ReviewCenter-ReviewPage-Source
+          - ReviewCenter-ReviewPage-Source-Details
+          - ReviewCenter-ReviewPage-Source-UploadNoKind
+          - ReviewCenter-ReviewPage-Source-UploadNoDetails
 
       - id: ReviewCenter-Web-RepositoryReviews-Source
         title: >-
@@ -1594,6 +2277,9 @@ sections:
           A reader must know which repository and revisions the review is about.
         children:
           - ReviewCenter-ReviewPage-Source
+          - ReviewCenter-ReviewPage-Source-Details
+          - ReviewCenter-ReviewPage-Source-UploadNoKind
+          - ReviewCenter-ReviewPage-Source-UploadNoDetails
         tests:
           - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
 
@@ -1604,6 +2290,15 @@ sections:
           Reviewing a change means seeing what it replaces.
         children:
           - ReviewCenter-ReviewPage-Versions
+          - ReviewCenter-ReviewPage-Versions-Head
+          - ReviewCenter-ReviewPage-Versions-Baseline
+          - ReviewCenter-ReviewPage-Versions-AddedFile
+          - ReviewCenter-ReviewPage-Versions-DeletedFile
+          - ReviewCenter-ReviewPage-Versions-DeletedContent
+          - ReviewCenter-ReviewPage-Versions-DeletedComment
+          - ReviewCenter-ReviewPage-Versions-NextFile
+          - ReviewCenter-ReviewPage-Versions-HeadOnly
+          - ReviewCenter-ReviewPage-Versions-Switch
         tests:
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
 
@@ -1615,6 +2310,15 @@ sections:
           The page keeps the full text one click away, and a deleted file has no head version to show.
         children:
           - ReviewCenter-ReviewPage-Versions
+          - ReviewCenter-ReviewPage-Versions-Head
+          - ReviewCenter-ReviewPage-Versions-Baseline
+          - ReviewCenter-ReviewPage-Versions-AddedFile
+          - ReviewCenter-ReviewPage-Versions-DeletedFile
+          - ReviewCenter-ReviewPage-Versions-DeletedContent
+          - ReviewCenter-ReviewPage-Versions-DeletedComment
+          - ReviewCenter-ReviewPage-Versions-NextFile
+          - ReviewCenter-ReviewPage-Versions-HeadOnly
+          - ReviewCenter-ReviewPage-Versions-Switch
         tests:
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
 
@@ -1626,6 +2330,15 @@ sections:
           The page keeps the replaced text one click away, and an added file has no baseline version to show.
         children:
           - ReviewCenter-ReviewPage-Versions
+          - ReviewCenter-ReviewPage-Versions-Head
+          - ReviewCenter-ReviewPage-Versions-Baseline
+          - ReviewCenter-ReviewPage-Versions-AddedFile
+          - ReviewCenter-ReviewPage-Versions-DeletedFile
+          - ReviewCenter-ReviewPage-Versions-DeletedContent
+          - ReviewCenter-ReviewPage-Versions-DeletedComment
+          - ReviewCenter-ReviewPage-Versions-NextFile
+          - ReviewCenter-ReviewPage-Versions-HeadOnly
+          - ReviewCenter-ReviewPage-Versions-Switch
         tests:
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
 
@@ -1637,6 +2350,18 @@ sections:
           Reviewers judge a change by reading what changed.
         children:
           - ReviewCenter-ReviewPage-Diff
+          - ReviewCenter-ReviewPage-Diff-PlainText
+          - ReviewCenter-ReviewPage-Diff-Unchanged
+          - ReviewCenter-ReviewPage-Diff-Pairing
+          - ReviewCenter-ReviewPage-Diff-AddedFile
+          - ReviewCenter-ReviewPage-Diff-DeletedFile
+          - ReviewCenter-ReviewPage-Diff-Marks
+          - ReviewCenter-ReviewPage-Diff-Colors
+          - ReviewCenter-ReviewPage-Diff-Summary
+          - ReviewCenter-ReviewPage-Diff-Hint
+          - ReviewCenter-ReviewPage-Diff-Collapsed
+          - ReviewCenter-ReviewPage-Diff-ScrollToChange
+          - ReviewCenter-ReviewPage-Diff-NoRows
         tests:
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
 
@@ -1647,6 +2372,18 @@ sections:
           The lines that did not change would bury the lines that did.
         children:
           - ReviewCenter-ReviewPage-Diff
+          - ReviewCenter-ReviewPage-Diff-PlainText
+          - ReviewCenter-ReviewPage-Diff-Unchanged
+          - ReviewCenter-ReviewPage-Diff-Pairing
+          - ReviewCenter-ReviewPage-Diff-AddedFile
+          - ReviewCenter-ReviewPage-Diff-DeletedFile
+          - ReviewCenter-ReviewPage-Diff-Marks
+          - ReviewCenter-ReviewPage-Diff-Colors
+          - ReviewCenter-ReviewPage-Diff-Summary
+          - ReviewCenter-ReviewPage-Diff-Hint
+          - ReviewCenter-ReviewPage-Diff-Collapsed
+          - ReviewCenter-ReviewPage-Diff-ScrollToChange
+          - ReviewCenter-ReviewPage-Diff-NoRows
 
       - id: ReviewCenter-Web-DiffReview-LineComment
         title: >-
@@ -1656,6 +2393,14 @@ sections:
           subsystem tests guard the stylesheet rules that show the comment control.
         children:
           - ReviewCenter-ReviewPage-DiffComment
+          - ReviewCenter-ReviewPage-DiffComment-Baseline
+          - ReviewCenter-ReviewPage-DiffComment-Head
+          - ReviewCenter-ReviewPage-DiffComment-PlainWords
+          - ReviewCenter-ReviewPage-DiffComment-ShiftClick
+          - ReviewCenter-ReviewPage-DiffComment-ThroughLine
+          - ReviewCenter-ReviewPage-DiffComment-Cancel
+          - ReviewCenter-ReviewPage-DiffComment-WholeFile
+          - ReviewCenter-ReviewPage-DiffComment-Focus
         tests:
           - WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch
           - WebSubsystem_Stylesheet_TransparentButtons_OverrideTheGlobalHoverFill
@@ -1667,6 +2412,13 @@ sections:
           A reader sees the discussion next to the line that it is about.
         children:
           - ReviewCenter-ReviewPage-DiffThreads
+          - ReviewCenter-ReviewPage-DiffThreads-FirstLine
+          - ReviewCenter-ReviewPage-DiffThreads-Collapsed
+          - ReviewCenter-ReviewPage-DiffThreads-Highlight
+          - ReviewCenter-ReviewPage-DiffThreads-Resolved
+          - ReviewCenter-ReviewPage-DiffThreads-Controls
+          - ReviewCenter-ReviewPage-DiffThreads-WholeFileOnly
+          - ReviewCenter-ReviewPage-DiffThreads-Counts
 
       - id: ReviewCenter-Web-DiffReview-Unavailable
         title: >-
@@ -1675,6 +2427,9 @@ sections:
           A reader who sees no diff must be told why instead of seeing an empty page.
         children:
           - ReviewCenter-ReviewPage-DiffStates
+          - ReviewCenter-ReviewPage-DiffStates-Versions
+          - ReviewCenter-ReviewPage-DiffStates-Binary
+          - ReviewCenter-ReviewPage-DiffStates-LineEndings
 
       - id: ReviewCenter-Web-DiffReview-PhoneLayout
         title: >-
@@ -1682,8 +2437,6 @@ sections:
         justification: |
           A page that scrolls sideways is hard to read on a phone. The subsystem test guards the stylesheet rules that
           keep the code scrolling inside itself.
-        children:
-          - ReviewCenter-ReviewPage-DiffLayout
         tests:
           - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
 
@@ -1696,7 +2449,34 @@ sections:
           line, or one thread by sending a link. The subsystem test guards the style of the link to a thread.
         children:
           - ReviewCenter-ReviewPage-DeepLinks
+          - ReviewCenter-ReviewPage-DeepLinks-Line
+          - ReviewCenter-ReviewPage-DeepLinks-BaselineLine
+          - ReviewCenter-ReviewPage-DeepLinks-Thread
+          - ReviewCenter-ReviewPage-DeepLinks-ThreadScroll
+          - ReviewCenter-ReviewPage-DeepLinks-BaselineThread
+          - ReviewCenter-ReviewPage-DeepLinks-ResolvedThread
+          - ReviewCenter-ReviewPage-DeepLinks-ThreadCounts
+          - ReviewCenter-ReviewPage-DeepLinks-ReplaceAddress
+          - ReviewCenter-ReviewPage-DeepLinks-KeepAddress
+          - ReviewCenter-ReviewPage-DeepLinks-ThreadLink
+          - ReviewCenter-ReviewPage-DeepLinks-CopyButton
+          - ReviewCenter-ReviewPage-DeepLinks-CopyLink
+          - ReviewCenter-ReviewPage-DeepLinks-CopyConfirm
+          - ReviewCenter-ReviewPage-DeepLinks-CopyTiming
+          - ReviewCenter-ReviewPage-DeepLinks-CopyFailed
+          - ReviewCenter-ReviewPage-DeepLinks-BuildReview
+          - ReviewCenter-ReviewPage-DeepLinks-BuildLine
+          - ReviewCenter-ReviewPage-DeepLinks-BuildThread
+          - ReviewCenter-ReviewPage-DeepLinks-Escaping
+          - ReviewCenter-ReviewPage-DeepLinks-RoundTrip
+          - ReviewCenter-ReviewPage-DeepLinks-LocalOnly
+          - ReviewCenter-ReviewPage-DeepLinks-NullArguments
           - ReviewCenter-ReviewPage-DeepLinksNotFound
+          - ReviewCenter-ReviewPage-DeepLinksNotFound-WayBack
+          - ReviewCenter-ReviewPage-DeepLinksNotFound-FileList
+          - ReviewCenter-ReviewPage-DeepLinksNotFound-NoErrorPage
+          - ReviewCenter-ReviewPage-DeepLinksNotFound-UnknownSide
+          - ReviewCenter-ReviewPage-DeepLinksNotFound-Cleared
         tests:
           - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
 
@@ -1707,6 +2487,28 @@ sections:
           A link that the reader copies from the address bar must open what the reader sees.
         children:
           - ReviewCenter-ReviewPage-DeepLinks
+          - ReviewCenter-ReviewPage-DeepLinks-Line
+          - ReviewCenter-ReviewPage-DeepLinks-BaselineLine
+          - ReviewCenter-ReviewPage-DeepLinks-Thread
+          - ReviewCenter-ReviewPage-DeepLinks-ThreadScroll
+          - ReviewCenter-ReviewPage-DeepLinks-BaselineThread
+          - ReviewCenter-ReviewPage-DeepLinks-ResolvedThread
+          - ReviewCenter-ReviewPage-DeepLinks-ThreadCounts
+          - ReviewCenter-ReviewPage-DeepLinks-ReplaceAddress
+          - ReviewCenter-ReviewPage-DeepLinks-KeepAddress
+          - ReviewCenter-ReviewPage-DeepLinks-ThreadLink
+          - ReviewCenter-ReviewPage-DeepLinks-CopyButton
+          - ReviewCenter-ReviewPage-DeepLinks-CopyLink
+          - ReviewCenter-ReviewPage-DeepLinks-CopyConfirm
+          - ReviewCenter-ReviewPage-DeepLinks-CopyTiming
+          - ReviewCenter-ReviewPage-DeepLinks-CopyFailed
+          - ReviewCenter-ReviewPage-DeepLinks-BuildReview
+          - ReviewCenter-ReviewPage-DeepLinks-BuildLine
+          - ReviewCenter-ReviewPage-DeepLinks-BuildThread
+          - ReviewCenter-ReviewPage-DeepLinks-Escaping
+          - ReviewCenter-ReviewPage-DeepLinks-RoundTrip
+          - ReviewCenter-ReviewPage-DeepLinks-LocalOnly
+          - ReviewCenter-ReviewPage-DeepLinks-NullArguments
 
       - id: ReviewCenter-Web-DeepLinks-ReturnAfterSignIn
         title: >-
@@ -1719,6 +2521,16 @@ sections:
         tests:
           - Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery
 
+      - id: ReviewCenter-Web-DeepLinks-FirstResponse
+        title: >-
+          The Web subsystem shall answer the first request for the address of a thread with the page that shows the
+          file of the thread and the highlighted thread.
+        justification: |
+          A colleague who opens a shared link must see the thread at once, so the server-rendered first response
+          already holds the file and the highlighted thread instead of waiting for the browser to run code.
+        tests:
+          - ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread
+
       - id: ReviewCenter-Web-PlanReviews
         title: >-
           The Web subsystem shall let a user plan the reviews that a head revision of a repository of the project needs
@@ -1727,9 +2539,36 @@ sections:
           Planning is useful only when a user can start it from the project and read the answer without raw git output.
         children:
           - ReviewCenter-PlanPage-Form
+          - ReviewCenter-PlanPage-Form-ProjectName
+          - ReviewCenter-PlanPage-Form-EnabledOnly
+          - ReviewCenter-PlanPage-Form-NoSecrets
+          - ReviewCenter-PlanPage-Form-Head
+          - ReviewCenter-PlanPage-Form-Baseline
+          - ReviewCenter-PlanPage-Form-BaselineDefault
+          - ReviewCenter-PlanPage-Form-BaselineInput
+          - ReviewCenter-PlanPage-Form-NotFound
+          - ReviewCenter-PlanPage-Form-NoRepository
+          - ReviewCenter-PlanPage-Form-MissingRepository
+          - ReviewCenter-PlanPage-Form-MissingHead
+          - ReviewCenter-PlanPage-Form-MissingBaseline
+          - ReviewCenter-PlanPage-Form-NoGitRead
           - ReviewCenter-PlanPage-State
+          - ReviewCenter-PlanPage-State-Mode
+          - ReviewCenter-PlanPage-State-Repository
+          - ReviewCenter-PlanPage-State-BaselineRevision
+          - ReviewCenter-PlanPage-State-Error
+          - ReviewCenter-PlanPage-State-Project
+          - ReviewCenter-PlanPage-State-ProjectResults
+          - ReviewCenter-PlanPage-State-StaleRead
+          - ReviewCenter-PlanPage-State-StaleCreate
+          - ReviewCenter-PlanPage-State-FreeForm
+          - ReviewCenter-PlanPage-State-Loading
+          - ReviewCenter-PlanPage-State-ReadDisabled
+          - ReviewCenter-PlanPage-State-CreateDisabled
           - ReviewCenter-PlanPage-Interactive
           - ReviewCenter-ProjectPage-PlanLink
+          - ReviewCenter-ProjectPage-PlanLink-Unavailable
+          - ReviewCenter-ProjectPage-PlanLink-Disabled
           - ReviewCenter-HelpPage-PlanningTopic
           - ReviewCenter-HelpPage-PlanningTopic-Approved
           - ReviewCenter-HelpPage-PlanningTopic-NoApproved
@@ -1744,6 +2583,8 @@ sections:
           A user must read the answer at a glance.
         children:
           - ReviewCenter-PlanPage-Summary
+          - ReviewCenter-PlanPage-Summary-Facts
+          - ReviewCenter-PlanPage-Summary-NextStep
         tests:
           - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
 
@@ -1754,6 +2595,16 @@ sections:
           The sets that need action are what the user came for, so they lead and are ready to be created.
         children:
           - ReviewCenter-PlanPage-Rows
+          - ReviewCenter-PlanPage-Rows-First
+          - ReviewCenter-PlanPage-Rows-Details
+          - ReviewCenter-PlanPage-Rows-Counts
+          - ReviewCenter-PlanPage-Rows-BulkSelection
+          - ReviewCenter-PlanPage-Rows-EmptySets
+          - ReviewCenter-PlanPage-Rows-FiledSets
+          - ReviewCenter-PlanPage-Rows-ProblemSets
+          - ReviewCenter-PlanPage-Rows-HiddenGroups
+          - ReviewCenter-PlanPage-Rows-PlainTitle
+          - ReviewCenter-PlanPage-Rows-PlainReason
         tests:
           - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
 
@@ -1764,6 +2615,16 @@ sections:
           Sets with nothing to do would bury the sets that need action.
         children:
           - ReviewCenter-PlanPage-Rows
+          - ReviewCenter-PlanPage-Rows-First
+          - ReviewCenter-PlanPage-Rows-Details
+          - ReviewCenter-PlanPage-Rows-Counts
+          - ReviewCenter-PlanPage-Rows-BulkSelection
+          - ReviewCenter-PlanPage-Rows-EmptySets
+          - ReviewCenter-PlanPage-Rows-FiledSets
+          - ReviewCenter-PlanPage-Rows-ProblemSets
+          - ReviewCenter-PlanPage-Rows-HiddenGroups
+          - ReviewCenter-PlanPage-Rows-PlainTitle
+          - ReviewCenter-PlanPage-Rows-PlainReason
         tests:
           - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
 
@@ -1774,6 +2635,20 @@ sections:
           The user must see which reviews were created and which were not.
         children:
           - ReviewCenter-PlanPage-Create
+          - ReviewCenter-PlanPage-Create-Disabled
+          - ReviewCenter-PlanPage-Create-TickedOnly
+          - ReviewCenter-PlanPage-Create-FromPlanCommit
+          - ReviewCenter-PlanPage-Create-Results
+          - ReviewCenter-PlanPage-Create-ResultCreated
+          - ReviewCenter-PlanPage-Create-ResultFailed
+          - ReviewCenter-PlanPage-Create-NoGitText
+          - ReviewCenter-PlanPage-Create-PlanAgain
+          - ReviewCenter-PlanPage-Create-BackLink
+          - ReviewCenter-PlanPage-Create-FailedKeepsOthers
+          - ReviewCenter-PlanPage-Create-FailedKeepsEarlier
+          - ReviewCenter-PlanPage-Create-Refused
+          - ReviewCenter-PlanPage-Create-RefusedKeepsPlan
+          - ReviewCenter-PlanPage-Create-RefusedCreatesNothing
         tests:
           - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
 
@@ -1784,6 +2659,16 @@ sections:
           Raw git output does not tell a user what to do next.
         children:
           - ReviewCenter-PlanPage-Error
+          - ReviewCenter-PlanPage-Error-NoConfig
+          - ReviewCenter-PlanPage-Error-NoConfigLink
+          - ReviewCenter-PlanPage-Error-InvalidConfig
+          - ReviewCenter-PlanPage-Error-Disabled
+          - ReviewCenter-PlanPage-Error-DisabledNoSecrets
+          - ReviewCenter-PlanPage-Error-Unreadable
+          - ReviewCenter-PlanPage-Error-UnreadableNoGitText
+          - ReviewCenter-PlanPage-Error-Unexpected
+          - ReviewCenter-PlanPage-Error-UnexpectedNoDetail
+          - ReviewCenter-PlanPage-Error-NoPlan
 
       - id: ReviewCenter-Web-PlanReviews-ReviewSet
         title: >-
@@ -1792,6 +2677,7 @@ sections:
           A reader of a planned review must see which set of files it covers.
         children:
           - ReviewCenter-ReviewPage-ReviewSet
+          - ReviewCenter-ReviewPage-ReviewSet-NoRow
 
       - id: ReviewCenter-Web-Attestation
         title: >-
@@ -1801,6 +2687,15 @@ sections:
           A user who completes a review needs the evidence at hand, and a review that is not approved has none yet.
         children:
           - ReviewCenter-ReviewPage-Attestation
+          - ReviewCenter-ReviewPage-Attestation-Address
+          - ReviewCenter-ReviewPage-Attestation-NotConcluded
+          - ReviewCenter-ReviewPage-Attestation-SelfSignedNote
+          - ReviewCenter-ReviewPage-Attestation-SuppliedNote
+          - ReviewCenter-ReviewPage-Attestation-OrganizationNote
+          - ReviewCenter-ReviewPage-Attestation-HelpLink
+          - ReviewCenter-ReviewPage-Attestation-KeyProblem
+          - ReviewCenter-ReviewPage-Attestation-KeyWarning
+          - ReviewCenter-ReviewPage-Attestation-NoKeyWarning
         tests:
           - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
 
@@ -1812,6 +2707,15 @@ sections:
           document anywhere.
         children:
           - ReviewCenter-ReviewPage-Attestation
+          - ReviewCenter-ReviewPage-Attestation-Address
+          - ReviewCenter-ReviewPage-Attestation-NotConcluded
+          - ReviewCenter-ReviewPage-Attestation-SelfSignedNote
+          - ReviewCenter-ReviewPage-Attestation-SuppliedNote
+          - ReviewCenter-ReviewPage-Attestation-OrganizationNote
+          - ReviewCenter-ReviewPage-Attestation-HelpLink
+          - ReviewCenter-ReviewPage-Attestation-KeyProblem
+          - ReviewCenter-ReviewPage-Attestation-KeyWarning
+          - ReviewCenter-ReviewPage-Attestation-NoKeyWarning
         tests:
           - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
 
@@ -1822,6 +2726,15 @@ sections:
           A user needs to know how much the signature is worth before relying on it.
         children:
           - ReviewCenter-ReviewPage-Attestation
+          - ReviewCenter-ReviewPage-Attestation-Address
+          - ReviewCenter-ReviewPage-Attestation-NotConcluded
+          - ReviewCenter-ReviewPage-Attestation-SelfSignedNote
+          - ReviewCenter-ReviewPage-Attestation-SuppliedNote
+          - ReviewCenter-ReviewPage-Attestation-OrganizationNote
+          - ReviewCenter-ReviewPage-Attestation-HelpLink
+          - ReviewCenter-ReviewPage-Attestation-KeyProblem
+          - ReviewCenter-ReviewPage-Attestation-KeyWarning
+          - ReviewCenter-ReviewPage-Attestation-NoKeyWarning
         tests:
           - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
 
@@ -1851,6 +2764,15 @@ sections:
           A user who sees no download must be told why instead of looking for it.
         children:
           - ReviewCenter-ReviewPage-Attestation
+          - ReviewCenter-ReviewPage-Attestation-Address
+          - ReviewCenter-ReviewPage-Attestation-NotConcluded
+          - ReviewCenter-ReviewPage-Attestation-SelfSignedNote
+          - ReviewCenter-ReviewPage-Attestation-SuppliedNote
+          - ReviewCenter-ReviewPage-Attestation-OrganizationNote
+          - ReviewCenter-ReviewPage-Attestation-HelpLink
+          - ReviewCenter-ReviewPage-Attestation-KeyProblem
+          - ReviewCenter-ReviewPage-Attestation-KeyWarning
+          - ReviewCenter-ReviewPage-Attestation-NoKeyWarning
 
       - id: ReviewCenter-Web-AccessTokens
         title: >-
@@ -1936,7 +2858,12 @@ sections:
           connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsLink
+          - ReviewCenter-ProjectPage-EvidenceSettingsLink-SystemAdmin
+          - ReviewCenter-ProjectPage-EvidenceSettingsLink-Hidden
           - ReviewCenter-ProjectPage-EvidenceSettingsAccess
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess-BackButton
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess-NotFound
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess-MissingProject
         tests:
           - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
           - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
@@ -1949,6 +2876,9 @@ sections:
           The page must not reveal a project to a user who may not administer it.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsAccess
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess-BackButton
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess-NotFound
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess-MissingProject
         tests:
           - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
 
@@ -1960,6 +2890,9 @@ sections:
           The administrator must see the current state of every decision before changing it.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsSwitches
+          - ReviewCenter-ProjectPage-EvidenceSettingsSwitches-Defaults
+          - ReviewCenter-ProjectPage-EvidenceSettingsSwitches-Descriptions
+          - ReviewCenter-ProjectPage-EvidenceSettingsSwitches-IndexDescription
         tests:
           - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
 
@@ -1971,6 +2904,12 @@ sections:
           The consequences of a decision are shown before it is saved.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Removed
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Banner
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-ReviewerNames
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Exposure
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-PeopleLine
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-NoneByDefault
 
       - id: ReviewCenter-Web-EvidenceSettings-LeftOutSummary
         title: >-
@@ -1980,6 +2919,12 @@ sections:
           The administrator must see what a reader of the PDF will miss.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Removed
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Banner
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-ReviewerNames
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Exposure
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-PeopleLine
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-NoneByDefault
 
       - id: ReviewCenter-Web-EvidenceSettings-ExposureWarning
         title: >-
@@ -1988,6 +2933,12 @@ sections:
           The administrator must see what becomes readable without signing in.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Removed
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Banner
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-ReviewerNames
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-Exposure
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-PeopleLine
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings-NoneByDefault
 
       - id: ReviewCenter-Web-EvidenceSettings-Save
         title: >-
@@ -1996,6 +2947,11 @@ sections:
           Switches that depend on each other must not be saved one by one.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsSave
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-StaysOpen
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-Confirmation
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingToSave
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingRecorded
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-Audit
         tests:
           - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
 
@@ -2006,6 +2962,11 @@ sections:
           Decisions with regulatory consequences must be accountable afterwards.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsSave
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-StaysOpen
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-Confirmation
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingToSave
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-NothingRecorded
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave-Audit
         tests:
           - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
 
@@ -2016,6 +2977,8 @@ sections:
           A save that overwrites a change nobody saw would undo a decision unnoticed.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsConflict
+          - ReviewCenter-ProjectPage-EvidenceSettingsConflict-NothingStored
+          - ReviewCenter-ProjectPage-EvidenceSettingsConflict-ShowsStored
 
       - id: ReviewCenter-Web-EvidenceSettings-RightLost
         title: >-
@@ -2025,6 +2988,9 @@ sections:
           A page that stays open must not let a user who lost the right keep deciding.
         children:
           - ReviewCenter-ProjectPage-EvidenceSettingsRightLost
+          - ReviewCenter-ProjectPage-EvidenceSettingsRightLost-NothingChanged
+          - ReviewCenter-ProjectPage-EvidenceSettingsRightLost-Switch
+          - ReviewCenter-ProjectPage-EvidenceSettingsRightLost-OtherProject
 
       - id: ReviewCenter-Web-EvidenceSettings-Topic
         title: >-
@@ -2051,7 +3017,16 @@ sections:
           for the project. The behavior needs a live connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-ChecklistLink
+          - ReviewCenter-ProjectPage-ChecklistLink-SystemAdmin
+          - ReviewCenter-ProjectPage-ChecklistLink-Hidden
+          - ReviewCenter-ProjectPage-ChecklistLink-Summary
+          - ReviewCenter-ProjectPage-ChecklistLink-SummaryLink
+          - ReviewCenter-ProjectPage-ChecklistLink-SummaryHidden
           - ReviewCenter-ProjectPage-ChecklistAccess
+          - ReviewCenter-ProjectPage-ChecklistAccess-DefaultBadge
+          - ReviewCenter-ProjectPage-ChecklistAccess-BackButton
+          - ReviewCenter-ProjectPage-ChecklistAccess-NotFound
+          - ReviewCenter-ProjectPage-ChecklistAccess-MissingProject
         tests:
           - ProjectChecklistPage_Render_Administrator_ShowsDefaultSummary
           - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
@@ -2064,6 +3039,10 @@ sections:
           The page must not reveal a project to a user who may not administer it.
         children:
           - ReviewCenter-ProjectPage-ChecklistAccess
+          - ReviewCenter-ProjectPage-ChecklistAccess-DefaultBadge
+          - ReviewCenter-ProjectPage-ChecklistAccess-BackButton
+          - ReviewCenter-ProjectPage-ChecklistAccess-NotFound
+          - ReviewCenter-ProjectPage-ChecklistAccess-MissingProject
         tests:
           - ProjectChecklistPage_Render_NoAdministerRight_ShowsNotFoundAndNothingElse
 
@@ -2074,6 +3053,11 @@ sections:
           A user who creates a review must know which questions it will contain.
         children:
           - ReviewCenter-ProjectPage-ChecklistLink
+          - ReviewCenter-ProjectPage-ChecklistLink-SystemAdmin
+          - ReviewCenter-ProjectPage-ChecklistLink-Hidden
+          - ReviewCenter-ProjectPage-ChecklistLink-Summary
+          - ReviewCenter-ProjectPage-ChecklistLink-SummaryLink
+          - ReviewCenter-ProjectPage-ChecklistLink-SummaryHidden
 
       - id: ReviewCenter-Web-ChecklistTemplate-ExportCurrent
         title: >-
@@ -2082,6 +3066,11 @@ sections:
           An export is the starting point for a change and the way to keep a copy.
         children:
           - ReviewCenter-ProjectPage-ChecklistExport
+          - ReviewCenter-ProjectPage-ChecklistExport-Default
+          - ReviewCenter-ProjectPage-ChecklistExport-IndentedJson
+          - ReviewCenter-ProjectPage-ChecklistExport-ReadsBack
+          - ReviewCenter-ProjectPage-ChecklistExport-LineBreak
+          - ReviewCenter-ProjectPage-ChecklistExport-RightLost
 
       - id: ReviewCenter-Web-ChecklistTemplate-ExportDefault
         title: >-
@@ -2090,6 +3079,11 @@ sections:
           The default is the base of every own wording, so it must be available to start from.
         children:
           - ReviewCenter-ProjectPage-ChecklistExport
+          - ReviewCenter-ProjectPage-ChecklistExport-Default
+          - ReviewCenter-ProjectPage-ChecklistExport-IndentedJson
+          - ReviewCenter-ProjectPage-ChecklistExport-ReadsBack
+          - ReviewCenter-ProjectPage-ChecklistExport-LineBreak
+          - ReviewCenter-ProjectPage-ChecklistExport-RightLost
 
       - id: ReviewCenter-Web-ChecklistTemplate-ImportPaste
         title: >-
@@ -2098,6 +3092,17 @@ sections:
           Pasting is the quickest way to bring in a definition.
         children:
           - ReviewCenter-ProjectPage-ChecklistImport
+          - ReviewCenter-ProjectPage-ChecklistImport-File
+          - ReviewCenter-ProjectPage-ChecklistImport-FileName
+          - ReviewCenter-ProjectPage-ChecklistImport-FileTooLarge
+          - ReviewCenter-ProjectPage-ChecklistImport-RefusedFileDropsImport
+          - ReviewCenter-ProjectPage-ChecklistImport-AllErrors
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingChangedNotice
+          - ReviewCenter-ProjectPage-ChecklistImport-NoPreview
+          - ReviewCenter-ProjectPage-ChecklistImport-NotJson
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingImported
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingStored
+          - ReviewCenter-ProjectPage-ChecklistImport-Sample
 
       - id: ReviewCenter-Web-ChecklistTemplate-ImportFile
         title: >-
@@ -2106,6 +3111,17 @@ sections:
           A definition is kept as a file in a repository, so it must be taken from one.
         children:
           - ReviewCenter-ProjectPage-ChecklistImport
+          - ReviewCenter-ProjectPage-ChecklistImport-File
+          - ReviewCenter-ProjectPage-ChecklistImport-FileName
+          - ReviewCenter-ProjectPage-ChecklistImport-FileTooLarge
+          - ReviewCenter-ProjectPage-ChecklistImport-RefusedFileDropsImport
+          - ReviewCenter-ProjectPage-ChecklistImport-AllErrors
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingChangedNotice
+          - ReviewCenter-ProjectPage-ChecklistImport-NoPreview
+          - ReviewCenter-ProjectPage-ChecklistImport-NotJson
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingImported
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingStored
+          - ReviewCenter-ProjectPage-ChecklistImport-Sample
 
       - id: ReviewCenter-Web-ChecklistTemplate-Validation
         title: >-
@@ -2114,6 +3130,17 @@ sections:
           An administrator must be able to correct all errors in one pass.
         children:
           - ReviewCenter-ProjectPage-ChecklistImport
+          - ReviewCenter-ProjectPage-ChecklistImport-File
+          - ReviewCenter-ProjectPage-ChecklistImport-FileName
+          - ReviewCenter-ProjectPage-ChecklistImport-FileTooLarge
+          - ReviewCenter-ProjectPage-ChecklistImport-RefusedFileDropsImport
+          - ReviewCenter-ProjectPage-ChecklistImport-AllErrors
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingChangedNotice
+          - ReviewCenter-ProjectPage-ChecklistImport-NoPreview
+          - ReviewCenter-ProjectPage-ChecklistImport-NotJson
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingImported
+          - ReviewCenter-ProjectPage-ChecklistImport-NothingStored
+          - ReviewCenter-ProjectPage-ChecklistImport-Sample
 
       - id: ReviewCenter-Web-ChecklistTemplate-Preview
         title: >-
@@ -2122,6 +3149,17 @@ sections:
           The administrator sees how the checklist will look before it replaces the current one.
         children:
           - ReviewCenter-ProjectPage-ChecklistPreview
+          - ReviewCenter-ProjectPage-ChecklistPreview-Sections
+          - ReviewCenter-ProjectPage-ChecklistPreview-Version
+          - ReviewCenter-ProjectPage-ChecklistPreview-Added
+          - ReviewCenter-ProjectPage-ChecklistPreview-Removed
+          - ReviewCenter-ProjectPage-ChecklistPreview-Reworded
+          - ReviewCenter-ProjectPage-ChecklistPreview-Moved
+          - ReviewCenter-ProjectPage-ChecklistPreview-Ignored
+          - ReviewCenter-ProjectPage-ChecklistPreview-NoChange
+          - ReviewCenter-ProjectPage-ChecklistPreview-NothingToReplace
+          - ReviewCenter-ProjectPage-ChecklistPreview-LabelWarning
+          - ReviewCenter-ProjectPage-ChecklistPreview-NullArgument
 
       - id: ReviewCenter-Web-ChecklistTemplate-Differences
         title: >-
@@ -2130,6 +3168,17 @@ sections:
           The administrator confirms a change knowing what changes.
         children:
           - ReviewCenter-ProjectPage-ChecklistPreview
+          - ReviewCenter-ProjectPage-ChecklistPreview-Sections
+          - ReviewCenter-ProjectPage-ChecklistPreview-Version
+          - ReviewCenter-ProjectPage-ChecklistPreview-Added
+          - ReviewCenter-ProjectPage-ChecklistPreview-Removed
+          - ReviewCenter-ProjectPage-ChecklistPreview-Reworded
+          - ReviewCenter-ProjectPage-ChecklistPreview-Moved
+          - ReviewCenter-ProjectPage-ChecklistPreview-Ignored
+          - ReviewCenter-ProjectPage-ChecklistPreview-NoChange
+          - ReviewCenter-ProjectPage-ChecklistPreview-NothingToReplace
+          - ReviewCenter-ProjectPage-ChecklistPreview-LabelWarning
+          - ReviewCenter-ProjectPage-ChecklistPreview-NullArgument
 
       - id: ReviewCenter-Web-ChecklistTemplate-Replace
         title: >-
@@ -2139,6 +3188,15 @@ sections:
           Projects in a regulated setting need their own wording without access to the server.
         children:
           - ReviewCenter-ProjectPage-ChecklistReplace
+          - ReviewCenter-ProjectPage-ChecklistReplace-Confirmation
+          - ReviewCenter-ProjectPage-ChecklistReplace-Cancelled
+          - ReviewCenter-ProjectPage-ChecklistReplace-Confirmed
+          - ReviewCenter-ProjectPage-ChecklistReplace-Shown
+          - ReviewCenter-ProjectPage-ChecklistReplace-Status
+          - ReviewCenter-ProjectPage-ChecklistReplace-Audit
+          - ReviewCenter-ProjectPage-ChecklistReplace-Refusal
+          - ReviewCenter-ProjectPage-ChecklistReplace-RefusalNothingStored
+          - ReviewCenter-ProjectPage-ChecklistReplace-RefusalKeepsCandidate
         tests:
           - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
 
@@ -2150,6 +3208,15 @@ sections:
           The administrator must know that the change does not touch reviews that are under way.
         children:
           - ReviewCenter-ProjectPage-ChecklistReplace
+          - ReviewCenter-ProjectPage-ChecklistReplace-Confirmation
+          - ReviewCenter-ProjectPage-ChecklistReplace-Cancelled
+          - ReviewCenter-ProjectPage-ChecklistReplace-Confirmed
+          - ReviewCenter-ProjectPage-ChecklistReplace-Shown
+          - ReviewCenter-ProjectPage-ChecklistReplace-Status
+          - ReviewCenter-ProjectPage-ChecklistReplace-Audit
+          - ReviewCenter-ProjectPage-ChecklistReplace-Refusal
+          - ReviewCenter-ProjectPage-ChecklistReplace-RefusalNothingStored
+          - ReviewCenter-ProjectPage-ChecklistReplace-RefusalKeepsCandidate
         tests:
           - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
 
@@ -2161,6 +3228,13 @@ sections:
           An own wording that is no longer wanted must be able to go.
         children:
           - ReviewCenter-ProjectPage-ChecklistReset
+          - ReviewCenter-ProjectPage-ChecklistReset-Disabled
+          - ReviewCenter-ProjectPage-ChecklistReset-Confirmation
+          - ReviewCenter-ProjectPage-ChecklistReset-Cancelled
+          - ReviewCenter-ProjectPage-ChecklistReset-Confirmed
+          - ReviewCenter-ProjectPage-ChecklistReset-Shown
+          - ReviewCenter-ProjectPage-ChecklistReset-Status
+          - ReviewCenter-ProjectPage-ChecklistReset-Audit
 
       - id: ReviewCenter-Web-ChecklistTemplate-Audit
         title: >-
@@ -2169,6 +3243,15 @@ sections:
           The checklist shows what was examined, so a change of it must be accountable afterwards.
         children:
           - ReviewCenter-ProjectPage-ChecklistReplace
+          - ReviewCenter-ProjectPage-ChecklistReplace-Confirmation
+          - ReviewCenter-ProjectPage-ChecklistReplace-Cancelled
+          - ReviewCenter-ProjectPage-ChecklistReplace-Confirmed
+          - ReviewCenter-ProjectPage-ChecklistReplace-Shown
+          - ReviewCenter-ProjectPage-ChecklistReplace-Status
+          - ReviewCenter-ProjectPage-ChecklistReplace-Audit
+          - ReviewCenter-ProjectPage-ChecklistReplace-Refusal
+          - ReviewCenter-ProjectPage-ChecklistReplace-RefusalNothingStored
+          - ReviewCenter-ProjectPage-ChecklistReplace-RefusalKeepsCandidate
         tests:
           - ProjectChecklistPage_Replace_Confirmed_StoresShowsAndAudits
 
@@ -2179,6 +3262,12 @@ sections:
           A change that overwrites a change nobody saw would undo it unnoticed.
         children:
           - ReviewCenter-ProjectPage-ChecklistConflict
+          - ReviewCenter-ProjectPage-ChecklistConflict-NothingStored
+          - ReviewCenter-ProjectPage-ChecklistConflict-ShowsStored
+          - ReviewCenter-ProjectPage-ChecklistConflict-Differences
+          - ReviewCenter-ProjectPage-ChecklistConflict-Reset
+          - ReviewCenter-ProjectPage-ChecklistConflict-ResetNothingStored
+          - ReviewCenter-ProjectPage-ChecklistConflict-ResetShowsStored
 
       - id: ReviewCenter-Web-ChecklistTemplate-RightLost
         title: >-
@@ -2187,6 +3276,8 @@ sections:
           A page that stays open must not let a user who lost the right keep changing the checklist.
         children:
           - ReviewCenter-ProjectPage-ChecklistRightLost
+          - ReviewCenter-ProjectPage-ChecklistRightLost-NothingChanged
+          - ReviewCenter-ProjectPage-ChecklistRightLost-OtherProject
 
       - id: ReviewCenter-Web-ChecklistTemplate-Topic
         title: >-
@@ -2214,6 +3305,11 @@ sections:
           zone. The behavior needs a live connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-NewReviewDueDate
+          - ReviewCenter-ProjectPage-NewReviewDueDate-UtcStatement
+          - ReviewCenter-ProjectPage-NewReviewDueDate-Stored
+          - ReviewCenter-ProjectPage-NewReviewDueDate-StoredFromRepository
+          - ReviewCenter-ProjectPage-NewReviewDueDate-PastDate
+          - ReviewCenter-ProjectPage-NewReviewDueDate-PastDateNothingCreated
         tests:
           - NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview
 
@@ -2224,6 +3320,11 @@ sections:
           A review from a repository is planned with a date as well.
         children:
           - ReviewCenter-ProjectPage-NewReviewDueDate
+          - ReviewCenter-ProjectPage-NewReviewDueDate-UtcStatement
+          - ReviewCenter-ProjectPage-NewReviewDueDate-Stored
+          - ReviewCenter-ProjectPage-NewReviewDueDate-StoredFromRepository
+          - ReviewCenter-ProjectPage-NewReviewDueDate-PastDate
+          - ReviewCenter-ProjectPage-NewReviewDueDate-PastDateNothingCreated
 
       - id: ReviewCenter-Web-DueDate-PlanDefault
         title: >-
@@ -2232,6 +3333,11 @@ sections:
           Planned reviews usually share a date, so the user states it once.
         children:
           - ReviewCenter-PlanPage-DueDate
+          - ReviewCenter-PlanPage-DueDate-Row
+          - ReviewCenter-PlanPage-DueDate-Utc
+          - ReviewCenter-PlanPage-DueDate-Default
+          - ReviewCenter-PlanPage-DueDate-RowDate
+          - ReviewCenter-PlanPage-DueDate-Refused
         tests:
           - PlanPage_Create_DueDates_DefaultAndRowDate
 
@@ -2242,6 +3348,11 @@ sections:
           One review of a plan may be due earlier than the others.
         children:
           - ReviewCenter-PlanPage-DueDate
+          - ReviewCenter-PlanPage-DueDate-Row
+          - ReviewCenter-PlanPage-DueDate-Utc
+          - ReviewCenter-PlanPage-DueDate-Default
+          - ReviewCenter-PlanPage-DueDate-RowDate
+          - ReviewCenter-PlanPage-DueDate-Refused
         tests:
           - PlanPage_Create_DueDates_DefaultAndRowDate
 
@@ -2252,6 +3363,17 @@ sections:
           A reader must see when a review is due and in which time basis.
         children:
           - ReviewCenter-ReviewPage-DueDate
+          - ReviewCenter-ReviewPage-DueDate-NoDate
+          - ReviewCenter-ReviewPage-DueDate-SaveDate
+          - ReviewCenter-ReviewPage-DueDate-ClearDate
+          - ReviewCenter-ReviewPage-DueDate-SystemAdminForm
+          - ReviewCenter-ReviewPage-DueDate-ProjectAdminForm
+          - ReviewCenter-ReviewPage-DueDate-CreatorForm
+          - ReviewCenter-ReviewPage-DueDate-NoFormOthers
+          - ReviewCenter-ReviewPage-DueDate-NoFormLocked
+          - ReviewCenter-ReviewPage-DueDate-BadText
+          - ReviewCenter-ReviewPage-DueDate-LockedRefusal
+          - ReviewCenter-ReviewPage-DueDate-RefusalKept
         tests:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
 
@@ -2263,6 +3385,9 @@ sections:
           A lead must see at a glance which reviews are late.
         children:
           - ReviewCenter-ReviewPage-Overdue
+          - ReviewCenter-ReviewPage-Overdue-TodayOrLater
+          - ReviewCenter-ReviewPage-Overdue-Concluded
+          - ReviewCenter-ReviewPage-Overdue-DateKept
         tests:
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
 
@@ -2275,6 +3400,17 @@ sections:
           closed.
         children:
           - ReviewCenter-ReviewPage-DueDate
+          - ReviewCenter-ReviewPage-DueDate-NoDate
+          - ReviewCenter-ReviewPage-DueDate-SaveDate
+          - ReviewCenter-ReviewPage-DueDate-ClearDate
+          - ReviewCenter-ReviewPage-DueDate-SystemAdminForm
+          - ReviewCenter-ReviewPage-DueDate-ProjectAdminForm
+          - ReviewCenter-ReviewPage-DueDate-CreatorForm
+          - ReviewCenter-ReviewPage-DueDate-NoFormOthers
+          - ReviewCenter-ReviewPage-DueDate-NoFormLocked
+          - ReviewCenter-ReviewPage-DueDate-BadText
+          - ReviewCenter-ReviewPage-DueDate-LockedRefusal
+          - ReviewCenter-ReviewPage-DueDate-RefusalKept
         tests:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
 
@@ -2285,6 +3421,17 @@ sections:
           A date that no longer applies must be able to go.
         children:
           - ReviewCenter-ReviewPage-DueDate
+          - ReviewCenter-ReviewPage-DueDate-NoDate
+          - ReviewCenter-ReviewPage-DueDate-SaveDate
+          - ReviewCenter-ReviewPage-DueDate-ClearDate
+          - ReviewCenter-ReviewPage-DueDate-SystemAdminForm
+          - ReviewCenter-ReviewPage-DueDate-ProjectAdminForm
+          - ReviewCenter-ReviewPage-DueDate-CreatorForm
+          - ReviewCenter-ReviewPage-DueDate-NoFormOthers
+          - ReviewCenter-ReviewPage-DueDate-NoFormLocked
+          - ReviewCenter-ReviewPage-DueDate-BadText
+          - ReviewCenter-ReviewPage-DueDate-LockedRefusal
+          - ReviewCenter-ReviewPage-DueDate-RefusalKept
         tests:
           - ReviewPage_DueDate_AdministratorSetsAndClears_ShowsDateInUtc
 
@@ -2295,6 +3442,17 @@ sections:
           A user who is refused must be told why and must not be offered a change that the rules refuse.
         children:
           - ReviewCenter-ReviewPage-DueDate
+          - ReviewCenter-ReviewPage-DueDate-NoDate
+          - ReviewCenter-ReviewPage-DueDate-SaveDate
+          - ReviewCenter-ReviewPage-DueDate-ClearDate
+          - ReviewCenter-ReviewPage-DueDate-SystemAdminForm
+          - ReviewCenter-ReviewPage-DueDate-ProjectAdminForm
+          - ReviewCenter-ReviewPage-DueDate-CreatorForm
+          - ReviewCenter-ReviewPage-DueDate-NoFormOthers
+          - ReviewCenter-ReviewPage-DueDate-NoFormLocked
+          - ReviewCenter-ReviewPage-DueDate-BadText
+          - ReviewCenter-ReviewPage-DueDate-LockedRefusal
+          - ReviewCenter-ReviewPage-DueDate-RefusalKept
         tests:
           - ReviewPage_DueDate_InThePast_ShowsOverdueBadgeAndBadTextIsRefused
 
@@ -2306,6 +3464,19 @@ sections:
           live connection, so it is verified by the component tests of the unit.
         children:
           - ReviewCenter-ProjectPage-Progress
+          - ReviewCenter-ProjectPage-Progress-OutOfDate
+          - ReviewCenter-ProjectPage-Progress-NoChecklist
+          - ReviewCenter-ProjectPage-Progress-OpenThreads
+          - ReviewCenter-ProjectPage-Progress-UnansweredChecks
+          - ReviewCenter-ProjectPage-Progress-DisputedChecks
+          - ReviewCenter-ProjectPage-Progress-ConclusionNeeded
+          - ReviewCenter-ProjectPage-Progress-NoFailCount
+          - ReviewCenter-ProjectPage-Progress-WaitingOn
+          - ReviewCenter-ProjectPage-Progress-LastActivity
+          - ReviewCenter-ProjectPage-Progress-DueDate
+          - ReviewCenter-ProjectPage-Progress-Overdue
+          - ReviewCenter-ProjectPage-Progress-Culture
+          - ReviewCenter-ProjectPage-Progress-DateAttributes
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
 
@@ -2317,6 +3488,19 @@ sections:
           A lead must see who has signed and who has to sign again.
         children:
           - ReviewCenter-ProjectPage-Progress
+          - ReviewCenter-ProjectPage-Progress-OutOfDate
+          - ReviewCenter-ProjectPage-Progress-NoChecklist
+          - ReviewCenter-ProjectPage-Progress-OpenThreads
+          - ReviewCenter-ProjectPage-Progress-UnansweredChecks
+          - ReviewCenter-ProjectPage-Progress-DisputedChecks
+          - ReviewCenter-ProjectPage-Progress-ConclusionNeeded
+          - ReviewCenter-ProjectPage-Progress-NoFailCount
+          - ReviewCenter-ProjectPage-Progress-WaitingOn
+          - ReviewCenter-ProjectPage-Progress-LastActivity
+          - ReviewCenter-ProjectPage-Progress-DueDate
+          - ReviewCenter-ProjectPage-Progress-Overdue
+          - ReviewCenter-ProjectPage-Progress-Culture
+          - ReviewCenter-ProjectPage-Progress-DateAttributes
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
 
@@ -2327,6 +3511,19 @@ sections:
           A lead must see what stands between a review and its approval.
         children:
           - ReviewCenter-ProjectPage-Progress
+          - ReviewCenter-ProjectPage-Progress-OutOfDate
+          - ReviewCenter-ProjectPage-Progress-NoChecklist
+          - ReviewCenter-ProjectPage-Progress-OpenThreads
+          - ReviewCenter-ProjectPage-Progress-UnansweredChecks
+          - ReviewCenter-ProjectPage-Progress-DisputedChecks
+          - ReviewCenter-ProjectPage-Progress-ConclusionNeeded
+          - ReviewCenter-ProjectPage-Progress-NoFailCount
+          - ReviewCenter-ProjectPage-Progress-WaitingOn
+          - ReviewCenter-ProjectPage-Progress-LastActivity
+          - ReviewCenter-ProjectPage-Progress-DueDate
+          - ReviewCenter-ProjectPage-Progress-Overdue
+          - ReviewCenter-ProjectPage-Progress-Culture
+          - ReviewCenter-ProjectPage-Progress-DateAttributes
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
 
@@ -2337,6 +3534,19 @@ sections:
           A lead must see who is holding each review up.
         children:
           - ReviewCenter-ProjectPage-Progress
+          - ReviewCenter-ProjectPage-Progress-OutOfDate
+          - ReviewCenter-ProjectPage-Progress-NoChecklist
+          - ReviewCenter-ProjectPage-Progress-OpenThreads
+          - ReviewCenter-ProjectPage-Progress-UnansweredChecks
+          - ReviewCenter-ProjectPage-Progress-DisputedChecks
+          - ReviewCenter-ProjectPage-Progress-ConclusionNeeded
+          - ReviewCenter-ProjectPage-Progress-NoFailCount
+          - ReviewCenter-ProjectPage-Progress-WaitingOn
+          - ReviewCenter-ProjectPage-Progress-LastActivity
+          - ReviewCenter-ProjectPage-Progress-DueDate
+          - ReviewCenter-ProjectPage-Progress-Overdue
+          - ReviewCenter-ProjectPage-Progress-Culture
+          - ReviewCenter-ProjectPage-Progress-DateAttributes
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
 
@@ -2347,6 +3557,19 @@ sections:
           A review that has been quiet for long needs a nudge.
         children:
           - ReviewCenter-ProjectPage-Progress
+          - ReviewCenter-ProjectPage-Progress-OutOfDate
+          - ReviewCenter-ProjectPage-Progress-NoChecklist
+          - ReviewCenter-ProjectPage-Progress-OpenThreads
+          - ReviewCenter-ProjectPage-Progress-UnansweredChecks
+          - ReviewCenter-ProjectPage-Progress-DisputedChecks
+          - ReviewCenter-ProjectPage-Progress-ConclusionNeeded
+          - ReviewCenter-ProjectPage-Progress-NoFailCount
+          - ReviewCenter-ProjectPage-Progress-WaitingOn
+          - ReviewCenter-ProjectPage-Progress-LastActivity
+          - ReviewCenter-ProjectPage-Progress-DueDate
+          - ReviewCenter-ProjectPage-Progress-Overdue
+          - ReviewCenter-ProjectPage-Progress-Culture
+          - ReviewCenter-ProjectPage-Progress-DateAttributes
         tests:
           - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
 
@@ -2357,6 +3580,19 @@ sections:
           A lead must see which reviews are late without opening them.
         children:
           - ReviewCenter-ProjectPage-Progress
+          - ReviewCenter-ProjectPage-Progress-OutOfDate
+          - ReviewCenter-ProjectPage-Progress-NoChecklist
+          - ReviewCenter-ProjectPage-Progress-OpenThreads
+          - ReviewCenter-ProjectPage-Progress-UnansweredChecks
+          - ReviewCenter-ProjectPage-Progress-DisputedChecks
+          - ReviewCenter-ProjectPage-Progress-ConclusionNeeded
+          - ReviewCenter-ProjectPage-Progress-NoFailCount
+          - ReviewCenter-ProjectPage-Progress-WaitingOn
+          - ReviewCenter-ProjectPage-Progress-LastActivity
+          - ReviewCenter-ProjectPage-Progress-DueDate
+          - ReviewCenter-ProjectPage-Progress-Overdue
+          - ReviewCenter-ProjectPage-Progress-Culture
+          - ReviewCenter-ProjectPage-Progress-DateAttributes
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
           - ProjectPage_Render_NonGregorianCulture_ShowsInvariantGregorianDates
@@ -2368,6 +3604,9 @@ sections:
           A lead reads the state of the project before reading the table.
         children:
           - ReviewCenter-ProjectPage-Summary
+          - ReviewCenter-ProjectPage-Summary-Rejected
+          - ReviewCenter-ProjectPage-Summary-Overdue
+          - ReviewCenter-ProjectPage-Summary-AllReviews
         tests:
           - ProjectPage_Render_Overview_ShowsStageSignaturesBlockersWaitingOnAndSummary
 
@@ -2379,6 +3618,14 @@ sections:
           A lead narrows the list to what needs attention.
         children:
           - ReviewCenter-ProjectPage-ProgressFilter
+          - ReviewCenter-ProjectPage-ProgressFilter-Overdue
+          - ReviewCenter-ProjectPage-ProgressFilter-Blocked
+          - ReviewCenter-ProjectPage-ProgressFilter-Text
+          - ReviewCenter-ProjectPage-ProgressFilter-NoMatch
+          - ReviewCenter-ProjectPage-ProgressFilter-Ignored
+          - ReviewCenter-ProjectPage-ProgressFilter-PageNotNumber
+          - ReviewCenter-ProjectPage-ProgressFilter-PageRange
+          - ReviewCenter-ProjectPage-ProgressFilter-Encoded
         tests:
           - ProjectPage_Render_QueryFilters_NarrowTheTable
 
@@ -2389,6 +3636,14 @@ sections:
           A lead orders the list by what matters at the moment.
         children:
           - ReviewCenter-ProjectPage-ProgressSort
+          - ReviewCenter-ProjectPage-ProgressSort-Stage
+          - ReviewCenter-ProjectPage-ProgressSort-Signatures
+          - ReviewCenter-ProjectPage-ProgressSort-Activity
+          - ReviewCenter-ProjectPage-ProgressSort-Due
+          - ReviewCenter-ProjectPage-ProgressSort-Direction
+          - ReviewCenter-ProjectPage-ProgressSort-HeaderLinks
+          - ReviewCenter-ProjectPage-ProgressSort-PageSize
+          - ReviewCenter-ProjectPage-ProgressSort-LinksKeepState
 
       - id: ReviewCenter-Web-Progress-Paging
         title: >-
@@ -2397,6 +3652,14 @@ sections:
           A project with many reviews must stay quick to load and easy to read.
         children:
           - ReviewCenter-ProjectPage-ProgressSort
+          - ReviewCenter-ProjectPage-ProgressSort-Stage
+          - ReviewCenter-ProjectPage-ProgressSort-Signatures
+          - ReviewCenter-ProjectPage-ProgressSort-Activity
+          - ReviewCenter-ProjectPage-ProgressSort-Due
+          - ReviewCenter-ProjectPage-ProgressSort-Direction
+          - ReviewCenter-ProjectPage-ProgressSort-HeaderLinks
+          - ReviewCenter-ProjectPage-ProgressSort-PageSize
+          - ReviewCenter-ProjectPage-ProgressSort-LinksKeepState
 
       - id: ReviewCenter-Web-Progress-QueryString
         title: >-
@@ -2405,6 +3668,14 @@ sections:
           A link that others can open must show the same list.
         children:
           - ReviewCenter-ProjectPage-ProgressSort
+          - ReviewCenter-ProjectPage-ProgressSort-Stage
+          - ReviewCenter-ProjectPage-ProgressSort-Signatures
+          - ReviewCenter-ProjectPage-ProgressSort-Activity
+          - ReviewCenter-ProjectPage-ProgressSort-Due
+          - ReviewCenter-ProjectPage-ProgressSort-Direction
+          - ReviewCenter-ProjectPage-ProgressSort-HeaderLinks
+          - ReviewCenter-ProjectPage-ProgressSort-PageSize
+          - ReviewCenter-ProjectPage-ProgressSort-LinksKeepState
         tests:
           - ProjectPage_Render_QueryFilters_NarrowTheTable
 
@@ -2415,6 +3686,13 @@ sections:
           An auditor must be able to read the progress of the project.
         children:
           - ReviewCenter-ProjectPage-ReadOnly
+          - ReviewCenter-ProjectPage-ReadOnly-NoControls
+          - ReviewCenter-ProjectPage-ReadOnly-Notice
+          - ReviewCenter-ProjectPage-ReadOnly-NoRepositoryRead
+          - ReviewCenter-ProjectPage-ReadOnly-NewReviewPage
+          - ReviewCenter-ProjectPage-ReadOnly-EmptyProject
+          - ReviewCenter-ProjectPage-ReadOnly-Stranger
+          - ReviewCenter-ProjectPage-ReadOnly-OwnRole
         tests:
           - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
 
@@ -2425,6 +3703,13 @@ sections:
           The page must not reveal a project to a user who may not see it.
         children:
           - ReviewCenter-ProjectPage-ReadOnly
+          - ReviewCenter-ProjectPage-ReadOnly-NoControls
+          - ReviewCenter-ProjectPage-ReadOnly-Notice
+          - ReviewCenter-ProjectPage-ReadOnly-NoRepositoryRead
+          - ReviewCenter-ProjectPage-ReadOnly-NewReviewPage
+          - ReviewCenter-ProjectPage-ReadOnly-EmptyProject
+          - ReviewCenter-ProjectPage-ReadOnly-Stranger
+          - ReviewCenter-ProjectPage-ReadOnly-OwnRole
         tests:
           - ProjectPage_Render_AuditorAndStranger_AuditorSeesTheTableStrangerNothing
 
@@ -2437,6 +3722,23 @@ sections:
           decide. The behavior needs a live connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ProjectPage-FollowUp
+          - ReviewCenter-ProjectPage-FollowUp-NoEarlierReview
+          - ReviewCenter-ProjectPage-FollowUp-Answers
+          - ReviewCenter-ProjectPage-FollowUp-NotApplicableSections
+          - ReviewCenter-ProjectPage-FollowUp-OpenThreads
+          - ReviewCenter-ProjectPage-FollowUp-ResolvedThreads
+          - ReviewCenter-ProjectPage-FollowUp-CheckDiscussions
+          - ReviewCenter-ProjectPage-FollowUp-DroppedFiles
+          - ReviewCenter-ProjectPage-FollowUp-Title
+          - ReviewCenter-ProjectPage-FollowUp-TypedTitle
+          - ReviewCenter-ProjectPage-FollowUp-Acknowledgement
+          - ReviewCenter-ProjectPage-FollowUp-AcknowledgementPassed
+          - ReviewCenter-ProjectPage-FollowUp-UploadCreation
+          - ReviewCenter-ProjectPage-FollowUp-RepositoryCreation
+          - ReviewCenter-ProjectPage-FollowUp-PlainReview
+          - ReviewCenter-ProjectPage-FollowUp-Refusal
+          - ReviewCenter-ProjectPage-FollowUp-RefusalOnCreate
+          - ReviewCenter-ProjectPage-FollowUp-FollowTag
         tests:
           - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
 
@@ -2447,6 +3749,23 @@ sections:
           The user must see what the follow-up takes over before creating it.
         children:
           - ReviewCenter-ProjectPage-FollowUp
+          - ReviewCenter-ProjectPage-FollowUp-NoEarlierReview
+          - ReviewCenter-ProjectPage-FollowUp-Answers
+          - ReviewCenter-ProjectPage-FollowUp-NotApplicableSections
+          - ReviewCenter-ProjectPage-FollowUp-OpenThreads
+          - ReviewCenter-ProjectPage-FollowUp-ResolvedThreads
+          - ReviewCenter-ProjectPage-FollowUp-CheckDiscussions
+          - ReviewCenter-ProjectPage-FollowUp-DroppedFiles
+          - ReviewCenter-ProjectPage-FollowUp-Title
+          - ReviewCenter-ProjectPage-FollowUp-TypedTitle
+          - ReviewCenter-ProjectPage-FollowUp-Acknowledgement
+          - ReviewCenter-ProjectPage-FollowUp-AcknowledgementPassed
+          - ReviewCenter-ProjectPage-FollowUp-UploadCreation
+          - ReviewCenter-ProjectPage-FollowUp-RepositoryCreation
+          - ReviewCenter-ProjectPage-FollowUp-PlainReview
+          - ReviewCenter-ProjectPage-FollowUp-Refusal
+          - ReviewCenter-ProjectPage-FollowUp-RefusalOnCreate
+          - ReviewCenter-ProjectPage-FollowUp-FollowTag
         tests:
           - NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp
 
@@ -2457,6 +3776,23 @@ sections:
           Open discussion must not be lost by a single click.
         children:
           - ReviewCenter-ProjectPage-FollowUp
+          - ReviewCenter-ProjectPage-FollowUp-NoEarlierReview
+          - ReviewCenter-ProjectPage-FollowUp-Answers
+          - ReviewCenter-ProjectPage-FollowUp-NotApplicableSections
+          - ReviewCenter-ProjectPage-FollowUp-OpenThreads
+          - ReviewCenter-ProjectPage-FollowUp-ResolvedThreads
+          - ReviewCenter-ProjectPage-FollowUp-CheckDiscussions
+          - ReviewCenter-ProjectPage-FollowUp-DroppedFiles
+          - ReviewCenter-ProjectPage-FollowUp-Title
+          - ReviewCenter-ProjectPage-FollowUp-TypedTitle
+          - ReviewCenter-ProjectPage-FollowUp-Acknowledgement
+          - ReviewCenter-ProjectPage-FollowUp-AcknowledgementPassed
+          - ReviewCenter-ProjectPage-FollowUp-UploadCreation
+          - ReviewCenter-ProjectPage-FollowUp-RepositoryCreation
+          - ReviewCenter-ProjectPage-FollowUp-PlainReview
+          - ReviewCenter-ProjectPage-FollowUp-Refusal
+          - ReviewCenter-ProjectPage-FollowUp-RefusalOnCreate
+          - ReviewCenter-ProjectPage-FollowUp-FollowTag
 
       - id: ReviewCenter-Web-FollowUp-CarriedMarks
         title: >-
@@ -2466,6 +3802,12 @@ sections:
           The reviewers must see what they inherited and from where.
         children:
           - ReviewCenter-ChecklistPage-CarriedMarks
+          - ReviewCenter-ChecklistPage-CarriedMarks-Section
+          - ReviewCenter-ChecklistPage-CarriedMarks-EarlierFail
+          - ReviewCenter-ChecklistPage-CarriedMarks-EarlierFailLink
+          - ReviewCenter-ChecklistPage-CarriedMarks-AnsweredAgain
+          - ReviewCenter-ChecklistPage-CarriedMarks-SameWording
+          - ReviewCenter-ChecklistPage-CarriedMarks-NoFollowed
         tests:
           - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
 
@@ -2476,6 +3818,12 @@ sections:
           The reviewers must see why a check is open again.
         children:
           - ReviewCenter-ChecklistPage-CarriedMarks
+          - ReviewCenter-ChecklistPage-CarriedMarks-Section
+          - ReviewCenter-ChecklistPage-CarriedMarks-EarlierFail
+          - ReviewCenter-ChecklistPage-CarriedMarks-EarlierFailLink
+          - ReviewCenter-ChecklistPage-CarriedMarks-AnsweredAgain
+          - ReviewCenter-ChecklistPage-CarriedMarks-SameWording
+          - ReviewCenter-ChecklistPage-CarriedMarks-NoFollowed
         tests:
           - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
 
@@ -2486,6 +3834,10 @@ sections:
           A reader must find the earlier review.
         children:
           - ReviewCenter-ReviewPage-FollowUp
+          - ReviewCenter-ReviewPage-FollowUp-Counts
+          - ReviewCenter-ReviewPage-FollowUp-FollowedBy
+          - ReviewCenter-ReviewPage-FollowUp-CarriedMark
+          - ReviewCenter-ReviewPage-FollowUp-Standalone
         tests:
           - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
 
@@ -2496,6 +3848,10 @@ sections:
           A reader must find the later reviews.
         children:
           - ReviewCenter-ReviewPage-FollowUp
+          - ReviewCenter-ReviewPage-FollowUp-Counts
+          - ReviewCenter-ReviewPage-FollowUp-FollowedBy
+          - ReviewCenter-ReviewPage-FollowUp-CarriedMark
+          - ReviewCenter-ReviewPage-FollowUp-Standalone
         tests:
           - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
 
@@ -2506,6 +3862,10 @@ sections:
           A reader must tell a carried thread from a new one.
         children:
           - ReviewCenter-ReviewPage-FollowUp
+          - ReviewCenter-ReviewPage-FollowUp-Counts
+          - ReviewCenter-ReviewPage-FollowUp-FollowedBy
+          - ReviewCenter-ReviewPage-FollowUp-CarriedMark
+          - ReviewCenter-ReviewPage-FollowUp-Standalone
         tests:
           - ReviewPage_Render_FollowUp_ShowsFollowsLinkCountsAndCarriedThreadMark
 
@@ -2556,6 +3916,10 @@ sections:
           The user has no password here, so the provider confirms the identity of the signer.
         children:
           - ReviewCenter-ReviewPage-ExternalSignature
+          - ReviewCenter-ReviewPage-ExternalSignature-Confirmed
+          - ReviewCenter-ReviewPage-ExternalSignature-MissingTime
+          - ReviewCenter-ReviewPage-ExternalSignature-StaleTime
+          - ReviewCenter-ReviewPage-ExternalSignature-GeneralMessage
         tests:
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
 
@@ -2579,6 +3943,17 @@ sections:
           tests of the units.
         children:
           - ReviewCenter-ChecklistPage-HiddenBallots
+          - ReviewCenter-ChecklistPage-HiddenBallots-Notice
+          - ReviewCenter-ChecklistPage-HiddenBallots-Missing
+          - ReviewCenter-ChecklistPage-HiddenBallots-NoAnswers
+          - ReviewCenter-ChecklistPage-HiddenBallots-NoMark
+          - ReviewCenter-ChecklistPage-HiddenBallots-NoCount
+          - ReviewCenter-ChecklistPage-HiddenBallots-NoReason
+          - ReviewCenter-ChecklistPage-HiddenBallots-NoFailed
+          - ReviewCenter-ChecklistPage-HiddenBallots-MemberCount
+          - ReviewCenter-ChecklistPage-HiddenBallots-MemberNoStanding
+          - ReviewCenter-ChecklistPage-HiddenBallots-Administrator
+          - ReviewCenter-ChecklistPage-HiddenBallots-SingleSlot
         tests:
           - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
 
@@ -2590,6 +3965,11 @@ sections:
           The review page must not give away what the checklist page hides.
         children:
           - ReviewCenter-ReviewPage-BallotMasking
+          - ReviewCenter-ReviewPage-BallotMasking-OwnProgress
+          - ReviewCenter-ReviewPage-BallotMasking-CheckThreads
+          - ReviewCenter-ReviewPage-BallotMasking-ThreadCount
+          - ReviewCenter-ReviewPage-BallotMasking-Conclusion
+          - ReviewCenter-ReviewPage-BallotMasking-Administrator
         tests:
           - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
 
@@ -2602,6 +3982,11 @@ sections:
         children:
           - ReviewCenter-ProjectPage-BallotMasking
           - ReviewCenter-ProjectPage-Ballots
+          - ReviewCenter-ProjectPage-Ballots-Missing
+          - ReviewCenter-ProjectPage-Ballots-SingleSlot
+          - ReviewCenter-ProjectPage-Ballots-SameForEveryViewer
+          - ReviewCenter-ProjectPage-Ballots-MaskedNote
+          - ReviewCenter-ProjectPage-Ballots-NoteGone
 
       - id: ReviewCenter-Web-BallotExperience-History
         title: >-
@@ -2611,6 +3996,8 @@ sections:
           The history must not give away what the checklist page hides.
         children:
           - ReviewCenter-HistoryPage-BallotMasking
+          - ReviewCenter-HistoryPage-BallotMasking-Metadata
+          - ReviewCenter-HistoryPage-BallotMasking-Visible
         tests:
           - HistoryPage_HiddenViewer_HidesAnswerDetailsOnly
 
@@ -2621,6 +4008,21 @@ sections:
           The reviewers settle the differences, so they must see them next to each other.
         children:
           - ReviewCenter-ChecklistPage-SideBySide
+          - ReviewCenter-ChecklistPage-SideBySide-Order
+          - ReviewCenter-ChecklistPage-SideBySide-Badge
+          - ReviewCenter-ChecklistPage-SideBySide-Reason
+          - ReviewCenter-ChecklistPage-SideBySide-ReasonEncoded
+          - ReviewCenter-ChecklistPage-SideBySide-OwnReason
+          - ReviewCenter-ChecklistPage-SideBySide-Summary
+          - ReviewCenter-ChecklistPage-SideBySide-FailedStatus
+          - ReviewCenter-ChecklistPage-SideBySide-History
+          - ReviewCenter-ChecklistPage-SideBySide-Discuss
+          - ReviewCenter-ChecklistPage-SideBySide-Thread
+          - ReviewCenter-ChecklistPage-SideBySide-ThreadLink
+          - ReviewCenter-ChecklistPage-SideBySide-Empty
+          - ReviewCenter-ChecklistPage-SideBySide-EmptyNotStarted
+          - ReviewCenter-ChecklistPage-SideBySide-Cancel
+          - ReviewCenter-ChecklistPage-SideBySide-DiscussKind
         tests:
           - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
 
@@ -2631,6 +4033,21 @@ sections:
           The way from a difference to its discussion must be one click.
         children:
           - ReviewCenter-ChecklistPage-SideBySide
+          - ReviewCenter-ChecklistPage-SideBySide-Order
+          - ReviewCenter-ChecklistPage-SideBySide-Badge
+          - ReviewCenter-ChecklistPage-SideBySide-Reason
+          - ReviewCenter-ChecklistPage-SideBySide-ReasonEncoded
+          - ReviewCenter-ChecklistPage-SideBySide-OwnReason
+          - ReviewCenter-ChecklistPage-SideBySide-Summary
+          - ReviewCenter-ChecklistPage-SideBySide-FailedStatus
+          - ReviewCenter-ChecklistPage-SideBySide-History
+          - ReviewCenter-ChecklistPage-SideBySide-Discuss
+          - ReviewCenter-ChecklistPage-SideBySide-Thread
+          - ReviewCenter-ChecklistPage-SideBySide-ThreadLink
+          - ReviewCenter-ChecklistPage-SideBySide-Empty
+          - ReviewCenter-ChecklistPage-SideBySide-EmptyNotStarted
+          - ReviewCenter-ChecklistPage-SideBySide-Cancel
+          - ReviewCenter-ChecklistPage-SideBySide-DiscussKind
 
       - id: ReviewCenter-Web-BallotExperience-SubmitAndSign
         title: >-
@@ -2639,7 +4056,28 @@ sections:
           A reviewer who is done should not have to take two steps where one is allowed.
         children:
           - ReviewCenter-ChecklistPage-SubmitAndSign
+          - ReviewCenter-ChecklistPage-SubmitAndSign-Password
+          - ReviewCenter-ChecklistPage-SubmitAndSign-Code
+          - ReviewCenter-ChecklistPage-SubmitAndSign-Secondary
+          - ReviewCenter-ChecklistPage-SubmitAndSign-SubmitOnly
+          - ReviewCenter-ChecklistPage-SubmitAndSign-MissingBallots
+          - ReviewCenter-ChecklistPage-SubmitAndSign-Sign
+          - ReviewCenter-ChecklistPage-SubmitAndSign-RefusedKeeps
+          - ReviewCenter-ChecklistPage-SubmitAndSign-RefusedExplains
+          - ReviewCenter-ChecklistPage-SubmitAndSign-ProviderHandIn
+          - ReviewCenter-ChecklistPage-SubmitAndSign-ProviderConfirm
+          - ReviewCenter-ChecklistPage-SubmitAndSign-Incomplete
+          - ReviewCenter-ChecklistPage-SubmitAndSign-SingleSlot
+          - ReviewCenter-ChecklistPage-SubmitAndSign-Revealed
+          - ReviewCenter-ChecklistPage-SubmitAndSign-RevealedExplains
+          - ReviewCenter-ChecklistPage-SubmitAndSign-ProviderRevealed
           - ReviewCenter-ChecklistPage-SignConfirm
+          - ReviewCenter-ChecklistPage-SignConfirm-Code
+          - ReviewCenter-ChecklistPage-SignConfirm-NoFields
+          - ReviewCenter-ChecklistPage-SignConfirm-HandOver
+          - ReviewCenter-ChecklistPage-SignConfirm-HandOverCode
+          - ReviewCenter-ChecklistPage-SignConfirm-Clear
+          - ReviewCenter-ChecklistPage-SignConfirm-NoEntries
         tests:
           - ChecklistPage_SubmitAndSign_SubmitsThenSigns
 
@@ -2650,6 +4088,11 @@ sections:
           A user who wants to take part must be able to join without asking someone to assign them.
         children:
           - ReviewCenter-ChecklistPage-AssignMe
+          - ReviewCenter-ChecklistPage-AssignMe-NewSlot
+          - ReviewCenter-ChecklistPage-AssignMe-NoAlternate
+          - ReviewCenter-ChecklistPage-AssignMe-KeepsSlots
+          - ReviewCenter-ChecklistPage-AssignMe-SlotHolder
+          - ReviewCenter-ChecklistPage-AssignMe-NonMember
         tests:
           - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
 
@@ -2738,6 +4181,12 @@ sections:
           A signature is confirmed with the same factors as the sign-in.
         children:
           - ReviewCenter-ReviewPage-SignTotpCode
+          - ReviewCenter-ReviewPage-SignTotpCode-NoCodeField
+          - ReviewCenter-ReviewPage-SignTotpCode-CodePassed
+          - ReviewCenter-ReviewPage-SignTotpCode-FieldsCleared
+          - ReviewCenter-ReviewPage-SignTotpCode-WrongCode
+          - ReviewCenter-ReviewPage-SignTotpCode-ReusedCode
+          - ReviewCenter-ReviewPage-SignTotpCode-RecoveryCode
 
       - id: ReviewCenter-Web-TotpSecondFactor-Visibility
         title: >-
@@ -2874,6 +4323,10 @@ sections:
           The marks must show what is new without a second place to look.
         children:
           - ReviewCenter-ReviewPage-UnreadMarkers
+          - ReviewCenter-ReviewPage-UnreadMarkers-Index
+          - ReviewCenter-ReviewPage-UnreadMarkers-Summary
+          - ReviewCenter-ReviewPage-UnreadMarkers-OwnComments
+          - ReviewCenter-ReviewPage-UnreadMarkers-LaterVisit
 
       - id: ReviewCenter-Web-Inbox-ThreadMarkers
         title: >-
@@ -2882,6 +4335,10 @@ sections:
           The marks must show what is new where the reader reads.
         children:
           - ReviewCenter-ReviewPage-UnreadMarkers
+          - ReviewCenter-ReviewPage-UnreadMarkers-Index
+          - ReviewCenter-ReviewPage-UnreadMarkers-Summary
+          - ReviewCenter-ReviewPage-UnreadMarkers-OwnComments
+          - ReviewCenter-ReviewPage-UnreadMarkers-LaterVisit
 
       - id: ReviewCenter-Web-Inbox-SeenOnVisit
         title: >-
@@ -2890,6 +4347,10 @@ sections:
           A comment stops being new once the user has seen it.
         children:
           - ReviewCenter-ReviewPage-MarkSeen
+          - ReviewCenter-ReviewPage-MarkSeen-Baseline
+          - ReviewCenter-ReviewPage-MarkSeen-LoadStart
+          - ReviewCenter-ReviewPage-MarkSeen-ParameterChange
+          - ReviewCenter-ReviewPage-MarkSeen-NoAccess
 
       - id: ReviewCenter-Web-Inbox-SignedInOnly
         title: >-
@@ -2924,6 +4385,16 @@ sections:
           connection, so it is verified by the component tests of the units.
         children:
           - ReviewCenter-ReviewPage-StatusPanel
+          - ReviewCenter-ReviewPage-StatusPanel-Signature
+          - ReviewCenter-ReviewPage-StatusPanel-Disputed
+          - ReviewCenter-ReviewPage-StatusPanel-Discuss
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussWarning
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussConfirm
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussCancel
+          - ReviewCenter-ReviewPage-StatusPanel-OpenCounts
+          - ReviewCenter-ReviewPage-StatusPanel-NextAction
+          - ReviewCenter-ReviewPage-StatusPanel-Hidden
+          - ReviewCenter-ReviewPage-StatusPanel-HiddenDisputes
         tests:
           - ReviewStatusPanel_ShowsExactlyOneNextActionButton
 
@@ -2934,6 +4405,16 @@ sections:
           The reader sees who is done without opening the checklist.
         children:
           - ReviewCenter-ReviewPage-StatusPanel
+          - ReviewCenter-ReviewPage-StatusPanel-Signature
+          - ReviewCenter-ReviewPage-StatusPanel-Disputed
+          - ReviewCenter-ReviewPage-StatusPanel-Discuss
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussWarning
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussConfirm
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussCancel
+          - ReviewCenter-ReviewPage-StatusPanel-OpenCounts
+          - ReviewCenter-ReviewPage-StatusPanel-NextAction
+          - ReviewCenter-ReviewPage-StatusPanel-Hidden
+          - ReviewCenter-ReviewPage-StatusPanel-HiddenDisputes
 
       - id: ReviewCenter-Web-WhereAreWe-Differences
         title: >-
@@ -2942,6 +4423,16 @@ sections:
           The differences are what the reviewers have to settle.
         children:
           - ReviewCenter-ReviewPage-StatusPanel
+          - ReviewCenter-ReviewPage-StatusPanel-Signature
+          - ReviewCenter-ReviewPage-StatusPanel-Disputed
+          - ReviewCenter-ReviewPage-StatusPanel-Discuss
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussWarning
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussConfirm
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussCancel
+          - ReviewCenter-ReviewPage-StatusPanel-OpenCounts
+          - ReviewCenter-ReviewPage-StatusPanel-NextAction
+          - ReviewCenter-ReviewPage-StatusPanel-Hidden
+          - ReviewCenter-ReviewPage-StatusPanel-HiddenDisputes
 
       - id: ReviewCenter-Web-WhereAreWe-OpenQuestions
         title: >-
@@ -2950,6 +4441,16 @@ sections:
           The open questions are what stands between the review and its approval.
         children:
           - ReviewCenter-ReviewPage-StatusPanel
+          - ReviewCenter-ReviewPage-StatusPanel-Signature
+          - ReviewCenter-ReviewPage-StatusPanel-Disputed
+          - ReviewCenter-ReviewPage-StatusPanel-Discuss
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussWarning
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussConfirm
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussCancel
+          - ReviewCenter-ReviewPage-StatusPanel-OpenCounts
+          - ReviewCenter-ReviewPage-StatusPanel-NextAction
+          - ReviewCenter-ReviewPage-StatusPanel-Hidden
+          - ReviewCenter-ReviewPage-StatusPanel-HiddenDisputes
 
       - id: ReviewCenter-Web-WhereAreWe-ChangesSince
         title: >-
@@ -2959,6 +4460,11 @@ sections:
           A reviewer who is asked to sign again must see why.
         children:
           - ReviewCenter-ReviewPage-ChangesSinceSigning
+          - ReviewCenter-ReviewPage-ChangesSinceSigning-NoJargon
+          - ReviewCenter-ReviewPage-ChangesSinceSigning-List
+          - ReviewCenter-ReviewPage-ChangesSinceSigning-Change
+          - ReviewCenter-ReviewPage-ChangesSinceSigning-Note
+          - ReviewCenter-ReviewPage-ChangesSinceSigning-Warning
         tests:
           - ReviewPage_SignedThenChanged_ExplainsWhatChanged
 
@@ -3016,6 +4522,15 @@ sections:
           The reviewer must know what to do next.
         children:
           - ReviewCenter-ReviewPage-StatusPanelGuidance
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-Justification
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-PlainText
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-Outcome
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-Caution
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-SignatureLost
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-AskerWaits
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-OtherParty
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-AfterSigning
+          - ReviewCenter-ReviewPage-StatusPanelGuidance-Masked
         tests:
           - ReviewPage_SignedThenChanged_ExplainsWhatChanged
 
@@ -3037,6 +4552,16 @@ sections:
           The panel shows the ballots of the others, so it must not give away what the checklist page hides.
         children:
           - ReviewCenter-ReviewPage-StatusPanel
+          - ReviewCenter-ReviewPage-StatusPanel-Signature
+          - ReviewCenter-ReviewPage-StatusPanel-Disputed
+          - ReviewCenter-ReviewPage-StatusPanel-Discuss
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussWarning
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussConfirm
+          - ReviewCenter-ReviewPage-StatusPanel-DiscussCancel
+          - ReviewCenter-ReviewPage-StatusPanel-OpenCounts
+          - ReviewCenter-ReviewPage-StatusPanel-NextAction
+          - ReviewCenter-ReviewPage-StatusPanel-Hidden
+          - ReviewCenter-ReviewPage-StatusPanel-HiddenDisputes
         tests:
           - ReviewPage_HiddenViewer_ShowsNoStandingConclusionOrCheckThreads
 
