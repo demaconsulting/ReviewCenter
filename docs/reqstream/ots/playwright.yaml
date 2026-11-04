@@ -13,11 +13,65 @@ sections:
       - title: Playwright Requirements
         requirements:
           - id: ReviewCenterPuppet-OTS-Playwright-Chromium
-            title: >-
-              Playwright shall drive a headless Chromium to load pages, click, hover, fill, read text, emulate
-              the color scheme, and capture screenshots.
+            title: Playwright shall drive a headless Chromium to load pages.
             justification: |
-              The Puppet developer tool depends on Playwright to show a coding agent the web interface.
+              The Puppet developer tool depends on Playwright to show a coding agent the web interface, so it must
+              start a headless Chromium and load pages. The real-browser end-to-end test navigates to pages of a real
+              server.
+            tags: [ots]
+            tests:
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - id: ReviewCenterPuppet-OTS-Playwright-Chromium-Click
+            title: Playwright shall click an element of a page in a headless Chromium.
+            justification: |
+              The agent follows links and presses buttons of the web interface. The end-to-end test clicks the sign-in,
+              projects, new project, and theme controls.
+            tags: [ots]
+            tests:
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - id: ReviewCenterPuppet-OTS-Playwright-Chromium-Hover
+            title: Playwright shall hover an element of a page in a headless Chromium.
+            justification: |
+              Some controls of the web interface appear only while the mouse is on them. The end-to-end test hovers a
+              control and shows that the hover persists until the mouse moves.
+            tags: [ots]
+            tests:
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - id: ReviewCenterPuppet-OTS-Playwright-Chromium-Fill
+            title: Playwright shall fill a form field of a page in a headless Chromium.
+            justification: |
+              The agent signs in and creates a project through forms. The end-to-end test fills in the sign-in and the
+              project forms.
+            tags: [ots]
+            tests:
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - id: ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText
+            title: Playwright shall read the text of an element of a page in a headless Chromium.
+            justification: |
+              The agent reads messages and names that the web interface shows. The end-to-end test reads the text of
+              an error message, of the current user, and of the project name.
+            tags: [ots]
+            tests:
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - id: ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
+            title: Playwright shall emulate the color scheme of a page in a headless Chromium.
+            justification: |
+              The agent checks the dark and the light appearance of the web interface. The end-to-end test emulates
+              the dark scheme and reads the media query of the page.
+            tags: [ots]
+            tests:
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - id: ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot
+            title: Playwright shall capture a screenshot of a page in a headless Chromium.
+            justification: |
+              The agent shows the web interface as an image. The end-to-end test captures a screenshot and checks that
+              the file is a PNG.
             tags: [ots]
             tests:
               - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

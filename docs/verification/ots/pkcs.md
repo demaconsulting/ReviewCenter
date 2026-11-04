@@ -13,8 +13,8 @@ passing test confirms that the signer of the attestation gets all of this from t
 
 System.Security.Cryptography.Pkcs has no self-validation mode and is verified by the project's own tests, which run the
 real library in memory with temporary keys and certificates. Each scenario names a specific test method that depends on
-the library under verification. A passing pipeline run for the scenario constitutes evidence that the requirement is
-satisfied.
+the library under verification. A passing pipeline run for all scenarios constitutes evidence that all six
+requirements are satisfied.
 
 ### Test Scenarios
 
@@ -32,15 +32,16 @@ satisfied.
 
 **Expected**: The library verifies the signature.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Ecdsa`.
 
 #### AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
 
-**Scenario**: A key whose private part cannot be exported signs the document.
+**Scenario**: On Windows only (the test is skipped where Windows CNG is unavailable), a key whose private part cannot be
+exported signs the document.
 
 **Expected**: The library signs through the key handle, and the signature verifies.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-NonExportableKey`.
 
 #### AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates
 
@@ -48,7 +49,8 @@ satisfied.
 
 **Expected**: The signature holds the certificate of the signer and the intermediate certificates.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Chain`,
+`ReviewCenter-OTS-Pkcs-DetachedSignature-Chain-Intermediates`.
 
 #### AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies
 
@@ -56,4 +58,4 @@ satisfied.
 
 **Expected**: The library reports that the signature does not match.
 
-**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature`.
+**Requirement coverage**: `ReviewCenter-OTS-Pkcs-DetachedSignature-Tamper`.

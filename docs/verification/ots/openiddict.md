@@ -14,8 +14,8 @@ a real provider and not against a mock.
 
 OpenIddict has no self-validation mode and is verified by the project's own tests, which run the full sign-in flow
 against it and read the time of the login from the tokens it issues. Each scenario names a specific test method that
-depends on the package under verification. A passing pipeline run for the scenario constitutes evidence that the
-requirement is satisfied.
+depends on the package under verification. A passing pipeline run for all scenarios constitutes evidence that all four
+requirements are satisfied.
 
 ### Test Scenarios
 
@@ -26,7 +26,8 @@ requirement is satisfied.
 **Expected**: The application finds the discovery document and the keys, and accepts the identity token, so the token is
 signed with the keys that the provider serves.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`,
+`ReviewCenter-OTS-OpenIddict-TestProvider-SigningKeys`, `ReviewCenter-OTS-OpenIddict-TestProvider-IdentityToken`.
 
 #### OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
 
@@ -34,7 +35,7 @@ signed with the keys that the provider serves.
 
 **Expected**: The identity token carries an `auth_time` that the application accepts as recent.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider-AuthTime`.
 
 #### OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
 
@@ -42,4 +43,4 @@ signed with the keys that the provider serves.
 
 **Expected**: The tokens carry exactly that time (or none), so the application refuses them.
 
-**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider`.
+**Requirement coverage**: `ReviewCenter-OTS-OpenIddict-TestProvider-AuthTime`.

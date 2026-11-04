@@ -8,143 +8,330 @@ sections:
   - title: Quality Requirements
     requirements:
       - id: Quality-TestInfrastructure
-        title: The repository shall rely on xUnit to execute and report automated test results.
+        title: The repository shall rely on xUnit to execute its automated tests.
         tags: [quality]
         justification: |
-          Automated testing depends on xUnit's test execution and reporting
-          capabilities. This grouping requirement links the xUnit OTS requirements
-          to the quality root so they participate in orphan detection without being
+          Automated testing depends on xUnit's test execution capabilities. This
+          grouping requirement links the xUnit execution OTS requirement to the
+          quality root so it participates in orphan detection without being
           falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-xUnit-Execute
+
+      - id: Quality-TestInfrastructure-Discovery
+        title: The repository shall rely on xUnit to discover its automated tests.
+        tags: [quality]
+        justification: |
+          The test run depends on xUnit finding every test without a hand-kept list.
+          This grouping requirement links the xUnit discovery OTS requirement to the
+          quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-xUnit-Execute-Discovery
+
+      - id: Quality-TestInfrastructure-Report
+        title: The repository shall rely on the test platform of xUnit to report automated test results.
+        tags: [quality]
+        justification: |
+          Coverage reporting and requirements traceability depend on the TRX result
+          files that the test run writes. This grouping requirement links the xUnit
+          reporting OTS requirement to the quality root so it participates in orphan
+          detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
           - ReviewCenter-OTS-xUnit-Report
 
       - id: Quality-BuildIntegrity
-        title: >-
-          The repository's build pipeline shall rely on BuildMark and VersionMark
-          to validate tool versions and enforce build integrity.
+        title: The repository's build pipeline shall rely on BuildMark to generate build notes.
         tags: [quality]
         justification: |
-          CI/CD reliability depends on BuildMark's build-integrity checks and
-          VersionMark's version-tracking capabilities. This grouping requirement
-          links those OTS requirements to the quality root so they participate in
-          orphan detection without being falsely reported as disconnected from
-          tool functionality.
+          CI/CD reliability depends on BuildMark's build-notes generation. This
+          grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-BuildMark
+
+      - id: Quality-BuildIntegrity-VersionTracking
+        title: The repository's build pipeline shall rely on VersionMark to publish the versions of its tools.
+        tags: [quality]
+        justification: |
+          Reproducible builds depend on VersionMark's version-tracking
+          capabilities. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-VersionMark
 
       - id: Quality-StaticAnalysis
-        title: The repository shall rely on SarifMark and SonarMark to enforce static-analysis quality gates.
+        title: The repository shall rely on SarifMark to enforce the static-analysis quality gate.
         tags: [quality]
         justification: |
-          Code quality assurance depends on SarifMark's SARIF-based enforcement and
-          SonarMark's SonarCloud integration. This grouping requirement links those
-          OTS requirements to the quality root so they participate in orphan
+          Code quality assurance depends on SarifMark's SARIF-based enforcement.
+          This grouping requirement links that OTS requirement to the quality root
+          so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-SarifMark-Enforcement
+
+      - id: Quality-StaticAnalysis-SarifReport
+        title: The repository shall rely on SarifMark to report the CodeQL results as a markdown document.
+        tags: [quality]
+        justification: |
+          The release artifacts include the CodeQL results, which depend on
+          SarifMark's report generation. This grouping requirement links that OTS
+          requirement to the quality root so it participates in orphan detection
+          without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-SarifMark
+
+      - id: Quality-StaticAnalysis-SonarReport
+        title: The repository shall rely on SonarMark to report the SonarCloud quality results.
+        tags: [quality]
+        justification: |
+          The release artifacts include the SonarCloud quality gate, which depends
+          on SonarMark's SonarCloud integration. This grouping requirement links
+          that OTS requirement to the quality root so it participates in orphan
           detection without being falsely reported as disconnected from tool
           functionality.
         children:
-          - ReviewCenter-OTS-SarifMark
-          - ReviewCenter-OTS-SarifMark-Enforcement
           - ReviewCenter-OTS-SonarMark
 
       - id: Quality-PeerReview
-        title: The repository shall rely on ReviewMark to enforce peer-review tracking and reporting.
+        title: The repository shall rely on ReviewMark to enforce that every review-set has current review evidence.
         tags: [quality]
         justification: |
-          Peer-review compliance depends on ReviewMark's enforcement, elaboration,
-          and linting capabilities. This grouping requirement links those OTS
-          requirements to the quality root so they participate in orphan detection
-          without being falsely reported as disconnected from tool functionality.
+          Peer-review compliance depends on ReviewMark's enforcement. This grouping
+          requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-ReviewMark-Enforce
+
+      - id: Quality-PeerReview-Reporting
+        title: The repository shall rely on ReviewMark to produce the review plan.
+        tags: [quality]
+        justification: |
+          Peer-review tracking depends on ReviewMark's plan generation. This
+          grouping requirement links that OTS requirement to the quality root so
+          it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-ReviewMark
-          - ReviewCenter-OTS-ReviewMark-Enforce
+
+      - id: Quality-PeerReview-Report
+        title: The repository shall rely on ReviewMark to produce the review report.
+        tags: [quality]
+        justification: |
+          Showing which review-sets are current or stale depends on ReviewMark's
+          report generation. This grouping requirement links that OTS requirement
+          to the quality root so it participates in orphan detection without being
+          falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-ReviewMark-Report
+
+      - id: Quality-PeerReview-Elaboration
+        title: The repository shall rely on ReviewMark to elaborate review-set details for agent consumption.
+        tags: [quality]
+        justification: |
+          Targeted automated reviews depend on ReviewMark's elaboration of the
+          review-sets. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-ReviewMark-Elaborate
+
+      - id: Quality-PeerReview-Lint
+        title: The repository shall rely on ReviewMark to validate the review configuration file.
+        tags: [quality]
+        justification: |
+          A faulty review configuration must stop the build, which depends on
+          ReviewMark's linting. This grouping requirement links that OTS
+          requirement to the quality root so it participates in orphan detection
+          without being falsely reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-ReviewMark-Lint
 
       - id: Quality-DocumentationGeneration
-        title: The repository shall rely on Pandoc and WeasyPrint to generate HTML and PDF documentation.
+        title: The repository shall rely on Pandoc to generate HTML documentation.
         tags: [quality]
         justification: |
-          Documentation generation depends on Pandoc's format conversion and
-          WeasyPrint's PDF rendering. This grouping requirement links those OTS
-          requirements to the quality root so they participate in orphan detection
-          without being falsely reported as disconnected from tool functionality.
+          Documentation generation depends on Pandoc's format conversion. This
+          grouping requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-Pandoc
+
+      - id: Quality-DocumentationGeneration-Pdf
+        title: The repository shall rely on WeasyPrint to generate PDF documentation.
+        tags: [quality]
+        justification: |
+          The PDF documents of the release depend on WeasyPrint's PDF rendering.
+          This grouping requirement links that OTS requirement to the quality root
+          so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-WeasyPrint
 
       - id: Quality-RequirementsTraceability
-        title: >-
-          The repository shall rely on ReqStream and FileAssert to validate
-          requirements traceability and generated documentation.
+        title: The repository shall rely on ReqStream to validate requirements traceability.
         tags: [quality]
         justification: |
           Requirements traceability depends on ReqStream's linting and reporting
-          capabilities, and generated-document verification depends on FileAssert.
-          This grouping requirement links those OTS requirements to the quality
-          root so they participate in orphan detection without being falsely
+          capabilities. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely
           reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-ReqStream
+
+      - id: Quality-RequirementsTraceability-DocumentAssertions
+        title: The repository shall rely on FileAssert to validate the generated documentation.
+        tags: [quality]
+        justification: |
+          Generated-document verification depends on FileAssert. This grouping
+          requirement links that OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-FileAssert
 
       - id: Quality-SoftwareStructureModeling
-        title: The repository shall rely on SysML2Tools to lint and render software-structure models.
+        title: The repository shall rely on SysML2Tools to lint software-structure models.
         tags: [quality]
         justification: |
-          Software-structure documentation depends on SysML2Tools' model-linting
-          and diagram-rendering capabilities. This grouping requirement links those
-          OTS requirements to the quality root so they participate in orphan
-          detection without being falsely reported as disconnected from tool
-          functionality.
+          Software-structure documentation depends on SysML2Tools' model linting.
+          This grouping requirement links that OTS requirement to the quality root
+          so it participates in orphan detection without being falsely reported as
+          disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-SysML2Tools-Lint
+
+      - id: Quality-SoftwareStructureModeling-Rendering
+        title: The repository shall rely on SysML2Tools to render software-structure models.
+        tags: [quality]
+        justification: |
+          Software-structure documentation depends on SysML2Tools' diagram
+          rendering. This grouping requirement links that OTS requirement to the
+          quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
           - ReviewCenter-OTS-SysML2Tools-Render
 
       - id: Quality-WebPlatform
-        title: The repository shall rely on ASP.NET Core to host the web application and render its components.
+        title: The repository shall rely on ASP.NET Core to host the web application.
         tags: [quality]
         justification: |
-          The ReviewCenter web service runs on ASP.NET Core with Kestrel and Blazor
-          Server. This grouping requirement links the ASP.NET Core OTS requirements
-          to the quality root so they participate in orphan detection without being
-          falsely reported as disconnected from tool functionality.
+          The ReviewCenter web service runs on ASP.NET Core with Kestrel. This
+          grouping requirement links the ASP.NET Core hosting OTS requirement to the
+          quality root so it participates in orphan detection without being falsely
+          reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-AspNetCore-Host
-          - ReviewCenter-OTS-AspNetCore-Components
-          - ReviewCenter-OTS-AspNetCore-Authentication
-          - ReviewCenter-OTS-AspNetCore-DataProtection
 
-      - id: Quality-DataStorage
-        title: The repository shall rely on Entity Framework Core with SQLite to store projects and reviews.
+      - id: Quality-WebPlatform-Components
+        title: The repository shall rely on ASP.NET Core to render the components of the web application.
         tags: [quality]
         justification: |
-          The Storage subsystem keeps projects and reviews in a SQLite database through
+          The user interface is built from Razor components that Blazor Server
+          renders and drives. This grouping requirement links the ASP.NET Core
+          component OTS requirements to the quality root so they participate in
+          orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
+          - ReviewCenter-OTS-AspNetCore-Components
+          - ReviewCenter-OTS-AspNetCore-Components-Events
+
+      - id: Quality-WebPlatform-Authentication
+        title: The repository shall rely on ASP.NET Core to authenticate users of the web application.
+        tags: [quality]
+        justification: |
+          The sign-in with a local account is built on the cookie authentication,
+          the authorization, the antiforgery protection, and the password hasher of
+          the framework. This grouping requirement links the ASP.NET Core
+          authentication OTS requirements to the quality root so they participate in
+          orphan detection without being falsely reported as disconnected from tool
+          functionality.
+        children:
+          - ReviewCenter-OTS-AspNetCore-Authentication
+          - ReviewCenter-OTS-AspNetCore-Authentication-SignOut
+          - ReviewCenter-OTS-AspNetCore-Authentication-Redirect
+          - ReviewCenter-OTS-AspNetCore-Authentication-Antiforgery
+          - ReviewCenter-OTS-AspNetCore-Authentication-PasswordAccept
+          - ReviewCenter-OTS-AspNetCore-Authentication-PasswordReject
+
+      - id: Quality-WebPlatform-DataProtection
+        title: The repository shall rely on ASP.NET Core to encrypt the secrets that the web application stores.
+        tags: [quality]
+        justification: |
+          The access tokens of git repositories are stored only encrypted, with the
+          Data Protection of the framework. This grouping requirement links the
+          ASP.NET Core data protection OTS requirements to the quality root so they
+          participate in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-AspNetCore-DataProtection
+          - ReviewCenter-OTS-AspNetCore-DataProtection-KeyRing
+          - ReviewCenter-OTS-AspNetCore-DataProtection-OtherKeyRing
+          - ReviewCenter-OTS-AspNetCore-DataProtection-Purpose
+          - ReviewCenter-OTS-AspNetCore-DataProtection-Certificate
+          - ReviewCenter-OTS-AspNetCore-DataProtection-Certificate-Previous
+          - ReviewCenter-OTS-AspNetCore-DataProtection-Dpapi
+
+      - id: Quality-DataStorage
+        title: The repository shall rely on Entity Framework Core with SQLite to persist its data.
+        tags: [quality]
+        justification: |
+          The Storage subsystem keeps its data in a SQLite database through
           Entity Framework Core. This grouping requirement links the EF Core OTS
           requirements to the quality root so they participate in orphan detection
           without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-EfCore-Mapping
+          - ReviewCenter-OTS-EfCore-Mapping-BinaryColumns
+          - ReviewCenter-OTS-EfCore-Mapping-CompositeKeys
           - ReviewCenter-OTS-EfCore-Sqlite
+          - ReviewCenter-OTS-EfCore-Sqlite-KeyUniqueness
+          - ReviewCenter-OTS-EfCore-Sqlite-Relationship
 
       - id: Quality-ComponentTesting
-        title: >-
-          The repository shall rely on bUnit, the ASP.NET Core test host, and OpenIddict as a test identity provider to
-          verify the web interface in memory.
+        title: The repository shall rely on bUnit to verify the Razor components of the web interface in memory.
         tags: [quality]
         justification: |
-          Verification of the Razor components and the hosting pipeline without a
-          browser depends on bUnit and the ASP.NET Core test host, and verification
-          of the sign-in with an identity provider depends on OpenIddict as a
-          provider that is used only by the tests. This grouping
-          requirement links those OTS requirements to the quality root so they
+          Verification of the Razor components without a browser depends on bUnit.
+          This grouping requirement links the bUnit OTS requirements to the quality
+          root so they participate in orphan detection without being falsely
+          reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-bUnit-Component
+          - ReviewCenter-OTS-bUnit-Component-FormSubmission
+          - ReviewCenter-OTS-bUnit-Component-FileSelection
+
+      - id: Quality-ComponentTesting-TestHost
+        title: The repository shall rely on the ASP.NET Core test host to verify the hosting pipeline in memory.
+        tags: [quality]
+        justification: |
+          Verification of the hosting pipeline without a network listener depends on
+          the ASP.NET Core test host. This grouping requirement links that OTS
+          requirement to the quality root so it participates in orphan detection
+          without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-bUnit-TestHost
+
+      - id: Quality-ComponentTesting-TestProvider
+        title: The repository shall rely on OpenIddict as a test identity provider to verify the sign-in in memory.
+        tags: [quality]
+        justification: |
+          Verification of the sign-in with an identity provider depends on OpenIddict
+          as a provider that is used only by the tests. This grouping requirement
+          links the OpenIddict OTS requirements to the quality root so they
           participate in orphan detection without being falsely reported as
           disconnected from tool functionality.
         children:
-          - ReviewCenter-OTS-bUnit-Component
-          - ReviewCenter-OTS-bUnit-TestHost
           - ReviewCenter-OTS-OpenIddict-TestProvider
+          - ReviewCenter-OTS-OpenIddict-TestProvider-SigningKeys
+          - ReviewCenter-OTS-OpenIddict-TestProvider-IdentityToken
+          - ReviewCenter-OTS-OpenIddict-TestProvider-AuthTime
 
       - id: Quality-BrowserAutomation
         title: The repository shall rely on Playwright to drive the web interface from the Puppet developer tool.
@@ -157,7 +344,12 @@ sections:
           functionality.
         children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium
-
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Click
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Hover
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Fill
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot
       - id: Quality-SourceAccess
         title: The repository shall rely on the installed git program to read source code from repositories.
         tags: [quality]
@@ -167,7 +359,19 @@ sections:
           disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-Git-Access
+          - ReviewCenter-OTS-Git-Access-ChildProcess
+          - ReviewCenter-OTS-Git-Access-Output
+          - ReviewCenter-OTS-Git-Access-ExitCode
+          - ReviewCenter-OTS-Git-Access-ErrorText
+          - ReviewCenter-OTS-Git-Access-ResolveRevision
+          - ReviewCenter-OTS-Git-Access-ResolveRevision-Refusal
+          - ReviewCenter-OTS-Git-Access-ListFiles
+          - ReviewCenter-OTS-Git-Access-ListChanges
+          - ReviewCenter-OTS-Git-Access-ListChanges-Renames
+          - ReviewCenter-OTS-Git-Access-ListChanges-EntryModes
+          - ReviewCenter-OTS-Git-Access-ReadFile
           - ReviewCenter-OTS-Git-Credentials
+          - ReviewCenter-OTS-Git-Credentials-NotStored
 
       - id: Quality-PatternVerification
         title: The repository shall rely on FileSystemGlobbing to verify the selection pattern matcher in its tests.
@@ -188,3 +392,6 @@ sections:
           participates in orphan detection without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-YamlDotNet-Parse
+          - ReviewCenter-OTS-YamlDotNet-Parse-UnknownKeys
+          - ReviewCenter-OTS-YamlDotNet-Parse-Alias
+          - ReviewCenter-OTS-YamlDotNet-Parse-ErrorPosition

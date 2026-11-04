@@ -284,6 +284,12 @@ sections:
           A coding agent polishing the interface looks at screenshots to judge what the user would see.
         children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Click
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Hover
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Fill
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-ReadText
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-ColorScheme
+          - ReviewCenterPuppet-OTS-Playwright-Chromium-Screenshot
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

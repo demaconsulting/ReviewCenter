@@ -10,16 +10,41 @@ sections:
       - title: OpenIddict Requirements
         requirements:
           - id: ReviewCenter-OTS-OpenIddict-TestProvider
-            title: >-
-              OpenIddict shall serve the discovery document and the signing keys, and shall issue identity tokens, with
-              the authentication time of the login, that are signed with its keys, in the authorization code flow with
-              a proof key, so that the sign-in code can be verified against a real provider in the tests.
+            title: OpenIddict shall serve the discovery document of a provider, so that the sign-in code can find it.
             justification: |
-              The tests of the sign-in need a provider that signs real tokens and speaks the protocol. Passing tests
-              that run the full flow against it, and that read the time of the login from the tokens it issues, confirm
-              that it does, and so that the tests that rely on it test the product and not a mock.
+              The tests of the sign-in need a provider that speaks the protocol, so that they test the product and
+              not a mock. A passing test that runs the full flow against it confirms that the application finds the
+              discovery document.
             tags: [ots]
             tests:
               - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+          - id: ReviewCenter-OTS-OpenIddict-TestProvider-SigningKeys
+            title: OpenIddict shall serve the signing keys of a provider, so that the sign-in code can find them.
+            justification: |
+              The sign-in code must validate the signature of the identity token with a key of the provider. A
+              passing test that runs the full flow confirms that the application finds the keys that the discovery
+              document names.
+            tags: [ots]
+            tests:
+              - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+          - id: ReviewCenter-OTS-OpenIddict-TestProvider-IdentityToken
+            title: >-
+              OpenIddict shall issue an identity token that is signed with its keys in the authorization code flow
+              with a proof key.
+            justification: |
+              The tests of the sign-in need tokens that the product can really validate. A passing test that runs the
+              full flow confirms that the application accepts the token, which shows that it is signed with the keys
+              that the provider serves.
+            tags: [ots]
+            tests:
+              - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+          - id: ReviewCenter-OTS-OpenIddict-TestProvider-AuthTime
+            title: OpenIddict shall put the authentication time of the login into the identity tokens that it issues.
+            justification: |
+              The confirmation of identity for a signature checks the time of the login. Passing tests confirm that a
+              fresh sign-in gives a token with a recent time and that a provider set to an old, a future, or no time
+              issues exactly that.
+            tags: [ots]
+            tests:
               - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
               - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed

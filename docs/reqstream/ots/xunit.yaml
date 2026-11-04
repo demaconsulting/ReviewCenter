@@ -9,12 +9,28 @@ sections:
       - title: xUnit Requirements
         requirements:
           - id: ReviewCenter-OTS-xUnit-Execute
-            title: xUnit shall discover and execute unit tests.
+            title: xUnit shall execute unit tests.
             justification: |
-              xUnit is the unit-testing framework used by the project. It discovers and
-              runs all test methods annotated with [Fact] or [Theory] on the Microsoft Testing
-              Platform. Passing tests confirm the framework correctly identifies and executes each
-              test method.
+              xUnit is the unit-testing framework used by the project. It runs all test methods annotated with
+              [Fact] or [Theory] on the Microsoft Testing Platform. Passing tests confirm the framework executes
+              each test method.
+            tags: [ots]
+            tests:
+              - Context_Create_NoArguments_ReturnsDefaultContext
+              - Context_Create_VersionFlag_SetsVersionTrue
+              - Context_Create_SilentFlag_SetsSilentTrue
+              - Context_Create_LogFlag_OpensLogFile
+              - Context_Create_UnknownArgument_ThrowsArgumentException
+              - PathHelpers_SafePathCombine_ValidPaths_CombinesCorrectly
+              - Program_Run_WithVersionFlag_DisplaysVersionOnly
+              - Validation_Run_WithSilentContext_PrintsSummary
+              - SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector
+          - id: ReviewCenter-OTS-xUnit-Execute-Discovery
+            title: xUnit shall discover the unit tests of the test projects.
+            justification: |
+              The project never lists its tests by hand: xUnit finds every method annotated with [Fact] or [Theory]
+              by itself. A passing test is evidence that xUnit discovered it, because a test that was not discovered
+              produces no result.
             tags: [ots]
             tests:
               - Context_Create_NoArguments_ReturnsDefaultContext

@@ -42,7 +42,7 @@ report from a test configuration and evidence store.
 
 **Expected**: Exits 0 and produces a non-empty review report.
 
-**Requirement coverage**: `ReviewCenter-OTS-ReviewMark`.
+**Requirement coverage**: `ReviewCenter-OTS-ReviewMark-Report`.
 
 #### ReviewMark_Enforce
 
