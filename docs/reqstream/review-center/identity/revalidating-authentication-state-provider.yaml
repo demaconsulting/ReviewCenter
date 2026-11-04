@@ -9,44 +9,123 @@ sections:
     requirements:
       - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate
         title: >-
-          The RevalidatingAuthenticationStateProvider unit shall, at the configured interval, read the signed-in
-          user of an open page from the user store again, shall keep the sign-in state only while that user
-          exists, is enabled, and has the same system administrator state and display name as at sign-in, and
-          shall otherwise make the sign-in state of the page anonymous.
+          The RevalidatingAuthenticationStateProvider unit shall, at the configured interval, keep the sign-in state
+          of an open page while the user exists, is enabled, and has the same system administrator state and display
+          name as at sign-in.
         justification: |
-          A page that stays open makes no request, so the check of the session cookie never runs for it. Without
-          a periodic check, a user who was disabled, removed, or demoted from system administrator would keep
-          seeing and changing review data on a page that was opened earlier.
+          A page that stays open makes no request, so the check of the session cookie never runs for it. A
+          periodic check must not disturb a user who is still valid.
         tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUserSameRole_ReturnsTrue
+          - RevalidatingAuthenticationStateProvider_Loop_UserStaysValid_StateStaysAuthenticated
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-UserDisabled
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall consider the user of an open page not valid when
+          the user is disabled.
+        justification: |
+          A user who was disabled would keep seeing and changing review data on a page that was opened earlier.
+        tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDisabled_ReturnsFalse
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_ExternalUserDisabled_ReturnsFalse
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-UserDeleted
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall consider the user of an open page not valid when
+          the user no longer exists.
+        justification: |
+          A user who was removed would keep seeing and changing review data on a page that was opened earlier.
+        tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDeleted_ReturnsFalse
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-RoleChanged
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall consider the user of an open page not valid when
+          the system administrator state differs from the state at sign-in.
+        justification: |
+          A user who was demoted from system administrator would keep the rights of one on a page that was opened
+          earlier.
+        tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-DisplayNameChanged
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall consider the user of an open page not valid when
+          the display name differs from the name at sign-in.
+        justification: |
+          Everything the page records must carry the current name, so a page that shows an old name must end.
+        tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_DisplayNameChanged_ReturnsFalse
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-NoNameClaim
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall consider the user of an open page not valid when
+          the sign-in state has no user name, without reading the user store.
+        justification: |
+          A sign-in state without a name cannot be compared with the stored user, so it must not be accepted.
+        tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_NoNameClaim_ReturnsFalse
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate-MakesAnonymous
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall make the sign-in state of an open page anonymous
+          when the user is not valid.
+        justification: |
+          Ending the sign-in state is what takes the rights away from a page that is already open.
+        tests:
           - RevalidatingAuthenticationStateProvider_Loop_UserDisabled_StateBecomesAnonymous
-          - RevalidatingAuthenticationStateProvider_Loop_UserStaysValid_StateStaysAuthenticated
 
       - id: ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed
         title: >-
-          The RevalidatingAuthenticationStateProvider unit shall make the sign-in state of the page anonymous
-          when the user cannot be read from the user store, and shall record the failure in the log with the user
-          name and no secret.
+          The RevalidatingAuthenticationStateProvider unit shall consider the user of an open page not valid when
+          the user cannot be read from the user store.
         justification: |
           A user whose account cannot be checked must not go on acting. Ending the page on a failed check loses
           what was typed on it, but never lets an unverifiable user keep a page open.
         tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_LookupThrows_ReturnsFalseFailClosed
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed-LoopAnonymous
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall make the sign-in state of an open page anonymous
+          when the user cannot be read from the user store.
+        justification: |
+          Ending the sign-in state is what takes the rights away from a page whose user cannot be verified.
+        tests:
           - RevalidatingAuthenticationStateProvider_Loop_LookupFails_StateBecomesAnonymous
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed-LogsFailure
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall record a failed read of the user in the log as a
+          warning with the user name and no secret.
+        justification: |
+          An operator needs to see why pages end, and the log must not become a place where secrets can be read.
+        tests:
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_LookupThrows_ReturnsFalseFailClosed
 
       - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Shutdown
         title: >-
-          The RevalidatingAuthenticationStateProvider unit shall stop checking when its page is closed, and shall
-          not treat a check that was cancelled by the closing as a failure of the user.
+          The RevalidatingAuthenticationStateProvider unit shall not treat a check that was cancelled by the closing
+          of its page as a failure of the user.
         justification: |
           Closing a page is normal. Reporting it as a failed check would log an error for every closed page and
           would try to end the sign-in state of a page that no longer exists.
         tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_CancelledLookup_ThrowsTaskCanceledWithToken
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Shutdown-StopsLoop
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall stop checking the user when its page is closed.
+        justification: |
+          A closed page that kept checking would read the user store for nobody.
+        tests:
           - RevalidatingAuthenticationStateProvider_Dispose_StopsLoop
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-InputValidation
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall throw an ArgumentNullException when a required
+          argument of its constructor is null.
+        justification: |
+          A missing dependency must fail at once, not as an obscure failure later in a page that is open.
+        tests:
+          - RevalidatingAuthenticationStateProvider_Constructor_NullArguments_Throw

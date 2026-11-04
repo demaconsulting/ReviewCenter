@@ -137,6 +137,42 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the attestation check reports that it verified the signature and that a changed byte is detected.
+    /// </summary>
+    [Fact]
+    public void ValidationChecks_AttestationPdf_RealRun_ReportsSignatureVerifiedAndChangedByteDetected()
+    {
+        // Arrange: the shared real run, in which the attestation check signed and verified a document
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: the check passed and its detail names the verification and the detected change
+        Assert.Matches(
+            @"ReviewCenter_AttestationPdf - Passed \(\d+ ms\): CMS signature and DocMDP verified; changed byte detected",
+            log);
+    }
+
+    /// <summary>
+    ///     Test that the host check reports that the login page and the embedded asset were served and that the host
+    ///     stopped cleanly.
+    /// </summary>
+    [Fact]
+    public void ValidationChecks_HostStart_RealRun_ReportsLoginPageAndAssetServedAndCleanStop()
+    {
+        // Arrange: the shared real run, in which the host check started the web host
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: both requests answered 200 and the host stopped cleanly
+        Assert.Matches(
+            @"ReviewCenter_HostStart - Passed \(\d+ ms\): listened on 127\.0\.0\.1:\d+; "
+            + @"/login and /_framework/blazor\.web\.js returned 200; stopped cleanly",
+            log);
+    }
+
+    /// <summary>
     ///     Test that the review workflow check shows that the author's checklist answer is refused, answers and signs
     ///     with a separate reviewer, also shows that the author's signature is refused, that the approved review is
     ///     locked and that an administrator's reopen unlocks it.
@@ -157,6 +193,62 @@ public partial class ValidationChecksTests
             + @"author signature refused; approved review locked and reopened by an administrator; "
             + @"evidence index fingerprint \w+…, record digest \w+…",
             log);
+    }
+
+    /// <summary>
+    ///     Test that the review workflow check, which throws when the ReviewLocked rule is not hit, reports in the real
+    ///     run that the author's signature is refused and that the approved review is locked.
+    /// </summary>
+    [Fact]
+    public void ReviewWorkflowCheck_RunAsync_RealRun_ReportsApprovedReviewLocked()
+    {
+        // Arrange: the shared real run, in which the check passed only because the locked review refused a change
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: the passed check names the refused signature and the locked approved review
+        Assert.Contains("author signature refused; approved review locked", log);
+    }
+
+    /// <summary>
+    ///     Test that the review workflow check, which throws when the administrator's reopen does not return the review
+    ///     to not approved, reports in the real run that an administrator reopened it and read the evidence index.
+    /// </summary>
+    [Fact]
+    public void ReviewWorkflowCheck_RunAsync_RealRun_ReportsAdministratorReopen()
+    {
+        // Arrange: the shared real run, in which the check passed only because the reopen unlocked the review
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: the passed check names the reopening by an administrator and the evidence index that follows
+        Assert.Contains("locked and reopened by an administrator; evidence index", log);
+    }
+
+    /// <summary>
+    ///     Test that the git check fails with the message that the server cannot run git when git cannot be started,
+    ///     without naming a folder.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_GitAvailable_GitNotOnPath_FailsWithGitUnavailableMessage()
+    {
+        // Arrange: wait for the shared real runs, which start git in the background, then let the search path name
+        // only an empty folder, so that git cannot be started
+        _ = RealValidationRun.Result;
+        _ = RealValidationRun.Process;
+        using var emptyFolder = new TemporaryDirectory();
+        using var configuration = new ConfiguredKeysEnvironment(new KeyValuePair<string, string?>("PATH", emptyFolder.DirectoryPath));
+
+        // Act: run the check
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => GitAvailableCheck.RunAsync(TestContext.Current.CancellationToken));
+
+        // Assert: the message says that the server cannot run git and what to install, and names no folder
+        Assert.Contains("The server cannot run git", exception.Message);
+        Assert.Contains("install git", exception.Message);
+        Assert.DoesNotContain(emptyFolder.DirectoryPath, exception.Message);
     }
 
     /// <summary>
@@ -334,6 +426,55 @@ public partial class ValidationChecksTests
         Assert.DoesNotContain("file-secret-value", detail);
         Assert.DoesNotContain(folder.DirectoryPath, detail);
         Assert.DoesNotContain("Warning", detail);
+    }
+
+    /// <summary>
+    ///     Test that the notification check opens no connection to the mail server it examines.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredNotifications_SmtpSettings_OpensNoConnection()
+    {
+        // Arrange: an SMTP configuration that points at a loopback listener, which accepts and records any connection
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        using var acceptTimeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        acceptTimeout.CancelAfter(TimeSpan.FromSeconds(10));
+        Task<System.Net.Sockets.TcpClient>? accepting = null;
+        try
+        {
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            using var configuration = new ConfiguredKeysEnvironment(SmtpVariables(
+                new("Notifications__Smtp__Host", "127.0.0.1"),
+                new("Notifications__Smtp__Port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                new("Notifications__Smtp__Password", "unused-secret-value")));
+            accepting = listener.AcceptTcpClientAsync(acceptTimeout.Token).AsTask();
+
+            // Act: run the check, then give a late or background connection attempt a short bounded time to arrive
+            var detail = await ConfiguredNotificationsCheck.RunAsync(TestContext.Current.CancellationToken);
+            var finished = await Task.WhenAny(accepting, Task.Delay(TimeSpan.FromMilliseconds(500),
+                TestContext.Current.CancellationToken));
+
+            // Assert: the check examined the settings and no connection was accepted by the listener
+            Assert.Contains("server 127.0.0.1", detail);
+            Assert.NotSame(accepting, finished);
+        }
+        finally
+        {
+            await acceptTimeout.CancelAsync();
+            listener.Stop();
+            if (accepting is not null)
+            {
+                try
+                {
+                    (await accepting).Dispose();
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException
+                                               or System.Net.Sockets.SocketException)
+                {
+                    // Expected: the pending accept ends when no connection arrived
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -692,6 +833,38 @@ public partial class ValidationChecksTests
         Assert.Contains(", thumbprint ", detail);
         Assert.Contains("warning: The signing certificate ", detail);
         Assert.Contains(" expires on ", detail);
+        Assert.DoesNotContain(certificates.DirectoryPath, detail);
+        Assert.DoesNotContain(KeysInstall.Password, detail);
+        Assert.Equal(before, install.Snapshot());
+    }
+
+    /// <summary>
+    ///     Test that the key check warns that the certificate of the File provider has ended, still passes, names no
+    ///     folder and never the password, and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_ConfiguredKeys_FileProviderExpiredKey_WarnsItExpiredAndStillPasses()
+    {
+        // Arrange: a protected PFX whose validity ended yesterday, with its password in the environment form
+        using var certificates = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WriteExpiredPfx(certificates, "attest", KeysInstall.Password);
+        using var install = new KeysInstall();
+        install.AddToken(1, KeysInstall.TokenText);
+        using var configuration = install.Configure(
+            new("Attestation__Provider", "File"),
+            new("Attestation__CertificatePath", pfx),
+            new("Attestation__CertificatePassword", KeysInstall.Password));
+        var before = install.Snapshot();
+
+        // Act: the check passes, because an expired certificate only fails it when a trusted key is required
+        var detail = await ConfiguredKeysCheck.RunAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the key is marked expired, the warning says it ended, it does not say it ends soon, and nothing leaks
+        Assert.Contains("attestation key File: subject 'CN=attest'", detail);
+        Assert.Contains("(expired)", detail);
+        Assert.Contains("warning: The signing certificate ", detail);
+        Assert.Contains(" expired on ", detail);
+        Assert.DoesNotContain(" expires on ", detail);
         Assert.DoesNotContain(certificates.DirectoryPath, detail);
         Assert.DoesNotContain(KeysInstall.Password, detail);
         Assert.Equal(before, install.Snapshot());

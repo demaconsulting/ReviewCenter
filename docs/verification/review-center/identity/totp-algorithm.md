@@ -19,7 +19,7 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 - All unit tests pass with zero failures.
 - The reference reproduces the ten published HOTP values of RFC 4226 Appendix D.
 - The production code reproduces the six published SHA-1 vectors of RFC 6238 Appendix B, and gives the same six digit
-  code as the reference for 200 random secrets and instants.
+  code as the reference for 200 random secrets and instants; the default code has six digits and keeps a leading zero.
 - A code of the current step or of the step before or after it is accepted and the step that is reported is
   `floor(unix time / 30)` plus the offset; a code two steps away, and a code that is not exactly six ASCII digits
   (missing, empty, short, long, with a letter or a space, or with other digit characters), is refused and reports step
@@ -44,6 +44,10 @@ computed with the production code and with the reference; both equal the publish
 **TotpAlgorithm_ComputeCode_ManyRandomSecrets_MatchTheReference**: With a fixed seed, 200 random secrets are used at
 random instants up to the year 2096; the six digit code of the production code equals that of the reference every time.
 This scenario is tested by `TotpAlgorithm_ComputeCode_ManyRandomSecrets_MatchTheReference`.
+
+**TotpAlgorithm_ComputeCode_DefaultDigits_GivesSixDigitsWithLeadingZero**: The code of the published instant
+1111111109 is computed with the default number of digits; it is `081804`, six digits with the leading zero kept. This
+scenario is tested by `TotpAlgorithm_ComputeCode_DefaultDigits_GivesSixDigitsWithLeadingZero`.
 
 **TotpAlgorithm_TryVerify_MatchedStep_IsFloorOfUnixTimeOverThirty**: A theory over the offsets -1, 0, and 1; the code
 of that step is computed by the reference and verified in the middle of a step. It is accepted and the reported step is

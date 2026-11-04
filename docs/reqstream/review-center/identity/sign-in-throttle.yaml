@@ -9,28 +9,88 @@ sections:
     requirements:
       - id: ReviewCenter-SignInThrottle-Limits
         title: >-
-          The SignInThrottle unit shall allow an attempt only while fewer than the configured number of attempts of
-          the same client address and user name (compared without regard to case) and fewer than the configured
-          number of attempts of the same client address were counted in the current window, shall count an attempt
-          the same way whether or not the user name exists, shall not count a refused attempt, shall count each
-          client address separately, shall start counting again when the window has passed, and shall give the
-          attempts of the name back when its sign-in succeeded (see the reservation requirement).
+          The SignInThrottle unit shall allow attempts of one client address and user name while fewer than the
+          configured number of attempts were counted in the current window for that name and for that address.
         justification: |
           Online password guessing must become slow for one client, both against one account and across many
-          accounts, without one client being able to lock other clients out. Counting by name only would let a
-          client try endless names, and counting by address only would make one shared address a single
-          allowance. A refused attempt that was counted would let an attacker extend their own refusal, and
-          counting by account existence would reveal which accounts exist. A user who signs in correctly must not
-          be refused because of earlier typing errors.
+          accounts, without one client being able to lock other clients out. A user who types a few errors must
+          still be able to try again.
         tests:
           - SignInThrottle_TryBegin_WithinLimits_AllowsAttempts
+
+      - id: ReviewCenter-SignInThrottle-Limits-NameLimit
+        title: >-
+          The SignInThrottle unit shall refuse a further attempt of a user name from one client address when the
+          configured number of attempts of that name was counted in the window, without regard to the case of the
+          name, and shall still allow other names from that address.
+        justification: |
+          Guessing the password of one account from one client must become slow, and one name must not block the
+          other names of the same address.
+        tests:
           - SignInThrottle_TryBegin_SameNameTooOften_RefusesFurtherAttempts
+
+      - id: ReviewCenter-SignInThrottle-Limits-AddressLimit
+        title: >-
+          The SignInThrottle unit shall refuse a further attempt from one client address when the configured number
+          of attempts of that address, with any names, was counted in the window.
+        justification: |
+          Counting by name only would let a client try endless names, so the attempts of the address are limited
+          as well.
+        tests:
           - SignInThrottle_TryBegin_ManyNamesFromOneAddress_RefusesAtAddressLimit
+
+      - id: ReviewCenter-SignInThrottle-Limits-PerAddress
+        title: >-
+          The SignInThrottle unit shall count the attempts of each client address separately from those of every
+          other address.
+        justification: |
+          One client must not be able to lock other clients out, and counting by name alone would do that.
+        tests:
           - SignInThrottle_TryBegin_OtherAddress_IsCountedSeparately
+
+      - id: ReviewCenter-SignInThrottle-Limits-WindowReset
+        title: >-
+          The SignInThrottle unit shall allow attempts again, counted from zero, when the window of the counters has
+          passed.
+        justification: |
+          A refusal is meant to slow guessing down, not to lock a person out for good.
+        tests:
           - SignInThrottle_TryBegin_AfterWindow_AllowsAgain
+
+      - id: ReviewCenter-SignInThrottle-Limits-SuccessGiveBack
+        title: >-
+          The SignInThrottle unit shall, when a sign-in succeeded, clear the counter of its user name and give one
+          attempt back to the counter of its client address.
+        justification: |
+          A user who signs in correctly must not be refused because of earlier typing errors, and the success must
+          not use up the quota of the address.
+        tests:
           - SignInThrottle_Succeeded_ClearsNameCounterAndReturnsAddressSlot
+
+      - id: ReviewCenter-SignInThrottle-Limits-RefusedNotCounted
+        title: >-
+          The SignInThrottle unit shall not count an attempt that it refuses.
+        justification: |
+          A refused attempt that was counted would let an attacker extend their own refusal and use up the quota of
+          the address with refused attempts.
+        tests:
           - SignInThrottle_TryBegin_RefusedAttempt_DoesNotConsumeSlots
+
+      - id: ReviewCenter-SignInThrottle-Limits-NullHandling
+        title: >-
+          The SignInThrottle unit shall treat a missing client address or user name like an empty one, counted and
+          limited like any other.
+        justification: |
+          A request without an address or a name must neither fail nor escape the limit.
+        tests:
           - SignInThrottle_TryBegin_NullAddressOrName_IsHandled
+
+      - id: ReviewCenter-SignInThrottle-Limits-Reset
+        title: >-
+          The SignInThrottle unit shall forget every counter when it is reset.
+        justification: |
+          An operator and the tests need a way to start from a clean state.
+        tests:
           - SignInThrottle_Reset_ClearsAllCounters
 
       - id: ReviewCenter-SignInThrottle-Options
@@ -45,48 +105,122 @@ sections:
 
       - id: ReviewCenter-SignInThrottle-Bounded
         title: >-
-          The SignInThrottle unit shall keep no more than a fixed number of counters in memory, removing expired
-          counters first and, when that is not enough, removing only as many of the oldest counters as are needed,
-          and never all counters at once.
+          The SignInThrottle unit shall keep no more than a fixed number of counters in memory.
         justification: |
           Names and addresses come from the caller, so an attacker could otherwise make the server use memory
-          without limit by trying many different names. Clearing the whole table would let one flood of fresh names
-          reset every counter at once, including the counters of the attacker. Removing the oldest counters only
-          as needed keeps the recent ones; a distributed flood that creates as many fresh counters as the cap
-          inside one window can still push out older counters, so the throttle then lets some attempts through,
-          but the account lockout (kept in the database) still applies, and a server that runs out of memory
-          helps nobody.
+          without limit by trying many different names. A server that runs out of memory helps nobody.
         tests:
           - SignInThrottle_TryBegin_ManyDistinctKeys_KeepsTableBounded
+
+      - id: ReviewCenter-SignInThrottle-Bounded-EvictOldest
+        title: >-
+          The SignInThrottle unit shall, when the counters are at the limit and a new counter is needed, remove only
+          as many of the oldest counters as are needed, never all counters at once, and keep the recent ones.
+        justification: |
+          Clearing the whole table would let one flood of fresh names reset every counter at once, including the
+          counters of the attacker. Removing the oldest counters only as needed keeps the recent ones. A distributed
+          flood that creates as many fresh counters as the cap inside one window can still push out older counters,
+          but the account lockout (kept in the database) still applies.
+        tests:
           - SignInThrottle_TryBegin_TableFull_EvictsOldestCountersAndKeepsRecentOnes
+
+      - id: ReviewCenter-SignInThrottle-Bounded-ExistingAddressKeyKept
+        title: >-
+          The SignInThrottle unit shall remove no counter for an attempt that needs only one new counter when one
+          place is free, because the counter of its client address exists already.
+        justification: |
+          Removing a counter that is not needed would forget the attempts of another name for no reason.
+        tests:
           - SignInThrottle_TryBegin_OneKeyMissing_DoesNotEvictForTheExistingAddressKey
+
+      - id: ReviewCenter-SignInThrottle-Bounded-PruneExpiredFirst
+        title: >-
+          The SignInThrottle unit shall remove the counters whose window has passed before it removes any counter
+          that is still live.
+        justification: |
+          An expired counter holds no information, so a live counter must not be lost while expired ones exist.
+        tests:
           - SignInThrottle_TryBegin_TableFullOfExpiredKeys_PrunesExpiredBeforeEvictingLiveOnes
+
+      - id: ReviewCenter-SignInThrottle-Bounded-ClockBackwards
+        title: >-
+          The SignInThrottle unit shall remove expired counters wherever they are in the order of creation, so that a
+          clock stepped backwards does not make it remove a live counter before expired ones.
+        justification: |
+          The clock of a server can be set back, and the counters created before the step then are not in time order.
+        tests:
           - SignInThrottle_TryBegin_ClockSteppedBackwards_PrunesExpiredBeforeEvictingLiveOnes
 
       - id: ReviewCenter-SignInThrottle-Reservation
         title: >-
-          The SignInThrottle unit shall give an attempt a reservation when it counts it, and shall give the attempts
-          back for a successful sign-in only to the counters that the reservation counted in, leaving counters that
-          have been removed or started again unchanged, and only once per reservation.
+          The SignInThrottle unit shall give an attempt that it counts a reservation, and shall give the attempts
+          back for a successful sign-in to the counters that the reservation counted in.
         justification: |
           Hashing a password takes time, so a counter can be removed or started again between the start of an
-          attempt and its success. Giving back by key alone would then clear or reduce a newer counter that
-          belongs to other attempts and let a client exceed its limits. A reservation that is given back once
-          cannot be used to refund more than was counted.
+          attempt and its success. A reservation names exactly the counters that the attempt was counted in.
         tests:
           - SignInThrottle_Succeeded_ClearsNameCounterAndReturnsAddressSlot
+
+      - id: ReviewCenter-SignInThrottle-Reservation-StaleWindowName
+        title: >-
+          The SignInThrottle unit shall leave the counter of a user name unchanged when a success is given back for a
+          reservation from a window that has passed.
+        justification: |
+          Giving back by key alone would clear a newer counter that belongs to other attempts and let a client exceed
+          its limits.
+        tests:
           - SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotClearNewNameCounter
+
+      - id: ReviewCenter-SignInThrottle-Reservation-StaleWindowAddress
+        title: >-
+          The SignInThrottle unit shall leave the counter of a client address unchanged when a success is given back
+          for a reservation from a window that has passed.
+        justification: |
+          Giving back by key alone would reduce a newer counter that belongs to other attempts and let a client
+          exceed its limits.
+        tests:
           - SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotRefundNewAddressCounter
+
+      - id: ReviewCenter-SignInThrottle-Reservation-AfterEviction
+        title: >-
+          The SignInThrottle unit shall leave counters that were started again unchanged when a success is given back
+          for a reservation whose counters were removed to keep the table within its cap.
+        justification: |
+          A flood from another address can remove the counters of a slow sign-in, and its success must not touch
+          the counters that were created after that.
+        tests:
           - SignInThrottle_Succeeded_AfterEviction_DoesNotTouchRecreatedWindows
+
+      - id: ReviewCenter-SignInThrottle-Reservation-RefundOnce
+        title: >-
+          The SignInThrottle unit shall give the attempts back only once per reservation.
+        justification: |
+          A reservation that is given back once cannot be used to refund more than was counted.
+        tests:
           - SignInThrottle_Succeeded_CalledTwiceWithOneReservation_RefundsOnce
+
+      - id: ReviewCenter-SignInThrottle-Reservation-InputValidation
+        title: >-
+          The SignInThrottle unit shall refuse a missing reservation when a success is given back.
+        justification: |
+          A missing reservation is a programming mistake that must be found at once.
+        tests:
           - SignInThrottle_Succeeded_NullReservation_Throws
+
+      - id: ReviewCenter-SignInThrottle-Reservation-ResetGenerations
+        title: >-
+          The SignInThrottle unit shall leave counters that were started after a reset unchanged when a success is
+          given back for a reservation from before the reset.
+        justification: |
+          A reset forgets every counter, and an old reservation must not refund counters that did not exist when it
+          was given.
+        tests:
           - SignInThrottle_Reset_DoesNotReuseGenerations
 
       - id: ReviewCenter-SignInThrottle-AddressOnly
         title: >-
           The SignInThrottle unit shall, on request, count an attempt against the counter of the client address
-          alone, with no counter per name, refuse it only when the address has used up its attempts, give the
-          attempt back for a success only once, and keep to the same cap on counters as an attempt with a name.
+          alone, with no limit per user name, and refuse it only when the address has used up its attempts.
         justification: |
           A request that carries no user name that can be trusted, such as the callback of an identity provider, must
           not be counted under a constant name: all people behind one shared address would share that one counter, and
@@ -94,17 +228,56 @@ sections:
           from one address without that effect.
         tests:
           - SignInThrottle_TryBeginAddressOnly_NoNameLimit_RefusesOnlyAtAddressLimit
+
+      - id: ReviewCenter-SignInThrottle-AddressOnly-SlotReturnedOnce
+        title: >-
+          The SignInThrottle unit shall give the attempt of an address-only request back for a success only once.
+        justification: |
+          A reservation that is given back twice must not refund more than was counted.
+        tests:
           - SignInThrottle_Succeeded_AddressOnlyReservation_ReturnsTheSlotOnce
+
+      - id: ReviewCenter-SignInThrottle-AddressOnly-TableFullBounded
+        title: >-
+          The SignInThrottle unit shall keep to the same cap on counters for an address-only attempt as for an attempt
+          with a name, removing the oldest counter when the table is full.
+        justification: |
+          Addresses come from the caller too, so counting the address alone must not let the memory grow without
+          limit.
+        tests:
           - SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap
 
       - id: ReviewCenter-SignInThrottle-ReleaseAddress
         title: >-
-          The SignInThrottle unit shall, on request, give back only the address slot of a reservation and keep the
-          counter of the name, give it back only once, and refuse a missing reservation.
+          The SignInThrottle unit shall, on request, give back the address slot of a reservation.
         justification: |
-          A right password that still owes a second factor must not use up the quota of the client address, but the
-          attempts on the name must stay counted until the whole sign-in has succeeded, so that guessing codes with a
-          known password stays bounded.
+          A right password that still owes a second factor must not use up the quota of the client address.
         tests:
           - SignInThrottle_ReleaseAddress_GivesBackTheAddressSlotButKeepsTheNameCounter
+
+      - id: ReviewCenter-SignInThrottle-ReleaseAddress-NameCounterKept
+        title: >-
+          The SignInThrottle unit shall keep the counter of the user name when it gives back the address slot of a
+          reservation.
+        justification: |
+          The attempts on the name must stay counted until the whole sign-in has succeeded, so that guessing codes
+          with a known password stays bounded.
+        tests:
+          - SignInThrottle_ReleaseAddress_GivesBackTheAddressSlotButKeepsTheNameCounter
+
+      - id: ReviewCenter-SignInThrottle-ReleaseAddress-Once
+        title: >-
+          The SignInThrottle unit shall give back the address slot of a reservation only once, even when the
+          reservation is released again or later given back as a success.
+        justification: |
+          A reservation must not be used to refund more than was counted.
+        tests:
+          - SignInThrottle_ReleaseAddress_GivesBackTheAddressSlotButKeepsTheNameCounter
+
+      - id: ReviewCenter-SignInThrottle-ReleaseAddress-InputValidation
+        title: >-
+          The SignInThrottle unit shall refuse a missing reservation when the address slot is given back.
+        justification: |
+          A missing reservation is a programming mistake that must be found at once.
+        tests:
           - SignInThrottle_ReleaseAddress_NullReservation_Throws

@@ -84,6 +84,7 @@ sections:
         tests:
           - GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable
           - GitRunner_RunAsync_OldGit_ThrowsGitUnavailable
+          - GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable
           - GitRunner_FailureFor_DescribesFailuresClearly
           - GitRunner_FailureFor_NeverContainsLocation
           - GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath

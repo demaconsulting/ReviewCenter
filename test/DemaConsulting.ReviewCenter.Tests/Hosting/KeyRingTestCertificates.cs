@@ -34,12 +34,29 @@ internal static class KeyRingTestCertificates
     ///     Creates a self-signed RSA certificate with its private key.
     /// </summary>
     /// <param name="name">The common name.</param>
+    /// <param name="validFromDays">The start of the validity, in days from now.</param>
+    /// <param name="validToDays">The end of the validity, in days from now.</param>
     /// <returns>The certificate; the caller disposes it.</returns>
-    private static X509Certificate2 CreateRsa(string name)
+    private static X509Certificate2 CreateRsa(string name, int validFromDays = -1, int validToDays = 30)
     {
         using var rsa = RSA.Create(2048);
         var request = new CertificateRequest($"CN={name}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(30));
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(validFromDays), DateTimeOffset.UtcNow.AddDays(validToDays));
+    }
+
+    /// <summary>
+    ///     Writes a new certificate with its private key as a PKCS #12 file, whose validity ended yesterday.
+    /// </summary>
+    /// <param name="folder">The temporary folder.</param>
+    /// <param name="name">The name of the certificate, which is also the file name without the extension.</param>
+    /// <param name="password">The password of the file; <c>null</c> for none.</param>
+    /// <returns>The path of the PFX file.</returns>
+    public static string WriteExpiredPfx(TemporaryDirectory folder, string name, string? password)
+    {
+        using var certificate = CreateRsa(name, -30, -1);
+        var path = folder.GetFilePath(name + ".pfx");
+        File.WriteAllBytes(path, certificate.Export(X509ContentType.Pfx, password));
+        return path;
     }
 
     /// <summary>

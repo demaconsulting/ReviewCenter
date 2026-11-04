@@ -9,40 +9,115 @@ sections:
     requirements:
       - id: ReviewCenter-TotpAlgorithm-Rfc6238
         title: >-
-          The TotpAlgorithm class shall compute the one-time password of RFC 6238 with HMAC-SHA-1 and 30 second steps,
-          giving the published codes for the published times, and shall give six digits to the person.
+          The TotpAlgorithm class shall compute the one-time password of RFC 6238 with HMAC-SHA-1 and 30 second
+          steps, giving the published codes for the published times.
         justification: |
           A code that differs from the one the app of the person shows would lock every enrolled person out. The
-          published vectors and an independent calculation in the tests show that the product computes what the apps
-          compute.
+          published vectors show that the product computes what the apps compute.
         tests:
-          - TotpOracle_Hotp_Rfc4226Values_MatchThePublishedTable
           - TotpAlgorithm_ComputeCode_Rfc6238Vectors_MatchThePublishedTable
+
+      - id: ReviewCenter-TotpAlgorithm-Rfc6238-RandomSecrets
+        title: >-
+          The TotpAlgorithm class shall give for any secret and instant the same code as an independent calculation
+          of RFC 4226 and RFC 6238.
+        justification: |
+          The published vectors cover one secret only. An independent calculation, itself checked against the
+          published values of RFC 4226, shows that the product computes what the apps compute for every secret.
+        tests:
           - TotpAlgorithm_ComputeCode_ManyRandomSecrets_MatchTheReference
+          - TotpOracle_Hotp_Rfc4226Values_MatchThePublishedTable
+
+      - id: ReviewCenter-TotpAlgorithm-Rfc6238-SixDigits
+        title: >-
+          The TotpAlgorithm class shall give a code of exactly six digits to the person, keeping a leading zero.
+        justification: |
+          Every authenticator app shows six digits, so a code of another length could never be typed.
+        tests:
+          - TotpAlgorithm_ComputeCode_DefaultDigits_GivesSixDigitsWithLeadingZero
 
       - id: ReviewCenter-TotpAlgorithm-Window
         title: >-
-          The TotpAlgorithm class shall accept a code only when it is exactly six digits and belongs to the current
-          time step or the one before or after it, shall tell which step matched, and shall refuse every other code.
+          The TotpAlgorithm class shall accept a code that is exactly six digits and belongs to the current time step
+          or to the one before or after it.
         justification: |
-          The clock of the phone of a person is a little off, so one step either way is accepted. A wider window gives
-          an attacker more codes to try, and the matched step is what the replay protection stores, so it must be
-          the real time step.
+          The clock of the phone of a person is a little off, so one step either way is accepted.
         tests:
           - TotpAlgorithm_TryVerify_MatchedStep_IsFloorOfUnixTimeOverThirty
+
+      - id: ReviewCenter-TotpAlgorithm-Window-MatchedStep
+        title: >-
+          The TotpAlgorithm class shall tell which time step an accepted code matched, which is the Unix time divided
+          by 30 and rounded down, plus the offset of the code.
+        justification: |
+          The matched step is what the replay protection stores, so it must be the real time step.
+        tests:
+          - TotpAlgorithm_TryVerify_MatchedStep_IsFloorOfUnixTimeOverThirty
+
+      - id: ReviewCenter-TotpAlgorithm-Window-OutsideWindow
+        title: >-
+          The TotpAlgorithm class shall refuse a code that belongs to a time step more than one step away from the
+          current one.
+        justification: |
+          A wider window gives an attacker more codes to try.
+        tests:
           - TotpAlgorithm_TryVerify_OutsideTheWindow_IsRefused
+
+      - id: ReviewCenter-TotpAlgorithm-Window-Malformed
+        title: >-
+          The TotpAlgorithm class shall refuse a code that is missing or is not exactly six ASCII digits, and report
+          no matched step.
+        justification: |
+          Text with spaces, letters, other digit characters, or another length is not a code that an app shows, and
+          must not be accepted by a lenient reading.
+        tests:
           - TotpAlgorithm_TryVerify_MalformedCode_IsRefused
 
       - id: ReviewCenter-TotpAlgorithm-Secret
         title: >-
-          The TotpAlgorithm class shall create a random secret of 160 bits, convert it to and from Base32 (tolerating
-          spaces, hyphens, and lower case when a person types it), and build the otpauth address with the issuer and
-          the account name that an authenticator app reads.
+          The TotpAlgorithm class shall create a random secret of 160 bits.
         justification: |
-          The secret must be unguessable, and the person must be able to type it or give it to the app as an address.
-          Refusing text that is not a secret keeps nonsense from becoming a key.
+          The secret must be unguessable.
         tests:
           - TotpAlgorithm_GenerateSecret_Is160BitsAndRoundTripsThroughBase32
+
+      - id: ReviewCenter-TotpAlgorithm-Secret-Base32RoundTrip
+        title: >-
+          The TotpAlgorithm class shall convert a secret to Base32 text without padding and back to the same secret.
+        justification: |
+          The person must be able to type the secret into an app, and the text must give back the same key.
+        tests:
+          - TotpAlgorithm_GenerateSecret_Is160BitsAndRoundTripsThroughBase32
+
+      - id: ReviewCenter-TotpAlgorithm-Secret-TypedTextTolerated
+        title: >-
+          The TotpAlgorithm class shall read Base32 text that a person typed with spaces, hyphens, or lower case.
+        justification: |
+          An app shows the secret in groups and a person types it the way it is shown.
+        tests:
           - TotpAlgorithm_TryFromBase32_TypedText_IsToleratedAndNonsenseIsRefused
+
+      - id: ReviewCenter-TotpAlgorithm-Secret-NonsenseRefused
+        title: >-
+          The TotpAlgorithm class shall refuse text that is missing, empty, or not Base32 when a secret is read.
+        justification: |
+          Refusing text that is not a secret keeps nonsense from becoming a key.
+        tests:
+          - TotpAlgorithm_TryFromBase32_TypedText_IsToleratedAndNonsenseIsRefused
+
+      - id: ReviewCenter-TotpAlgorithm-Secret-OtpauthUri
+        title: >-
+          The TotpAlgorithm class shall build the otpauth address with the issuer and the account name that an
+          authenticator app reads.
+        justification: |
+          The person can give the secret to the app as an address or a picture of it instead of typing it.
+        tests:
           - TotpAlgorithm_BuildUri_HasTheOtpauthForm
+
+      - id: ReviewCenter-TotpAlgorithm-Secret-InputValidation
+        title: >-
+          The TotpAlgorithm class shall refuse missing arguments and a number of digits outside 6 to 8.
+        justification: |
+          A misuse must be found at once and must not end in a wrong code.
+        tests:
           - TotpAlgorithm_InvalidArguments_Throw

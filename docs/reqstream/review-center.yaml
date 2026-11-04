@@ -1684,6 +1684,32 @@ sections:
           - ReviewCenter-Hosting-SecretScan
           - ReviewCenter-Hosting-KeyRingLost
           - ReviewCenter-ValidationChecks-ConfiguredKeys
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NothingConfiguredSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-MissingDatabaseSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NoFolderNoSecretsSkipped
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-CertificateRing
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-EmptyRingFails
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-OtherRingFails
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-WrongCertificate
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-PlaintextWhenEncryptionRequired
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnusableSettings
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnsupportedProvider
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-AttestationKeyReport
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-LegacyAttestationWarning
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnreadableAttestationKey
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-AttestationIoError
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-UnsupportedAttestationProvider
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderReport
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-ExpiryWarning-Ended
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPassword
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderMissingFile
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderNoPath
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderWrongPassword
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-FileProviderUntrustedKey
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-CreatesNothing
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NoSecretInReport
+          - ReviewCenter-ValidationChecks-ConfiguredKeys-NoPathInReport
         tests:
           - ServerHost_CreateApplication_LostRing_RefusesToStartAndCreatesNoKey
           - ValidationChecks_ConfiguredKeys_EmptyRingWithSecrets_FailsAndCreatesNoKey

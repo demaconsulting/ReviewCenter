@@ -121,7 +121,17 @@ public enum IdTokenFault
     /// <summary>
     ///     The <c>nonce</c> is not the one of the authorization request.
     /// </summary>
-    WrongNonce
+    WrongNonce,
+
+    /// <summary>
+    ///     The token has expired: its lifetime ended an hour ago.
+    /// </summary>
+    Expired,
+
+    /// <summary>
+    ///     The token is signed with a key that is not the provider's own.
+    /// </summary>
+    WrongSignature
 }
 
 /// <summary>
@@ -180,6 +190,11 @@ internal sealed class FakeIdentityProvider : IAsyncDisposable
     private readonly ConcurrentQueue<IReadOnlyDictionary<string, string>> _authorizeRequests = new();
 
     /// <summary>
+    ///     The number of token requests (code exchanges) the token endpoint has seen.
+    /// </summary>
+    private int _tokenRequests;
+
+    /// <summary>
     ///     The running provider.
     /// </summary>
     private readonly WebApplication _app;
@@ -222,6 +237,11 @@ internal sealed class FakeIdentityProvider : IAsyncDisposable
     ///     Gets the requests the authorization endpoint has seen so far, oldest first.
     /// </summary>
     public IReadOnlyList<IReadOnlyDictionary<string, string>> AuthorizeRequests => _authorizeRequests.ToArray();
+
+    /// <summary>
+    ///     Gets the number of token requests (code exchanges) the token endpoint has seen so far.
+    /// </summary>
+    public int TokenRequestCount => Volatile.Read(ref _tokenRequests);
 
     /// <summary>
     ///     Starts a provider on a free loopback port.
@@ -342,6 +362,7 @@ internal sealed class FakeIdentityProvider : IAsyncDisposable
     /// <returns>A task that completes when the response is written.</returns>
     private async Task TokenAsync(HttpContext http)
     {
+        Interlocked.Increment(ref _tokenRequests);
         if (Scenario.RefuseCode)
         {
             http.Response.StatusCode = (int)HttpStatusCode.BadRequest;
@@ -375,6 +396,20 @@ internal sealed class FakeIdentityProvider : IAsyncDisposable
             case IdTokenFault.WrongAudience:
                 payload["aud"] = ForgedAudience;
                 break;
+            case IdTokenFault.Expired:
+                var now = DateTimeOffset.UtcNow;
+                payload["iat"] = now.AddHours(-2).ToUnixTimeSeconds();
+                payload["nbf"] = now.AddHours(-2).ToUnixTimeSeconds();
+                payload["exp"] = now.AddHours(-1).ToUnixTimeSeconds();
+                break;
+            case IdTokenFault.WrongSignature:
+                using (var otherRsa = RSA.Create(2048))
+                {
+                    var otherKey = new RsaSecurityKey(otherRsa.ExportParameters(true)) { KeyId = signingKey.KeyId };
+                    return handler.CreateToken(
+                        payload.ToJsonString(), new SigningCredentials(otherKey, SecurityAlgorithms.RsaSha256));
+                }
+
             default:
                 payload["nonce"] = ForgedNonce;
                 break;

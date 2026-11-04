@@ -10,251 +10,808 @@ sections:
     requirements:
       - id: ReviewCenter-OidcSignIn-Login
         title: >-
-          The OidcSignIn unit shall, only when sign-in with a provider is enabled, start a sign-in on a request with a
-          valid antiforgery token by sending the browser to the provider with the authorization code flow, a proof
-          key, a state, and a nonce, shall accept the answer only when the provider's signature, issuer, audience, and
-          lifetime, the state, and the nonce are valid, and shall then sign the user in with the same session cookie as
-          the password sign-in.
+          The OidcSignIn unit shall sign a person in, with a session cookie and a redirect to the requested local
+          address, when the answer of the provider is accepted.
         justification: |
-          The provider is a third party that proves who the person is. The code flow with a proof key keeps the tokens
-          out of the browser and out of the address, and checking the issuer, audience, lifetime, state, and nonce
-          keeps a token that was made for another application, another person, or another moment from being accepted.
+          The provider is a third party that proves who the person is, so an accepted answer is all that is needed
+          to open a session.
         tests:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+
+      - id: ReviewCenter-OidcSignIn-Login-CodeFlowPkce
+        title: >-
+          The OidcSignIn unit shall start a sign-in by sending the browser to the provider with the authorization
+          code flow, a proof key, a state, and a nonce.
+        justification: |
+          The code flow with a proof key keeps the tokens out of the browser and out of the address, and the state
+          and the nonce tie the answer to the sign-in that was started.
+        tests:
           - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+
+      - id: ReviewCenter-OidcSignIn-Login-Antiforgery
+        title: >-
+          The OidcSignIn unit shall start a sign-in only on a request with a valid antiforgery token, and shall send
+          nothing to the provider and set no cookie otherwise.
+        justification: |
+          Another site must not be able to start a sign-in in the browser of a visitor.
+        tests:
           - OidcSignIn_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled
+
+      - id: ReviewCenter-OidcSignIn-Login-StateChecked
+        title: >-
+          The OidcSignIn unit shall refuse an answer of the provider whose state is not the one issued for the
+          sign-in.
+        justification: |
+          An answer that was not asked for by this browser could be one that an attacker made the browser send.
+        tests:
           - OidcSignIn_TamperedState_IsRefused
+
+      - id: ReviewCenter-OidcSignIn-Login-TokenChecked
+        title: >-
+          The OidcSignIn unit shall refuse an identity token whose issuer, audience, or nonce is not the expected
+          one, although the provider signed it.
+        justification: |
+          A token that was made for another application, another provider, or another sign-in must not be accepted
+          as proof of who the person is.
+        tests:
           - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
+
+      - id: ReviewCenter-OidcSignIn-Login-TokenSignature
+        title: >-
+          The OidcSignIn unit shall refuse an identity token that is not signed with the key of the provider.
+        justification: |
+          A token that anybody could make would let anybody sign in as anybody.
+        tests:
+          - OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
+
+      - id: ReviewCenter-OidcSignIn-Login-TokenLifetime
+        title: >-
+          The OidcSignIn unit shall refuse an identity token whose lifetime has ended.
+        justification: |
+          A token that was made for another moment must not be accepted, or an old answer could be used again.
+        tests:
+          - OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
+
+      - id: ReviewCenter-OidcSignIn-Login-CodeRefused
+        title: >-
+          The OidcSignIn unit shall end a sign-in without a session when the provider refuses the authorization code.
+        justification: |
+          Without the tokens of the provider nothing proves who the person is.
+        tests:
           - OidcSignIn_ProviderRefusesTheCode_EndsWithoutSession
+
+      - id: ReviewCenter-OidcSignIn-Login-EmailVerified
+        title: >-
+          The OidcSignIn unit shall refuse the sign-in of a person whose e-mail address the provider does not report as
+          verified when the settings require a verified e-mail address.
+        justification: |
+          An organization that relies on the e-mail address at its provider must not accept an address that the
+          provider itself has not checked.
+        tests:
           - OidcSignIn_UnverifiedEmail_IsRefusedOnlyWhenRequired
+
+      - id: ReviewCenter-OidcSignIn-Login-Button
+        title: >-
+          The OidcSignIn unit shall offer a button with the display name of the provider on the sign-in page, next to
+          the form of the local sign-in, while sign-in with a provider is on.
+        justification: |
+          People must be able to find the way in with the provider, and a person who has a local account must keep
+          the local form.
+        tests:
+          - OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm
 
       - id: ReviewCenter-OidcSignIn-Settings
         title: >-
-          The OidcSignIn unit shall read the provider settings (address, client identifier, client secret, scopes,
+          The OidcSignIn unit shall accept the provider settings (address, client identifier, client secret, scopes,
           display name, user name claim, whether the e-mail address must be verified, and the age allowed for a
-          confirmation of identity) from the Identity:Oidc settings, shall take the client secret from the setting or
-          from a file, and shall register and map nothing while the
-          sign-in is off.
+          confirmation of identity) of the Identity:Oidc settings when every value is valid and within its limit.
         justification: |
           The provider settings belong to the person who runs the server and are read from the settings and the
-          environment, where the client secret can be kept out of the files. Registering and mapping nothing while the
-          sign-in is off keeps an unused way in from existing at all, and keeps a server that does not use a provider
-          from needing any provider setting.
+          environment, where the client secret can be kept out of the files.
         tests:
           - OidcOptionsValidator_Validate_ValidSettings_Succeeds
+
+      - id: ReviewCenter-OidcSignIn-Settings-Disabled
+        title: >-
+          The OidcSignIn unit shall check no provider setting, and need none, while sign-in with a provider is off.
+        justification: |
+          A server that does not use a provider must not need any provider setting.
+        tests:
           - OidcOptionsValidator_Validate_Disabled_SucceedsWhateverTheValues
+
+      - id: ReviewCenter-OidcSignIn-Settings-NothingMapped
+        title: >-
+          The OidcSignIn unit shall map no endpoint of the sign-in and show no button on the sign-in page while
+          sign-in with a provider is off.
+        justification: |
+          An unused way in must not exist at all.
+        tests:
           - OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown
-          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
 
       - id: ReviewCenter-OidcSignIn-SettingsValidation
         title: >-
-          The OidcSignIn unit shall stop the server from starting, naming the setting and never its value, when an
-          enabled provider setting is missing (the client secret included, which is required and may not be empty or
-          only white space), too long, not https (http is accepted for a loopback address only), without the openid
-          scope, or out of its bounds.
+          The OidcSignIn unit shall refuse an enabled provider setting that is missing or malformed, with a message
+          that names the setting.
         justification: |
           A wrong address or a missing value must be found when the server starts and not when the first person cannot
-          sign in. Plain http to a provider would let somebody on the network read or change the answer, so it is
-          accepted only for a development provider on the same machine. Bounding every value keeps a wrong setting from
-          reaching the provider or the page, and never printing a value keeps the secret out of the log. The server is
-          a confidential client that proves itself at the token endpoint with its secret, so a missing secret is a
-          wrong setting too and a public client with a proof key alone is not supported.
+          sign in, and the name of the setting tells the administrator what to fix.
         tests:
           - OidcOptionsValidator_Validate_InvalidSetting_FailsNamingTheSettingWithoutValues
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-NoValueInMessage
+        title: >-
+          The OidcSignIn unit shall never put the value of an invalid provider setting into the message that refuses
+          it.
+        justification: |
+          A value that is wrong may still be a secret, and the message ends up in the log.
+        tests:
+          - OidcOptionsValidator_Validate_InvalidSetting_FailsNamingTheSettingWithoutValues
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-MissingSecret
+        title: >-
+          The OidcSignIn unit shall refuse enabled provider settings without a client secret (never set, empty, or
+          only white space), naming the setting and saying that it is required.
+        justification: |
+          The server is a confidential client that proves itself at the token endpoint with its secret, so a missing
+          secret is a wrong setting and a public client with a proof key alone is not supported.
+        tests:
           - OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-NoSecretEcho
+        title: >-
+          The OidcSignIn unit shall keep a client secret that is too long or holds a control character, and any part
+          of it, out of the message that refuses it.
+        justification: |
+          Printing a secret that is refused would put it into the log.
+        tests:
           - OidcOptionsValidator_Validate_InvalidClientSecret_FailsWithoutEchoingTheSecret
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-LengthLimit
+        title: >-
+          The OidcSignIn unit shall refuse a provider setting that is longer than its limit, naming the setting.
+        justification: |
+          Bounding every value keeps a wrong setting from reaching the provider or the page.
+        tests:
           - OidcOptionsValidator_Validate_ValuePastTheLimit_Fails
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-OpenIdScope
+        title: >-
+          The OidcSignIn unit shall refuse a list of scopes that does not hold the openid scope, naming the setting.
+        justification: |
+          Without the openid scope the provider does not send an identity token, and the sign-in could never work.
+        tests:
+          - OidcOptionsValidator_Validate_InvalidSetting_FailsNamingTheSettingWithoutValues
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-ScopeCount
+        title: >-
+          The OidcSignIn unit shall refuse a list that holds more scopes than the limit, naming the setting.
+        justification: |
+          A long list of scopes would ask the provider for rights the sign-in does not need.
+        tests:
           - OidcOptionsValidator_Validate_TooManyOrTooLongScopes_Fails
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-ScopeLength
+        title: >-
+          The OidcSignIn unit shall refuse a scope that is longer than the limit for one scope, naming the setting.
+        justification: |
+          A scope that is far longer than any real scope is a wrong setting, and it would be sent to the provider.
+        tests:
+          - OidcOptionsValidator_Validate_TooManyOrTooLongScopes_Fails
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-ReauthMaxAge
+        title: >-
+          The OidcSignIn unit shall refuse an age allowed for a confirmation of identity that is below 10 seconds or
+          above 900 seconds, naming the setting.
+        justification: |
+          An age below the time a person needs to sign in at the provider would refuse every confirmation, and an age
+          of hours would accept a sign-in that is no proof of who is at the keyboard now.
+        tests:
           - OidcOptionsValidator_Validate_ReauthMaxAgeSeconds_MustBeWithinBounds
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-SchemeLoopbackOnly
+        title: >-
+          The OidcSignIn unit shall accept an address of the provider that is not https only when it is http to a
+          loopback address.
+        justification: |
+          Plain http to a provider would let somebody on the network read or change the answer, so it is accepted
+          only for a development provider on the same machine.
+        tests:
           - OidcOptionsValidator_Validate_Scheme_HttpOnlyForLoopback
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation-InputValidation
+        title: >-
+          The OidcSignIn unit shall throw an ArgumentNullException when the check of the provider settings is given no
+          settings.
+        justification: |
+          A missing settings object is a defect of the caller and must not pass as valid settings.
+        tests:
           - OidcOptionsValidator_Validate_Null_Throws
-          - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
 
       - id: ReviewCenter-OidcSignIn-ClientSecretFile
         title: >-
           The OidcSignIn unit shall accept the client secret in a file named by the Identity:Oidc:ClientSecretFile
-          setting, use the trimmed contents of the file as the secret, refuse a secret that is set both inline and in a
-          file, and stop the server from starting, naming the setting and never the secret, when the file is missing,
-          cannot be read, is empty, or is too large.
+          setting while the inline client secret stays empty.
         justification: |
           A client secret in a settings file or in the environment is easy to leak, while a file that a secret store
           or the service manager provides (a mounted secret, a systemd credential) is the safer way to hand it to the
-          server. Two sources would leave it unclear which one is in force, and a file that is wrong must be found
-          when the server starts and not when the first person cannot sign in. The reading and the rules of the file
-          are those of the shared SecretSource unit.
+          server. The reading and the rules of the file are those of the shared SecretSource unit.
         children:
           - ReviewCenter-Utilities-SecretSource
         tests:
           - OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret
+
+      - id: ReviewCenter-OidcSignIn-ClientSecretFile-TrimmedSecret
+        title: >-
+          The OidcSignIn unit shall use the trimmed contents of the client secret file as the client secret.
+        justification: |
+          An editor or a secret store adds a line break at the end of a file, which is no part of the secret.
+        tests:
+          - OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret
+
+      - id: ReviewCenter-OidcSignIn-ClientSecretFile-BothSetRefused
+        title: >-
+          The OidcSignIn unit shall refuse a client secret that is set both inline and in a file, naming both settings.
+        justification: |
+          Two sources would leave it unclear which one is in force.
+        tests:
           - OidcOptionsValidator_Validate_ClientSecretAndFileBothSet_FailsNamingBothSettings
+
+      - id: ReviewCenter-OidcSignIn-ClientSecretFile-FileProblem
+        title: >-
+          The OidcSignIn unit shall refuse a client secret file that is missing, empty, or too large, or that holds a
+          secret out of its limits, naming the ClientSecretFile setting.
+        justification: |
+          A file that is wrong must be found when the server starts and not when the first person cannot sign in.
+        tests:
           - OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret
+
+      - id: ReviewCenter-OidcSignIn-ClientSecretFile-FileProblemNoSecret
+        title: >-
+          The OidcSignIn unit shall keep the secret, and any part of it, out of the message that refuses a client
+          secret file.
+        justification: |
+          Printing a secret that is refused would put it into the log.
+        tests:
+          - OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret
+
+      - id: ReviewCenter-OidcSignIn-ClientSecretFile-ChangedAfterValidation
+        title: >-
+          The OidcSignIn unit shall refuse a client secret that is out of its limits when the file is read again to
+          register the provider, naming the file setting and not holding the secret.
+        justification: |
+          A file can change between the check at start-up and the reading for the provider, and the limits must hold
+          for the secret that is really used.
+        tests:
           - OidcOptions_ResolveClientSecret_FileChangedAfterValidation_RefusesOutOfBoundsSecret
-          - ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret
+
+      - id: ReviewCenter-OidcSignIn-ClientSecretFile-SignsIn
+        title: >-
+          The OidcSignIn unit shall sign a person in with the client secret read from the file, with the trimmed
+          contents handed to the handler of the provider.
+        justification: |
+          A secret that the settings accept but the sign-in does not use would be a trap for the administrator.
+        tests:
           - OidcSignIn_ClientSecretFile_SignsInAndHandlerUsesTheTrimmedSecret
 
       - id: ReviewCenter-OidcSignIn-Account
         title: >-
-          The OidcSignIn unit shall sign in with the issuer and the subject of the identity token only, shall ask the
-          UserService unit for the account, which is created on the first sign-in without any project and without the
-          system administrator right, and shall never link the identity to an existing local account, whatever the
-          name or e-mail address of the identity.
+          The OidcSignIn unit shall create the account of a person on the first sign-in with the issuer and the
+          subject of the identity token, enabled, without any project and without the system administrator right.
         justification: |
-          A user name or an e-mail address is not proof of who a person is at another system, so using it to find an
-          account would let a person with a chosen name take over a local account, for example of an administrator. The
-          pair of issuer and subject is the only stable identity the provider promises. Giving a new person no rights
-          means the right to see a project is always given by a person who is allowed to give it.
+          Giving a new person no rights means the right to see a project is always given by a person who is allowed to
+          give it.
         tests:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+
+      - id: ReviewCenter-OidcSignIn-Account-SecondSignInSameAccount
+        title: >-
+          The OidcSignIn unit shall sign a person in to the account found by the issuer and the subject of the identity
+          token, without creating an account, whatever name and e-mail address the provider sends then.
+        justification: |
+          The pair of issuer and subject is the only stable identity the provider promises, and a name can change.
+        tests:
           - OidcSignIn_SecondSignIn_UsesTheSameAccount
+
+      - id: ReviewCenter-OidcSignIn-Account-OtherSubjectSeparate
+        title: >-
+          The OidcSignIn unit shall create a separate account with a unique user name for a person with another
+          subject who proposes a user name that is in use.
+        justification: |
+          Two people who propose the same name are not the same person.
+        tests:
           - OidcSignIn_OtherSubjectSameName_CreatesSeparateAccountWithUniqueName
+
+      - id: ReviewCenter-OidcSignIn-Account-NeverLinksToLocalAccount
+        title: >-
+          The OidcSignIn unit shall never link an identity of the provider to an existing local account, whatever the
+          name or the e-mail address of the identity.
+        justification: |
+          A user name or an e-mail address is not proof of who a person is at another system, so using it to find an
+          account would let a person with a chosen name take over a local account, for example of an administrator.
+        tests:
           - OidcSignIn_NameOfLocalAccount_NeverLinksToIt
+
+      - id: ReviewCenter-OidcSignIn-Account-NamesSanitized
+        title: >-
+          The OidcSignIn unit shall reduce a user name that the provider proposes to safe characters, and a display
+          name to one clean line, before it creates an account.
+        justification: |
+          The names come from a third party and are shown to other people and written to the trail.
+        tests:
           - OidcSignIn_HostileNames_AreSanitized
 
       - id: ReviewCenter-OidcSignIn-DisabledRefused
         title: >-
-          The OidcSignIn unit shall refuse the sign-in of a disabled account, set no cookie, and give the same answer
-          as for any other failed sign-in with the provider.
+          The OidcSignIn unit shall refuse the sign-in of a disabled account with the answer for a failed sign-in with
+          the provider.
         justification: |
-          Disabling an account must keep that person out whatever way they sign in, and a different answer would tell a
-          stranger that the account exists.
+          Disabling an account must keep that person out whatever way they sign in.
+        tests:
+          - OidcSignIn_DisabledAccount_IsRefusedLikeAnyFailure
+
+      - id: ReviewCenter-OidcSignIn-DisabledRefused-NoCookie
+        title: >-
+          The OidcSignIn unit shall set no session cookie when it refuses the sign-in of a disabled account.
+        justification: |
+          A cookie would let the disabled person into the application.
+        tests:
+          - OidcSignIn_DisabledAccount_IsRefusedLikeAnyFailure
+
+      - id: ReviewCenter-OidcSignIn-DisabledRefused-AuditReason
+        title: >-
+          The OidcSignIn unit shall record the refusal of a disabled account in the audit trail with the reason
+          account disabled.
+        justification: |
+          The person sees the same answer as for any failure, so only the trail tells an administrator why.
         tests:
           - OidcSignIn_DisabledAccount_IsRefusedLikeAnyFailure
 
       - id: ReviewCenter-OidcSignIn-OpenRedirect
         title: >-
-          The OidcSignIn unit shall use a return address after the sign-in or the confirmation of identity only when
-          it is a local path, and shall use the home page for any other value.
+          The OidcSignIn unit shall use the home page after the sign-in when the return address is not a local path.
         justification: |
           A return address that could lead to another site would let an attacker use the sign-in to send people to a
           look-alike site after they have signed in at the real provider.
         tests:
           - OidcSignIn_ForeignReturnUrl_IsReplacedByHome
+
+      - id: ReviewCenter-OidcSignIn-OpenRedirect-Reauth
+        title: >-
+          The OidcSignIn unit shall use the home page after the confirmation of identity when the return address is
+          not a local path.
+        justification: |
+          The confirmation must not become an open redirect that sends a signed-in person to a look-alike site.
+        tests:
           - OidcReauth_ForeignReturnUrl_ReturnsToLocalAddress
 
       - id: ReviewCenter-OidcSignIn-Throttle
         title: >-
-          The OidcSignIn unit shall count every answer of the provider that arrives at the callback address against
-          the address quota of the sign-in throttle of the client address only, without a counter per name, shall hand
-          the attempt back when the answer is accepted, and shall refuse the answer, without exchanging the code or
-          checking a token, when the throttle refuses.
+          The OidcSignIn unit shall refuse an answer of the provider that arrives at the callback address from a client
+          address whose quota of the sign-in throttle is used up, counting every answer against that quota.
         justification: |
           The callback address can be called by anybody, so without a limit it could be used to make the server do the
           work of checking tokens without end. The address limit of the password sign-in keeps one rule for every way
-          in. The callback carries no user name that can be trusted, so a counter per name would be one counter shared
-          by everybody, and a few bad requests from one shared address (an office or a proxy) would block every person
-          behind it; only the address is counted.
+          in.
         tests:
           - OidcSignIn_TooManyCallbacks_AreThrottled
+
+      - id: ReviewCenter-OidcSignIn-Throttle-NoCodeExchange
+        title: >-
+          The OidcSignIn unit shall refuse an answer that the throttle refuses without exchanging the code with the
+          provider.
+        justification: |
+          Checking a token costs the server work, and nothing can be checked before the code is exchanged, so the
+          refusal comes first.
+        tests:
+          - OidcSignIn_ThrottledCallback_DoesNotExchangeTheCode
+
+      - id: ReviewCenter-OidcSignIn-Throttle-OtherPersonNotBlocked
+        title: >-
+          The OidcSignIn unit shall count an answer of the provider against the client address only, with no counter
+          per name, so that bad answers below the address limit do not block another person.
+        justification: |
+          The callback carries no user name that can be trusted, so a counter per name would be one counter shared by
+          everybody, and a few bad requests from one shared address (an office or a proxy) would block every person
+          behind it.
+        tests:
           - OidcSignIn_BadCallbacksBelowAddressLimit_DoNotBlockAnotherPerson
+
+      - id: ReviewCenter-OidcSignIn-Throttle-SuccessGivesSlotBack
+        title: >-
+          The OidcSignIn unit shall hand the attempt back to the quota of the client address when the answer of the
+          provider is accepted.
+        justification: |
+          People who sign in correctly must not use up the quota that is meant for failures.
+        tests:
           - OidcSignIn_SuccessfulCallback_HandsTheAddressSlotBack
 
       - id: ReviewCenter-OidcSignIn-Audit
         title: >-
-          The OidcSignIn unit shall record a successful sign-in with a provider (auth.oidc-sign-in), a failed sign-in
-          with only the class of the reason (auth.oidc-sign-in-failed), a refused confirmation of identity
-          (signature.reauth-failed), and the creation of an account (account.oidc-created), and shall never log or
-          record a token, a claim, or the secret in its own logging and audit trail (the log of the framework
-          handler, an OTS item, is not under its control; the tests allow it to name only the issuer and the audience
-          of a token it refused, which the sender of the token chose and which are no secret).
+          The OidcSignIn unit shall record a successful sign-in with a provider in the audit trail (auth.oidc-sign-in)
+          with the host of the issuer and the person who signed in.
         justification: |
-          Who signed in, and which attempts failed, are part of the history. The class of the reason shows what went
-          wrong without recording text that an attacker or the provider chose, and a token or a secret in a log or
-          in the trail would be a leak.
+          Who signed in is part of the history.
         tests:
           - OidcSignIn_FirstSignIn_RecordsCreationAndSignIn
+
+      - id: ReviewCenter-OidcSignIn-Audit-AccountCreated
+        title: >-
+          The OidcSignIn unit shall record the creation of an account at the first sign-in in the audit trail
+          (account.oidc-created) with the host of the issuer and the person.
+        justification: |
+          A new account that nobody created by hand must be traceable.
+        tests:
+          - OidcSignIn_FirstSignIn_RecordsCreationAndSignIn
+
+      - id: ReviewCenter-OidcSignIn-Audit-FailedSignIn
+        title: >-
+          The OidcSignIn unit shall record a failed sign-in with a provider in the audit trail
+          (auth.oidc-sign-in-failed) with only the class of the reason.
+        justification: |
+          The class of the reason shows what went wrong without recording text that an attacker or the provider chose.
+        tests:
           - OidcSignIn_ProviderRefuses_ShowsFailureAndRecordsReasonClass
+          - OidcSignIn_TamperedState_IsRefused
+          - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
+          - OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
+
+      - id: ReviewCenter-OidcSignIn-Audit-ReauthRefused
+        title: >-
+          The OidcSignIn unit shall record a refused confirmation of identity in the audit trail
+          (signature.reauth-failed) with only the class of the reason.
+        justification: |
+          A refused confirmation may be an attack on a signature, and the class of the reason shows why it was
+          refused.
+        tests:
           - OidcReauth_SignWithoutProof_IsRefusedAndRecorded
           - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed
+
+      - id: ReviewCenter-OidcSignIn-Audit-NoSecretRecorded
+        title: >-
+          The OidcSignIn unit shall never log or record the client secret in its own logging and audit trail.
+        justification: |
+          A secret in a log or in the trail would be a leak.
+        tests:
           - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+          - OidcSignIn_ClientSecretFile_SignsInAndHandlerUsesTheTrimmedSecret
+
+      - id: ReviewCenter-OidcSignIn-Audit-NoTokenRecorded
+        title: >-
+          The OidcSignIn unit shall never log or record a token or a claim in its own logging and audit trail (the log
+          of the framework handler, an OTS item, is not under its control; the tests allow it to name only the issuer
+          and the audience of a token it refused).
+        justification: |
+          The issuer and the audience are chosen by the sender of the token and are no secret, while the other values
+          of a token would put personal data of a stranger into the log.
+        tests:
           - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
           - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed
 
       - id: ReviewCenter-OidcSignIn-FailureAnswer
         title: >-
           The OidcSignIn unit shall answer every failed sign-in with the provider, whatever the cause, with the same
-          redirect to the sign-in page and one message that does not tell the cause, and shall set no cookie.
+          redirect to the sign-in page.
         justification: |
-          A message that names the cause (a bad token, a disabled account, a wrong state) helps somebody who is
-          probing the callback address, and the person is helped better by the log and the trail than by technical
-          text on the page.
+          A different answer for each cause helps somebody who is probing the callback address.
         tests:
           - OidcSignIn_ProviderRefuses_ShowsFailureAndRecordsReasonClass
           - OidcSignIn_TamperedState_IsRefused
           - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
+          - OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
           - OidcSignIn_DisabledAccount_IsRefusedLikeAnyFailure
+
+      - id: ReviewCenter-OidcSignIn-FailureAnswer-NoCookie
+        title: >-
+          The OidcSignIn unit shall set no cookie on a failed sign-in with the provider.
+        justification: |
+          A cookie would open a session for a sign-in that failed.
+        tests:
+          - OidcSignIn_ProviderRefuses_ShowsFailureAndRecordsReasonClass
+          - OidcSignIn_TamperedState_IsRefused
+          - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
+          - OidcSignIn_ExpiredOrWronglySignedToken_FailsClosed
+          - OidcSignIn_DisabledAccount_IsRefusedLikeAnyFailure
+
+      - id: ReviewCenter-OidcSignIn-FailureAnswer-Message
+        title: >-
+          The OidcSignIn unit shall show one message on the sign-in page for a failed sign-in with the provider, which
+          does not tell the cause.
+        justification: |
+          A message that names the cause (a bad token, a disabled account, a wrong state) helps somebody who is
+          probing, and the person is helped better by the log and the trail than by technical text on the page.
+        tests:
           - OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm
 
       - id: ReviewCenter-OidcSignIn-Reauth
         title: >-
-          The OidcSignIn unit shall, for a signed-in user of a provider who is allowed to sign a slot, on a request
-          with a valid antiforgery token, confirm the identity for one signature by sending the browser to the
-          provider with prompt=login and max_age=0, and shall issue the confirmation only when the answer has an
-          authentication time that is not older than the allowed age and not more than a minute in the future, the
-          same subject as the account, the same issuer, and a session that belongs to the user the confirmation was
-          started for; and shall in every other case (an authentication time that is missing, not a whole number,
-          negative or outside the range of dates included) fail closed, issue nothing, and record the reason class.
+          The OidcSignIn unit shall issue a confirmation of identity that is accepted for exactly one signature when
+          the person has signed in again at the provider and the answer is right.
         justification: |
-          A person who is signed in on a shared computer must not be able to sign for somebody else, and a provider
-          that does not ask for the password again would make the confirmation a click. Only a login that happened
-          now, by the same person, at the same provider, proves that the person at the keyboard is the user. Anything
-          that cannot be checked is refused, because a signature that was not confirmed would be worthless. Another
-          site must not be able to start a confirmation for a signed-in user, which the antiforgery token prevents.
+          A person who is signed in on a shared computer must not be able to sign for somebody else, and a
+          confirmation that works more than once would be a standing permission.
         tests:
           - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+
+      - id: ReviewCenter-OidcSignIn-Reauth-PromptLoginMaxAge0
+        title: >-
+          The OidcSignIn unit shall ask the provider with prompt=login and max_age=0 to sign the person in again for a
+          confirmation of identity.
+        justification: |
+          A provider that does not ask for the password again would make the confirmation a click.
+        tests:
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+
+      - id: ReviewCenter-OidcSignIn-Reauth-Antiforgery
+        title: >-
+          The OidcSignIn unit shall start a confirmation of identity only on a request with a valid antiforgery token,
+          and shall send nothing to the provider and issue no confirmation otherwise.
+        justification: |
+          Another site must not be able to start a confirmation for a signed-in user.
+        tests:
           - OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled
-          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
-          - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
-          - OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly
-          - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
-          - OidcReauth_SessionUserDiffersFromConfirmedUser_IsRefusedAndGivesNoProof
-          - OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof
-          - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed
-          - OidcReauth_SessionEndedAtTheProvider_IsRefusedWithoutProof
-          - OidcReauth_SignWithoutProof_IsRefusedAndRecorded
+
+      - id: ReviewCenter-OidcSignIn-Reauth-NotAllowedNeverSent
+        title: >-
+          The OidcSignIn unit shall not send a person to the provider for a confirmation of identity when the person
+          has no session, is a local user, or is not allowed to sign the slot.
+        justification: |
+          A confirmation that nobody could use must not start a sign-in at the provider.
+        tests:
           - OidcReauth_NotAllowed_IsNeverSentToTheProvider
+
+      - id: ReviewCenter-OidcSignIn-Reauth-AuthTimeTooOld
+        title: >-
+          The OidcSignIn unit shall refuse a confirmation of identity whose authentication time is older than the
+          allowed age, and accept one that is exactly that old.
+        justification: |
+          Only a login that happened now proves that the person at the keyboard is the user.
+        tests:
+          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly
+
+      - id: ReviewCenter-OidcSignIn-Reauth-AuthTimeInFuture
+        title: >-
+          The OidcSignIn unit shall refuse a confirmation of identity whose authentication time is more than a minute
+          in the future, and accept one that is exactly a minute ahead.
+        justification: |
+          A small difference between the clocks of the server and the provider must not refuse a right person, while
+          a time far ahead is a wrong answer.
+        tests:
+          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly
+
+      - id: ReviewCenter-OidcSignIn-Reauth-AuthTimeMissing
+        title: >-
+          The OidcSignIn unit shall fail closed and issue no confirmation of identity when the answer of the provider
+          has no authentication time.
+        justification: |
+          Anything that cannot be checked is refused, because a signature that was not confirmed would be worthless.
+        tests:
+          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+
+      - id: ReviewCenter-OidcSignIn-Reauth-AuthTimeUnusable
+        title: >-
+          The OidcSignIn unit shall fail closed, without an error, and issue no confirmation of identity when the
+          authentication time is negative or is not a whole number of seconds that a date can hold.
+        justification: |
+          A provider that sends a value nobody can check must be refused like one that sends none, and the person is
+          sent back to the review and not to an error page.
+        tests:
+          - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
+
+      - id: ReviewCenter-OidcSignIn-Reauth-OtherSubject
+        title: >-
+          The OidcSignIn unit shall issue no confirmation of identity, create no account, and leave the session as it
+          was when another subject than the one of the account signs in at the provider.
+        justification: |
+          Only the same person at the same provider proves that the person at the keyboard is the user.
+        tests:
+          - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
           - OidcReauth_VerifyReauth_ComparesIssuerAndSubjectOfTheAccount
+
+      - id: ReviewCenter-OidcSignIn-Reauth-OtherIssuer
+        title: >-
+          The OidcSignIn unit shall issue no confirmation of identity when the issuer of the answer is not the issuer
+          of the account.
+        justification: |
+          The same subject at another provider is another person.
+        tests:
+          - OidcReauth_VerifyReauth_ComparesIssuerAndSubjectOfTheAccount
+
+      - id: ReviewCenter-OidcSignIn-Reauth-SessionUserBinding
+        title: >-
+          The OidcSignIn unit shall issue no confirmation of identity when the user of the session at the time of the
+          answer is not the user the confirmation was started for.
+        justification: |
+          A confirmation for one user must not be used by another person who signed in at the same browser meanwhile.
+        tests:
+          - OidcReauth_SessionUserDiffersFromConfirmedUser_IsRefusedAndGivesNoProof
+
+      - id: ReviewCenter-OidcSignIn-Reauth-WrongBinding
+        title: >-
+          The OidcSignIn unit shall refuse a confirmation of identity that was started for another user, that has no
+          record of the user it was started for, or that has no claims, as another user.
+        justification: |
+          Every doubt about whom a confirmation was started for refuses it.
+        tests:
           - OidcReauth_VerifyReauth_WrongBinding_IsRefusedAsOther
+
+      - id: ReviewCenter-OidcSignIn-Reauth-ProviderRefusal
+        title: >-
+          The OidcSignIn unit shall end a confirmation of identity that the provider answers with an error at the
+          review, with a failure and no confirmation.
+        justification: |
+          A person who is refused at the provider has not proved who they are.
+        tests:
+          - OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof
+
+      - id: ReviewCenter-OidcSignIn-Reauth-TokenChecks
+        title: >-
+          The OidcSignIn unit shall issue no confirmation of identity when the identity token has a wrong issuer,
+          audience, or nonce, creating no account and leaving the session unchanged.
+        justification: |
+          A token that was made for another application, another provider, or another sign-in proves nothing.
+        tests:
+          - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed
+
+      - id: ReviewCenter-OidcSignIn-Reauth-ProviderSessionEnded
+        title: >-
+          The OidcSignIn unit shall issue no confirmation of identity, and send the person to the sign-in page, when
+          the session ended before the answer of the provider arrived.
+        justification: |
+          A confirmation for a session that was ended on purpose, by the person or by disabling the account, must
+          not be given.
+        tests:
+          - OidcReauth_SessionEndedAtTheProvider_IsRefusedWithoutProof
+
+      - id: ReviewCenter-OidcSignIn-Reauth-RecordedRefusal
+        title: >-
+          The OidcSignIn unit shall refuse to sign for a user without a password who has no confirmation of identity,
+          and record the refusal.
+        justification: |
+          A signature that was not confirmed would be worthless, and a try to sign without it must be traceable.
+        tests:
+          - OidcReauth_SignWithoutProof_IsRefusedAndRecorded
 
       - id: ReviewCenter-OidcSignIn-ReauthAnswer
         title: >-
-          The OidcSignIn unit shall, when a confirmation of identity is refused, send the browser back to the review
-          with a distinct answer when the authentication time was missing and when it was not recent enough, and with
-          the general answer for every other reason, while the recorded reason class stays the same.
+          The OidcSignIn unit shall send the browser back to the review with a distinct answer when a confirmation of
+          identity is refused because the authentication time is missing.
         justification: |
-          An administrator can fix a provider that does not send the authentication time only if the person is told that
-          this is the cause, and the cause says nothing that helps an attacker. Every other cause stays behind the
-          general answer, so the page does not help somebody who is probing the confirmation.
+          An administrator can fix a provider that does not send the authentication time only if the person is told
+          that this is the cause.
         tests:
           - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
           - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
-          - OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-NotRecent
+        title: >-
+          The OidcSignIn unit shall send the browser back to the review with a distinct answer when a confirmation of
+          identity is refused because the sign-in was not recent enough.
+        justification: |
+          The person can repeat the confirmation when told that the sign-in at the provider was too old.
+        tests:
+          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-General
+        title: >-
+          The OidcSignIn unit shall send the browser back to the review with the general answer when a confirmation of
+          identity is refused for any other reason.
+        justification: |
+          Every other cause stays behind the general answer, so the page does not help somebody who is probing the
+          confirmation.
+        tests:
           - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
           - OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof
           - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-ReasonClass
+        title: >-
+          The OidcSignIn unit shall record the same reason class for a refused confirmation of identity whichever
+          answer the person gets.
+        justification: |
+          The answer for the person is kept short, while the trail keeps the exact class of the reason.
+        tests:
+          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-MissingText
+        title: >-
+          The OidcSignIn unit shall tell on the review page, after a refusal for a missing authentication time, that
+          the provider did not report a usable sign-in time and that an administrator must check it.
+        justification: |
+          Only the administrator of the provider can fix it, so the person must be able to say what to ask for.
+        tests:
+          - OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-NotRecentText
+        title: >-
+          The OidcSignIn unit shall tell on the review page, after a refusal for a sign-in that was not recent enough,
+          that the sign-in was not recent enough.
+        justification: |
+          The person can repeat the confirmation, and must not be told that the provider is wrong.
+        tests:
+          - OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationButton
+        title: >-
+          The OidcSignIn unit shall offer a user of a provider a button to confirm the identity with the provider, and
+          no password field, on the review page.
+        justification: |
+          A user of a provider has no password to type.
+        tests:
+          - OidcReauth_ReviewPage_OffersConfirmationThenSigning
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-GeneralText
+        title: >-
+          The OidcSignIn unit shall tell on the review page, after a refused confirmation, that the identity could not
+          be confirmed, next to the button.
+        justification: |
+          The person must know that nothing was signed and that the confirmation can be tried again.
+        tests:
+          - OidcReauth_ReviewPage_OffersConfirmationThenSigning
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer-ConfirmationThenSigning
+        title: >-
+          The OidcSignIn unit shall offer the button to sign on the review page after a successful confirmation of
+          identity, in place of the button to confirm.
+        justification: |
+          The confirmation is for one signature, and the next step is to sign.
+        tests:
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
 
       - id: ReviewCenter-OidcSignIn-LocalSession
         title: >-
-          The OidcSignIn unit shall keep the session of a user of a provider in the same cookie, with the same checks
-          on every request and on open pages, as the session of a local user, shall keep that session when a
-          confirmation of identity succeeds, and shall end only the local session on sign-out.
+          The OidcSignIn unit shall keep the session of a user of a provider in the same cookie as the session of a
+          local user.
         justification: |
           One kind of session means a disabled user, or a changed right, ends the session in the same way and in the
-          same time for every user. Ending the session at the provider is the business of the provider and of the
-          person, and a sign-out that reached out to another system would be a second thing that could fail.
+          same time for every user.
         tests:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+
+      - id: ReviewCenter-OidcSignIn-LocalSession-LogoutLocalOnly
+        title: >-
+          The OidcSignIn unit shall end only the local session on sign-out, without a request to the provider.
+        justification: |
+          Ending the session at the provider is the business of the provider and of the person, and a sign-out that
+          reached out to another system would be a second thing that could fail.
+        tests:
           - OidcSignIn_Logout_IsLocalOnly
+
+      - id: ReviewCenter-OidcSignIn-LocalSession-DisabledEndsSession
+        title: >-
+          The OidcSignIn unit shall end the open session of a user of a provider on the next request when the account
+          is disabled.
+        justification: |
+          A user of a provider is held to the same checks on every request as a local user.
+        tests:
           - OidcSignIn_AccountDisabledWhileSessionIsOpen_EndsTheSession
+
+      - id: ReviewCenter-OidcSignIn-LocalSession-ReauthKeepsSession
+        title: >-
+          The OidcSignIn unit shall keep the session of the user as it was when a confirmation of identity succeeds.
+        justification: |
+          The confirmation is for one signature and must not sign the person in again as somebody else.
+        tests:
           - OidcReauth_Success_KeepsTheSession
 
       - id: ReviewCenter-OidcSignIn-NoPassword
         title: >-
-          The OidcSignIn unit shall create the account of a provider without any password, so that the account can be
-          used only through the provider and no password, not even an empty one, signs it in.
+          The OidcSignIn unit shall create the account of a provider without any password.
         justification: |
-          An account with an unknown password hash that could be guessed or set would be a second way in that the
-          provider and its rules for passwords cannot control.
+          An account with a password that could be guessed or set would be a second way in that the provider and its
+          rules for passwords cannot control.
         tests:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+
+      - id: ReviewCenter-OidcSignIn-NoPassword-PasswordLoginRefused
+        title: >-
+          The OidcSignIn unit shall refuse a password sign-in of an account of a provider, whatever the password, even
+          an empty one.
+        justification: |
+          The account can be used only through the provider.
+        tests:
           - OidcSignIn_PasswordSignInOfExternalAccount_IsRefused
