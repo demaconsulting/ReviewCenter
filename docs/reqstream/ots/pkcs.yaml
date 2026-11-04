@@ -40,7 +40,7 @@ sections:
               passing test confirms that the library signs through the key handle and that the signature verifies.
             tags: [ots]
             tests:
-              - AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
+              - windows@AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
           - id: ReviewCenter-OTS-Pkcs-DetachedSignature-Chain
             title: >-
               System.Security.Cryptography.Pkcs shall embed the signer certificate in the CMS signature.

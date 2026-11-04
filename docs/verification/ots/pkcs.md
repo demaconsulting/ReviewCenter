@@ -36,7 +36,8 @@ requirements are satisfied.
 
 #### AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
 
-**Scenario**: A key whose private part cannot be exported signs the document.
+**Scenario**: On Windows only (the test is skipped where Windows CNG is unavailable), a key whose private part cannot be
+exported signs the document.
 
 **Expected**: The library signs through the key handle, and the signature verifies.
 
