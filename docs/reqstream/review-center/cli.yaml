@@ -115,6 +115,18 @@ sections:
         tests:
           - CliSubsystem_LogFlow_ContextAndProgram_WritesLogFile
 
+      - id: ReviewCenter-Cli-Log-OpenFailure
+        title: >-
+          The Cli subsystem shall report an error on stderr and exit with a non-zero code when the log file that
+          `--log` names cannot be opened.
+        justification: |
+          A log that cannot be written would otherwise be lost without a word, so a run that was asked to keep a
+          record must stop and say that it cannot.
+        children:
+          - ReviewCenter-Context-LogFailure
+        tests:
+          - CliSubsystem_LogFlow_ContextAndProgram_UnopenableLogFile_ReportsErrorAndExitsNonZero
+
       - id: ReviewCenter-Cli-ErrorOutput
         title: The Cli subsystem shall write error messages to stderr.
         justification: |
@@ -122,7 +134,6 @@ sections:
           without polluting stdout, which consumers may pipe or redirect for data capture.
         children:
           - ReviewCenter-Context-ErrorOutput
-          - ReviewCenter-Context-LogFailure
         tests:
           - CliSubsystem_ErrorOutput_ContextAndProgram_WritesErrorToStderr
 
@@ -135,25 +146,36 @@ sections:
           the argument in the message lets the operator find the typo at once.
         children:
           - ReviewCenter-Context-InvalidArgs
-          - ReviewCenter-Context-UserAddMisuse-WrongAction
         tests:
           - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsUnknownArgumentsAndExitsNonZero
 
       - id: ReviewCenter-Cli-InvalidArgs-Malformed
         title: >-
-          The Cli subsystem shall reject an option value that is malformed, such as a heading depth that is not an
-          integer, with an error message that names the option.
+          The Cli subsystem shall reject an option value that is malformed, which is a heading depth that is not an
+          integer from 1 to 6 or a listen URL that is not an absolute http or https URL, with an error message that
+          names the option.
         justification: |
           A value that cannot be used would otherwise be replaced by a default without telling the operator, which
           hides a misconfiguration of the run.
         children:
-          - ReviewCenter-Context-InvalidArgs-MissingValue
           - ReviewCenter-Context-InvalidArgs-DepthNotInteger
           - ReviewCenter-Context-InvalidArgs-DepthOutOfRange
-          - ReviewCenter-Context-Urls-Missing
           - ReviewCenter-Context-Urls-Invalid
         tests:
           - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMalformedValueAndExitsNonZero
+
+      - id: ReviewCenter-Cli-InvalidArgs-MissingValue
+        title: >-
+          The Cli subsystem shall reject an option that needs a value when the value is missing, with an error message
+          that names the option.
+        justification: |
+          An option at the end of the command line has nothing to work with, and guessing a value could change the
+          run in a way that the operator did not choose.
+        children:
+          - ReviewCenter-Context-InvalidArgs-MissingValue
+          - ReviewCenter-Context-Urls-Missing
+        tests:
+          - CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMissingValueAndExitsNonZero
 
       - id: ReviewCenter-Cli-ExitCode
         title: The Cli subsystem shall return a non-zero exit code on failure.
@@ -185,7 +207,7 @@ sections:
         children:
           - ReviewCenter-Context-CheckConfig
         tests:
-          - CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate
+          - CliSubsystem_CheckConfigFlow_Context_WithValidate_IsParsed
 
       - id: ReviewCenter-Cli-CheckConfig-RequiresValidate
         title: The Cli subsystem shall reject the `--check-config` option when `--validate` is not provided.
@@ -239,7 +261,7 @@ sections:
           - ReviewCenter-Context-UserAdd
           - ReviewCenter-Context-UserAdd-SystemAdmin
         tests:
-          - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
+          - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsAndDocumentsThem
 
       - id: ReviewCenter-Cli-UserAdd-OrdinaryDefault
         title: >-
@@ -261,7 +283,7 @@ sections:
         children:
           - ReviewCenter-Context-UserAddMisuse
         tests:
-          - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
+          - CliSubsystem_UserAddFlow_ContextAndProgram_MissingNames_AreRejected
 
       - id: ReviewCenter-Cli-UserAdd-OptionsWithoutVerb
         title: >-
@@ -272,7 +294,19 @@ sections:
         children:
           - ReviewCenter-Context-UserAddMisuse-OptionsWithoutVerb
         tests:
-          - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
+          - CliSubsystem_UserAddFlow_ContextAndProgram_OptionsWithoutVerb_AreRejected
+
+      - id: ReviewCenter-Cli-UserAdd-WrongAction
+        title: >-
+          The Cli subsystem shall reject the user verb when the add action is missing or another action is given, with
+          an error message and a non-zero exit code.
+        justification: |
+          Only the add action exists for the user verb, so a mistyped or missing action must be refused instead of
+          being taken for a request that the tool cannot carry out.
+        children:
+          - ReviewCenter-Context-UserAddMisuse-WrongAction
+        tests:
+          - CliSubsystem_UserAddFlow_ContextAndProgram_WrongAction_RejectsAndExitsNonZero
 
       - id: ReviewCenter-Cli-UserAdd-NoPasswordOption
         title: >-

@@ -2335,6 +2335,7 @@ sections:
           - ReviewCenter-Cli-UserAdd-OrdinaryDefault
           - ReviewCenter-Cli-UserAdd-MissingNames
           - ReviewCenter-Cli-UserAdd-OptionsWithoutVerb
+          - ReviewCenter-Cli-UserAdd-WrongAction
           - ReviewCenter-Cli-UserAdd-NoPasswordOption
           - ReviewCenter-Hosting-UserAdd
           - ReviewCenter-Hosting-UserAdd-StandardInput
@@ -2448,8 +2449,10 @@ sections:
           - ReviewCenter-Hosting-KeyRingProtection
           - ReviewCenter-Utilities-SecretSource
           - ReviewCenter-Utilities-SecretSource-Inline
+          - ReviewCenter-Utilities-SecretSource-Neither
           - ReviewCenter-Utilities-SecretSource-Refusal
           - ReviewCenter-Utilities-SecretSource-NoDisclosure
+          - ReviewCenter-Utilities-SecretSource-Conflict
         tests:
           - ServerHost_Restart_CertificateKeyRing_ProtectedValueStaysReadable
           - ServerHost_CreateApplication_WrongCertificateForTheRing_ThrowsClearErrorWithoutSecondKey
@@ -2637,10 +2640,12 @@ sections:
           - ReviewCenter-Program-Banner
           - ReviewCenter-Cli-Silent
           - ReviewCenter-Cli-Log
+          - ReviewCenter-Cli-Log-OpenFailure
           - ReviewCenter-Program-ExitCode
           - ReviewCenter-Cli-ExitCode
           - ReviewCenter-Cli-InvalidArgs
           - ReviewCenter-Cli-InvalidArgs-Malformed
+          - ReviewCenter-Cli-InvalidArgs-MissingValue
           - ReviewCenter-Cli-ErrorOutput
           - ReviewCenter-Cli-ArgumentParsing
           - ReviewCenter-Cli-OutputChannels

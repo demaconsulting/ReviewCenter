@@ -93,30 +93,125 @@ sections:
           inside it, so that nothing else in the file system is touched by a run.
         children:
           - ReviewCenter-TemporaryDirectory-GetFilePath
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilePaths_AreInsideDirectory
+
+      - id: ReviewCenter-Utilities-TempFiles-Parents
+        title: >-
+          The Utilities subsystem shall create the folders above a file path that it hands out, so that the caller can
+          write to the file at once.
+        justification: |
+          Checks write files such as keys and caches several folders down; creating the folders once, where the path
+          is handed out, keeps every caller from repeating that step and failing when it forgets it.
+        children:
           - ReviewCenter-TemporaryDirectory-GetFilePath-Parents
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_NestedFilePath_CanBeWrittenAtOnce
+
+      - id: ReviewCenter-Utilities-TempFiles-Escape
+        title: >-
+          The Utilities subsystem shall reject a file name for the temporary directory that would leave the directory.
+        justification: |
+          A file name that comes from outside must not be able to place a scratch file, or later a deletion, anywhere
+          else in the file system; the refusal at the directory covers every caller.
+        children:
           - ReviewCenter-TemporaryDirectory-GetFilePath-Escape
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_EscapingFileNames_AreRejected
+
+      - id: ReviewCenter-Utilities-TempFiles-NullPath
+        title: >-
+          The Utilities subsystem shall reject a null file name for the temporary directory.
+        justification: |
+          A missing file name would otherwise surface as an unrelated failure inside the caller; refusing it where the
+          path is handed out names the argument that was missing.
+        children:
           - ReviewCenter-TemporaryDirectory-GetFilePath-NullPath
         tests:
-          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_NullFileName_IsRejected
 
       - id: ReviewCenter-Utilities-TempFiles-Removed
         title: >-
           The Utilities subsystem shall remove the temporary directory and every file in it, including files in
-          nested folders, when it is disposed.
+          nested folders, when it is disposed while no file in it is held open.
         justification: |
           A run must not leave its scratch files behind; the removal covers the whole directory, so that the code that
           created the files does not have to remember each one.
         children:
           - ReviewCenter-TemporaryDirectory-Dispose
-          - ReviewCenter-TemporaryDirectory-Dispose-NoThrow
-          - ReviewCenter-TemporaryDirectory-Dispose-Repeated
-          - ReviewCenter-TemporaryDirectory-BoundedRetry
-          - ReviewCenter-TemporaryDirectory-BoundedRetry-Default
-          - ReviewCenter-TemporaryDirectory-BoundedRetry-GiveUp
-          - ReviewCenter-TemporaryDirectory-BoundedRetry-NoFinalPause
-          - ReviewCenter-TemporaryDirectory-BoundedRetry-InvalidPolicy
         tests:
           - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose
+
+      - id: ReviewCenter-Utilities-TempFiles-Removed-Repeated
+        title: >-
+          The Utilities subsystem shall allow a temporary directory to be disposed more than once.
+        justification: |
+          Cleanup code often runs twice, once by an explicit call and once by the end of a using scope; the second
+          disposal must be harmless so that the callers need no flag to avoid it.
+        children:
+          - ReviewCenter-TemporaryDirectory-Dispose-Repeated
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_DisposedTwice_DoesNotThrow
+
+      - id: ReviewCenter-Utilities-TempFiles-Removed-Retry
+        title: >-
+          The Utilities subsystem shall retry the removal of a temporary directory and remove the whole directory when
+          a file in it that is held open is released within the retry time.
+        justification: |
+          A file can stay locked for a moment after the code that used it has stopped (a virus scanner, the indexer, a
+          database handle that is released late); retrying for a short time keeps such a moment from leaving the
+          directory behind.
+        children:
+          - ReviewCenter-TemporaryDirectory-BoundedRetry
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved
+
+      - id: ReviewCenter-Utilities-TempFiles-LockedFile
+        title: >-
+          The Utilities subsystem shall not throw when a temporary directory is disposed while a file in it stays held
+          open, and shall leave the directory to the operating system.
+        justification: |
+          A cleanup failure must not turn a finished piece of work into a failure, and a folder that is still locked
+          is cleaned up later by the operating system's own temporary-file cleanup.
+        children:
+          - ReviewCenter-TemporaryDirectory-Dispose-NoThrow
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-GiveUp
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing
+
+      - id: ReviewCenter-Utilities-TempFiles-LockedFile-Bounded
+        title: >-
+          The Utilities subsystem shall stop waiting for a file that stays held open in less than three seconds.
+        justification: |
+          A lock that never goes away must not stall the end of a run, which is why the retry has a bound.
+        children:
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-Default
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime
+
+      - id: ReviewCenter-Utilities-TempFiles-LockedFile-NoFinalPause
+        title: >-
+          The Utilities subsystem shall not pause after the last attempt to remove a temporary directory, so that a
+          policy of one attempt returns without waiting.
+        justification: |
+          Waiting after the last attempt can only delay the end of a run without any chance of a better outcome, so
+          the wait stops with the last attempt instead of adding one more pause.
+        children:
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-NoFinalPause
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_SingleAttemptPolicy_DisposeDoesNotPause
+
+      - id: ReviewCenter-Utilities-TempFiles-InvalidPolicy
+        title: >-
+          The Utilities subsystem shall reject a retry policy for removing a temporary directory with fewer than one
+          attempt or with a negative pause.
+        justification: |
+          A policy of no attempts would never remove the directory and a negative pause cannot be waited; refusing
+          both when the directory is created shows the mistake at once instead of at cleanup.
+        children:
+          - ReviewCenter-TemporaryDirectory-BoundedRetry-InvalidPolicy
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_InvalidRetryPolicy_IsRejected
 
       # ---------------------------------------------------------------------------------------------------------------
       # Secrets
@@ -144,17 +239,41 @@ sections:
           must keep working next to the file form for every service that holds a secret.
         children:
           - ReviewCenter-SecretSource-Inline
-          - ReviewCenter-SecretSource-Inline-Neither
         tests:
           - UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned
 
+      - id: ReviewCenter-Utilities-SecretSource-Neither
+        title: >-
+          The Utilities subsystem shall resolve to no secret, without an error, when neither the inline setting nor the
+          file setting is set.
+        justification: |
+          A service whose secret is optional must start without one; treating the absence of both settings as a
+          refusal would force every deployment to invent a value for a secret it does not use.
+        children:
+          - ReviewCenter-SecretSource-Inline-Neither
+        tests:
+          - UtilitiesSubsystem_SecretSourceWorkflow_NeitherSet_ReturnsNoSecret
+
+      - id: ReviewCenter-Utilities-SecretSource-Conflict
+        title: >-
+          The Utilities subsystem shall refuse a secret that is set both inline and in a file with a message that names
+          both settings.
+        justification: |
+          Two sources for one secret leave it unclear which one the operator meant; naming both settings in the
+          refusal shows which two to choose between.
+        children:
+          - ReviewCenter-SecretSource-Conflict
+        tests:
+          - UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalNamesBothSettings
+
       - id: ReviewCenter-Utilities-SecretSource-Refusal
         title: >-
-          The Utilities subsystem shall refuse a secret file setting that points to a file that does not exist, with a
-          message that names the file setting.
+          The Utilities subsystem shall refuse a secret file setting that points to a file that is missing, cannot be
+          read, is empty, is larger than 8192 bytes, or is not UTF-8 text, with a message that names the file setting.
         justification: |
           A secret that silently falls back to nothing turns a mistake in the setting into a start that appears to
-          work and fails later; a clear message at start-up lets the operator fix it at once.
+          work and fails later; a clear message at start-up lets the operator fix it at once, whatever is wrong with
+          the file.
         children:
           - ReviewCenter-SecretSource-FileProblems
           - ReviewCenter-SecretSource-FileProblems-Unreadable
@@ -163,16 +282,17 @@ sections:
           - ReviewCenter-SecretSource-FileProblems-NotUtf8
         tests:
           - UtilitiesSubsystem_SecretSourceWorkflow_FileRemoved_IsRefusedNamingSetting
+          - UtilitiesSubsystem_SecretSourceWorkflow_UnusableFiles_AreRefusedNamingSetting
 
       - id: ReviewCenter-Utilities-SecretSource-NoDisclosure
         title: >-
-          The Utilities subsystem shall refuse a secret that is set both inline and in a file with a message that does
-          not hold the secret.
+          The Utilities subsystem shall never put the secret, or a part of it, in the message of a refusal that it
+          raises.
         justification: |
           The message of a failed start reaches the console, the journal, and the log collection of the operator; the
-          secret must never be in it, even in the refusal that has the secret in hand.
+          secret must never be in it, even in the refusals that have the secret in hand.
         children:
-          - ReviewCenter-SecretSource-Conflict
           - ReviewCenter-SecretSource-NoDisclosure
         tests:
           - UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret
+          - UtilitiesSubsystem_SecretSourceWorkflow_UnusableFiles_AreRefusedNamingSetting

@@ -181,7 +181,7 @@ public class UtilitiesSubsystemTests
     }
 
     /// <summary>
-    ///     Test that the temporary directory keeps a workflow's files inside one folder and removes them all.
+    ///     Test that the temporary directory removes the nested files of a workflow and the directory on disposal.
     /// </summary>
     [Fact]
     public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose()
@@ -205,14 +205,247 @@ public class UtilitiesSubsystemTests
                 File.WriteAllText(file, "data");
             }
 
-            // Assert (before disposal): every file is inside the directory
-            Assert.All(files, file => Assert.StartsWith(directoryPath, file, StringComparison.Ordinal));
             Assert.All(files, file => Assert.True(File.Exists(file)));
         }
 
-        // Assert (after disposal): nothing is left behind, neither the files nor the directory
+        // Assert: nothing is left behind, neither the files nor the directory
         Assert.False(Directory.Exists(directoryPath));
         Assert.All(files, file => Assert.False(File.Exists(file)));
+    }
+
+    /// <summary>
+    ///     Test that every path the temporary directory hands out lies inside the directory.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilePaths_AreInsideDirectory()
+    {
+        // Arrange: a temporary directory and the file names a workflow would ask for
+        using var directory = new TemporaryDirectory();
+        var names = new[] { "selftest.db", "keys/key.xml", "git-cache/repo-0/objects/pack/data" };
+
+        // Act: ask for the path of each file
+        var paths = names.Select(directory.GetFilePath).ToList();
+
+        // Assert: every path is the file inside the directory
+        Assert.Equal(names.Length, paths.Count);
+        var prefix = directory.DirectoryPath + Path.DirectorySeparatorChar;
+        for (var i = 0; i < names.Length; i++)
+        {
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(directory.DirectoryPath, names[i])),
+                Path.GetFullPath(paths[i]));
+            Assert.StartsWith(prefix, paths[i], StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a file in nested folders of the temporary directory can be written at once.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_NestedFilePath_CanBeWrittenAtOnce()
+    {
+        // Arrange: a temporary directory and the path of a file three folders down
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("one/two/three/file.txt");
+
+        // Act: write the file without creating any folder
+        File.WriteAllText(path, "data");
+
+        // Assert: the folders above the file exist and the file holds the data
+        Assert.True(Directory.Exists(Path.GetDirectoryName(path)));
+        Assert.Equal("data", File.ReadAllText(path));
+    }
+
+    /// <summary>
+    ///     Test that file names that would leave the temporary directory are rejected.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_EscapingFileNames_AreRejected()
+    {
+        // Arrange: a temporary directory and names that climb out of it
+        using var directory = new TemporaryDirectory();
+        var names = new[] { "../escape.txt", "../../escape.txt", "sub/../../escape.txt" };
+
+        // Act: ask for the path of each name
+        var exceptions = names
+            .Select(name => Record.Exception(() => directory.GetFilePath(name)))
+            .ToList();
+
+        // Assert: every name is rejected
+        Assert.Equal(names.Length, exceptions.Count);
+        Assert.All(exceptions, exception => Assert.IsType<ArgumentException>(exception));
+    }
+
+    /// <summary>
+    ///     Test that a null file name is rejected by the temporary directory, naming the argument.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_NullFileName_IsRejected()
+    {
+        // Arrange: a temporary directory
+        using var directory = new TemporaryDirectory();
+
+        // Act: ask for the path of a null name
+        var exception = Record.Exception(() => directory.GetFilePath(null!));
+
+        // Assert: the null is rejected with the argument that was missing
+        var nullException = Assert.IsType<ArgumentNullException>(exception);
+        Assert.Equal("relativePath", nullException.ParamName);
+    }
+
+    /// <summary>
+    ///     Test that disposing a temporary directory twice does not throw.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_DisposedTwice_DoesNotThrow()
+    {
+        // Arrange: a directory with a file, disposed once
+        var directory = new TemporaryDirectory();
+        File.WriteAllText(directory.GetFilePath("data.txt"), "data");
+        directory.Dispose();
+
+        // Act: dispose it again
+        var exception = Record.Exception(directory.Dispose);
+
+        // Assert: nothing is thrown and the directory is gone
+        Assert.Null(exception);
+        Assert.False(Directory.Exists(directory.DirectoryPath));
+    }
+
+    /// <summary>
+    ///     Test that a file that is released while the removal retries lets the whole directory be removed.
+    /// </summary>
+    [Fact]
+    public async Task UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a file in a nested folder that stays open for about 100 ms, while the removal retries every 50 ms
+        // for up to 2 s; a dedicated thread releases the file so that a busy thread pool cannot delay the release
+        var directory = new TemporaryDirectory(40, TimeSpan.FromMilliseconds(50));
+        var directoryPath = directory.DirectoryPath;
+        var stream = new FileStream(
+            directory.GetFilePath("nested/locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        var release = Task.Factory.StartNew(
+            () =>
+            {
+                using var gate = new ManualResetEventSlim(false);
+                gate.Wait(TimeSpan.FromMilliseconds(100));
+                stream.Dispose();
+            },
+            TestContext.Current.CancellationToken,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+
+        // Act: dispose while the file is open
+        var exception = Record.Exception(directory.Dispose);
+        await release;
+
+        // Assert: the retry outlasted the lock and the whole directory is gone
+        Assert.Null(exception);
+        Assert.False(Directory.Exists(directoryPath));
+    }
+
+    /// <summary>
+    ///     Test that disposing a temporary directory while a file stays open does not throw and leaves the directory.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a file that stays open for the whole test
+        using var directory = new TemporaryDirectory();
+        using var stream = new FileStream(
+            directory.GetFilePath("locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
+        // Act: dispose while the file is open
+        var exception = Record.Exception(directory.Dispose);
+
+        // Assert: nothing is thrown and the directory is left behind
+        Assert.Null(exception);
+        Assert.True(Directory.Exists(directory.DirectoryPath));
+
+        // Cleanup: release the file and remove what is left
+        stream.Dispose();
+        directory.Dispose();
+        Assert.False(Directory.Exists(directory.DirectoryPath));
+    }
+
+    /// <summary>
+    ///     Test that disposing a temporary directory while a file stays open stops waiting in less than three seconds.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a file that stays open for the whole test
+        using var directory = new TemporaryDirectory();
+        using var stream = new FileStream(
+            directory.GetFilePath("locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
+        // Act: dispose and measure how long it takes
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        directory.Dispose();
+        watch.Stop();
+
+        // Assert: the wait is bounded
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
+
+        // Cleanup: release the file and remove what is left
+        stream.Dispose();
+        directory.Dispose();
+    }
+
+    /// <summary>
+    ///     Test that a policy of one attempt returns without a pause, even with a long pause configured.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_SingleAttemptPolicy_DisposeDoesNotPause()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a file that stays open and a policy of one attempt with a pause that must never be taken
+        using var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30));
+        using var stream = new FileStream(
+            directory.GetFilePath("locked.txt"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
+        // Act: dispose and measure how long it takes
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        directory.Dispose();
+        watch.Stop();
+
+        // Assert: it returned long before the pause
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"Paused after the last attempt: {watch.Elapsed}");
+
+        // Cleanup: release the file and remove what is left
+        stream.Dispose();
+        directory.Dispose();
+    }
+
+    /// <summary>
+    ///     Test that a retry policy with no attempts or a negative pause is rejected when the directory is created.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_InvalidRetryPolicy_IsRejected()
+    {
+        // Arrange: policies with no attempt, a negative number of attempts and a negative pause
+        var policies = new (int Attempts, TimeSpan Pause)[]
+        {
+            (0, TimeSpan.FromMilliseconds(10)),
+            (-1, TimeSpan.FromMilliseconds(10)),
+            (3, TimeSpan.FromMilliseconds(-1))
+        };
+
+        // Act: create a directory with each policy
+        var exceptions = policies
+            .Select(policy => Record.Exception(() => new TemporaryDirectory(policy.Attempts, policy.Pause)))
+            .ToList();
+
+        // Assert: every policy is rejected
+        Assert.Equal(policies.Length, exceptions.Count);
+        Assert.All(exceptions, exception => Assert.IsType<ArgumentOutOfRangeException>(exception));
     }
 
     /// <summary>
@@ -250,6 +483,41 @@ public class UtilitiesSubsystemTests
     }
 
     /// <summary>
+    ///     Test that utilities subsystem resolves to no secret, without an error, when neither setting is set.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_NeitherSet_ReturnsNoSecret()
+    {
+        // Arrange: neither the inline setting nor the file setting is set
+
+        // Act: resolve the secret; an exception would fail the test
+        var secret = SecretSource.Resolve(null, "Test:Secret", null, "Test:SecretFile");
+
+        // Assert: no secret is returned
+        Assert.Null(secret);
+    }
+
+    /// <summary>
+    ///     Test that utilities subsystem refuses a secret that is set inline and in a file, naming both settings.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalNamesBothSettings()
+    {
+        // Arrange: a secret file in a temporary directory and an inline secret
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("secrets/client.txt");
+        File.WriteAllText(path, "file-secret\n");
+
+        // Act: resolve with both settings set
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => SecretSource.Resolve("inline-secret", "Test:Secret", path, "Test:SecretFile"));
+
+        // Assert: the message names both settings
+        Assert.Contains("Test:Secret", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Test:SecretFile", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that utilities subsystem refuses a secret that is set inline and in a file, without the secret in the
     ///     message.
     /// </summary>
@@ -265,11 +533,47 @@ public class UtilitiesSubsystemTests
         var exception = Assert.Throws<InvalidOperationException>(
             () => SecretSource.Resolve("inline-secret", "Test:Secret", path, "Test:SecretFile"));
 
-        // Assert: the message names both settings and holds neither secret
-        Assert.Contains("Test:Secret", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Test:SecretFile", exception.Message, StringComparison.Ordinal);
+        // Assert: the message holds neither secret
         Assert.DoesNotContain("inline-secret", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("file-secret", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that utilities subsystem refuses every kind of unusable secret file, naming the file setting and
+    ///     without the contents of the file in the message.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_SecretSourceWorkflow_UnusableFiles_AreRefusedNamingSetting()
+    {
+        // Arrange: a file that is not there, a directory, an empty file, a file of 8193 bytes and a file that is not
+        // UTF-8, the last two with a recognizable text at the start
+        using var directory = new TemporaryDirectory();
+        var unusable = new Dictionary<string, string>
+        {
+            ["missing"] = directory.GetFilePath("missing.txt"),
+            ["directory"] = directory.DirectoryPath,
+            ["empty"] = directory.GetFilePath("empty.txt"),
+            ["too-large"] = directory.GetFilePath("large.txt"),
+            ["not-utf8"] = directory.GetFilePath("binary.bin")
+        };
+        File.WriteAllText(unusable["empty"], string.Empty);
+        File.WriteAllText(unusable["too-large"], "leaked-secret" + new string('x', 8193 - "leaked-secret".Length));
+        File.WriteAllBytes(unusable["not-utf8"], [.. "leaked-secret"u8.ToArray(), 0xFF, 0xFE, 0xC3, 0x28]);
+
+        // Act: resolve each file
+        var refusals = unusable.ToDictionary(
+            entry => entry.Key,
+            entry => Record.Exception(() => SecretSource.Resolve(null, "Test:Secret", entry.Value, "Test:SecretFile")));
+
+        // Assert: every file is refused with a message that names the file setting and holds no file contents
+        Assert.Equal(5, refusals.Count);
+        foreach (var (kind, refusal) in refusals)
+        {
+            var exception = Assert.IsType<InvalidOperationException>(refusal);
+            Assert.True(exception.Message.Contains("Test:SecretFile", StringComparison.Ordinal),
+                $"The refusal of the {kind} file does not name the file setting: {exception.Message}");
+            Assert.DoesNotContain("leaked-secret", exception.Message, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>

@@ -24,16 +24,27 @@ N/A - standard test environment.
   (`SafePaths-AbsolutePath`).
 - Two `TemporaryDirectory` instances that exist at the same time have different paths (`TempFiles`).
 - The paths that `GetFilePath` hands out, including those in nested folders, lie inside the directory
-  (`TempFiles-InsideOnly`).
-- Files created through a `TemporaryDirectory`, including in nested folders, are gone after it is disposed
-  (`TempFiles-Removed`).
+  (`TempFiles-InsideOnly`), the folders above a nested file exist so that it can be written at once
+  (`TempFiles-Parents`), names that would leave the directory are rejected with `ArgumentException`
+  (`TempFiles-Escape`), and a null name is rejected with `ArgumentNullException` that names the argument
+  (`TempFiles-NullPath`).
+- Files created through a `TemporaryDirectory`, including in nested folders, are gone after it is disposed while none
+  of them is held open (`TempFiles-Removed`), and disposing a second time does not throw (`TempFiles-Removed-Repeated`).
+- On Windows, a file that is released while the removal retries lets the whole directory be removed
+  (`TempFiles-Removed-Retry`); a file that stays open makes the disposal return without an exception and leave the
+  directory (`TempFiles-LockedFile`), in less than three seconds (`TempFiles-LockedFile-Bounded`), and a policy of one
+  attempt does not pause (`TempFiles-LockedFile-NoFinalPause`). These tests skip on other platforms, where an open file
+  does not block a delete.
+- A retry policy with no attempt or a negative pause is rejected (`TempFiles-InvalidPolicy`).
 - A secret file written to a `TemporaryDirectory` is resolved by `SecretSource` as its trimmed contents
   (`SecretSource`).
-- An inline secret is returned as it is given (`SecretSource-Inline`).
-- Once the secret file is gone, resolving it is refused with a message that names the file setting
-  (`SecretSource-Refusal`).
-- A secret that is set inline and in a file is refused with a message that holds neither secret
-  (`SecretSource-NoDisclosure`).
+- An inline secret is returned as it is given (`SecretSource-Inline`), and no secret is returned, without an error,
+  when neither setting is set (`SecretSource-Neither`).
+- A secret file that is missing, is a directory, is empty, is larger than 8192 bytes, or is not UTF-8 is refused with a
+  message that names the file setting (`SecretSource-Refusal`).
+- A secret that is set inline and in a file is refused with a message that names both settings
+  (`SecretSource-Conflict`).
+- None of these refusals puts the secret or the contents of a file in its message (`SecretSource-NoDisclosure`).
 
 ### Test Scenarios
 
@@ -42,10 +53,54 @@ instances exist at the same time and each is asked for the same relative file na
 them have different paths. This scenario is tested by
 `UtilitiesSubsystem_TemporaryDirectoryWorkflow_TwoDirectories_UseDifferentPaths`.
 
-**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose**: Files are
-created in nested folders through `TemporaryDirectory.GetFilePath` and written; every path lies inside the directory,
-and after the instance is disposed neither the files nor the directory exist. This scenario is tested by
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilePaths_AreInsideDirectory**: `TemporaryDirectory.GetFilePath` is
+asked for three names, two of them in nested folders; each path is the expected file in the directory and starts with
+the directory path and a separator. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilePaths_AreInsideDirectory`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_NestedFilePath_CanBeWrittenAtOnce**: The path of a file three folders
+down is requested and the file is written at once, without creating a folder; the folder exists and the file holds the
+data. This scenario is tested by `UtilitiesSubsystem_TemporaryDirectoryWorkflow_NestedFilePath_CanBeWrittenAtOnce`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_EscapingFileNames_AreRejected**: `GetFilePath` is asked for
+`../escape.txt`, `../../escape.txt`, and `sub/../../escape.txt`; each call throws `ArgumentException`. This scenario is
+tested by `UtilitiesSubsystem_TemporaryDirectoryWorkflow_EscapingFileNames_AreRejected`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_NullFileName_IsRejected**: `GetFilePath` is asked for a null name; it
+throws `ArgumentNullException` whose parameter name is `relativePath`. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_NullFileName_IsRejected`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose**: Files are created in nested
+folders through `TemporaryDirectory.GetFilePath` and written, and after the instance is disposed neither the files
+nor the directory exist. This scenario is tested by
 `UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_DisposedTwice_DoesNotThrow**: A directory with a file is disposed and
+then disposed again; the second call does not throw and the directory is gone. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_DisposedTwice_DoesNotThrow`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved**: On Windows, a file in a
+nested folder is held open for about 100 ms while the directory, with 40 attempts 50 ms apart, is disposed; the
+disposal does not throw and the whole directory is gone. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileReleasedDuringRetry_DirectoryIsRemoved`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing**: On Windows, a
+file stays open while a directory with the default policy is disposed; the disposal does not throw and the directory
+is still there, and after the file is released a second disposal removes it. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeLeavesDirectoryWithoutThrowing`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime**: On Windows, a file stays
+open while a directory with the default policy is disposed; the disposal returns in less than three seconds. This
+scenario is tested by `UtilitiesSubsystem_TemporaryDirectoryWorkflow_FileHeldOpen_DisposeReturnsInBoundedTime`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_SingleAttemptPolicy_DisposeDoesNotPause**: On Windows, a file stays
+open while a directory with one attempt and a 30 second pause is disposed; the disposal returns in less than five
+seconds, so the pause is never taken. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_SingleAttemptPolicy_DisposeDoesNotPause`.
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_InvalidRetryPolicy_IsRejected**: Directories are created with 0
+attempts, with -1 attempts, and with a pause of -1 ms; each creation throws `ArgumentOutOfRangeException`. This
+scenario is tested by `UtilitiesSubsystem_TemporaryDirectoryWorkflow_InvalidRetryPolicy_IsRejected`.
 
 **UtilitiesSubsystem_PathResolutionWorkflow_ValidPaths_ResolvesCorrectly**: Multiple valid
 relative path arguments are combined with a base path using `PathHelpers.SafePathCombine`; all
@@ -84,10 +139,24 @@ scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDi
 secret file is disposed; the same `SecretSource.Resolve` call is refused with a message that names the file setting.
 This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileRemoved_IsRefusedNamingSetting`.
 
+**UtilitiesSubsystem_SecretSourceWorkflow_UnusableFiles_AreRefusedNamingSetting**: In a `TemporaryDirectory`, a file
+that is missing, a directory, an empty file, a file of 8193 bytes, and a file that is not UTF-8 (the last two start
+with a recognizable text) are each given as the secret file; every one of the five calls throws
+`InvalidOperationException` whose message names the file setting and does not contain the recognizable text. This
+scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_UnusableFiles_AreRefusedNamingSetting`.
+
 **UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned**: Only an inline secret is given; `SecretSource.Resolve`
 returns it unchanged. This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_InlineValue_IsReturned`.
 
-**UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret**: A secret file is written inside a
+**UtilitiesSubsystem_SecretSourceWorkflow_NeitherSet_ReturnsNoSecret**: Neither the inline secret nor the file is
+given; `SecretSource.Resolve` returns no secret and throws nothing. This scenario is tested by
+`UtilitiesSubsystem_SecretSourceWorkflow_NeitherSet_ReturnsNoSecret`.
+
+**UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalNamesBothSettings**: A secret file is written inside a
 `TemporaryDirectory` and an inline secret is given as well; `SecretSource.Resolve` throws `InvalidOperationException`
-whose message names both settings and contains neither the inline secret nor the contents of the file. This scenario
-is tested by `UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret`.
+whose message names both settings. This scenario is tested by
+`UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalNamesBothSettings`.
+
+**UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret**: The same two sources are given;
+`SecretSource.Resolve` throws `InvalidOperationException` whose message contains neither the inline secret nor the
+contents of the file. This scenario is tested by `UtilitiesSubsystem_SecretSourceWorkflow_BothSet_RefusalHasNoSecret`.

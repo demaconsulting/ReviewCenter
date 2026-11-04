@@ -77,8 +77,10 @@ same command, and not by the two commands after it. A click on a missing element
 `theme light` and `theme dark` set the emulated color scheme (checked with `eval`); `console` succeeds; a `start`
 with a missing Chromium (an empty browser folder for that one start) exits with 1, prints the reason and leaves no
 control file; a `start` while running exits with 1; `stop` exits with 0
-and removes the control file; a second `stop` exits with 2. It is the evidence for the lifecycle, the interaction
-commands, and the visual-check system requirements. Tested by
+and removes the control file; a second `stop` exits with 2. It is the evidence for the lifecycle (including the
+control file that every command uses to find the browser), the interaction commands (running a command, its printed
+result and exit code 0, addressing an element by a selector, click, hover, fill, text), and the visual-check system
+requirements. Tested by
 `windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer` and
 `ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer`.
 

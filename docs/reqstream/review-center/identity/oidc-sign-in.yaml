@@ -238,8 +238,10 @@ sections:
         children:
           - ReviewCenter-Utilities-SecretSource
           - ReviewCenter-Utilities-SecretSource-Inline
+          - ReviewCenter-Utilities-SecretSource-Neither
           - ReviewCenter-Utilities-SecretSource-Refusal
           - ReviewCenter-Utilities-SecretSource-NoDisclosure
+          - ReviewCenter-Utilities-SecretSource-Conflict
         tests:
           - OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret
 

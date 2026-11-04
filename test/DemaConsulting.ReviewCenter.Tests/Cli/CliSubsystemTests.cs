@@ -323,29 +323,91 @@ public class CliSubsystemTests
     /// <summary>
     ///     Test that Program rejects a malformed option value, writes an error to stderr, and exits non-zero.
     /// </summary>
-    [Fact]
-    public void CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMalformedValueAndExitsNonZero()
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    /// <param name="option">The option that the error message must name.</param>
+    [Theory]
+    [InlineData("--depth abc", "--depth")]
+    [InlineData("--depth 0", "--depth")]
+    [InlineData("--depth 7", "--depth")]
+    [InlineData("serve --urls not-a-url", "--urls")]
+    [InlineData("serve --urls ftp://localhost:21", "--urls")]
+    public void CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMalformedValueAndExitsNonZero(
+        string arguments,
+        string option)
     {
-        // Arrange: a heading depth that is not an integer
-        var args = new[] { "--depth", "abc" };
+        // Arrange: a malformed option value
+        var args = arguments.Split(' ');
 
+        // Act: invoke the actual CLI entry point with the malformed value
+        var (result, errorOutput) = RunMainCapturingError(args);
+
+        // Assert: the malformed value produces a non-zero exit code and an error on stderr that names the option
+        Assert.Equal(1, result);
+        Assert.Contains(option, errorOutput);
+    }
+
+    /// <summary>
+    ///     Test that Program rejects an option whose value is missing, writes an error to stderr, and exits non-zero.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space; the last one is the option without its value.</param>
+    /// <param name="option">The option that the error message must name.</param>
+    [Theory]
+    [InlineData("--log", "--log")]
+    [InlineData("--results", "--results")]
+    [InlineData("--result", "--result")]
+    [InlineData("--depth", "--depth")]
+    [InlineData("serve --urls", "--urls")]
+    public void CliSubsystem_InvalidArgs_ContextAndProgram_RejectsMissingValueAndExitsNonZero(
+        string arguments,
+        string option)
+    {
+        // Arrange: an option at the end of the command line
+        var args = arguments.Split(' ');
+
+        // Act: invoke the actual CLI entry point without the value
+        var (result, errorOutput) = RunMainCapturingError(args);
+
+        // Assert: the missing value produces a non-zero exit code and an error on stderr that names the option
+        Assert.Equal(1, result);
+        Assert.Contains($"{option} requires", errorOutput);
+    }
+
+    /// <summary>
+    ///     Runs the CLI entry point with the error stream captured.
+    /// </summary>
+    /// <param name="args">The command-line arguments.</param>
+    /// <returns>The exit code and the text written to the error stream.</returns>
+    private static (int ExitCode, string ErrorOutput) RunMainCapturingError(string[] args)
+    {
         var originalError = Console.Error;
         try
         {
             using var errWriter = new StringWriter();
             Console.SetError(errWriter);
-
-            // Act: invoke the actual CLI entry point with the malformed value
             var result = Program.Main(args);
-
-            // Assert: the malformed value produces a non-zero exit code and an error on stderr that names the option
-            Assert.Equal(1, result);
-            Assert.Contains("--depth", errWriter.ToString());
+            return (result, errWriter.ToString());
         }
         finally
         {
             Console.SetError(originalError);
         }
+    }
+
+    /// <summary>
+    ///     Test that Program reports an error and exits non-zero when the log file cannot be opened.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_LogFlow_ContextAndProgram_UnopenableLogFile_ReportsErrorAndExitsNonZero()
+    {
+        // Arrange: a log path that is a directory, which cannot be opened as a file
+        var args = new[] { "--version", "--log", Path.GetTempPath() };
+
+        // Act: invoke the actual CLI entry point
+        var (result, errorOutput) = RunMainCapturingError(args);
+
+        // Assert: the run fails with an error on stderr that says the log file could not be opened
+        Assert.Equal(1, result);
+        Assert.Contains("Failed to open log file", errorOutput);
     }
 
     /// <summary>
@@ -398,19 +460,33 @@ public class CliSubsystemTests
     }
 
     /// <summary>
-    ///     Test that Context and Program work together to handle the --check-config option of a validation run.
+    ///     Test that Context parses the --check-config option of a validation run when --validate is provided.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_CheckConfigFlow_Context_WithValidate_IsParsed()
+    {
+        // Arrange: no setup required; the option together with --validate is the input under test
+
+        // Act: create the context from the command line
+        using var context = Context.Create(["--validate", "--check-config", "--silent"]);
+
+        // Assert: both options are recorded
+        Assert.True(context.Validate);
+        Assert.True(context.CheckConfig);
+    }
+
+    /// <summary>
+    ///     Test that Context rejects the --check-config option when --validate is not provided.
     /// </summary>
     [Fact]
     public void CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate()
     {
-        // Arrange: the opt-in option with and without --validate
+        // Arrange: no setup required; the option without --validate is the input under test
 
-        // Act: create the contexts from the command lines
-        using var withValidate = Context.Create(["--validate", "--check-config", "--silent"]);
+        // Act: create the context from the command line
         var withoutValidate = Assert.Throws<ArgumentException>(() => Context.Create(["--check-config"]));
 
-        // Assert: the option is parsed with --validate and rejected without it
-        Assert.True(withValidate.CheckConfig);
+        // Assert: the option is rejected with a message that names both options
         Assert.Contains("--check-config requires --validate", withoutValidate.Message);
     }
 
@@ -496,10 +572,10 @@ public class CliSubsystemTests
 
     /// <summary>
     ///     Test that the user add verb passes through Context and Program: the options are recorded and the help
-    ///     text documents them, and the misuse of the verb is rejected during parsing.
+    ///     text documents them.
     /// </summary>
     [Fact]
-    public void CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse()
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsAndDocumentsThem()
     {
         // Arrange: capture console output for the help text
         var originalOut = Console.Out;
@@ -508,26 +584,12 @@ public class CliSubsystemTests
             using var outWriter = new StringWriter();
             Console.SetOut(outWriter);
 
-            // Act: parse the verb, print the help, and parse the misuse of the verb
+            // Act: parse the verb and print the help
             using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann", "--system-admin"]);
             using var help = Context.Create(["--help"]);
             Program.Run(help);
-            var missingNames = new[]
-            {
-                new[] { "user", "add" },
-                new[] { "user", "add", "--username", "ann" },
-                new[] { "user", "add", "--display-name", "Ann" }
-            };
-            var missingNameErrors = missingNames.Select(args => Record.Exception(() => Context.Create(args))).ToList();
-            var optionsWithoutVerb = new[]
-            {
-                new[] { "--username", "ann" },
-                new[] { "--display-name", "Ann" },
-                new[] { "--system-admin" }
-            };
-            var strayOptionErrors = optionsWithoutVerb.Select(args => Record.Exception(() => Context.Create(args))).ToList();
 
-            // Assert: the options are recorded, the help documents them, and every misuse is refused
+            // Assert: the options are recorded and the help documents them
             Assert.True(context.UserAdd);
             Assert.Equal("ann", context.Username);
             Assert.Equal("Ann", context.DisplayName);
@@ -535,22 +597,92 @@ public class CliSubsystemTests
             var output = outWriter.ToString();
             Assert.Contains("user add", output);
             Assert.Contains("REVIEWCENTER_PASSWORD", output);
-            Assert.Equal(missingNames.Length, missingNameErrors.Count);
-            Assert.All(missingNameErrors, error =>
-            {
-                var argumentException = Assert.IsType<ArgumentException>(error);
-                Assert.Contains("requires --username and --display-name", argumentException.Message);
-            });
-            Assert.Equal(optionsWithoutVerb.Length, strayOptionErrors.Count);
-            Assert.All(strayOptionErrors, error =>
-            {
-                var argumentException = Assert.IsType<ArgumentException>(error);
-                Assert.Contains("require the user add verb", argumentException.Message);
-            });
         }
         finally
         {
             Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the user add verb is rejected during parsing when a name is missing.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_MissingNames_AreRejected()
+    {
+        // Arrange: command lines without the user name, without the display name, and without both
+        var missingNames = new[]
+        {
+            new[] { "user", "add" },
+            new[] { "user", "add", "--username", "ann" },
+            new[] { "user", "add", "--display-name", "Ann" }
+        };
+
+        // Act: parse each command line
+        var errors = missingNames.Select(args => Record.Exception(() => Context.Create(args))).ToList();
+
+        // Assert: every command line is refused with a message that names the two options
+        Assert.Equal(missingNames.Length, errors.Count);
+        Assert.All(errors, error =>
+        {
+            var argumentException = Assert.IsType<ArgumentException>(error);
+            Assert.Contains("requires --username and --display-name", argumentException.Message);
+        });
+    }
+
+    /// <summary>
+    ///     Test that the user options are rejected during parsing when the user add verb is not given.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_OptionsWithoutVerb_AreRejected()
+    {
+        // Arrange: each of the three options without the verb
+        var optionsWithoutVerb = new[]
+        {
+            new[] { "--username", "ann" },
+            new[] { "--display-name", "Ann" },
+            new[] { "--system-admin" }
+        };
+
+        // Act: parse each command line
+        var errors = optionsWithoutVerb.Select(args => Record.Exception(() => Context.Create(args))).ToList();
+
+        // Assert: every command line is refused with a message that names the missing verb
+        Assert.Equal(optionsWithoutVerb.Length, errors.Count);
+        Assert.All(errors, error =>
+        {
+            var argumentException = Assert.IsType<ArgumentException>(error);
+            Assert.Contains("require the user add verb", argumentException.Message);
+        });
+    }
+
+    /// <summary>
+    ///     Test that a user verb without the add action, or with another action, is rejected with an error and a
+    ///     non-zero exit code.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("user")]
+    [InlineData("user remove")]
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_WrongAction_RejectsAndExitsNonZero(string arguments)
+    {
+        // Arrange: capture the error stream
+        var originalError = Console.Error;
+        try
+        {
+            using var errWriter = new StringWriter();
+            Console.SetError(errWriter);
+
+            // Act: invoke the actual CLI entry point with the misused verb
+            var result = Program.Main(arguments.Split(' '));
+
+            // Assert: the run fails with an error that names the missing action
+            Assert.Equal(1, result);
+            Assert.Contains("user requires the add action", errWriter.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
         }
     }
 
