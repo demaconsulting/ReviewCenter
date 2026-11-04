@@ -29,7 +29,17 @@ N/A - standard test environment.
   progress, and only the first section open; a partly answered review opens the first section with unanswered
   checks; opening a section closes the one that was open.
 - A Pass is stored at once with the signed-in user and the time, in the draft ballot of the user's slot, and the
-  progress follows.
+  progress follows; every check offers Pass, Fail and N/A, and with two slots the answer goes into the ballot of the
+  signed-in user.
+- An Auditor, a concluded review and an author who may not answer disable every control that changes the checklist:
+  the answer buttons, the justification and reason fields and their save buttons, and the applicability switch; a user
+  without a slot has the answer controls disabled and still sees the consolidated standing, also in a single-slot and
+  in a concluded review.
+- The ballot status says "You have not answered yet." before the first answer; the author who is blocked is offered
+  neither Submit ballot nor Submit and sign; a single-slot draft completed by carried answers offers Submit ballot; a
+  user with a second factor is offered the code field beside the password field.
+- A started discussion links to the review page, and its kind is Question unless the reviewer chooses Finding; the
+  differing answers are listed in the order of the slots.
 - A reviewer who holds a slot sees the state of the own ballot; a complete draft ballot of a review with several slots
   offers **Submit ballot**, which hands it in and changes the status line; an incomplete ballot and the ballot of a
   single-slot review that the completing answer handed in offer no button (a complete single-slot draft that no answer
@@ -87,6 +97,10 @@ status line, the overall progress, all 14 sections with their progress, and exac
 each check's outcome group is named by its check text.
 This scenario is tested by `ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection`.
 
+**ChecklistPage_Render_NewReview_OffersPassFailAndNotApplicableForEveryCheck**: The page is rendered for a new
+review; each of the 8 checks of the open section has a Pass, a Fail and an N/A button, and no other check offers them.
+This scenario is tested by `ChecklistPage_Render_NewReview_OffersPassFailAndNotApplicableForEveryCheck`.
+
 **ChecklistPage_Render_UnknownReview_ShowsNotFound**: The page is rendered for an unknown review; the not-found
 message is shown and no checklist. This scenario is tested by `ChecklistPage_Render_UnknownReview_ShowsNotFound`.
 
@@ -112,6 +126,11 @@ by `ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText`.
 **ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy**: Fail is clicked and a justification is
 saved; the answer is stored, the text stays in the box, and "Answered by" shows the display name and the UTC time.
 This scenario is tested by `ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy`.
+
+**ChecklistPage_Answer_NotApplicable_ShowsRequiredJustificationBoxAndStoresOnSave**: N/A is clicked; the
+justification box appears with its required marker, a justification is typed and saved, and the answer is stored as
+not applicable with that text. This scenario is tested by
+`ChecklistPage_Answer_NotApplicable_ShowsRequiredJustificationBoxAndStoresOnSave`.
 
 **ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy**: Another user ("bea") is signed in and Pass is clicked;
 the page has no name field, "Answered by" shows the display name of that user, and the stored answer carries the
@@ -176,6 +195,13 @@ review while the rule is on: the notice `author-answer-blocked` is shown and the
 disabled. Another member sees no notice and enabled controls, and with the rule switched off the author sees none. This
 scenario is tested by `ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls`.
 
+**ChecklistPage_Render_AuthorWhileRuleIsOn_DisablesEveryControlThatChangesTheChecklist**: The author of a review, who
+answered everything while the project let authors answer (a Fail with a justification, and the design section as not
+applicable with a reason), opens the page after the rule was switched on; the answer buttons, the justification field and
+its save button, the switch of the sections, and the reason field and its save button are all disabled, while the
+sections can still be opened. This scenario is tested by
+`ChecklistPage_Render_AuthorWhileRuleIsOn_DisablesEveryControlThatChangesTheChecklist`.
+
 **ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice**: The author of an approved review sees
 `checklist-locked` and not `author-answer-blocked`. This scenario is tested by
 `ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice`.
@@ -188,6 +214,12 @@ controls are disabled. This scenario is tested by `ChecklistPage_Render_Rejected
 off, the rule is switched on, and the author clicks Pass; the error line of the check contains "Authors cannot answer
 the checklist" and nothing is stored. This scenario is tested by
 `ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing`.
+
+**ChecklistPage_Render_RejectedConcludedReview_DisablesEveryControlThatChangesTheChecklist**: The page is rendered for a
+review concluded as rejected, with a Fail that has a justification and a section that is not applicable; the answer
+buttons, the justification field and its save button, the switch of the sections, and the reason field and its save
+button are all disabled, while the sections can still be opened. This scenario is tested by
+`ChecklistPage_Render_RejectedConcludedReview_DisablesEveryControlThatChangesTheChecklist`.
 
 **ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate**: A review has
 two slots; the first (Rita) is signed and the owner of the second (Sam) has handed in a ballot that agrees. Sam changes
@@ -244,6 +276,15 @@ check only, the page shows no submit button. In a review with one slot (cyd) tha
 the ballot in, the page shows no submit button and the status line says submitted. This scenario is tested by
 `ChecklistPage_SubmitButton_HiddenWhenIncompleteOrSingleSlot`.
 
+**ChecklistPage_BallotStatus_NotAnsweredYet_ShowsYouHaveNotAnswered**: In a review with two slots ann has answered
+nothing; the ballot status line reads "You have not answered yet.". This scenario is tested by
+`ChecklistPage_BallotStatus_NotAnsweredYet_ShowsYouHaveNotAnswered`.
+
+**ChecklistPage_SubmitButton_HiddenWhenAuthorIsBlocked**: In a review with two slots the author answered every check
+while the project let authors answer, and the rule is switched on afterwards; the page shows the author notice and the
+ballot as a draft, and offers neither Submit ballot nor Submit and sign. This scenario is tested by
+`ChecklistPage_SubmitButton_HiddenWhenAuthorIsBlocked`.
+
 **ChecklistPage_NoSlot_ShowsHint**: ann opens the checklist of a review whose only slot belongs to bob; the notice
 `no-slot-notice` is shown, and there is no submit button and no ballot status line. This scenario is tested by
 `ChecklistPage_NoSlot_ShowsHint`.
@@ -256,6 +297,12 @@ status, progress, check text, project name or review title is shown. This scenar
 **ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl**: An Auditor opens the checklist; the answers
 are visible, the `readonly-notice` is shown, and every answer, applicability, and justification control is disabled.
 This scenario is tested by `ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl`.
+
+**ChecklistPage_Render_Auditor_DisablesEveryControlThatChangesTheChecklist**: An Auditor opens a checklist whose only
+reviewer answered everything, with a Fail that has a justification and a section that is not applicable; the read-only
+notice is shown, and the answer buttons, the justification field and its save button, the switch of the sections, and
+the reason field and its save button are all disabled, while the sections can still be opened. This scenario is tested
+by `ChecklistPage_Render_Auditor_DisablesEveryControlThatChangesTheChecklist`.
 
 **ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the checklist open and the membership is
 removed; passing a check shows the not-found message, nothing of the checklist remains in the markup, and no answer is
@@ -279,6 +326,11 @@ and the project then reworded one of them before the follow-up was created. The 
 reworded check, because the earlier justification belongs to other wording, and still shows it for the unchanged check.
 This scenario is tested by `ChecklistPage_Render_FollowUp_ReworkedCheckThatFailed_ShowsNoEarlierFail`.
 
+**ChecklistPage_SubmitButton_ShownForSingleSlotDraftCompletedByCarriedAnswers**: Bob passed every check of the earlier
+review, and the follow-up has bob as its only reviewer, so the answers carried from the earlier review complete the
+draft; the status says draft and the Submit ballot button is shown. This scenario is tested by
+`ChecklistPage_SubmitButton_ShownForSingleSlotDraftCompletedByCarriedAnswers`.
+
 **ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts**: In a review with three slots two ballots are handed in
 with different answers, and the third reviewer has a draft. The page shows how many ballots are handed in and the notice
 that the others stay hidden, and neither a standing, nor a count of disputed checks, nor a name of another reviewer next
@@ -287,6 +339,20 @@ to an answer. This scenario is tested by `ChecklistPage_DraftBallot_HidesOtherBa
 **ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount**: A member without a slot opens the checklist of such a
 review and sees the count and the Assign me button, and no standing. This scenario is tested by
 `ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount`.
+
+**ChecklistPage_MemberWithoutSlot_AnswerControlsAreDisabled**: A plain member without a slot opens the checklist of a
+review with two slots; the Pass, Fail and N/A buttons of the first check are disabled. This scenario is tested by
+`ChecklistPage_MemberWithoutSlot_AnswerControlsAreDisabled`.
+
+**ChecklistPage_MemberWithoutSlot_SingleSlotReview_ShowsTheStanding**: The only reviewer of a review answered every
+check, and a plain member without a slot opens the checklist; the no-slot notice is shown with the status line
+"Checklist complete." and the progress "58 of 58 checks answered". This scenario is tested by
+`ChecklistPage_MemberWithoutSlot_SingleSlotReview_ShowsTheStanding`.
+
+**ChecklistPage_MemberWithoutSlot_ConcludedReview_ShowsTheStanding**: Both reviewers of a review handed in and signed,
+so the review is concluded, and a plain member without a slot opens the checklist; the locked notice, the status line
+"Checklist complete." and the progress "58 of 58 checks answered" are shown. This scenario is tested by
+`ChecklistPage_MemberWithoutSlot_ConcludedReview_ShowsTheStanding`.
 
 **ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks**: A reviewer who has handed in sees "Ann: Pass /
 Bob: N/A" under the check on which the ballots differ and not under a check on which they agree. This scenario is tested
@@ -322,6 +388,11 @@ stays. This scenario is tested by `ChecklistPage_BallotsLine_NamesWhoHasNotHande
 shows the pointer to the history with a link that ends in `/history`; the open review does not show it. This scenario is
 tested by `ChecklistPage_ConcludedMultiSlotReview_PointsToTheHistory`.
 
+**ChecklistPage_SubmittedBallot_ShowsAnswersInTheOrderOfTheSlots**: Zed holds the first slot and abe the second; the
+viewer has handed in and the first check is answered differently; the answers are shown as "Zed: Pass / Abe: Fail",
+which is the order of the slots and not the alphabetical order. This scenario is tested by
+`ChecklistPage_SubmittedBallot_ShowsAnswersInTheOrderOfTheSlots`.
+
 **ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers**: A system administrator who holds no slot sees the
 differing answers. This scenario is tested by `ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers`.
 
@@ -332,6 +403,15 @@ side-by-side line. This scenario is tested by `ChecklistPage_SingleSlot_ShowsNoB
 started; a thread about the check exists with that text, and a link to the review page is shown. This scenario is tested
 by `ChecklistPage_DisputedCheck_DiscussStartsCheckThread`.
 
+**ChecklistPage_DiscussStarted_LinksToTheReviewPage**: A discussion is started about a differing check; the notice
+that says it was started contains a link whose address is the review page. This scenario is tested by
+`ChecklistPage_DiscussStarted_LinksToTheReviewPage`.
+
+**ChecklistPage_DiscussFinding_KindChosenInComposer**: The Discuss form of a check is opened; Question is the
+preselected kind; after "Finding (goes in the report)" is chosen and a text is typed, starting the discussion stores a
+thread of the kind Finding about that check. This scenario is tested by
+`ChecklistPage_DiscussFinding_KindChosenInComposer`.
+
 **ChecklistPage_DiscussWithoutText_ShowsError**: Discuss is started without text; a message is shown next to the form
 and no thread is created. This scenario is tested by `ChecklistPage_DiscussWithoutText_ShowsError`.
 
@@ -341,6 +421,10 @@ and no thread is created. This scenario is tested by `ChecklistPage_DiscussWitho
 **ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction**: A reviewer with a complete draft in a review with
 two slots sees Submit and sign as the main action with the password field, and Submit ballot as the secondary one. This
 scenario is tested by `ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction`.
+
+**ChecklistPage_CompleteDraft_UserWithSecondFactor_OffersCodeField**: Bob has enrolled a second factor and has a
+complete draft in a review with two slots; the code field is offered beside the password field. This scenario is tested
+by `ChecklistPage_CompleteDraft_UserWithSecondFactor_OffersCodeField`.
 
 **ChecklistPage_SubmitAndSign_WarnsWhenOtherBallotsAreMissing**: Bob has a complete draft in a review with three slots
 where ann has not started and cyd has a draft: the caution above the Submit and sign form names Ann and Cyd in the
