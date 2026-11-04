@@ -82,7 +82,7 @@ the project nor an entry is stored. This scenario is tested by
 `ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing`.
 
 **ReviewStore_AddReviewAsync_AuditInsertFails_StoresNoReview**: A project exists and the audit insert fails; adding a
-review throws, the review is not there, and no entry was added. This scenario is tested by
+review throws, neither the review nor its file is there, and no entry was added. This scenario is tested by
 `ReviewStore_AddReviewAsync_AuditInsertFails_StoresNoReview`.
 **ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange**: The audit insert fails; the project is rolled back.
 This scenario is tested by `ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange`, and for a user, including

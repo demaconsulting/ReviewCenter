@@ -1248,7 +1248,6 @@ sections:
           the deadline of a review.
         children:
           - ReviewCenter-ReviewStore-DueDate-Audit
-          - ReviewCenter-ReviewStore-DueDate-Audit
           - ReviewCenter-ReviewStore-DueDate-AuditAtomic
           - ReviewCenter-ReviewStore-DueDate-ChainIntact
         tests:
