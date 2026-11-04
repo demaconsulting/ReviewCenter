@@ -211,6 +211,11 @@ open the created review, and the page does not navigate until the link is follow
 is typed; the form says the date is in UTC. After submitting, the review carries the date. This scenario is tested by
 `NewReviewPage_CreateForm_DueDate_IsStoredWithTheReview`, defined in `NewReviewPageRepositoryTests.cs`.
 
+**NewReviewPage_Render_DueDateField_StatesCalendarDayInUtc**: The new-review form of a project is rendered; the optional
+due date field is a date input, is empty, and its field text says "Due date (optional)" and "A calendar day in UTC".
+This scenario is tested by `NewReviewPage_Render_DueDateField_StatesCalendarDayInUtc`, defined in
+`NewReviewPageRepositoryTests.cs`.
+
 **NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing**: Yesterday as the due date shows an error that
 names the due date and creates nothing; with the field emptied the review is created without a date. This scenario is
 tested by `NewReviewPage_CreateForm_DueDateInThePast_ShowsErrorAndCreatesNothing`.
@@ -521,8 +526,9 @@ submitted; the error names the identifier, the entered values stay, and only the
 scenario is tested by `NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId`.
 
 **NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing**: The form is submitted with the review
-identifier `new`, in any letter case; the error says that the identifier is reserved and no review is stored. This
-scenario is tested by `NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing`.
+identifier `new`, in each of the spellings `New`, `NEW`, and `new` (a theory); the error says that the identifier is
+reserved and no review is stored. This scenario is tested by
+`NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing`.
 
 **NewReviewPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError**: Two files with the same name are chosen and
 the form is submitted; the error names the file and no review is stored. This scenario is tested by
@@ -547,6 +553,13 @@ submitted; the error is still shown and nothing is stored. This scenario is test
 but streams the per-file maximum, and enough of them are delivered to the file input to pass the total limit; the
 total-size error is shown and no selection is kept. This scenario is tested by
 `NewReviewPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes`.
+
+**NewReviewPage_FileInput_DeclaredLimitsExceeded_OpensNoStream**: A theory over three selections whose declared values
+break a limit: one file more than the file-count limit ("TooManyFiles"), one file over the per-file size limit
+("FileTooLarge"), and files whose declared sizes together exceed the total limit ("TotalTooLarge"). Each file is a
+recording fake browser file that counts its `OpenReadStream` calls; after the selection the error is shown and no file
+has been opened, so the page refuses on the declared values before it reads any file. This scenario is tested by
+`NewReviewPage_FileInput_DeclaredLimitsExceeded_OpensNoStream`, defined in `NewReviewPageRepositoryTests.cs`.
 
 **ProjectPage_AfterRender_Interactive_SetsMarker**: The project page is rendered; its root element has
 `data-interactive` equal to `true`. This scenario is tested by `ProjectPage_AfterRender_Interactive_SetsMarker`.
@@ -579,9 +592,21 @@ switch is unchanged, and nothing more is audited. This scenario is tested by
 
 **ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement**: The hints next to the two further switches say that the
 rule applies to every project and, for the author rule, that this includes projects created before it was enforced; the
-reopener hint says that a reopen is refused when nobody may sign. There is no "Not applied yet" text and there are no
+reopener hint says that a reopen is refused when nobody may sign and that this includes projects created before it was
+enforced. There is no "Not applied yet" text and there are no
 pending markers anywhere on the page. This scenario is tested by
 `ProjectPage_ReviewRules_NewSwitches_DescribeEnforcement`.
+
+**ProjectPage_ReviewRules_IndependentSwitch_ExplainsTheRule**: A project admin opens the project page; the hint inside
+the independent reviewers switch (`review-rule-independent-reviewers`) explains the rule. This scenario is tested by
+`ProjectPage_ReviewRules_IndependentSwitch_ExplainsTheRule`.
+
+**ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads**: After the page was loaded, another
+administrator switches the independent reviewers rule off. The page, which still shows it on, has the independent
+switch and the author switch both turned off and saves; the error shows the message of the stale change
+(`ProjectService.IndependentReviewersChangedByOthersMessage`), the independent switch shows the stored value (off), the
+author switch is back on (the page reloaded the stored values), no success status is shown, and the audit count is
+unchanged. This scenario is tested by `ProjectPage_ReviewRules_IndependentReviewers_StaleValue_ShowsMessageAndReloads`.
 
 **Evidence settings** are verified in `EvidenceSettingsPageTests.cs`, with the real `EvidenceSettingsService` and the
 real access rules behind the page.
@@ -591,6 +616,13 @@ real access rules behind the page.
 settings button with the address `/projects/{id}/evidence-settings`; the page of a plain member has none. These scenarios
 are tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons` and
 `ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`.
+
+**ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls**: The system administrator opens the
+page of a project of which they are no member; the Evidence settings button and
+the checklist link have the addresses `/projects/{id}/evidence-settings` and `/projects/{id}/checklist`, the Review
+rules card with the independent reviewers switch is shown, and the checklist summary says "default-1 (14 sections, 58
+checks), built-in default". This scenario is tested by
+`ProjectPage_Render_SystemAdministrator_ShowsEvidenceChecklistAndRulesControls`.
 
 **EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings**: A project admin and a system administrator
 open the page of a project without stored settings; the two anonymous switches are off, the five content switches are
@@ -622,7 +654,8 @@ with your quality or compliance lead.", the five warnings differ from each other
 sections. This scenario is tested by `EvidenceSettingsPage_Switch_AllContentOff_WarningsAreTailoredAndBannerListsAll`.
 
 **EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine**: Turning the index on shows the exposure
-warning and no sentence about people; turning the anonymous PDFs on adds the sentence that names the review discussion
+warning (it says that anyone who can reach this server can read what was opened, without signing in) and no sentence
+about people; turning the anonymous PDFs on adds the sentence that names the review discussion
 and the reviewer names; turning the reviewer names off keeps only the discussion; turning the threads off removes the
 sentence and keeps the general warning; turning both anonymous switches off removes the warning. This scenario is tested
 by `EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine`.
@@ -806,6 +839,11 @@ a hint to choose a repository. This scenario is tested by
 uploaded reviews, and for a repository source the reviews of the chosen repository, each with its identifier and title,
 after the option for no follow-up. This scenario is tested by
 `NewReviewPage_FollowUp_Selector_ListsEligibleReviewsOfTheChosenSource`.
+
+**NewReviewPage_FollowUp_NotApplicableSection_PreviewCountsIt**: The earlier review has one section marked as not
+applicable; after the earlier review is chosen, the preview says "1 N/A section" (singular) and not zero. This scenario
+is tested by `NewReviewPage_FollowUp_NotApplicableSection_PreviewCountsIt`, defined in
+`NewReviewPageFollowUpTests.cs`.
 
 **NewReviewPage_FollowUp_Upload_ShowsPreviewSuggestsTitleAndCreatesFollowUp**: An earlier review is chosen and files are
 selected; the page shows the counts that `ReviewService.PreviewFollowUpAsync` reports, suggests the title "Follow-up to"
