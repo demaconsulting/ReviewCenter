@@ -167,8 +167,10 @@ public class ReauthProofStoreTests
 
         // Assert
         Assert.False(store.Has(1, 1, "rev-1", 0));
-        Assert.True(store.Has(1, 1, "rev-1", 1));
-        Assert.True(store.Has(1, 1, "rev-1", ReauthProofStore.MaxEntries));
+        for (var slot = 1; slot <= ReauthProofStore.MaxEntries; slot++)
+        {
+            Assert.True(store.Has(1, 1, "rev-1", slot), $"proof {slot} was dropped");
+        }
 
         // Act: after the lifetime every proof is expired and is dropped for a new one
         clock.Advance(ReauthProofStore.Lifetime);
@@ -176,7 +178,10 @@ public class ReauthProofStoreTests
 
         // Assert
         Assert.True(store.Has(2, 1, "rev-1", 0));
-        Assert.False(store.Has(1, 1, "rev-1", 1));
+        for (var slot = 1; slot <= ReauthProofStore.MaxEntries; slot++)
+        {
+            Assert.False(store.Has(1, 1, "rev-1", slot), $"expired proof {slot} is still held");
+        }
     }
 
     /// <summary>
@@ -206,9 +211,12 @@ public class ReauthProofStoreTests
             store.Issue(1, 1, "rev-1", ReauthProofStore.MaxEntries + extra);
         }
 
-        // Assert: the oldest live proof, the newest old one and the three new ones are all live
-        Assert.True(store.Has(1, 1, "rev-1", 3));
-        Assert.True(store.Has(1, 1, "rev-1", ReauthProofStore.MaxEntries - 1));
+        // Assert: every proof that was live before is still live, and so are the three new ones
+        for (var slot = 3; slot < ReauthProofStore.MaxEntries; slot++)
+        {
+            Assert.True(store.Has(1, 1, "rev-1", slot), $"live proof {slot} was dropped");
+        }
+
         for (var extra = 0; extra < 3; extra++)
         {
             Assert.True(store.Has(1, 1, "rev-1", ReauthProofStore.MaxEntries + extra));

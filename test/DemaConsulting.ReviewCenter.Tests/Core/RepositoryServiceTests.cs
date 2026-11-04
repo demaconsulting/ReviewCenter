@@ -1261,8 +1261,8 @@ public class RepositoryServiceTests
     }
 
     /// <summary>
-    ///     Test that an administrator who is disabled after a first successful call is refused on every operation of
-    ///     the same service instance.
+    ///     Test that an administrator who is disabled after a first successful call is refused on create, update,
+    ///     disable and list of the same service instance.
     /// </summary>
     [Fact]
     public async Task RepositoryService_AdminOnly_RechecksTheActorOnEveryCall()

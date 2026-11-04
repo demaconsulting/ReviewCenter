@@ -40,11 +40,12 @@ seen nor consumable at the end of it. This scenario is tested by `ReauthProofSto
 **ReauthProofStore_IssueAgain_RestartsTheLifetime**: A proof issued again just before it ends can be consumed after
 the first lifetime would have ended. This scenario is tested by `ReauthProofStore_IssueAgain_RestartsTheLifetime`.
 
-**ReauthProofStore_Full_DropsExpiredThenOldest**: With a full store one more proof pushes out only the oldest; after the
-lifetime a new proof drops the ended ones. This scenario is tested by `ReauthProofStore_Full_DropsExpiredThenOldest`.
+**ReauthProofStore_Full_DropsExpiredThenOldest**: With a full store one more proof pushes out only the oldest, every other
+proof stays; after the lifetime a new proof drops every ended proof. This scenario is tested by
+`ReauthProofStore_Full_DropsExpiredThenOldest`.
 
 **ReauthProofStore_Full_EndedProofsMakeRoomAndLiveOnesStay**: In a full store whose first three proofs ended, three more
-proofs are accepted and every live proof, the oldest one included, is still live. This scenario is tested by
+proofs are accepted and every one of the live proofs is still live. This scenario is tested by
 `ReauthProofStore_Full_EndedProofsMakeRoomAndLiveOnesStay`.
 
 **ReauthProofStore_Limits_AreFiveMinutesAndTenThousand**: The lifetime of a proof is read as five minutes and the

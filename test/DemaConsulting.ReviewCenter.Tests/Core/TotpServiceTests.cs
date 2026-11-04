@@ -752,6 +752,15 @@ public partial class TotpServiceTests
         Assert.Equal(TotpSignInOutcome.Success, result.Outcome);
         Assert.True(result.UsedRecoveryCode);
         Assert.Equal(9, await world.Store.CountUnusedRecoveryCodesAsync(user.Id, cancellationToken));
+
+        // Assert: it was exactly that code - it is refused now, while another code of the user still works
+        var again = await world.Totp.CompleteSignInAsync(
+            await world.BeginSignInAsync("ann"), "10.0.0.1", codes[0], cancellationToken);
+        Assert.NotEqual(TotpSignInOutcome.Success, again.Outcome);
+        var other = await world.Totp.CompleteSignInAsync(
+            await world.BeginSignInAsync("ann"), "10.0.0.1", codes[1], cancellationToken);
+        Assert.Equal(TotpSignInOutcome.Success, other.Outcome);
+        Assert.True(other.UsedRecoveryCode);
     }
 
     /// <summary>

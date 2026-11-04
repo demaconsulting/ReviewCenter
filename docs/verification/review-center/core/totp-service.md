@@ -141,7 +141,8 @@ right code gives `ChallengeInvalid` without a user, uses up no step, and counts 
 
 **TotpService_CompleteSignInAsync_RecoveryCodeSpellings_AreAccepted**: A theory over a recovery code in lower case, with
 spaces for hyphens, without hyphens, and padded with blanks; each signs in with the recovery code and leaves nine codes
-unused. This scenario is tested by `TotpService_CompleteSignInAsync_RecoveryCodeSpellings_AreAccepted`.
+unused; the same code is then refused and another recovery code still signs in. This scenario is tested by
+`TotpService_CompleteSignInAsync_RecoveryCodeSpellings_AreAccepted`.
 
 **TotpService_CompleteSignInAsync_CodeOfTheEnrollment_IsAReplay**: The code that confirmed the enrollment fails at
 sign-in, and the code of the next step signs in. This scenario is tested by
