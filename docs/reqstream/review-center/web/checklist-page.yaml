@@ -2,137 +2,556 @@
 # Software Unit Requirements for the ChecklistPage Unit
 #
 # The ChecklistPage unit is the page at /projects/{project}/reviews/{review}/checklist that shows the checklist of
-# one review, lets a reviewer answer its checks, and shows what is left to do.
+# one review, lets a reviewer answer its checks, and shows what is left to do. Every requirement states one
+# criterion that is verified by tests of the unit itself; the first requirement of each group keeps the id of the
+# requirement that the group was split from.
 
 sections:
   - title: ChecklistPage Unit Requirements
     requirements:
       - id: ReviewCenter-ChecklistPage-Show
         title: >-
-          The ChecklistPage unit shall show a status line of how many checks are unanswered (or that the
-          checklist is complete), the overall progress with the number of sections that do not apply, and every
-          section with its own progress, with only the first section that has unanswered checks open to begin
-          with, and shall show a not-found message when the review does not exist and a message when the review
-          has no checklist.
+          The ChecklistPage unit shall show a status line with the number of checks that are unanswered.
         justification: |
-          A reviewer must see at once what is left to do and where to start. Opening only one section keeps the
-          fifty-odd checks from burying what matters. A mistyped link must lead to a clear answer.
+          A reviewer must see at once what is left to do, so the page opens with the number of checks that are still
+          unanswered.
         tests:
           - ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection
-          - ChecklistPage_Render_UnknownReview_ShowsNotFound
-          - ChecklistPage_Render_ReviewWithoutChecklist_ShowsMissing
-          - ChecklistPage_Render_PartlyAnswered_OpensFirstIncompleteSection
+
+      - id: ReviewCenter-ChecklistPage-Show-Complete
+        title: >-
+          The ChecklistPage unit shall say in the status line that the checklist is complete once every check is
+          answered.
+        justification: |
+          The reviewer must know when the work is done, instead of reading a count of zero.
+        tests:
           - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
+
+      - id: ReviewCenter-ChecklistPage-Show-Progress
+        title: >-
+          The ChecklistPage unit shall show the overall progress as the number of answered checks out of all checks.
+        justification: |
+          A number out of a total tells the reviewer how far along the checklist is.
+        tests:
+          - ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection
+
+      - id: ReviewCenter-ChecklistPage-Show-NotApplicable
+        title: >-
+          The ChecklistPage unit shall add the number of sections that do not apply to the overall progress.
+        justification: |
+          The reader must see why the total of checks is smaller than the checklist when a section is skipped.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+
+      - id: ReviewCenter-ChecklistPage-Show-SectionProgress
+        title: >-
+          The ChecklistPage unit shall show the progress of every section next to its title.
+        justification: |
+          The reviewer sees which section still has work without opening every section.
+        tests:
+          - ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection
+
+      - id: ReviewCenter-ChecklistPage-Show-FirstOpen
+        title: >-
+          The ChecklistPage unit shall open, to begin with, only the first section that has unanswered checks.
+        justification: |
+          Opening one section keeps the fifty-odd checks from burying what matters, and the first section with work
+          left is where the reviewer continues.
+        tests:
+          - ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection
+          - ChecklistPage_Render_PartlyAnswered_OpensFirstIncompleteSection
+
+      - id: ReviewCenter-ChecklistPage-Show-NotFound
+        title: >-
+          The ChecklistPage unit shall show a not-found message when the review does not exist.
+        justification: |
+          A mistyped link must lead to a clear answer instead of an empty page.
+        tests:
+          - ChecklistPage_Render_UnknownReview_ShowsNotFound
+
+      - id: ReviewCenter-ChecklistPage-Show-NoChecklist
+        title: >-
+          The ChecklistPage unit shall show a message that the review has no checklist when it has none.
+        justification: |
+          The reader must know that the page is empty on purpose and not because something failed to load.
+        tests:
+          - ChecklistPage_Render_ReviewWithoutChecklist_ShowsMissing
 
       - id: ReviewCenter-ChecklistPage-Access
         title: >-
           The ChecklistPage unit shall show a user who may not see the project the page for a review that does not
-          exist and none of the checklist, and shall check the view access again at the start of every action of
-          the open page, so that a user whose membership was removed meanwhile gets that page and nothing that was
-          loaded, and an answer is not stored.
+          exist.
         justification: |
-          A page that stays open does not load again, so without a new check a removed member would keep reading
-          the checklist and could keep answering it. A hidden project looks like a missing one, so the page does
-          not reveal it either.
+          A hidden project looks like a missing one, so the page does not reveal that the project or the review
+          exists.
         tests:
           - ChecklistPage_Render_NonMember_LooksLikeAMissingReview
+
+      - id: ReviewCenter-ChecklistPage-Access-NoData
+        title: >-
+          The ChecklistPage unit shall show a user who may not see the project none of the checklist.
+        justification: |
+          Nothing of the checklist may leak to a user without access, so the markup carries none of its content.
+        tests:
+          - ChecklistPage_Render_NonMember_LooksLikeAMissingReview
+
+      - id: ReviewCenter-ChecklistPage-Access-Answer
+        title: >-
+          The ChecklistPage unit shall check the view access again when a check of the open page is answered, and
+          show a user whose membership was removed meanwhile the not-found page with none of the loaded checklist.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading the
+          checklist and could keep answering it.
+        tests:
           - ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData
+
+      - id: ReviewCenter-ChecklistPage-Access-Section
+        title: >-
+          The ChecklistPage unit shall check the view access again when a section of the open page is opened or
+          closed, and show a user whose membership was removed meanwhile the not-found page with none of the loaded
+          checklist.
+        justification: |
+          A removed member must not keep reading the checklist by opening the sections of a page that was loaded
+          before the membership ended.
+        tests:
           - ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData
+
+      - id: ReviewCenter-ChecklistPage-Access-NotStored
+        title: >-
+          The ChecklistPage unit shall not store an answer that a user gives after the membership was removed.
+        justification: |
+          A removed member must not keep changing the checklist from a page that was loaded before the membership
+          ended.
+        tests:
+          - ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData
 
       - id: ReviewCenter-ChecklistPage-ReadOnly
         title: >-
-          The ChecklistPage unit shall show a member whose role is auditor the checklist with a read-only notice and
-          with every control that answers a check or changes a section disabled, so that nothing can be changed.
+          The ChecklistPage unit shall show a member whose role is auditor a read-only notice.
         justification: |
-          An auditor reads the answers and the justifications but must not be offered to change them, and the notice
-          says why the controls are disabled.
+          An auditor reads the answers and the justifications but may not change them, and the notice says why the
+          controls are disabled.
         tests:
           - ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl
 
+      - id: ReviewCenter-ChecklistPage-ReadOnly-Controls
+        title: >-
+          The ChecklistPage unit shall disable, for a member whose role is auditor, every control that answers a
+          check or changes a section.
+        justification: |
+          An auditor must not be offered to change the answers, the justifications or the applicability of a
+          section, so every control that does so is disabled.
+        tests:
+          - ChecklistPage_Render_Auditor_ShowsReadOnlyNoticeAndDisablesEveryControl
+          - ChecklistPage_Render_Auditor_DisablesEveryControlThatChangesTheChecklist
+
       - id: ReviewCenter-ChecklistPage-Answer
         title: >-
-          The ChecklistPage unit shall offer Pass, Fail, and N/A buttons for each check of the open section, store
-          a Pass at once, ask for a justification, marked as required, only for Fail and N/A and store those when
-          the reviewer saves, store each answer in the ballot of the reviewer slot of the signed-in user, show the
-          display name and UTC time of the answer, record the signed-in user as the person who answered without any
-          field for a name, and show a violated rule as a message next to the check.
+          The ChecklistPage unit shall offer a Pass, a Fail and an N/A button for each check of the open section.
         justification: |
-          One click per check keeps the work fast, and the justification is only asked for where it is needed.
-          A message beside the check tells the reviewer exactly what to fix. The person is the signed-in user, so
-          it cannot be chosen or faked, and the answer belongs to the ballot of that person's slot, so that nobody
-          answers in the name of another reviewer.
+          One click per check keeps the work fast, and the three outcomes are the answers a check can have.
+        tests:
+          - ChecklistPage_Render_NewReview_OffersPassFailAndNotApplicableForEveryCheck
+
+      - id: ReviewCenter-ChecklistPage-Answer-Label
+        title: >-
+          The ChecklistPage unit shall present the outcome buttons of each check as one group that is labelled with
+          the text of the check.
+        justification: |
+          Assistive technology must announce which check a button answers, so each group of buttons is named by the
+          check text.
+        tests:
+          - ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection
+
+      - id: ReviewCenter-ChecklistPage-Answer-Pass
+        title: >-
+          The ChecklistPage unit shall store a Pass at once when the reviewer presses Pass.
+        justification: |
+          One click per check keeps the work fast, so a Pass needs no second step.
         tests:
           - ChecklistPage_Answer_Pass_SavesImmediately
+
+      - id: ReviewCenter-ChecklistPage-Answer-PassNoJustification
+        title: >-
+          The ChecklistPage unit shall not ask for a justification when the reviewer answers Pass.
+        justification: |
+          A justification is only asked for where it is needed, and a Pass has nothing to explain.
+        tests:
+          - ChecklistPage_Answer_Pass_SavesImmediately
+
+      - id: ReviewCenter-ChecklistPage-Answer-Fail
+        title: >-
+          The ChecklistPage unit shall ask for a justification, marked as required, when the reviewer answers Fail.
+        justification: |
+          A failed check must say what is wrong, so the reviewer is shown a box that is marked as required.
+        tests:
           - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
+
+      - id: ReviewCenter-ChecklistPage-Answer-NotApplicable
+        title: >-
+          The ChecklistPage unit shall ask for a justification, marked as required, when the reviewer answers N/A.
+        justification: |
+          Skipping a check must be an explained decision, so the reviewer is shown a box that is marked as required.
+        tests:
+          - ChecklistPage_Answer_NotApplicable_ShowsRequiredJustificationBoxAndStoresOnSave
+
+      - id: ReviewCenter-ChecklistPage-Answer-Required
+        title: >-
+          The ChecklistPage unit shall not store a Fail whose justification is empty.
+        justification: |
+          An unexplained Fail cannot be acted on, so saving it empty stores nothing.
+        tests:
+          - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
+
+      - id: ReviewCenter-ChecklistPage-Answer-Save
+        title: >-
+          The ChecklistPage unit shall store a Fail together with its justification when the reviewer saves it.
+        justification: |
+          The answer is complete only with its reason, so the reason is stored with the Fail.
+        tests:
           - ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy
+
+      - id: ReviewCenter-ChecklistPage-Answer-SaveNotApplicable
+        title: >-
+          The ChecklistPage unit shall store an N/A together with its justification when the reviewer saves it.
+        justification: |
+          The skip is an explained decision only if its reason is stored with it.
+        tests:
+          - ChecklistPage_Answer_NotApplicable_ShowsRequiredJustificationBoxAndStoresOnSave
+
+      - id: ReviewCenter-ChecklistPage-Answer-OwnSlot
+        title: >-
+          The ChecklistPage unit shall store each answer in the ballot of the reviewer slot of the signed-in user.
+        justification: |
+          Every reviewer answers in a ballot of their own, so nobody answers in the name of another reviewer.
+        tests:
+          - ChecklistPage_Answer_TwoReviewerSlots_StoresTheAnswerInTheBallotOfTheSignedInUser
+
+      - id: ReviewCenter-ChecklistPage-Answer-AnsweredBy
+        title: >-
+          The ChecklistPage unit shall show with an answer the display name of the person who answered and the UTC
+          time of the answer.
+        justification: |
+          Readers must know who decided and when, so the name and the time stay visible next to the answer.
+        tests:
+          - ChecklistPage_Answer_Pass_SavesImmediately
+          - ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy
+
+      - id: ReviewCenter-ChecklistPage-Answer-User
+        title: >-
+          The ChecklistPage unit shall record the signed-in user as the person who answered.
+        justification: |
+          The person is the signed-in user, so it cannot be chosen or faked.
+        tests:
           - ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy
+
+      - id: ReviewCenter-ChecklistPage-Answer-NoNameField
+        title: >-
+          The ChecklistPage unit shall offer no field for the name of the person who answers.
+        justification: |
+          A field for a name would let a reviewer answer under another name, so the page has none.
+        tests:
+          - ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy
+
+      - id: ReviewCenter-ChecklistPage-Answer-Violation
+        title: >-
+          The ChecklistPage unit shall show the message of a violated rule as a message next to the check that was
+          answered.
+        justification: |
+          A message beside the check tells the reviewer exactly what to fix.
+        tests:
+          - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
+          - ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing
 
       - id: ReviewCenter-ChecklistPage-SubmitBallot
         title: >-
-          The ChecklistPage unit shall show a reviewer who holds a reviewer slot the state of the own ballot (not
-          answered yet, a draft that does not count until it is submitted, or submitted and counting), shall offer a
-          Submit ballot button only while that ballot is a draft that answers every check it requires and the controls
-          are not disabled, and shall hand the ballot in when the button is pressed, so that the button is not offered
-          for an incomplete ballot or after a hand-in, and, in a review with a single slot, where an answer or an edit
-          that completes the ballot hands it in, only for a complete draft that no such answer produced (a follow-up
-          whose checks are all carried, or a checklist without checks).
+          The ChecklistPage unit shall offer a Submit ballot button to a reviewer whose own ballot is a draft that
+          answers every check it requires.
         justification: |
-          A ballot counts in the record only after the reviewer hands it in, so the reviewer has to see whether the
-          answers already count and has to have a visible way to hand them in. Offering the button only when the
-          service would accept the hand-in avoids a refusal that the page could have prevented, and a review with
-          one slot has nobody to agree with, so it keeps its single step of answering.
+          A ballot counts in the record only after the reviewer hands it in, so the reviewer needs a visible way to
+          hand in a ballot that is ready.
+        tests:
+          - ChecklistPage_SubmitButton_ShownWhenDraftComplete
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-HandIn
+        title: >-
+          The ChecklistPage unit shall hand the own ballot in when the Submit ballot button is pressed.
+        justification: |
+          Pressing the button is the reviewer's decision that the answers count, so it hands the ballot in.
+        tests:
+          - ChecklistPage_SubmitButton_ShownWhenDraftComplete
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-NotAnswered
+        title: >-
+          The ChecklistPage unit shall tell a reviewer who holds a reviewer slot and has not answered yet so in the
+          ballot status line.
+        justification: |
+          The reviewer must see whether the answers already count, and before the first answer there is no ballot.
+        tests:
+          - ChecklistPage_BallotStatus_NotAnsweredYet_ShowsYouHaveNotAnswered
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-Draft
+        title: >-
+          The ChecklistPage unit shall tell a reviewer whose own ballot is a draft that it does not count until it is
+          submitted.
+        justification: |
+          The reviewer must see that the answers do not count yet, so that a draft is not mistaken for a hand-in.
+        tests:
+          - ChecklistPage_SubmitButton_ShownWhenDraftComplete
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-Counted
+        title: >-
+          The ChecklistPage unit shall tell a reviewer whose own ballot is submitted that it counts in the review.
+        justification: |
+          The reviewer must see that the answers count, so that nothing is left to do after the hand-in.
         tests:
           - ChecklistPage_SubmitButton_ShownWhenDraftComplete
           - ChecklistPage_SubmitButton_HiddenWhenIncompleteOrSingleSlot
 
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-Incomplete
+        title: >-
+          The ChecklistPage unit shall not offer the Submit ballot button for a ballot that does not answer every
+          check it requires.
+        justification: |
+          The checklist service would refuse the hand-in of an incomplete ballot, so the page does not offer what it
+          could have prevented.
+        tests:
+          - ChecklistPage_SubmitButton_HiddenWhenIncompleteOrSingleSlot
+          - ChecklistPage_IncompleteDraft_OffersNoSubmitButtons
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-AfterHandIn
+        title: >-
+          The ChecklistPage unit shall not offer the Submit ballot button once the own ballot is handed in.
+        justification: |
+          Nothing is left to hand in once the ballot counts.
+        tests:
+          - ChecklistPage_SubmitButton_ShownWhenDraftComplete
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-Disabled
+        title: >-
+          The ChecklistPage unit shall not offer the Submit ballot button while the controls of the checklist are
+          disabled.
+        justification: |
+          A reviewer who may not change the checklist may not hand in a ballot either, so the page does not offer a
+          hand-in that would be refused.
+        tests:
+          - ChecklistPage_SubmitButton_HiddenWhenAuthorIsBlocked
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-SingleSlot
+        title: >-
+          The ChecklistPage unit shall not offer the Submit ballot button in a review with a single reviewer slot
+          when the answers have handed the ballot in.
+        justification: |
+          A review with one slot has nobody to agree with, so it keeps its single step of answering and offers no
+          second step.
+        tests:
+          - ChecklistPage_SubmitButton_HiddenWhenIncompleteOrSingleSlot
+
+      - id: ReviewCenter-ChecklistPage-SubmitBallot-Carried
+        title: >-
+          The ChecklistPage unit shall offer the Submit ballot button in a review with a single reviewer slot for a
+          complete draft that no answer produced, such as a follow-up whose checks are all carried.
+        justification: |
+          No answer will ever hand such a ballot in, so the button is the only way to make it count.
+        tests:
+          - ChecklistPage_SubmitButton_ShownForSingleSlotDraftCompletedByCarriedAnswers
+
       - id: ReviewCenter-ChecklistPage-NoSlot
         title: >-
           The ChecklistPage unit shall tell a signed-in user who holds no reviewer slot of the review, and who is not
-          read-only, that they cannot answer until they add themselves as a reviewer slot, with neither a ballot
-          status nor a Submit ballot button, and with the answer controls disabled; in a review with a single slot or
-          a concluded review the notice also says that they see the consolidated standing of the submitted ballots
-          (a multi-slot review that is not concluded is covered by ReviewCenter-ChecklistPage-HiddenBallots).
+          read-only, that they are not a reviewer yet and cannot answer until they add themselves as a reviewer
+          slot.
         justification: |
           Only a reviewer answers a checklist, so a project member without a slot would otherwise meet controls that
-          the service refuses. The notice says why and what to do, and where the standing is open to everyone (a
-          single-slot or concluded review) the standing they see is the one that every other reader sees.
+          the service refuses. The notice says why and what to do.
         tests:
           - ChecklistPage_NoSlot_ShowsHint
 
+      - id: ReviewCenter-ChecklistPage-NoSlot-NoBallotStatus
+        title: >-
+          The ChecklistPage unit shall show no ballot status to a signed-in user who holds no reviewer slot.
+        justification: |
+          There is no ballot to describe, and a status line would suggest that there is one.
+        tests:
+          - ChecklistPage_NoSlot_ShowsHint
+
+      - id: ReviewCenter-ChecklistPage-NoSlot-NoSubmit
+        title: >-
+          The ChecklistPage unit shall not offer the Submit ballot button to a signed-in user who holds no reviewer
+          slot.
+        justification: |
+          There is nothing to hand in without a ballot.
+        tests:
+          - ChecklistPage_NoSlot_ShowsHint
+
+      - id: ReviewCenter-ChecklistPage-NoSlot-Disabled
+        title: >-
+          The ChecklistPage unit shall disable the answer controls for a signed-in user who holds no reviewer slot.
+        justification: |
+          The checklist service would refuse the answers of a user without a slot, so the page does not offer them.
+        tests:
+          - ChecklistPage_MemberWithoutSlot_AnswerControlsAreDisabled
+
+      - id: ReviewCenter-ChecklistPage-NoSlot-SingleStanding
+        title: >-
+          The ChecklistPage unit shall show the consolidated standing of the submitted ballots to a signed-in user who
+          holds no reviewer slot in a review with a single slot.
+        justification: |
+          With one slot the standing is open to everyone, so the user without a slot sees the one that every other
+          reader sees.
+        tests:
+          - ChecklistPage_MemberWithoutSlot_SingleSlotReview_ShowsTheStanding
+
+      - id: ReviewCenter-ChecklistPage-NoSlot-ConcludedStanding
+        title: >-
+          The ChecklistPage unit shall show the consolidated standing of the submitted ballots to a signed-in user who
+          holds no reviewer slot in a concluded review.
+        justification: |
+          Once a review is concluded the answers are open to everyone, so the user without a slot sees the standing
+          that every other reader sees.
+        tests:
+          - ChecklistPage_MemberWithoutSlot_ConcludedReview_ShowsTheStanding
+
       - id: ReviewCenter-ChecklistPage-Applicability
         title: >-
-          The ChecklistPage unit shall let the reviewer mark the open section as not applying, asking for a
-          required reason and storing it when the reviewer saves, show such a section as not applicable with no
-          checks to answer and leave it out of the progress totals, show a violated rule next to the reason, and
-          let the reviewer mark the section as applying again. While the switch is off and the reason is not
-          saved yet, the section shall show a "Reason needed" state with a hint that nothing is saved until the
-          reason is saved.
+          The ChecklistPage unit shall show a reason field when the reviewer switches the open section to not
+          applying.
         justification: |
-          Sections that do not fit the review, such as code checks in a documentation-only review, must not
-          leave the checklist incomplete forever, but skipping one must be a visible, explained decision. A switch
-          that looks off while nothing is stored would mislead the reviewer.
+          Sections that do not fit the review, such as code checks in a documentation-only review, may be skipped,
+          but skipping one must be an explained decision.
         tests:
           - ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError
+          - ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Save
+        title: >-
+          The ChecklistPage unit shall store the section as not applicable together with its reason when the
+          reviewer saves the reason.
+        justification: |
+          The decision takes effect only when its reason is given, so saving the reason is what stores it.
+        tests:
           - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+          - ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Shown
+        title: >-
+          The ChecklistPage unit shall show a section that does not apply as not applicable.
+        justification: |
+          The state of a skipped section must be visible to every reader of the checklist.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+
+      - id: ReviewCenter-ChecklistPage-Applicability-NoChecks
+        title: >-
+          The ChecklistPage unit shall show no checks to answer for a section that does not apply.
+        justification: |
+          Nothing in a skipped section is left to do, so its checks are not offered.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Totals
+        title: >-
+          The ChecklistPage unit shall leave the checks of a section that does not apply out of the progress totals.
+        justification: |
+          A skipped section must not keep the checklist incomplete forever.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Violation
+        title: >-
+          The ChecklistPage unit shall show the message of a violated rule next to the reason field of the section.
+        justification: |
+          A message beside the reason tells the reviewer exactly what to fix.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Required
+        title: >-
+          The ChecklistPage unit shall keep counting a section as applying when its reason is saved empty.
+        justification: |
+          Skipping a section without a reason is refused, so the section and the totals stay as they were.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Reapply
+        title: >-
+          The ChecklistPage unit shall let the reviewer mark a section that does not apply as applying again, with its
+          checks and the progress totals restored.
+        justification: |
+          A wrong decision must be reversible without help from an administrator.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Pending
+        title: >-
+          The ChecklistPage unit shall show a section whose switch is off and whose reason is not saved yet in a
+          "Reason needed" state.
+        justification: |
+          A switch that looks off while nothing is stored would mislead the reviewer, so the section says that a
+          reason is still needed.
+        tests:
+          - ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded
+
+      - id: ReviewCenter-ChecklistPage-Applicability-Hint
+        title: >-
+          The ChecklistPage unit shall show, with the "Reason needed" state, a hint that nothing is saved until the
+          reason is saved.
+        justification: |
+          The reviewer must know that the switch alone changes nothing, and the hint goes away when the reason is
+          saved.
+        tests:
+          - ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded
+
+      - id: ReviewCenter-ChecklistPage-Applicability-NothingStored
+        title: >-
+          The ChecklistPage unit shall store nothing while the switch is off and the reason is not saved.
+        justification: |
+          The decision takes effect only with its reason, so the stored section keeps applying until then.
+        tests:
           - ChecklistPage_Applicability_SwitchOffBeforeReasonSaved_ShowsReasonNeeded
 
       - id: ReviewCenter-ChecklistPage-SignatureWarning
         title: >-
-          The ChecklistPage unit shall, when handing the own ballot in, or saving an answer or a change of the
-          applicability of a section that changes the consolidated standing, would make a current signature of another
-          reviewer out of date, store nothing and show a warning next to the control that was used that names every
-          affected slot and its signer, repeat the change with those slots acknowledged only when the reviewer
-          confirms, show the warning again with every affected slot when another signature appeared meanwhile, and
-          leave the signatures and the record unchanged, and keep the unsaved choice and reason, when the reviewer
-          cancels, and shall show no warning for a save that leaves the digest unchanged, such as an answer in a draft
-          ballot.
+          The ChecklistPage unit shall show, when handing the own ballot in would make the current signature of
+          another reviewer out of date, a warning next to the control that was used that names every affected slot
+          and its signer.
         justification: |
           A ballot changes the record only while it counts, so saving answers into a draft is free and handing the
-          ballot in is the moment that can void a signature, as can taking back a dissent that was submitted. The
-          reviewer has to see whose signature is affected and decide, so that nobody learns afterwards that a reviewer
-          has to sign again. A signature that appears while the warning is open must be shown before it is voided. The
-          test names are kept from the single-checklist model; each now follows a draft, a hand-in or the taking back
-          of a counted dissent, as the scenarios describe.
+          ballot in is the moment that can void a signature. The reviewer has to see whose signature is affected and
+          decide, so that nobody learns afterwards that a reviewer has to sign again. The test names are kept from
+          the single-checklist model; each now follows a draft, a hand-in or the taking back of a counted dissent, as
+          the scenarios describe.
+        tests:
+          - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
+          - ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring
+          - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-TakenBack
+        title: >-
+          The ChecklistPage unit shall show, inside the check, a warning that names every affected slot and its
+          signer when taking back a counted dissent would make a current signature of another reviewer out of date.
+        justification: |
+          Taking back a dissent that was submitted changes the record just as a hand-in does, so the reviewer is
+          warned at the check that is being changed.
+        tests:
+          - ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-Applicability
+        title: >-
+          The ChecklistPage unit shall show a warning that names every affected slot and its signer when switching a
+          section that does not apply back on would make a current signature of another reviewer out of date.
+        justification: |
+          Making a skipped section apply again changes what the signature is for, so the reviewer must see whose
+          signature is affected before deciding.
+        tests:
+          - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-NothingStored
+        title: >-
+          The ChecklistPage unit shall store nothing while a signature warning is shown.
+        justification: |
+          The change takes effect only after the reviewer has decided, so the record stays as it was while the warning
+          is open.
         tests:
           - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
           - ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores
@@ -140,192 +559,869 @@ sections:
           - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
           - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
           - ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning
-          - ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-Confirm
+        title: >-
+          The ChecklistPage unit shall repeat the change with the warned slots acknowledged when the reviewer
+          confirms a signature warning.
+        justification: |
+          The reviewer decided knowingly to change the record, so the change is stored when the warning is confirmed.
+        tests:
+          - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
+          - ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores
+          - ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring
+          - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
+          - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-OutOfDate
+        title: >-
+          The ChecklistPage unit shall make the signatures that were named in a confirmed warning out of date.
+        justification: |
+          A signature no longer covers a record that was changed after it was given, so confirming the change marks
+          the signature as out of date.
+        tests:
+          - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
+          - ChecklistPage_Answer_PassOnSignedReview_ShowsWarningNextToTheCheckAndConfirmStores
+          - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
+          - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-Merged
+        title: >-
+          The ChecklistPage unit shall store nothing and show the warning again with every affected slot when
+          another signature appeared after the warning was shown and the reviewer confirms.
+        justification: |
+          A signature that appears while the warning is open must be shown to the reviewer before it is voided.
+        tests:
+          - ChecklistPage_Answer_SignatureAddedWhileWarningOpen_ShowsMergedWarningBeforeStoring
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-Cancel
+        title: >-
+          The ChecklistPage unit shall leave the signatures and the record unchanged when the reviewer cancels a
+          signature warning.
+        justification: |
+          The reviewer can back out of a change that would void a signature without any effect on the record.
+        tests:
+          - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
+          - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
+          - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-KeepChoice
+        title: >-
+          The ChecklistPage unit shall keep the unsaved switch position and reason of a section when the reviewer
+          cancels the warning of a hand-in.
+        justification: |
+          The reviewer does not have to retype the reason after backing out of the hand-in.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-Revert
+        title: >-
+          The ChecklistPage unit shall put the switch of a section that does not apply back to off when the reviewer
+          cancels the warning for switching it on.
+        justification: |
+          The page must show the stored state, and cancelling stores nothing, so the section is still not applicable.
+        tests:
+          - ChecklistPage_Applicability_SwitchOnOnSignedReview_CancelRevertsTheSwitchAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-Draft
+        title: >-
+          The ChecklistPage unit shall show no signature warning for a save that leaves the digest of the record
+          unchanged, such as an answer in a draft ballot.
+        justification: |
+          A draft does not count in the record, so saving into it voids no signature and needs no warning.
+        tests:
+          - ChecklistPage_Answer_SignedReview_ShowsWarningAndConfirmStoresTheAnswerAndMarksTheSignatureOutOfDate
+          - ChecklistPage_Applicability_NotApplicableOnSignedReview_ShowsWarningAndConfirmStores
+
+      - id: ReviewCenter-ChecklistPage-SignatureWarning-SwitchOff
+        title: >-
+          The ChecklistPage unit shall drop the warning for switching a section on when the reviewer switches the
+          section off again.
+        justification: |
+          The change that the warning was about no longer exists, so the warning must not stay on the page.
+        tests:
+          - ChecklistPage_Applicability_SwitchOnWarningOpen_SwitchingOffDropsTheWarning
 
       - id: ReviewCenter-ChecklistPage-NextUnanswered
         title: >-
-          The ChecklistPage unit shall offer, while checks are unanswered, a Next unanswered check button that
-          opens the section of the first unanswered check and scrolls to that check (skipping sections that are being
-          switched off, unless only those are left, when it opens the first of them at its reason field), offer the
-          same button at the
-          end of a finished section, and, once the checklist is complete, offer a link back to the review instead.
+          The ChecklistPage unit shall offer a Next unanswered check button while checks are unanswered.
         justification: |
-          The page tells the reviewer what to do next, so that they do not have to look for the one check that
-          is left, or scroll back to the top when a section is done.
+          The page tells the reviewer what to do next, so that they do not have to look for the one check that is left.
+        tests:
+          - ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection
+          - ChecklistPage_NextUnanswered_Click_OpensSectionOfFirstUnansweredCheck
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-Open
+        title: >-
+          The ChecklistPage unit shall open the section of the first unanswered check when the Next unanswered check
+          button is pressed.
+        justification: |
+          The check that is left may be in a closed section, so the button opens the section that holds it.
         tests:
           - ChecklistPage_NextUnanswered_Click_OpensSectionOfFirstUnansweredCheck
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-Scroll
+        title: >-
+          The ChecklistPage unit shall scroll to the first unanswered check when the Next unanswered check button is
+          pressed.
+        justification: |
+          A section holds many checks, so the page brings the one that is left into view.
+        tests:
+          - ChecklistPage_NextUnanswered_Click_OpensSectionOfFirstUnansweredCheck
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-SkipPending
+        title: >-
+          The ChecklistPage unit shall skip sections that are being switched off when it looks for the first
+          unanswered check.
+        justification: |
+          The checks of a section that is being switched off are about to leave the checklist, so they are not what the
+          reviewer has left to do.
+        tests:
           - ChecklistPage_NextUnanswered_PendingNotApplicableSection_SkipsIt
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-OnlyPending
+        title: >-
+          The ChecklistPage unit shall open the reason field of the first section that is being switched off when
+          only such sections have unanswered checks.
+        justification: |
+          When nothing else is left, the reason of the section that is being switched off is the remaining work.
+        tests:
           - ChecklistPage_NextUnanswered_OnlyPendingNotApplicableSectionLeft_OpensItsReasonField
-          - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-SectionEnd
+        title: >-
+          The ChecklistPage unit shall offer the Next unanswered check button at the end of a finished section
+          while checks are unanswered.
+        justification: |
+          The reviewer who finishes a section need not scroll back to the top to continue.
+        tests:
           - ChecklistPage_FinishedSection_OffersNextActionAtItsEnd
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-SectionEndBack
+        title: >-
+          The ChecklistPage unit shall offer a link back to the review at the end of a finished section once the
+          checklist is complete.
+        justification: |
+          With nothing left to answer, the way on from the end of a section is the review.
+        tests:
+          - ChecklistPage_FinishedSection_OffersNextActionAtItsEnd
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-Complete
+        title: >-
+          The ChecklistPage unit shall offer a link back to the review once the checklist is complete.
+        justification: |
+          Nothing is left to do on the page, so the reviewer is pointed back to the review.
+        tests:
+          - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered-NoNext
+        title: >-
+          The ChecklistPage unit shall not offer the Next unanswered check button once the checklist is complete.
+        justification: |
+          There is no next check once everything is answered, so a button that leads nowhere is not shown.
+        tests:
+          - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
 
       - id: ReviewCenter-ChecklistPage-Interactive
         title: >-
-          The ChecklistPage unit shall keep one section open at a time, give every interactive element a stable
-          lowercase hyphenated data-testid attribute, and report that it is interactive, through a marker on its
-          root element, once it has rendered on a live connection.
+          The ChecklistPage unit shall keep one section open at a time.
         justification: |
-          One open section keeps the page short. Stable identifiers keep automated tests and the Puppet tool
-          working as the page evolves, and the marker tells them when the page responds.
+          One open section keeps the page short, so opening a section closes the one that was open.
         tests:
           - ChecklistPage_Render_OpeningSection_ClosesOthers
+
+      - id: ReviewCenter-ChecklistPage-Interactive-TestId
+        title: >-
+          The ChecklistPage unit shall give every interactive element of the page a stable lowercase hyphenated
+          data-testid attribute.
+        justification: |
+          Stable identifiers keep automated tests and the Puppet tool working as the page evolves.
+        tests:
           - ChecklistPage_Render_EveryInteractiveElementHasKebabCaseTestId
+
+      - id: ReviewCenter-ChecklistPage-Interactive-WarningTestId
+        title: >-
+          The ChecklistPage unit shall give every interactive element of an open signature warning a stable lowercase
+          hyphenated data-testid attribute.
+        justification: |
+          The elements of a warning appear only after an action, so they need identifiers that tests can rely on too.
+        tests:
+          - ChecklistPage_Render_SignatureWarningOpen_EveryInteractiveElementHasKebabCaseTestId
+
+      - id: ReviewCenter-ChecklistPage-Interactive-Marker
+        title: >-
+          The ChecklistPage unit shall report that it is interactive, through a marker on its root element, once it
+          has rendered on a live connection.
+        justification: |
+          The marker tells automated tests and the Puppet tool when the page responds to input.
+        tests:
           - ChecklistPage_AfterRender_Interactive_SetsMarker
 
       - id: ReviewCenter-ChecklistPage-Locked
         title: >-
-          The ChecklistPage unit shall show a notice that the review is concluded, approved or rejected, and locked, and
-          disable the answer
-          buttons, the justification fields, the save buttons, and the applicability switches of the sections, and not
-          offer the Submit ballot button, while the review is locked, and shall keep the checklist readable and the
-          navigation available.
+          The ChecklistPage unit shall show a notice that the review is concluded, approved or rejected, and locked.
         justification: |
-          The answers are part of what the signatures approved. A user who cannot change them must see why. The
-          lock itself is enforced by the checklist service, which refuses the change with the message of the rule if a
-          stale page still sends it.
+          The answers are part of what the signatures approved. A user who cannot change them must see why.
         tests:
           - ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls
           - ChecklistPage_Render_RejectedConcludedReview_IsReadOnly
 
+      - id: ReviewCenter-ChecklistPage-Locked-Controls
+        title: >-
+          The ChecklistPage unit shall disable the answer buttons, the justification fields, the save buttons and
+          the applicability switches of the sections while the review is locked.
+        justification: |
+          The answers are part of what the signatures approved, so a locked page does not offer to change them.
+        tests:
+          - ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls
+          - ChecklistPage_Render_RejectedConcludedReview_IsReadOnly
+          - ChecklistPage_Render_RejectedConcludedReview_DisablesEveryControlThatChangesTheChecklist
+
+      - id: ReviewCenter-ChecklistPage-Locked-Readable
+        title: >-
+          The ChecklistPage unit shall let the reader open the sections of a locked review to read their checks.
+        justification: |
+          A locked checklist is still the record of what was reviewed, so it must stay readable.
+        tests:
+          - ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls
+
       - id: ReviewCenter-ChecklistPage-AuthorBlocked
         title: >-
-          The ChecklistPage unit shall show to the author of the review, while the project does not let authors answer
-          the checklist, a notice that another project member has to answer it, with the answer buttons, the
-          justification fields, the save buttons, and the applicability switches disabled, shall show neither to any
-          other user nor when the rule is switched off, shall show only the lock notice for a locked review, and shall
-          show the message of the rule when a stale page still sends the answer.
+          The ChecklistPage unit shall show the author of the review, while the project does not let authors answer
+          the checklist, a notice that another project member has to answer it.
         justification: |
-          A user who cannot answer must see why and what to do instead. The rule itself is enforced by the checklist
-          service, which refuses the change with the message of the rule if a stale page still sends it.
+          A user who cannot answer must see why and what to do instead.
         tests:
           - ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls
+
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked-Controls
+        title: >-
+          The ChecklistPage unit shall disable the answer buttons, the justification fields, the save buttons and
+          the applicability switches for the author of the review while the project does not let authors answer the
+          checklist.
+        justification: |
+          The checklist service refuses the answers of the author under that rule, so the page does not offer them.
+        tests:
+          - ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls
+          - ChecklistPage_Render_AuthorWhileRuleIsOn_DisablesEveryControlThatChangesTheChecklist
+
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked-OtherUser
+        title: >-
+          The ChecklistPage unit shall show the author notice to no project member other than the author.
+        justification: |
+          The rule restricts only the author, so no other member is told that they cannot answer.
+        tests:
+          - ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls
+
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked-OtherControls
+        title: >-
+          The ChecklistPage unit shall keep the answer controls enabled for a project member other than the author.
+        justification: |
+          The rule restricts only the author, so every other reviewer keeps answering.
+        tests:
+          - ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls
+
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked-RuleOff
+        title: >-
+          The ChecklistPage unit shall show no author notice when the project lets authors answer the checklist.
+        justification: |
+          Without the rule nothing is blocked, so a notice would only mislead the author.
+        tests:
+          - ChecklistPage_Render_AuthorWhileRuleIsOn_ShowsNoticeAndDisablesControls
+
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked-Locked
+        title: >-
+          The ChecklistPage unit shall show only the lock notice to the author of a locked review.
+        justification: |
+          The lock is the stronger reason, so a second notice about the author would only add noise.
+        tests:
           - ChecklistPage_Render_AuthorOfApprovedReview_ShowsOnlyTheLockNotice
+
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked-Refusal
+        title: >-
+          The ChecklistPage unit shall show the message of the rule next to the check when a page that was loaded
+          before the rule was switched on sends an answer that the rule refuses.
+        justification: |
+          A page that stays open does not know that the rule changed, so the reviewer must see why the answer was
+          refused.
+        tests:
+          - ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing
+
+      - id: ReviewCenter-ChecklistPage-AuthorBlocked-NotStored
+        title: >-
+          The ChecklistPage unit shall not store an answer that the rule refuses when a page that was loaded before
+          the rule was switched on sends it.
+        justification: |
+          The rule is enforced by the checklist service, and the page must show that the refused answer was not kept.
+        tests:
           - ChecklistPage_Answer_RuleSwitchedOnAfterLoad_ShowsTheRefusalAndStoresNothing
 
       - id: ReviewCenter-ChecklistPage-CarriedMarks
         title: >-
-          The ChecklistPage unit shall mark on the checklist of a follow-up review every answer and every section
-          state that was carried from another review with a Carried from badge that links to that review, and shall
-          show, for a check that is not answered and failed in the followed review with the same wording, the earlier
-          Fail and its justification, read-only, with a link to that review, until the check is answered again, and
-          shall show neither on a review that follows nothing.
+          The ChecklistPage unit shall mark every answer that was carried from another review on the checklist of a
+          follow-up review with a Carried from badge that links to that review.
         justification: |
           A carried answer was given by someone else about an earlier state of the content, so the reviewer must see
-          that it was carried and from where. The earlier Fail is the reason for the follow-up; showing it makes the
-          reviewer decide the check again on purpose instead of overlooking it.
+          that it was carried and from where.
         tests:
           - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+
+      - id: ReviewCenter-ChecklistPage-CarriedMarks-Section
+        title: >-
+          The ChecklistPage unit shall mark every section state that was carried from another review on the checklist
+          of a follow-up review with a Carried from mark that links to that review.
+        justification: |
+          A carried decision to skip a section was made about an earlier state of the content, so the reviewer must
+          see that it was carried and from where.
+        tests:
+          - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+
+      - id: ReviewCenter-ChecklistPage-CarriedMarks-EarlierFail
+        title: >-
+          The ChecklistPage unit shall show, for a check that is not answered and failed with the same wording in the
+          followed review, the earlier Fail together with its justification.
+        justification: |
+          The earlier Fail is the reason for the follow-up. Showing it makes the reviewer decide the check again on
+          purpose instead of overlooking it.
+        tests:
+          - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+
+      - id: ReviewCenter-ChecklistPage-CarriedMarks-EarlierFailLink
+        title: >-
+          The ChecklistPage unit shall link the earlier Fail of a check to the review in which it was given.
+        justification: |
+          The reader can open the earlier review to see the discussion behind the Fail.
+        tests:
+          - ChecklistPage_Render_FollowUp_ShowsCarriedMarksAndEarlierFail
+
+      - id: ReviewCenter-ChecklistPage-CarriedMarks-AnsweredAgain
+        title: >-
+          The ChecklistPage unit shall stop showing the earlier Fail of a check once the check is answered again.
+        justification: |
+          Once the reviewer has decided the check again on purpose, the earlier Fail is no longer open.
+        tests:
           - ChecklistPage_Render_FollowUp_DecidedAgainOrEarlierReview_ShowsNoEarlierFail
+
+      - id: ReviewCenter-ChecklistPage-CarriedMarks-SameWording
+        title: >-
+          The ChecklistPage unit shall show the earlier Fail only for a check whose wording is the same as in the
+          followed review.
+        justification: |
+          A reworded check is a different question, so the Fail of the old wording does not apply to it.
+        tests:
           - ChecklistPage_Render_FollowUp_ReworkedCheckThatFailed_ShowsNoEarlierFail
+
+      - id: ReviewCenter-ChecklistPage-CarriedMarks-NoFollowed
+        title: >-
+          The ChecklistPage unit shall show neither a carried mark nor an earlier Fail on a review that follows
+          nothing.
+        justification: |
+          Nothing was carried into such a review, so marks would only mislead the reviewer.
+        tests:
+          - ChecklistPage_Render_FollowUp_DecidedAgainOrEarlierReview_ShowsNoEarlierFail
 
       - id: ReviewCenter-ChecklistPage-HiddenBallots
         title: >-
           The ChecklistPage unit shall tell a reviewer of a review with several reviewer slots who has not handed in
-          their own ballot how many ballots are handed in out of how many, and that the answers of the others stay
-          hidden until the own ballot is handed in, and who of the other reviewers has not handed in, shall show no
-          standing, no number of disputed checks, no different-answers mark, no justification of another reviewer, and
-          no failed check to that reviewer, shall tell a member without a slot the same count with no
-          standing, shall show everything to an administrator without a ballot, and shall show none of it for a review
-          with a single slot.
+          the own ballot how many ballots are handed in out of how many.
         justification: |
-          Seeing that somebody answered differently, or what they answered, would sway the reviewer before the own
-          answer is given. Who has handed in stays visible, because it tells who is still to come, and the people who
-          steer the review need the whole picture. A single reviewer has nobody to be swayed by, so that page keeps
-          its plain form.
+          Who has handed in stays visible, because it tells the reviewer who is still to come.
         tests:
           - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
-          - ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount
-          - ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers
-          - ChecklistPage_SingleSlot_ShowsNoBallotCountsOrSideBySide
           - ChecklistPage_BallotsLine_NamesWhoHasNotHandedIn
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-Notice
+        title: >-
+          The ChecklistPage unit shall tell a reviewer who has not handed in the own ballot that the answers of the
+          others stay hidden until the own ballot is handed in.
+        justification: |
+          Seeing what the others answered would sway the reviewer before the own answer is given, so the page says why
+          nothing of the others is shown.
+        tests:
+          - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
+          - ChecklistPage_BallotsLine_NamesWhoHasNotHandedIn
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-Missing
+        title: >-
+          The ChecklistPage unit shall name the other reviewers who have not handed in to a reviewer who has not
+          handed in the own ballot.
+        justification: |
+          It tells the reviewer whom the review is still waiting for.
+        tests:
+          - ChecklistPage_BallotsLine_NamesWhoHasNotHandedIn
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-NoAnswers
+        title: >-
+          The ChecklistPage unit shall show a reviewer who has not handed in the own ballot no answer of another
+          reviewer.
+        justification: |
+          Seeing what the others answered would sway the reviewer before the own answer is given.
+        tests:
+          - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
+          - ChecklistPage_HiddenViewer_ShowsNoReasonNoDisputeCountNoFailedCheck
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-NoMark
+        title: >-
+          The ChecklistPage unit shall show a reviewer who has not handed in the own ballot no different-answers mark.
+        justification: |
+          A mark that says the others answered differently would give away what they answered.
+        tests:
+          - ChecklistPage_DraftBallot_HidesOtherBallotsAndDisputeCounts
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-NoCount
+        title: >-
+          The ChecklistPage unit shall show a reviewer who has not handed in the own ballot no number of disputed
+          checks.
+        justification: |
+          A count of disputed checks would give away that and how often the others answered differently.
+        tests:
+          - ChecklistPage_HiddenViewer_ShowsNoReasonNoDisputeCountNoFailedCheck
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-NoReason
+        title: >-
+          The ChecklistPage unit shall show a reviewer who has not handed in the own ballot no justification of
+          another reviewer.
+        justification: |
+          The justification of another reviewer would reveal what that reviewer answered.
+        tests:
+          - ChecklistPage_HiddenViewer_ShowsNoReasonNoDisputeCountNoFailedCheck
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-NoFailed
+        title: >-
+          The ChecklistPage unit shall show a reviewer who has not handed in the own ballot no failed check of the
+          others in the status line.
+        justification: |
+          A status line that counts failures would reveal that the others failed a check, so it says only that the
+          checklist is complete.
+        tests:
           - ChecklistPage_HiddenViewer_ShowsNoReasonNoDisputeCountNoFailedCheck
           - ChecklistPage_AgreedFailureHiddenFromDraftViewer_StatusLineSaysOnlyComplete
 
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-MemberCount
+        title: >-
+          The ChecklistPage unit shall tell a project member who holds no reviewer slot of a review with several
+          slots how many ballots are handed in out of how many.
+        justification: |
+          The count of handed-in ballots is open to every member, because it tells who is still to come.
+        tests:
+          - ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-MemberNoStanding
+        title: >-
+          The ChecklistPage unit shall show a project member who holds no reviewer slot of a review with several
+          slots no status line and no progress line.
+        justification: |
+          The standing would reveal what the reviewers answered before they have all handed in.
+        tests:
+          - ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-Administrator
+        title: >-
+          The ChecklistPage unit shall show a system administrator who holds no ballot the differing answers of the
+          reviewers side by side instead of the hidden notice.
+        justification: |
+          The people who steer the review need the whole picture, and an administrator has no own answer that could
+          be swayed.
+        tests:
+          - ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers
+
+      - id: ReviewCenter-ChecklistPage-HiddenBallots-SingleSlot
+        title: >-
+          The ChecklistPage unit shall show no ballot count, no hidden notice and no side-by-side answers for a
+          review with a single reviewer slot.
+        justification: |
+          A single reviewer has nobody to be swayed by, so that page keeps its plain form.
+        tests:
+          - ChecklistPage_SingleSlot_ShowsNoBallotCountsOrSideBySide
+
       - id: ReviewCenter-ChecklistPage-SideBySide
         title: >-
-          The ChecklistPage unit shall show a reviewer who has handed in their own ballot, under every check that the
-          submitted ballots answer differently, the answers by name side by side in the order of the slots, with the
-          justification of every other reviewer who gave one (encoded, and without repeating the viewer's own), shall
-          mark the check with a different-answers badge, shall say at the top how many checks are answered
-          differently, shall word the status line "Checklist complete, N checks failed." when the submitted ballots
-          agree on a failure, shall point a concluded review with several slots to the history of the review, where
-          the answers of all reviewers are, and shall offer a Discuss button that opens a small form and
-          starts a discussion thread about that check with the text given, refusing an empty text with a message
-          next to the form, closing the form on cancel, and linking to the review page for the thread.
+          The ChecklistPage unit shall show a reviewer who has handed in the own ballot, under every check that the
+          submitted ballots answer differently, the answers by name side by side.
         justification: |
           After the own ballot is in, the reviewers are meant to compare and to settle the difference. Seeing who
-          answered what, and why, in one line, is the quickest way to know whom to talk to, and a button next to the
-          check turns that into the conversation without a search for the right place. The count at the top and the
-          failed-check wording keep a reviewer from reading a green "complete" over a difference or a failure, and the
-          pointer keeps a concluded page from looking as if only one reviewer had answered.
+          answered what in one line is the quickest way to know whom to talk to.
         tests:
           - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
+          - ChecklistPage_AdministratorWithoutBallot_SeesDifferingAnswers
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Order
+        title: >-
+          The ChecklistPage unit shall show the answers of a differing check side by side in the order of the
+          reviewer slots.
+        justification: |
+          A stable order that does not depend on the names makes the comparison quick.
+        tests:
+          - ChecklistPage_SubmittedBallot_ShowsAnswersInTheOrderOfTheSlots
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Badge
+        title: >-
+          The ChecklistPage unit shall mark a check that the submitted ballots answer differently with a
+          different-answers badge.
+        justification: |
+          A difference must not be overlooked, so the check itself carries a mark.
+        tests:
+          - ChecklistPage_SubmittedBallot_ShowsSideBySideForDifferingChecks
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Reason
+        title: >-
+          The ChecklistPage unit shall show with a differing check the justification of every other reviewer who gave
+          one.
+        justification: |
+          Why somebody answered differently is the quickest way to settle the difference.
+        tests:
           - ChecklistPage_DisputedCheck_ShowsOtherReviewersReasonEncodedAndNotOwn
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-ReasonEncoded
+        title: >-
+          The ChecklistPage unit shall show the justification of another reviewer as text, with any markup in it
+          encoded.
+        justification: |
+          A justification is typed by another user and must not inject markup into the page of the reader.
+        tests:
+          - ChecklistPage_DisputedCheck_ShowsOtherReviewersReasonEncodedAndNotOwn
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-OwnReason
+        title: >-
+          The ChecklistPage unit shall not repeat the justification of the viewer among those of the other reviewers.
+        justification: |
+          The reviewer knows what was written, so only the justifications of the others are added.
+        tests:
+          - ChecklistPage_DisputedCheck_ShowsOtherReviewersReasonEncodedAndNotOwn
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Summary
+        title: >-
+          The ChecklistPage unit shall say at the top of the checklist how many checks are answered differently.
+        justification: |
+          A green "complete" must not hide a difference, so the count of differing checks is shown at the top.
+        tests:
           - ChecklistPage_DisputedChecks_SummaryAtTheTopCountsThem
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-FailedStatus
+        title: >-
+          The ChecklistPage unit shall word the status line "Checklist complete, N checks failed." when the submitted
+          ballots agree on a failure.
+        justification: |
+          A failure must not read as a plain success.
+        tests:
           - ChecklistPage_AgreedFailure_StatusLineNamesFailedChecks
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-History
+        title: >-
+          The ChecklistPage unit shall point a concluded review with several reviewer slots to the history of the
+          review, where the answers of all reviewers are.
+        justification: |
+          A concluded page must not look as if only one reviewer had answered.
+        tests:
           - ChecklistPage_ConcludedMultiSlotReview_PointsToTheHistory
-          - ChecklistPage_DisputedCheck_DiscussStartsCheckThread
-          - ChecklistPage_DiscussWithoutText_ShowsError
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Discuss
+        title: >-
+          The ChecklistPage unit shall offer under a differing check a Discuss button that opens a small form.
+        justification: |
+          A button next to the check turns the difference into a conversation without a search for the right place.
+        tests:
           - ChecklistPage_DiscussCancel_ClosesTheForm
+          - ChecklistPage_DisputedCheck_DiscussStartsCheckThread
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Thread
+        title: >-
+          The ChecklistPage unit shall start a discussion thread about the check with the text given when the
+          reviewer starts the discussion in the Discuss form.
+        justification: |
+          The thread is where the reviewers settle the difference, and it is tied to the check it is about.
+        tests:
+          - ChecklistPage_DisputedCheck_DiscussStartsCheckThread
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-ThreadLink
+        title: >-
+          The ChecklistPage unit shall link the notice of a started discussion to the review page.
+        justification: |
+          The thread lives on the review page, so the notice leads the reviewer to it.
+        tests:
+          - ChecklistPage_DiscussStarted_LinksToTheReviewPage
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Empty
+        title: >-
+          The ChecklistPage unit shall refuse an empty Discuss text with a message next to the form.
+        justification: |
+          An empty thread helps nobody, and the message tells the reviewer what to fix.
+        tests:
+          - ChecklistPage_DiscussWithoutText_ShowsError
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-EmptyNotStarted
+        title: >-
+          The ChecklistPage unit shall start no thread when the Discuss text is empty.
+        justification: |
+          An empty discussion must not clutter the review, so the refusal stores nothing.
+        tests:
+          - ChecklistPage_DiscussWithoutText_ShowsError
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-Cancel
+        title: >-
+          The ChecklistPage unit shall close the Discuss form without starting a thread when the reviewer cancels.
+        justification: |
+          The reviewer can back out of a discussion without any effect on the review.
+        tests:
+          - ChecklistPage_DiscussCancel_ClosesTheForm
+
+      - id: ReviewCenter-ChecklistPage-SideBySide-DiscussKind
+        title: >-
+          The ChecklistPage unit shall start the discussion as a Finding when the reviewer chooses the kind Finding
+          in the Discuss form.
+        justification: |
+          Only a Finding goes in the report, so the reviewer chooses the kind when starting the discussion.
+        tests:
+          - ChecklistPage_DiscussFinding_KindChosenInComposer
 
       - id: ReviewCenter-ChecklistPage-SubmitAndSign
         title: >-
-          The ChecklistPage unit shall offer, in a review with several reviewer slots whose own ballot is a complete
-          draft and where nothing but the hand-in blocks the signature, a Submit and sign button as the main action
-          with the password field (and the code field of the second factor) beside it, and the Submit ballot button
-          as a secondary action, shall hand the ballot in and then sign when the button is pressed, keeping the
-          handed-in ballot and saying so when the signature is refused, shall hand the ballot in for an account of an
-          identity provider and then ask the user to confirm the identity at the provider, and shall offer neither
-          button for an incomplete draft, and not Submit and sign in a review with a single slot, and shall sign only
-          the digest of the record that the viewer is shown after the hand-in, so that when the reloaded view shows a
-          check that the submitted ballots answer differently nothing is signed and the page says that something
-          changed, and shall warn above the form, in the wording of the review page, which other reviewers have not
-          handed in.
+          The ChecklistPage unit shall offer a Submit and sign button as the main action to a reviewer of a review
+          with several reviewer slots whose own ballot is a complete draft.
         justification: |
-          Handing in and signing are two steps that most reviewers want as one, once the answers are final and nobody
-          else is in the way. Offering it only when the signature would be accepted avoids a refusal, and keeping the
-          hand-in when the signature fails means no work is lost. The identity provider cannot be asked from the
-          same step, so the ballot is handed in first and the confirmation follows. Before the hand-in the viewer has
-          not seen the answers of the other reviewers, so a signature given in the same click must never cover a
-          record that the viewer has not been shown: when the view after the hand-in reveals a difference, the
-          viewer reads it and signs on the review page, which is the second confirmation. The signature of a ballot
-          that other reviewers have still to hand in is not a mistake, but the viewer should know the others are
-          missing before signing.
+          Handing in and signing are two steps that most reviewers want as one, once the answers are final.
         tests:
           - ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction
-          - ChecklistPage_SubmitAndSign_WarnsWhenOtherBallotsAreMissing
-          - ChecklistPage_IncompleteDraft_OffersNoSubmitButtons
-          - ChecklistPage_SubmitAndSign_SubmitsThenSigns
-          - ChecklistPage_SubmitAndSign_WrongPassword_KeepsBallotAndExplains
-          - ChecklistPage_SubmitAndSign_OtherReviewerChangesAnswerAfterHandIn_SignsNothingAndExplains
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-Password
+        title: >-
+          The ChecklistPage unit shall offer a password field beside the Submit and sign button.
+        justification: |
+          The signature is confirmed with the password of the reviewer, so the field sits next to the button.
+        tests:
+          - ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-Code
+        title: >-
+          The ChecklistPage unit shall offer a code field beside the Submit and sign button to a user who has a
+          second factor.
+        justification: |
+          The signature of a user with a second factor needs the code, so the field is offered next to the password.
+        tests:
+          - ChecklistPage_CompleteDraft_UserWithSecondFactor_OffersCodeField
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-Secondary
+        title: >-
+          The ChecklistPage unit shall keep the Submit ballot button as a secondary action beside the Submit and sign
+          button.
+        justification: |
+          A reviewer may want to hand in without signing, so that choice stays available.
+        tests:
+          - ChecklistPage_CompleteDraft_OffersSubmitAndSignAsPrimaryAction
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-SubmitOnly
+        title: >-
+          The ChecklistPage unit shall hand the ballot in without signing when the Submit ballot button is pressed.
+        justification: |
+          Handing in and signing are separate decisions, so the secondary action does not sign.
+        tests:
           - ChecklistPage_SubmitBallotAlone_DoesNotSign
-          - ChecklistPage_SingleSlot_OffersNoSubmitAndSign
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-MissingBallots
+        title: >-
+          The ChecklistPage unit shall warn above the form, in the wording of the review page, which other reviewers
+          have not handed in.
+        justification: |
+          The signature of a ballot that other reviewers have still to hand in is not a mistake, but the viewer should
+          know the others are missing before signing.
+        tests:
+          - ChecklistPage_SubmitAndSign_WarnsWhenOtherBallotsAreMissing
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-Sign
+        title: >-
+          The ChecklistPage unit shall hand the ballot in and then sign it when the Submit and sign button is pressed.
+        justification: |
+          One step instead of two saves the reviewer a trip to the review page.
+        tests:
+          - ChecklistPage_SubmitAndSign_SubmitsThenSigns
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-RefusedKeeps
+        title: >-
+          The ChecklistPage unit shall keep the ballot handed in when the signature is refused after the hand-in.
+        justification: |
+          Keeping the hand-in when the signature fails means no work is lost.
+        tests:
+          - ChecklistPage_SubmitAndSign_WrongPassword_KeepsBallotAndExplains
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-RefusedExplains
+        title: >-
+          The ChecklistPage unit shall say that the ballot is handed in but the signature failed, with a link to the
+          review, when the signature is refused after the hand-in.
+        justification: |
+          The reviewer must know what happened and where to sign again.
+        tests:
+          - ChecklistPage_SubmitAndSign_WrongPassword_KeepsBallotAndExplains
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-ProviderHandIn
+        title: >-
+          The ChecklistPage unit shall hand the ballot in for an account of an identity provider when the Submit and
+          sign button is pressed.
+        justification: |
+          The identity provider cannot be asked from the same step, so the ballot is handed in first.
+        tests:
           - ChecklistPage_SubmitAndSign_ProviderUser_SubmitsThenAsksToConfirmIdentity
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-ProviderConfirm
+        title: >-
+          The ChecklistPage unit shall then ask the user of an account of an identity provider to confirm the
+          identity at the provider.
+        justification: |
+          The signature of such an account needs a fresh identity check at the provider, which follows the hand-in.
+        tests:
+          - ChecklistPage_SubmitAndSign_ProviderUser_SubmitsThenAsksToConfirmIdentity
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-Incomplete
+        title: >-
+          The ChecklistPage unit shall offer neither the Submit and sign button nor the Submit ballot button for a
+          draft that is not complete.
+        justification: |
+          The checklist service would refuse the hand-in of an incomplete ballot, so the page does not offer it.
+        tests:
+          - ChecklistPage_IncompleteDraft_OffersNoSubmitButtons
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-SingleSlot
+        title: >-
+          The ChecklistPage unit shall not offer the Submit and sign button in a review with a single reviewer slot.
+        justification: |
+          A review with one slot has nobody to agree with, so the single step of answering hands the ballot in.
+        tests:
+          - ChecklistPage_SingleSlot_OffersNoSubmitAndSign
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-Revealed
+        title: >-
+          The ChecklistPage unit shall sign nothing when the view reloaded after the hand-in shows a check that the
+          submitted ballots answer differently.
+        justification: |
+          Before the hand-in the viewer has not seen the answers of the other reviewers, so a signature given in the
+          same click must never cover a record that the viewer has not been shown.
+        tests:
+          - ChecklistPage_SubmitAndSign_OtherReviewerChangesAnswerAfterHandIn_SignsNothingAndExplains
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-RevealedExplains
+        title: >-
+          The ChecklistPage unit shall tell the user that something changed when the view reloaded after the hand-in
+          shows a check that the submitted ballots answer differently.
+        justification: |
+          The viewer reads the difference and signs on the review page, which is the second confirmation.
+        tests:
+          - ChecklistPage_SubmitAndSign_OtherReviewerChangesAnswerAfterHandIn_SignsNothingAndExplains
+
+      - id: ReviewCenter-ChecklistPage-SubmitAndSign-ProviderRevealed
+        title: >-
+          The ChecklistPage unit shall explain a revealed difference to the user of an account of an identity provider
+          and skip the confirmation of the identity.
+        justification: |
+          There is nothing to sign yet, so asking for the identity at the provider would be pointless.
+        tests:
           - ChecklistPage_SubmitAndSign_ProviderUser_DifferingBallotRevealed_ExplainsAndSkipsConfirmation
 
       - id: ReviewCenter-ChecklistPage-SignConfirm
         title: >-
-          The SignConfirm component shall show the password field, and the code field when the user has a second
-          factor, for a local account, and no field for an account of an identity provider, shall hand the entries
-          to the page once when the button is pressed, and shall clear the password field afterwards.
+          The SignConfirm component shall show a password field for a local account.
         justification: |
-          The secrets of a signature must not stay in the page, and the form must match the way the account signs in.
-          The component is small and reusable, so its behavior is tested on its own.
+          The form must match the way the account signs in, and a local account signs with its password.
         tests:
           - SignConfirm_PasswordUser_HandsPasswordOverOnceAndClearsField
+
+      - id: ReviewCenter-ChecklistPage-SignConfirm-Code
+        title: >-
+          The SignConfirm component shall show a code field for a local account that has a second factor.
+        justification: |
+          The form must match the way the account signs in, and a second factor needs its code.
+        tests:
           - SignConfirm_UserWithSecondFactor_HandsPasswordAndCodeOver
+
+      - id: ReviewCenter-ChecklistPage-SignConfirm-NoFields
+        title: >-
+          The SignConfirm component shall show no field for an account of an identity provider.
+        justification: |
+          Such an account confirms its identity at the provider, so the form has nothing to ask for.
+        tests:
+          - SignConfirm_ProviderUser_ShowsNoFieldsAndHandsOverNothing
+
+      - id: ReviewCenter-ChecklistPage-SignConfirm-HandOver
+        title: >-
+          The SignConfirm component shall hand the password to the page once when the button is pressed.
+        justification: |
+          The page does the signing, so the component hands the entry over exactly once.
+        tests:
+          - SignConfirm_PasswordUser_HandsPasswordOverOnceAndClearsField
+
+      - id: ReviewCenter-ChecklistPage-SignConfirm-HandOverCode
+        title: >-
+          The SignConfirm component shall hand the code to the page together with the password when the button is
+          pressed.
+        justification: |
+          The signature of a user with a second factor needs both entries, so they are handed over together.
+        tests:
+          - SignConfirm_UserWithSecondFactor_HandsPasswordAndCodeOver
+
+      - id: ReviewCenter-ChecklistPage-SignConfirm-Clear
+        title: >-
+          The SignConfirm component shall clear the password field after the button is pressed.
+        justification: |
+          The secrets of a signature must not stay in the page.
+        tests:
+          - SignConfirm_PasswordUser_HandsPasswordOverOnceAndClearsField
+
+      - id: ReviewCenter-ChecklistPage-SignConfirm-NoEntries
+        title: >-
+          The SignConfirm component shall hand nothing over when the button of an account of an identity provider is
+          pressed.
+        justification: |
+          Such an account has no entries to hand over, so nothing is sent to the page.
+        tests:
           - SignConfirm_ProviderUser_ShowsNoFieldsAndHandsOverNothing
 
       - id: ReviewCenter-ChecklistPage-AssignMe
         title: >-
-          The ChecklistPage unit shall offer a project member who may be a reviewer and holds no slot an Assign me as
-          reviewer button that adds a new slot with the user as primary reviewer and no alternate, leaving every
-          existing slot as it is, and shall offer it to nobody who holds a slot or who is not a member.
+          The ChecklistPage unit shall offer an Assign me as reviewer button to a project member who holds no
+          reviewer slot.
         justification: |
-          A member who wants to review should not need to find the page of the slots. The shortcut only ever adds a
-          slot, so it can never take a place that somebody else holds.
+          A member who wants to review should not need to find the page of the slots.
+        tests:
+          - ChecklistPage_ProjectAdministratorWithoutSlot_OffersAssignMe
+          - ChecklistPage_MemberWithoutSlot_SeesNoStandingOnlyBallotCount
+
+      - id: ReviewCenter-ChecklistPage-AssignMe-NewSlot
+        title: >-
+          The ChecklistPage unit shall add a new reviewer slot with the user as primary reviewer when the Assign me
+          as reviewer button is pressed.
+        justification: |
+          The shortcut only adds a slot, so it never takes a place that somebody else holds.
         tests:
           - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
-          - ChecklistPage_ProjectAdministratorWithoutSlot_OffersAssignMe
+
+      - id: ReviewCenter-ChecklistPage-AssignMe-NoAlternate
+        title: >-
+          The ChecklistPage unit shall add the new reviewer slot with no alternate reviewer.
+        justification: |
+          The member can add an alternate on the page of the slots, so the shortcut does not choose one.
+        tests:
+          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+
+      - id: ReviewCenter-ChecklistPage-AssignMe-KeepsSlots
+        title: >-
+          The ChecklistPage unit shall leave every existing reviewer slot as it is when the Assign me as reviewer
+          button is pressed.
+        justification: |
+          The shortcut must never take a place that somebody else holds.
+        tests:
+          - ChecklistPage_AssignMe_AddsNewSlotAndKeepsExistingOnes
+
+      - id: ReviewCenter-ChecklistPage-AssignMe-SlotHolder
+        title: >-
+          The ChecklistPage unit shall not offer the Assign me as reviewer button to a user who holds a reviewer slot.
+        justification: |
+          A reviewer who already holds a slot has nothing to add.
+        tests:
           - ChecklistPage_ViewerWithSlot_OffersNoAssignMe
+
+      - id: ReviewCenter-ChecklistPage-AssignMe-NonMember
+        title: >-
+          The ChecklistPage unit shall not offer the Assign me as reviewer button to a user who is not a member of the
+          project.
+        justification: |
+          Only members of a project may become its reviewers.
+        tests:
           - ChecklistPage_NonMember_OffersNoAssignMe

@@ -162,6 +162,49 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the diff of an approved review says that comments are read-only and disables every line comment
+    ///     control, while the same diff of the open review offers them.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_ApprovedReview_ShowsLockedHintAndDisablesLineComments()
+    {
+        // Arrange: the open review shows enabled controls
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        var admin = new Actor("adm", "Adm");
+        var reviewer = await Users.CreateAsync("rev", "Rev", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(reviewer.Id, projectId, cancellationToken);
+        var slot = await Signing.AddSlotAsync(admin, projectId, "REV-1", reviewer.Id, null, cancellationToken);
+        var open = RenderPage(projectId);
+        await SelectFileAsync(open, ModPath);
+        Assert.All(open.FindAll("[data-testid^='diff-comment-']"), button => Assert.False(button.HasAttribute("disabled")));
+
+        // Act: the reviewer answers every check and signs, so that the review is approved; then render the page
+        var actor = new Actor("rev", "Rev");
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+        }
+
+        await Checklists.SubmitBallotAsync(projectId, "REV-1", actor, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", cancellationToken);
+        await Signing.SignAsync(
+            actor, projectId, "REV-1", slot.Id, approval!.Digest, "correct horse battery", cancellationToken);
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+
+        // Assert: the hint says so, and every comment control is disabled and marked as locked
+        Assert.Equal("This review is locked; comments are read-only.", cut.Find("[data-testid='diff-hint']").TextContent);
+        var buttons = cut.FindAll("[data-testid^='diff-comment-']");
+        Assert.NotEmpty(buttons);
+        Assert.All(buttons, button =>
+        {
+            Assert.True(button.HasAttribute("disabled"));
+            Assert.Equal("true", button.GetAttribute("data-locked"));
+        });
+    }
+
+    /// <summary>
     ///     Test that a modified file opens as a diff with the "x added, y removed" summary, the hint, and the
     ///     rows numbered on both sides.
     /// </summary>
@@ -220,6 +263,64 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Contains("empty", placeholder.ClassList);
         Assert.Equal("true", placeholder.GetAttribute("aria-hidden"));
         Assert.Equal("added", cut.Find("[data-testid='diff-row-21']").GetAttribute("data-kind"));
+    }
+
+    /// <summary>
+    ///     Test that a removed row carries a "-" sign and the removed kind, an added row a "+" sign and the added kind,
+    ///     and an unchanged row neither sign nor changed kind, so that the three can be told apart without color.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_RemovedAndAddedRows_ShowSignsAndKindStyles()
+    {
+        // Arrange and Act: open the modified file (row 9 removed, row 10 added, row 11 unchanged)
+        var (_, cut) = await OpenModAsync();
+
+        // Assert: the removed row has the minus sign and the removed class only
+        var removed = cut.Find("[data-testid='diff-row-9']");
+        Assert.Equal("-", removed.QuerySelector(".diff-sign")!.TextContent);
+        Assert.Contains("removed", removed.ClassList);
+        Assert.DoesNotContain("added", removed.ClassList);
+        Assert.DoesNotContain("context", removed.ClassList);
+
+        // Assert: the added row has the plus sign and the added class only
+        var added = cut.Find("[data-testid='diff-row-10']");
+        Assert.Equal("+", added.QuerySelector(".diff-sign")!.TextContent);
+        Assert.Contains("added", added.ClassList);
+        Assert.DoesNotContain("removed", added.ClassList);
+        Assert.DoesNotContain("context", added.ClassList);
+
+        // Assert: the unchanged row has no sign and the context class only
+        var unchanged = cut.Find("[data-testid='diff-row-11']");
+        Assert.Equal(string.Empty, unchanged.QuerySelector(".diff-sign")!.TextContent.Trim());
+        Assert.Contains("context", unchanged.ClassList);
+        Assert.DoesNotContain("added", unchanged.ClassList);
+        Assert.DoesNotContain("removed", unchanged.ClassList);
+    }
+
+    /// <summary>
+    ///     Test that text that looks like markup is shown as text in the cells of the diff and creates no element.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_MarkupInLines_IsShownAsPlainText()
+    {
+        // Arrange: a modified file whose removed, added and unchanged lines contain markup
+        var projectId = await CreateReviewAsync(
+            ("src/markup.txt", ChangeKind.Modified, "<i>old</i>\nsame <b>x</b>\n", "<b>new</b> & more\nsame <b>x</b>\n"));
+        var cut = RenderPage(projectId);
+
+        // Act: open the file
+        await SelectFileAsync(cut, "src/markup.txt");
+
+        // Assert: every cell shows the characters of its line
+        Assert.Equal("<i>old</i>", cut.Find("[data-testid='diff-text-0']").TextContent);
+        Assert.Equal("<b>new</b> & more", cut.Find("[data-testid='diff-text-1']").TextContent);
+        Assert.Equal("same <b>x</b>", cut.Find("[data-testid='diff-text-2']").TextContent);
+        Assert.Equal("same <b>x</b>", cut.Find("[data-testid='diff-text-old-2']").TextContent);
+
+        // Assert: none of the markup became an element of the diff
+        var diff = cut.Find("[data-testid='diff-content']");
+        Assert.Empty(diff.QuerySelectorAll("b"));
+        Assert.Empty(diff.QuerySelectorAll("i"));
     }
 
     /// <summary>
@@ -602,6 +703,7 @@ public class ReviewPageDiffTests : PageTestBase
 
         // Assert: the form opens under that line and names the version in plain words
         Assert.NotEmpty(cut.FindAll("[data-testid='diff-composer'] [data-testid='new-thread-form']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-pair-9'] + [data-testid='diff-composer']"));
         Assert.Equal("Comment on line 10 (before).", cut.Find("[data-testid='thread-target']").TextContent);
         Assert.Contains("selected", cut.Find("[data-testid='diff-row-9']").ClassList);
 
@@ -633,12 +735,14 @@ public class ReviewPageDiffTests : PageTestBase
         // Act: comment on the added line
         await cut.Find("[data-testid='diff-comment-10']").ClickAsync();
         Assert.Equal("Comment on line 10 (after).", cut.Find("[data-testid='thread-target']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-pair-9'] + [data-testid='diff-composer']"));
         await cut.Find("[data-testid='thread-text-input']").InputAsync("Nice");
         await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
 
         // Act: comment on an unchanged line (row 7 is line 8)
         await cut.Find("[data-testid='diff-comment-7']").ClickAsync();
         Assert.Equal("Comment on line 8 (after).", cut.Find("[data-testid='thread-target']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-pair-7'] + [data-testid='diff-composer']"));
         await cut.Find("[data-testid='thread-text-input']").InputAsync("Context");
         await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
 
@@ -1095,7 +1199,33 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='diff-composer']"));
         Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid^='diff-comment-']"));
         Assert.All(cut.FindAll("[data-testid^='diff-comment-']"), button => Assert.True(button.HasAttribute("disabled")));
+    }
+
+    /// <summary>
+    ///     Test that the Head version of a file shows an auditor the line comment buttons disabled, all of them.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_AuditorHeadView_DisablesEveryLineCommentButton()
+    {
+        // Arrange: an auditor opens the modified file
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        var auditor = await Users.CreateAsync("aud", "Aud", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(auditor.Id, projectId, ProjectRole.Auditor, cancellationToken);
+        SignInAs("aud", "Aud", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+
+        // Act: switch to the Head version
+        await cut.Find("[data-testid='view-head-button']").ClickAsync();
+
+        // Assert: the numbered head lines have a comment button each, and every one is disabled
+        var buttons = cut.FindAll("[data-testid^='line-comment-']");
+        Assert.Equal(21, buttons.Count);
+        Assert.All(buttons, button => Assert.True(button.HasAttribute("disabled")));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
     }
 
     /// <summary>
@@ -1134,5 +1264,19 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Equal("You have read-only access; comments are disabled.", cut.Find("[data-testid='diff-hint']").TextContent);
         var text = typeof(ReviewPage).GetProperty("NewText", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         Assert.Equal(string.Empty, text.GetValue(cut.Instance));
+
+        // Act: the role is restored, the page reloads again and the reader chooses the same line
+        await ChangeMemberRoleAsync(projectId, "mem", ProjectRole.User);
+        await cut.InvokeAsync(async () =>
+        {
+            await (Task)refresh.Invoke(cut.Instance, null)!;
+            typeof(Microsoft.AspNetCore.Components.ComponentBase)
+                .GetMethod("StateHasChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(cut.Instance, null);
+        });
+        await cut.Find("[data-testid='diff-comment-9']").ClickAsync();
+
+        // Assert: the form shows no text of the dropped draft
+        Assert.Equal(string.Empty, cut.Find("[data-testid='thread-text-input']").GetAttribute("value") ?? string.Empty);
     }
 }

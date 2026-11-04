@@ -230,6 +230,32 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that neither the location, nor the user name, nor the token of the one registered repository appears
+    ///     in the page, before or after a plan is shown.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Render_RepositoryWithCredentials_ShowsNoLocationUserNameOrToken()
+    {
+        // Arrange: one repository registered with a location, a user name and a token
+        var (projectId, _) = await ArrangeAsync();
+        string[] secrets = ["svc", "hidden-token-42", "secret-host", "private-repo", Location];
+
+        // Act: render the form
+        var cut = RenderPage(projectId);
+
+        // Assert: none of them is in the form
+        Assert.Equal("main-repo", TextOf(cut, "plan-repository-select").Replace("Choose a repository", string.Empty));
+        Assert.All(secrets, secret => Assert.DoesNotContain(secret, cut.Markup, StringComparison.Ordinal));
+
+        // Act: show the plan
+        await ShowPlanAsync(cut);
+
+        // Assert: none of them is in the plan either
+        Assert.True(Has(cut, "plan-summary"));
+        Assert.All(secrets, secret => Assert.DoesNotContain(secret, cut.Markup, StringComparison.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that the baseline text box appears only for the explicit mode.
     /// </summary>
     [Fact]
@@ -359,6 +385,33 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a file deleted since the explicit baseline is counted as deleted in the counts of its set.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_ExplicitBaselineWithDeletedFile_CountsDeletedFiles()
+    {
+        // Arrange: since v1 the core set lost one file, next to the modified and the added one
+        var (projectId, _) = await ArrangeAsync();
+        Git.Script(
+            H1,
+            H2,
+            [
+                ("src/a.cs", ChangeKind.Modified, "two\n", "three\n"),
+                ("src/b.cs", ChangeKind.Added, null, "new\n"),
+                ("src/gone.cs", ChangeKind.Deleted, "old\n", null)
+            ]);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='plan-baseline-explicit']").ChangeAsync(true);
+        await cut.Find("[data-testid='plan-baseline-input']").InputAsync("v1");
+
+        // Act: show the plan
+        await ShowPlanAsync(cut);
+
+        // Assert: the counts name every kind
+        Assert.Equal("3 changed files (1 added, 1 modified, 1 deleted)", TextOf(cut, "plan-row-counts-core"));
+    }
+
+    /// <summary>
     ///     Test that the no-baseline mode says so in the facts line and lists all files.
     /// </summary>
     [Fact]
@@ -375,6 +428,31 @@ public class PlanPageTests : PageTestBase
         // Assert: the facts say all files
         Assert.Contains("Baseline: all files (no baseline).", TextOf(cut, "plan-facts"), StringComparison.Ordinal);
         Assert.Equal("2 sets need review, 1 has nothing to review.", TextOf(cut, "plan-summary"));
+    }
+
+    /// <summary>
+    ///     Test that no list of sets with nothing to review is offered when every set has files to review.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_NoEmptySets_HidesTheNothingToReviewGroup()
+    {
+        // Arrange: only the sets that have files
+        var (projectId, _) = await ArrangeAsync();
+        SetParser.Sets =
+        [
+            new("core", "Core", ["src/**"]),
+            new("docs", "Documentation", ["docs/**"])
+        ];
+        var cut = RenderPage(projectId);
+
+        // Act: show the plan
+        await ShowPlanAsync(cut);
+
+        // Assert: the rows to review are there and the group for empty sets is not
+        Assert.True(Has(cut, "plan-todo"));
+        Assert.Equal("2 sets need review.", TextOf(cut, "plan-summary"));
+        Assert.False(Has(cut, "plan-empty-list"));
+        Assert.False(Has(cut, "plan-empty-toggle"));
     }
 
     /// <summary>
@@ -442,6 +520,26 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that no select-all and select-none buttons are offered for three rows.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Ticks_ThreeRows_OffersNoSelectAllAndNone()
+    {
+        // Arrange: three sets that need a review
+        var (projectId, _) = await ArrangeAsync();
+        SetParser.Sets = [.. Enumerable.Range(1, 3).Select(n => new ReviewSetDefinition($"s{n}", $"Set {n}", ["src/**"]))];
+        var cut = RenderPage(projectId);
+
+        // Act: show the plan
+        await ShowPlanAsync(cut);
+
+        // Assert: three rows, ticked, and no bulk buttons
+        Assert.Equal("Create 3 reviews", TextOf(cut, "plan-create-button"));
+        Assert.False(Has(cut, "plan-select-all"));
+        Assert.False(Has(cut, "plan-select-none"));
+    }
+
+    /// <summary>
     ///     Test that creating shows one result per review with a link to each created review, and that the
     ///     reviews belong to their review-sets.
     /// </summary>
@@ -498,6 +596,29 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the plan offers a due date for all reviews and one for each row, empty by default, as a calendar
+    ///     day in UTC.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_Plan_OffersDueDateForAllAndEachRow()
+    {
+        // Arrange: a project with a plan to show
+        var (projectId, _) = await ArrangeAsync();
+        var cut = RenderPage(projectId);
+
+        // Act: show the plan
+        await ShowPlanAsync(cut);
+
+        // Assert: a date input for all reviews and one per row, none filled in, and the hint names UTC
+        string[] inputs = ["plan-default-due-input", "plan-row-due-core", "plan-row-due-docs"];
+        Assert.All(inputs, id => Assert.Equal("date", cut.Find($"[data-testid='{id}']").GetAttribute("type")));
+        Assert.All(
+            inputs,
+            id => Assert.Equal(string.Empty, cut.Find($"[data-testid='{id}']").GetAttribute("value") ?? string.Empty));
+        Assert.Contains("calendar day in UTC", TextOf(cut, "plan-todo"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a due date in the past on a row fails only that row, with a message about the due date.
     /// </summary>
     [Fact]
@@ -517,6 +638,29 @@ public class PlanPageTests : PageTestBase
         Assert.Contains("due date", TextOf(second, "plan-result-message-core"), StringComparison.OrdinalIgnoreCase);
         Assert.Equal("Created", TextOf(second, "plan-result-status-docs"));
         Assert.Null(Assert.Single(await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken)).DueDate);
+    }
+
+    /// <summary>
+    ///     Test that a row that fails after an earlier row was created leaves that earlier review in place.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Create_LaterRowFails_KeepsTheEarlierReview()
+    {
+        // Arrange: a plan with a past date on the docs row only, the row after core (the clock is 2025-03-04)
+        var (projectId, _) = await ArrangeAsync();
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut);
+        await cut.Find("[data-testid='plan-row-due-docs']").InputAsync("2025-03-03");
+
+        // Act: create
+        await cut.Find("[data-testid='plan-create-button']").ClickAsync();
+
+        // Assert: core was created and stays, docs failed, and nothing else exists
+        Assert.Equal("1 review created, 1 failed.", TextOf(cut, "plan-result-summary"));
+        Assert.Equal("Created", TextOf(cut, "plan-result-status-core"));
+        Assert.Equal("Failed", TextOf(cut, "plan-result-status-docs"));
+        var review = Assert.Single(await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken));
+        Assert.Equal("core", review.Id);
     }
 
     /// <summary>
@@ -655,6 +799,63 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the sets that need a review come before the sets that cannot be planned, the filed ones and the
+    ///     empty ones, whatever their order in the configuration file.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_SetsOfEveryKind_ListsSetsNeedingReviewFirst()
+    {
+        // Arrange: the configuration lists the empty, the invalid and the filed set before the one to review
+        var (projectId, _) = await ArrangeAsync();
+        SetParser.Sets =
+        [
+            new("empty", "Empty", ["nothing/**"]),
+            new("bad", "Bad set", ["../x"]),
+            new("docs", "Documentation", ["docs/**"]),
+            new("core", "Core", ["src/**"])
+        ];
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut);
+        await cut.Find("[data-testid='plan-row-check-core']").ChangeAsync(false);
+        await cut.Find("[data-testid='plan-create-button']").ClickAsync();
+        await cut.Find("[data-testid='plan-again-button']").ClickAsync();
+
+        // Act: the markup of the plan, which has one set of each kind
+        var markup = cut.Markup;
+
+        // Assert: every kind is there, and the to-review group is the first of the groups
+        var todo = markup.IndexOf("data-testid=\"plan-todo\"", StringComparison.Ordinal);
+        var problems = markup.IndexOf("data-testid=\"plan-problems\"", StringComparison.Ordinal);
+        var filed = markup.IndexOf("data-testid=\"plan-filed-list\"", StringComparison.Ordinal);
+        var empty = markup.IndexOf("data-testid=\"plan-empty-list\"", StringComparison.Ordinal);
+        Assert.True(todo >= 0, "plan-todo");
+        Assert.True(problems > todo, "plan-problems");
+        Assert.True(filed > todo, "plan-filed-list");
+        Assert.True(empty > todo, "plan-empty-list");
+        Assert.Equal("1 set needs review, 1 already filed, 1 has nothing to review, 1 cannot be planned.", TextOf(cut, "plan-summary"));
+    }
+
+    /// <summary>
+    ///     Test that markup in the reason a set cannot be planned is shown as text, never as markup.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_MarkupInProblemReason_IsEscaped()
+    {
+        // Arrange: a set whose pattern is markup and invalid, so that its reason repeats the pattern
+        var (projectId, _) = await ArrangeAsync();
+        SetParser.Sets = [new("bad", "Bad set", ["<i id=\"y\">/../x"])];
+        var cut = RenderPage(projectId);
+
+        // Act: show the plan
+        await ShowPlanAsync(cut);
+
+        // Assert: the reason is text with the markup in it, and there is no injected element
+        Assert.Contains("<i id=\"y\">", TextOf(cut, "plan-problem-reason-bad"), StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("#y"));
+        Assert.Empty(cut.FindAll("[data-testid='plan-problem-reason-bad'] i"));
+    }
+
+    /// <summary>
     ///     Test that changing the form discards the plan so the screen never disagrees with the form.
     /// </summary>
     [Fact]
@@ -686,6 +887,70 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that choosing another repository discards the plan.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_FormChange_Repository_DiscardsPlan()
+    {
+        // Arrange: a shown plan, and a second repository to choose
+        var (projectId, repositoryId) = await ArrangeAsync();
+        var second = await Repositories.CreateAsync(
+            projectId, "second-repo", "https://example.com/two.git", null, null, _admin, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='plan-repository-select']").ChangeAsync(second.Id.ToString(CultureInfo.InvariantCulture));
+        await ShowPlanAsync(cut);
+        Assert.True(Has(cut, "plan-summary"));
+
+        // Act: choose the other repository
+        await cut.Find("[data-testid='plan-repository-select']").ChangeAsync(repositoryId.ToString(CultureInfo.InvariantCulture));
+
+        // Assert: the plan is gone
+        Assert.False(Has(cut, "plan-summary"));
+        Assert.False(Has(cut, "plan-create-button"));
+    }
+
+    /// <summary>
+    ///     Test that typing another baseline revision discards the plan.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_FormChange_BaselineRevision_DiscardsPlan()
+    {
+        // Arrange: a plan shown for the explicit baseline v1
+        var (projectId, _) = await ArrangeAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='plan-baseline-explicit']").ChangeAsync(true);
+        await cut.Find("[data-testid='plan-baseline-input']").InputAsync("v1");
+        await ShowPlanAsync(cut);
+        Assert.True(Has(cut, "plan-summary"));
+
+        // Act: type another baseline
+        await cut.Find("[data-testid='plan-baseline-input']").InputAsync("v2");
+
+        // Assert: the plan is gone
+        Assert.False(Has(cut, "plan-summary"));
+        Assert.False(Has(cut, "plan-create-button"));
+    }
+
+    /// <summary>
+    ///     Test that changing the form discards the error of the last attempt.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_FormChange_AfterError_DiscardsError()
+    {
+        // Arrange: a head that does not exist gives an error
+        var (projectId, _) = await ArrangeAsync();
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut, "no-such-branch");
+        Assert.True(Has(cut, "plan-error"));
+
+        // Act: type another head revision
+        await cut.Find("[data-testid='plan-head-input']").InputAsync("main");
+
+        // Assert: the error is gone
+        Assert.False(Has(cut, "plan-error"));
+    }
+
+    /// <summary>
     ///     Test that navigating to another project clears the form and the plan of the previous one.
     /// </summary>
     [Fact]
@@ -706,6 +971,32 @@ public class PlanPageTests : PageTestBase
         await cut.WaitForAssertionAsync(() => Assert.Equal("Gemini", TextOf(cut, "plan-breadcrumb-project")));
         Assert.False(Has(cut, "plan-summary"));
         Assert.Equal(string.Empty, cut.Find("[data-testid='plan-head-input']").GetAttribute("value") ?? string.Empty);
+    }
+
+    /// <summary>
+    ///     Test that navigating to another project clears the results of the creation of the previous one.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ParametersChange_ResultsShown_ClearsResults()
+    {
+        // Arrange: reviews created for the first project, and a second project
+        var (projectId, _) = await ArrangeAsync();
+        var second = await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        await Repositories.CreateAsync(second.Id, "gemini-repo", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut);
+        await cut.Find("[data-testid='plan-create-button']").ClickAsync();
+        Assert.True(Has(cut, "plan-result-summary"));
+
+        // Act: the router reuses the component for the other project
+        await cut.InvokeAsync(() => cut.Instance.SetParametersAsync(
+            ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(PlanPage.ProjectId)] = second.Id })));
+
+        // Assert: the results are gone and the form of the new project is shown
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Gemini", TextOf(cut, "plan-breadcrumb-project")));
+        Assert.False(Has(cut, "plan-result-summary"));
+        Assert.False(Has(cut, "plan-results"));
+        Assert.True(Has(cut, "plan-form"));
     }
 
     /// <summary>
@@ -1000,6 +1291,7 @@ public class PlanPageTests : PageTestBase
         Assert.DoesNotContain("fatal", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-host", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("Could not resolve", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("hidden-token-42", cut.Markup, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -1139,6 +1431,27 @@ public class PlanPageTests : PageTestBase
 
         // Assert
         AssertNothingOfThePlanIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the form is open reads nothing from git when asking for
+    ///     a plan.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_MembershipRevoked_ReadsNothingFromGit()
+    {
+        // Arrange: a member has the form open and loses the membership
+        var projectId = await ArrangeForMemberAsync();
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        Assert.True(Has(cut, "plan-form"));
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: ask for the plan
+        await ShowPlanAsync(cut);
+
+        // Assert: git was never opened
+        Assert.Empty(Git.Opened);
     }
 
     /// <summary>

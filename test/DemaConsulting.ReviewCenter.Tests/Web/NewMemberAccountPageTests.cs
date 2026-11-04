@@ -238,6 +238,30 @@ public class NewMemberAccountPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that choosing both the project admin and the auditor role shows a message and creates no account.
+    /// </summary>
+    [Fact]
+    public async Task NewMemberAccountPage_Submit_AdminAndAuditorTogether_ShowsMessageAndCreatesNothing()
+    {
+        // Arrange: both role boxes are ticked
+        var apollo = await ArrangeAsync();
+        SignInAs("padm", "Padm", isSystemAdmin: false);
+        var cut = RenderPage(apollo);
+        await cut.Find("[data-testid='new-account-auditor-checkbox']").ChangeAsync(true);
+        await cut.Find("[data-testid='new-account-admin-checkbox']").ChangeAsync(true);
+        var before = (await Store.ListMembershipsAsync(apollo, TestContext.Current.CancellationToken)).Count;
+
+        // Act
+        await SubmitAsync(cut, "fresh", "Fresh One");
+
+        // Assert: the message asks for one role, no password is shown, and no account or membership was created
+        Assert.Equal("Choose either project admin or auditor, not both.", cut.Find("[data-testid='new-account-error']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='new-account-password-box']"));
+        Assert.Null(await UserStore.GetByUsernameAsync("fresh", TestContext.Current.CancellationToken));
+        Assert.Equal(before, (await Store.ListMembershipsAsync(apollo, TestContext.Current.CancellationToken)).Count);
+    }
+
+    /// <summary>
     ///     Test that a submission after the right was lost while the page was open (membership revoked, demoted to
     ///     plain member, or session ended without the page knowing) creates nothing and leaves the not-found state
     ///     with no form, no error and nothing typed.

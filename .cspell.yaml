@@ -51,6 +51,7 @@ words:
   - TOTP
   - otpnet
   - mailkit
+  - maxlength
   - otpauth
   - hmac
   - hmacsha

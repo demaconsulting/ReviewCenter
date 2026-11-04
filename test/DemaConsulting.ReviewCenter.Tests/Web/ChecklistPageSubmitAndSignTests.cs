@@ -75,6 +75,27 @@ public class ChecklistPageSubmitAndSignTests : BallotPageTestBase
     }
 
     /// <summary>
+    ///     Test that a complete draft of a user who has a second factor offers the code field beside the password field
+    ///     of "Submit and sign".
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_CompleteDraft_UserWithSecondFactor_OffersCodeField()
+    {
+        // Arrange: bob has a second factor and a complete draft in a review with two slots
+        var projectId = await CreateReviewAsync("ann", "bob");
+        await AnswerAsync(projectId, "bob", submit: false);
+        await EnrollTotpAsync("bob", Password);
+        SignInAs("bob", "Bob", false);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.NotNull(cut.Find("[data-testid='submit-sign-password']"));
+        Assert.NotNull(cut.Find("[data-testid='submit-sign-totp']"));
+    }
+
+    /// <summary>
     ///     Test that "Submit and sign" warns, above the form, that the other reviewers named have not handed in, and that
     ///     the warning is gone when every other ballot is in.
     /// </summary>
@@ -275,6 +296,9 @@ public class ChecklistPageSubmitAndSignTests : BallotPageTestBase
         await cut.Find("[data-testid='submit-sign-form']").SubmitAsync();
 
         // Assert: the ballot is in, nothing is signed yet, and the re-authentication form is ready
+        Assert.Equal(
+            BallotState.Submitted,
+            (await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken, external.Username))!.BallotState);
         Assert.Equal(SlotSignatureState.NotSigned, await SignatureOfAsync(projectId, external.Username));
         var form = cut.Find("[data-testid='submit-sign-reauth-form']");
         Assert.Equal("/auth/oidc/reauth", form.GetAttribute("action"));

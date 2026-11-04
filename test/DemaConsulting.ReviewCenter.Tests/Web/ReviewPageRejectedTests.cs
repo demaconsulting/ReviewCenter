@@ -179,6 +179,29 @@ public class ReviewPageRejectedTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the alternate reviewer of a slot saves the conclusion text through the card, which then stores it
+    ///     and shows it in the editor.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ConclusionCard_AlternateSavesText_ShowsInCard()
+    {
+        // Arrange: a rejection without a conclusion text, viewed by bob, the alternate of the slot
+        var (projectId, _) = await CreateRejectedAsync(withText: false);
+        SignInAs("bob", "Bob", isSystemAdmin: false);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='review-conclusion-input']").InputAsync(ConclusionText);
+
+        // Act
+        await cut.Find("[data-testid='review-conclusion-form']").SubmitAsync();
+
+        // Assert: stored, shown in the editor, and no error
+        var review = await Store.GetReviewAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.Equal(ConclusionText, review!.ReviewConclusionText);
+        Assert.Equal(ConclusionText, cut.Find("[data-testid='review-conclusion-input']").GetAttribute("value"));
+        Assert.Empty(cut.FindAll("[data-testid='review-conclusion-error']"));
+    }
+
+    /// <summary>
     ///     Test that a change of the conclusion text after a signature asks for confirmation naming the slot, and that
     ///     confirming stores it.
     /// </summary>
@@ -206,6 +229,28 @@ public class ReviewPageRejectedTests : PageTestBase
         var changed = await Store.GetReviewAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
         Assert.Equal("Changed reasons.", changed!.ReviewConclusionText);
         Assert.Empty(cut.FindAll("[data-testid='signature-warning']"));
+    }
+
+    /// <summary>
+    ///     Test that the message of the rule is shown when the service refuses a change of the conclusion text, here
+    ///     because the review was concluded while the form was open, and that the stored text is unchanged.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ConclusionCard_ServiceRefuses_ShowsRuleMessage()
+    {
+        // Arrange: a rejection with its text, and Ann types another text into the open form
+        var (projectId, slotId) = await CreateRejectedAsync(withText: true);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='review-conclusion-input']").InputAsync("Other reasons.");
+
+        // Act: the review is concluded through the service, then the open form is saved
+        await SignAsync(projectId, slotId);
+        await cut.Find("[data-testid='review-conclusion-form']").SubmitAsync();
+
+        // Assert: the message of the rule is shown and the stored text is unchanged
+        Assert.NotEmpty(cut.Find("[data-testid='review-conclusion-error']").TextContent);
+        var review = await Store.GetReviewAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.Equal(ConclusionText, review!.ReviewConclusionText);
     }
 
     /// <summary>
@@ -298,6 +343,27 @@ public class ReviewPageRejectedTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='attestation-rejected-note']"));
         Assert.NotNull(cut.Find("[data-testid='attestation']"));
         Assert.NotNull(cut.Find("[data-testid='attestation-download-button']"));
+    }
+
+    /// <summary>
+    ///     Test that a review concluded as rejected shows its due date in the past without the Overdue badge.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DueDate_RejectedConcluded_ShowsNoOverdueBadge()
+    {
+        // Arrange: a rejected review with a due date of yesterday (the clock is 2025-03-04), then concluded
+        var (projectId, slotId) = await CreateRejectedAsync(withText: true);
+        await Reviews.SetDueDateAsync(
+            projectId, "REV-1", new DateOnly(2025, 3, 3), TestActors.Ann, TestContext.Current.CancellationToken);
+        await SignAsync(projectId, slotId);
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert: concluded as rejected, the date is shown, and there is no badge
+        Assert.Equal("Rejected", cut.Find("[data-testid='review-approval']").TextContent);
+        Assert.Equal("Due 2025-03-03 (UTC)", cut.Find("[data-testid='review-due-date']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='review-overdue']"));
     }
 
     /// <summary>

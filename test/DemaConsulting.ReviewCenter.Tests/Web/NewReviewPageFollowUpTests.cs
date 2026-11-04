@@ -224,6 +224,30 @@ public class NewReviewPageFollowUpTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the preview counts a section of the earlier review that is marked not applicable as carried.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_FollowUp_NotApplicableSection_PreviewCountsIt()
+    {
+        // Arrange: the earlier review has the section DES marked as not applicable
+        var projectId = await ArrangeSourceAsync();
+        await Checklists.SetSectionApplicabilityAsync(
+            projectId, "REV-1", "DES", false, "No design", TestActors.Bob, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-2");
+        await SelectFilesAsync(cut, "a.txt", "b.txt");
+
+        // Act: choose the earlier review
+        await cut.Find("[data-testid='follow-source-select']").ChangeAsync("REV-1");
+
+        // Assert: the preview counts the one not-applicable section and not zero
+        var preview = TextOf(cut, "follow-preview");
+        Assert.Contains("1 N/A section", preview, StringComparison.Ordinal);
+        Assert.DoesNotContain("1 N/A sections", preview, StringComparison.Ordinal);
+        Assert.DoesNotContain("0 N/A section", preview, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the preview says how many check discussions of the earlier review are not carried, whether they are
     ///     open or resolved, and that they are not counted among the carried open threads.
     /// </summary>
