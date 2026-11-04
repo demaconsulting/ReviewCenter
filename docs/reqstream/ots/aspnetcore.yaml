@@ -33,11 +33,12 @@ sections:
               - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
               - WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive
           - id: ReviewCenter-OTS-AspNetCore-Components-Events
-            title: ASP.NET Core shall handle user events of a Razor component over the live connection of the page.
+            title: ASP.NET Core shall handle user events of a Razor component.
             justification: |
               The pages react to button clicks and form submissions, and the service depends on the framework to
-              carry these events from the browser to the component over the live connection. Passing tests confirm
-              that an event reaches the component, in a component test and in a real browser.
+              deliver these events to the component. A passing component test confirms that a form submission
+              reaches the component in memory, and the real-browser test confirms that clicks and form
+              submissions reach it over the live connection of the page.
             tags: [ots]
             tests:
               - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
@@ -81,7 +82,7 @@ sections:
             tests:
               - SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn
           - id: ReviewCenter-OTS-AspNetCore-Authentication-PasswordAccept
-            title: The password hasher of ASP.NET Core shall accept the right password against its salted hash.
+            title: The password hasher of ASP.NET Core shall accept the right password against its hash.
             justification: |
               Passwords are stored only as hashes, so the sign-in works only when the hasher of the framework accepts
               the right password. A passing test confirms that the right password verifies.
@@ -89,7 +90,7 @@ sections:
             tests:
               - PasswordHasher_Verify_RightAndWrongPassword_OnlyRightSucceeds
           - id: ReviewCenter-OTS-AspNetCore-Authentication-PasswordReject
-            title: The password hasher of ASP.NET Core shall reject a wrong password against a salted hash.
+            title: The password hasher of ASP.NET Core shall reject a wrong password against a hash.
             justification: |
               A wrong password must never sign a user in. A passing test confirms that a password that differs from
               the hashed one does not verify.

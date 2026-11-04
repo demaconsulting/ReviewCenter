@@ -78,7 +78,7 @@ sections:
         title: The repository shall rely on SarifMark to report the CodeQL results as a markdown document.
         tags: [quality]
         justification: |
-          The release artifacts include the CodeQL results, which depends on
+          The release artifacts include the CodeQL results, which depend on
           SarifMark's report generation. This grouping requirement links that OTS
           requirement to the quality root so it participates in orphan detection
           without being falsely reported as disconnected from tool functionality.

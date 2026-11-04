@@ -7,8 +7,8 @@ defined in the git OTS Software Requirements document.
 
 git mirrors a repository, resolves revisions, lists the files of a commit and the changes between two commits, and
 gives the exact bytes of a file, when it is run as a child process without a shell. It sends credentials that it is
-given in its process environment as an HTTP header without storing them. Passing tests confirm that all of these
-functions work correctly.
+given in its process environment as a Basic authorization header without storing them. Passing tests confirm that all
+of these functions work correctly.
 
 ### Verification Approach
 
@@ -33,11 +33,21 @@ program and an empty cache folder.
 
 **Scenario**: The runner starts the installed git program with a call that succeeds and with a call that fails.
 
-**Expected**: The program runs without a shell, the output of the first call is returned, and the failing call returns
-a nonzero exit code and a non-empty error text.
+**Expected**: The output of the first call is returned, and the failing call returns a nonzero exit code and a
+non-empty error text.
 
-**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ChildProcess`, `ReviewCenter-OTS-Git-Access-Output`,
-`ReviewCenter-OTS-Git-Access-ExitCode`, `ReviewCenter-OTS-Git-Access-ErrorText`.
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-Output`, `ReviewCenter-OTS-Git-Access-ExitCode`,
+`ReviewCenter-OTS-Git-Access-ErrorText`.
+
+#### GitRunner_BuildStartInfo_TokenOnlyInEnvironment
+
+**Scenario**: The runner builds the process description of a fetch for access with credentials, without starting the
+program.
+
+**Expected**: The shell is not used, the command line is empty, the arguments are given as a list, and the token
+appears only in the environment of the process.
+
+**Requirement coverage**: `ReviewCenter-OTS-Git-Access-ChildProcess`.
 
 #### GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
 
@@ -78,18 +88,19 @@ file and one added file; it also skips the link and the submodule.
 
 #### GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
 
-**Scenario**: git fetches from a local server that refuses the credentials, with a token given in the environment of
-the process.
+**Scenario**: git lists the remote references of a local plain HTTP server that refuses the credentials, with a token
+given in the environment of the process.
 
-**Expected**: The server receives the credentials as an HTTP header, the failure is reported as an authentication
-failure, and the token appears nowhere in the message.
+**Expected**: The server receives the credentials as a Basic authorization header, the failure is reported as an
+authentication failure, and the token appears nowhere in the message.
 
 **Requirement coverage**: `ReviewCenter-OTS-Git-Credentials`.
 
 #### GitSource_Mirror_NeverStoresTheToken
 
-**Scenario**: A repository with a token is mirrored, and the configuration of the mirror is read.
+**Scenario**: A local origin is mirrored twice, by clone and then by fetch, with a token given, and the top-level
+files of the mirror are read.
 
-**Expected**: The configuration of the mirror holds no part of the token.
+**Expected**: No top-level file of the mirror, including its configuration, holds the token or its encoded form.
 
 **Requirement coverage**: `ReviewCenter-OTS-Git-Credentials-NotStored`.

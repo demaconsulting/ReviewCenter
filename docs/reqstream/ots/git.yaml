@@ -20,13 +20,14 @@ sections:
             tests:
               - GitSource_Open_FirstUse_ClonesOneBareMirrorPerRepository
           - id: ReviewCenter-OTS-Git-Access-ChildProcess
-            title: git shall run as a child process without a shell.
+            title: git shall be started directly by the service, with its arguments as a list and no shell.
             justification: |
-              The service starts git directly, so that no shell interprets the arguments. A passing test that runs the
-              real program confirms that git runs as a child process that the service controls.
+              The service starts git directly, so that no shell interprets the arguments and no argument can inject a
+              command. A passing test that builds the process description of a git call confirms that the shell is
+              not used, that the command line is empty, and that the arguments are given as a list.
             tags: [ots]
             tests:
-              - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+              - GitRunner_BuildStartInfo_TokenOnlyInEnvironment
           - id: ReviewCenter-OTS-Git-Access-Output
             title: git shall write its result to the standard output of the child process.
             justification: |
@@ -110,20 +111,24 @@ sections:
               - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
           - id: ReviewCenter-OTS-Git-Credentials
             title: >-
-              git shall send credentials that it is given in its process environment as an HTTP header to an https
-              server.
+              git shall send credentials that it is given in its process environment as a Basic authorization header
+              to the server.
             justification: |
               Tokens must reach the server without appearing in a command line or a URL. The service depends on git
               reading its configuration from the environment of the process, so a token exists only for the lifetime
-              of the git process. A passing test confirms that a server receives the header.
+              of the git process. A passing test that runs the real program against a local HTTP server that
+              refuses the credentials confirms that the server receives the Basic authorization header.
             tags: [ots]
             tests:
               - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
           - id: ReviewCenter-OTS-Git-Credentials-NotStored
-            title: git shall not store the credentials that it is given in the repository or its configuration.
+            title: >-
+              git shall not write the credentials that it is given into the top-level files of the mirror, including
+              its configuration.
             justification: |
-              A token that stays in the mirror on disk would outlive the git process. A passing test confirms that
-              the configuration of the mirror holds no part of the token.
+              A token that stays in the mirror on disk would outlive the git process. A passing test that mirrors a
+              local origin twice, by clone and by fetch, with credentials given confirms that no top-level file of
+              the mirror holds the token or its encoded form.
             tags: [ots]
             tests:
               - GitSource_Mirror_NeverStoresTheToken
