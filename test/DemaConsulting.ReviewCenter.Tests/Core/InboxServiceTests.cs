@@ -2165,6 +2165,28 @@ public class InboxServiceTests
     }
 
     /// <summary>
+    ///     Test that marking a review as seen leaves the record digest unchanged and that the inbox service has no
+    ///     audit trail to write to.
+    /// </summary>
+    [Fact]
+    public async Task InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail()
+    {
+        // Arrange
+        var world = await InboxTestWorld.CreateAsync();
+        await world.CreateReviewAsync("r1");
+        var before = RecordDigest.Compute((await world.Store.GetRecordAsync(world.ProjectId, "r1", Ct))!);
+
+        // Act
+        var stored = await world.Inbox.MarkSeenAsync(InboxTestWorld.ActorOf("ann"), world.ProjectId, "r1", 7, null, Ct);
+
+        // Assert: the state is stored, the digest is unchanged, and nothing of the service can reach an audit trail
+        Assert.True(stored);
+        Assert.Equal(before, RecordDigest.Compute((await world.Store.GetRecordAsync(world.ProjectId, "r1", Ct))!));
+        var dependencies = typeof(InboxService).GetConstructors().SelectMany(c => c.GetParameters()).Select(p => p.ParameterType);
+        Assert.DoesNotContain(typeof(IAuditStore), dependencies);
+    }
+
+    /// <summary>
     ///     Test that the creator of a review who signed in with an API token gets no failed-checks row, while the same
     ///     creator signed in as a person does.
     /// </summary>

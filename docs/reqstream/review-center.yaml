@@ -41,6 +41,9 @@ sections:
           - ReviewCenter-Web-Projects-Project
           - ReviewCenter-Web-Projects-HeaderLink
           - ReviewCenter-Core-Projects
+          - ReviewCenter-Core-Projects-AdminOnly
+          - ReviewCenter-Core-Projects-List
+          - ReviewCenter-Core-Projects-Read
         tests:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
 
@@ -66,8 +69,19 @@ sections:
           - ReviewCenter-Web-Reviews-Files
           - ReviewCenter-Web-Reviews-Details
           - ReviewCenter-Core-Reviews
+          - ReviewCenter-Core-Reviews-Files
+          - ReviewCenter-Core-Reviews-ReadBack
           - ReviewCenter-Core-Fingerprint
+          - ReviewCenter-Core-Fingerprint-NameOrderIndependent
+          - ReviewCenter-Core-Fingerprint-Arguments
           - ReviewCenter-Core-Rules
+          - ReviewCenter-Core-Rules-Project
+          - ReviewCenter-Core-Rules-ReviewIdentity
+          - ReviewCenter-Core-Rules-ReviewProject
+          - ReviewCenter-Core-Rules-Upload
+          - ReviewCenter-Core-Rules-ThreadAnchor
+          - ReviewCenter-Core-Rules-CommentText
+          - ReviewCenter-Core-Rules-NoStorage
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
 
@@ -86,6 +100,27 @@ sections:
           examined even when the repository moves on, is rewritten, or is deleted.
         children:
           - ReviewCenter-Core-RepositoryReviews
+          - ReviewCenter-Core-RepositoryReviews-DigestBinding
+          - ReviewCenter-Core-RepositoryReviews-RepositoryRefused
+          - ReviewCenter-Core-RepositoryReviews-RevisionRefused
+          - ReviewCenter-Core-RepositoryReviews-SelectionRefused
+          - ReviewCenter-Core-RepositoryReviews-IdRefused
+          - ReviewCenter-Core-RepositoryReviews-RefusalChangesNothing
+          - ReviewCenter-Core-RepositoryReviews-GitFailure
+          - ReviewCenter-Core-RepositoryReviews-RequestRefused
+          - ReviewCenter-Core-RepositoryReviews-Frozen
+          - ReviewCenter-Core-RepositoryReviews-NothingToReview
+          - ReviewCenter-Core-RepositoryReviews-Limits
+          - ReviewCenter-Core-RepositoryReviews-LimitsBeforeReading
+          - ReviewCenter-Core-RepositoryReviews-SkippedEntries
+          - ReviewCenter-Core-RepositoryReviews-Audit
+          - ReviewCenter-Core-RepositoryReviews-DigestSource
+          - ReviewCenter-Core-RepositoryReviews-ReviewSet
+          - ReviewCenter-Core-RepositoryReviews-ReviewSetLength
+          - ReviewCenter-Core-RepositoryReviews-ReviewSetNone
+          - ReviewCenter-Core-RepositoryReviews-CommentOnHead
+          - ReviewCenter-Core-RepositoryReviews-CommentAccepted
+          - ReviewCenter-Core-RepositoryReviews-RuleViolations
           - ReviewCenter-Storage-RepositoryReviews
           - ReviewCenter-Storage-RepositoryReviews-FileBaseline
           - ReviewCenter-Storage-RepositoryReviews-NoContentInReview
@@ -99,6 +134,17 @@ sections:
           - ReviewCenter-Web-RepositoryReviews-HeadVersion
           - ReviewCenter-Web-RepositoryReviews-BaselineVersion
           - ReviewCenter-Core-Diff
+          - ReviewCenter-Core-Diff-Compute
+          - ReviewCenter-Core-Diff-Numbering
+          - ReviewCenter-Core-Diff-Bounds
+          - ReviewCenter-Core-Diff-Segments
+          - ReviewCenter-Core-Diff-Pairing
+          - ReviewCenter-Core-Diff-Arguments
+          - ReviewCenter-Core-Diff-NoComparison
+          - ReviewCenter-Core-Diff-NotFound
+          - ReviewCenter-Core-Diff-ThreadSide
+          - ReviewCenter-Core-Diff-ThreadSideRefused
+          - ReviewCenter-Core-Diff-DigestSide
           - ReviewCenter-Web-DiffReview
           - ReviewCenter-Web-DiffReview-Collapsed
           - ReviewCenter-Web-DiffReview-LineComment
@@ -125,6 +171,33 @@ sections:
           review-set that each signed review covers.
         children:
           - ReviewCenter-Core-PlanReviews
+          - ReviewCenter-Core-PlanReviews-BrokenSet
+          - ReviewCenter-Core-PlanReviews-ConfigRefused
+          - ReviewCenter-Core-PlanReviews-InputRefused
+          - ReviewCenter-Core-PlanReviews-AccessRefused
+          - ReviewCenter-Core-PlanReviews-ArgumentsRefused
+          - ReviewCenter-Core-PlanReviews-FullReview
+          - ReviewCenter-Core-PlanReviews-SinceRevision
+          - ReviewCenter-Core-PlanReviews-SinceLastApproved
+          - ReviewCenter-Core-PlanReviews-FallbackNoApproved
+          - ReviewCenter-Core-PlanReviews-RejectedLater
+          - ReviewCenter-Core-PlanReviews-Fallback
+          - ReviewCenter-Core-PlanReviews-AlreadyFiled
+          - ReviewCenter-Core-PlanReviews-FiledNewSelection
+          - ReviewCenter-Core-PlanReviews-NothingToReview
+          - ReviewCenter-Core-PlanReviews-WillCreate
+          - ReviewCenter-Core-PlanReviews-Create
+          - ReviewCenter-Core-PlanReviews-OwnTransaction
+          - ReviewCenter-Core-PlanReviews-ResultPerReview
+          - ReviewCenter-Core-PlanReviews-Cancel
+          - ReviewCenter-Core-PlanReviews-ResultFiled
+          - ReviewCenter-Core-PlanReviews-RequestInvalid
+          - ReviewCenter-Core-PlanReviews-BatchRefused
+          - ReviewCenter-Core-PlanReviews-BatchNoGit
+          - ReviewCenter-Core-PlanReviews-BatchAccess
+          - ReviewCenter-Core-PlanReviews-Identity
+          - ReviewCenter-Core-PlanReviews-IdentityUnique
+          - ReviewCenter-Core-PlanReviews-IdentityTitle
           - ReviewCenter-ContentSources-ReviewSets
           - ReviewCenter-ContentSources-ReviewSets-Read
           - ReviewCenter-ContentSources-ReviewSets-Ancestry
@@ -155,6 +228,20 @@ sections:
           (21 CFR Part 11 section 11.10(e)).
         children:
           - ReviewCenter-Core-DueDate
+          - ReviewCenter-Core-DueDate-Range
+          - ReviewCenter-Core-DueDate-Audit
+          - ReviewCenter-Core-DueDate-OutOfDigest
+          - ReviewCenter-Core-DueDate-Overdue
+          - ReviewCenter-Core-DueDate-Change
+          - ReviewCenter-Core-DueDate-ChangeRefused
+          - ReviewCenter-Core-DueDate-NoToken
+          - ReviewCenter-Core-DueDate-ChangeClear
+          - ReviewCenter-Core-DueDate-ChangeFarAhead
+          - ReviewCenter-Core-DueDate-Unchanged
+          - ReviewCenter-Core-DueDate-ApprovedLocked
+          - ReviewCenter-Core-DueDate-Concurrent
+          - ReviewCenter-Core-DueDate-Plan
+          - ReviewCenter-Core-DueDate-PlanRefused
           - ReviewCenter-Storage-DueDate
           - ReviewCenter-Storage-DueDate-Default
           - ReviewCenter-Storage-DueDate-CompareAndSet
@@ -172,6 +259,8 @@ sections:
           - ReviewCenter-Web-DueDate-Clear
           - ReviewCenter-Web-DueDate-Refused
           - ReviewCenter-Api-DueDate
+          - ReviewCenter-Api-DueDate-Invalid
+          - ReviewCenter-Api-DueDate-Shown
         tests:
           - ReviewCenter_DueDate_SetOnCreationAndEdit_ShowsOverdueAndIsAudited
           - ApiEndpoints_CreateReview_DueDate_IsCreatedAndShownWithOverdueFlag
@@ -191,6 +280,24 @@ sections:
           disagree with the review page.
         children:
           - ReviewCenter-Core-Progress
+          - ReviewCenter-Core-Progress-Reopened
+          - ReviewCenter-Core-Progress-Signatures
+          - ReviewCenter-Core-Progress-WaitingOn
+          - ReviewCenter-Core-Progress-Blockers
+          - ReviewCenter-Core-Progress-Blocked
+          - ReviewCenter-Core-Progress-Overdue
+          - ReviewCenter-Core-Progress-LastActivity
+          - ReviewCenter-Core-Progress-ViewerRights
+          - ReviewCenter-Core-Progress-ViewerRefused
+          - ReviewCenter-Core-Progress-TokenViewer
+          - ReviewCenter-Core-Progress-Performance
+          - ReviewCenter-Core-Progress-Bound
+          - ReviewCenter-Core-Progress-GivenList
+          - ReviewCenter-Core-Progress-Arguments
+          - ReviewCenter-Core-Progress-KindCounts
+          - ReviewCenter-Core-Progress-BallotCounts
+          - ReviewCenter-Core-Progress-MaskedBallots
+          - ReviewCenter-Core-Progress-ApprovalCounts
           - ReviewCenter-Storage-Progress
           - ReviewCenter-Web-Progress
           - ReviewCenter-Web-Progress-Signatures
@@ -206,6 +313,8 @@ sections:
           - ReviewCenter-Web-Progress-AuditorView
           - ReviewCenter-Web-Progress-OutsiderView
           - ReviewCenter-Api-Progress
+          - ReviewCenter-Api-Progress-SameService
+          - ReviewCenter-Api-Progress-OnlyAdditive
         tests:
           - ReviewCenter_ProjectOverview_ShowsWhoIsBlockingAndFiltersByState
           - ApiEndpoints_ListReviews_Progress_ShowsApprovalSignaturesAndLastActivity
@@ -226,6 +335,25 @@ sections:
           while the member still owes a signature keeps a review from waiting for somebody who may no longer sign.
         children:
           - ReviewCenter-Core-ProjectAccess
+          - ReviewCenter-Core-ProjectAccess-Work
+          - ReviewCenter-Core-ProjectAccess-ProjectAdmin
+          - ReviewCenter-Core-ProjectAccess-PlainMember
+          - ReviewCenter-Core-ProjectAccess-OtherActors
+          - ReviewCenter-Core-ProjectAccess-SystemAdmin
+          - ReviewCenter-Core-ProjectAccess-AuditTrail
+          - ReviewCenter-Core-ProjectAccess-AuditTrailRefused
+          - ReviewCenter-Core-ProjectAccess-Auditor
+          - ReviewCenter-Core-ProjectAccess-TemporaryPassword
+          - ReviewCenter-Core-ProjectAccess-CurrentState
+          - ReviewCenter-Core-ProjectAccess-TokenOwner
+          - ReviewCenter-Core-ProjectAccess-Dependencies
+          - ReviewCenter-Core-ProjectAccess-MemberLookup
+          - ReviewCenter-Core-ProjectAccess-AddThrottle
+          - ReviewCenter-Core-ProjectAccess-LastAdmin
+          - ReviewCenter-Core-ProjectAccess-CreateAccount
+          - ReviewCenter-Core-ProjectAccess-MemberAudit
+          - ReviewCenter-Core-ProjectAccess-AuditorRole
+          - ReviewCenter-Core-ProjectAccess-SlotsAndSigning
           - ReviewCenter-Web-ProjectAccess
           - ReviewCenter-Web-ProjectAccess-AdminSeesAll
           - ReviewCenter-Web-ProjectAccess-HiddenProject
@@ -250,6 +378,8 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AuditRecheck
           - ReviewCenter-Web-ProjectAccess-AuditLost
           - ReviewCenter-Api-ReadOnlyRole
+          - ReviewCenter-Api-ReadOnlyRole-Refused
+          - ReviewCenter-Api-ReadOnlyRole-NonMember
         tests:
           - ReviewCenter_Auditor_CanReadEverythingAndChangeNothing
           - ApiAuditor_CreateReview_AuditorIs403AndNonMemberIs404
@@ -275,13 +405,49 @@ sections:
           Leaving the new lines out of every other review keeps the signatures that already exist valid.
         children:
           - ReviewCenter-Core-FollowUp
+          - ReviewCenter-Core-FollowUp-Optional
+          - ReviewCenter-Core-FollowUp-Unfit
+          - ReviewCenter-Core-FollowUp-DroppedThreads
+          - ReviewCenter-Core-FollowUp-Acknowledged
+          - ReviewCenter-Core-FollowUp-DuplicateId
+          - ReviewCenter-Core-FollowUp-Arguments
+          - ReviewCenter-Core-FollowUp-Audit
+          - ReviewCenter-Core-FollowUp-AuditNone
+          - ReviewCenter-Core-FollowUp-CarriedAnswers
+          - ReviewCenter-Core-FollowUp-NotCarriedAnswers
+          - ReviewCenter-Core-FollowUp-CarriedSections
+          - ReviewCenter-Core-FollowUp-CarriedThreads
+          - ReviewCenter-Core-FollowUp-ThreadAnchor
+          - ReviewCenter-Core-FollowUp-NotCarried
+          - ReviewCenter-Core-FollowUp-ResolvedCounted
+          - ReviewCenter-Core-FollowUp-CheckThreads
+          - ReviewCenter-Core-FollowUp-CheckThreadsCounted
+          - ReviewCenter-Core-FollowUp-CheckThreadsNotDropped
+          - ReviewCenter-Core-FollowUp-Marks
+          - ReviewCenter-Core-FollowUp-MarksProgress
+          - ReviewCenter-Core-FollowUp-CreatorAuthor
+          - ReviewCenter-Core-FollowUp-AnswersNoBlock
+          - ReviewCenter-Core-FollowUp-OpenThreadsBlock
+          - ReviewCenter-Core-FollowUp-Digest
+          - ReviewCenter-Core-FollowUp-DigestCarried
+          - ReviewCenter-Core-FollowUp-DigestOthers
+          - ReviewCenter-Core-FollowUp-Preview
+          - ReviewCenter-Core-FollowUp-PreviewReadOnly
+          - ReviewCenter-Core-FollowUp-PreviewRefused
+          - ReviewCenter-Core-FollowUp-PreviewHidden
+          - ReviewCenter-Core-FollowUp-PreviewAuditor
           - ReviewCenter-Storage-FollowUp
           - ReviewCenter-Storage-FollowUp-CarriedRows
+          - ReviewCenter-Storage-FollowUp-CarriedRows-Counts
           - ReviewCenter-Storage-FollowUp-CarryFailsStoresNothing
           - ReviewCenter-Storage-FollowUp-Record
           - ReviewCenter-Storage-FollowUp-ReplaceCarried
           - ReviewCenter-Api-FollowUp
+          - ReviewCenter-Api-FollowUp-Invalid
+          - ReviewCenter-Api-FollowUp-Shown
           - ReviewCenter-Evidence-FollowUp
+          - ReviewCenter-Evidence-FollowUp-Carried
+          - ReviewCenter-Evidence-FollowUp-NotShown
           - ReviewCenter-Web-FollowUp
           - ReviewCenter-Web-FollowUp-Preview
           - ReviewCenter-Web-FollowUp-DropConfirmation
@@ -322,6 +488,93 @@ sections:
           access to a project no longer learns anything about its reviews.
         children:
           - ReviewCenter-Core-Inbox
+          - ReviewCenter-Core-Inbox-ToAnswerRow
+          - ReviewCenter-Core-Inbox-ToAnswerAgain
+          - ReviewCenter-Core-Inbox-ToAnswerLink
+          - ReviewCenter-Core-Inbox-ToAnswerExcluded
+          - ReviewCenter-Core-Inbox-Disputed
+          - ReviewCenter-Core-Inbox-DisputedRow
+          - ReviewCenter-Core-Inbox-DisputedUnread
+          - ReviewCenter-Core-Inbox-DisputedSettled
+          - ReviewCenter-Core-Inbox-DisputedHidden
+          - ReviewCenter-Core-Inbox-ToSign
+          - ReviewCenter-Core-Inbox-ToSignBallotNotIn
+          - ReviewCenter-Core-Inbox-ToSignBlocked
+          - ReviewCenter-Core-Inbox-ToSignDisputeSettled
+          - ReviewCenter-Core-Inbox-ToSignConclusionText
+          - ReviewCenter-Core-Inbox-ToSignConclusionTextWritten
+          - ReviewCenter-Core-Inbox-ToSignNotSigned
+          - ReviewCenter-Core-Inbox-ToSignAgain
+          - ReviewCenter-Core-Inbox-ToSignSlotState
+          - ReviewCenter-Core-Inbox-ToSignMatchesStatus
+          - ReviewCenter-Core-Inbox-ToSignOpenThread
+          - ReviewCenter-Core-Inbox-ToSignOpenThreadReplies
+          - ReviewCenter-Core-Inbox-ToSignDueDate
+          - ReviewCenter-Core-Inbox-ToSignOverdue
+          - ReviewCenter-Core-Inbox-ToSignConcluded
+          - ReviewCenter-Core-Inbox-ToSignMissingBallots
+          - ReviewCenter-Core-Inbox-QuestionForYou
+          - ReviewCenter-Core-Inbox-QuestionRow
+          - ReviewCenter-Core-Inbox-QuestionNoBallotData
+          - ReviewCenter-Core-Inbox-QuestionCount
+          - ReviewCenter-Core-Inbox-QuestionNotListed
+          - ReviewCenter-Core-Inbox-QuestionNoAction
+          - ReviewCenter-Core-Inbox-QuestionApiToken
+          - ReviewCenter-Core-Inbox-SignatureLost
+          - ReviewCenter-Core-Inbox-SignatureLostRow
+          - ReviewCenter-Core-Inbox-SignatureLostReady
+          - ReviewCenter-Core-Inbox-SignatureLostWaiting
+          - ReviewCenter-Core-Inbox-SignatureLostCount
+          - ReviewCenter-Core-Inbox-SignatureLostNobodyElse
+          - ReviewCenter-Core-Inbox-SignatureLostConcluded
+          - ReviewCenter-Core-Inbox-RepliesWaiting
+          - ReviewCenter-Core-Inbox-RepliesWaitingAuthor
+          - ReviewCenter-Core-Inbox-RepliesWaitingSystem
+          - ReviewCenter-Core-Inbox-RepliesWaitingChip
+          - ReviewCenter-Core-Inbox-RepliesWaitingNot
+          - ReviewCenter-Core-Inbox-FailedChecks
+          - ReviewCenter-Core-Inbox-FailedChecksNotCounted
+          - ReviewCenter-Core-Inbox-FailedChecksRow
+          - ReviewCenter-Core-Inbox-FailedChecksNotCreator
+          - ReviewCenter-Core-Inbox-FailedChecksNotApplicable
+          - ReviewCenter-Core-Inbox-FailedChecksConcluded
+          - ReviewCenter-Core-Inbox-FailedChecksApiToken
+          - ReviewCenter-Core-Inbox-WaitingForOthers
+          - ReviewCenter-Core-Inbox-WaitingRow
+          - ReviewCenter-Core-Inbox-WaitingNoVerdict
+          - ReviewCenter-Core-Inbox-WaitingNoDueDate
+          - ReviewCenter-Core-Inbox-WaitingNeverUnread
+          - ReviewCenter-Core-Inbox-Updates
+          - ReviewCenter-Core-Inbox-UpdatesRejected
+          - ReviewCenter-Core-Inbox-UpdatesReopened
+          - ReviewCenter-Core-Inbox-UpdatesOwn
+          - ReviewCenter-Core-Inbox-UpdatesSeen
+          - ReviewCenter-Core-Inbox-UpdatesCreator
+          - ReviewCenter-Core-Inbox-Access
+          - ReviewCenter-Core-Inbox-AccessCurrent
+          - ReviewCenter-Core-Inbox-AccessAuditor
+          - ReviewCenter-Core-Inbox-AccessEmpty
+          - ReviewCenter-Core-Inbox-AccessConcluded
+          - ReviewCenter-Core-Inbox-AccessSysadmin
+          - ReviewCenter-Core-Inbox-Count
+          - ReviewCenter-Core-Inbox-CountNotCounted
+          - ReviewCenter-Core-Inbox-EachGroup
+          - ReviewCenter-Core-Inbox-Unread
+          - ReviewCenter-Core-Inbox-UnreadNeverSeen
+          - ReviewCenter-Core-Inbox-UnreadOwn
+          - ReviewCenter-Core-Inbox-UnreadItem
+          - ReviewCenter-Core-Inbox-UnreadChanges
+          - ReviewCenter-Core-Inbox-UnreadBallot
+          - ReviewCenter-Core-Inbox-UnreadDraftIgnored
+          - ReviewCenter-Core-Inbox-UnreadHidden
+          - ReviewCenter-Core-Inbox-UnreadCount
+          - ReviewCenter-Core-Inbox-MarkSeen
+          - ReviewCenter-Core-Inbox-NeverBackwards
+          - ReviewCenter-Core-Inbox-MarkSeenRefused
+          - ReviewCenter-Core-Inbox-MarkAll
+          - ReviewCenter-Core-Inbox-MarkSeenArguments
+          - ReviewCenter-Core-Inbox-KindWording
+          - ReviewCenter-Core-Inbox-SeenNotAudited
           - ReviewCenter-Storage-Inbox
           - ReviewCenter-Storage-Inbox-Candidates
           - ReviewCenter-Storage-Inbox-LightRecords
@@ -384,10 +637,57 @@ sections:
           - ReviewCenter-Web-DeepLinks-ReturnAfterSignIn
           - ReviewCenter-Web-DeepLinks-FirstResponse
           - ReviewCenter-Core-Threads
+          - ReviewCenter-Core-Threads-Author
+          - ReviewCenter-Core-Threads-Reply
+          - ReviewCenter-Core-Threads-ReplyNotFound
+          - ReviewCenter-Core-Threads-ResolveReopen
+          - ReviewCenter-Core-Threads-StateNotFound
+          - ReviewCenter-Core-Threads-NoEdit
+          - ReviewCenter-Core-Threads-ReadBack
+          - ReviewCenter-Core-Threads-Activity
+          - ReviewCenter-Core-Threads-Index
+          - ReviewCenter-Core-Threads-NextStep
+          - ReviewCenter-Core-Threads-IncludedComment
+          - ReviewCenter-Core-Threads-Chat
+          - ReviewCenter-Core-Threads-Kind
+          - ReviewCenter-Core-Threads-IncludedList
+          - ReviewCenter-Core-Threads-ResolutionNote
+          - ReviewCenter-Core-Threads-ResolutionNoteTooLong
+          - ReviewCenter-Core-Threads-ResolutionNoteQuestion
+          - ReviewCenter-Core-Threads-ResolutionNoteStored
+          - ReviewCenter-Core-Threads-ResolutionNoteReport
+          - ReviewCenter-Core-Threads-ResolutionNoteRepeated
+          - ReviewCenter-Core-Threads-ResolutionNoteReopen
+          - ReviewCenter-Core-Threads-ResolutionNoteRecordChanged
+          - ReviewCenter-Core-Threads-Promotion
+          - ReviewCenter-Core-Threads-PromotionLead
+          - ReviewCenter-Core-Threads-PromotionRefused
+          - ReviewCenter-Core-Threads-PromotionReport
+          - ReviewCenter-Core-Threads-PromotionResolved
+          - ReviewCenter-Core-Threads-Demotion
+          - ReviewCenter-Core-Threads-PromotionRepeated
+          - ReviewCenter-Core-Threads-CommentToggle
+          - ReviewCenter-Core-Threads-CommentToggleRefused
+          - ReviewCenter-Core-Threads-CommentToggleTarget
+          - ReviewCenter-Core-Threads-CheckThreads
+          - ReviewCenter-Core-Threads-CheckThreadsRefused
+          - ReviewCenter-Core-Threads-CheckThreadsLifecycle
+          - ReviewCenter-Core-Threads-CheckThreadStart
+          - ReviewCenter-Core-Threads-CheckThreadStartRefused
+          - ReviewCenter-Core-Threads-CheckThreadStartLocked
+          - ReviewCenter-Core-Threads-CheckThreadStartAcknowledge
+          - ReviewCenter-Core-Threads-CheckThreadStartChat
+          - ReviewCenter-Core-Threads-Capabilities
+          - ReviewCenter-Core-Threads-CapabilitiesLimited
+          - ReviewCenter-Core-Threads-CapabilitiesEquality
+          - ReviewCenter-Core-Threads-Counts
+          - ReviewCenter-Core-Threads-CountsPhrase
+          - ReviewCenter-Core-Threads-CheckThreadDigest
           - ReviewCenter-Storage-Threads
           - ReviewCenter-Storage-Threads-State
           - ReviewCenter-Storage-Threads-Comments
           - ReviewCenter-Storage-Threads-Report
+          - ReviewCenter-Storage-Threads-ConcludedRefused
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
@@ -434,12 +734,39 @@ sections:
           - ReviewCenter-Web-ChecklistTemplate-RightLost
           - ReviewCenter-Web-ChecklistTemplate-Topic
           - ReviewCenter-Core-Checklist
+          - ReviewCenter-Core-Checklist-Default
+          - ReviewCenter-Core-Checklist-Frozen
+          - ReviewCenter-Core-Checklist-Applicability
+          - ReviewCenter-Core-Checklist-Answer
+          - ReviewCenter-Core-Checklist-AnswerJustification
+          - ReviewCenter-Core-Checklist-AnswerRefused
+          - ReviewCenter-Core-Checklist-AnsweredBy
+          - ReviewCenter-Core-Checklist-Progress
+          - ReviewCenter-Core-Checklist-BallotSubmit
+          - ReviewCenter-Core-Checklist-SingleSlot
           - ReviewCenter-Core-ProjectChecklist
+          - ReviewCenter-Core-ProjectChecklist-Validation
+          - ReviewCenter-Core-ProjectChecklist-Access
+          - ReviewCenter-Core-ProjectChecklist-HiddenFromOthers
+          - ReviewCenter-Core-ProjectChecklist-AdminChange
+          - ReviewCenter-Core-ProjectChecklist-MemberRefused
+          - ReviewCenter-Core-ProjectChecklist-NoToken
+          - ReviewCenter-Core-ProjectChecklist-RefusalChangesNothing
+          - ReviewCenter-Core-ProjectChecklist-Change
+          - ReviewCenter-Core-ProjectChecklist-VersionLabel
+          - ReviewCenter-Core-ProjectChecklist-NoChange
+          - ReviewCenter-Core-ProjectChecklist-Reset
+          - ReviewCenter-Core-ProjectChecklist-Audit
+          - ReviewCenter-Core-ProjectChecklist-Conflict
+          - ReviewCenter-Core-ProjectChecklist-Arguments
+          - ReviewCenter-Core-ProjectChecklist-ValidationRules
           - ReviewCenter-Storage-Checklist
           - ReviewCenter-Storage-Checklist-Sections
           - ReviewCenter-Storage-Checklist-Answers
           - ReviewCenter-Storage-Checklist-BallotStatus
           - ReviewCenter-Storage-Checklist-BallotSlotLifecycle
+          - ReviewCenter-Storage-Checklist-BallotSlotLifecycle-Seed
+          - ReviewCenter-Storage-Checklist-BallotSlotLifecycle-LeaverRemoved
           - ReviewCenter-Storage-ProjectChecklist
           - ReviewCenter-Storage-ProjectChecklist-Default
           - ReviewCenter-Storage-ProjectChecklist-CompareAndSet
@@ -464,6 +791,7 @@ sections:
           form field, means nobody can act in the name of somebody else.
         children:
           - ReviewCenter-Identity-Actor
+          - ReviewCenter-Identity-Actor-NobodyRefused
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
@@ -494,6 +822,118 @@ sections:
           - ReviewCenter-Web-Signatures-Digest
           - ReviewCenter-Web-Signatures-ProjectStatus
           - ReviewCenter-Core-Signatures
+          - ReviewCenter-Core-Signatures-DigestBinding
+          - ReviewCenter-Core-Signatures-DigestNullRecord
+          - ReviewCenter-Core-Signatures-DigestCoverage
+          - ReviewCenter-Core-Signatures-DigestNotCovered
+          - ReviewCenter-Core-Signatures-DigestConclusionText
+          - ReviewCenter-Core-Signatures-DigestChecklist
+          - ReviewCenter-Core-Signatures-DigestChecklistInvalid
+          - ReviewCenter-Core-Signatures-DigestWho
+          - ReviewCenter-Core-Signatures-DigestIndependence
+          - ReviewCenter-Core-Signatures-DigestUnambiguous
+          - ReviewCenter-Core-Signatures-DigestReport
+          - ReviewCenter-Core-Signatures-DigestChecks
+          - ReviewCenter-Core-Signatures-DigestDraftIgnored
+          - ReviewCenter-Core-Signatures-DigestNoBallotContent
+          - ReviewCenter-Core-Signatures-DigestOutcome
+          - ReviewCenter-Core-Signatures-DigestBallotFingerprint
+          - ReviewCenter-Core-Signatures-SlotUsers
+          - ReviewCenter-Core-Signatures-SlotCandidates
+          - ReviewCenter-Core-Signatures-SlotCandidatesNoPassword
+          - ReviewCenter-Core-Signatures-SlotCandidatesAccess
+          - ReviewCenter-Core-Signatures-SlotEdit
+          - ReviewCenter-Core-Signatures-SlotEditExists
+          - ReviewCenter-Core-Signatures-SlotLocked
+          - ReviewCenter-Core-Signatures-SlotActor
+          - ReviewCenter-Core-Signatures-SlotProject
+          - ReviewCenter-Core-Signatures-SlotViewAccess
+          - ReviewCenter-Core-Signatures-Signer
+          - ReviewCenter-Core-Signatures-SignerMember
+          - ReviewCenter-Core-Signatures-Blockers
+          - ReviewCenter-Core-Signatures-BlockersListed
+          - ReviewCenter-Core-Signatures-FailNotBlocker
+          - ReviewCenter-Core-Signatures-Sign
+          - ReviewCenter-Core-Signatures-SignRecord
+          - ReviewCenter-Core-Signatures-SignMeaning
+          - ReviewCenter-Core-Signatures-Unchanged
+          - ReviewCenter-Core-Signatures-Reauthenticate
+          - ReviewCenter-Core-Signatures-ReauthenticateFailure
+          - ReviewCenter-Core-Signatures-ReauthenticateLockout
+          - ReviewCenter-Core-Signatures-RecordCurrent
+          - ReviewCenter-Core-Signatures-AlreadySigned
+          - ReviewCenter-Core-Signatures-Status
+          - ReviewCenter-Core-Signatures-StatusMissing
+          - ReviewCenter-Core-Signatures-SlotStates
+          - ReviewCenter-Core-Signatures-OutOfDate
+          - ReviewCenter-Core-Signatures-Concluded
+          - ReviewCenter-Core-Signatures-StatusBlockers
+          - ReviewCenter-Core-Signatures-StatusNextStep
+          - ReviewCenter-Core-Signatures-StatusAssignee
+          - ReviewCenter-Core-Signatures-StatusAssigneeKept
+          - ReviewCenter-Core-Signatures-StatusBatch
+          - ReviewCenter-Core-Signatures-Impact
+          - ReviewCenter-Core-Signatures-ImpactRefused
+          - ReviewCenter-Core-Signatures-ImpactAcknowledged
+          - ReviewCenter-Core-Signatures-ImpactNotNeeded
+          - ReviewCenter-Core-Signatures-ImpactOwnSlot
+          - ReviewCenter-Core-Signatures-BallotAcknowledge
+          - ReviewCenter-Core-Signatures-BallotNames
+          - ReviewCenter-Core-Signatures-BallotRemaining
+          - ReviewCenter-Core-Signatures-BallotAcknowledged
+          - ReviewCenter-Core-Signatures-BallotExceptionCopy
+          - ReviewCenter-Core-Signatures-BallotNotNeeded
+          - ReviewCenter-Core-Signatures-BallotDraftKeeps
+          - ReviewCenter-Core-Signatures-OwnBallot
+          - ReviewCenter-Core-Signatures-OwnBallotOrder
+          - ReviewCenter-Core-Signatures-EarlySigning
+          - ReviewCenter-Core-Signatures-DisputedBlocker
+          - ReviewCenter-Core-Signatures-NextStepDisputed
+          - ReviewCenter-Core-Signatures-NextStepRejected
+          - ReviewCenter-Core-Signatures-NextStepSigners
+          - ReviewCenter-Core-Signatures-FailedMasked
+          - ReviewCenter-Core-Signatures-FailedMaskedNote
+          - ReviewCenter-Core-Signatures-FailedMaskedWording
+          - ReviewCenter-Core-Signatures-FailedMaskedHandIn
+          - ReviewCenter-Core-Signatures-SlotBallotAcknowledge
+          - ReviewCenter-Core-Signatures-SlotBallotNotNeeded
+          - ReviewCenter-Core-Signatures-SlotBallotState
+          - ReviewCenter-Core-Signatures-SlotBallotStateNoChecklist
+          - ReviewCenter-Core-Signatures-SlotBallotStateMasked
+          - ReviewCenter-Core-Signatures-SignApproved
+          - ReviewCenter-Core-Signatures-Rejected
+          - ReviewCenter-Core-Signatures-RejectedConclusion
+          - ReviewCenter-Core-Signatures-RejectedMessage
+          - ReviewCenter-Core-Signatures-RejectedBlockers
+          - ReviewCenter-Core-Signatures-RejectedLocks
+          - ReviewCenter-Core-Signatures-RejectedReopen
+          - ReviewCenter-Core-Signatures-AuditOutcome
+          - ReviewCenter-Core-Signatures-ThreadAcknowledge
+          - ReviewCenter-Core-Signatures-ThreadNames
+          - ReviewCenter-Core-Signatures-ThreadAcknowledged
+          - ReviewCenter-Core-Signatures-ThreadNothingStored
+          - ReviewCenter-Core-Signatures-ThreadAfterValidation
+          - ReviewCenter-Core-Signatures-ThreadNotFound
+          - ReviewCenter-Core-Signatures-ThreadNotNeeded
+          - ReviewCenter-Core-Signatures-ThreadRestored
+          - ReviewCenter-Core-Signatures-ConclusionText
+          - ReviewCenter-Core-Signatures-ConclusionTextLead
+          - ReviewCenter-Core-Signatures-ConclusionTextNonMember
+          - ReviewCenter-Core-Signatures-ConclusionTextRefused
+          - ReviewCenter-Core-Signatures-ConclusionTextCanSet
+          - ReviewCenter-Core-Signatures-ConclusionTextNormalized
+          - ReviewCenter-Core-Signatures-ConclusionTextBlank
+          - ReviewCenter-Core-Signatures-ConclusionTextMaxLength
+          - ReviewCenter-Core-Signatures-ConclusionTextTooLong
+          - ReviewCenter-Core-Signatures-ConclusionTextControl
+          - ReviewCenter-Core-Signatures-ConclusionTextLocked
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledge
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledged
+          - ReviewCenter-Core-Signatures-ConclusionTextNoChange
+          - ReviewCenter-Core-Signatures-ConclusionTextConcurrent
+          - ReviewCenter-Core-Signatures-ConclusionTextAudit
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoText
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoChange
           - ReviewCenter-Storage-Signatures
           - ReviewCenter-Storage-Signatures-Slots
           - ReviewCenter-Storage-Signatures-Current
@@ -506,6 +946,34 @@ sections:
           - ReviewCenter-Storage-Signatures-ConclusionText
           - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Core-BallotConsolidation
+          - ReviewCenter-Core-BallotConsolidation-Disputed
+          - ReviewCenter-Core-BallotConsolidation-Pending
+          - ReviewCenter-Core-BallotConsolidation-NotApplicableCheck
+          - ReviewCenter-Core-BallotConsolidation-CheckOutcomes
+          - ReviewCenter-Core-BallotConsolidation-SubmittedOnly
+          - ReviewCenter-Core-BallotConsolidation-Order
+          - ReviewCenter-Core-BallotConsolidation-Applicability
+          - ReviewCenter-Core-BallotConsolidation-SectionChecks
+          - ReviewCenter-Core-BallotConsolidation-SectionDisputeCount
+          - ReviewCenter-Core-BallotConsolidation-Outcome
+          - ReviewCenter-Core-BallotConsolidation-OutcomeRejected
+          - ReviewCenter-Core-BallotConsolidation-OutcomeApproved
+          - ReviewCenter-Core-BallotConsolidation-Counts
+          - ReviewCenter-Core-BallotConsolidation-BallotCounts
+          - ReviewCenter-Core-BallotConsolidation-ReadOnly
+          - ReviewCenter-Core-BallotConsolidation-Complete
+          - ReviewCenter-Core-BallotConsolidation-BallotState
+          - ReviewCenter-Core-BallotConsolidation-Arguments
+          - ReviewCenter-Core-BallotConsolidation-Projection
+          - ReviewCenter-Core-BallotConsolidation-ProjectionSingleSlot
+          - ReviewCenter-Core-BallotConsolidation-ProjectionNoChecklist
+          - ReviewCenter-Core-BallotConsolidation-ProjectionOwnBallot
+          - ReviewCenter-Core-BallotConsolidation-ProjectionArguments
+          - ReviewCenter-Core-BallotConsolidation-EditBallots
+          - ReviewCenter-Core-BallotConsolidation-EditAnswers
+          - ReviewCenter-Core-BallotConsolidation-EditSections
+          - ReviewCenter-Core-BallotConsolidation-EditReassign
+          - ReviewCenter-Core-BallotConsolidation-EditInput
         tests:
           - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
@@ -540,6 +1008,118 @@ sections:
           read the answers of the others before giving their own, so those stay hidden until the own ballot is in.
         children:
           - ReviewCenter-Core-Signatures
+          - ReviewCenter-Core-Signatures-DigestBinding
+          - ReviewCenter-Core-Signatures-DigestNullRecord
+          - ReviewCenter-Core-Signatures-DigestCoverage
+          - ReviewCenter-Core-Signatures-DigestNotCovered
+          - ReviewCenter-Core-Signatures-DigestConclusionText
+          - ReviewCenter-Core-Signatures-DigestChecklist
+          - ReviewCenter-Core-Signatures-DigestChecklistInvalid
+          - ReviewCenter-Core-Signatures-DigestWho
+          - ReviewCenter-Core-Signatures-DigestIndependence
+          - ReviewCenter-Core-Signatures-DigestUnambiguous
+          - ReviewCenter-Core-Signatures-DigestReport
+          - ReviewCenter-Core-Signatures-DigestChecks
+          - ReviewCenter-Core-Signatures-DigestDraftIgnored
+          - ReviewCenter-Core-Signatures-DigestNoBallotContent
+          - ReviewCenter-Core-Signatures-DigestOutcome
+          - ReviewCenter-Core-Signatures-DigestBallotFingerprint
+          - ReviewCenter-Core-Signatures-SlotUsers
+          - ReviewCenter-Core-Signatures-SlotCandidates
+          - ReviewCenter-Core-Signatures-SlotCandidatesNoPassword
+          - ReviewCenter-Core-Signatures-SlotCandidatesAccess
+          - ReviewCenter-Core-Signatures-SlotEdit
+          - ReviewCenter-Core-Signatures-SlotEditExists
+          - ReviewCenter-Core-Signatures-SlotLocked
+          - ReviewCenter-Core-Signatures-SlotActor
+          - ReviewCenter-Core-Signatures-SlotProject
+          - ReviewCenter-Core-Signatures-SlotViewAccess
+          - ReviewCenter-Core-Signatures-Signer
+          - ReviewCenter-Core-Signatures-SignerMember
+          - ReviewCenter-Core-Signatures-Blockers
+          - ReviewCenter-Core-Signatures-BlockersListed
+          - ReviewCenter-Core-Signatures-FailNotBlocker
+          - ReviewCenter-Core-Signatures-Sign
+          - ReviewCenter-Core-Signatures-SignRecord
+          - ReviewCenter-Core-Signatures-SignMeaning
+          - ReviewCenter-Core-Signatures-Unchanged
+          - ReviewCenter-Core-Signatures-Reauthenticate
+          - ReviewCenter-Core-Signatures-ReauthenticateFailure
+          - ReviewCenter-Core-Signatures-ReauthenticateLockout
+          - ReviewCenter-Core-Signatures-RecordCurrent
+          - ReviewCenter-Core-Signatures-AlreadySigned
+          - ReviewCenter-Core-Signatures-Status
+          - ReviewCenter-Core-Signatures-StatusMissing
+          - ReviewCenter-Core-Signatures-SlotStates
+          - ReviewCenter-Core-Signatures-OutOfDate
+          - ReviewCenter-Core-Signatures-Concluded
+          - ReviewCenter-Core-Signatures-StatusBlockers
+          - ReviewCenter-Core-Signatures-StatusNextStep
+          - ReviewCenter-Core-Signatures-StatusAssignee
+          - ReviewCenter-Core-Signatures-StatusAssigneeKept
+          - ReviewCenter-Core-Signatures-StatusBatch
+          - ReviewCenter-Core-Signatures-Impact
+          - ReviewCenter-Core-Signatures-ImpactRefused
+          - ReviewCenter-Core-Signatures-ImpactAcknowledged
+          - ReviewCenter-Core-Signatures-ImpactNotNeeded
+          - ReviewCenter-Core-Signatures-ImpactOwnSlot
+          - ReviewCenter-Core-Signatures-BallotAcknowledge
+          - ReviewCenter-Core-Signatures-BallotNames
+          - ReviewCenter-Core-Signatures-BallotRemaining
+          - ReviewCenter-Core-Signatures-BallotAcknowledged
+          - ReviewCenter-Core-Signatures-BallotExceptionCopy
+          - ReviewCenter-Core-Signatures-BallotNotNeeded
+          - ReviewCenter-Core-Signatures-BallotDraftKeeps
+          - ReviewCenter-Core-Signatures-OwnBallot
+          - ReviewCenter-Core-Signatures-OwnBallotOrder
+          - ReviewCenter-Core-Signatures-EarlySigning
+          - ReviewCenter-Core-Signatures-DisputedBlocker
+          - ReviewCenter-Core-Signatures-NextStepDisputed
+          - ReviewCenter-Core-Signatures-NextStepRejected
+          - ReviewCenter-Core-Signatures-NextStepSigners
+          - ReviewCenter-Core-Signatures-FailedMasked
+          - ReviewCenter-Core-Signatures-FailedMaskedNote
+          - ReviewCenter-Core-Signatures-FailedMaskedWording
+          - ReviewCenter-Core-Signatures-FailedMaskedHandIn
+          - ReviewCenter-Core-Signatures-SlotBallotAcknowledge
+          - ReviewCenter-Core-Signatures-SlotBallotNotNeeded
+          - ReviewCenter-Core-Signatures-SlotBallotState
+          - ReviewCenter-Core-Signatures-SlotBallotStateNoChecklist
+          - ReviewCenter-Core-Signatures-SlotBallotStateMasked
+          - ReviewCenter-Core-Signatures-SignApproved
+          - ReviewCenter-Core-Signatures-Rejected
+          - ReviewCenter-Core-Signatures-RejectedConclusion
+          - ReviewCenter-Core-Signatures-RejectedMessage
+          - ReviewCenter-Core-Signatures-RejectedBlockers
+          - ReviewCenter-Core-Signatures-RejectedLocks
+          - ReviewCenter-Core-Signatures-RejectedReopen
+          - ReviewCenter-Core-Signatures-AuditOutcome
+          - ReviewCenter-Core-Signatures-ThreadAcknowledge
+          - ReviewCenter-Core-Signatures-ThreadNames
+          - ReviewCenter-Core-Signatures-ThreadAcknowledged
+          - ReviewCenter-Core-Signatures-ThreadNothingStored
+          - ReviewCenter-Core-Signatures-ThreadAfterValidation
+          - ReviewCenter-Core-Signatures-ThreadNotFound
+          - ReviewCenter-Core-Signatures-ThreadNotNeeded
+          - ReviewCenter-Core-Signatures-ThreadRestored
+          - ReviewCenter-Core-Signatures-ConclusionText
+          - ReviewCenter-Core-Signatures-ConclusionTextLead
+          - ReviewCenter-Core-Signatures-ConclusionTextNonMember
+          - ReviewCenter-Core-Signatures-ConclusionTextRefused
+          - ReviewCenter-Core-Signatures-ConclusionTextCanSet
+          - ReviewCenter-Core-Signatures-ConclusionTextNormalized
+          - ReviewCenter-Core-Signatures-ConclusionTextBlank
+          - ReviewCenter-Core-Signatures-ConclusionTextMaxLength
+          - ReviewCenter-Core-Signatures-ConclusionTextTooLong
+          - ReviewCenter-Core-Signatures-ConclusionTextControl
+          - ReviewCenter-Core-Signatures-ConclusionTextLocked
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledge
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledged
+          - ReviewCenter-Core-Signatures-ConclusionTextNoChange
+          - ReviewCenter-Core-Signatures-ConclusionTextConcurrent
+          - ReviewCenter-Core-Signatures-ConclusionTextAudit
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoText
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoChange
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Web-Signatures-Approve
           - ReviewCenter-Web-Signatures-Reject
@@ -559,17 +1139,57 @@ sections:
           - ReviewCenter-Storage-Signatures-ConclusionText
           - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Api-Isolation
+          - ReviewCenter-Api-Isolation-NoWebPages
+          - ReviewCenter-Api-Isolation-NoCookie
           - ReviewCenter-Core-IndependentReviewers
+          - ReviewCenter-Core-IndependentReviewers-Slot
+          - ReviewCenter-Core-IndependentReviewers-Sign
+          - ReviewCenter-Core-IndependentReviewers-NotRequired
+          - ReviewCenter-Core-IndependentReviewers-TokenCreator
+          - ReviewCenter-Core-IndependentReviewers-AdminOnly
+          - ReviewCenter-Core-IndependentReviewers-Refused
+          - ReviewCenter-Core-IndependentReviewers-NeverToken
+          - ReviewCenter-Core-IndependentReviewers-Stale
+          - ReviewCenter-Core-IndependentReviewers-Unchanged
+          - ReviewCenter-Core-IndependentReviewers-Audit
           - ReviewCenter-Storage-ReviewIntegrity
           - ReviewCenter-Storage-ReviewIntegrity-ApprovedLock
           - ReviewCenter-Storage-ReviewIntegrity-OpenThreadSigning
           - ReviewCenter-Storage-ReviewIntegrity-ReopenAudit
           - ReviewCenter-Storage-ReviewIntegrity-ReopenRefused
+          - ReviewCenter-Storage-ReviewIntegrity-ReopenRefused-Concurrent
           - ReviewCenter-Storage-ReviewIntegrity-IndependentReviewers
           - ReviewCenter-Storage-ReviewIntegrity-SettingAudit
           - ReviewCenter-Web-ReviewRules
           - ReviewCenter-Web-ReviewRules-Hidden
           - ReviewCenter-Core-BallotVisibility
+          - ReviewCenter-Core-BallotVisibility-HandedIn
+          - ReviewCenter-Core-BallotVisibility-Privileged
+          - ReviewCenter-Core-BallotVisibility-Concluded
+          - ReviewCenter-Core-BallotVisibility-SingleSlot
+          - ReviewCenter-Core-BallotVisibility-BallotView
+          - ReviewCenter-Core-BallotVisibility-HandInCounts
+          - ReviewCenter-Core-BallotVisibility-AssignShortcut
+          - ReviewCenter-Core-BallotVisibility-SubmitAndSign
+          - ReviewCenter-Core-BallotVisibility-ViewHidden
+          - ReviewCenter-Core-BallotVisibility-ViewerRequired
+          - ReviewCenter-Core-BallotVisibility-NoDisputeLeak
+          - ReviewCenter-Core-BallotVisibility-NoOutcomeLeak
+          - ReviewCenter-Core-BallotVisibility-NoInboxLeak
+          - ReviewCenter-Core-BallotVisibility-HandedInVisible
+          - ReviewCenter-Core-BallotVisibility-FixedText
+          - ReviewCenter-Core-BallotVisibility-Discussions
+          - ReviewCenter-Core-BallotVisibility-FileDiscussions
+          - ReviewCenter-Core-BallotVisibility-DiscussionStart
+          - ReviewCenter-Core-BallotVisibility-DiscussionStartRefused
+          - ReviewCenter-Core-BallotVisibility-AuditMasking
+          - ReviewCenter-Core-BallotVisibility-AuditKept
+          - ReviewCenter-Core-BallotVisibility-AuditVisibleViewer
+          - ReviewCenter-Core-BallotVisibility-AuditUnknownViewer
+          - ReviewCenter-Core-BallotVisibility-AuditNullRefused
+          - ReviewCenter-Core-BallotVisibility-OwnBallot
+          - ReviewCenter-Core-BallotVisibility-ViewDetails
+          - ReviewCenter-Core-BallotVisibility-MissingNames
           - ReviewCenter-Web-BallotExperience
           - ReviewCenter-Web-BallotExperience-ReviewPage
           - ReviewCenter-Web-BallotExperience-ProjectOverview
@@ -604,6 +1224,50 @@ sections:
           theme for a person to look at.
         children:
           - ReviewCenter-Core-ReviewStatus
+          - ReviewCenter-Core-ReviewStatus-NextActionDone
+          - ReviewCenter-Core-ReviewStatus-NextActionReadOnly
+          - ReviewCenter-Core-ReviewStatus-NextActionSlots
+          - ReviewCenter-Core-ReviewStatus-NextActionBallot
+          - ReviewCenter-Core-ReviewStatus-NextActionOpenWork
+          - ReviewCenter-Core-ReviewStatus-NextActionSign
+          - ReviewCenter-Core-ReviewStatus-NextActionSigned
+          - ReviewCenter-Core-ReviewStatus-NextActionWait
+          - ReviewCenter-Core-ReviewStatus-NextActionOwnQuestion
+          - ReviewCenter-Core-ReviewStatus-NextActionOwnQuestionUnnamed
+          - ReviewCenter-Core-ReviewStatus-NextActionOthers
+          - ReviewCenter-Core-ReviewStatus-NextActionArguments
+          - ReviewCenter-Core-ReviewStatus-Standing
+          - ReviewCenter-Core-ReviewStatus-Disputes
+          - ReviewCenter-Core-ReviewStatus-DisputeStart
+          - ReviewCenter-Core-ReviewStatus-DisputeStartRefused
+          - ReviewCenter-Core-ReviewStatus-OpenCounts
+          - ReviewCenter-Core-ReviewStatus-StatusNextAction
+          - ReviewCenter-Core-ReviewStatus-SingleSlot
+          - ReviewCenter-Core-ReviewStatus-NoSlots
+          - ReviewCenter-Core-ReviewStatus-Unavailable
+          - ReviewCenter-Core-ReviewStatus-PassedIn
+          - ReviewCenter-Core-ReviewStatus-PassedInUnavailable
+          - ReviewCenter-Core-ReviewStatus-ReopenerWaits
+          - ReviewCenter-Core-ReviewStatus-ReopenerSigns
+          - ReviewCenter-Core-ReviewStatus-StatusArguments
+          - ReviewCenter-Core-ReviewStatus-Masked
+          - ReviewCenter-Core-ReviewStatus-MaskedNoAction
+          - ReviewCenter-Core-ReviewStatus-Changes
+          - ReviewCenter-Core-ReviewStatus-ChangesBallots
+          - ReviewCenter-Core-ReviewStatus-ChangesConclusion
+          - ReviewCenter-Core-ReviewStatus-ChangesThreads
+          - ReviewCenter-Core-ReviewStatus-ChangesComments
+          - ReviewCenter-Core-ReviewStatus-ChangesFindings
+          - ReviewCenter-Core-ReviewStatus-ChangesLeftOut
+          - ReviewCenter-Core-ReviewStatus-ChangesNone
+          - ReviewCenter-Core-ReviewStatus-ChangesWholeTrail
+          - ReviewCenter-Core-ReviewStatus-ChangesMasked
+          - ReviewCenter-Core-ReviewStatus-Guidance
+          - ReviewCenter-Core-ReviewStatus-GuidanceOutcome
+          - ReviewCenter-Core-ReviewStatus-GuidanceCaution
+          - ReviewCenter-Core-ReviewStatus-GuidanceNoCaution
+          - ReviewCenter-Core-ReviewStatus-GuidanceAskerWaits
+          - ReviewCenter-Core-ReviewStatus-GuidanceSignedNames
           - ReviewCenter-Web-WhereAreWe
           - ReviewCenter-Web-WhereAreWe-Ballots
           - ReviewCenter-Web-WhereAreWe-Differences
@@ -635,7 +1299,27 @@ sections:
           the enforcement are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-ReviewRuleSwitches
+          - ReviewCenter-Core-ReviewRuleSwitches-DefaultOn
+          - ReviewCenter-Core-ReviewRuleSwitches-Refused
+          - ReviewCenter-Core-ReviewRuleSwitches-NeverToken
+          - ReviewCenter-Core-ReviewRuleSwitches-Stale
+          - ReviewCenter-Core-ReviewRuleSwitches-Unchanged
+          - ReviewCenter-Core-ReviewRuleSwitches-Audit
           - ReviewCenter-Core-ReviewRules
+          - ReviewCenter-Core-ReviewRules-AuthorSection
+          - ReviewCenter-Core-ReviewRules-AuthorOthers
+          - ReviewCenter-Core-ReviewRules-AuthorBeforeLock
+          - ReviewCenter-Core-ReviewRules-AuthorBlocked
+          - ReviewCenter-Core-ReviewRules-AuthorBlockedOthers
+          - ReviewCenter-Core-ReviewRules-ReopenerSigning
+          - ReviewCenter-Core-ReviewRules-ReopenerOrder
+          - ReviewCenter-Core-ReviewRules-ReopenerNoAttempt
+          - ReviewCenter-Core-ReviewRules-ReopenerBallot
+          - ReviewCenter-Core-ReviewRules-StrandedSlot
+          - ReviewCenter-Core-ReviewRules-StrandedSlotNames
+          - ReviewCenter-Core-ReviewRules-StrandedSlotNothingStored
+          - ReviewCenter-Core-ReviewRules-StrandedSlotAllowed
+          - ReviewCenter-Core-ReviewRules-RuleOff
           - ReviewCenter-Storage-ReviewRuleSwitches
           - ReviewCenter-Storage-ReviewRuleSwitches-Default
           - ReviewCenter-Storage-ReviewRuleSwitches-CompareAndSet
@@ -673,6 +1357,118 @@ sections:
           OpenID Connect proof are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-Signatures
+          - ReviewCenter-Core-Signatures-DigestBinding
+          - ReviewCenter-Core-Signatures-DigestNullRecord
+          - ReviewCenter-Core-Signatures-DigestCoverage
+          - ReviewCenter-Core-Signatures-DigestNotCovered
+          - ReviewCenter-Core-Signatures-DigestConclusionText
+          - ReviewCenter-Core-Signatures-DigestChecklist
+          - ReviewCenter-Core-Signatures-DigestChecklistInvalid
+          - ReviewCenter-Core-Signatures-DigestWho
+          - ReviewCenter-Core-Signatures-DigestIndependence
+          - ReviewCenter-Core-Signatures-DigestUnambiguous
+          - ReviewCenter-Core-Signatures-DigestReport
+          - ReviewCenter-Core-Signatures-DigestChecks
+          - ReviewCenter-Core-Signatures-DigestDraftIgnored
+          - ReviewCenter-Core-Signatures-DigestNoBallotContent
+          - ReviewCenter-Core-Signatures-DigestOutcome
+          - ReviewCenter-Core-Signatures-DigestBallotFingerprint
+          - ReviewCenter-Core-Signatures-SlotUsers
+          - ReviewCenter-Core-Signatures-SlotCandidates
+          - ReviewCenter-Core-Signatures-SlotCandidatesNoPassword
+          - ReviewCenter-Core-Signatures-SlotCandidatesAccess
+          - ReviewCenter-Core-Signatures-SlotEdit
+          - ReviewCenter-Core-Signatures-SlotEditExists
+          - ReviewCenter-Core-Signatures-SlotLocked
+          - ReviewCenter-Core-Signatures-SlotActor
+          - ReviewCenter-Core-Signatures-SlotProject
+          - ReviewCenter-Core-Signatures-SlotViewAccess
+          - ReviewCenter-Core-Signatures-Signer
+          - ReviewCenter-Core-Signatures-SignerMember
+          - ReviewCenter-Core-Signatures-Blockers
+          - ReviewCenter-Core-Signatures-BlockersListed
+          - ReviewCenter-Core-Signatures-FailNotBlocker
+          - ReviewCenter-Core-Signatures-Sign
+          - ReviewCenter-Core-Signatures-SignRecord
+          - ReviewCenter-Core-Signatures-SignMeaning
+          - ReviewCenter-Core-Signatures-Unchanged
+          - ReviewCenter-Core-Signatures-Reauthenticate
+          - ReviewCenter-Core-Signatures-ReauthenticateFailure
+          - ReviewCenter-Core-Signatures-ReauthenticateLockout
+          - ReviewCenter-Core-Signatures-RecordCurrent
+          - ReviewCenter-Core-Signatures-AlreadySigned
+          - ReviewCenter-Core-Signatures-Status
+          - ReviewCenter-Core-Signatures-StatusMissing
+          - ReviewCenter-Core-Signatures-SlotStates
+          - ReviewCenter-Core-Signatures-OutOfDate
+          - ReviewCenter-Core-Signatures-Concluded
+          - ReviewCenter-Core-Signatures-StatusBlockers
+          - ReviewCenter-Core-Signatures-StatusNextStep
+          - ReviewCenter-Core-Signatures-StatusAssignee
+          - ReviewCenter-Core-Signatures-StatusAssigneeKept
+          - ReviewCenter-Core-Signatures-StatusBatch
+          - ReviewCenter-Core-Signatures-Impact
+          - ReviewCenter-Core-Signatures-ImpactRefused
+          - ReviewCenter-Core-Signatures-ImpactAcknowledged
+          - ReviewCenter-Core-Signatures-ImpactNotNeeded
+          - ReviewCenter-Core-Signatures-ImpactOwnSlot
+          - ReviewCenter-Core-Signatures-BallotAcknowledge
+          - ReviewCenter-Core-Signatures-BallotNames
+          - ReviewCenter-Core-Signatures-BallotRemaining
+          - ReviewCenter-Core-Signatures-BallotAcknowledged
+          - ReviewCenter-Core-Signatures-BallotExceptionCopy
+          - ReviewCenter-Core-Signatures-BallotNotNeeded
+          - ReviewCenter-Core-Signatures-BallotDraftKeeps
+          - ReviewCenter-Core-Signatures-OwnBallot
+          - ReviewCenter-Core-Signatures-OwnBallotOrder
+          - ReviewCenter-Core-Signatures-EarlySigning
+          - ReviewCenter-Core-Signatures-DisputedBlocker
+          - ReviewCenter-Core-Signatures-NextStepDisputed
+          - ReviewCenter-Core-Signatures-NextStepRejected
+          - ReviewCenter-Core-Signatures-NextStepSigners
+          - ReviewCenter-Core-Signatures-FailedMasked
+          - ReviewCenter-Core-Signatures-FailedMaskedNote
+          - ReviewCenter-Core-Signatures-FailedMaskedWording
+          - ReviewCenter-Core-Signatures-FailedMaskedHandIn
+          - ReviewCenter-Core-Signatures-SlotBallotAcknowledge
+          - ReviewCenter-Core-Signatures-SlotBallotNotNeeded
+          - ReviewCenter-Core-Signatures-SlotBallotState
+          - ReviewCenter-Core-Signatures-SlotBallotStateNoChecklist
+          - ReviewCenter-Core-Signatures-SlotBallotStateMasked
+          - ReviewCenter-Core-Signatures-SignApproved
+          - ReviewCenter-Core-Signatures-Rejected
+          - ReviewCenter-Core-Signatures-RejectedConclusion
+          - ReviewCenter-Core-Signatures-RejectedMessage
+          - ReviewCenter-Core-Signatures-RejectedBlockers
+          - ReviewCenter-Core-Signatures-RejectedLocks
+          - ReviewCenter-Core-Signatures-RejectedReopen
+          - ReviewCenter-Core-Signatures-AuditOutcome
+          - ReviewCenter-Core-Signatures-ThreadAcknowledge
+          - ReviewCenter-Core-Signatures-ThreadNames
+          - ReviewCenter-Core-Signatures-ThreadAcknowledged
+          - ReviewCenter-Core-Signatures-ThreadNothingStored
+          - ReviewCenter-Core-Signatures-ThreadAfterValidation
+          - ReviewCenter-Core-Signatures-ThreadNotFound
+          - ReviewCenter-Core-Signatures-ThreadNotNeeded
+          - ReviewCenter-Core-Signatures-ThreadRestored
+          - ReviewCenter-Core-Signatures-ConclusionText
+          - ReviewCenter-Core-Signatures-ConclusionTextLead
+          - ReviewCenter-Core-Signatures-ConclusionTextNonMember
+          - ReviewCenter-Core-Signatures-ConclusionTextRefused
+          - ReviewCenter-Core-Signatures-ConclusionTextCanSet
+          - ReviewCenter-Core-Signatures-ConclusionTextNormalized
+          - ReviewCenter-Core-Signatures-ConclusionTextBlank
+          - ReviewCenter-Core-Signatures-ConclusionTextMaxLength
+          - ReviewCenter-Core-Signatures-ConclusionTextTooLong
+          - ReviewCenter-Core-Signatures-ConclusionTextControl
+          - ReviewCenter-Core-Signatures-ConclusionTextLocked
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledge
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledged
+          - ReviewCenter-Core-Signatures-ConclusionTextNoChange
+          - ReviewCenter-Core-Signatures-ConclusionTextConcurrent
+          - ReviewCenter-Core-Signatures-ConclusionTextAudit
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoText
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoChange
           - ReviewCenter-Web-Signatures
           - ReviewCenter-Web-Signatures-Approve
           - ReviewCenter-Web-Signatures-Reject
@@ -681,7 +1477,143 @@ sections:
           - ReviewCenter-Web-Signatures-Digest
           - ReviewCenter-Web-Signatures-ProjectStatus
           - ReviewCenter-Identity-OidcSignIn
+          - ReviewCenter-Identity-OidcSignIn-Settings
+          - ReviewCenter-Identity-OidcSignIn-NewAccount
+          - ReviewCenter-Identity-OidcSignIn-NoLocalLink
+          - ReviewCenter-Identity-OidcSignIn-NoPassword
+          - ReviewCenter-Identity-OidcSignIn-DisabledRefused
+          - ReviewCenter-Identity-OidcSignIn-ReturnAddress
+          - ReviewCenter-Identity-OidcSignIn-Throttle
+          - ReviewCenter-Identity-OidcSignIn-Audit
+          - ReviewCenter-Identity-OidcSignIn-FailureAnswer
+          - ReviewCenter-Identity-OidcSignIn-Reauth
+          - ReviewCenter-Identity-OidcSignIn-Reauth-Fresh
+          - ReviewCenter-Identity-OidcSignIn-Reauth-SamePerson
+          - ReviewCenter-Identity-OidcSignIn-Reauth-Once
+          - ReviewCenter-Identity-OidcSignIn-Reauth-FailsClosed
+          - ReviewCenter-Identity-OidcSignIn-Reauth-RefusalAnswer
+          - ReviewCenter-Identity-OidcSignIn-LocalSession
+          - ReviewCenter-Identity-OidcSignIn-CodeFlow
           - ReviewCenter-Core-TotpSecondFactor
+          - ReviewCenter-Core-TotpSecondFactor-SetupPending
+          - ReviewCenter-Core-TotpSecondFactor-SetupReplace
+          - ReviewCenter-Core-TotpSecondFactor-SetupPassword
+          - ReviewCenter-Core-TotpSecondFactor-SetupAlreadyOn
+          - ReviewCenter-Core-TotpSecondFactor-SetupConfirm
+          - ReviewCenter-Core-TotpSecondFactor-SetupWindow
+          - ReviewCenter-Core-TotpSecondFactor-SetupWrongCode
+          - ReviewCenter-Core-TotpSecondFactor-SetupNothingStarted
+          - ReviewCenter-Core-TotpSecondFactor-SetupRecoveryCodes
+          - ReviewCenter-Core-TotpSecondFactor-SetupCancel
+          - ReviewCenter-Core-TotpSecondFactor-SetupCancelKeepsOn
+          - ReviewCenter-Core-TotpSecondFactor-Availability
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityRefused
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityMessage
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityOperations
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityStatus
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityArguments
+          - ReviewCenter-Core-TotpSecondFactor-Verify
+          - ReviewCenter-Core-TotpSecondFactor-VerifyOutsideWindow
+          - ReviewCenter-Core-TotpSecondFactor-VerifyUser
+          - ReviewCenter-Core-TotpSecondFactor-VerifyRefusal
+          - ReviewCenter-Core-TotpSecondFactor-VerifyChallengeInvalid
+          - ReviewCenter-Core-TotpSecondFactor-VerifyForeignClientKept
+          - ReviewCenter-Core-TotpSecondFactor-VerifyFeatureOff
+          - ReviewCenter-Core-TotpSecondFactor-VerifyUnreadableSecret
+          - ReviewCenter-Core-TotpSecondFactor-VerifyInvalidated
+          - ReviewCenter-Core-TotpSecondFactor-VerifyLastSignIn
+          - ReviewCenter-Core-TotpSecondFactor-Replay
+          - ReviewCenter-Core-TotpSecondFactor-ReplayConcurrent
+          - ReviewCenter-Core-TotpSecondFactor-ReplaySetupCode
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodes
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesStrength
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesHashed
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesSignIn
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesSpelling
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesOnce
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesOtherUser
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplace
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplaceStopsOld
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplaceNeedsAppCode
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplaceRefused
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesUnreadableSecret
+          - ReviewCenter-Core-TotpSecondFactor-Disable
+          - ReviewCenter-Core-TotpSecondFactor-DisableRecoveryCode
+          - ReviewCenter-Core-TotpSecondFactor-DisableRefused
+          - ReviewCenter-Core-TotpSecondFactor-DisableNotEnrolled
+          - ReviewCenter-Core-TotpSecondFactor-DisableRecoveryCodesDeleted
+          - ReviewCenter-Core-TotpSecondFactor-DisablePendingSignIns
+          - ReviewCenter-Core-TotpSecondFactor-AdminReset
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetRefused
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetTarget
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetPendingSignIns
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetList
+          - ReviewCenter-Core-TotpSecondFactor-Lockout
+          - ReviewCenter-Core-TotpSecondFactor-LockoutLocked
+          - ReviewCenter-Core-TotpSecondFactor-LockoutOperations
+          - ReviewCenter-Core-TotpSecondFactor-LockoutShared
+          - ReviewCenter-Core-TotpSecondFactor-LockoutCleared
+          - ReviewCenter-Core-TotpSecondFactor-LockoutPasswordAlone
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChange
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeRecoveryCode
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeNoCode
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeWrongPassword
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeReused
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeCounted
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeClearedAfterProof
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeLockout
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangePasswordOnly
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeApiToken
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeNotRequired
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeTemporary
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeUnreadable
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeConcurrent
+          - ReviewCenter-Core-TotpSecondFactor-Audit
+          - ReviewCenter-Core-TotpSecondFactor-AuditRemoved
+          - ReviewCenter-Core-TotpSecondFactor-AuditReset
+          - ReviewCenter-Core-TotpSecondFactor-AuditRecoveryRegenerated
+          - ReviewCenter-Core-TotpSecondFactor-AuditRecoveryUsed
+          - ReviewCenter-Core-TotpSecondFactor-AuditWrongCode
+          - ReviewCenter-Core-TotpSecondFactor-NoSecretLeak
+          - ReviewCenter-Core-TotpSecondFactor-NoSecretLeakErrors
+          - ReviewCenter-Core-TotpSecondFactor-NoSecretLeakShownOnce
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeSingleUse
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeToken
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeHash
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeUnknown
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeRetry
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeLimit
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeBinding
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeNoAddress
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeExpiry
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeExpiryReturned
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeBounded
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeEnded
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeReturnFull
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeInvalidationBound
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeInvalidate
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeTakenBefore
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeTakenAfter
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeArguments
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorRequired
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorKeepsCounter
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorDisabled
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorFailsClosed
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorNotRequired
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorWrongPassword
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockout
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockoutIsLocked
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockoutConfirmLocked
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockoutConfirmPassword
+          - ReviewCenter-Core-TotpSecondFactor-SignatureCode
+          - ReviewCenter-Core-TotpSecondFactor-SignaturePasswordFirst
+          - ReviewCenter-Core-TotpSecondFactor-SignatureRecoveryRefused
+          - ReviewCenter-Core-TotpSecondFactor-SignatureReplayRefused
+          - ReviewCenter-Core-TotpSecondFactor-SignatureApiToken
+          - ReviewCenter-Core-TotpSecondFactor-SignatureLockoutCount
+          - ReviewCenter-Core-TotpSecondFactor-SignatureLockoutAudit
+          - ReviewCenter-Core-TotpSecondFactor-SignatureFailClosed
+          - ReviewCenter-Core-TotpSecondFactor-SignatureNoCode
           - ReviewCenter-Web-TotpSecondFactor
           - ReviewCenter-Web-TotpSecondFactor-TurnOff
           - ReviewCenter-Web-TotpSecondFactor-CodePage
@@ -691,6 +1623,70 @@ sections:
           - ReviewCenter-Web-TotpSecondFactor-Reset
           - ReviewCenter-Web-TotpSecondFactor-HelpTopic
           - ReviewCenter-Core-AuditTrail
+          - ReviewCenter-Core-AuditTrail-Verify
+          - ReviewCenter-Core-AuditTrail-TamperDetected
+          - ReviewCenter-Core-AuditTrail-Detail
+          - ReviewCenter-Core-AuditTrail-Actor
+          - ReviewCenter-Core-AuditTrail-Record
+          - ReviewCenter-Core-AuditTrail-Coalesce
+          - ReviewCenter-Core-AuditTrail-CoalesceOverflow
+          - ReviewCenter-Core-AuditTrail-Pages
+          - ReviewCenter-Core-AuditTrail-Scope
+          - ReviewCenter-Core-AuditTrail-Cursors
+          - ReviewCenter-Core-AuditTrail-Filter
+          - ReviewCenter-Core-AuditTrail-FilterInput
+          - ReviewCenter-Core-AuditTrail-FilterRefused
+          - ReviewCenter-Core-AuditTrail-FilterSingleDay
+          - ReviewCenter-Core-AuditTrail-ActionCatalog
+          - ReviewCenter-Core-AuditTrail-VerifyTrail
+          - ReviewCenter-Core-AuditTrail-VerifyTrailBroken
+          - ReviewCenter-Core-AuditTrail-Export
+          - ReviewCenter-Core-AuditTrail-ExportScope
+          - ReviewCenter-Core-AuditTrail-ExportEmpty
+          - ReviewCenter-Core-AuditTrail-ExportCancelled
+          - ReviewCenter-Core-AuditTrail-ExportRefused
+          - ReviewCenter-Core-AuditTrail-ExportChainState
+          - ReviewCenter-Core-AuditTrail-ExportFile
+          - ReviewCenter-Core-AuditTrail-ExportNoLeak
+          - ReviewCenter-Core-AuditTrail-ExportAudited
+          - ReviewCenter-Core-AuditTrail-ExportAuditedIncomplete
+          - ReviewCenter-Core-AuditTrail-ExportCsv
+          - ReviewCenter-Core-AuditTrail-ExportCsvSafe
+          - ReviewCenter-Core-AuditTrail-ExportJson
+          - ReviewCenter-Core-AuditTrail-ExportWriter
+          - ReviewCenter-Core-AuditTrail-Projects
+          - ReviewCenter-Core-AuditTrail-ProjectMembers
+          - ReviewCenter-Core-AuditTrail-ProjectMemberRefused
+          - ReviewCenter-Core-AuditTrail-EvidenceSettings
+          - ReviewCenter-Core-AuditTrail-ProjectChecklist
+          - ReviewCenter-Core-AuditTrail-Reviews
+          - ReviewCenter-Core-AuditTrail-Threads
+          - ReviewCenter-Core-AuditTrail-ThreadNoText
+          - ReviewCenter-Core-AuditTrail-ThreadMissing
+          - ReviewCenter-Core-AuditTrail-ThreadReport
+          - ReviewCenter-Core-AuditTrail-ThreadResolutionNote
+          - ReviewCenter-Core-AuditTrail-ThreadReportMarks
+          - ReviewCenter-Core-AuditTrail-ThreadReportNoOp
+          - ReviewCenter-Core-AuditTrail-CheckThreads
+          - ReviewCenter-Core-AuditTrail-Checklists
+          - ReviewCenter-Core-AuditTrail-ChecklistsRefused
+          - ReviewCenter-Core-AuditTrail-Slots
+          - ReviewCenter-Core-AuditTrail-Signatures
+          - ReviewCenter-Core-AuditTrail-SigningRefused
+          - ReviewCenter-Core-AuditTrail-Users
+          - ReviewCenter-Core-AuditTrail-UserNoPassword
+          - ReviewCenter-Core-AuditTrail-SignInEvents
+          - ReviewCenter-Core-AuditTrail-SignInNoPassword
+          - ReviewCenter-Core-AuditTrail-SignInReasons
+          - ReviewCenter-Core-AuditTrail-SignInOnce
+          - ReviewCenter-Core-AuditTrail-SignInResilient
+          - ReviewCenter-Core-AuditTrail-Reauth
+          - ReviewCenter-Core-AuditTrail-ReauthNoPassword
+          - ReviewCenter-Core-AuditTrail-ReauthOnce
+          - ReviewCenter-Core-AuditTrail-ReauthSigning
+          - ReviewCenter-Core-AuditTrail-Repositories
+          - ReviewCenter-Core-AuditTrail-RepositoryNoSecret
+          - ReviewCenter-Core-AuditTrail-RepositoryNoChange
         tests:
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
 
@@ -713,6 +1709,118 @@ sections:
           commits, selection, changes, review-set) moves it is verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-Signatures
+          - ReviewCenter-Core-Signatures-DigestBinding
+          - ReviewCenter-Core-Signatures-DigestNullRecord
+          - ReviewCenter-Core-Signatures-DigestCoverage
+          - ReviewCenter-Core-Signatures-DigestNotCovered
+          - ReviewCenter-Core-Signatures-DigestConclusionText
+          - ReviewCenter-Core-Signatures-DigestChecklist
+          - ReviewCenter-Core-Signatures-DigestChecklistInvalid
+          - ReviewCenter-Core-Signatures-DigestWho
+          - ReviewCenter-Core-Signatures-DigestIndependence
+          - ReviewCenter-Core-Signatures-DigestUnambiguous
+          - ReviewCenter-Core-Signatures-DigestReport
+          - ReviewCenter-Core-Signatures-DigestChecks
+          - ReviewCenter-Core-Signatures-DigestDraftIgnored
+          - ReviewCenter-Core-Signatures-DigestNoBallotContent
+          - ReviewCenter-Core-Signatures-DigestOutcome
+          - ReviewCenter-Core-Signatures-DigestBallotFingerprint
+          - ReviewCenter-Core-Signatures-SlotUsers
+          - ReviewCenter-Core-Signatures-SlotCandidates
+          - ReviewCenter-Core-Signatures-SlotCandidatesNoPassword
+          - ReviewCenter-Core-Signatures-SlotCandidatesAccess
+          - ReviewCenter-Core-Signatures-SlotEdit
+          - ReviewCenter-Core-Signatures-SlotEditExists
+          - ReviewCenter-Core-Signatures-SlotLocked
+          - ReviewCenter-Core-Signatures-SlotActor
+          - ReviewCenter-Core-Signatures-SlotProject
+          - ReviewCenter-Core-Signatures-SlotViewAccess
+          - ReviewCenter-Core-Signatures-Signer
+          - ReviewCenter-Core-Signatures-SignerMember
+          - ReviewCenter-Core-Signatures-Blockers
+          - ReviewCenter-Core-Signatures-BlockersListed
+          - ReviewCenter-Core-Signatures-FailNotBlocker
+          - ReviewCenter-Core-Signatures-Sign
+          - ReviewCenter-Core-Signatures-SignRecord
+          - ReviewCenter-Core-Signatures-SignMeaning
+          - ReviewCenter-Core-Signatures-Unchanged
+          - ReviewCenter-Core-Signatures-Reauthenticate
+          - ReviewCenter-Core-Signatures-ReauthenticateFailure
+          - ReviewCenter-Core-Signatures-ReauthenticateLockout
+          - ReviewCenter-Core-Signatures-RecordCurrent
+          - ReviewCenter-Core-Signatures-AlreadySigned
+          - ReviewCenter-Core-Signatures-Status
+          - ReviewCenter-Core-Signatures-StatusMissing
+          - ReviewCenter-Core-Signatures-SlotStates
+          - ReviewCenter-Core-Signatures-OutOfDate
+          - ReviewCenter-Core-Signatures-Concluded
+          - ReviewCenter-Core-Signatures-StatusBlockers
+          - ReviewCenter-Core-Signatures-StatusNextStep
+          - ReviewCenter-Core-Signatures-StatusAssignee
+          - ReviewCenter-Core-Signatures-StatusAssigneeKept
+          - ReviewCenter-Core-Signatures-StatusBatch
+          - ReviewCenter-Core-Signatures-Impact
+          - ReviewCenter-Core-Signatures-ImpactRefused
+          - ReviewCenter-Core-Signatures-ImpactAcknowledged
+          - ReviewCenter-Core-Signatures-ImpactNotNeeded
+          - ReviewCenter-Core-Signatures-ImpactOwnSlot
+          - ReviewCenter-Core-Signatures-BallotAcknowledge
+          - ReviewCenter-Core-Signatures-BallotNames
+          - ReviewCenter-Core-Signatures-BallotRemaining
+          - ReviewCenter-Core-Signatures-BallotAcknowledged
+          - ReviewCenter-Core-Signatures-BallotExceptionCopy
+          - ReviewCenter-Core-Signatures-BallotNotNeeded
+          - ReviewCenter-Core-Signatures-BallotDraftKeeps
+          - ReviewCenter-Core-Signatures-OwnBallot
+          - ReviewCenter-Core-Signatures-OwnBallotOrder
+          - ReviewCenter-Core-Signatures-EarlySigning
+          - ReviewCenter-Core-Signatures-DisputedBlocker
+          - ReviewCenter-Core-Signatures-NextStepDisputed
+          - ReviewCenter-Core-Signatures-NextStepRejected
+          - ReviewCenter-Core-Signatures-NextStepSigners
+          - ReviewCenter-Core-Signatures-FailedMasked
+          - ReviewCenter-Core-Signatures-FailedMaskedNote
+          - ReviewCenter-Core-Signatures-FailedMaskedWording
+          - ReviewCenter-Core-Signatures-FailedMaskedHandIn
+          - ReviewCenter-Core-Signatures-SlotBallotAcknowledge
+          - ReviewCenter-Core-Signatures-SlotBallotNotNeeded
+          - ReviewCenter-Core-Signatures-SlotBallotState
+          - ReviewCenter-Core-Signatures-SlotBallotStateNoChecklist
+          - ReviewCenter-Core-Signatures-SlotBallotStateMasked
+          - ReviewCenter-Core-Signatures-SignApproved
+          - ReviewCenter-Core-Signatures-Rejected
+          - ReviewCenter-Core-Signatures-RejectedConclusion
+          - ReviewCenter-Core-Signatures-RejectedMessage
+          - ReviewCenter-Core-Signatures-RejectedBlockers
+          - ReviewCenter-Core-Signatures-RejectedLocks
+          - ReviewCenter-Core-Signatures-RejectedReopen
+          - ReviewCenter-Core-Signatures-AuditOutcome
+          - ReviewCenter-Core-Signatures-ThreadAcknowledge
+          - ReviewCenter-Core-Signatures-ThreadNames
+          - ReviewCenter-Core-Signatures-ThreadAcknowledged
+          - ReviewCenter-Core-Signatures-ThreadNothingStored
+          - ReviewCenter-Core-Signatures-ThreadAfterValidation
+          - ReviewCenter-Core-Signatures-ThreadNotFound
+          - ReviewCenter-Core-Signatures-ThreadNotNeeded
+          - ReviewCenter-Core-Signatures-ThreadRestored
+          - ReviewCenter-Core-Signatures-ConclusionText
+          - ReviewCenter-Core-Signatures-ConclusionTextLead
+          - ReviewCenter-Core-Signatures-ConclusionTextNonMember
+          - ReviewCenter-Core-Signatures-ConclusionTextRefused
+          - ReviewCenter-Core-Signatures-ConclusionTextCanSet
+          - ReviewCenter-Core-Signatures-ConclusionTextNormalized
+          - ReviewCenter-Core-Signatures-ConclusionTextBlank
+          - ReviewCenter-Core-Signatures-ConclusionTextMaxLength
+          - ReviewCenter-Core-Signatures-ConclusionTextTooLong
+          - ReviewCenter-Core-Signatures-ConclusionTextControl
+          - ReviewCenter-Core-Signatures-ConclusionTextLocked
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledge
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledged
+          - ReviewCenter-Core-Signatures-ConclusionTextNoChange
+          - ReviewCenter-Core-Signatures-ConclusionTextConcurrent
+          - ReviewCenter-Core-Signatures-ConclusionTextAudit
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoText
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoChange
           - ReviewCenter-Storage-Signatures
           - ReviewCenter-Storage-Signatures-Slots
           - ReviewCenter-Storage-Signatures-Current
@@ -732,8 +1840,58 @@ sections:
           - ReviewCenter-Web-Signatures-Digest
           - ReviewCenter-Web-Signatures-ProjectStatus
           - ReviewCenter-Core-Fingerprint
+          - ReviewCenter-Core-Fingerprint-NameOrderIndependent
+          - ReviewCenter-Core-Fingerprint-Arguments
           - ReviewCenter-Core-RepositoryReviews
+          - ReviewCenter-Core-RepositoryReviews-DigestBinding
+          - ReviewCenter-Core-RepositoryReviews-RepositoryRefused
+          - ReviewCenter-Core-RepositoryReviews-RevisionRefused
+          - ReviewCenter-Core-RepositoryReviews-SelectionRefused
+          - ReviewCenter-Core-RepositoryReviews-IdRefused
+          - ReviewCenter-Core-RepositoryReviews-RefusalChangesNothing
+          - ReviewCenter-Core-RepositoryReviews-GitFailure
+          - ReviewCenter-Core-RepositoryReviews-RequestRefused
+          - ReviewCenter-Core-RepositoryReviews-Frozen
+          - ReviewCenter-Core-RepositoryReviews-NothingToReview
+          - ReviewCenter-Core-RepositoryReviews-Limits
+          - ReviewCenter-Core-RepositoryReviews-LimitsBeforeReading
+          - ReviewCenter-Core-RepositoryReviews-SkippedEntries
+          - ReviewCenter-Core-RepositoryReviews-Audit
+          - ReviewCenter-Core-RepositoryReviews-DigestSource
+          - ReviewCenter-Core-RepositoryReviews-ReviewSet
+          - ReviewCenter-Core-RepositoryReviews-ReviewSetLength
+          - ReviewCenter-Core-RepositoryReviews-ReviewSetNone
+          - ReviewCenter-Core-RepositoryReviews-CommentOnHead
+          - ReviewCenter-Core-RepositoryReviews-CommentAccepted
+          - ReviewCenter-Core-RepositoryReviews-RuleViolations
           - ReviewCenter-Core-PlanReviews
+          - ReviewCenter-Core-PlanReviews-BrokenSet
+          - ReviewCenter-Core-PlanReviews-ConfigRefused
+          - ReviewCenter-Core-PlanReviews-InputRefused
+          - ReviewCenter-Core-PlanReviews-AccessRefused
+          - ReviewCenter-Core-PlanReviews-ArgumentsRefused
+          - ReviewCenter-Core-PlanReviews-FullReview
+          - ReviewCenter-Core-PlanReviews-SinceRevision
+          - ReviewCenter-Core-PlanReviews-SinceLastApproved
+          - ReviewCenter-Core-PlanReviews-FallbackNoApproved
+          - ReviewCenter-Core-PlanReviews-RejectedLater
+          - ReviewCenter-Core-PlanReviews-Fallback
+          - ReviewCenter-Core-PlanReviews-AlreadyFiled
+          - ReviewCenter-Core-PlanReviews-FiledNewSelection
+          - ReviewCenter-Core-PlanReviews-NothingToReview
+          - ReviewCenter-Core-PlanReviews-WillCreate
+          - ReviewCenter-Core-PlanReviews-Create
+          - ReviewCenter-Core-PlanReviews-OwnTransaction
+          - ReviewCenter-Core-PlanReviews-ResultPerReview
+          - ReviewCenter-Core-PlanReviews-Cancel
+          - ReviewCenter-Core-PlanReviews-ResultFiled
+          - ReviewCenter-Core-PlanReviews-RequestInvalid
+          - ReviewCenter-Core-PlanReviews-BatchRefused
+          - ReviewCenter-Core-PlanReviews-BatchNoGit
+          - ReviewCenter-Core-PlanReviews-BatchAccess
+          - ReviewCenter-Core-PlanReviews-Identity
+          - ReviewCenter-Core-PlanReviews-IdentityUnique
+          - ReviewCenter-Core-PlanReviews-IdentityTitle
         tests:
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
           - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
@@ -765,18 +1923,68 @@ sections:
           the tests of the child requirements.
         children:
           - ReviewCenter-Core-Reviews
+          - ReviewCenter-Core-Reviews-Files
+          - ReviewCenter-Core-Reviews-ReadBack
           - ReviewCenter-Core-RepositoryReviews
+          - ReviewCenter-Core-RepositoryReviews-DigestBinding
+          - ReviewCenter-Core-RepositoryReviews-RepositoryRefused
+          - ReviewCenter-Core-RepositoryReviews-RevisionRefused
+          - ReviewCenter-Core-RepositoryReviews-SelectionRefused
+          - ReviewCenter-Core-RepositoryReviews-IdRefused
+          - ReviewCenter-Core-RepositoryReviews-RefusalChangesNothing
+          - ReviewCenter-Core-RepositoryReviews-GitFailure
+          - ReviewCenter-Core-RepositoryReviews-RequestRefused
+          - ReviewCenter-Core-RepositoryReviews-Frozen
+          - ReviewCenter-Core-RepositoryReviews-NothingToReview
+          - ReviewCenter-Core-RepositoryReviews-Limits
+          - ReviewCenter-Core-RepositoryReviews-LimitsBeforeReading
+          - ReviewCenter-Core-RepositoryReviews-SkippedEntries
+          - ReviewCenter-Core-RepositoryReviews-Audit
+          - ReviewCenter-Core-RepositoryReviews-DigestSource
+          - ReviewCenter-Core-RepositoryReviews-ReviewSet
+          - ReviewCenter-Core-RepositoryReviews-ReviewSetLength
+          - ReviewCenter-Core-RepositoryReviews-ReviewSetNone
+          - ReviewCenter-Core-RepositoryReviews-CommentOnHead
+          - ReviewCenter-Core-RepositoryReviews-CommentAccepted
+          - ReviewCenter-Core-RepositoryReviews-RuleViolations
           - ReviewCenter-Storage-RepositoryReviews
           - ReviewCenter-Storage-RepositoryReviews-FileBaseline
           - ReviewCenter-Storage-RepositoryReviews-NoContentInReview
           - ReviewCenter-Storage-RepositoryReviews-BaselineOnRequest
           - ReviewCenter-Core-Checklist
+          - ReviewCenter-Core-Checklist-Default
+          - ReviewCenter-Core-Checklist-Frozen
+          - ReviewCenter-Core-Checklist-Applicability
+          - ReviewCenter-Core-Checklist-Answer
+          - ReviewCenter-Core-Checklist-AnswerJustification
+          - ReviewCenter-Core-Checklist-AnswerRefused
+          - ReviewCenter-Core-Checklist-AnsweredBy
+          - ReviewCenter-Core-Checklist-Progress
+          - ReviewCenter-Core-Checklist-BallotSubmit
+          - ReviewCenter-Core-Checklist-SingleSlot
           - ReviewCenter-Core-ProjectChecklist
+          - ReviewCenter-Core-ProjectChecklist-Validation
+          - ReviewCenter-Core-ProjectChecklist-Access
+          - ReviewCenter-Core-ProjectChecklist-HiddenFromOthers
+          - ReviewCenter-Core-ProjectChecklist-AdminChange
+          - ReviewCenter-Core-ProjectChecklist-MemberRefused
+          - ReviewCenter-Core-ProjectChecklist-NoToken
+          - ReviewCenter-Core-ProjectChecklist-RefusalChangesNothing
+          - ReviewCenter-Core-ProjectChecklist-Change
+          - ReviewCenter-Core-ProjectChecklist-VersionLabel
+          - ReviewCenter-Core-ProjectChecklist-NoChange
+          - ReviewCenter-Core-ProjectChecklist-Reset
+          - ReviewCenter-Core-ProjectChecklist-Audit
+          - ReviewCenter-Core-ProjectChecklist-Conflict
+          - ReviewCenter-Core-ProjectChecklist-Arguments
+          - ReviewCenter-Core-ProjectChecklist-ValidationRules
           - ReviewCenter-Storage-Checklist
           - ReviewCenter-Storage-Checklist-Sections
           - ReviewCenter-Storage-Checklist-Answers
           - ReviewCenter-Storage-Checklist-BallotStatus
           - ReviewCenter-Storage-Checklist-BallotSlotLifecycle
+          - ReviewCenter-Storage-Checklist-BallotSlotLifecycle-Seed
+          - ReviewCenter-Storage-Checklist-BallotSlotLifecycle-LeaverRemoved
           - ReviewCenter-Storage-ProjectChecklist
           - ReviewCenter-Storage-ProjectChecklist-Default
           - ReviewCenter-Storage-ProjectChecklist-CompareAndSet
@@ -784,11 +1992,170 @@ sections:
           - ReviewCenter-Storage-ProjectChecklist-Stale
           - ReviewCenter-Storage-ProjectChecklist-MissingProject
           - ReviewCenter-Core-Threads
+          - ReviewCenter-Core-Threads-Author
+          - ReviewCenter-Core-Threads-Reply
+          - ReviewCenter-Core-Threads-ReplyNotFound
+          - ReviewCenter-Core-Threads-ResolveReopen
+          - ReviewCenter-Core-Threads-StateNotFound
+          - ReviewCenter-Core-Threads-NoEdit
+          - ReviewCenter-Core-Threads-ReadBack
+          - ReviewCenter-Core-Threads-Activity
+          - ReviewCenter-Core-Threads-Index
+          - ReviewCenter-Core-Threads-NextStep
+          - ReviewCenter-Core-Threads-IncludedComment
+          - ReviewCenter-Core-Threads-Chat
+          - ReviewCenter-Core-Threads-Kind
+          - ReviewCenter-Core-Threads-IncludedList
+          - ReviewCenter-Core-Threads-ResolutionNote
+          - ReviewCenter-Core-Threads-ResolutionNoteTooLong
+          - ReviewCenter-Core-Threads-ResolutionNoteQuestion
+          - ReviewCenter-Core-Threads-ResolutionNoteStored
+          - ReviewCenter-Core-Threads-ResolutionNoteReport
+          - ReviewCenter-Core-Threads-ResolutionNoteRepeated
+          - ReviewCenter-Core-Threads-ResolutionNoteReopen
+          - ReviewCenter-Core-Threads-ResolutionNoteRecordChanged
+          - ReviewCenter-Core-Threads-Promotion
+          - ReviewCenter-Core-Threads-PromotionLead
+          - ReviewCenter-Core-Threads-PromotionRefused
+          - ReviewCenter-Core-Threads-PromotionReport
+          - ReviewCenter-Core-Threads-PromotionResolved
+          - ReviewCenter-Core-Threads-Demotion
+          - ReviewCenter-Core-Threads-PromotionRepeated
+          - ReviewCenter-Core-Threads-CommentToggle
+          - ReviewCenter-Core-Threads-CommentToggleRefused
+          - ReviewCenter-Core-Threads-CommentToggleTarget
+          - ReviewCenter-Core-Threads-CheckThreads
+          - ReviewCenter-Core-Threads-CheckThreadsRefused
+          - ReviewCenter-Core-Threads-CheckThreadsLifecycle
+          - ReviewCenter-Core-Threads-CheckThreadStart
+          - ReviewCenter-Core-Threads-CheckThreadStartRefused
+          - ReviewCenter-Core-Threads-CheckThreadStartLocked
+          - ReviewCenter-Core-Threads-CheckThreadStartAcknowledge
+          - ReviewCenter-Core-Threads-CheckThreadStartChat
+          - ReviewCenter-Core-Threads-Capabilities
+          - ReviewCenter-Core-Threads-CapabilitiesLimited
+          - ReviewCenter-Core-Threads-CapabilitiesEquality
+          - ReviewCenter-Core-Threads-Counts
+          - ReviewCenter-Core-Threads-CountsPhrase
+          - ReviewCenter-Core-Threads-CheckThreadDigest
           - ReviewCenter-Storage-Threads
           - ReviewCenter-Storage-Threads-State
           - ReviewCenter-Storage-Threads-Comments
           - ReviewCenter-Storage-Threads-Report
+          - ReviewCenter-Storage-Threads-ConcludedRefused
           - ReviewCenter-Core-Signatures
+          - ReviewCenter-Core-Signatures-DigestBinding
+          - ReviewCenter-Core-Signatures-DigestNullRecord
+          - ReviewCenter-Core-Signatures-DigestCoverage
+          - ReviewCenter-Core-Signatures-DigestNotCovered
+          - ReviewCenter-Core-Signatures-DigestConclusionText
+          - ReviewCenter-Core-Signatures-DigestChecklist
+          - ReviewCenter-Core-Signatures-DigestChecklistInvalid
+          - ReviewCenter-Core-Signatures-DigestWho
+          - ReviewCenter-Core-Signatures-DigestIndependence
+          - ReviewCenter-Core-Signatures-DigestUnambiguous
+          - ReviewCenter-Core-Signatures-DigestReport
+          - ReviewCenter-Core-Signatures-DigestChecks
+          - ReviewCenter-Core-Signatures-DigestDraftIgnored
+          - ReviewCenter-Core-Signatures-DigestNoBallotContent
+          - ReviewCenter-Core-Signatures-DigestOutcome
+          - ReviewCenter-Core-Signatures-DigestBallotFingerprint
+          - ReviewCenter-Core-Signatures-SlotUsers
+          - ReviewCenter-Core-Signatures-SlotCandidates
+          - ReviewCenter-Core-Signatures-SlotCandidatesNoPassword
+          - ReviewCenter-Core-Signatures-SlotCandidatesAccess
+          - ReviewCenter-Core-Signatures-SlotEdit
+          - ReviewCenter-Core-Signatures-SlotEditExists
+          - ReviewCenter-Core-Signatures-SlotLocked
+          - ReviewCenter-Core-Signatures-SlotActor
+          - ReviewCenter-Core-Signatures-SlotProject
+          - ReviewCenter-Core-Signatures-SlotViewAccess
+          - ReviewCenter-Core-Signatures-Signer
+          - ReviewCenter-Core-Signatures-SignerMember
+          - ReviewCenter-Core-Signatures-Blockers
+          - ReviewCenter-Core-Signatures-BlockersListed
+          - ReviewCenter-Core-Signatures-FailNotBlocker
+          - ReviewCenter-Core-Signatures-Sign
+          - ReviewCenter-Core-Signatures-SignRecord
+          - ReviewCenter-Core-Signatures-SignMeaning
+          - ReviewCenter-Core-Signatures-Unchanged
+          - ReviewCenter-Core-Signatures-Reauthenticate
+          - ReviewCenter-Core-Signatures-ReauthenticateFailure
+          - ReviewCenter-Core-Signatures-ReauthenticateLockout
+          - ReviewCenter-Core-Signatures-RecordCurrent
+          - ReviewCenter-Core-Signatures-AlreadySigned
+          - ReviewCenter-Core-Signatures-Status
+          - ReviewCenter-Core-Signatures-StatusMissing
+          - ReviewCenter-Core-Signatures-SlotStates
+          - ReviewCenter-Core-Signatures-OutOfDate
+          - ReviewCenter-Core-Signatures-Concluded
+          - ReviewCenter-Core-Signatures-StatusBlockers
+          - ReviewCenter-Core-Signatures-StatusNextStep
+          - ReviewCenter-Core-Signatures-StatusAssignee
+          - ReviewCenter-Core-Signatures-StatusAssigneeKept
+          - ReviewCenter-Core-Signatures-StatusBatch
+          - ReviewCenter-Core-Signatures-Impact
+          - ReviewCenter-Core-Signatures-ImpactRefused
+          - ReviewCenter-Core-Signatures-ImpactAcknowledged
+          - ReviewCenter-Core-Signatures-ImpactNotNeeded
+          - ReviewCenter-Core-Signatures-ImpactOwnSlot
+          - ReviewCenter-Core-Signatures-BallotAcknowledge
+          - ReviewCenter-Core-Signatures-BallotNames
+          - ReviewCenter-Core-Signatures-BallotRemaining
+          - ReviewCenter-Core-Signatures-BallotAcknowledged
+          - ReviewCenter-Core-Signatures-BallotExceptionCopy
+          - ReviewCenter-Core-Signatures-BallotNotNeeded
+          - ReviewCenter-Core-Signatures-BallotDraftKeeps
+          - ReviewCenter-Core-Signatures-OwnBallot
+          - ReviewCenter-Core-Signatures-OwnBallotOrder
+          - ReviewCenter-Core-Signatures-EarlySigning
+          - ReviewCenter-Core-Signatures-DisputedBlocker
+          - ReviewCenter-Core-Signatures-NextStepDisputed
+          - ReviewCenter-Core-Signatures-NextStepRejected
+          - ReviewCenter-Core-Signatures-NextStepSigners
+          - ReviewCenter-Core-Signatures-FailedMasked
+          - ReviewCenter-Core-Signatures-FailedMaskedNote
+          - ReviewCenter-Core-Signatures-FailedMaskedWording
+          - ReviewCenter-Core-Signatures-FailedMaskedHandIn
+          - ReviewCenter-Core-Signatures-SlotBallotAcknowledge
+          - ReviewCenter-Core-Signatures-SlotBallotNotNeeded
+          - ReviewCenter-Core-Signatures-SlotBallotState
+          - ReviewCenter-Core-Signatures-SlotBallotStateNoChecklist
+          - ReviewCenter-Core-Signatures-SlotBallotStateMasked
+          - ReviewCenter-Core-Signatures-SignApproved
+          - ReviewCenter-Core-Signatures-Rejected
+          - ReviewCenter-Core-Signatures-RejectedConclusion
+          - ReviewCenter-Core-Signatures-RejectedMessage
+          - ReviewCenter-Core-Signatures-RejectedBlockers
+          - ReviewCenter-Core-Signatures-RejectedLocks
+          - ReviewCenter-Core-Signatures-RejectedReopen
+          - ReviewCenter-Core-Signatures-AuditOutcome
+          - ReviewCenter-Core-Signatures-ThreadAcknowledge
+          - ReviewCenter-Core-Signatures-ThreadNames
+          - ReviewCenter-Core-Signatures-ThreadAcknowledged
+          - ReviewCenter-Core-Signatures-ThreadNothingStored
+          - ReviewCenter-Core-Signatures-ThreadAfterValidation
+          - ReviewCenter-Core-Signatures-ThreadNotFound
+          - ReviewCenter-Core-Signatures-ThreadNotNeeded
+          - ReviewCenter-Core-Signatures-ThreadRestored
+          - ReviewCenter-Core-Signatures-ConclusionText
+          - ReviewCenter-Core-Signatures-ConclusionTextLead
+          - ReviewCenter-Core-Signatures-ConclusionTextNonMember
+          - ReviewCenter-Core-Signatures-ConclusionTextRefused
+          - ReviewCenter-Core-Signatures-ConclusionTextCanSet
+          - ReviewCenter-Core-Signatures-ConclusionTextNormalized
+          - ReviewCenter-Core-Signatures-ConclusionTextBlank
+          - ReviewCenter-Core-Signatures-ConclusionTextMaxLength
+          - ReviewCenter-Core-Signatures-ConclusionTextTooLong
+          - ReviewCenter-Core-Signatures-ConclusionTextControl
+          - ReviewCenter-Core-Signatures-ConclusionTextLocked
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledge
+          - ReviewCenter-Core-Signatures-ConclusionTextAcknowledged
+          - ReviewCenter-Core-Signatures-ConclusionTextNoChange
+          - ReviewCenter-Core-Signatures-ConclusionTextConcurrent
+          - ReviewCenter-Core-Signatures-ConclusionTextAudit
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoText
+          - ReviewCenter-Core-Signatures-ConclusionTextAuditNoChange
           - ReviewCenter-Storage-Signatures
           - ReviewCenter-Storage-Signatures-Slots
           - ReviewCenter-Storage-Signatures-Current
@@ -801,8 +2168,73 @@ sections:
           - ReviewCenter-Storage-Signatures-ConclusionText
           - ReviewCenter-Storage-Signatures-Batch
           - ReviewCenter-Core-AuditTrail
+          - ReviewCenter-Core-AuditTrail-Verify
+          - ReviewCenter-Core-AuditTrail-TamperDetected
+          - ReviewCenter-Core-AuditTrail-Detail
+          - ReviewCenter-Core-AuditTrail-Actor
+          - ReviewCenter-Core-AuditTrail-Record
+          - ReviewCenter-Core-AuditTrail-Coalesce
+          - ReviewCenter-Core-AuditTrail-CoalesceOverflow
+          - ReviewCenter-Core-AuditTrail-Pages
+          - ReviewCenter-Core-AuditTrail-Scope
+          - ReviewCenter-Core-AuditTrail-Cursors
+          - ReviewCenter-Core-AuditTrail-Filter
+          - ReviewCenter-Core-AuditTrail-FilterInput
+          - ReviewCenter-Core-AuditTrail-FilterRefused
+          - ReviewCenter-Core-AuditTrail-FilterSingleDay
+          - ReviewCenter-Core-AuditTrail-ActionCatalog
+          - ReviewCenter-Core-AuditTrail-VerifyTrail
+          - ReviewCenter-Core-AuditTrail-VerifyTrailBroken
+          - ReviewCenter-Core-AuditTrail-Export
+          - ReviewCenter-Core-AuditTrail-ExportScope
+          - ReviewCenter-Core-AuditTrail-ExportEmpty
+          - ReviewCenter-Core-AuditTrail-ExportCancelled
+          - ReviewCenter-Core-AuditTrail-ExportRefused
+          - ReviewCenter-Core-AuditTrail-ExportChainState
+          - ReviewCenter-Core-AuditTrail-ExportFile
+          - ReviewCenter-Core-AuditTrail-ExportNoLeak
+          - ReviewCenter-Core-AuditTrail-ExportAudited
+          - ReviewCenter-Core-AuditTrail-ExportAuditedIncomplete
+          - ReviewCenter-Core-AuditTrail-ExportCsv
+          - ReviewCenter-Core-AuditTrail-ExportCsvSafe
+          - ReviewCenter-Core-AuditTrail-ExportJson
+          - ReviewCenter-Core-AuditTrail-ExportWriter
+          - ReviewCenter-Core-AuditTrail-Projects
+          - ReviewCenter-Core-AuditTrail-ProjectMembers
+          - ReviewCenter-Core-AuditTrail-ProjectMemberRefused
+          - ReviewCenter-Core-AuditTrail-EvidenceSettings
+          - ReviewCenter-Core-AuditTrail-ProjectChecklist
+          - ReviewCenter-Core-AuditTrail-Reviews
+          - ReviewCenter-Core-AuditTrail-Threads
+          - ReviewCenter-Core-AuditTrail-ThreadNoText
+          - ReviewCenter-Core-AuditTrail-ThreadMissing
+          - ReviewCenter-Core-AuditTrail-ThreadReport
+          - ReviewCenter-Core-AuditTrail-ThreadResolutionNote
+          - ReviewCenter-Core-AuditTrail-ThreadReportMarks
+          - ReviewCenter-Core-AuditTrail-ThreadReportNoOp
+          - ReviewCenter-Core-AuditTrail-CheckThreads
+          - ReviewCenter-Core-AuditTrail-Checklists
+          - ReviewCenter-Core-AuditTrail-ChecklistsRefused
+          - ReviewCenter-Core-AuditTrail-Slots
+          - ReviewCenter-Core-AuditTrail-Signatures
+          - ReviewCenter-Core-AuditTrail-SigningRefused
+          - ReviewCenter-Core-AuditTrail-Users
+          - ReviewCenter-Core-AuditTrail-UserNoPassword
+          - ReviewCenter-Core-AuditTrail-SignInEvents
+          - ReviewCenter-Core-AuditTrail-SignInNoPassword
+          - ReviewCenter-Core-AuditTrail-SignInReasons
+          - ReviewCenter-Core-AuditTrail-SignInOnce
+          - ReviewCenter-Core-AuditTrail-SignInResilient
+          - ReviewCenter-Core-AuditTrail-Reauth
+          - ReviewCenter-Core-AuditTrail-ReauthNoPassword
+          - ReviewCenter-Core-AuditTrail-ReauthOnce
+          - ReviewCenter-Core-AuditTrail-ReauthSigning
+          - ReviewCenter-Core-AuditTrail-Repositories
+          - ReviewCenter-Core-AuditTrail-RepositoryNoSecret
+          - ReviewCenter-Core-AuditTrail-RepositoryNoChange
           - ReviewCenter-Storage-AuditTrail
           - ReviewCenter-Storage-AuditTrail-Gate
+          - ReviewCenter-Storage-AuditTrail-GateReleased
           - ReviewCenter-Storage-AuditTrail-Linear
           - ReviewCenter-Storage-AuditTrail-UniqueSequence
           - ReviewCenter-Storage-AuditTrail-Immutable
@@ -814,11 +2246,41 @@ sections:
           - ReviewCenter-Storage-Persistence-Reviews
           - ReviewCenter-Storage-Persistence-FileContent
           - ReviewCenter-Core-ApprovalLock
+          - ReviewCenter-Core-ApprovalLock-Concluded
+          - ReviewCenter-Core-ApprovalLock-RejectedText
+          - ReviewCenter-Core-ApprovalLock-ApprovedOnly
+          - ReviewCenter-Core-ApprovalLock-Status
+          - ReviewCenter-Core-ApprovalLock-BlockerHint
+          - ReviewCenter-Core-ApprovalLock-OpenThreadSign
+          - ReviewCenter-Core-ApprovalLock-ChatKeeps
+          - ReviewCenter-Core-ApprovalLock-ResolvedConcludes
+          - ReviewCenter-Core-ApprovalLock-ResolvedNoAudit
+          - ReviewCenter-Core-ApprovalLock-ChangesRefused
+          - ReviewCenter-Core-ApprovalLock-NothingChanged
+          - ReviewCenter-Core-ApprovalLock-AfterAccess
+          - ReviewCenter-Core-ApprovalLock-BeforeFileLookup
+          - ReviewCenter-Core-ApprovalLock-ReviewNotFound
+          - ReviewCenter-Core-ApprovalLock-OpenThreadAccepts
+          - ReviewCenter-Core-ApprovalLock-SlotChanges
+          - ReviewCenter-Core-ApprovalLock-ChecklistRefused
+          - ReviewCenter-Core-ApprovalLock-SignatureRefused
+          - ReviewCenter-Core-ApprovalLock-Message
+          - ReviewCenter-Core-ApprovalLock-Reopen
+          - ReviewCenter-Core-ApprovalLock-ReopenRefused
+          - ReviewCenter-Core-ApprovalLock-ReopenReason
+          - ReviewCenter-Core-ApprovalLock-ReopenUnlockedRefused
+          - ReviewCenter-Core-ApprovalLock-ReopenMissing
+          - ReviewCenter-Core-ApprovalLock-ReopenStored
+          - ReviewCenter-Core-ApprovalLock-ReopenAudit
+          - ReviewCenter-Core-ApprovalLock-HistoryKept
+          - ReviewCenter-Core-ApprovalLock-BallotsStay
+          - ReviewCenter-Core-ApprovalLock-FreshSignatures
           - ReviewCenter-Storage-ReviewIntegrity
           - ReviewCenter-Storage-ReviewIntegrity-ApprovedLock
           - ReviewCenter-Storage-ReviewIntegrity-OpenThreadSigning
           - ReviewCenter-Storage-ReviewIntegrity-ReopenAudit
           - ReviewCenter-Storage-ReviewIntegrity-ReopenRefused
+          - ReviewCenter-Storage-ReviewIntegrity-ReopenRefused-Concurrent
           - ReviewCenter-Storage-ReviewIntegrity-IndependentReviewers
           - ReviewCenter-Storage-ReviewIntegrity-SettingAudit
           - ReviewCenter-Web-ReviewLock
@@ -828,6 +2290,8 @@ sections:
           - ReviewCenter-Web-ReviewLock-ReopenHistory
           - ReviewCenter-Web-ReviewLock-Independence
           - ReviewCenter-Api-LockedReview
+          - ReviewCenter-Api-LockedReview-Conflict409
+          - ReviewCenter-Api-LockedReview-NoReopen
         tests:
           - ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised
           - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
@@ -863,8 +2327,73 @@ sections:
           repeated failures, and the omission of comment texts are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Core-AuditTrail
+          - ReviewCenter-Core-AuditTrail-Verify
+          - ReviewCenter-Core-AuditTrail-TamperDetected
+          - ReviewCenter-Core-AuditTrail-Detail
+          - ReviewCenter-Core-AuditTrail-Actor
+          - ReviewCenter-Core-AuditTrail-Record
+          - ReviewCenter-Core-AuditTrail-Coalesce
+          - ReviewCenter-Core-AuditTrail-CoalesceOverflow
+          - ReviewCenter-Core-AuditTrail-Pages
+          - ReviewCenter-Core-AuditTrail-Scope
+          - ReviewCenter-Core-AuditTrail-Cursors
+          - ReviewCenter-Core-AuditTrail-Filter
+          - ReviewCenter-Core-AuditTrail-FilterInput
+          - ReviewCenter-Core-AuditTrail-FilterRefused
+          - ReviewCenter-Core-AuditTrail-FilterSingleDay
+          - ReviewCenter-Core-AuditTrail-ActionCatalog
+          - ReviewCenter-Core-AuditTrail-VerifyTrail
+          - ReviewCenter-Core-AuditTrail-VerifyTrailBroken
+          - ReviewCenter-Core-AuditTrail-Export
+          - ReviewCenter-Core-AuditTrail-ExportScope
+          - ReviewCenter-Core-AuditTrail-ExportEmpty
+          - ReviewCenter-Core-AuditTrail-ExportCancelled
+          - ReviewCenter-Core-AuditTrail-ExportRefused
+          - ReviewCenter-Core-AuditTrail-ExportChainState
+          - ReviewCenter-Core-AuditTrail-ExportFile
+          - ReviewCenter-Core-AuditTrail-ExportNoLeak
+          - ReviewCenter-Core-AuditTrail-ExportAudited
+          - ReviewCenter-Core-AuditTrail-ExportAuditedIncomplete
+          - ReviewCenter-Core-AuditTrail-ExportCsv
+          - ReviewCenter-Core-AuditTrail-ExportCsvSafe
+          - ReviewCenter-Core-AuditTrail-ExportJson
+          - ReviewCenter-Core-AuditTrail-ExportWriter
+          - ReviewCenter-Core-AuditTrail-Projects
+          - ReviewCenter-Core-AuditTrail-ProjectMembers
+          - ReviewCenter-Core-AuditTrail-ProjectMemberRefused
+          - ReviewCenter-Core-AuditTrail-EvidenceSettings
+          - ReviewCenter-Core-AuditTrail-ProjectChecklist
+          - ReviewCenter-Core-AuditTrail-Reviews
+          - ReviewCenter-Core-AuditTrail-Threads
+          - ReviewCenter-Core-AuditTrail-ThreadNoText
+          - ReviewCenter-Core-AuditTrail-ThreadMissing
+          - ReviewCenter-Core-AuditTrail-ThreadReport
+          - ReviewCenter-Core-AuditTrail-ThreadResolutionNote
+          - ReviewCenter-Core-AuditTrail-ThreadReportMarks
+          - ReviewCenter-Core-AuditTrail-ThreadReportNoOp
+          - ReviewCenter-Core-AuditTrail-CheckThreads
+          - ReviewCenter-Core-AuditTrail-Checklists
+          - ReviewCenter-Core-AuditTrail-ChecklistsRefused
+          - ReviewCenter-Core-AuditTrail-Slots
+          - ReviewCenter-Core-AuditTrail-Signatures
+          - ReviewCenter-Core-AuditTrail-SigningRefused
+          - ReviewCenter-Core-AuditTrail-Users
+          - ReviewCenter-Core-AuditTrail-UserNoPassword
+          - ReviewCenter-Core-AuditTrail-SignInEvents
+          - ReviewCenter-Core-AuditTrail-SignInNoPassword
+          - ReviewCenter-Core-AuditTrail-SignInReasons
+          - ReviewCenter-Core-AuditTrail-SignInOnce
+          - ReviewCenter-Core-AuditTrail-SignInResilient
+          - ReviewCenter-Core-AuditTrail-Reauth
+          - ReviewCenter-Core-AuditTrail-ReauthNoPassword
+          - ReviewCenter-Core-AuditTrail-ReauthOnce
+          - ReviewCenter-Core-AuditTrail-ReauthSigning
+          - ReviewCenter-Core-AuditTrail-Repositories
+          - ReviewCenter-Core-AuditTrail-RepositoryNoSecret
+          - ReviewCenter-Core-AuditTrail-RepositoryNoChange
           - ReviewCenter-Storage-AuditTrail
           - ReviewCenter-Storage-AuditTrail-Gate
+          - ReviewCenter-Storage-AuditTrail-GateReleased
           - ReviewCenter-Storage-AuditTrail-Linear
           - ReviewCenter-Storage-AuditTrail-UniqueSequence
           - ReviewCenter-Storage-AuditTrail-Immutable
@@ -873,6 +2402,10 @@ sections:
           - ReviewCenter-Storage-AuditTrail-Batches
           - ReviewCenter-Storage-AuditTrail-ProjectOnly
           - ReviewCenter-Identity-AuditTrail
+          - ReviewCenter-Identity-AuditTrail-BestEffort
+          - ReviewCenter-Identity-AuditTrail-TypedName
+          - ReviewCenter-Identity-AuditTrail-NoPassword
+          - ReviewCenter-Identity-AuditTrail-Coalesce
         tests:
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
           - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
@@ -921,6 +2454,11 @@ sections:
           - ReviewCenter-Web-AuditHistory-Link
           - ReviewCenter-Web-AuditHistory-PlainText
           - ReviewCenter-Api-AuditExport
+          - ReviewCenter-Api-AuditExport-ChainHeaders
+          - ReviewCenter-Api-AuditExport-Allowed
+          - ReviewCenter-Api-AuditExport-Refused
+          - ReviewCenter-Api-AuditExport-NoSession
+          - ReviewCenter-Api-AuditExport-NotInApi
         tests:
           - ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen
           - ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne
@@ -946,12 +2484,56 @@ sections:
           of the content, and the audit entry of the release are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Evidence-Document
+          - ReviewCenter-Evidence-Document-Deterministic
+          - ReviewCenter-Evidence-Document-Checklist
+          - ReviewCenter-Evidence-Document-Findings
+          - ReviewCenter-Evidence-Document-NoExcludedComments
+          - ReviewCenter-Evidence-Document-Conclusion
+          - ReviewCenter-Evidence-Document-RejectionMarked
+          - ReviewCenter-Evidence-Document-BallotsAppendix
+          - ReviewCenter-Evidence-Document-SignOffs
+          - ReviewCenter-Evidence-Document-AuditHead
+          - ReviewCenter-Evidence-Document-KeyStatement
+          - ReviewCenter-Evidence-Document-LeftOut
+          - ReviewCenter-Evidence-Document-ReopenHistory
           - ReviewCenter-Evidence-Signature
+          - ReviewCenter-Evidence-Signature-Chain
+          - ReviewCenter-Evidence-Signature-NonExportable
+          - ReviewCenter-Evidence-Signature-ContentUnchanged
+          - ReviewCenter-Evidence-Signature-TamperEvident
           - ReviewCenter-Evidence-Key
+          - ReviewCenter-Evidence-Key-SelfSigned
+          - ReviewCenter-Evidence-Key-CertificateStore
+          - ReviewCenter-Evidence-Key-File
+          - ReviewCenter-Evidence-Key-RequireTrusted
+          - ReviewCenter-Evidence-Key-ExpiryWarning
+          - ReviewCenter-Evidence-Key-KeyKind
           - ReviewCenter-Evidence-Honesty
+          - ReviewCenter-Evidence-Honesty-Limits
           - ReviewCenter-Evidence-Release
+          - ReviewCenter-Evidence-Release-Anonymous
+          - ReviewCenter-Evidence-Release-OnDemand
+          - ReviewCenter-Evidence-Release-Audit
+          - ReviewCenter-Evidence-Release-IncompleteRefused
+          - ReviewCenter-Evidence-Release-KeyUnavailable
           - ReviewCenter-Evidence-ContentSettings
+          - ReviewCenter-Evidence-ContentSettings-ReadTwice
+          - ReviewCenter-Evidence-ContentSettings-ContentScope
+          - ReviewCenter-Evidence-ContentSettings-NeutralLabels
+          - ReviewCenter-Evidence-ContentSettings-SignatureValid
+          - ReviewCenter-Evidence-ContentSettings-AnonymousActor
           - ReviewCenter-Core-EvidenceSettings
+          - ReviewCenter-Core-EvidenceSettings-Describe
+          - ReviewCenter-Core-EvidenceSettings-Access
+          - ReviewCenter-Core-EvidenceSettings-MemberRefused
+          - ReviewCenter-Core-EvidenceSettings-OtherActors
+          - ReviewCenter-Core-EvidenceSettings-RefusalChangesNothing
+          - ReviewCenter-Core-EvidenceSettings-Change
+          - ReviewCenter-Core-EvidenceSettings-Audit
+          - ReviewCenter-Core-EvidenceSettings-StartingPoint
+          - ReviewCenter-Core-EvidenceSettings-Conflict
+          - ReviewCenter-Core-EvidenceSettings-ActorlessRead
+          - ReviewCenter-Core-EvidenceSettings-Arguments
           - ReviewCenter-Storage-EvidenceSettings
           - ReviewCenter-Storage-EvidenceSettings-Default
           - ReviewCenter-Storage-EvidenceSettings-CompareAndSet
@@ -1002,12 +2584,23 @@ sections:
           setting are verified by the tests of the child requirements.
         children:
           - ReviewCenter-Evidence-Index
+          - ReviewCenter-Evidence-Index-Fields
+          - ReviewCenter-Evidence-Index-Excluded
+          - ReviewCenter-Evidence-Index-Order
           - ReviewCenter-Evidence-Index-Schema
           - ReviewCenter-Evidence-Index-Fingerprint
           - ReviewCenter-Evidence-Index-Semantics
           - ReviewCenter-Evidence-Visibility
+          - ReviewCenter-Evidence-Visibility-OtherActors
+          - ReviewCenter-Evidence-Visibility-Anonymous
+          - ReviewCenter-Evidence-Visibility-AnonymousOff
+          - ReviewCenter-Evidence-Visibility-AnonymousIncomplete
           - ReviewCenter-Api-EvidenceJourney
+          - ReviewCenter-Api-EvidenceJourney-Revoked
           - ReviewCenter-Api-AnonymousEvidence
+          - ReviewCenter-Api-AnonymousEvidence-OffRefused
+          - ReviewCenter-Api-AnonymousEvidence-WrongToken
+          - ReviewCenter-Api-AnonymousEvidence-OpenApi
           - ReviewCenter-Api-AnonymousEvidence-OpenRoutes
           - ReviewCenter-Api-AnonymousEvidence-Index
           - ReviewCenter-Api-AnonymousEvidence-Pdf
@@ -1040,9 +2633,22 @@ sections:
           configurable interval.
         children:
           - ReviewCenter-Identity-Login
+          - ReviewCenter-Identity-Login-SameAnswer
+          - ReviewCenter-Identity-Login-Cookie
+          - ReviewCenter-Identity-Login-Antiforgery
+          - ReviewCenter-Identity-Login-Logout
+          - ReviewCenter-Identity-Login-ReturnUrl
           - ReviewCenter-Identity-Throttle
+          - ReviewCenter-Identity-Throttle-AddressTotal
+          - ReviewCenter-Identity-Throttle-SameAnswer
+          - ReviewCenter-Identity-Throttle-NoPasswordCheck
+          - ReviewCenter-Identity-Throttle-Settings
+          - ReviewCenter-Identity-Throttle-SettingsValidated
           - ReviewCenter-Identity-Session
           - ReviewCenter-Identity-CircuitSession
+          - ReviewCenter-Identity-CircuitSession-Interval
+          - ReviewCenter-Identity-CircuitSession-EndSignIn
+          - ReviewCenter-Identity-CircuitSession-FailClosed
           - ReviewCenter-Web-SignIn
           - ReviewCenter-Web-SignIn-Logout
           - ReviewCenter-Web-SignIn-SignInLink
@@ -1087,7 +2693,54 @@ sections:
           provider says from giving anybody more than the administrators of the review tool give.
         children:
           - ReviewCenter-Identity-OidcSignIn
+          - ReviewCenter-Identity-OidcSignIn-Settings
+          - ReviewCenter-Identity-OidcSignIn-NewAccount
+          - ReviewCenter-Identity-OidcSignIn-NoLocalLink
+          - ReviewCenter-Identity-OidcSignIn-NoPassword
+          - ReviewCenter-Identity-OidcSignIn-DisabledRefused
+          - ReviewCenter-Identity-OidcSignIn-ReturnAddress
+          - ReviewCenter-Identity-OidcSignIn-Throttle
+          - ReviewCenter-Identity-OidcSignIn-Audit
+          - ReviewCenter-Identity-OidcSignIn-FailureAnswer
+          - ReviewCenter-Identity-OidcSignIn-Reauth
+          - ReviewCenter-Identity-OidcSignIn-Reauth-Fresh
+          - ReviewCenter-Identity-OidcSignIn-Reauth-SamePerson
+          - ReviewCenter-Identity-OidcSignIn-Reauth-Once
+          - ReviewCenter-Identity-OidcSignIn-Reauth-FailsClosed
+          - ReviewCenter-Identity-OidcSignIn-Reauth-RefusalAnswer
+          - ReviewCenter-Identity-OidcSignIn-LocalSession
+          - ReviewCenter-Identity-OidcSignIn-CodeFlow
           - ReviewCenter-Core-ExternalIdentity
+          - ReviewCenter-Core-ExternalIdentity-Create
+          - ReviewCenter-Core-ExternalIdentity-Enabled
+          - ReviewCenter-Core-ExternalIdentity-NoRights
+          - ReviewCenter-Core-ExternalIdentity-Audit
+          - ReviewCenter-Core-ExternalIdentity-Disabled
+          - ReviewCenter-Core-ExternalIdentity-MissingIdentity
+          - ReviewCenter-Core-ExternalIdentity-IssuerLength
+          - ReviewCenter-Core-ExternalIdentity-SubjectLength
+          - ReviewCenter-Core-ExternalIdentity-UserName
+          - ReviewCenter-Core-ExternalIdentity-DisplayName
+          - ReviewCenter-Core-ExternalIdentity-NameTaken
+          - ReviewCenter-Core-ExternalIdentity-NoLink
+          - ReviewCenter-Core-ExternalIdentity-NoPassword
+          - ReviewCenter-Core-ExternalIdentity-NoPasswordSignature
+          - ReviewCenter-Core-ExternalIdentity-NoPasswordChange
+          - ReviewCenter-Core-ExternalIdentity-SignProof
+          - ReviewCenter-Core-ExternalIdentity-ProofRequired
+          - ReviewCenter-Core-ExternalIdentity-ProofAudit
+          - ReviewCenter-Core-ExternalIdentity-ProofCheck
+          - ReviewCenter-Core-ExternalIdentity-ProofReviewer
+          - ReviewCenter-Core-ExternalIdentity-ProofReviewerRefused
+          - ReviewCenter-Core-ExternalIdentity-ProofBinding
+          - ReviewCenter-Core-ExternalIdentity-ProofClock
+          - ReviewCenter-Core-ExternalIdentity-ProofExpiry
+          - ReviewCenter-Core-ExternalIdentity-SingleUse
+          - ReviewCenter-Core-ExternalIdentity-UsedUp
+          - ReviewCenter-Core-ExternalIdentity-UsedUpLast
+          - ReviewCenter-Core-ExternalIdentity-ProofKept
+          - ReviewCenter-Core-ExternalIdentity-ProofBounded
+          - ReviewCenter-Core-ExternalIdentity-ProofBoundedLive
           - ReviewCenter-Storage-ExternalIdentity
           - ReviewCenter-Storage-ExternalIdentity-ExactPair
           - ReviewCenter-Storage-ExternalIdentity-UniquePair
@@ -1120,7 +2773,134 @@ sections:
           lockout, and recovery keep it from becoming a new weak point.
         children:
           - ReviewCenter-Identity-TotpSecondFactor
+          - ReviewCenter-Identity-TotpSecondFactor-PendingSignIn
+          - ReviewCenter-Identity-TotpSecondFactor-OpensWithCode
+          - ReviewCenter-Identity-TotpSecondFactor-WrongCodes
+          - ReviewCenter-Identity-TotpSecondFactor-Rfc6238
+          - ReviewCenter-Identity-TotpSecondFactor-SecretEncrypted
+          - ReviewCenter-Identity-TotpSecondFactor-SecretBound
+          - ReviewCenter-Identity-TotpSecondFactor-NoSecretLeak
+          - ReviewCenter-Identity-TotpSecondFactor-OtherSignIns
           - ReviewCenter-Core-TotpSecondFactor
+          - ReviewCenter-Core-TotpSecondFactor-SetupPending
+          - ReviewCenter-Core-TotpSecondFactor-SetupReplace
+          - ReviewCenter-Core-TotpSecondFactor-SetupPassword
+          - ReviewCenter-Core-TotpSecondFactor-SetupAlreadyOn
+          - ReviewCenter-Core-TotpSecondFactor-SetupConfirm
+          - ReviewCenter-Core-TotpSecondFactor-SetupWindow
+          - ReviewCenter-Core-TotpSecondFactor-SetupWrongCode
+          - ReviewCenter-Core-TotpSecondFactor-SetupNothingStarted
+          - ReviewCenter-Core-TotpSecondFactor-SetupRecoveryCodes
+          - ReviewCenter-Core-TotpSecondFactor-SetupCancel
+          - ReviewCenter-Core-TotpSecondFactor-SetupCancelKeepsOn
+          - ReviewCenter-Core-TotpSecondFactor-Availability
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityRefused
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityMessage
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityOperations
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityStatus
+          - ReviewCenter-Core-TotpSecondFactor-AvailabilityArguments
+          - ReviewCenter-Core-TotpSecondFactor-Verify
+          - ReviewCenter-Core-TotpSecondFactor-VerifyOutsideWindow
+          - ReviewCenter-Core-TotpSecondFactor-VerifyUser
+          - ReviewCenter-Core-TotpSecondFactor-VerifyRefusal
+          - ReviewCenter-Core-TotpSecondFactor-VerifyChallengeInvalid
+          - ReviewCenter-Core-TotpSecondFactor-VerifyForeignClientKept
+          - ReviewCenter-Core-TotpSecondFactor-VerifyFeatureOff
+          - ReviewCenter-Core-TotpSecondFactor-VerifyUnreadableSecret
+          - ReviewCenter-Core-TotpSecondFactor-VerifyInvalidated
+          - ReviewCenter-Core-TotpSecondFactor-VerifyLastSignIn
+          - ReviewCenter-Core-TotpSecondFactor-Replay
+          - ReviewCenter-Core-TotpSecondFactor-ReplayConcurrent
+          - ReviewCenter-Core-TotpSecondFactor-ReplaySetupCode
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodes
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesStrength
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesHashed
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesSignIn
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesSpelling
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesOnce
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesOtherUser
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplace
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplaceStopsOld
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplaceNeedsAppCode
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesReplaceRefused
+          - ReviewCenter-Core-TotpSecondFactor-RecoveryCodesUnreadableSecret
+          - ReviewCenter-Core-TotpSecondFactor-Disable
+          - ReviewCenter-Core-TotpSecondFactor-DisableRecoveryCode
+          - ReviewCenter-Core-TotpSecondFactor-DisableRefused
+          - ReviewCenter-Core-TotpSecondFactor-DisableNotEnrolled
+          - ReviewCenter-Core-TotpSecondFactor-DisableRecoveryCodesDeleted
+          - ReviewCenter-Core-TotpSecondFactor-DisablePendingSignIns
+          - ReviewCenter-Core-TotpSecondFactor-AdminReset
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetRefused
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetTarget
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetPendingSignIns
+          - ReviewCenter-Core-TotpSecondFactor-AdminResetList
+          - ReviewCenter-Core-TotpSecondFactor-Lockout
+          - ReviewCenter-Core-TotpSecondFactor-LockoutLocked
+          - ReviewCenter-Core-TotpSecondFactor-LockoutOperations
+          - ReviewCenter-Core-TotpSecondFactor-LockoutShared
+          - ReviewCenter-Core-TotpSecondFactor-LockoutCleared
+          - ReviewCenter-Core-TotpSecondFactor-LockoutPasswordAlone
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChange
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeRecoveryCode
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeNoCode
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeWrongPassword
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeReused
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeCounted
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeClearedAfterProof
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeLockout
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangePasswordOnly
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeApiToken
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeNotRequired
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeTemporary
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeUnreadable
+          - ReviewCenter-Core-TotpSecondFactor-PasswordChangeConcurrent
+          - ReviewCenter-Core-TotpSecondFactor-Audit
+          - ReviewCenter-Core-TotpSecondFactor-AuditRemoved
+          - ReviewCenter-Core-TotpSecondFactor-AuditReset
+          - ReviewCenter-Core-TotpSecondFactor-AuditRecoveryRegenerated
+          - ReviewCenter-Core-TotpSecondFactor-AuditRecoveryUsed
+          - ReviewCenter-Core-TotpSecondFactor-AuditWrongCode
+          - ReviewCenter-Core-TotpSecondFactor-NoSecretLeak
+          - ReviewCenter-Core-TotpSecondFactor-NoSecretLeakErrors
+          - ReviewCenter-Core-TotpSecondFactor-NoSecretLeakShownOnce
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeSingleUse
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeToken
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeHash
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeUnknown
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeRetry
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeLimit
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeBinding
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeNoAddress
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeExpiry
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeExpiryReturned
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeBounded
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeEnded
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeReturnFull
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeInvalidationBound
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeInvalidate
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeTakenBefore
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeTakenAfter
+          - ReviewCenter-Core-TotpSecondFactor-ChallengeArguments
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorRequired
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorKeepsCounter
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorDisabled
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorFailsClosed
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorNotRequired
+          - ReviewCenter-Core-TotpSecondFactor-SecondFactorWrongPassword
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockout
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockoutIsLocked
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockoutConfirmLocked
+          - ReviewCenter-Core-TotpSecondFactor-SharedLockoutConfirmPassword
+          - ReviewCenter-Core-TotpSecondFactor-SignatureCode
+          - ReviewCenter-Core-TotpSecondFactor-SignaturePasswordFirst
+          - ReviewCenter-Core-TotpSecondFactor-SignatureRecoveryRefused
+          - ReviewCenter-Core-TotpSecondFactor-SignatureReplayRefused
+          - ReviewCenter-Core-TotpSecondFactor-SignatureApiToken
+          - ReviewCenter-Core-TotpSecondFactor-SignatureLockoutCount
+          - ReviewCenter-Core-TotpSecondFactor-SignatureLockoutAudit
+          - ReviewCenter-Core-TotpSecondFactor-SignatureFailClosed
+          - ReviewCenter-Core-TotpSecondFactor-SignatureNoCode
           - ReviewCenter-Storage-TotpSecondFactor
           - ReviewCenter-Storage-TotpSecondFactor-StepRace
           - ReviewCenter-Storage-TotpSecondFactor-RecoveryRace
@@ -2123,6 +3903,7 @@ sections:
           11.10(d), limiting system access to authorized individuals).
         children:
           - ReviewCenter-Identity-Authorization
+          - ReviewCenter-Identity-Authorization-UserAdmin
           - ReviewCenter-Hosting-Authentication
         tests:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
@@ -2145,6 +3926,25 @@ sections:
           a token that was handed out earlier.
         children:
           - ReviewCenter-Core-ProjectAccess
+          - ReviewCenter-Core-ProjectAccess-Work
+          - ReviewCenter-Core-ProjectAccess-ProjectAdmin
+          - ReviewCenter-Core-ProjectAccess-PlainMember
+          - ReviewCenter-Core-ProjectAccess-OtherActors
+          - ReviewCenter-Core-ProjectAccess-SystemAdmin
+          - ReviewCenter-Core-ProjectAccess-AuditTrail
+          - ReviewCenter-Core-ProjectAccess-AuditTrailRefused
+          - ReviewCenter-Core-ProjectAccess-Auditor
+          - ReviewCenter-Core-ProjectAccess-TemporaryPassword
+          - ReviewCenter-Core-ProjectAccess-CurrentState
+          - ReviewCenter-Core-ProjectAccess-TokenOwner
+          - ReviewCenter-Core-ProjectAccess-Dependencies
+          - ReviewCenter-Core-ProjectAccess-MemberLookup
+          - ReviewCenter-Core-ProjectAccess-AddThrottle
+          - ReviewCenter-Core-ProjectAccess-LastAdmin
+          - ReviewCenter-Core-ProjectAccess-CreateAccount
+          - ReviewCenter-Core-ProjectAccess-MemberAudit
+          - ReviewCenter-Core-ProjectAccess-AuditorRole
+          - ReviewCenter-Core-ProjectAccess-SlotsAndSigning
           - ReviewCenter-ProjectAccess-Visibility
           - ReviewCenter-ProjectAccess-Visibility-Administer
           - ReviewCenter-ProjectAccess-Visibility-NotAdministrator
@@ -2194,11 +3994,13 @@ sections:
           - ReviewCenter-Web-ProjectAccess-AuditRecheck
           - ReviewCenter-Web-ProjectAccess-AuditLost
           - ReviewCenter-Api-ProjectAccess
+          - ReviewCenter-Api-ProjectAccess-Checklist
           - ReviewCenter-Api-ProjectAccess-SameAnswer
           - ReviewCenter-Api-ProjectAccess-Served
           - ReviewCenter-Api-ProjectAccess-ListProjects
           - ReviewCenter-Api-ProjectAccess-Removed
           - ReviewCenter-Evidence-Visibility
+          - ReviewCenter-Evidence-Visibility-OtherActors
           - ReviewCenter-Storage-Memberships
           - ReviewCenter-Storage-Memberships-OnePerUser
           - ReviewCenter-Storage-Memberships-UnknownProject
@@ -2209,8 +4011,13 @@ sections:
           - ReviewCenter-Storage-Memberships-LastAdmin
           - ReviewCenter-Storage-Memberships-NewAccount
           - ReviewCenter-Storage-Memberships-UserImpact
+          - ReviewCenter-Storage-Memberships-UserImpact-SoleAdmin
           - ReviewCenter-Hosting-ProjectAccess
           - ReviewCenter-Identity-AdminClaim
+          - ReviewCenter-Identity-AdminClaim-NoProjectRole
+          - ReviewCenter-Identity-AdminClaim-MustChange
+          - ReviewCenter-Identity-AdminClaim-AccountPage
+          - ReviewCenter-Identity-AdminClaim-PasswordChanged
         tests:
           - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
@@ -2234,6 +4041,25 @@ sections:
           the tests of the child requirements.
         children:
           - ReviewCenter-Core-ProjectAccess
+          - ReviewCenter-Core-ProjectAccess-Work
+          - ReviewCenter-Core-ProjectAccess-ProjectAdmin
+          - ReviewCenter-Core-ProjectAccess-PlainMember
+          - ReviewCenter-Core-ProjectAccess-OtherActors
+          - ReviewCenter-Core-ProjectAccess-SystemAdmin
+          - ReviewCenter-Core-ProjectAccess-AuditTrail
+          - ReviewCenter-Core-ProjectAccess-AuditTrailRefused
+          - ReviewCenter-Core-ProjectAccess-Auditor
+          - ReviewCenter-Core-ProjectAccess-TemporaryPassword
+          - ReviewCenter-Core-ProjectAccess-CurrentState
+          - ReviewCenter-Core-ProjectAccess-TokenOwner
+          - ReviewCenter-Core-ProjectAccess-Dependencies
+          - ReviewCenter-Core-ProjectAccess-MemberLookup
+          - ReviewCenter-Core-ProjectAccess-AddThrottle
+          - ReviewCenter-Core-ProjectAccess-LastAdmin
+          - ReviewCenter-Core-ProjectAccess-CreateAccount
+          - ReviewCenter-Core-ProjectAccess-MemberAudit
+          - ReviewCenter-Core-ProjectAccess-AuditorRole
+          - ReviewCenter-Core-ProjectAccess-SlotsAndSigning
           - ReviewCenter-Web-ProjectAccess
           - ReviewCenter-Web-ProjectAccess-AdminSeesAll
           - ReviewCenter-Web-ProjectAccess-HiddenProject
@@ -2267,6 +4093,7 @@ sections:
           - ReviewCenter-Storage-Memberships-LastAdmin
           - ReviewCenter-Storage-Memberships-NewAccount
           - ReviewCenter-Storage-Memberships-UserImpact
+          - ReviewCenter-Storage-Memberships-UserImpact-SoleAdmin
         tests:
           - ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers
 
@@ -2287,7 +4114,39 @@ sections:
           behind, and a password hash means a copy of the database does not reveal the passwords.
         children:
           - ReviewCenter-Core-Users
+          - ReviewCenter-Core-Users-Arguments
+          - ReviewCenter-Core-Users-UserName
+          - ReviewCenter-Core-Users-DisplayName
+          - ReviewCenter-Core-Users-Password
+          - ReviewCenter-Core-Users-SignIn
+          - ReviewCenter-Core-Users-SignInRefused
+          - ReviewCenter-Core-Users-Lockout
+          - ReviewCenter-Core-Users-Enabled
+          - ReviewCenter-Core-Users-LastAdmin
+          - ReviewCenter-Core-Users-ChangePassword
+          - ReviewCenter-Core-Users-ChangePasswordRefused
+          - ReviewCenter-Core-Users-ChangePasswordSecondFactor
+          - ReviewCenter-Core-Users-SetPassword
+          - ReviewCenter-Core-Users-SetPasswordRules
+          - ReviewCenter-Core-Users-SetSystemAdmin
+          - ReviewCenter-Core-Users-NotFound
+          - ReviewCenter-Core-Users-TemporaryPassword
+          - ReviewCenter-Core-Users-TemporaryReauth
+          - ReviewCenter-Core-Users-TemporarySame
+          - ReviewCenter-Core-Users-TemporaryEnds
+          - ReviewCenter-Core-Users-AdminPasswordIsTemporary
+          - ReviewCenter-Core-Users-LastSignIn
+          - ReviewCenter-Core-Users-LastSignInNone
+          - ReviewCenter-Core-Users-LockedStatus
+          - ReviewCenter-Core-Users-Unlock
+          - ReviewCenter-Core-Users-UnlockRefused
           - ReviewCenter-Core-UserImpact
+          - ReviewCenter-Core-UserImpact-Ordering
+          - ReviewCenter-Core-UserImpact-BatchRead
+          - ReviewCenter-Core-UserImpact-SoleAdmin
+          - ReviewCenter-Core-UserImpact-Scope
+          - ReviewCenter-Core-UserImpact-Refused
+          - ReviewCenter-Core-UserImpact-Arguments
           - ReviewCenter-Storage-Users
           - ReviewCenter-Storage-Users-UniqueName
           - ReviewCenter-Web-SignIn
@@ -2361,8 +4220,44 @@ sections:
           deleted, so that the reviews made from it keep their reference.
         children:
           - ReviewCenter-Core-Repositories
+          - ReviewCenter-Core-Repositories-NameUnique
+          - ReviewCenter-Core-Repositories-LocationAccepted
+          - ReviewCenter-Core-Repositories-LocationRemoteHttp
+          - ReviewCenter-Core-Repositories-LocationChange
+          - ReviewCenter-Core-Repositories-LocationShape
+          - ReviewCenter-Core-Repositories-LocationGitSafety
+          - ReviewCenter-Core-Repositories-LocationUrlParts
+          - ReviewCenter-Core-Repositories-CredentialsHttps
+          - ReviewCenter-Core-Repositories-CredentialsPair
+          - ReviewCenter-Core-Repositories-CredentialsUserName
+          - ReviewCenter-Core-Repositories-CredentialsToken
+          - ReviewCenter-Core-Repositories-CredentialsTokenInText
+          - ReviewCenter-Core-Repositories-CredentialsKeptTokenInText
+          - ReviewCenter-Core-Repositories-CredentialsTokenCase
+          - ReviewCenter-Core-Repositories-CredentialsMessage
+          - ReviewCenter-Core-Repositories-CredentialsRefusalChangesNothing
+          - ReviewCenter-Core-Repositories-CredentialsNotCompared
+          - ReviewCenter-Core-Repositories-TokenEncrypted
+          - ReviewCenter-Core-Repositories-TokenUpdate
+          - ReviewCenter-Core-Repositories-TokenReplaceEmpty
+          - ReviewCenter-Core-Repositories-TokenNeverReturned
+          - ReviewCenter-Core-Repositories-AdminOnly
+          - ReviewCenter-Core-Repositories-AdminMemberRefused
+          - ReviewCenter-Core-Repositories-AdminNotVisible
+          - ReviewCenter-Core-Repositories-AdminRefusalChangesNothing
+          - ReviewCenter-Core-Repositories-AdminRecheck
+          - ReviewCenter-Core-Repositories-OneProject
+          - ReviewCenter-Core-Repositories-OwnerAccess
+          - ReviewCenter-Core-Repositories-OwnerListing
+          - ReviewCenter-Core-Repositories-DisableNotDelete
+          - ReviewCenter-Core-Repositories-DisabledListing
+          - ReviewCenter-Core-Repositories-DisabledRefused
+          - ReviewCenter-Core-Repositories-Access
+          - ReviewCenter-Core-Repositories-AccessUnreadable
+          - ReviewCenter-Core-Repositories-RuleViolations
           - ReviewCenter-Storage-Repositories
           - ReviewCenter-Storage-Repositories-EncryptedToken
+          - ReviewCenter-Storage-Repositories-EncryptedToken-UpdateSemantics
           - ReviewCenter-Storage-Repositories-ProjectOnlyList
           - ReviewCenter-Storage-Repositories-UniqueName
           - ReviewCenter-Web-Repositories
@@ -2404,6 +4299,17 @@ sections:
           - ReviewCenter-ContentSources-DisabledRepository
           - ReviewCenter-ContentSources-DisabledRepository-NotOffered
           - ReviewCenter-Core-FileSelection
+          - ReviewCenter-Core-FileSelection-RevisionRule
+          - ReviewCenter-Core-FileSelection-Match
+          - ReviewCenter-Core-FileSelection-Wildcards
+          - ReviewCenter-Core-FileSelection-Parse
+          - ReviewCenter-Core-FileSelection-Normalize
+          - ReviewCenter-Core-FileSelection-PatternRule
+          - ReviewCenter-Core-FileSelection-PatternLimits
+          - ReviewCenter-Core-FileSelection-PatternUnsafe
+          - ReviewCenter-Core-FileSelection-Bounded
+          - ReviewCenter-Core-FileSelection-Compatibility
+          - ReviewCenter-Core-FileSelection-RuleViolations
           - ReviewCenter-Hosting-GitSettings
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
@@ -2548,12 +4454,50 @@ sections:
           attributable.
         children:
           - ReviewCenter-Core-AccessTokens
+          - ReviewCenter-Core-AccessTokens-Value
+          - ReviewCenter-Core-AccessTokens-HashOnly
+          - ReviewCenter-Core-AccessTokens-DisplayId
+          - ReviewCenter-Core-AccessTokens-ValueOnce
+          - ReviewCenter-Core-AccessTokens-Name
+          - ReviewCenter-Core-AccessTokens-NameRefused
+          - ReviewCenter-Core-AccessTokens-NameLength
+          - ReviewCenter-Core-AccessTokens-NameTooLong
+          - ReviewCenter-Core-AccessTokens-OwnerRefused
+          - ReviewCenter-Core-AccessTokens-Expiry
+          - ReviewCenter-Core-AccessTokens-ExpiryOther
+          - ReviewCenter-Core-AccessTokens-Expired
+          - ReviewCenter-Core-AccessTokens-Limit
+          - ReviewCenter-Core-AccessTokens-LimitActive
+          - ReviewCenter-Core-AccessTokens-Authenticate
+          - ReviewCenter-Core-AccessTokens-AuthenticateRefused
+          - ReviewCenter-Core-AccessTokens-AuthenticateRevoked
+          - ReviewCenter-Core-AccessTokens-AuthenticateOwner
+          - ReviewCenter-Core-AccessTokens-LastUsed
+          - ReviewCenter-Core-AccessTokens-LastUsedThrottle
+          - ReviewCenter-Core-AccessTokens-Revoke
+          - ReviewCenter-Core-AccessTokens-RevokeRefused
+          - ReviewCenter-Core-AccessTokens-NoTokenManagement
+          - ReviewCenter-Core-AccessTokens-TemporaryPassword
+          - ReviewCenter-Core-AccessTokens-TemporaryPasswordCleared
+          - ReviewCenter-Core-AccessTokens-Audit
+          - ReviewCenter-Core-AccessTokens-AuditRevoked
+          - ReviewCenter-Core-AccessTokens-AuditNoValue
+          - ReviewCenter-Core-AccessTokens-AuditExpiry
+          - ReviewCenter-Core-AccessTokens-NoSigning
+          - ReviewCenter-Core-AccessTokens-NoSlotChange
+          - ReviewCenter-Core-AccessTokens-NoSigningQuiet
+          - ReviewCenter-Core-AccessTokens-CreatedBy
+          - ReviewCenter-Core-AccessTokens-CreatedViaApi
+          - ReviewCenter-Core-AccessTokens-CreatedViaAudit
+          - ReviewCenter-Core-AccessTokens-CreatedViaPerson
           - ReviewCenter-Storage-AccessTokens
           - ReviewCenter-Storage-AccessTokens-CreatorFlag
           - ReviewCenter-Storage-AccessTokens-Find
           - ReviewCenter-Storage-AccessTokens-List
           - ReviewCenter-Storage-AccessTokens-Revoke
+          - ReviewCenter-Storage-AccessTokens-Revoke-OwnTokensOnly
           - ReviewCenter-Storage-AccessTokens-Touch
+          - ReviewCenter-Storage-AccessTokens-Touch-CompareAndSet
           - ReviewCenter-Storage-AccessTokens-Audit
           - ReviewCenter-Web-AccessTokens
           - ReviewCenter-Web-AccessTokens-Copy
@@ -2562,6 +4506,11 @@ sections:
           - ReviewCenter-Web-AccessTokens-HelpTopic
           - ReviewCenter-Web-AccessTokens-HelpLink
           - ReviewCenter-Api-TokenJourney
+          - ReviewCenter-Api-TokenJourney-Basic
+          - ReviewCenter-Api-TokenJourney-Refusal
+          - ReviewCenter-Api-TokenJourney-Throttle
+          - ReviewCenter-Api-TokenJourney-FailureAudit
+          - ReviewCenter-Api-TokenJourney-NoTokenInLog
         tests:
           - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
           - CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner
@@ -2583,10 +4532,27 @@ sections:
           a signature still proves that a person was there.
         children:
           - ReviewCenter-Api-ReviewJourney
+          - ReviewCenter-Api-ReviewJourney-Read
+          - ReviewCenter-Api-ReviewJourney-Masking
+          - ReviewCenter-Api-ReviewJourney-CreateUpload
+          - ReviewCenter-Api-ReviewJourney-CreateRepository
+          - ReviewCenter-Api-ReviewJourney-Marked
+          - ReviewCenter-Api-ReviewJourney-Attestation
+          - ReviewCenter-Api-ReviewJourney-ProblemDocument
+          - ReviewCenter-Api-ReviewJourney-Limits
+          - ReviewCenter-Api-ReviewJourney-UnknownAddress
           - ReviewCenter-Api-Isolation
+          - ReviewCenter-Api-Isolation-NoWebPages
+          - ReviewCenter-Api-Isolation-NoCookie
           - ReviewCenter-Api-Document
+          - ReviewCenter-Api-Document-Scheme
+          - ReviewCenter-Api-Document-AnonymousOperations
+          - ReviewCenter-Api-Document-Stable
+          - ReviewCenter-Api-Document-Snapshot
           - ReviewCenter-Api-EvidenceJourney
+          - ReviewCenter-Api-EvidenceJourney-Revoked
           - ReviewCenter-Api-ProjectAccess
+          - ReviewCenter-Api-ProjectAccess-Checklist
           - ReviewCenter-Api-ProjectAccess-SameAnswer
           - ReviewCenter-Api-ProjectAccess-Served
           - ReviewCenter-Api-ProjectAccess-ListProjects
@@ -2685,8 +4651,12 @@ sections:
           - ReviewCenter-Cli-ResultAlias
           - ReviewCenter-SelfTest-Qualification
           - ReviewCenter-SelfTest-Hermetic
+          - ReviewCenter-SelfTest-Hermetic-NoConfiguration
+          - ReviewCenter-SelfTest-Hermetic-NoDatabase
+          - ReviewCenter-SelfTest-Hermetic-NoPort
           - ReviewCenter-SelfTest-ResultsOutput
           - ReviewCenter-SelfTest-InvalidExtension
+          - ReviewCenter-SelfTest-InvalidExtension-ExitCode
         tests:
           - ReviewCenter_ValidateFlag_Provided_RunsValidation
           - ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile

@@ -400,6 +400,10 @@ it, and the Ready to sign row of ann for the review is unread. This scenario is 
 the user, the project, the review, the given newest comment, and the time of the clock. This scenario is tested by
 `InboxService_MarkSeenAsync_FirstCall_StoresCommentAndTime`.
 
+**InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail**: Marking a review as seen stores the state and
+leaves the record digest of the review unchanged, and the inbox service has no audit store among its dependencies. This
+scenario is tested by `InboxService_MarkSeenAsync_KeepsStateOutOfRecordDigestAndAuditTrail`.
+
 **InboxRules_SlotState_MatchesSigningServiceApproval**: The slot state is the one the signing service reports for a slot
 that was never signed, a slot with a current signature, and a slot whose signature is out of date. This scenario is
 tested by `InboxRules_SlotState_MatchesSigningServiceApproval`.

@@ -217,10 +217,10 @@ sections:
       - id: ReviewCenter-Storage-Threads-Report
         title: >-
           The Storage subsystem shall store the resolution of a thread, the kind of a thread, and the report flag
-          of a comment only as the rules of the report allow, and refuse the change of a concluded review.
+          of a comment only as the rules of the report allow.
         justification: |
           What is included in the review report is evidence, so the database layer applies the rules of the
-          report itself and keeps a record that was read earlier from being changed behind a signature.
+          report itself.
         children:
           - ReviewCenter-ReviewStore-ThreadReport
           - ReviewCenter-ReviewStore-ThreadReport-KindChanged
@@ -238,11 +238,19 @@ sections:
           - ReviewCenter-ReviewStore-ThreadReport-DemoteRepliesKept
           - ReviewCenter-ReviewStore-ThreadReport-ReplyFlag
           - ReviewCenter-ReviewStore-ThreadReport-ReplyFlagRefused
-          - ReviewCenter-ReviewStore-ThreadReport-Locked
         tests:
           - ReviewStore_ResolveThreadAsync_FindingWithNote_StoresIncludedResolutionAndAudits
           - ReviewStore_SetThreadKindAsync_PromoteDemote_UpdatesStartingAndResolutionComments
           - ReviewStore_SetCommentReportAsync_ReplyToggles_StartingAndResolutionRefused
+
+      - id: ReviewCenter-Storage-Threads-ConcludedRefused
+        title: >-
+          The Storage subsystem shall refuse a change of the threads of a concluded review.
+        justification: |
+          A record that was read earlier must not be changed behind a signature.
+        children:
+          - ReviewCenter-ReviewStore-ThreadReport-Locked
+        tests:
           - ReviewStore_ThreadWrites_ConcludedReview_ThrowReviewLocked
 
       - id: ReviewCenter-Storage-Users
@@ -396,27 +404,42 @@ sections:
 
       - id: ReviewCenter-Storage-Checklist-BallotSlotLifecycle
         title: >-
-          The Storage subsystem shall keep the ballot of a reviewer slot in step with the slot, seeding it from the
-          baseline of a follow-up review, and removing the own answers of a reviewer who leaves the slot.
+          The Storage subsystem shall keep the ballot of a reviewer slot in step with the slot.
         justification: |
-          A ballot belongs to a slot, so a reviewer who takes over a slot must not inherit the answers of the
-          one who left, and carried answers of the earlier review must not be lost.
+          A ballot belongs to a slot, so the ballot must follow what happens to the slot: a swap of roles keeps it,
+          the removal of the slot deletes it, and a signed slot is left as it is.
         children:
           - ReviewCenter-ReviewStore-BallotSlotLifecycle
-          - ReviewCenter-ReviewStore-BallotSlotLifecycle-NoBaseline
-          - ReviewCenter-ReviewStore-BallotSlotLifecycle-DepartingRows
-          - ReviewCenter-ReviewStore-BallotSlotLifecycle-CarriedKept
-          - ReviewCenter-ReviewStore-BallotSlotLifecycle-CarriedKeptNoReassignEntry
-          - ReviewCenter-ReviewStore-BallotSlotLifecycle-RevertsToDraft
-          - ReviewCenter-ReviewStore-BallotSlotLifecycle-ReassignEntry
           - ReviewCenter-ReviewStore-BallotSlotLifecycle-RoleSwapKeeps
           - ReviewCenter-ReviewStore-BallotSlotLifecycle-RoleSwapKeepsNoReassignEntry
           - ReviewCenter-ReviewStore-BallotSlotLifecycle-RemovedSlot
           - ReviewCenter-ReviewStore-BallotSlotLifecycle-SignedSlotKept
         tests:
-          - ReviewStore_AddSlotAsync_FollowUpBaseline_SeedsDraftBallotWithCarriedRows
-          - ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft
           - ReviewStore_RemoveSlotAsync_WithBallot_DeletesTheBallotRows
+
+      - id: ReviewCenter-Storage-Checklist-BallotSlotLifecycle-Seed
+        title: >-
+          The Storage subsystem shall seed the ballot of a new reviewer slot from the baseline of a follow-up review.
+        justification: |
+          Carried answers of the earlier review must not be lost when a slot is added.
+        children:
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-NoBaseline
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-CarriedKept
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-CarriedKeptNoReassignEntry
+        tests:
+          - ReviewStore_AddSlotAsync_FollowUpBaseline_SeedsDraftBallotWithCarriedRows
+
+      - id: ReviewCenter-Storage-Checklist-BallotSlotLifecycle-LeaverRemoved
+        title: >-
+          The Storage subsystem shall remove the own answers of a reviewer who leaves a slot.
+        justification: |
+          A reviewer who takes over a slot must not inherit the answers of the one who left.
+        children:
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-DepartingRows
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-RevertsToDraft
+          - ReviewCenter-ReviewStore-BallotSlotLifecycle-ReassignEntry
+        tests:
+          - ReviewStore_UpdateSlotAsync_DepartingUser_RemovesOwnRowsAndRevertsToDraft
 
       - id: ReviewCenter-Storage-Signatures
         title: >-
@@ -663,11 +686,17 @@ sections:
 
       - id: ReviewCenter-Storage-AuditTrail-Gate
         title: >-
-          The Storage subsystem shall store audited changes through one process-wide gate shared by all stores,
-          which a failed change releases.
+          The Storage subsystem shall store audited changes through one process-wide gate shared by all stores.
         justification: |
-          One gate keeps the changes of all stores in one order, and a gate that a failed change kept would stop
-          every later change.
+          One gate keeps the changes of all stores in one order.
+        tests:
+          - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
+
+      - id: ReviewCenter-Storage-AuditTrail-GateReleased
+        title: >-
+          The Storage subsystem shall release the process-wide gate when an audited change fails.
+        justification: |
+          A gate that a failed change kept would stop every later change.
         children:
           - ReviewCenter-AuditStore-Atomic-GateRelease
           - ReviewCenter-UserStore-Audit-GateRelease
@@ -825,23 +854,30 @@ sections:
 
       - id: ReviewCenter-Storage-Repositories-EncryptedToken
         title: >-
-          The Storage subsystem shall keep the access token of a repository only in its encrypted form, and keep,
-          replace, or clear it only as an update of the repository says.
+          The Storage subsystem shall keep the access token of a repository only in its encrypted form.
         justification: |
-          A copy of the database must not reveal a token, and an update that does not mention the token must not
-          lose it.
+          A copy of the database must not reveal a token.
         children:
           - ReviewCenter-RepositoryStore-Token
           - ReviewCenter-RepositoryStore-Token-None
           - ReviewCenter-RepositoryStore-Token-HiddenFromRecord
-          - ReviewCenter-RepositoryStore-Token-Keep
-          - ReviewCenter-RepositoryStore-Token-Replace
-          - ReviewCenter-RepositoryStore-Token-Clear
           - ReviewCenter-DbContext-Repositories-EncryptedToken
         tests:
           - RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText
-          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
           - RepositoryStore_ReadModel_HasNoTokenMember
+
+      - id: ReviewCenter-Storage-Repositories-EncryptedToken-UpdateSemantics
+        title: >-
+          The Storage subsystem shall keep, replace, or clear the access token of a repository only as an update of
+          the repository says.
+        justification: |
+          An update that does not mention the token must not lose it.
+        children:
+          - ReviewCenter-RepositoryStore-Token-Keep
+          - ReviewCenter-RepositoryStore-Token-Replace
+          - ReviewCenter-RepositoryStore-Token-Clear
+        tests:
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
 
       - id: ReviewCenter-Storage-Repositories-ProjectOnlyList
         title: >-
@@ -1003,25 +1039,32 @@ sections:
 
       - id: ReviewCenter-Storage-Memberships-UserImpact
         title: >-
-          The Storage subsystem shall report the reviewer slots a user holds and the projects in which the user
-          is the only enabled project administrator.
+          The Storage subsystem shall report the reviewer slots a user holds.
         justification: |
-          Before an account is disabled or removed, an administrator must see which reviews would lose a reviewer
-          and which projects would lose their only administrator.
+          Before an account is disabled or removed, an administrator must see which reviews would lose a reviewer.
         children:
           - ReviewCenter-ReviewStore-UserImpact
           - ReviewCenter-ReviewStore-UserImpact-Order
           - ReviewCenter-ReviewStore-UserImpact-OtherUsersSlots
           - ReviewCenter-ReviewStore-UserImpact-NoSlots
+          - ReviewCenter-ReviewStore-UserImpact-DisabledUserNotReported
+        tests:
+          - ReviewStore_ListSlotsOfUserAsync_PrimaryAndAlternate_AreFoundInOrder
+
+      - id: ReviewCenter-Storage-Memberships-UserImpact-SoleAdmin
+        title: >-
+          The Storage subsystem shall report the projects in which a user is the only enabled project administrator.
+        justification: |
+          Before an account is disabled or removed, an administrator must see which projects would lose their only
+          administrator.
+        children:
           - ReviewCenter-ReviewStore-UserImpact-SoleAdmin
           - ReviewCenter-ReviewStore-UserImpact-SoleAdminOrder
           - ReviewCenter-ReviewStore-UserImpact-SharedAdminLeftOut
           - ReviewCenter-ReviewStore-UserImpact-NotAdminLeftOut
           - ReviewCenter-ReviewStore-UserImpact-DisabledAdminNotCounted
           - ReviewCenter-ReviewStore-UserImpact-OrdinaryMemberNotCounted
-          - ReviewCenter-ReviewStore-UserImpact-DisabledUserNotReported
         tests:
-          - ReviewStore_ListSlotsOfUserAsync_PrimaryAndAlternate_AreFoundInOrder
           - ReviewStore_ListSoleAdminProjectsAsync_OnlyEnabledAdministrator_IsFound
 
       - id: ReviewCenter-Storage-EvidenceSettings
@@ -1313,8 +1356,8 @@ sections:
 
       - id: ReviewCenter-Storage-FollowUp-CarriedRows
         title: >-
-          The Storage subsystem shall keep the numbers of answers and threads a follow-up review carried, and the
-          answers, sections, and threads it carried, with the review they came from, in a database file.
+          The Storage subsystem shall keep the answers, sections, and threads a follow-up review carried, with the
+          review they came from, in a database file.
         justification: |
           The carried answers and threads are part of what the reviewers approve, so they must survive a
           restart.
@@ -1323,11 +1366,21 @@ sections:
           - ReviewCenter-ReviewStore-FollowUp-CarriedSections
           - ReviewCenter-ReviewStore-FollowUp-CarriedThreads
           - ReviewCenter-ReviewStore-FollowUp-CarriedFlags
-          - ReviewCenter-ReviewStore-FollowUp-ThreadNumbers
           - ReviewCenter-DbContext-FollowUp-CarriedRowsNotMapped
         tests:
           - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
           - ReviewStore_AddReviewAsync_CarriedFinding_PersistsFlagsAndKind
+
+      - id: ReviewCenter-Storage-FollowUp-CarriedRows-Counts
+        title: >-
+          The Storage subsystem shall keep the numbers of answers and threads a follow-up review carried in a
+          database file.
+        justification: |
+          The numbers are shown to the readers of the review, so they must survive a restart.
+        children:
+          - ReviewCenter-ReviewStore-FollowUp-ThreadNumbers
+        tests:
+          - ReviewStore_AddReviewAsync_FollowUp_RoundTripsEveryNewColumn
 
       - id: ReviewCenter-Storage-FollowUp-CarryFailsStoresNothing
         title: >-
@@ -1445,19 +1498,27 @@ sections:
       - id: ReviewCenter-Storage-ReviewIntegrity-ReopenRefused
         title: >-
           The Storage subsystem shall refuse to reopen a review that is not approved or does not exist, storing
-          nothing, and let only one of two overlapping reopenings succeed.
+          nothing.
         justification: |
-          Two reopenings of one approval would record the same approval twice, so the check is made in the
-          transaction of the reopening.
+          A reopening of a review that is not approved would change a record that no approval covers.
         children:
           - ReviewCenter-ReviewStore-ReopenRefusal
           - ReviewCenter-ReviewStore-ReopenRefusal-NotFound
           - ReviewCenter-ReviewStore-ReopenRefusal-NothingStored
           - ReviewCenter-ReviewStore-ReopenRefusal-NoAuditEntry
+        tests:
+          - ReviewStore_ReopenReviewAsync_NotApprovedOrUnknown_IsRefusedAndStoresNothing
+
+      - id: ReviewCenter-Storage-ReviewIntegrity-ReopenRefused-Concurrent
+        title: >-
+          The Storage subsystem shall let only one of two overlapping reopenings of a review succeed.
+        justification: |
+          Two reopenings of one approval would record the same approval twice, so the check is made in the
+          transaction of the reopening.
+        children:
           - ReviewCenter-ReviewStore-ReopenRefusal-OneWinner
           - ReviewCenter-ReviewStore-ReopenRefusal-StoredOnce
         tests:
-          - ReviewStore_ReopenReviewAsync_NotApprovedOrUnknown_IsRefusedAndStoresNothing
           - ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds
 
       - id: ReviewCenter-Storage-ReviewIntegrity-IndependentReviewers
@@ -1672,23 +1733,27 @@ sections:
 
       - id: ReviewCenter-Storage-AccessTokens-Revoke
         title: >-
-          The Storage subsystem shall mark a personal access token of a user as revoked, once, and no token of
-          another user.
+          The Storage subsystem shall mark a personal access token of a user as revoked, once.
         justification: |
-          A revoked token must stay revoked after a restart, and a user must not be able to revoke the tokens of
-          others.
+          A revoked token must stay revoked after a restart.
         children:
           - ReviewCenter-PersonalAccessTokenStore-Revoke
           - ReviewCenter-PersonalAccessTokenStore-Revoke-Once
-          - ReviewCenter-PersonalAccessTokenStore-Revoke-OtherUsers
         tests:
           - StorageSubsystem_AccessTokens_PersistAcrossReopen
           - PersonalAccessTokenStore_RevokeAsync_OwnToken_RevokesOnceAndAudits
 
+      - id: ReviewCenter-Storage-AccessTokens-Revoke-OwnTokensOnly
+        title: >-
+          The Storage subsystem shall not mark a personal access token of another user as revoked.
+        justification: |
+          A user must not be able to revoke the tokens of others.
+        children:
+          - ReviewCenter-PersonalAccessTokenStore-Revoke-OtherUsers
+
       - id: ReviewCenter-Storage-AccessTokens-Touch
         title: >-
-          The Storage subsystem shall mark a personal access token as used by changing only its last-used time,
-          only against the time the caller saw.
+          The Storage subsystem shall mark a personal access token as used by changing only its last-used time.
         justification: |
           Every request with a token marks it as used, so the write must be cheap, must not disturb the other
           values, and must not produce an audit entry for every request.
@@ -1696,10 +1761,18 @@ sections:
           - ReviewCenter-PersonalAccessTokenStore-Touch
           - ReviewCenter-PersonalAccessTokenStore-Touch-OtherValuesKept
           - ReviewCenter-PersonalAccessTokenStore-Touch-NoAudit
+        tests:
+          - PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed
+
+      - id: ReviewCenter-Storage-AccessTokens-Touch-CompareAndSet
+        title: >-
+          The Storage subsystem shall mark a personal access token as used only against the time the caller saw.
+        justification: |
+          Parallel requests with one token must not each write the same change.
+        children:
           - ReviewCenter-PersonalAccessTokenStore-Touch-CompareAndSet
           - ReviewCenter-PersonalAccessTokenStore-Touch-OneWriter
         tests:
-          - PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed
           - PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce
 
       - id: ReviewCenter-Storage-AccessTokens-Audit

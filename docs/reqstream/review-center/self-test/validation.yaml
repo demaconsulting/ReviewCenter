@@ -15,23 +15,6 @@ sections:
         justification: |
           Provides a built-in mechanism to verify the tool is functioning correctly
           in the deployment environment. A summary is printed for human review.
-        children:
-          - ReviewCenter-Utilities-SafePaths
-          - ReviewCenter-Utilities-SafePaths-PathTraversal
-          - ReviewCenter-Utilities-SafePaths-AbsolutePath
-          - ReviewCenter-Utilities-SafePaths-NullArgument
-          - ReviewCenter-Utilities-TempFiles
-          - ReviewCenter-Utilities-TempFiles-InsideOnly
-          - ReviewCenter-Utilities-TempFiles-Parents
-          - ReviewCenter-Utilities-TempFiles-Escape
-          - ReviewCenter-Utilities-TempFiles-NullPath
-          - ReviewCenter-Utilities-TempFiles-Removed
-          - ReviewCenter-Utilities-TempFiles-Removed-Repeated
-          - ReviewCenter-Utilities-TempFiles-Removed-Retry
-          - ReviewCenter-Utilities-TempFiles-LockedFile
-          - ReviewCenter-Utilities-TempFiles-LockedFile-Bounded
-          - ReviewCenter-Utilities-TempFiles-LockedFile-NoFinalPause
-          - ReviewCenter-Utilities-TempFiles-InvalidPolicy
         tests:
           - Validation_Run_WithSilentContext_PrintsSummary
 

@@ -115,35 +115,72 @@ sections:
 
       - id: ReviewCenter-SelfTest-Hermetic
         title: >-
-          The self-validation run shall be hermetic: every file it creates lives in a temporary folder that is
-          removed at the end, and by default it reads no configuration, touches no configured database and binds no
-          configured port.
+          The self-validation run shall create every file it needs in a temporary folder that is removed at the end.
         justification: |
-          Tool qualification evidence is only worth something if it comes out the same on every machine and cannot
-          damage the deployment it qualifies. A run that used the configured database or port would depend on, and
-          could change, the state of the system under test, and a run that left files behind would fill the disk of
-          a CI runner. The only look at the deployment's own configuration is the opt-in `--check-config` check,
-          which is read-only.
+          A run that left files behind would fill the disk of a CI runner, and a run that wrote outside its own folder
+          could damage the deployment it qualifies.
+        children:
+          - ReviewCenter-ValidationChecks-Hermetic
+          - ReviewCenter-ValidationChecks-FastCommit
+          - ReviewCenter-ValidationChecks-FastCommit-OnlyInsideFolder
+          - ReviewCenter-Utilities-SafePaths
+          - ReviewCenter-Utilities-SafePaths-PathTraversal
+          - ReviewCenter-Utilities-SafePaths-AbsolutePath
+          - ReviewCenter-Utilities-SafePaths-NullArgument
+          - ReviewCenter-Utilities-TempFiles
+          - ReviewCenter-Utilities-TempFiles-InsideOnly
+          - ReviewCenter-Utilities-TempFiles-Parents
+          - ReviewCenter-Utilities-TempFiles-Escape
+          - ReviewCenter-Utilities-TempFiles-NullPath
+          - ReviewCenter-Utilities-TempFiles-Removed
+          - ReviewCenter-Utilities-TempFiles-Removed-Repeated
+          - ReviewCenter-Utilities-TempFiles-Removed-Retry
+          - ReviewCenter-Utilities-TempFiles-LockedFile
+          - ReviewCenter-Utilities-TempFiles-LockedFile-Bounded
+          - ReviewCenter-Utilities-TempFiles-LockedFile-NoFinalPause
+          - ReviewCenter-Utilities-TempFiles-InvalidPolicy
+
+      - id: ReviewCenter-SelfTest-Hermetic-NoConfiguration
+        title: >-
+          By default the self-validation run shall read no configuration of the deployment.
+        justification: |
+          Tool qualification evidence is only worth something if it comes out the same on every machine. The only look
+          at the deployment's own configuration is the opt-in `--check-config` check, which is read-only.
         children:
           - ReviewCenter-Validation-CheckConfig
           - ReviewCenter-Validation-DefaultChecks
-          - ReviewCenter-ValidationChecks-Hermetic
           - ReviewCenter-ValidationChecks-Hermetic-InMemoryConfiguration
-          - ReviewCenter-ValidationChecks-Hermetic-EphemeralLoopbackPort
+          - ReviewCenter-ServerHost-IsolatedSettings-Environment
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
+
+      - id: ReviewCenter-SelfTest-Hermetic-NoDatabase
+        title: >-
+          By default the self-validation run shall touch no configured database or key ring of the deployment.
+        justification: |
+          A run that used the configured database would depend on, and could change, the state of the system under
+          test.
+        children:
           - ReviewCenter-ValidationChecks-Hermetic-PermissionsOnlyKeys
-          - ReviewCenter-ValidationChecks-FastCommit
           - ReviewCenter-ValidationChecks-FastCommit-ProductionDefault
-          - ReviewCenter-ValidationChecks-FastCommit-OnlyInsideFolder
           - ReviewCenter-ValidationChecks-FastCommit-ReadOnlyUntouched
           - ReviewCenter-ValidationChecks-FastCommit-InMemoryUntouched
           - ReviewCenter-ValidationChecks-FastCommit-RequiresAllowedFolder
-          - ReviewCenter-ServerHost-IsolatedSettings
-          - ReviewCenter-ServerHost-IsolatedSettings-Environment
           - ReviewCenter-ServerHost-IsolatedSettings-AmbientData
-          - ReviewCenter-ServerHost-IsolatedSettings-Routes
-          - ReviewCenter-ServerHost-IsolatedSettings-DefaultHostAmbient
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
+
+      - id: ReviewCenter-SelfTest-Hermetic-NoPort
+        title: >-
+          By default the self-validation run shall bind no configured port and listen only on an ephemeral loopback
+          port.
+        justification: |
+          A run that used the configured port would collide with, or disturb, the service of the machine.
+        children:
+          - ReviewCenter-ValidationChecks-Hermetic-EphemeralLoopbackPort
+          - ReviewCenter-ServerHost-IsolatedSettings
+          - ReviewCenter-ServerHost-IsolatedSettings-Routes
+          - ReviewCenter-ServerHost-IsolatedSettings-DefaultHostAmbient
 
       - id: ReviewCenter-SelfTest-ConfiguredNotifications
         title: >-
@@ -222,14 +259,22 @@ sections:
 
       - id: ReviewCenter-SelfTest-InvalidExtension
         title: >-
-          The tool shall report an error and set a non-zero exit code when an
-          unsupported results file extension is provided.
+          The tool shall report an error when an unsupported results file extension is provided.
         justification: |
           Prevents silent loss of validation evidence by failing loudly when a results
           file cannot be written due to an unrecognized extension. This enables CI/CD
           pipelines to detect misconfigured output paths automatically.
         children:
           - ReviewCenter-Validation-InvalidExtension
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile
+
+      - id: ReviewCenter-SelfTest-InvalidExtension-ExitCode
+        title: >-
+          The tool shall set a non-zero exit code when an unsupported results file extension is provided.
+        justification: |
+          A pipeline decides on the exit code, so a results file that cannot be written must not look like a success.
+        children:
           - ReviewCenter-Validation-InvalidExtension-ExitCode
         tests:
           - SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile

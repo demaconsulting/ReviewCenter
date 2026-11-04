@@ -15,18 +15,10 @@ sections:
       - id: ReviewCenter-Evidence-Document
         title: >-
           The Evidence subsystem shall produce, for a concluded review (approved or rejected), a PDF document that
-          states the review, its content fingerprint, its files, its checklist (the consolidated standing of the
-          submitted ballots, with who answered each agreed check and when), the findings and included comments (never a
-          comment that was not included), its conclusion, its reviewer sign-offs, a ballots
-          appendix with the final ballot of every slot and its fingerprint, the head of the audit trail, and the key
-          that signed it, in the same bytes for the same input, with the files, checklist wording, findings, reviewer
-          names, and git context left out as the evidence settings of the project say, a rejection marked as such on
-          its first page, and, for a review that was reopened after an approval, the history of the reopenings.
+          states the review, its content fingerprint, and its files.
         justification: |
-          The conclusion of a review must be portable. A document that holds what was reviewed and who signed, and that
-          is the same when it is made again, can be filed, printed, and checked outside the tool. A reader must also
-          be able to see that an approval followed one that was reopened, and a rejection must be recognizable at a
-          glance.
+          The conclusion of a review must be portable. A document that holds what was reviewed can be filed, printed,
+          and checked outside the tool.
         children:
           - ReviewCenter-PdfDocumentWriter-Structure
           - ReviewCenter-PdfDocumentWriter-Structure-CrossReference
@@ -39,7 +31,6 @@ sections:
           - ReviewCenter-PdfDocumentWriter-Structure-Metadata
           - ReviewCenter-PdfDocumentWriter-Structure-CreatorProducer
           - ReviewCenter-PdfDocumentWriter-Structure-MetadataUnicode
-          - ReviewCenter-PdfDocumentWriter-Deterministic
           - ReviewCenter-PdfDocumentWriter-Layout
           - ReviewCenter-PdfDocumentWriter-Layout-LongWord
           - ReviewCenter-PdfDocumentWriter-Layout-LineFeed
@@ -54,73 +45,175 @@ sections:
           - ReviewCenter-AttestationRenderer-Review-Upload
           - ReviewCenter-AttestationRenderer-Review-FileList
           - ReviewCenter-AttestationRenderer-Review-FileCount
+          - ReviewCenter-AttestationRenderer-Output
+          - ReviewCenter-AttestationRenderer-Output-Pages
+          - ReviewCenter-AttestationRenderer-Output-Unicode
+          - ReviewCenter-AttestationRenderer-Output-Arguments
+          - ReviewCenter-AttestationService-Report-NotConcluded
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Document-Deterministic
+        title: >-
+          The Evidence subsystem shall produce the document of a concluded review in the same bytes for the same input.
+        justification: |
+          A document that is the same when it is made again can be compared and checked outside the tool.
+        children:
+          - ReviewCenter-PdfDocumentWriter-Deterministic
+          - ReviewCenter-AttestationRenderer-Output-Deterministic
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Document-Checklist
+        title: >-
+          The Evidence subsystem shall state in the document of a concluded review its checklist, the consolidated
+          standing of the submitted ballots, with who answered each agreed check and when.
+        justification: |
+          The checklist is what the reviewers answered, so a reader must see the answers and who gave them.
+        children:
+          - ReviewCenter-AttestationRenderer-AnswerTimes
+          - ReviewCenter-AttestationRenderer-AnswerTimes-Utc
+          - ReviewCenter-AttestationRenderer-AnswerTimes-None
+          - ReviewCenter-AttestationRenderer-Findings-NoChecklist
+          - ReviewCenter-AttestationService-Document-Checklist
+          - ReviewCenter-AttestationService-Document-AnswerTime
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Document-Findings
+        title: >-
+          The Evidence subsystem shall state in the document of a concluded review the findings and included comments.
+        justification: |
+          The findings are the reasons for the outcome, so a reader must be able to read them.
+        children:
           - ReviewCenter-AttestationRenderer-Findings
           - ReviewCenter-AttestationRenderer-Findings-LongComment
           - ReviewCenter-AttestationRenderer-Findings-CommentPages
-          - ReviewCenter-AttestationRenderer-Findings-NoChecklist
           - ReviewCenter-AttestationRenderer-Findings-List
           - ReviewCenter-AttestationRenderer-Findings-Status
           - ReviewCenter-AttestationRenderer-Findings-LongFindingComment
           - ReviewCenter-AttestationRenderer-Findings-None
           - ReviewCenter-AttestationRenderer-Findings-Discussion
-          - ReviewCenter-AttestationRenderer-AnswerTimes
-          - ReviewCenter-AttestationRenderer-AnswerTimes-Utc
-          - ReviewCenter-AttestationRenderer-AnswerTimes-None
           - ReviewCenter-AttestationRenderer-FindingList
           - ReviewCenter-AttestationRenderer-FindingList-Order
           - ReviewCenter-AttestationRenderer-FindingList-Pages
+          - ReviewCenter-AttestationService-CheckThreadLabel
+          - ReviewCenter-AttestationService-Report
+          - ReviewCenter-AttestationService-Report-Discussion
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Document-NoExcludedComments
+        title: >-
+          The Evidence subsystem shall never print in the document of a concluded review a comment that was not
+          included.
+        justification: |
+          A comment that a reviewer kept out of the report must not reach people outside the tool through the document.
+        children:
+          - ReviewCenter-AttestationService-Report-Excluded
+          - ReviewCenter-AttestationService-Report-DigestCoverage
+
+      - id: ReviewCenter-Evidence-Document-Conclusion
+        title: >-
+          The Evidence subsystem shall state the conclusion of the review in the document of a concluded review.
+        justification: |
+          The conclusion is the outcome that the document exists to carry.
+        children:
           - ReviewCenter-AttestationRenderer-Conclusion
           - ReviewCenter-AttestationRenderer-Conclusion-Text
+          - ReviewCenter-AttestationService-Report-Conclusion
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Document-RejectionMarked
+        title: >-
+          The Evidence subsystem shall mark a rejection as such on the first page of the document.
+        justification: |
+          A rejection must be recognizable at a glance.
+        children:
           - ReviewCenter-AttestationRenderer-Conclusion-RejectionHeading
           - ReviewCenter-AttestationRenderer-Conclusion-RejectedTitle
           - ReviewCenter-AttestationRenderer-Conclusion-RejectedBanner
           - ReviewCenter-AttestationRenderer-Conclusion-BannerPlacement
           - ReviewCenter-AttestationRenderer-Conclusion-NoBanner
+
+      - id: ReviewCenter-Evidence-Document-BallotsAppendix
+        title: >-
+          The Evidence subsystem shall state in the document of a concluded review a ballots appendix with the final
+          ballot of every slot and its fingerprint.
+        justification: |
+          A reader can check the consolidated checklist against the ballots that it was built from.
+        children:
           - ReviewCenter-AttestationRenderer-BallotAppendix
           - ReviewCenter-AttestationRenderer-BallotAppendix-Answers
           - ReviewCenter-AttestationRenderer-BallotAppendix-NotApplicable
           - ReviewCenter-AttestationRenderer-BallotAppendix-Fingerprint
           - ReviewCenter-AttestationRenderer-BallotAppendix-Omitted
-          - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOff
-          - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOffIdentifiers
+          - ReviewCenter-AttestationService-Report-Appendix
+          - ReviewCenter-AttestationService-Report-SlotOrder
+          - ReviewCenter-AttestationService-Report-BallotFingerprint
+
+      - id: ReviewCenter-Evidence-Document-SignOffs
+        title: >-
+          The Evidence subsystem shall state in the document of a concluded review the reviewer sign-offs.
+        justification: |
+          The sign-offs say who stands behind the outcome and what each one signed.
+        children:
           - ReviewCenter-AttestationRenderer-SignOffs
           - ReviewCenter-AttestationRenderer-SignOffs-SignedAt
           - ReviewCenter-AttestationRenderer-SignOffs-Digest
           - ReviewCenter-AttestationRenderer-SignOffs-DigestLine
-          - ReviewCenter-AttestationRenderer-SignOffs-AuditHead
           - ReviewCenter-AttestationRenderer-SignOffs-ToolVersion
           - ReviewCenter-AttestationRenderer-SignOffs-ToolVersionProperty
           - ReviewCenter-AttestationRenderer-SignOffs-Names
-          - ReviewCenter-AttestationRenderer-Output
-          - ReviewCenter-AttestationRenderer-Output-Deterministic
-          - ReviewCenter-AttestationRenderer-Output-Pages
-          - ReviewCenter-AttestationRenderer-Output-Unicode
-          - ReviewCenter-AttestationRenderer-Output-Arguments
+          - ReviewCenter-AttestationService-Document-SignOffs
+
+      - id: ReviewCenter-Evidence-Document-AuditHead
+        title: >-
+          The Evidence subsystem shall state in the document of a concluded review the head of the audit trail.
+        justification: |
+          The head of the trail ties the document to the record that can show whether it was altered later.
+        children:
+          - ReviewCenter-AttestationRenderer-SignOffs-AuditHead
+          - ReviewCenter-AttestationService-Document-AuditHead
+
+      - id: ReviewCenter-Evidence-Document-KeyStatement
+        title: >-
+          The Evidence subsystem shall state in the document of a concluded review the key that signed it.
+        justification: |
+          A reader must see which key to check the signature against.
+        children:
+          - ReviewCenter-AttestationService-Document-Key
+
+      - id: ReviewCenter-Evidence-Document-LeftOut
+        title: >-
+          The Evidence subsystem shall leave out of the document of a concluded review the reviewer names, checklist
+          wording, and findings that the evidence settings of the project say to leave out.
+        justification: |
+          A project that publishes its evidence needs to keep parts of a review out of the document.
+        children:
+          - ReviewCenter-AttestationService-Report-NamesOff
+          - ReviewCenter-AttestationService-Report-WordingOff
+          - ReviewCenter-AttestationService-Report-ThreadsOff
+          - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOff
+          - ReviewCenter-AttestationRenderer-BallotAppendix-WordingOffIdentifiers
+
+      - id: ReviewCenter-Evidence-Document-ReopenHistory
+        title: >-
+          The Evidence subsystem shall state in the document of a review that was reopened after an approval the history
+          of the reopenings.
+        justification: |
+          A reader must be able to see that an approval followed one that was reopened.
+        children:
           - ReviewCenter-AttestationService-ReopenHistory
           - ReviewCenter-AttestationService-ReopenHistory-NeverReopened
           - ReviewCenter-AttestationService-ReopenHistory-NoNames
           - ReviewCenter-AttestationService-ReopenHistory-Locked
-          - ReviewCenter-AttestationService-CheckThreadLabel
-          - ReviewCenter-AttestationService-Report
-          - ReviewCenter-AttestationService-Report-Conclusion
-          - ReviewCenter-AttestationService-Report-Excluded
-          - ReviewCenter-AttestationService-Report-DigestCoverage
-          - ReviewCenter-AttestationService-Report-Discussion
-          - ReviewCenter-AttestationService-Report-Appendix
-          - ReviewCenter-AttestationService-Report-SlotOrder
-          - ReviewCenter-AttestationService-Report-BallotFingerprint
-          - ReviewCenter-AttestationService-Report-NamesOff
-          - ReviewCenter-AttestationService-Report-WordingOff
-          - ReviewCenter-AttestationService-Report-ThreadsOff
-          - ReviewCenter-AttestationService-Report-NotConcluded
-        tests:
-          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 
       - id: ReviewCenter-Evidence-Signature
         title: >-
           The Evidence subsystem shall sign the document with a detached CMS signature (adbe.pkcs7.detached, SHA-256)
-          made with an RSA or an ECDSA key that is never exported, keep the content the reviewers saw unchanged, embed
-          the certificate chain, and make any later change of the signed content show.
+          made with an RSA or an ECDSA key.
         justification: |
           Integrity since the signing and the origin of the key are what a digital signature gives. They are worth
           something only when a PDF reader or any CMS library can check them without ReviewCenter.
@@ -130,7 +223,6 @@ sections:
           - ReviewCenter-AttestationSigner-Signature-Digest
           - ReviewCenter-AttestationSigner-Signature-SigningTime
           - ReviewCenter-AttestationSigner-Signature-SignerCertificate
-          - ReviewCenter-AttestationSigner-NonExportableKey
           - ReviewCenter-AttestationSigner-Structure
           - ReviewCenter-AttestationSigner-Structure-CrossReference
           - ReviewCenter-AttestationSigner-Structure-SignatureField
@@ -138,24 +230,58 @@ sections:
           - ReviewCenter-AttestationSigner-Structure-Reason
           - ReviewCenter-AttestationSigner-Structure-Date
           - ReviewCenter-AttestationSigner-Structure-ByteRange
-          - ReviewCenter-AttestationSigner-Certification
-          - ReviewCenter-AttestationSigner-Certification-Catalog
-          - ReviewCenter-AttestationSigner-Certification-Verifies
-          - ReviewCenter-AttestationSigner-Certification-Covered
-          - ReviewCenter-AttestationSigner-Certification-Permission
-          - ReviewCenter-AttestationSigner-TamperEvident
-          - ReviewCenter-AttestationSigner-TamperEvident-Appended
-          - ReviewCenter-AttestationSigner-Chain
-          - ReviewCenter-AttestationSigner-Chain-TooLarge
           - ReviewCenter-AttestationSigner-Deterministic
           - ReviewCenter-AttestationSigner-Refusals
           - ReviewCenter-AttestationSigner-Refusals-NotAttestation
           - ReviewCenter-AttestationSigner-Arguments
           - ReviewCenter-OTS-Pkcs-DetachedSignature
           - ReviewCenter-OTS-Pkcs-DetachedSignature-Ecdsa
-          - ReviewCenter-OTS-Pkcs-DetachedSignature-NonExportableKey
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Signature-Chain
+        title: >-
+          The Evidence subsystem shall embed the certificate chain of the signing key in the signature.
+        justification: |
+          A reader can check the signature up to the certificate that it trusts without asking ReviewCenter for the
+          chain.
+        children:
+          - ReviewCenter-AttestationSigner-Chain
+          - ReviewCenter-AttestationSigner-Chain-TooLarge
           - ReviewCenter-OTS-Pkcs-DetachedSignature-Chain
           - ReviewCenter-OTS-Pkcs-DetachedSignature-Chain-Intermediates
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Signature-NonExportable
+        title: >-
+          The Evidence subsystem shall sign with a key that is never exported.
+        justification: |
+          A key that cannot leave the store cannot be copied by somebody who only reads the server.
+        children:
+          - ReviewCenter-AttestationSigner-NonExportableKey
+          - ReviewCenter-OTS-Pkcs-DetachedSignature-NonExportableKey
+
+      - id: ReviewCenter-Evidence-Signature-ContentUnchanged
+        title: >-
+          The Evidence subsystem shall keep the content the reviewers saw unchanged by certifying the document.
+        justification: |
+          A certified document tells a reader that nothing but allowed changes happened after the signing.
+        children:
+          - ReviewCenter-AttestationSigner-Certification
+          - ReviewCenter-AttestationSigner-Certification-Catalog
+          - ReviewCenter-AttestationSigner-Certification-Verifies
+          - ReviewCenter-AttestationSigner-Certification-Covered
+          - ReviewCenter-AttestationSigner-Certification-Permission
+
+      - id: ReviewCenter-Evidence-Signature-TamperEvident
+        title: >-
+          The Evidence subsystem shall make any later change of the signed content show.
+        justification: |
+          A signature is worth something only if a change after the signing is visible to the reader.
+        children:
+          - ReviewCenter-AttestationSigner-TamperEvident
+          - ReviewCenter-AttestationSigner-TamperEvident-Appended
           - ReviewCenter-OTS-Pkcs-DetachedSignature-Tamper
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
@@ -163,20 +289,26 @@ sections:
       - id: ReviewCenter-Evidence-Key
         title: >-
           The Evidence subsystem shall sign with a key that the operator chooses between a self-signed key that the
-          server creates and keeps for itself, protected at rest by the Data Protection key ring, a certificate in a
-          certificate store, and a certificate with its private key in a file, shall refuse a key that does not meet
-          the RequireTrustedKey rule, shall warn when the certificate of a key ends soon or has ended, and shall tell
-          the user and the reader of the document which kind of key signed it.
+          server creates and keeps for itself, a certificate in a certificate store, and a certificate with its private
+          key in a file.
         justification: |
           A new installation must work without configuration, and an organization must be able to sign with a key that
-          it controls. Nobody should mistake the default key for an organization key, a key that the server keeps
-          for itself must not be usable by anyone who only copies its file, and the operator must hear about the end
-          of a certificate before the readers of the attestations do.
+          it controls.
         children:
           - ReviewCenter-AttestationKeyProvider-Selection
           - ReviewCenter-AttestationKeyProvider-Selection-CertificateStore
           - ReviewCenter-AttestationKeyProvider-Selection-File
           - ReviewCenter-AttestationKeyProvider-Selection-Unknown
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Key-SelfSigned
+        title: >-
+          The Evidence subsystem shall keep the self-signed key that the server creates protected at rest by the Data
+          Protection key ring.
+        justification: |
+          A key that the server keeps for itself must not be usable by anyone who only copies its file.
+        children:
           - ReviewCenter-AttestationKeyProvider-SelfSigned
           - ReviewCenter-AttestationKeyProvider-SelfSigned-Validity
           - ReviewCenter-AttestationKeyProvider-SelfSigned-Reload
@@ -203,6 +335,14 @@ sections:
           - ReviewCenter-AttestationKeyProvider-SelfSignedErrors-Corrupt
           - ReviewCenter-AttestationKeyProvider-SelfSignedErrors-NoFolderInMessage
           - ReviewCenter-AttestationKeyProvider-SelfSignedErrors-ProtectFails
+
+      - id: ReviewCenter-Evidence-Key-CertificateStore
+        title: >-
+          The Evidence subsystem shall sign with a certificate in a certificate store when the operator chooses it.
+        justification: |
+          An organization may keep its signing key in the store of the machine, where the server can use it but the
+          key cannot be copied.
+        children:
           - ReviewCenter-AttestationKeyProvider-CertificateStore
           - ReviewCenter-AttestationKeyProvider-CertificateStore-PrivateKeyInStore
           - ReviewCenter-AttestationKeyProvider-CertificateStore-Thumbprint
@@ -210,6 +350,15 @@ sections:
           - ReviewCenter-AttestationKeyProvider-CertificateStore-Location
           - ReviewCenter-AttestationKeyProvider-CertificateStore-NotFound
           - ReviewCenter-AttestationKeyProvider-CertificateStore-NoPrivateKey
+
+      - id: ReviewCenter-Evidence-Key-File
+        title: >-
+          The Evidence subsystem shall sign with a certificate and its private key from a file when the operator
+          chooses it.
+        justification: |
+          An organization may hand its signing key to the server as a file, so the file formats and the protection of
+          its password must be handled safely.
+        children:
           - ReviewCenter-AttestationKeyProvider-File
           - ReviewCenter-AttestationKeyProvider-File-PemKeyFile
           - ReviewCenter-AttestationKeyProvider-File-PemOneFile
@@ -237,6 +386,13 @@ sections:
           - ReviewCenter-AttestationKeyProvider-FilePermissions
           - ReviewCenter-AttestationKeyProvider-FilePermissions-PasswordFile
           - ReviewCenter-AttestationKeyProvider-FilePermissions-OnlyKeyFile
+
+      - id: ReviewCenter-Evidence-Key-ExpiryWarning
+        title: >-
+          The Evidence subsystem shall warn when the certificate of a key ends soon or has ended.
+        justification: |
+          The operator must hear about the end of a certificate before the readers of the attestations do.
+        children:
           - ReviewCenter-AttestationKeyProvider-Expiry
           - ReviewCenter-AttestationKeyProvider-Expiry-Expired
           - ReviewCenter-AttestationKeyProvider-Expiry-Disabled
@@ -247,6 +403,14 @@ sections:
           - ReviewCenter-AttestationKeyProvider-Expiry-ExpiredUnrestricted
           - ReviewCenter-AttestationKeyProvider-Expiry-Setting
           - ReviewCenter-AttestationKeyProvider-Expiry-SelfSignedNone
+
+      - id: ReviewCenter-Evidence-Key-RequireTrusted
+        title: >-
+          The Evidence subsystem shall refuse a key that does not meet the RequireTrustedKey rule.
+        justification: |
+          An organization that requires a key it controls must not get documents signed with a key that does not
+          qualify.
+        children:
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Off
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey-Organization
@@ -264,6 +428,13 @@ sections:
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-InfoFlag
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-LoggedOnce
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning-NotRefused
+
+      - id: ReviewCenter-Evidence-Key-KeyKind
+        title: >-
+          The Evidence subsystem shall tell the user and the reader of the document which kind of key signed it.
+        justification: |
+          Nobody should mistake the default key for an organization key.
+        children:
           - ReviewCenter-AttestationKeyProvider-Describe
           - ReviewCenter-AttestationKeyProvider-Describe-Unavailable
           - ReviewCenter-AttestationKeyProvider-Describe-UnexpectedFailure
@@ -278,12 +449,22 @@ sections:
       - id: ReviewCenter-Evidence-Honesty
         title: >-
           The Evidence subsystem shall state in the document that the signature proves integrity since the signing and
-          the origin of the server key, and does not prove who the reviewers are or when the signing happened.
+          the origin of the server key.
         justification: |
           A reader who takes a signature for more than it is would be misled by the tool that made it.
         children:
           - ReviewCenter-AttestationRenderer-ProvesStatement
           - ReviewCenter-AttestationRenderer-ProvesStatement-KeyOrigin
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Honesty-Limits
+        title: >-
+          The Evidence subsystem shall state in the document that the signature does not prove who the reviewers are or
+          when the signing happened.
+        justification: |
+          A reader who took the signature for proof of identity or of time would be misled by the tool that made it.
+        children:
           - ReviewCenter-AttestationRenderer-ProvesStatement-ReviewerIdentity
           - ReviewCenter-AttestationRenderer-ProvesStatement-SigningTime
         tests:
@@ -291,77 +472,91 @@ sections:
 
       - id: ReviewCenter-Evidence-Release
         title: >-
-          The Evidence subsystem shall release the attestation only of a concluded review, to a signed-in user or, for
-          the API route, when the project allows it and the review was approved, to a request without a user, on
-          demand and without keeping it, shall record each release in the audit trail, and shall refuse an incomplete
-          review and an unusable key with a status that tells them apart.
+          The Evidence subsystem shall release the attestation only of a concluded review, to a signed-in user.
         justification: |
-          The attestation is evidence of completion. Generating it on demand means that it always shows the current
-          audit head, and recording each release keeps the trail complete about who took a copy.
+          The attestation is evidence of completion, so it exists only for a review that is concluded.
         children:
           - ReviewCenter-AttestationService-Approved
           - ReviewCenter-AttestationService-Approved-Rejected
           - ReviewCenter-AttestationService-Approved-NotRejectedMark
           - ReviewCenter-AttestationService-Approved-NotFound
-          - ReviewCenter-AttestationService-Approved-NotComplete
-          - ReviewCenter-AttestationService-Approved-RecordChanged
           - ReviewCenter-AttestationService-Approved-NoKeyRequest
-          - ReviewCenter-AttestationService-Revalidation
-          - ReviewCenter-AttestationService-Revalidation-BallotFingerprint
-          - ReviewCenter-AttestationService-Revalidation-NoLongerComplete
-          - ReviewCenter-AttestationService-Revalidation-SlotsChanged
-          - ReviewCenter-AttestationService-Revalidation-Settings
-          - ReviewCenter-AttestationService-Revalidation-Unchanged
-          - ReviewCenter-AttestationService-Revalidation-NoDocument
-          - ReviewCenter-AttestationService-Revalidation-NothingRecorded
-          - ReviewCenter-AttestationService-Document
-          - ReviewCenter-AttestationService-Document-Checklist
-          - ReviewCenter-AttestationService-Document-AnswerTime
-          - ReviewCenter-AttestationService-Document-SignOffs
-          - ReviewCenter-AttestationService-Document-AuditHead
-          - ReviewCenter-AttestationService-Document-Key
-          - ReviewCenter-AttestationService-Document-FileName
-          - ReviewCenter-AttestationService-Document-DefaultSettings
-          - ReviewCenter-AttestationService-Document-NamesOff
-          - ReviewCenter-AttestationService-Document-ThreadsOff
-          - ReviewCenter-AttestationService-Document-FilesOff
-          - ReviewCenter-AttestationService-Document-ChecklistWordingOff
-          - ReviewCenter-AttestationService-Document-SignedAfterSettings
-          - ReviewCenter-AttestationService-KeyUnavailable
-          - ReviewCenter-AttestationService-KeyUnavailable-SignerFailure
-          - ReviewCenter-AttestationService-KeyUnavailable-NothingRecorded
-          - ReviewCenter-AttestationService-Audit
-          - ReviewCenter-AttestationService-Audit-EveryRelease
-          - ReviewCenter-AttestationService-Audit-AnonymousActor
-          - ReviewCenter-AttestationService-Audit-Outcome
-          - ReviewCenter-AttestationService-Audit-Strict
           - ReviewCenter-AttestationService-Arguments
           - ReviewCenter-AttestationEndpoint-Authorization
           - ReviewCenter-AttestationEndpoint-Authorization-NothingGenerated
           - ReviewCenter-AttestationEndpoint-Authorization-NothingRecorded
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Release-Anonymous
+        title: >-
+          The Evidence subsystem shall release the attestation of an approved review on the API route to a request
+          without a user when the project allows it.
+        justification: |
+          A project may publish its evidence without an account, and that must stay a decision of the project.
+        children:
           - ReviewCenter-AttestationEndpoint-Authorization-AnonymousSwitches
+
+      - id: ReviewCenter-Evidence-Release-OnDemand
+        title: >-
+          The Evidence subsystem shall generate the attestation on demand and not keep it.
+        justification: |
+          Generating it on demand means that it always shows the current audit head.
+        children:
+          - ReviewCenter-AttestationService-Document-FileName
           - ReviewCenter-AttestationEndpoint-Download
           - ReviewCenter-AttestationEndpoint-Download-ContentType
           - ReviewCenter-AttestationEndpoint-Download-FileName
           - ReviewCenter-AttestationEndpoint-Download-NoCache
-          - ReviewCenter-AttestationEndpoint-Download-AuditEvent
           - ReviewCenter-AttestationEndpoint-Download-DefaultKey
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Release-Audit
+        title: >-
+          The Evidence subsystem shall record each release of the attestation in the audit trail.
+        justification: |
+          Recording each release keeps the trail complete about who took a copy.
+        children:
+          - ReviewCenter-AttestationService-Audit
+          - ReviewCenter-AttestationService-Audit-EveryRelease
+          - ReviewCenter-AttestationService-Audit-Outcome
+          - ReviewCenter-AttestationService-Audit-Strict
+          - ReviewCenter-AttestationEndpoint-Download-AuditEvent
+
+      - id: ReviewCenter-Evidence-Release-IncompleteRefused
+        title: >-
+          The Evidence subsystem shall refuse to release the attestation of a review that is incomplete or changed,
+          with a status that tells it apart from an unusable key.
+        justification: |
+          A caller must be able to tell a review that is not ready from a server that cannot sign.
+        children:
+          - ReviewCenter-AttestationService-Approved-NotComplete
+          - ReviewCenter-AttestationService-Approved-RecordChanged
           - ReviewCenter-AttestationEndpoint-Statuses
           - ReviewCenter-AttestationEndpoint-Statuses-NotComplete
           - ReviewCenter-AttestationEndpoint-Statuses-Changed
           - ReviewCenter-AttestationEndpoint-Statuses-ChangedNothingRecorded
+        tests:
+          - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
+
+      - id: ReviewCenter-Evidence-Release-KeyUnavailable
+        title: >-
+          The Evidence subsystem shall refuse to release the attestation when the signing key is unusable, with a
+          status that tells it apart from an incomplete review.
+        justification: |
+          A caller must be able to tell a server that cannot sign from a review that is not ready.
+        children:
+          - ReviewCenter-AttestationService-KeyUnavailable
+          - ReviewCenter-AttestationService-KeyUnavailable-SignerFailure
+          - ReviewCenter-AttestationService-KeyUnavailable-NothingRecorded
           - ReviewCenter-AttestationEndpoint-Statuses-KeyUnavailable
           - ReviewCenter-AttestationEndpoint-Statuses-KeyUnavailableNothingRecorded
-        tests:
-          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
-          - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
 
       - id: ReviewCenter-Evidence-Index
         title: >-
           The Evidence subsystem shall list the completed reviews of a project that were planned from a review-set in an
-          index in the format that ReviewMark reads, with the review-set id, the fingerprint of the files, the date of
-          the latest signature, the result pass and the address of the attestation, but not a review that is incomplete,
-          changed since it was signed, or has no review-set id, and in the same order for the same reviews.
+          index in the format that ReviewMark reads.
         justification: |
           ReviewMark verifies in a pipeline that every review-set has a current review. Reading the evidence from the
           tool that holds the reviews, in the format it already knows, closes that loop without a second record of the
@@ -369,16 +564,40 @@ sections:
         children:
           - ReviewCenter-EvidenceIndex-Completed
           - ReviewCenter-EvidenceIndex-Completed-Several
+          - ReviewCenter-EvidenceIndex-Completed-OtherProject
+        tests:
+          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+
+      - id: ReviewCenter-Evidence-Index-Fields
+        title: >-
+          The Evidence subsystem shall give each entry of the evidence index the review-set id, the fingerprint of the
+          files, the date of the latest signature, the result pass and the address of the attestation.
+        justification: |
+          These are the fields that ReviewMark needs to decide whether a review-set has a current review.
+        tests:
+          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+
+      - id: ReviewCenter-Evidence-Index-Excluded
+        title: >-
+          The Evidence subsystem shall leave out of the evidence index a review that is incomplete, changed since it
+          was signed, or has no review-set id.
+        justification: |
+          A review that is not a current approval must not make a review-set look satisfied.
+        children:
           - ReviewCenter-EvidenceIndex-Completed-Incomplete
           - ReviewCenter-EvidenceIndex-Completed-Changed
           - ReviewCenter-EvidenceIndex-Completed-Rejected
-          - ReviewCenter-EvidenceIndex-Completed-OtherProject
-          - ReviewCenter-EvidenceIndex-Identity
           - ReviewCenter-EvidenceIndex-Identity-NoSetId
-          - ReviewCenter-EvidenceIndex-Fields
-          - ReviewCenter-EvidenceIndex-Fields-Fingerprint
+        tests:
+          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+
+      - id: ReviewCenter-Evidence-Index-Order
+        title: >-
+          The Evidence subsystem shall list the entries of the evidence index in the same order for the same reviews.
+        justification: |
+          An index that is the same for the same reviews can be compared and committed.
+        children:
           - ReviewCenter-EvidenceIndex-Order
-          - ReviewCenter-EvidenceIndex-Order-Entries
           - ReviewCenter-EvidenceIndex-Order-LatestCompletion
           - ReviewCenter-EvidenceIndex-Order-LowestReviewId
         tests:
@@ -425,95 +644,89 @@ sections:
       - id: ReviewCenter-Evidence-Visibility
         title: >-
           The Evidence subsystem shall release an attestation and an evidence index only to an actor who may view the
-          project of the review, and shall answer any other actor as it answers for a project or review that does not
-          exist; a request without an actor shall be served only when the project has switched on the anonymous
-          evidence index or the anonymous attestation PDFs for that kind of document, and otherwise answered in the
-          same way; such a request for a review that is not complete or was rejected shall be answered as for a review
-          that does not exist.
+          project of the review.
         justification: |
-          An attestation and an index disclose the content and the approvals of a project. Answering a non-member
-          differently from a missing project would also tell the non-member which projects exist. Publishing the
-          evidence without an account is a decision of the project. An anonymous caller must not be able to tell a
-          review that is not complete from one that does not exist.
+          An attestation and an index disclose the content and the approvals of a project, so only a member of the
+          project or a system administrator may take them.
         children:
           - ReviewCenter-AttestationService-Visibility
           - ReviewCenter-AttestationService-Visibility-Member
-          - ReviewCenter-AttestationService-Visibility-AnonymousOff
-          - ReviewCenter-AttestationService-Visibility-AnonymousUnknownProject
-          - ReviewCenter-AttestationService-Visibility-AnonymousOn
-          - ReviewCenter-AttestationService-Visibility-AnonymousIncomplete
-          - ReviewCenter-AttestationService-Visibility-AnonymousRejected
           - ReviewCenter-AttestationEndpoint-Visibility
-          - ReviewCenter-AttestationEndpoint-Visibility-SameAsMissing
-          - ReviewCenter-AttestationEndpoint-Visibility-NothingRecorded
           - ReviewCenter-AttestationEndpoint-Visibility-Member
           - ReviewCenter-AttestationEndpoint-Visibility-SystemAdmin
           - ReviewCenter-EvidenceIndex-Visibility
           - ReviewCenter-EvidenceIndex-Visibility-Member
           - ReviewCenter-EvidenceIndex-Visibility-SystemAdmin
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+
+      - id: ReviewCenter-Evidence-Visibility-OtherActors
+        title: >-
+          The Evidence subsystem shall answer an actor who may not view the project of a review as it answers for a
+          project or review that does not exist.
+        justification: |
+          Answering a non-member differently from a missing project would also tell the non-member which projects
+          exist.
+        children:
+          - ReviewCenter-AttestationEndpoint-Visibility-SameAsMissing
+          - ReviewCenter-AttestationEndpoint-Visibility-NothingRecorded
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
+
+      - id: ReviewCenter-Evidence-Visibility-Anonymous
+        title: >-
+          The Evidence subsystem shall serve a request without an actor only when the project has switched on the
+          anonymous evidence index or the anonymous attestation PDFs for that kind of document.
+        justification: |
+          Publishing the evidence without an account is a decision of the project.
+        children:
+          - ReviewCenter-AttestationService-Visibility-AnonymousOn
           - ReviewCenter-EvidenceIndex-Visibility-Anonymous
+        tests:
+          - EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting
+
+      - id: ReviewCenter-Evidence-Visibility-AnonymousOff
+        title: >-
+          The Evidence subsystem shall answer a request without an actor as it answers for a project or review that
+          does not exist when the project has not switched on the anonymous setting for that kind of document.
+        justification: |
+          A caller without an account must not be able to tell a project that keeps its evidence private from one that
+          does not exist.
+        children:
+          - ReviewCenter-AttestationService-Visibility-AnonymousOff
+          - ReviewCenter-AttestationService-Visibility-AnonymousUnknownProject
           - ReviewCenter-EvidenceIndex-Visibility-AnonymousOff
           - ReviewCenter-EvidenceIndex-Visibility-AnonymousMissing
         tests:
-          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
-          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
-          - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
           - AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound
+
+      - id: ReviewCenter-Evidence-Visibility-AnonymousIncomplete
+        title: >-
+          The Evidence subsystem shall answer a request without an actor for a review that is not complete or was
+          rejected as it answers for a review that does not exist.
+        justification: |
+          An anonymous caller must not be able to tell a review that is not complete from one that does not exist.
+        children:
+          - ReviewCenter-AttestationService-Visibility-AnonymousIncomplete
+          - ReviewCenter-AttestationService-Visibility-AnonymousRejected
+        tests:
           - AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview
-          - EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting
 
       - id: ReviewCenter-Evidence-ContentSettings
         title: >-
-          The Evidence subsystem shall make every PDF it releases follow the evidence settings of the project, read
-          once and read again before signing, with a Content scope section that states what was left out and the
-          settings in effect, names replaced by neutral labels, a signature that stays valid after the reduction, and
-          the audit actor anonymous for a request without a user.
+          The Evidence subsystem shall make every PDF it releases follow the evidence settings of the project, with a
+          Content scope section that states what was left out and the settings in effect.
         justification: |
           A project that publishes its evidence needs to keep parts of a review out of the document, and a reader needs
-          to see that this was done. The signature must cover the reduced document so that it can still be checked, and
-          the release must be traceable even when nobody signed in.
+          to see that this was done.
         children:
-          - ReviewCenter-AttestationService-Revalidation
-          - ReviewCenter-AttestationService-Revalidation-BallotFingerprint
-          - ReviewCenter-AttestationService-Revalidation-NoLongerComplete
-          - ReviewCenter-AttestationService-Revalidation-SlotsChanged
-          - ReviewCenter-AttestationService-Revalidation-Settings
-          - ReviewCenter-AttestationService-Revalidation-Unchanged
-          - ReviewCenter-AttestationService-Revalidation-NoDocument
-          - ReviewCenter-AttestationService-Revalidation-NothingRecorded
           - ReviewCenter-AttestationService-Document
-          - ReviewCenter-AttestationService-Document-Checklist
-          - ReviewCenter-AttestationService-Document-AnswerTime
-          - ReviewCenter-AttestationService-Document-SignOffs
-          - ReviewCenter-AttestationService-Document-AuditHead
-          - ReviewCenter-AttestationService-Document-Key
-          - ReviewCenter-AttestationService-Document-FileName
           - ReviewCenter-AttestationService-Document-DefaultSettings
           - ReviewCenter-AttestationService-Document-NamesOff
           - ReviewCenter-AttestationService-Document-ThreadsOff
           - ReviewCenter-AttestationService-Document-FilesOff
           - ReviewCenter-AttestationService-Document-ChecklistWordingOff
-          - ReviewCenter-AttestationService-Document-SignedAfterSettings
-          - ReviewCenter-AttestationService-Labels
-          - ReviewCenter-AttestationService-Labels-Participant
-          - ReviewCenter-AttestationService-Labels-Answerer
-          - ReviewCenter-AttestationService-Labels-SamePerson
-          - ReviewCenter-AttestationService-Labels-Requester
-          - ReviewCenter-AttestationService-Labels-Anonymous
-          - ReviewCenter-AttestationService-Labels-TypedText
-          - ReviewCenter-AttestationService-Audit
-          - ReviewCenter-AttestationService-Audit-EveryRelease
-          - ReviewCenter-AttestationService-Audit-AnonymousActor
-          - ReviewCenter-AttestationService-Audit-Outcome
-          - ReviewCenter-AttestationService-Audit-Strict
-          - ReviewCenter-AttestationRenderer-ContentScope
-          - ReviewCenter-AttestationRenderer-ContentScope-Placement
-          - ReviewCenter-AttestationRenderer-ContentScope-NothingLeftOut
-          - ReviewCenter-AttestationRenderer-ContentScope-SwitchStates
-          - ReviewCenter-AttestationRenderer-ContentScope-LeftOut
-          - ReviewCenter-AttestationRenderer-ContentScope-Anonymous
-          - ReviewCenter-AttestationRenderer-ContentScope-SignedIn
-          - ReviewCenter-AttestationRenderer-ContentScope-SettingsTime
           - ReviewCenter-AttestationRenderer-ContentSwitches
           - ReviewCenter-AttestationRenderer-ContentSwitches-ThreadsNote
           - ReviewCenter-AttestationRenderer-ContentSwitches-GitContext
@@ -523,26 +736,115 @@ sections:
           - ReviewCenter-AttestationRenderer-ContentSwitches-Files
           - ReviewCenter-AttestationRenderer-ContentSwitches-AlwaysIncluded
         tests:
-          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
-          - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
-          - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
           - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      - id: ReviewCenter-Evidence-ContentSettings-ReadTwice
+        title: >-
+          The Evidence subsystem shall read the evidence settings of the project once and read them again before
+          signing.
+        justification: |
+          A change of the settings while the document is rendered must not leave a document that shows more than the
+          project now allows.
+        children:
+          - ReviewCenter-AttestationService-Revalidation
+          - ReviewCenter-AttestationService-Revalidation-BallotFingerprint
+          - ReviewCenter-AttestationService-Revalidation-NoLongerComplete
+          - ReviewCenter-AttestationService-Revalidation-SlotsChanged
+          - ReviewCenter-AttestationService-Revalidation-Settings
+          - ReviewCenter-AttestationService-Revalidation-Unchanged
+          - ReviewCenter-AttestationService-Revalidation-NoDocument
+          - ReviewCenter-AttestationService-Revalidation-NothingRecorded
+        tests:
+          - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
+
+      - id: ReviewCenter-Evidence-ContentSettings-ContentScope
+        title: >-
+          The Evidence subsystem shall state in the Content scope section of the PDF what was left out and the settings
+          in effect.
+        justification: |
+          A reader of a reduced document needs to see that it was reduced and by which settings.
+        children:
+          - ReviewCenter-AttestationRenderer-ContentScope
+          - ReviewCenter-AttestationRenderer-ContentScope-Placement
+          - ReviewCenter-AttestationRenderer-ContentScope-NothingLeftOut
+          - ReviewCenter-AttestationRenderer-ContentScope-SwitchStates
+          - ReviewCenter-AttestationRenderer-ContentScope-LeftOut
+          - ReviewCenter-AttestationRenderer-ContentScope-Anonymous
+          - ReviewCenter-AttestationRenderer-ContentScope-SignedIn
+          - ReviewCenter-AttestationRenderer-ContentScope-SettingsTime
+        tests:
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      - id: ReviewCenter-Evidence-ContentSettings-NeutralLabels
+        title: >-
+          The Evidence subsystem shall replace names in the PDF by neutral labels when the project switches names off.
+        justification: |
+          A project that publishes its evidence may not want to name its people, and the same person must stay
+          recognizable as the same label.
+        children:
+          - ReviewCenter-AttestationService-Labels
+          - ReviewCenter-AttestationService-Labels-Participant
+          - ReviewCenter-AttestationService-Labels-Answerer
+          - ReviewCenter-AttestationService-Labels-SamePerson
+          - ReviewCenter-AttestationService-Labels-Requester
+          - ReviewCenter-AttestationService-Labels-Anonymous
+          - ReviewCenter-AttestationService-Labels-TypedText
+        tests:
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+
+      - id: ReviewCenter-Evidence-ContentSettings-SignatureValid
+        title: >-
+          The Evidence subsystem shall sign the PDF after the reduction so that its signature stays valid.
+        justification: |
+          The signature must cover the reduced document so that it can still be checked.
+        children:
+          - ReviewCenter-AttestationService-Document-SignedAfterSettings
+        tests:
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+
+      - id: ReviewCenter-Evidence-ContentSettings-AnonymousActor
+        title: >-
+          The Evidence subsystem shall audit the actor of a release as anonymous for a request without a user.
+        justification: |
+          The release must be traceable even when nobody signed in.
+        children:
+          - ReviewCenter-AttestationService-Audit-AnonymousActor
+        tests:
+          - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
 
       - id: ReviewCenter-Evidence-FollowUp
         title: >-
           The Evidence subsystem shall show in the attestation PDF of a follow-up review which earlier review it
-          follows, how much it carried from it, and which checklist answers, sections and threads were carried, and
-          show nothing of the kind for a review that follows none.
+          follows and how much it carried from it.
         justification: |
           The signature approves the carried answers together with the others, so the document that is shown to
           people outside the tool has to say which are which.
         children:
           - ReviewCenter-AttestationService-FollowUp
-          - ReviewCenter-AttestationService-FollowUp-CarriedMarks
-          - ReviewCenter-AttestationService-FollowUp-NotFollowing
           - ReviewCenter-AttestationRenderer-FollowUp
-          - ReviewCenter-AttestationRenderer-FollowUp-Marks
-          - ReviewCenter-AttestationRenderer-FollowUp-NotFollowing
         tests:
           - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
           - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks
+
+      - id: ReviewCenter-Evidence-FollowUp-Carried
+        title: >-
+          The Evidence subsystem shall show in the attestation PDF of a follow-up review which checklist answers,
+          sections and threads were carried.
+        justification: |
+          A reader must be able to tell a carried answer from one that was given in the follow-up review.
+        children:
+          - ReviewCenter-AttestationService-FollowUp-CarriedMarks
+          - ReviewCenter-AttestationRenderer-FollowUp-Marks
+        tests:
+          - AttestationService_GenerateAsync_FollowUpReview_NamesFollowedReviewAndCarriedAnswers
+          - AttestationRenderer_Render_FollowUp_ShowsFollowedReviewAndCarriedMarks
+
+      - id: ReviewCenter-Evidence-FollowUp-NotShown
+        title: >-
+          The Evidence subsystem shall show nothing of the follow-up kind in the attestation PDF of a review that
+          follows none.
+        justification: |
+          A document that claims a predecessor that does not exist would mislead its reader.
+        children:
+          - ReviewCenter-AttestationService-FollowUp-NotFollowing
+          - ReviewCenter-AttestationRenderer-FollowUp-NotFollowing

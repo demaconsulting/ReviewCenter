@@ -174,6 +174,34 @@ public class ApiSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a token cannot reopen an approved review: the API has no reopen route and the signing service
+    ///     refuses an actor that came through a token, so the review stays approved.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiSubsystem_LockedReview_TokenCannotReopen()
+    {
+        // Arrange: an approved review, a token, and an actor that came through that token
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+        var viaToken = new Actor("ann", "Ann") { ApiTokenId = token.Token.DisplayId };
+        var route = $"/api/projects/{projectId}/reviews/REV-1";
+
+        // Act: look for a reopen route, reopen through the service, and read the review again
+        var reopen = await client.PostAsync($"{route}/reopen", Json(new { }), TestContext.Current.CancellationToken);
+        var refusal = await Assert.ThrowsAsync<DomainRuleException>(() => app.Services.GetRequiredService<SigningService>()
+            .ReopenReviewAsync(viaToken, projectId, "REV-1", "Found a gap", TestContext.Current.CancellationToken));
+        var read = await client.GetAsync(route, TestContext.Current.CancellationToken);
+        using var readJson = await JsonAsync(read);
+
+        // Assert: no route, a refusal, and the review is still approved
+        Assert.Equal(HttpStatusCode.NotFound, reopen.StatusCode);
+        Assert.Equal(DomainRule.ActorNotAllowed, refusal.Rule);
+        Assert.True(readJson.RootElement.GetProperty("approved").GetBoolean());
+    }
+
+    /// <summary>
     ///     Test that a token never signs and never opens the web pages: the API has no signing route, the signing
     ///     service refuses an actor that came through a token, and the account page treats the token as signed out.
     /// </summary>
