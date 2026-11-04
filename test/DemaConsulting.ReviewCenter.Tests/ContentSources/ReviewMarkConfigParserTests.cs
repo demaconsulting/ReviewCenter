@@ -147,6 +147,139 @@ public class ReviewMarkConfigParserTests
     }
 
     /// <summary>
+    ///     Test that the block style (mappings and lists on their own lines, plain values) is read.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_BlockStyle_IsRead()
+    {
+        // Arrange: a file in block style with two sets
+        const string text = "reviews:\n"
+            + "  - id: a\n"
+            + "    title: Block A\n"
+            + "    paths:\n"
+            + "      - src/**\n"
+            + "      - docs/a.md\n"
+            + "  - id: b\n"
+            + "    title: Block B\n"
+            + "    paths:\n"
+            + "      - src/b.cs\n";
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: both sets with their titles and paths
+        Assert.Equal(["a", "b"], sets.Select(set => set.Id));
+        Assert.Equal("Block A", sets[0].Title);
+        Assert.Equal(["src/**", "docs/a.md"], sets[0].Paths);
+        Assert.Equal(["src/b.cs"], sets[1].Paths);
+    }
+
+    /// <summary>
+    ///     Test that the flow style (braces and brackets on one line) is read.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_FlowStyle_IsRead()
+    {
+        // Arrange: a file whose entry and path list are in flow style
+        const string text = "reviews:\n  - {id: a, title: Flow A, paths: [src/**, docs/a.md]}\n";
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: the set with its title and both paths
+        var set = Assert.Single(sets);
+        Assert.Equal("a", set.Id);
+        Assert.Equal("Flow A", set.Title);
+        Assert.Equal(["src/**", "docs/a.md"], set.Paths);
+    }
+
+    /// <summary>
+    ///     Test that single-quoted and double-quoted strings are read as YAML defines them.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_QuotedStrings_AreRead()
+    {
+        // Arrange: quoted values: a colon and an escaped quote in a title, and single quotes around a leading exclamation
+        const string text = "reviews:\n"
+            + "  - id: \"a\"\n"
+            + "    title: \"A: the \\\"first\\\" one\"\n"
+            + "    paths: ['!src/gen/**', \"y z.txt\"]\n";
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: the quotes are removed and the escapes are applied
+        var set = Assert.Single(sets);
+        Assert.Equal("a", set.Id);
+        Assert.Equal("A: the \"first\" one", set.Title);
+        Assert.Equal(["!src/gen/**", "y z.txt"], set.Paths);
+    }
+
+    /// <summary>
+    ///     Test that a folded block scalar is read as one line.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_FoldedText_IsRead()
+    {
+        // Arrange: a title written as a folded block scalar over two lines
+        const string text = "reviews:\n"
+            + "  - id: a\n"
+            + "    title: >-\n"
+            + "      B is folded\n"
+            + "      over two lines\n";
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: the lines are joined with one space
+        Assert.Equal("B is folded over two lines", Assert.Single(sets).Title);
+    }
+
+    /// <summary>
+    ///     Test that white space around the identifier, the title and each path is removed.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_PaddedValues_AreTrimmed()
+    {
+        // Arrange: quoted values that start and end with spaces
+        const string text = "reviews:\n"
+            + "  - id: '  a  '\n"
+            + "    title: '  Padded title  '\n"
+            + "    paths: ['  src/**  ', ' docs/a.md']\n";
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: nothing of the padding is left
+        var set = Assert.Single(sets);
+        Assert.Equal("a", set.Id);
+        Assert.Equal("Padded title", set.Title);
+        Assert.Equal(["src/**", "docs/a.md"], set.Paths);
+    }
+
+    /// <summary>
+    ///     Test that a review-set without a paths key, and one with an empty paths list, get an empty list of paths.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_SetWithoutPaths_HasEmptyPathList()
+    {
+        // Arrange: one set without the key and one with an empty list
+        const string text = "reviews:\n"
+            + "  - id: a\n"
+            + "    title: A\n"
+            + "  - id: b\n"
+            + "    title: B\n"
+            + "    paths: []\n";
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: both sets are read and both have no paths
+        Assert.Equal(["a", "b"], sets.Select(set => set.Id));
+        Assert.All(sets, set => Assert.Empty(set.Paths));
+    }
+
+    /// <summary>
     ///     Test that a file that starts with a UTF-8 byte order mark is read as if the mark was not there.
     /// </summary>
     [Fact]
@@ -259,38 +392,206 @@ public class ReviewMarkConfigParserTests
     }
 
     /// <summary>
-    ///     Test that a file one past a count or length limit is refused with the rule and a message that names the
-    ///     limit.
+    ///     Test that a file with exactly the most review-sets that are allowed is read.
     /// </summary>
-    /// <param name="kind">The limit that is exceeded.</param>
-    /// <param name="expected">A part of the expected message.</param>
-    [Theory]
-    [InlineData("set-count", "more than 500 review-sets")]
-    [InlineData("id-length", "The id of review-set 1 is longer than 100")]
-    [InlineData("title-length", "The title of review-set 1 is longer than 200")]
-    [InlineData("path-count", "has more than 100 paths")]
-    [InlineData("path-length", "A path of review-set 1")]
-    public void ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit(string kind, string expected)
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_SetCountAtLimit_IsRead()
     {
-        // Arrange: a file that is one past the limit of the given kind
-        var text = kind switch
-        {
-            "set-count" => "reviews:\n"
-                + string.Concat(Enumerable.Range(0, ReviewLimits.MaxReviewSets + 1).Select(i => $"  - {{id: s{i}, title: T}}\n")),
-            "id-length" => $"reviews:\n  - id: {new string('i', ReviewLimits.MaxReviewSetIdLength + 1)}\n    title: T\n",
-            "title-length" => $"reviews:\n  - id: a\n    title: {new string('t', ReviewLimits.MaxReviewSetTitleLength + 1)}\n",
-            "path-count" => "reviews:\n  - id: a\n    title: T\n    paths: ["
-                + string.Join(", ", Enumerable.Repeat("a", SelectionMatcher.MaxPatterns + 1)) + "]\n",
-            "path-length" => $"reviews:\n  - id: a\n    title: T\n    paths: [{new string('p', SelectionMatcher.MaxPatternLength + 1)}]\n",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown limit.")
-        };
+        // Arrange: a file with exactly the allowed number of review-sets
+        var text = "reviews:\n"
+            + string.Concat(Enumerable.Range(0, ReviewLimits.MaxReviewSets).Select(i => $"  - {{id: s{i}, title: T}}\n"));
+
+        // Act: parse it
+        var sets = Parse(text);
+
+        // Assert: every set is read
+        Assert.Equal(ReviewLimits.MaxReviewSets, sets.Count);
+    }
+
+    /// <summary>
+    ///     Test that an identifier with exactly the most characters that are allowed is read.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_IdLengthAtLimit_IsRead()
+    {
+        // Arrange: an identifier exactly at the limit
+        var id = new string('i', ReviewLimits.MaxReviewSetIdLength);
+
+        // Act: parse it
+        var sets = Parse($"reviews:\n  - id: {id}\n    title: T\n");
+
+        // Assert: the identifier is read in full
+        Assert.Equal(id, Assert.Single(sets).Id);
+    }
+
+    /// <summary>
+    ///     Test that a title with exactly the most characters that are allowed is read.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_TitleLengthAtLimit_IsRead()
+    {
+        // Arrange: a title exactly at the limit
+        var title = new string('t', ReviewLimits.MaxReviewSetTitleLength);
+
+        // Act: parse it
+        var sets = Parse($"reviews:\n  - id: a\n    title: {title}\n");
+
+        // Assert: the title is read in full
+        Assert.Equal(title, Assert.Single(sets).Title);
+    }
+
+    /// <summary>
+    ///     Test that a review-set with exactly the most paths that are allowed is read.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_PathCountAtLimit_IsRead()
+    {
+        // Arrange: a set with exactly the allowed number of paths
+        var paths = string.Join(", ", Enumerable.Repeat("a", SelectionMatcher.MaxPatterns));
+
+        // Act: parse it
+        var sets = Parse($"reviews:\n  - id: a\n    title: T\n    paths: [{paths}]\n");
+
+        // Assert: every path is read
+        Assert.Equal(SelectionMatcher.MaxPatterns, Assert.Single(sets).Paths.Count);
+    }
+
+    /// <summary>
+    ///     Test that a path with exactly the most characters that are allowed is read.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_PathLengthAtLimit_IsRead()
+    {
+        // Arrange: a path exactly at the limit
+        var path = new string('p', SelectionMatcher.MaxPatternLength);
+
+        // Act: parse it
+        var sets = Parse($"reviews:\n  - id: a\n    title: T\n    paths: [{path}]\n");
+
+        // Assert: the path is read in full
+        Assert.Equal([path], Assert.Single(sets).Paths);
+    }
+
+    /// <summary>
+    ///     Test that a file with one review-set more than allowed is refused with a message that names the limit.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_TooManySets_ThrowsConfigInvalid()
+    {
+        // Arrange: one set more than the limit
+        var text = "reviews:\n"
+            + string.Concat(Enumerable.Range(0, ReviewLimits.MaxReviewSets + 1).Select(i => $"  - {{id: s{i}, title: T}}\n"));
 
         // Act: parse it
         var exception = Assert.Throws<DomainRuleException>(() => Parse(text));
 
-        // Assert: the rule and the message that names the limit
+        // Assert: the rule and the limit in the message
         Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
-        Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("more than 500 review-sets", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an identifier with one character more than allowed is refused with a message that names the limit.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_IdTooLong_ThrowsConfigInvalid()
+    {
+        // Arrange: an identifier one past the limit
+        var text = $"reviews:\n  - id: {new string('i', ReviewLimits.MaxReviewSetIdLength + 1)}\n    title: T\n";
+
+        // Act: parse it
+        var exception = Assert.Throws<DomainRuleException>(() => Parse(text));
+
+        // Assert: the rule and the limit in the message
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Contains("The id of review-set 1 is longer than 100", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a title with one character more than allowed is refused with a message that names the limit.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_TitleTooLong_ThrowsConfigInvalid()
+    {
+        // Arrange: a title one past the limit
+        var text = $"reviews:\n  - id: a\n    title: {new string('t', ReviewLimits.MaxReviewSetTitleLength + 1)}\n";
+
+        // Act: parse it
+        var exception = Assert.Throws<DomainRuleException>(() => Parse(text));
+
+        // Assert: the rule and the limit in the message
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Contains("The title of review-set 1 is longer than 200", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a review-set with one path more than allowed is refused with a message that names the limit.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_TooManyPaths_ThrowsConfigInvalid()
+    {
+        // Arrange: one path more than the limit
+        var paths = string.Join(", ", Enumerable.Repeat("a", SelectionMatcher.MaxPatterns + 1));
+
+        // Act: parse it
+        var exception = Assert.Throws<DomainRuleException>(
+            () => Parse($"reviews:\n  - id: a\n    title: T\n    paths: [{paths}]\n"));
+
+        // Assert: the rule and the limit in the message
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Contains("has more than 100 paths", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a path with one character more than allowed is refused with a message that names the path.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_PathTooLong_ThrowsConfigInvalid()
+    {
+        // Arrange: a path one past the limit
+        var path = new string('p', SelectionMatcher.MaxPatternLength + 1);
+
+        // Act: parse it
+        var exception = Assert.Throws<DomainRuleException>(
+            () => Parse($"reviews:\n  - id: a\n    title: T\n    paths: [{path}]\n"));
+
+        // Assert: the rule and the review-set that holds the path
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Contains("A path of review-set 1", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an empty path is refused with a message that names the review-set.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_EmptyPath_ThrowsConfigInvalid()
+    {
+        // Arrange: a set with an empty path next to a valid one
+        const string text = "reviews:\n  - id: a\n    title: T\n    paths: [src/**, \"\"]\n";
+
+        // Act: parse it
+        var exception = Assert.Throws<DomainRuleException>(() => Parse(text));
+
+        // Assert: the rule and the review-set that holds the path
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Contains("A path of review-set 1", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a path with a control character is refused with a message that names the review-set.
+    /// </summary>
+    [Fact]
+    public void ReviewMarkConfigParser_Parse_PathWithControlCharacter_ThrowsConfigInvalid()
+    {
+        // Arrange: a path with a line feed in the middle
+        const string text = "reviews:\n  - id: a\n    title: T\n    paths: [\"a\\nb\"]\n";
+
+        // Act: parse it
+        var exception = Assert.Throws<DomainRuleException>(() => Parse(text));
+
+        // Assert: the rule and the review-set that holds the path
+        Assert.Equal(DomainRule.ReviewSetConfigInvalid, exception.Rule);
+        Assert.Contains("A path of review-set 1", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

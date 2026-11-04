@@ -535,6 +535,90 @@ public class KeyRingProtectionTests
     }
 
     /// <summary>
+    ///     Test that a PFX file (with the password that opens it) loads as a certificate with a private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PfxCertificate_LoadsWithPrivateKey()
+    {
+        // Arrange: a PFX file with a password
+        using var folder = new TemporaryDirectory();
+        var pfx = KeyRingTestCertificates.WritePfx(folder, "pfx", Password);
+
+        // Act: prepare the ring
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(pfx), UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
+    ///     Test that a PEM file that holds the private key itself loads as a certificate with a private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey()
+    {
+        // Arrange: a PEM file that holds the certificate and its key, and no password
+        using var folder = new TemporaryDirectory();
+        var (inside, _) = KeyRingTestCertificates.WritePem(folder, "inside", null, separateKey: false);
+
+        // Act: prepare the ring
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(inside, null), UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
+    ///     Test that a PEM certificate with its key in the separate file of DataProtection:CertificateKeyPath loads
+    ///     as a certificate with a private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PemWithSeparateKeyFile_LoadsWithPrivateKey()
+    {
+        // Arrange: a PEM certificate file and a separate key file, and no password
+        using var folder = new TemporaryDirectory();
+        var (separate, separateKey) = KeyRingTestCertificates.WritePem(folder, "separate", null, separateKey: true);
+        var settings = new KeyRingSettings
+        {
+            Protection = "Certificate",
+            CertificatePath = separate,
+            CertificateKeyPath = separateKey
+        };
+
+        // Act: prepare the ring
+        using var plan = KeyRingProtection.Prepare(settings, UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
+    ///     Test that a PEM file whose private key is encrypted loads with the password as a certificate with a
+    ///     private key.
+    /// </summary>
+    [Fact]
+    public void KeyRingProtection_Prepare_PemWithEncryptedKey_LoadsWithPrivateKey()
+    {
+        // Arrange: a PEM file that holds the certificate and a key that the password encrypts
+        using var folder = new TemporaryDirectory();
+        var (encrypted, _) = KeyRingTestCertificates.WritePem(folder, "encrypted", Password, separateKey: false);
+
+        // Act: prepare the ring with the password
+        using var plan = KeyRingProtection.Prepare(CertificateSettings(encrypted), UnixPlatform);
+
+        // Assert: no problem and a certificate with a private key
+        Assert.Null(plan.Problem);
+        Assert.NotNull(plan.Certificate);
+        Assert.True(plan.Certificate.HasPrivateKey);
+    }
+
+    /// <summary>
     ///     Test that an earlier certificate loads with the password of the current one, or without a password, and
     ///     that an earlier certificate that cannot be loaded is reported with its position.
     /// </summary>

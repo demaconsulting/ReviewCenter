@@ -145,10 +145,26 @@ internal static class UserCommand
         }
 
         // 3. An interactive prompt, asked twice because a typo in the only password would lock the user out
-        Console.Error.Write("Password: ");
-        var first = ReadMasked();
-        Console.Error.Write("Repeat password: ");
-        var second = ReadMasked();
+        return Prompt(() => ReadMasked(() => Console.ReadKey(intercept: true), Console.Error), Console.Error);
+    }
+
+    /// <summary>
+    ///     Asks for the password twice and returns it when both entries are the same.
+    /// </summary>
+    /// <param name="readMasked">Reads one entry without echoing it; the real one reads the keyboard.</param>
+    /// <param name="prompts">Receives the two questions; the real one is standard error.</param>
+    /// <returns>The password that was entered twice.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the two entries differ.</exception>
+    /// <remarks>
+    ///     This is a seam that does not change what the command does: the keyboard and the console are passed in so
+    ///     that a test can run the prompt without a console.
+    /// </remarks>
+    internal static string Prompt(Func<string> readMasked, TextWriter prompts)
+    {
+        prompts.Write("Password: ");
+        var first = readMasked();
+        prompts.Write("Repeat password: ");
+        var second = readMasked();
         if (first != second)
         {
             throw new InvalidOperationException("The passwords do not match.");
@@ -160,16 +176,22 @@ internal static class UserCommand
     /// <summary>
     ///     Reads one line from the keyboard without echoing it.
     /// </summary>
+    /// <param name="readKey">Reads the next key without echoing it; the real one is <see cref="Console.ReadKey(bool)"/>.</param>
+    /// <param name="echo">Receives the line break when the line ends; the real one is standard error.</param>
     /// <returns>The typed text; the Enter key ends the line and Backspace removes the last character.</returns>
-    private static string ReadMasked()
+    /// <remarks>
+    ///     This is a seam that does not change what the command does: the keyboard and the console are passed in so
+    ///     that a test can type without a console.
+    /// </remarks>
+    internal static string ReadMasked(Func<ConsoleKeyInfo> readKey, TextWriter echo)
     {
         var text = new StringBuilder();
         while (true)
         {
-            var key = Console.ReadKey(intercept: true);
+            var key = readKey();
             if (key.Key == ConsoleKey.Enter)
             {
-                Console.Error.WriteLine();
+                echo.WriteLine();
                 return text.ToString();
             }
 

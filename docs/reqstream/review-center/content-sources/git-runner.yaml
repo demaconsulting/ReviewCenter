@@ -224,6 +224,24 @@ sections:
         tests:
           - GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit
 
+      - id: ReviewCenter-GitRunner-Timeout-StopsGit
+        title: >-
+          The GitRunner class shall stop the git program of a call that exceeds the time limit.
+        justification: |
+          A git program that keeps running after its call was given up would use the processor and the repository
+          folder, and would pile up with every further call.
+        tests:
+          - GitRunner_RunAsync_TimeoutWithFakeGit_StopsGitItself
+
+      - id: ReviewCenter-GitRunner-Timeout-StopsChildren
+        title: >-
+          The GitRunner class shall stop every process that git started for a call that exceeds the time limit.
+        justification: |
+          A stopped git must not leave helper processes running, because they would keep using the processor and
+          the repository folder after the call was reported as timed out.
+        tests:
+          - GitRunner_RunAsync_TimeoutWithChildProcess_StopsTheChildProcess
+
       - id: ReviewCenter-GitRunner-OutputLimit
         title: >-
           The GitRunner class shall refuse a git call whose standard output exceeds the cap given for the call with an

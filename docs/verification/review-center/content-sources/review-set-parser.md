@@ -41,6 +41,29 @@ gives the two sets in file order with their ordered paths. This scenario is test
 style, quoting, a folded block scalar, and padded values gives the values as YAML defines them, trimmed. This scenario is
 tested by `ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood`.
 
+**ReviewMarkConfigParser_Parse_BlockStyle_IsRead**: A file in block style with two sets gives both sets with their
+titles and paths. This scenario is tested by `ReviewMarkConfigParser_Parse_BlockStyle_IsRead`.
+
+**ReviewMarkConfigParser_Parse_FlowStyle_IsRead**: A file whose entry and path list are written in flow style (braces
+and brackets) gives the set with its title and both paths. This scenario is tested by
+`ReviewMarkConfigParser_Parse_FlowStyle_IsRead`.
+
+**ReviewMarkConfigParser_Parse_QuotedStrings_AreRead**: A file with single-quoted and double-quoted values, including a
+colon and an escaped quote in a title, gives the values without the quotes and with the escapes applied. This scenario is
+tested by `ReviewMarkConfigParser_Parse_QuotedStrings_AreRead`.
+
+**ReviewMarkConfigParser_Parse_FoldedText_IsRead**: A title written as a folded block scalar over two lines is read as
+one line, with the lines joined by one space. This scenario is tested by
+`ReviewMarkConfigParser_Parse_FoldedText_IsRead`.
+
+**ReviewMarkConfigParser_Parse_PaddedValues_AreTrimmed**: An identifier, a title, and two paths that are quoted with
+spaces around them are read without the spaces. This scenario is tested by
+`ReviewMarkConfigParser_Parse_PaddedValues_AreTrimmed`.
+
+**ReviewMarkConfigParser_Parse_SetWithoutPaths_HasEmptyPathList**: A review-set without a `paths` key and one with an
+empty `paths` list are both read, and both have no paths. This scenario is tested by
+`ReviewMarkConfigParser_Parse_SetWithoutPaths_HasEmptyPathList`.
+
 **ReviewMarkConfigParser_Parse_ByteOrderMark_IsSkipped**: A small file whose bytes start with a UTF-8 byte order mark is
 read, and its one review-set has the expected identifier and title. This scenario is tested by
 `ReviewMarkConfigParser_Parse_ByteOrderMark_IsSkipped`.
@@ -59,10 +82,48 @@ part that shows no library text. This scenario is tested by `ReviewMarkConfigPar
 set count limits are read; files one past each limit are refused with the rule. This scenario is tested by
 `ReviewMarkConfigParser_Parse_Limits_AreEnforced`.
 
-**ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit**: A theory over files that are one past the
-set count, identifier length, title length, path count, and path length limits; each gives the rule
-`ReviewSetConfigInvalid` and a message that names its own limit. This scenario is tested by
-`ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit`.
+**ReviewMarkConfigParser_Parse_SetCountAtLimit_IsRead**: A file with exactly 500 review-sets is read and gives all of
+them. This scenario is tested by `ReviewMarkConfigParser_Parse_SetCountAtLimit_IsRead`.
+
+**ReviewMarkConfigParser_Parse_IdLengthAtLimit_IsRead**: An identifier of exactly 100 characters is read in full. This
+scenario is tested by `ReviewMarkConfigParser_Parse_IdLengthAtLimit_IsRead`.
+
+**ReviewMarkConfigParser_Parse_TitleLengthAtLimit_IsRead**: A title of exactly 200 characters is read in full. This
+scenario is tested by `ReviewMarkConfigParser_Parse_TitleLengthAtLimit_IsRead`.
+
+**ReviewMarkConfigParser_Parse_PathCountAtLimit_IsRead**: A review-set with exactly 100 paths is read and gives all of
+them. This scenario is tested by `ReviewMarkConfigParser_Parse_PathCountAtLimit_IsRead`.
+
+**ReviewMarkConfigParser_Parse_PathLengthAtLimit_IsRead**: A path of exactly 400 characters is read in full. This
+scenario is tested by `ReviewMarkConfigParser_Parse_PathLengthAtLimit_IsRead`.
+
+**ReviewMarkConfigParser_Parse_TooManySets_ThrowsConfigInvalid**: A file with 501 review-sets is refused with the rule
+`ReviewSetConfigInvalid` and a message that names the limit of 500 review-sets. This scenario is tested by
+`ReviewMarkConfigParser_Parse_TooManySets_ThrowsConfigInvalid`.
+
+**ReviewMarkConfigParser_Parse_IdTooLong_ThrowsConfigInvalid**: An identifier of 101 characters is refused with the rule
+and a message that names the identifier limit. This scenario is tested by
+`ReviewMarkConfigParser_Parse_IdTooLong_ThrowsConfigInvalid`.
+
+**ReviewMarkConfigParser_Parse_TitleTooLong_ThrowsConfigInvalid**: A title of 201 characters is refused with the rule
+and a message that names the title limit. This scenario is tested by
+`ReviewMarkConfigParser_Parse_TitleTooLong_ThrowsConfigInvalid`.
+
+**ReviewMarkConfigParser_Parse_TooManyPaths_ThrowsConfigInvalid**: A review-set with 101 paths is refused with the rule
+and a message that names the limit of 100 paths. This scenario is tested by
+`ReviewMarkConfigParser_Parse_TooManyPaths_ThrowsConfigInvalid`.
+
+**ReviewMarkConfigParser_Parse_PathTooLong_ThrowsConfigInvalid**: A path of 401 characters is refused with the rule and
+a message that names the review-set that holds it. This scenario is tested by
+`ReviewMarkConfigParser_Parse_PathTooLong_ThrowsConfigInvalid`.
+
+**ReviewMarkConfigParser_Parse_EmptyPath_ThrowsConfigInvalid**: A review-set with an empty path next to a valid one is
+refused with the rule and a message that names the review-set that holds the path. This scenario is tested by
+`ReviewMarkConfigParser_Parse_EmptyPath_ThrowsConfigInvalid`.
+
+**ReviewMarkConfigParser_Parse_PathWithControlCharacter_ThrowsConfigInvalid**: A path with a line feed in the middle is
+refused with the rule and a message that names the review-set that holds the path. This scenario is tested by
+`ReviewMarkConfigParser_Parse_PathWithControlCharacter_ThrowsConfigInvalid`.
 
 **ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead**: A valid file that is exactly 256 KiB is read and gives its
 review-set. This scenario is tested by `ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead`.

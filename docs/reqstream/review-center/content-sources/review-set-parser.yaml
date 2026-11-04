@@ -32,19 +32,47 @@ sections:
 
       - id: ReviewCenter-ReviewSetParser-Read-Styles
         title: >-
-          The ReviewSetParser class shall understand the block, flow, quoted, and folded styles of YAML.
+          The ReviewSetParser class shall understand the block style of YAML.
         justification: |
-          Reading the file as YAML defines it lets the same file serve both tools.
+          Reading the file as YAML defines it lets the same file serve both tools, and the block style is the one that
+          the files of ReviewMark normally use.
         tests:
+          - ReviewMarkConfigParser_Parse_BlockStyle_IsRead
           - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
+
+      - id: ReviewCenter-ReviewSetParser-Read-Styles-Flow
+        title: >-
+          The ReviewSetParser class shall understand the flow style of YAML.
+        justification: |
+          A user may write an entry or a list of paths on one line with braces and brackets, and the same file must
+          still serve both tools.
+        tests:
+          - ReviewMarkConfigParser_Parse_FlowStyle_IsRead
+
+      - id: ReviewCenter-ReviewSetParser-Read-Styles-Quoted
+        title: >-
+          The ReviewSetParser class shall understand the single-quoted and double-quoted strings of YAML.
+        justification: |
+          A title with a colon or a path with special characters needs quotes, and the quotes are not part of the value.
+        tests:
+          - ReviewMarkConfigParser_Parse_QuotedStrings_AreRead
+
+      - id: ReviewCenter-ReviewSetParser-Read-Styles-Folded
+        title: >-
+          The ReviewSetParser class shall understand the folded text of YAML.
+        justification: |
+          A long title may be written over several lines, and the same file must still serve both tools.
+        tests:
+          - ReviewMarkConfigParser_Parse_FoldedText_IsRead
 
       - id: ReviewCenter-ReviewSetParser-Read-Trimmed
         title: >-
-          The ReviewSetParser class shall trim the white space around the identifier of a review-set.
+          The ReviewSetParser class shall trim the white space around the identifier, the title, and each path of a
+          review-set.
         justification: |
-          An identifier written with padding and the same identifier without it must name the same set.
+          A value written with padding and the same value without it must name the same set, title, and path.
         tests:
-          - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
+          - ReviewMarkConfigParser_Parse_PaddedValues_AreTrimmed
 
       - id: ReviewCenter-ReviewSetParser-Read-ByteOrderMark
         title: >-
@@ -68,7 +96,7 @@ sections:
         justification: |
           A review-set without paths is allowed.
         tests:
-          - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
+          - ReviewMarkConfigParser_Parse_SetWithoutPaths_HasEmptyPathList
 
       - id: ReviewCenter-ReviewSetParser-Limits
         title: >-
@@ -93,7 +121,7 @@ sections:
         justification: |
           The count bounds the work of the server and the size of the planner page.
         tests:
-          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+          - ReviewMarkConfigParser_Parse_TooManySets_ThrowsConfigInvalid
 
       - id: ReviewCenter-ReviewSetParser-Limits-IdLength
         title: >-
@@ -101,7 +129,7 @@ sections:
         justification: |
           The identifier is stored, used in file names and shown in lists, so its length is bounded.
         tests:
-          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+          - ReviewMarkConfigParser_Parse_IdTooLong_ThrowsConfigInvalid
 
       - id: ReviewCenter-ReviewSetParser-Limits-TitleLength
         title: >-
@@ -110,7 +138,7 @@ sections:
           The title is shown in headings and mail, where an unbounded text would break the layout and bloat the stored
           data.
         tests:
-          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+          - ReviewMarkConfigParser_Parse_TitleTooLong_ThrowsConfigInvalid
 
       - id: ReviewCenter-ReviewSetParser-Limits-IdControl
         title: >-
@@ -134,28 +162,85 @@ sections:
         justification: |
           A selection allows only 100 patterns.
         tests:
-          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+          - ReviewMarkConfigParser_Parse_TooManyPaths_ThrowsConfigInvalid
 
       - id: ReviewCenter-ReviewSetParser-Limits-PathValue
         title: >-
-          The ReviewSetParser class shall refuse a path that is empty, longer than 400 characters, or contains a control
-          character.
+          The ReviewSetParser class shall refuse a path that is empty.
         justification: |
-          The paths of a set are joined into one selection text with line breaks, so a path must be one plain line of
-          limited length.
+          An empty path selects nothing and is almost certainly a mistake in the file, so the user is told where it is.
         tests:
+          - ReviewMarkConfigParser_Parse_EmptyPath_ThrowsConfigInvalid
           - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
-          - ReviewMarkConfigParser_Parse_OverLimit_ThrowsConfigInvalidNamingTheLimit
+
+      - id: ReviewCenter-ReviewSetParser-Limits-PathValue-Length
+        title: >-
+          The ReviewSetParser class shall refuse a path that is longer than 400 characters.
+        justification: |
+          A selection allows only patterns of limited length, so a longer path would be refused later with a less
+          helpful message.
+        tests:
+          - ReviewMarkConfigParser_Parse_PathTooLong_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Limits-PathValue-Control
+        title: >-
+          The ReviewSetParser class shall refuse a path that contains a control character.
+        justification: |
+          The paths of a set are joined into one selection text with line breaks, so a path must be one plain line.
+        tests:
+          - ReviewMarkConfigParser_Parse_PathWithControlCharacter_ThrowsConfigInvalid
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
 
       - id: ReviewCenter-ReviewSetParser-Limits-AtLimit
         title: >-
-          The ReviewSetParser class shall accept a file whose size, review-set count, identifier length, title length,
-          path count, and path length are exactly at their limits.
+          The ReviewSetParser class shall accept a file whose size is exactly at the limit of 256 KiB.
         justification: |
-          The limits must not refuse a file that is allowed.
+          The limit must not refuse a file that is allowed.
         tests:
-          - ReviewMarkConfigParser_Parse_Limits_AreEnforced
           - ReviewMarkConfigParser_Parse_FileAtSizeLimit_IsRead
+
+      - id: ReviewCenter-ReviewSetParser-Limits-AtLimit-SetCount
+        title: >-
+          The ReviewSetParser class shall accept a file with exactly 500 review-sets.
+        justification: |
+          The limit must not refuse a file that is allowed.
+        tests:
+          - ReviewMarkConfigParser_Parse_SetCountAtLimit_IsRead
+          - ReviewMarkConfigParser_Parse_Limits_AreEnforced
+
+      - id: ReviewCenter-ReviewSetParser-Limits-AtLimit-IdLength
+        title: >-
+          The ReviewSetParser class shall accept a review-set whose identifier has exactly 100 characters.
+        justification: |
+          The limit must not refuse an identifier that is allowed.
+        tests:
+          - ReviewMarkConfigParser_Parse_IdLengthAtLimit_IsRead
+
+      - id: ReviewCenter-ReviewSetParser-Limits-AtLimit-TitleLength
+        title: >-
+          The ReviewSetParser class shall accept a review-set whose title has exactly 200 characters.
+        justification: |
+          The limit must not refuse a title that is allowed.
+        tests:
+          - ReviewMarkConfigParser_Parse_TitleLengthAtLimit_IsRead
+
+      - id: ReviewCenter-ReviewSetParser-Limits-AtLimit-PathCount
+        title: >-
+          The ReviewSetParser class shall accept a review-set with exactly 100 paths.
+        justification: |
+          The limit must not refuse a set that is allowed.
+        tests:
+          - ReviewMarkConfigParser_Parse_PathCountAtLimit_IsRead
+          - ReviewMarkConfigParser_Parse_Limits_AreEnforced
+
+      - id: ReviewCenter-ReviewSetParser-Limits-AtLimit-PathLength
+        title: >-
+          The ReviewSetParser class shall accept a path with exactly 400 characters.
+        justification: |
+          The limit must not refuse a path that is allowed.
+        tests:
+          - ReviewMarkConfigParser_Parse_PathLengthAtLimit_IsRead
+          - ReviewMarkConfigParser_Parse_Limits_AreEnforced
 
       - id: ReviewCenter-ReviewSetParser-Errors
         title: >-

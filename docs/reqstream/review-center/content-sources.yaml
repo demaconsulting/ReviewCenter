@@ -32,6 +32,8 @@ sections:
           - ReviewCenter-GitRunner-NoShell-Result
           - ReviewCenter-GitRunner-Timeout
           - ReviewCenter-GitRunner-Timeout-Ends
+          - ReviewCenter-GitRunner-Timeout-StopsGit
+          - ReviewCenter-GitRunner-Timeout-StopsChildren
           - ReviewCenter-GitRunner-OutputLimit
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
@@ -241,6 +243,9 @@ sections:
           - ReviewCenter-ReviewSetParser-Read
           - ReviewCenter-ReviewSetParser-Read-UnknownKeys
           - ReviewCenter-ReviewSetParser-Read-Styles
+          - ReviewCenter-ReviewSetParser-Read-Styles-Flow
+          - ReviewCenter-ReviewSetParser-Read-Styles-Quoted
+          - ReviewCenter-ReviewSetParser-Read-Styles-Folded
           - ReviewCenter-ReviewSetParser-Read-Trimmed
           - ReviewCenter-ReviewSetParser-Read-ByteOrderMark
           - ReviewCenter-ReviewSetParser-Read-WindowsLineEnds
@@ -254,7 +259,14 @@ sections:
           - ReviewCenter-ReviewSetParser-Limits-TitleControl
           - ReviewCenter-ReviewSetParser-Limits-PathCount
           - ReviewCenter-ReviewSetParser-Limits-PathValue
+          - ReviewCenter-ReviewSetParser-Limits-PathValue-Length
+          - ReviewCenter-ReviewSetParser-Limits-PathValue-Control
           - ReviewCenter-ReviewSetParser-Limits-AtLimit
+          - ReviewCenter-ReviewSetParser-Limits-AtLimit-SetCount
+          - ReviewCenter-ReviewSetParser-Limits-AtLimit-IdLength
+          - ReviewCenter-ReviewSetParser-Limits-AtLimit-TitleLength
+          - ReviewCenter-ReviewSetParser-Limits-AtLimit-PathCount
+          - ReviewCenter-ReviewSetParser-Limits-AtLimit-PathLength
           - ReviewCenter-ReviewSetParser-Errors
           - ReviewCenter-ReviewSetParser-Errors-NotYaml
           - ReviewCenter-ReviewSetParser-Errors-MissingId

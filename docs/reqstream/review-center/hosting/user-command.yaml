@@ -93,6 +93,35 @@ sections:
         tests:
           - UserCommand_Run_PasswordInEnvironment_CreatesUserWithThatPassword
 
+      - id: ReviewCenter-UserCommand-Password-Prompt
+        title: >-
+          The UserCommand class shall ask for the password and then for the repeated password when neither the
+          environment variable nor standard input supplies one.
+        justification: |
+          A person at a terminal has no environment variable or pipe, and a password that is typed only once could
+          lock the new user out through a typing mistake.
+        tests:
+          - UserCommand_Prompt_BothEntries_AreAskedAndTheSameValueIsReturned
+
+      - id: ReviewCenter-UserCommand-Password-Mismatch
+        title: >-
+          The UserCommand class shall refuse the password with the error "The passwords do not match." when the two
+          prompt entries differ.
+        justification: |
+          A typing mistake in the only password would lock the new user out, so the command stops instead of
+          creating the user.
+        tests:
+          - UserCommand_Prompt_DifferentEntries_ThrowsInvalidOperation
+
+      - id: ReviewCenter-UserCommand-Password-Backspace
+        title: >-
+          The UserCommand class shall remove the last typed character when the Backspace key is pressed while the
+          password is typed at the prompt.
+        justification: |
+          The prompt does not show what is typed, so the person needs Backspace to correct a mistake.
+        tests:
+          - UserCommand_ReadMasked_Backspace_RemovesLastCharacter
+
       - id: ReviewCenter-UserCommand-Password-NoPassword
         title: >-
           The UserCommand class shall report the error "No password was provided." and return exit code 1 when no

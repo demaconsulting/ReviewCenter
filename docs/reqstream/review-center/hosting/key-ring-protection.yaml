@@ -156,13 +156,38 @@ sections:
 
       - id: ReviewCenter-KeyRingProtection-Certificate-Formats
         title: >-
-          The KeyRingProtection class shall load a certificate with a private key from a PFX file, from a PEM file
-          that holds the key, from a PEM file with a separate DataProtection:CertificateKeyPath, and from a PEM file
-          with an encrypted key.
+          The KeyRingProtection class shall load a certificate with a private key from a PFX file.
         justification: |
-          Operators hold their certificates in different formats and should not have to convert them.
+          Operators hold their certificates in different formats and should not have to convert them; the PFX file is
+          the usual format on Windows.
         tests:
+          - KeyRingProtection_Prepare_PfxCertificate_LoadsWithPrivateKey
           - KeyRingProtection_Prepare_SupportedFormats_LoadWithPrivateKey
+
+      - id: ReviewCenter-KeyRingProtection-Certificate-Formats-PemInside
+        title: >-
+          The KeyRingProtection class shall load a certificate with a private key from a PEM file that holds the key.
+        justification: |
+          A single PEM file with the certificate and its key is the usual output of many certificate tools.
+        tests:
+          - KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey
+
+      - id: ReviewCenter-KeyRingProtection-Certificate-Formats-PemSeparateKey
+        title: >-
+          The KeyRingProtection class shall load a certificate with a private key from a PEM file and the separate key
+          file that DataProtection:CertificateKeyPath names.
+        justification: |
+          Many tools write the certificate and its key to two files, and the operator should not have to join them.
+        tests:
+          - KeyRingProtection_Prepare_PemWithSeparateKeyFile_LoadsWithPrivateKey
+
+      - id: ReviewCenter-KeyRingProtection-Certificate-Formats-PemEncryptedKey
+        title: >-
+          The KeyRingProtection class shall load a certificate with a private key from a PEM file with an encrypted key.
+        justification: |
+          A private key that is stored encrypted is safer on disk, and the operator should not have to decrypt it.
+        tests:
+          - KeyRingProtection_Prepare_PemWithEncryptedKey_LoadsWithPrivateKey
 
       - id: ReviewCenter-KeyRingProtection-Certificate-Password
         title: >-

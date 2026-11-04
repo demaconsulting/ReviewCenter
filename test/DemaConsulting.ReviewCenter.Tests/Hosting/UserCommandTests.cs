@@ -241,6 +241,74 @@ public class UserCommandTests
     }
 
     /// <summary>
+    ///     Makes the key presses of a typed text, ended by the Enter key.
+    /// </summary>
+    /// <param name="text">The text; <c>\b</c> stands for the Backspace key.</param>
+    /// <returns>A function that gives the next key press each time it is called.</returns>
+    private static Func<ConsoleKeyInfo> TypedKeys(string text)
+    {
+        var keys = new Queue<ConsoleKeyInfo>(
+            text.Select(c => c == '\b'
+                ? new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false)
+                : new ConsoleKeyInfo(c, ConsoleKey.A, false, false, false))
+                .Append(new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)));
+        return keys.Dequeue;
+    }
+
+    /// <summary>
+    ///     Test that the prompt asks for the password and then for the repeated password, and returns the value when
+    ///     both entries are the same.
+    /// </summary>
+    [Fact]
+    public void UserCommand_Prompt_BothEntries_AreAskedAndTheSameValueIsReturned()
+    {
+        // Arrange: a keyboard that gives the same entry twice and a writer for the questions
+        var entries = new Queue<string>(["correct horse", "correct horse"]);
+        var prompts = new StringWriter();
+
+        // Act: run the prompt
+        var password = UserCommand.Prompt(entries.Dequeue, prompts);
+
+        // Assert: the value is returned, both entries were read, and both questions were asked in order
+        Assert.Equal("correct horse", password);
+        Assert.Empty(entries);
+        Assert.Equal("Password: Repeat password: ", prompts.ToString());
+    }
+
+    /// <summary>
+    ///     Test that two different entries are refused with the error that the passwords do not match.
+    /// </summary>
+    [Fact]
+    public void UserCommand_Prompt_DifferentEntries_ThrowsInvalidOperation()
+    {
+        // Arrange: a keyboard that gives two different entries
+        var entries = new Queue<string>(["correct horse", "correct hose"]);
+
+        // Act: run the prompt
+        var exception = Assert.Throws<InvalidOperationException>(() => UserCommand.Prompt(entries.Dequeue, new StringWriter()));
+
+        // Assert: the message says that the passwords do not match
+        Assert.Equal("The passwords do not match.", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the Backspace key removes the last character that was typed.
+    /// </summary>
+    [Fact]
+    public void UserCommand_ReadMasked_Backspace_RemovesLastCharacter()
+    {
+        // Arrange: the keys a, b, Backspace, c and Enter
+        var echo = new StringWriter();
+
+        // Act: read the line
+        var text = UserCommand.ReadMasked(TypedKeys("ab\bc"), echo);
+
+        // Assert: the b was removed, and the typed characters were not echoed
+        Assert.Equal("ac", text);
+        Assert.Equal(Environment.NewLine, echo.ToString());
+    }
+
+    /// <summary>
     ///     Runs the user command with the given arguments against a database.
     /// </summary>
     /// <param name="connectionString">The connection string of the database.</param>

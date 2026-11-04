@@ -146,6 +146,9 @@ sections:
           - ReviewCenter-UserCommand-Create-NoKeyRing
           - ReviewCenter-UserCommand-Create-Arguments
           - ReviewCenter-UserCommand-Password
+          - ReviewCenter-UserCommand-Password-Prompt
+          - ReviewCenter-UserCommand-Password-Mismatch
+          - ReviewCenter-UserCommand-Password-Backspace
           - ReviewCenter-UserCommand-Password-NoPassword
           - ReviewCenter-UserCommand-Password-NoDatabase
           - ReviewCenter-UserCommand-Errors
@@ -360,6 +363,9 @@ sections:
           - ReviewCenter-KeyRingProtection-Certificate
           - ReviewCenter-KeyRingProtection-Certificate-Restart
           - ReviewCenter-KeyRingProtection-Certificate-Formats
+          - ReviewCenter-KeyRingProtection-Certificate-Formats-PemInside
+          - ReviewCenter-KeyRingProtection-Certificate-Formats-PemSeparateKey
+          - ReviewCenter-KeyRingProtection-Certificate-Formats-PemEncryptedKey
           - ReviewCenter-KeyRingProtection-Certificate-Password
           - ReviewCenter-KeyRingProtection-Certificate-PasswordFile
           - ReviewCenter-KeyRingProtection-Certificate-NoPath

@@ -91,6 +91,22 @@ password, and keeps the cause. This scenario is tested by the test of the same n
 encrypted PEM files load with a private key; previous certificates load with the shared
 password or none, and a bad one is named by its index. These scenarios are tested by the tests of the same names.
 
+**KeyRingProtection_Prepare_PfxCertificate_LoadsWithPrivateKey**: A PFX file with a password is prepared with that
+password; there is no problem and the certificate has a private key. This scenario is tested by
+`KeyRingProtection_Prepare_PfxCertificate_LoadsWithPrivateKey`.
+
+**KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey**: A PEM file that holds the certificate and its private
+key is prepared without a password; there is no problem and the certificate has a private key. This scenario is tested
+by `KeyRingProtection_Prepare_PemWithKeyInside_LoadsWithPrivateKey`.
+
+**KeyRingProtection_Prepare_PemWithSeparateKeyFile_LoadsWithPrivateKey**: A PEM certificate file and the key file that
+`DataProtection:CertificateKeyPath` names are prepared without a password; there is no problem and the certificate has
+a private key. This scenario is tested by `KeyRingProtection_Prepare_PemWithSeparateKeyFile_LoadsWithPrivateKey`.
+
+**KeyRingProtection_Prepare_PemWithEncryptedKey_LoadsWithPrivateKey**: A PEM file whose private key is encrypted is
+prepared with the password; there is no problem and the certificate has a private key. This scenario is tested by
+`KeyRingProtection_Prepare_PemWithEncryptedKey_LoadsWithPrivateKey`.
+
 **KeyRingProtection_Apply_Dpapi_CreatesTheEncryptorForTheScope** and
 **KeyRingProtection_Apply_CertificateAndOthers_WiresTheCertificateEncryptorOnly**: A stub factory shows that DPAPI is
 created with the right scope and that no other mode creates it; the certificate mode wires the certificate encryptor.
