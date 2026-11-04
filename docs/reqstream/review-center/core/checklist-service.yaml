@@ -17,22 +17,54 @@ sections:
       # ---------------------------------------------------------------------------------------------------------------
       - id: ReviewCenter-ChecklistService-Default
         title: >-
-          The ChecklistService class shall provide a built-in default checklist of 14 sections and 58 checks, with the
-          section identifiers of the review template in template order, a version, and the first and the last check
-          identifier of the template.
+          The ChecklistService class shall provide a built-in default checklist of 14 sections with the section
+          identifiers of the review template in template order.
         justification: |
           Reviewers follow the same checks in every review, and a check keeps one stable identifier. A project that has
           no checklist of its own needs a reviewed standard to start from.
         tests:
           - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
 
+      - id: ReviewCenter-ChecklistService-Default-Checks
+        title: >-
+          The ChecklistService class shall provide in the default checklist 58 checks, with the check count of every
+          section of the template.
+        justification: |
+          A reviewer answers the same checks in every review, so the number of checks of each section must not drift.
+        tests:
+          - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
+
+      - id: ReviewCenter-ChecklistService-Default-Version
+        title: >-
+          The ChecklistService class shall give the default checklist a version label.
+        justification: |
+          The version names the wording that a review was answered against.
+        tests:
+          - ChecklistService_DefaultChecklist_HasAVersionLabel
+
+      - id: ReviewCenter-ChecklistService-Default-FirstLast
+        title: >-
+          The ChecklistService class shall make the first check of the default checklist REQ-01 and the last check
+          CODEDOC-04.
+        justification: |
+          The first and the last check mark the ends of the template, so a dropped or added section shows at once.
+        tests:
+          - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
+
       - id: ReviewCenter-ChecklistService-Default-Identifiers
         title: >-
           The ChecklistService class shall give every check of the default checklist an identifier that is unique and
-          consists of the identifier of its section, a hyphen, and a two-digit number, and shall give every check
-          wording.
+          consists of the identifier of its section, a hyphen, and a two-digit number.
         justification: |
           Answers are stored by check identifier, so an ambiguous identifier would mix up two checks.
+        tests:
+          - ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection
+
+      - id: ReviewCenter-ChecklistService-Default-Wording
+        title: >-
+          The ChecklistService class shall give every check of the default checklist wording.
+        justification: |
+          A check without wording could not be answered.
         tests:
           - ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection
 
@@ -127,10 +159,17 @@ sections:
 
       - id: ReviewCenter-ChecklistService-Validation-Size
         title: >-
-          The ChecklistValidator class shall refuse a definition text of more than 256 KiB and accept one of exactly
-          256 KiB.
+          The ChecklistValidator class shall refuse a definition text of more than 256 KiB.
         justification: |
           The size limit keeps the copy that every review stores small.
+        tests:
+          - ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes
+
+      - id: ReviewCenter-ChecklistService-Validation-Size-AtLimit
+        title: >-
+          The ChecklistValidator class shall accept a definition text of exactly 256 KiB.
+        justification: |
+          A limit that is inclusive must let a text of exactly that size through.
         tests:
           - ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes
 
@@ -152,18 +191,33 @@ sections:
 
       - id: ReviewCenter-ChecklistService-Validation-SectionCount
         title: >-
-          The ChecklistValidator class shall refuse a definition with more than 50 sections and accept one with 50.
+          The ChecklistValidator class shall refuse a definition with more than 50 sections.
         justification: |
           The limit keeps the review page usable.
         tests:
           - ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections
 
+      - id: ReviewCenter-ChecklistService-Validation-SectionCount-AtLimit
+        title: >-
+          The ChecklistValidator class shall accept a definition with 50 sections.
+        justification: |
+          A limit that is inclusive must let a definition of exactly that size through.
+        tests:
+          - ChecklistValidator_Validate_SectionCount_LimitsAtMaxSections
+
       - id: ReviewCenter-ChecklistService-Validation-ItemCount
         title: >-
-          The ChecklistValidator class shall refuse a definition with more than 500 checks in all and accept one with
-          500.
+          The ChecklistValidator class shall refuse a definition with more than 500 checks in all.
         justification: |
           The limit keeps the review page usable.
+        tests:
+          - ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems
+
+      - id: ReviewCenter-ChecklistService-Validation-ItemCount-AtLimit
+        title: >-
+          The ChecklistValidator class shall accept a definition with 500 checks in all.
+        justification: |
+          A limit that is inclusive must let a definition of exactly that size through.
         tests:
           - ChecklistValidator_Validate_ItemCount_LimitsAtMaxItems
 
@@ -194,17 +248,32 @@ sections:
 
       - id: ReviewCenter-ChecklistService-Validation-IdUnique
         title: >-
-          The ChecklistValidator class shall refuse an identifier that is used twice among the sections and checks,
-          also when the two differ only in letter case, and report the error at the later use.
+          The ChecklistValidator class shall refuse an identifier that is used twice among the sections and checks.
         justification: |
           An answer must belong to exactly one check.
         tests:
           - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
 
+      - id: ReviewCenter-ChecklistService-Validation-IdUnique-CaseInsensitive
+        title: >-
+          The ChecklistValidator class shall treat two identifiers that differ only in letter case as the same
+          identifier.
+        justification: |
+          Identifiers that differ only in case would look alike on the page and in addresses.
+        tests:
+          - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
+
+      - id: ReviewCenter-ChecklistService-Validation-IdUnique-LaterUse
+        title: >-
+          The ChecklistValidator class shall report the duplicate-identifier error at the later use.
+        justification: |
+          The first use is the one that stays, so the error must point at the one to correct.
+        tests:
+          - ChecklistValidator_Validate_DuplicateIds_AreReportedAtTheLaterUse
+
       - id: ReviewCenter-ChecklistService-Validation-Titles
         title: >-
-          The ChecklistValidator class shall require a title of 1 to 200 characters for every section, and refuse a
-          title that is blank.
+          The ChecklistValidator class shall require a title of 1 to 200 characters for every section.
         justification: |
           A reviewer needs a short name for each part of the checklist.
         tests:
@@ -212,8 +281,7 @@ sections:
 
       - id: ReviewCenter-ChecklistService-Validation-Wording
         title: >-
-          The ChecklistValidator class shall require wording of 1 to 1000 characters for every check, and refuse
-          wording that is empty.
+          The ChecklistValidator class shall require wording of 1 to 1000 characters for every check.
         justification: |
           The wording is what the reviewer attests.
         tests:
@@ -221,10 +289,25 @@ sections:
 
       - id: ReviewCenter-ChecklistService-Validation-Hint
         title: >-
-          The ChecklistValidator class shall accept an empty applicability hint and a hint of up to 500 characters of a
-          section, and refuse a longer one.
+          The ChecklistValidator class shall accept an empty applicability hint of a section.
         justification: |
-          A hint helps but is optional and must stay short.
+          A hint helps but is optional.
+        tests:
+          - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-Hint-Length
+        title: >-
+          The ChecklistValidator class shall accept an applicability hint of up to 500 characters.
+        justification: |
+          A hint must stay short, and a hint of exactly the limit is still allowed.
+        tests:
+          - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
+
+      - id: ReviewCenter-ChecklistService-Validation-Hint-TooLong
+        title: >-
+          The ChecklistValidator class shall refuse an applicability hint of more than 500 characters.
+        justification: |
+          A hint must stay short.
         tests:
           - ChecklistValidator_Validate_TitlesTextAndHint_BoundariesAndPresence
 
@@ -317,9 +400,26 @@ sections:
       - id: ReviewCenter-ChecklistService-Applicability-ReasonLimit
         title: >-
           The ChecklistService class shall refuse a reason of more than 2000 characters with the
-          ChecklistJustificationInvalid rule, accept one of exactly 2000, and keep the earlier reason when it refuses.
+          ChecklistJustificationInvalid rule.
         justification: |
           Stored text must stay bounded.
+        tests:
+          - ChecklistService_SetSectionApplicability_ReasonTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Applicability-ReasonLimit-AtLimit
+        title: >-
+          The ChecklistService class shall accept a reason of exactly 2000 characters.
+        justification: |
+          A limit that is inclusive must let a reason of exactly that length through.
+        tests:
+          - ChecklistService_SetSectionApplicability_ReasonTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Applicability-ReasonLimit-KeepsEarlier
+        title: >-
+          The ChecklistService class shall keep the earlier reason of a section when it refuses a reason that is too
+          long.
+        justification: |
+          A refused change must leave the record as it was.
         tests:
           - ChecklistService_SetSectionApplicability_ReasonTooLong_Throws
 
@@ -357,10 +457,17 @@ sections:
 
       - id: ReviewCenter-ChecklistService-Answer-PassNoJustification
         title: >-
-          The ChecklistService class shall accept a Pass answer without a justification, and store a blank justification
-          as none.
+          The ChecklistService class shall accept a Pass answer without a justification.
         justification: |
           A pass needs no explanation.
+        tests:
+          - ChecklistService_SetAnswer_PassWithoutJustification_Stores
+
+      - id: ReviewCenter-ChecklistService-Answer-PassNoJustification-BlankStoredAsNone
+        title: >-
+          The ChecklistService class shall store a blank justification of a Pass answer as none.
+        justification: |
+          A blank text carries no information and must not be shown as if it did.
         tests:
           - ChecklistService_SetAnswer_PassWithoutJustification_Stores
 
@@ -385,9 +492,25 @@ sections:
       - id: ReviewCenter-ChecklistService-Answer-JustificationLimit
         title: >-
           The ChecklistService class shall refuse a justification of more than 2000 characters with the
-          ChecklistJustificationInvalid rule, accept one of exactly 2000, and store nothing when it refuses.
+          ChecklistJustificationInvalid rule.
         justification: |
           Stored text must stay bounded.
+        tests:
+          - ChecklistService_SetAnswer_JustificationTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Answer-JustificationLimit-AtLimit
+        title: >-
+          The ChecklistService class shall accept a justification of exactly 2000 characters.
+        justification: |
+          A limit that is inclusive must let a justification of exactly that length through.
+        tests:
+          - ChecklistService_SetAnswer_JustificationTooLong_Throws
+
+      - id: ReviewCenter-ChecklistService-Answer-JustificationLimit-StoresNothing
+        title: >-
+          The ChecklistService class shall store nothing when it refuses a justification that is too long.
+        justification: |
+          A refused answer must leave the check unanswered.
         tests:
           - ChecklistService_SetAnswer_JustificationTooLong_Throws
 
@@ -515,8 +638,15 @@ sections:
 
       - id: ReviewCenter-ChecklistService-Progress-NothingLeft
         title: >-
-          The ChecklistService class shall name no first incomplete section and no next unanswered check when the
-          checklist is complete.
+          The ChecklistService class shall name no first incomplete section when the checklist is complete.
+        justification: |
+          The page must know when to stop guiding.
+        tests:
+          - ChecklistState_Progress_AllApplicableAnswered_IsComplete
+
+      - id: ReviewCenter-ChecklistService-Progress-NothingLeft-NextCheck
+        title: >-
+          The ChecklistService class shall name no next unanswered check when the checklist is complete.
         justification: |
           The page must know when to stop guiding.
         tests:
@@ -718,10 +848,26 @@ sections:
       - id: ReviewCenter-ChecklistService-AuthorRule-BlockedFlag
         title: >-
           The ChecklistService class shall mark the checklist as blocked for the author of the review, whatever the
-          letter case of the user name, only while the author rule is on, and not for another viewer or without a
-          viewer.
+          letter case of the user name.
         justification: |
           The page must not offer the author an answer that will be refused.
+        tests:
+          - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-BlockedFlag-OtherViewers
+        title: >-
+          The ChecklistService class shall not mark the checklist as blocked for another viewer or without a viewer.
+        justification: |
+          Only the author is refused, so the page must not hide the answers from anybody else.
+        tests:
+          - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
+
+      - id: ReviewCenter-ChecklistService-AuthorRule-BlockedFlag-RuleOff
+        title: >-
+          The ChecklistService class shall not mark the checklist as blocked for the author of the review while the
+          author rule is off.
+        justification: |
+          While the rule is off the author may answer, so the page must not block the author.
         tests:
           - ChecklistService_Get_ViewerUsername_SetsAuthorBlockedOnlyForTheAuthorWhileRuleIsOn
 
@@ -742,18 +888,35 @@ sections:
       - id: ReviewCenter-ChecklistService-SignatureImpact-Names
         title: >-
           The ChecklistService class shall name in the refusal the number and the signer of every affected slot, whether
-          the primary or the alternate reviewer signed, and not the slots without a signature.
+          the primary or the alternate reviewer signed.
         justification: |
           The actor must see whom the change affects.
+        tests:
+          - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-Names-Unsigned
+        title: >-
+          The ChecklistService class shall not name in the refusal a slot that has no signature.
+        justification: |
+          A slot without a signature is not affected, and naming it would ask for an acknowledgement that means nothing.
         tests:
           - ChecklistService_SetAnswerAsync_PrimaryAndAlternateSigners_NamesSlotNumbersAndSigners
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-Remaining
         title: >-
           The ChecklistService class shall name in the refusal after an incomplete acknowledgement the slots that are
-          still not acknowledged, and not let the acknowledgement of a slot that has no signature suppress any of them.
+          still not acknowledged.
         justification: |
           The actor must see what is left to acknowledge.
+        tests:
+          - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
+
+      - id: ReviewCenter-ChecklistService-SignatureImpact-Remaining-Unrelated
+        title: >-
+          The ChecklistService class shall not let the acknowledgement of a slot that has no signature suppress any of
+          the slots that are still not acknowledged.
+        justification: |
+          An acknowledgement of an unrelated slot must not hide a signature that is still affected.
         tests:
           - ChecklistService_SetAnswerAsync_PartialAcknowledgement_ThrowsWithRemainingSlots
 
@@ -786,11 +949,12 @@ sections:
 
       - id: ReviewCenter-ChecklistService-SignatureImpact-ExceptionCopy
         title: >-
-          The DomainRuleException class shall keep its own copy of the affected slots that it was built with, so that a
-          later change of the list does not change the exception.
+          The ChecklistService class shall keep the affected slots listed in a refusal as they were when it raised the
+          refusal, so that a later change of the signatures does not change the refusal.
         justification: |
           An error must not change after it was thrown.
         tests:
+          - ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards
           - ChecklistService_DomainRuleException_AffectedSlots_AreCopiedFromTheSource
 
       # ---------------------------------------------------------------------------------------------------------------
@@ -818,9 +982,18 @@ sections:
       - id: ReviewCenter-ChecklistService-CarriedMarking-Progress
         title: >-
           The ChecklistService class shall count the answers that were carried over from an earlier review as answered
-          in the progress of a ballot, and leave a carried not-applicable section out of the total.
+          in the progress of a ballot.
         justification: |
           A follow-up starts from the answers that are still valid.
+        tests:
+          - ChecklistService_Get_CarriedAnswers_CountAsAnswered
+
+      - id: ReviewCenter-ChecklistService-CarriedMarking-Progress-NotApplicableSection
+        title: >-
+          The ChecklistService class shall leave a section that was carried over from an earlier review as not
+          applicable out of the total of the progress of a ballot.
+        justification: |
+          A section that does not apply must not block the follow-up.
         tests:
           - ChecklistService_Get_CarriedAnswers_CountAsAnswered
 
@@ -1223,8 +1396,26 @@ sections:
 
       - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange
         title: >-
-          The ChecklistService class shall report that nothing changed, without an acknowledgement, and keep the
-          signatures current when the review conclusion text is the same as the stored one.
+          The ChecklistService class shall report that nothing changed when the review conclusion text is the same as
+          the stored one.
+        justification: |
+          A change that changes nothing must be told as such.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Acknowledgement
+        title: >-
+          The ChecklistService class shall need no acknowledgement of a signature when the review conclusion text is
+          the same as the stored one.
+        justification: |
+          Nobody is affected by a change that changes nothing, so nobody needs to be asked.
+        tests:
+          - ChecklistService_SetReviewConclusionTextAsync_SameValue_NoOpNoAudit
+
+      - id: ReviewCenter-ChecklistService-ReviewConclusionText-NoChange-Signature
+        title: >-
+          The ChecklistService class shall keep the signatures current when the review conclusion text is the same as
+          the stored one.
         justification: |
           A change that changes nothing must not invalidate a signature.
         tests:

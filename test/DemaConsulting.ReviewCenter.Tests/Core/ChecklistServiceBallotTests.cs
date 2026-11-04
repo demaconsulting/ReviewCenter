@@ -232,6 +232,34 @@ public class ChecklistServiceBallotTests
     }
 
     /// <summary>
+    ///     Test that the affected slots listed in a refusal stay as they were when the refusal was raised, although
+    ///     the signatures change afterwards.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SubmitBallotAsync_Refusal_AffectedSlotsDoNotChangeAfterwards()
+    {
+        // Arrange: slot 1 signed, and sam disagrees in his draft
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await SignedReviewWorld.CreateAsync();
+        await world.SignAsync(1);
+        var sam = SignedReviewWorld.ActorOf("sam");
+        await world.Checklists.SetAnswerAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, SignedReviewWorld.FirstItemId, ChecklistOutcome.Fail, "Wrong.", sam, cancellationToken);
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Checklists.SubmitBallotAsync(world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken));
+        var recorded = ex.AffectedSlots.ToArray();
+        Assert.Single(recorded);
+
+        // Act: hand the ballot in with the acknowledgement, which puts the signature out of date
+        await world.Checklists.SubmitBallotAsync(
+            world.ProjectId, SignedReviewWorld.ReviewId, sam, cancellationToken, [world.Slots[0].Id]);
+
+        // Assert: the signature changed, the refusal that was caught did not
+        Assert.Empty(await world.SignedSlotIdsAsync());
+        Assert.Equal(recorded, ex.AffectedSlots);
+    }
+
+    /// <summary>
     ///     Test that a ballot that agrees with the others when it is handed in again warns nobody.
     /// </summary>
     [Fact]

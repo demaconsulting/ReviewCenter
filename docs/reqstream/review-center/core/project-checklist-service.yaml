@@ -137,21 +137,23 @@ sections:
 
       - id: ReviewCenter-ProjectChecklistService-Access-Change
         title: >-
-          The ProjectChecklistService class shall replace the checklist of a project only for a system administrator or
+          The ProjectChecklistService class shall replace the checklist of a project for a system administrator and for
           a project administrator of that project.
         justification: |
-          The checklist decides what every later review is answered against, so only the people who administer the
-          project may change it.
+          The checklist decides what every later review is answered against, so the people who administer the
+          project must be able to change it.
         tests:
           - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
 
       - id: ReviewCenter-ProjectChecklistService-Access-Reset
         title: >-
-          The ProjectChecklistService class shall reset the checklist of a project only for a system administrator or a
+          The ProjectChecklistService class shall reset the checklist of a project for a system administrator and for a
           project administrator of that project.
         justification: |
-          A reset changes the standard of every later review as much as a replacement does.
+          A reset changes the standard of every later review as much as a replacement does, so the people who
+          administer the project must be able to do it.
         tests:
+          - ProjectChecklistService_ResetAsync_ActorKinds_AreAllowedOrRefused
           - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
 
       - id: ReviewCenter-ProjectChecklistService-Access-MemberRefused
@@ -162,18 +164,39 @@ sections:
           A member may see the checklist but not decide it, and the refusal tells the member why.
         tests:
           - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - ProjectChecklistService_ResetAsync_ActorKinds_AreAllowedOrRefused
           - ProjectChecklistService_ResetAsync_MemberAndOutsider_AreRefusedAndNothingChanges
 
       - id: ReviewCenter-ProjectChecklistService-Access-Hidden
         title: >-
-          The ProjectChecklistService class shall give an actor who may not see the project, a user outside the
-          project, an administrator of another project, a disabled user, or no actor at all, the same answer as for a
-          project that does not exist, the ProjectNotFound rule, when the actor reads, replaces or resets the
-          checklist.
+          The ProjectChecklistService class shall give an actor who may not see the project (a user outside the
+          project, an administrator of another project, a disabled user, or no actor) the same answer as for a project
+          that does not exist, the ProjectNotFound rule, when the actor reads the checklist.
         justification: |
           A project that the actor may not see must read like a missing one, so that its existence does not leak.
         tests:
           - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - ProjectChecklistService_GetAsync_NullActor_IsNotFound
+
+      - id: ReviewCenter-ProjectChecklistService-Access-HiddenReplace
+        title: >-
+          The ProjectChecklistService class shall give an actor who may not see the project (a user outside the
+          project, an administrator of another project, or a disabled user) the ProjectNotFound rule when the actor
+          replaces the checklist.
+        justification: |
+          A project that the actor may not see must read like a missing one, so that its existence does not leak.
+        tests:
+          - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
+
+      - id: ReviewCenter-ProjectChecklistService-Access-HiddenReset
+        title: >-
+          The ProjectChecklistService class shall give an actor who may not see the project (a user outside the
+          project, an administrator of another project, or a disabled user) the ProjectNotFound rule when the actor
+          resets the checklist.
+        justification: |
+          A project that the actor may not see must read like a missing one, so that its existence does not leak.
+        tests:
+          - ProjectChecklistService_ResetAsync_ActorKinds_AreAllowedOrRefused
           - ProjectChecklistService_ResetAsync_MemberAndOutsider_AreRefusedAndNothingChanges
 
       - id: ReviewCenter-ProjectChecklistService-Access-Missing
@@ -212,6 +235,7 @@ sections:
         tests:
           - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
           - ProjectChecklistService_SetAndReset_ApiToken_AreRefused
+          - ProjectChecklistService_ResetAsync_ActorKinds_AreAllowedOrRefused
           - ProjectChecklistService_ResetAsync_MemberAndOutsider_AreRefusedAndNothingChanges
 
       - id: ReviewCenter-ProjectChecklistService-Access-Revoked
@@ -402,11 +426,18 @@ sections:
 
       - id: ReviewCenter-ProjectChecklistService-Audit-Actor
         title: >-
-          The ProjectChecklistService class shall name the actor in the audit entry of a replacement and of a reset.
+          The ProjectChecklistService class shall name the actor in the audit entry of a replacement.
         justification: |
           A change must be attributable.
         tests:
           - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
+
+      - id: ReviewCenter-ProjectChecklistService-Audit-ResetActor
+        title: >-
+          The ProjectChecklistService class shall name the actor in the audit entry of a reset.
+        justification: |
+          A reset changes the standard of the project and must be attributable like a replacement.
+        tests:
           - ProjectChecklistService_ResetAsync_CustomDefinition_RestoresDefaultAndAudits
 
       - id: ReviewCenter-ProjectChecklistService-Audit-Detail
