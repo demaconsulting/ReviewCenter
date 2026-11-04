@@ -91,7 +91,7 @@ sections:
       - id: ReviewCenter-RevisionValidator-Refuse-Characters
         title: >-
           The RevisionValidator class shall refuse a revision that contains a character other than letters, digits,
-          and the characters . _ / + @ # -.
+          and the characters . _ / + @  # -.
         justification: |
           A strict list of characters is safer than a copy of the naming rules of git, which allow characters that a
           shell or git could read in a special way.

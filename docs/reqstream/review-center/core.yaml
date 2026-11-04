@@ -79,6 +79,8 @@ sections:
           - ReviewCenter-RepositoryService-Ownership
           - ReviewCenter-ThreadService-Access
           - ReviewCenter-ChecklistService-Access
+          - ReviewCenter-ChecklistService-Access-Section
+          - ReviewCenter-ChecklistService-Arguments
           - ReviewCenter-ChecklistService-BallotAccess
         tests:
           - ProjectAccess_Matrix_ActorKinds_GetTheirRights
@@ -130,16 +132,78 @@ sections:
           simultaneous change, and must be traceable in the history of the project.
         children:
           - ReviewCenter-ProjectChecklistService-Read
+          - ReviewCenter-ProjectChecklistService-Read-Hash
+          - ReviewCenter-ProjectChecklistService-Read-DefaultHash
+          - ReviewCenter-ProjectChecklistService-Read-Unreadable
           - ReviewCenter-ProjectChecklistService-Validation
+          - ReviewCenter-ProjectChecklistService-Validation-Errors
+          - ReviewCenter-ProjectChecklistService-Validation-StoredForm
+          - ReviewCenter-ProjectChecklistService-Validation-Check
+          - ReviewCenter-ProjectChecklistService-Validation-CheckValid
+          - ReviewCenter-ProjectChecklistService-Validation-CheckNothingStored
           - ReviewCenter-ProjectChecklistService-Access
+          - ReviewCenter-ProjectChecklistService-Access-ReadToken
+          - ReviewCenter-ProjectChecklistService-Access-Change
+          - ReviewCenter-ProjectChecklistService-Access-Reset
+          - ReviewCenter-ProjectChecklistService-Access-MemberRefused
+          - ReviewCenter-ProjectChecklistService-Access-Hidden
+          - ReviewCenter-ProjectChecklistService-Access-Missing
+          - ReviewCenter-ProjectChecklistService-Access-Token
+          - ReviewCenter-ProjectChecklistService-Access-TokenReset
+          - ReviewCenter-ProjectChecklistService-Access-NothingChanged
+          - ReviewCenter-ProjectChecklistService-Access-Revoked
           - ReviewCenter-ProjectChecklistService-Change
+          - ReviewCenter-ProjectChecklistService-Change-NormalForm
+          - ReviewCenter-ProjectChecklistService-Change-OtherProjects
+          - ReviewCenter-ProjectChecklistService-Change-Reported
           - ReviewCenter-ProjectChecklistService-VersionLabel
+          - ReviewCenter-ProjectChecklistService-VersionLabel-Default
+          - ReviewCenter-ProjectChecklistService-VersionLabel-Message
+          - ReviewCenter-ProjectChecklistService-VersionLabel-NothingStored
           - ReviewCenter-ProjectChecklistService-NoChange
+          - ReviewCenter-ProjectChecklistService-NoChange-Recorded
+          - ReviewCenter-ProjectChecklistService-NoChange-Reset
+          - ReviewCenter-ProjectChecklistService-NoChange-ResetRecorded
           - ReviewCenter-ProjectChecklistService-Reset
+          - ReviewCenter-ProjectChecklistService-Reset-Reported
+          - ReviewCenter-ProjectChecklistService-Reset-ExistingReviews
           - ReviewCenter-ProjectChecklistService-Audit
+          - ReviewCenter-ProjectChecklistService-Audit-Reset
+          - ReviewCenter-ProjectChecklistService-Audit-Project
+          - ReviewCenter-ProjectChecklistService-Audit-Actor
+          - ReviewCenter-ProjectChecklistService-Audit-Detail
+          - ReviewCenter-ProjectChecklistService-Audit-ResetDetail
+          - ReviewCenter-ProjectChecklistService-Audit-NoWording
+          - ReviewCenter-ProjectChecklistService-Audit-Length
           - ReviewCenter-ProjectChecklistService-Conflict
+          - ReviewCenter-ProjectChecklistService-Conflict-Reset
+          - ReviewCenter-ProjectChecklistService-Conflict-Message
+          - ReviewCenter-ProjectChecklistService-Conflict-NothingStored
           - ReviewCenter-ProjectChecklistService-Arguments
+          - ReviewCenter-ProjectChecklistService-Arguments-Actor
+          - ReviewCenter-ProjectChecklistService-Arguments-ExpectedHash
           - ReviewCenter-ChecklistService-Validation
+          - ReviewCenter-ChecklistService-Validation-EmptyText
+          - ReviewCenter-ChecklistService-Validation-NotJson
+          - ReviewCenter-ChecklistService-Validation-Size
+          - ReviewCenter-ChecklistService-Validation-Version
+          - ReviewCenter-ChecklistService-Validation-Sections
+          - ReviewCenter-ChecklistService-Validation-SectionCount
+          - ReviewCenter-ChecklistService-Validation-ItemCount
+          - ReviewCenter-ChecklistService-Validation-EmptySection
+          - ReviewCenter-ChecklistService-Validation-IdForm
+          - ReviewCenter-ChecklistService-Validation-IdLength
+          - ReviewCenter-ChecklistService-Validation-IdUnique
+          - ReviewCenter-ChecklistService-Validation-Titles
+          - ReviewCenter-ChecklistService-Validation-Wording
+          - ReviewCenter-ChecklistService-Validation-Hint
+          - ReviewCenter-ChecklistService-Validation-NullEntries
+          - ReviewCenter-ChecklistService-Validation-AllErrors
+          - ReviewCenter-ChecklistService-Validation-ErrorPath
+          - ReviewCenter-ChecklistService-Validation-CanonicalPath
+          - ReviewCenter-ChecklistService-Validation-MemberNames
+          - ReviewCenter-ChecklistService-Validation-ParseOrThrow
+          - ReviewCenter-ChecklistService-Validation-ErrorText
         tests:
           - ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused
           - ProjectChecklistService_SetAsync_Change_IsStoredAndAudited
@@ -155,7 +219,11 @@ sections:
           submitted, including binary files and files with Windows line endings.
         children:
           - ReviewCenter-ReviewService-Draft
+          - ReviewCenter-ReviewService-Draft-Content
           - ReviewCenter-ReviewService-Read
+          - ReviewCenter-ReviewService-Read-List
+          - ReviewCenter-ReviewService-Read-Content
+          - ReviewCenter-ReviewService-Read-NotFound
         tests:
           - CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack
 
@@ -169,9 +237,15 @@ sections:
           a deviation would silently break that match.
         children:
           - ReviewCenter-Fingerprint-FileHash
+          - ReviewCenter-Fingerprint-FileHash-LineEndings
+          - ReviewCenter-Fingerprint-FileHash-Verbatim
           - ReviewCenter-Fingerprint-SetHash
+          - ReviewCenter-Fingerprint-SetHash-Order
+          - ReviewCenter-Fingerprint-SetHash-FromContents
+          - ReviewCenter-Fingerprint-SetHash-Arguments
           - ReviewCenter-Fingerprint-Duplicates
           - ReviewCenter-ReviewService-Fingerprint
+          - ReviewCenter-ReviewService-Fingerprint-Independent
         tests:
           - CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack
           - CoreSubsystem_Fingerprint_SameContentOtherNamesAndOrder_GivesSameFingerprint
@@ -187,10 +261,20 @@ sections:
         children:
           - ReviewCenter-ProjectService-Validation
           - ReviewCenter-ReviewService-Id
+          - ReviewCenter-ReviewService-Id-Unique
+          - ReviewCenter-ReviewService-Id-OtherProject
           - ReviewCenter-ReviewService-Title
+          - ReviewCenter-ReviewService-Title-Length
           - ReviewCenter-ReviewService-Project
+          - ReviewCenter-ReviewService-Project-Hidden
           - ReviewCenter-ReviewService-Files
+          - ReviewCenter-ReviewService-Files-BlankPath
+          - ReviewCenter-ReviewService-Files-PathLength
+          - ReviewCenter-ReviewService-Files-DuplicatePath
+          - ReviewCenter-ReviewService-Files-PathCase
           - ReviewCenter-ReviewService-Limits
+          - ReviewCenter-ReviewService-Limits-FileCount
+          - ReviewCenter-ReviewService-Limits-TotalSize
           - ReviewCenter-ThreadService-Anchor
           - ReviewCenter-ThreadService-Comment
         tests:
@@ -222,6 +306,10 @@ sections:
           - ReviewCenter-ThreadService-CheckThreadStart
           - ReviewCenter-ThreadService-Capabilities
           - ReviewCenter-RecordDigest-CheckThread
+          - ReviewCenter-RecordDigest-CheckThread-Comments
+          - ReviewCenter-RecordDigest-CheckThread-Chat
+          - ReviewCenter-RecordDigest-CheckThread-Sorted
+          - ReviewCenter-RecordDigest-CheckThread-FileUnchanged
         tests:
           - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder
 
@@ -237,17 +325,63 @@ sections:
           about.
         children:
           - ReviewCenter-LineDiff-Compute
+          - ReviewCenter-LineDiff-Compute-Reconstruct
+          - ReviewCenter-LineDiff-Compute-Equal
+          - ReviewCenter-LineDiff-Compute-EmptyBaseline
+          - ReviewCenter-LineDiff-Compute-EmptyHead
+          - ReviewCenter-LineDiff-Compute-Counts
+          - ReviewCenter-LineDiff-Compute-Arguments
           - ReviewCenter-LineDiff-Order
           - ReviewCenter-LineDiff-Numbering
+          - ReviewCenter-LineDiff-Numbering-Context
+          - ReviewCenter-LineDiff-Numbering-Removed
+          - ReviewCenter-LineDiff-Numbering-Added
+          - ReviewCenter-LineDiff-Numbering-SplitLines
+          - ReviewCenter-LineDiff-Numbering-LineEndings
+          - ReviewCenter-LineDiff-Numbering-FinalLineEnding
+          - ReviewCenter-LineDiff-Numbering-LoneReturn
           - ReviewCenter-LineDiff-Bounds
+          - ReviewCenter-LineDiff-Bounds-LineLimitAccepted
+          - ReviewCenter-LineDiff-Bounds-EditLimit
+          - ReviewCenter-LineDiff-Bounds-EditLimitAccepted
+          - ReviewCenter-LineDiff-Bounds-EmptySide
           - ReviewCenter-LineDiff-Segments
+          - ReviewCenter-LineDiff-Segments-Merge
+          - ReviewCenter-LineDiff-Segments-OneRowGap
+          - ReviewCenter-LineDiff-Segments-Collapse
+          - ReviewCenter-LineDiff-Segments-NoChanges
+          - ReviewCenter-LineDiff-Segments-Cover
+          - ReviewCenter-LineDiff-Segments-EdgeNoGap
+          - ReviewCenter-LineDiff-Segments-Context
+          - ReviewCenter-LineDiff-Segments-Pinned
+          - ReviewCenter-LineDiff-Segments-PinnedIgnored
+          - ReviewCenter-LineDiff-Segments-Arguments
           - ReviewCenter-LineDiff-Pairing
+          - ReviewCenter-LineDiff-Pairing-Paired
+          - ReviewCenter-LineDiff-Pairing-LeftoverRemoved
+          - ReviewCenter-LineDiff-Pairing-LeftoverAdded
+          - ReviewCenter-LineDiff-Pairing-PureAdded
+          - ReviewCenter-LineDiff-Pairing-PureRemoved
+          - ReviewCenter-LineDiff-Pairing-Cover
+          - ReviewCenter-LineDiff-Pairing-Range
+          - ReviewCenter-LineDiff-Pairing-Arguments
           - ReviewCenter-ReviewService-Diff
+          - ReviewCenter-ReviewService-Diff-Added
+          - ReviewCenter-ReviewService-Diff-Deleted
+          - ReviewCenter-ReviewService-Diff-NoBaseline
+          - ReviewCenter-ReviewService-Diff-Binary
+          - ReviewCenter-ReviewService-Diff-TooLarge
+          - ReviewCenter-ReviewService-Diff-LineEndings
+          - ReviewCenter-ReviewService-Diff-NotFound
           - ReviewCenter-ThreadService-Side
           - ReviewCenter-RecordDigest-ThreadSide
+          - ReviewCenter-RecordDigest-ThreadSide-Change
         tests:
           - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
           - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
+          - FileText_TryReadLines_Text_SplitsLikeSplitLines
+          - FileText_TryReadLines_Binary_ReturnsNull
+          - FileText_TryReadLines_Null_ThrowsArgumentNullException
 
       - id: ReviewCenter-Core-Checklist
         title: >-
@@ -261,21 +395,92 @@ sections:
           what is still open. Freezing it at creation keeps the questions fixed for the life of the review.
         children:
           - ReviewCenter-ChecklistService-Default
+          - ReviewCenter-ChecklistService-Default-Identifiers
+          - ReviewCenter-ChecklistService-Default-Valid
+          - ReviewCenter-ChecklistService-Default-Json
+          - ReviewCenter-ChecklistService-Default-Incomplete
           - ReviewCenter-ChecklistService-Freeze
+          - ReviewCenter-ChecklistService-Freeze-NoChecklist
+          - ReviewCenter-ChecklistService-Freeze-UnknownReview
           - ReviewCenter-ReviewService-ProjectChecklist
+          - ReviewCenter-ReviewService-ProjectChecklist-Default
+          - ReviewCenter-ReviewService-ProjectChecklist-Unusable
+          - ReviewCenter-ReviewService-ProjectChecklist-Later
+          - ReviewCenter-ReviewService-ProjectChecklist-LaterApproved
           - ReviewCenter-ChecklistService-Applicability
+          - ReviewCenter-ChecklistService-Applicability-Reason
+          - ReviewCenter-ChecklistService-Applicability-ReasonLimit
+          - ReviewCenter-ChecklistService-Applicability-Applies
+          - ReviewCenter-ChecklistService-Applicability-UnknownSection
           - ReviewCenter-ChecklistService-Answer
+          - ReviewCenter-ChecklistService-Answer-PassNoJustification
+          - ReviewCenter-ChecklistService-Answer-Replace
+          - ReviewCenter-ChecklistService-Answer-Justification
+          - ReviewCenter-ChecklistService-Answer-JustificationLimit
+          - ReviewCenter-ChecklistService-Answer-Trimmed
+          - ReviewCenter-ChecklistService-Answer-UnknownCheck
+          - ReviewCenter-ChecklistService-Answer-UnknownReview
+          - ReviewCenter-ChecklistService-Answer-UndefinedOutcome
           - ReviewCenter-ChecklistService-AnsweredBy
+          - ReviewCenter-ChecklistService-AnsweredBy-Section
+          - ReviewCenter-ChecklistService-AnsweredBy-NullActor
+          - ReviewCenter-ChecklistService-AnsweredBy-Digest
           - ReviewCenter-ChecklistService-Progress
+          - ReviewCenter-ChecklistService-Progress-Failed
+          - ReviewCenter-ChecklistService-Progress-NotApplicable
+          - ReviewCenter-ChecklistService-Progress-IgnoredAnswers
+          - ReviewCenter-ChecklistService-Progress-Complete
+          - ReviewCenter-ChecklistService-Progress-NothingLeft
+          - ReviewCenter-ChecklistService-Progress-FirstSection
+          - ReviewCenter-ChecklistService-Progress-NextCheck
+          - ReviewCenter-ChecklistService-Progress-SingleSlotDraft
           - ReviewCenter-ChecklistService-ReviewConclusionText
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Lead
+          - ReviewCenter-ChecklistService-ReviewConclusionText-NonMember
+          - ReviewCenter-ChecklistService-ReviewConclusionText-OtherMember
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Auditor
+          - ReviewCenter-ChecklistService-ReviewConclusionText-ApiToken
+          - ReviewCenter-ChecklistService-ReviewConclusionText-CanSet
+          - ReviewCenter-ChecklistService-ReviewConclusionText-CanSetNobody
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Normalized
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Blank
+          - ReviewCenter-ChecklistService-ReviewConclusionText-MaxLength
+          - ReviewCenter-ChecklistService-ReviewConclusionText-TooLong
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Control
+          - ReviewCenter-ChecklistService-ReviewConclusionText-CarriageReturn
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Concluded
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Acknowledge
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Acknowledged
+          - ReviewCenter-ChecklistService-ReviewConclusionText-NoChange
+          - ReviewCenter-ChecklistService-ReviewConclusionText-Concurrent
           - ReviewCenter-ChecklistService-ReviewConclusionTextAudit
+          - ReviewCenter-ChecklistService-ReviewConclusionTextAudit-NoText
+          - ReviewCenter-ChecklistService-ReviewConclusionTextAudit-Scope
+          - ReviewCenter-ChecklistService-ReviewConclusionTextAudit-Actor
+          - ReviewCenter-ChecklistService-ReviewConclusionTextAudit-NoChange
+          - ReviewCenter-ChecklistService-ReviewConclusionTextAudit-Refused
           - ReviewCenter-ChecklistService-BallotSlot
+          - ReviewCenter-ChecklistService-BallotSlot-Submit
+          - ReviewCenter-ChecklistService-BallotSlot-Section
+          - ReviewCenter-ChecklistService-BallotSlot-OwnBallot
           - ReviewCenter-ChecklistService-BallotSubmit
+          - ReviewCenter-ChecklistService-BallotSubmit-Incomplete
+          - ReviewCenter-ChecklistService-BallotSubmit-Repeat
           - ReviewCenter-ChecklistService-SingleSlotAutoSubmit
+          - ReviewCenter-ChecklistService-SingleSlotAutoSubmit-Draft
+          - ReviewCenter-ChecklistService-SingleSlotAutoSubmit-Section
           - ReviewCenter-ChecklistService-OwnBallotView
+          - ReviewCenter-ChecklistService-OwnBallotView-NoOtherDraft
+          - ReviewCenter-ChecklistService-OwnBallotView-NoSlot
+          - ReviewCenter-ChecklistService-OwnBallotView-Consolidated
           - ReviewCenter-ChecklistService-BallotViewDetails
+          - ReviewCenter-ChecklistService-BallotViewDetails-FailedCount
+          - ReviewCenter-ChecklistService-BallotViewDetails-OwnSlot
+          - ReviewCenter-ChecklistService-BallotViewDetails-MissingNames
+          - ReviewCenter-ChecklistService-BallotViewDetails-Hidden
         tests:
           - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
+          - ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot
 
       - id: ReviewCenter-Core-Users
         title: >-
@@ -328,20 +533,83 @@ sections:
           confirms, keeps a signature from being lost unnoticed.
         children:
           - ReviewCenter-RecordDigest-Format
+          - ReviewCenter-RecordDigest-Format-Header
+          - ReviewCenter-RecordDigest-Format-Layout
           - ReviewCenter-RecordDigest-NullRecord
+          - ReviewCenter-RecordDigest-NullRecord-Compute
           - ReviewCenter-RecordDigest-Coverage
+          - ReviewCenter-RecordDigest-Coverage-CheckAnswer
+          - ReviewCenter-RecordDigest-Coverage-SectionNa
+          - ReviewCenter-RecordDigest-Coverage-ThreadAdded
+          - ReviewCenter-RecordDigest-Coverage-ThreadAnchor
+          - ReviewCenter-RecordDigest-Coverage-CommentFields
+          - ReviewCenter-RecordDigest-Coverage-Promotion
+          - ReviewCenter-RecordDigest-Coverage-NewComment
+          - ReviewCenter-RecordDigest-Coverage-Chat
+          - ReviewCenter-RecordDigest-Coverage-ThreadState
+          - ReviewCenter-RecordDigest-Coverage-ThreadIdentity
+          - ReviewCenter-RecordDigest-Coverage-ConclusionText
+          - ReviewCenter-RecordDigest-Coverage-ConclusionLine
+          - ReviewCenter-RecordDigest-Coverage-ConclusionNone
           - ReviewCenter-RecordDigest-Checklist
+          - ReviewCenter-RecordDigest-Checklist-Change
+          - ReviewCenter-RecordDigest-Checklist-Order
+          - ReviewCenter-RecordDigest-Checklist-None
           - ReviewCenter-RecordDigest-ChecklistInvalid
+          - ReviewCenter-RecordDigest-ChecklistInvalid-Minimal
           - ReviewCenter-RecordDigest-AnsweredBy
+          - ReviewCenter-RecordDigest-AnsweredBy-Justification
+          - ReviewCenter-RecordDigest-AnsweredBy-Time
           - ReviewCenter-RecordDigest-SectionSetter
+          - ReviewCenter-RecordDigest-SectionSetter-Reason
+          - ReviewCenter-RecordDigest-SectionSetter-Time
           - ReviewCenter-RecordDigest-Independence
+          - ReviewCenter-RecordDigest-Independence-Identities
+          - ReviewCenter-RecordDigest-Independence-Slots
+          - ReviewCenter-RecordDigest-Independence-ApplicableSection
           - ReviewCenter-RecordDigest-Unambiguous
+          - ReviewCenter-RecordDigest-Unambiguous-EmptyValues
+          - ReviewCenter-RecordDigest-Unambiguous-Absent
           - ReviewCenter-RecordDigest-Report
+          - ReviewCenter-RecordDigest-Report-Block
+          - ReviewCenter-RecordDigest-Report-Claim
+          - ReviewCenter-RecordDigest-Report-Comment
+          - ReviewCenter-RecordDigest-Report-Resolution
+          - ReviewCenter-RecordDigest-Report-Fields
+          - ReviewCenter-RecordDigest-Report-CommentOrder
+          - ReviewCenter-RecordDigest-Report-Sorted
+          - ReviewCenter-RecordDigest-Report-Chat
           - ReviewCenter-RecordDigest-ConsolidatedChecks
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-Disputed
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-Pending
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-Sorted
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-NaSection
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-DisputedSection
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-NaSectionChecks
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-DisputedSectionChecks
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-ApplicableSection
+          - ReviewCenter-RecordDigest-ConsolidatedChecks-SectionsSorted
           - ReviewCenter-RecordDigest-DraftIgnored
+          - ReviewCenter-RecordDigest-DraftIgnored-Agreeing
+          - ReviewCenter-RecordDigest-DraftIgnored-Disagreement
           - ReviewCenter-RecordDigest-NoBallotContent
+          - ReviewCenter-RecordDigest-NoBallotContent-CarriedSection
           - ReviewCenter-RecordDigest-Outcome
+          - ReviewCenter-RecordDigest-Outcome-Approved
+          - ReviewCenter-RecordDigest-Outcome-Rejected
           - ReviewCenter-RecordDigest-BallotFingerprint
+          - ReviewCenter-RecordDigest-BallotFingerprint-Header
+          - ReviewCenter-RecordDigest-BallotFingerprint-SubmittedOnly
+          - ReviewCenter-RecordDigest-BallotFingerprint-Ordinal
+          - ReviewCenter-RecordDigest-BallotFingerprint-Answers
+          - ReviewCenter-RecordDigest-BallotFingerprint-AnswerOrder
+          - ReviewCenter-RecordDigest-BallotFingerprint-LastRow
+          - ReviewCenter-RecordDigest-BallotFingerprint-Sections
+          - ReviewCenter-RecordDigest-BallotFingerprint-SectionOrder
+          - ReviewCenter-RecordDigest-BallotFingerprint-Change
+          - ReviewCenter-RecordDigest-BallotFingerprint-DisplayName
+          - ReviewCenter-RecordDigest-BallotFingerprint-Justification
+          - ReviewCenter-RecordDigest-BallotFingerprint-NullRecord
           - ReviewCenter-SigningService-Slots
           - ReviewCenter-SigningService-Slots-Members
           - ReviewCenter-SigningService-Slots-Numbering
@@ -418,7 +686,15 @@ sections:
           - ReviewCenter-SigningService-SignatureImpact-NoSignature
           - ReviewCenter-SigningService-SignatureImpact-OwnSlotExcluded
           - ReviewCenter-ChecklistService-SignatureImpact
+          - ReviewCenter-ChecklistService-SignatureImpact-Names
+          - ReviewCenter-ChecklistService-SignatureImpact-Remaining
+          - ReviewCenter-ChecklistService-SignatureImpact-Acknowledged
+          - ReviewCenter-ChecklistService-SignatureImpact-NoSignature
+          - ReviewCenter-ChecklistService-SignatureImpact-DraftChange
+          - ReviewCenter-ChecklistService-SignatureImpact-ExceptionCopy
           - ReviewCenter-ChecklistService-BallotImpact
+          - ReviewCenter-ChecklistService-BallotImpact-NoWarning
+          - ReviewCenter-ChecklistService-BallotImpact-OwnSlot
           - ReviewCenter-SigningService-OwnBallotSubmitted
           - ReviewCenter-SigningService-OwnBallotSubmitted-NothingStored
           - ReviewCenter-SigningService-OwnBallotSubmitted-AfterDigest
@@ -520,11 +796,15 @@ sections:
           - ReviewCenter-SigningService-OpenCheckThread-ResolvedAllowsSign
           - ReviewCenter-SigningService-OpenCheckThread-ResolvedConcludes
           - ReviewCenter-ChecklistService-ApprovalLock
+          - ReviewCenter-ChecklistService-ApprovalLock-BeforeImpact
           - ReviewCenter-RecordDigest-ReopenCount
+          - ReviewCenter-RecordDigest-ReopenCount-Change
+          - ReviewCenter-RecordDigest-ReopenCount-Zero
         tests:
           - CoreSubsystem_ApprovedReview_RefusesEveryMutationWithReviewLocked
           - CoreSubsystem_ReopenReview_RequiresAdminAndReasonAndNeedsFreshSignatures
           - CoreSubsystem_ReopenReview_OfUnlockedReview_ThrowsReviewNotLocked
+          - ReviewService_FollowUp_ApprovedIsLockedAndCanBeReopened
 
       - id: ReviewCenter-Core-IndependentReviewers
         title: >-
@@ -581,6 +861,12 @@ sections:
           can switch off, with a record, leaves a project that has to let one person do everything able to do so.
         children:
           - ReviewCenter-ChecklistService-AuthorRule
+          - ReviewCenter-ChecklistService-AuthorRule-Section
+          - ReviewCenter-ChecklistService-AuthorRule-Message
+          - ReviewCenter-ChecklistService-AuthorRule-OtherActors
+          - ReviewCenter-ChecklistService-AuthorRule-RuleOff
+          - ReviewCenter-ChecklistService-AuthorRule-BeforeLock
+          - ReviewCenter-ChecklistService-AuthorRule-BlockedFlag
           - ReviewCenter-SigningService-ReopenerRule
           - ReviewCenter-SigningService-ReopenerRule-AnyEarlierReopen
           - ReviewCenter-SigningService-ReopenerRule-AfterIndependence
@@ -588,6 +874,7 @@ sections:
           - ReviewCenter-SigningService-ReopenerRule-NoFailedAttempt
           - ReviewCenter-SigningService-ReopenerRule-RuleOff
           - ReviewCenter-ChecklistService-ReopenerBallot
+          - ReviewCenter-ChecklistService-ReopenerBallot-Submit
           - ReviewCenter-SigningService-StrandedSlot
           - ReviewCenter-SigningService-StrandedSlot-NamesSlots
           - ReviewCenter-SigningService-StrandedSlot-BothReviewers
@@ -597,6 +884,7 @@ sections:
           - ReviewCenter-SigningService-StrandedSlot-SlotKeepsSomebody
         tests:
           - CoreSubsystem_ReviewRules_EnforcedAndSwitchableOff
+          - ThreadService_Threads_AuthorWhileRuleIsOn_AreNotAffected
 
       - id: ReviewCenter-Core-AuditTrail
         title: >-
@@ -631,11 +919,24 @@ sections:
           - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-EvidenceSettingsService-Audit
           - ReviewCenter-ProjectChecklistService-Audit
+          - ReviewCenter-ProjectChecklistService-Audit-Reset
+          - ReviewCenter-ProjectChecklistService-Audit-Project
+          - ReviewCenter-ProjectChecklistService-Audit-Actor
+          - ReviewCenter-ProjectChecklistService-Audit-Detail
+          - ReviewCenter-ProjectChecklistService-Audit-ResetDetail
+          - ReviewCenter-ProjectChecklistService-Audit-NoWording
+          - ReviewCenter-ProjectChecklistService-Audit-Length
           - ReviewCenter-ReviewService-Audit
+          - ReviewCenter-ReviewService-Audit-FileCount
           - ReviewCenter-ThreadService-Audit
           - ReviewCenter-ThreadService-ReportAudit
           - ReviewCenter-ThreadService-CheckThreadAudit
           - ReviewCenter-ChecklistService-Audit
+          - ReviewCenter-ChecklistService-Audit-Section
+          - ReviewCenter-ChecklistService-Audit-Hash
+          - ReviewCenter-ChecklistService-Audit-Scope
+          - ReviewCenter-ChecklistService-Audit-Actor
+          - ReviewCenter-ChecklistService-Audit-Refused
           - ReviewCenter-SigningService-Audit
           - ReviewCenter-SigningService-Audit-SlotChanged
           - ReviewCenter-SigningService-Audit-SlotRemoved
@@ -690,9 +991,41 @@ sections:
           one place keeps option-like text away from git and keeps a pattern from using unbounded resources.
         children:
           - ReviewCenter-RevisionValidator-Accept
+          - ReviewCenter-RevisionValidator-Accept-LengthLimit
+          - ReviewCenter-RevisionValidator-Accept-Verdict
           - ReviewCenter-RevisionValidator-Refuse
+          - ReviewCenter-RevisionValidator-Refuse-Empty
+          - ReviewCenter-RevisionValidator-Refuse-TooLong
+          - ReviewCenter-RevisionValidator-Refuse-Start
+          - ReviewCenter-RevisionValidator-Refuse-Expression
+          - ReviewCenter-RevisionValidator-Refuse-Whitespace
+          - ReviewCenter-RevisionValidator-Refuse-Characters
+          - ReviewCenter-RevisionValidator-Refuse-Malformed
           - ReviewCenter-SelectionMatcher-Match
+          - ReviewCenter-SelectionMatcher-Match-Exclusion
+          - ReviewCenter-SelectionMatcher-Match-Star
+          - ReviewCenter-SelectionMatcher-Match-Question
+          - ReviewCenter-SelectionMatcher-Match-DoubleStar
+          - ReviewCenter-SelectionMatcher-Match-TrailingDoubleStar
+          - ReviewCenter-SelectionMatcher-Match-CaseSensitive
           - ReviewCenter-SelectionMatcher-Parse
+          - ReviewCenter-SelectionMatcher-Parse-BlankLines
+          - ReviewCenter-SelectionMatcher-Parse-Prefix
+          - ReviewCenter-SelectionMatcher-Parse-ExclusionSpace
+          - ReviewCenter-SelectionMatcher-Parse-Folder
+          - ReviewCenter-SelectionMatcher-Parse-Normalize
+          - ReviewCenter-SelectionMatcher-Parse-RoundTrip
+          - ReviewCenter-SelectionMatcher-Parse-Invalid
+          - ReviewCenter-SelectionMatcher-Parse-Empty
+          - ReviewCenter-SelectionMatcher-Parse-EmptyPattern
+          - ReviewCenter-SelectionMatcher-Parse-TooMany
+          - ReviewCenter-SelectionMatcher-Parse-TooLong
+          - ReviewCenter-SelectionMatcher-Parse-Limits
+          - ReviewCenter-SelectionMatcher-Parse-Backslash
+          - ReviewCenter-SelectionMatcher-Parse-DotSegment
+          - ReviewCenter-SelectionMatcher-Parse-EmptySegment
+          - ReviewCenter-SelectionMatcher-Parse-Control
+          - ReviewCenter-SelectionMatcher-Parse-Arguments
           - ReviewCenter-SelectionMatcher-Bounded
           - ReviewCenter-SelectionMatcher-Compatibility
         tests:
@@ -710,14 +1043,51 @@ sections:
           later commit nor a different selection can leave a signature looking current.
         children:
           - ReviewCenter-ReviewService-FromRepository
+          - ReviewCenter-ReviewService-FromRepository-Selection
+          - ReviewCenter-ReviewService-FromRepository-AllFiles
+          - ReviewCenter-ReviewService-FromRepository-DeletedFiles
+          - ReviewCenter-ReviewService-FromRepository-Baseline
+          - ReviewCenter-ReviewService-FromRepository-Fingerprint
+          - ReviewCenter-ReviewService-FromRepository-Digest
+          - ReviewCenter-ReviewService-FromRepository-Disabled
+          - ReviewCenter-ReviewService-FromRepository-RepositoryUnknown
+          - ReviewCenter-ReviewService-FromRepository-OtherProject
+          - ReviewCenter-ReviewService-FromRepository-RevisionUnknown
+          - ReviewCenter-ReviewService-FromRepository-RevisionInvalid
+          - ReviewCenter-ReviewService-FromRepository-RevisionBlank
+          - ReviewCenter-ReviewService-FromRepository-SelectionInvalid
+          - ReviewCenter-ReviewService-FromRepository-SelectionLength
+          - ReviewCenter-ReviewService-FromRepository-IdInvalid
+          - ReviewCenter-ReviewService-FromRepository-Refusal
+          - ReviewCenter-ReviewService-FromRepository-GitFailure
+          - ReviewCenter-ReviewService-FromRepository-BeforeOpening
+          - ReviewCenter-ReviewService-FromRepository-NoRepositories
+          - ReviewCenter-ReviewService-FromRepository-SourceRequired
           - ReviewCenter-ReviewService-Frozen
+          - ReviewCenter-ReviewService-Frozen-NoGit
+          - ReviewCenter-ReviewService-Frozen-Digest
+          - ReviewCenter-ReviewService-Frozen-Disabled
           - ReviewCenter-ReviewService-NothingToReview
+          - ReviewCenter-ReviewService-NothingToReview-Message
+          - ReviewCenter-ReviewService-NothingToReview-NoBaseline
           - ReviewCenter-ReviewService-RepositoryLimits
+          - ReviewCenter-ReviewService-RepositoryLimits-TotalSize
+          - ReviewCenter-ReviewService-RepositoryLimits-FileCount
+          - ReviewCenter-ReviewService-RepositoryLimits-BeforeReading
           - ReviewCenter-ReviewService-SkippedEntries
+          - ReviewCenter-ReviewService-SkippedEntries-Audit
           - ReviewCenter-ReviewService-RepositoryAudit
           - ReviewCenter-RecordDigest-Source
+          - ReviewCenter-RecordDigest-Source-Repository
+          - ReviewCenter-RecordDigest-Source-Changes
+          - ReviewCenter-RecordDigest-Source-ReviewSet
+          - ReviewCenter-RecordDigest-Source-ReviewSetEmpty
+          - ReviewCenter-RecordDigest-Source-Change
           - ReviewCenter-RecordDigest-SourceOrder
           - ReviewCenter-ReviewService-ReviewSet
+          - ReviewCenter-ReviewService-ReviewSet-Audit
+          - ReviewCenter-ReviewService-ReviewSet-Length
+          - ReviewCenter-ReviewService-ReviewSet-None
           - ReviewCenter-ThreadService-DeletedFile
         tests:
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
@@ -738,14 +1108,82 @@ sections:
           back to a full review whenever a baseline cannot be trusted keeps changed files from escaping review.
         children:
           - ReviewCenter-ReviewPlanner-Plan
+          - ReviewCenter-ReviewPlanner-Plan-Session
+          - ReviewCenter-ReviewPlanner-Plan-Counts
+          - ReviewCenter-ReviewPlanner-Plan-ChangeLists
+          - ReviewCenter-ReviewPlanner-Plan-OneList
+          - ReviewCenter-ReviewPlanner-Plan-BrokenSet
+          - ReviewCenter-ReviewPlanner-Plan-SetPath
+          - ReviewCenter-ReviewPlanner-Plan-SetId
+          - ReviewCenter-ReviewPlanner-Plan-SetSize
+          - ReviewCenter-ReviewPlanner-Plan-NoConfig
+          - ReviewCenter-ReviewPlanner-Plan-ConfigTooLarge
+          - ReviewCenter-ReviewPlanner-Plan-ConfigInvalid
+          - ReviewCenter-ReviewPlanner-Plan-Mode
+          - ReviewCenter-ReviewPlanner-Plan-HeadUnknown
+          - ReviewCenter-ReviewPlanner-Plan-HeadInvalid
+          - ReviewCenter-ReviewPlanner-Plan-ProjectMissing
+          - ReviewCenter-ReviewPlanner-Plan-RepositoryMissing
+          - ReviewCenter-ReviewPlanner-Plan-RepositoryOff
+          - ReviewCenter-ReviewPlanner-Plan-Hidden
+          - ReviewCenter-ReviewPlanner-Plan-ReadOnly
+          - ReviewCenter-ReviewPlanner-Plan-Arguments
+          - ReviewCenter-ReviewPlanner-Plan-ActorMissing
           - ReviewCenter-ReviewPlanner-Baseline
+          - ReviewCenter-ReviewPlanner-Baseline-Explicit
+          - ReviewCenter-ReviewPlanner-Baseline-ExplicitUnknown
+          - ReviewCenter-ReviewPlanner-Baseline-Last
+          - ReviewCenter-ReviewPlanner-Baseline-LastSigned
+          - ReviewCenter-ReviewPlanner-Baseline-NoApproved
+          - ReviewCenter-ReviewPlanner-Baseline-Rejected
+          - ReviewCenter-ReviewPlanner-Baseline-RejectedLater
+          - ReviewCenter-ReviewPlanner-Baseline-NotAncestor
+          - ReviewCenter-ReviewPlanner-Baseline-AncestorUnknown
+          - ReviewCenter-ReviewPlanner-Baseline-SelectionChanged
           - ReviewCenter-ReviewPlanner-Classification
+          - ReviewCenter-ReviewPlanner-Classification-NewSelection
+          - ReviewCenter-ReviewPlanner-Classification-Unchanged
+          - ReviewCenter-ReviewPlanner-Classification-NoChange
+          - ReviewCenter-ReviewPlanner-Classification-WillCreate
+          - ReviewCenter-ReviewPlanner-Classification-Totals
           - ReviewCenter-ReviewPlanner-Create
+          - ReviewCenter-ReviewPlanner-Create-Commits
+          - ReviewCenter-ReviewPlanner-Create-Content
+          - ReviewCenter-ReviewPlanner-Create-SetId
+          - ReviewCenter-ReviewPlanner-Create-Session
+          - ReviewCenter-ReviewPlanner-Create-Audit
+          - ReviewCenter-ReviewPlanner-Create-Checklist
+          - ReviewCenter-ReviewPlanner-Create-Isolation
+          - ReviewCenter-ReviewPlanner-Create-Failed
+          - ReviewCenter-ReviewPlanner-Create-Fault
+          - ReviewCenter-ReviewPlanner-Create-GitFailure
+          - ReviewCenter-ReviewPlanner-Create-Cancel
+          - ReviewCenter-ReviewPlanner-Create-Filed
+          - ReviewCenter-ReviewPlanner-Create-BadBaseline
+          - ReviewCenter-ReviewPlanner-Create-BadSelection
+          - ReviewCenter-ReviewPlanner-Create-BadSetId
+          - ReviewCenter-ReviewPlanner-Create-BatchHead
+          - ReviewCenter-ReviewPlanner-Create-BatchSize
+          - ReviewCenter-ReviewPlanner-Create-BatchArguments
+          - ReviewCenter-ReviewPlanner-Create-BatchProject
+          - ReviewCenter-ReviewPlanner-Create-BatchNoGit
+          - ReviewCenter-ReviewPlanner-Create-Hidden
+          - ReviewCenter-ReviewPlanner-Create-ReadOnly
           - ReviewCenter-ReviewPlanner-Identity
+          - ReviewCenter-ReviewPlanner-Identity-Fallback
+          - ReviewCenter-ReviewPlanner-Identity-Length
+          - ReviewCenter-ReviewPlanner-Identity-Unique
+          - ReviewCenter-ReviewPlanner-Identity-Race
+          - ReviewCenter-ReviewPlanner-Identity-Title
+          - ReviewCenter-ReviewPlanner-Identity-TitleCut
         tests:
           - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
           - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
           - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
+          - ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline
+          - ReviewPlanner_PlanAsync_RealGit_NoConfigurationOrUnknownHead_ThrowTheirRules
+          - ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview
+          - ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview
 
       - id: ReviewCenter-Core-DueDate
         title: >-
@@ -761,8 +1199,32 @@ sections:
           so it must not make a signature look out of date.
         children:
           - ReviewCenter-ReviewService-DueDate
+          - ReviewCenter-ReviewService-DueDate-None
+          - ReviewCenter-ReviewService-DueDate-Range
+          - ReviewCenter-ReviewService-DueDate-Audit
+          - ReviewCenter-ReviewService-DueDate-Repository
+          - ReviewCenter-ReviewService-DueDate-OutsideDigest
+          - ReviewCenter-ReviewService-DueDate-Overdue
+          - ReviewCenter-ReviewService-DueDate-IsoText
           - ReviewCenter-ReviewService-DueDateChange
+          - ReviewCenter-ReviewService-DueDateChange-Creator
+          - ReviewCenter-ReviewService-DueDateChange-SystemAdmin
+          - ReviewCenter-ReviewService-DueDateChange-OtherMember
+          - ReviewCenter-ReviewService-DueDateChange-Outsider
+          - ReviewCenter-ReviewService-DueDateChange-ReadOnlyCreator
+          - ReviewCenter-ReviewService-DueDateChange-ApiToken
+          - ReviewCenter-ReviewService-DueDateChange-Clear
+          - ReviewCenter-ReviewService-DueDateChange-Unchanged
+          - ReviewCenter-ReviewService-DueDateChange-Past
+          - ReviewCenter-ReviewService-DueDateChange-FarAhead
+          - ReviewCenter-ReviewService-DueDateChange-NotFound
+          - ReviewCenter-ReviewService-DueDateChange-Locked
+          - ReviewCenter-ReviewService-DueDateChange-Concurrent
+          - ReviewCenter-ReviewService-DueDateChange-Audit
           - ReviewCenter-ReviewPlanner-DueDate
+          - ReviewCenter-ReviewPlanner-DueDate-Default
+          - ReviewCenter-ReviewPlanner-DueDate-Refused
+          - ReviewCenter-ReviewPlanner-DueDate-Audit
         tests:
           - ReviewService_CreateDraftAsync_DueDateInRange_StoresDateAndAuditsIt
           - ReviewService_SetDueDateAsync_ProjectAdmin_ChangesAndAuditsOldAndNew
@@ -785,16 +1247,69 @@ sections:
           review page, and it must not tell a stranger that a project exists.
         children:
           - ReviewCenter-ReviewProgressService-Stage
+          - ReviewCenter-ReviewProgressService-Stage-Empty
+          - ReviewCenter-ReviewProgressService-Stage-Setup
+          - ReviewCenter-ReviewProgressService-Stage-Approved
+          - ReviewCenter-ReviewProgressService-Stage-Rejected
+          - ReviewCenter-ReviewProgressService-Stage-InReview
+          - ReviewCenter-ReviewProgressService-Stage-OpenThread
+          - ReviewCenter-ReviewProgressService-Stage-Reopened
+          - ReviewCenter-ReviewProgressService-Stage-ReopenedFlag
           - ReviewCenter-ReviewProgressService-SlotProgress
+          - ReviewCenter-ReviewProgressService-SlotProgress-OutOfDate
           - ReviewCenter-ReviewProgressService-WaitingOn
+          - ReviewCenter-ReviewProgressService-WaitingOn-OutOfDate
+          - ReviewCenter-ReviewProgressService-WaitingOn-Alternate
+          - ReviewCenter-ReviewProgressService-WaitingOn-Signed
+          - ReviewCenter-ReviewProgressService-WaitingOn-Once
+          - ReviewCenter-ReviewProgressService-WaitingOn-Disabled
+          - ReviewCenter-ReviewProgressService-WaitingOn-Concluded
           - ReviewCenter-ReviewProgressService-Blockers
+          - ReviewCenter-ReviewProgressService-Blockers-Unanswered
+          - ReviewCenter-ReviewProgressService-Blockers-Failed
+          - ReviewCenter-ReviewProgressService-Blockers-Disputed
+          - ReviewCenter-ReviewProgressService-Blockers-NoChecklist
+          - ReviewCenter-ReviewProgressService-Blockers-ConclusionRequired
+          - ReviewCenter-ReviewProgressService-Blockers-Consistent
+          - ReviewCenter-ReviewProgressService-Blockers-Blocked
+          - ReviewCenter-ReviewProgressService-Blockers-Concluded
+          - ReviewCenter-ReviewProgressService-Blockers-FailAgreed
           - ReviewCenter-ReviewProgressService-Overdue
+          - ReviewCenter-ReviewProgressService-Overdue-DueDay
+          - ReviewCenter-ReviewProgressService-Overdue-NoDate
+          - ReviewCenter-ReviewProgressService-Overdue-Concluded
+          - ReviewCenter-ReviewProgressService-Overdue-DueDate
           - ReviewCenter-ReviewProgressService-LastActivity
+          - ReviewCenter-ReviewProgressService-LastActivity-Created
+          - ReviewCenter-ReviewProgressService-LastActivity-OneRead
           - ReviewCenter-ReviewProgressService-ViewerRights
+          - ReviewCenter-ReviewProgressService-ViewerRights-NotFound
+          - ReviewCenter-ReviewProgressService-ViewerRights-Disabled
+          - ReviewCenter-ReviewProgressService-ViewerRights-TokenMasked
+          - ReviewCenter-ReviewProgressService-ViewerRights-TokenSubmitted
+          - ReviewCenter-ReviewProgressService-ViewerRights-TokenDraft
+          - ReviewCenter-ReviewProgressService-ViewerRights-GivenList
           - ReviewCenter-ReviewProgressService-Performance
+          - ReviewCenter-ReviewProgressService-Performance-Bound
+          - ReviewCenter-ReviewProgressService-Performance-ReviewList
+          - ReviewCenter-ReviewProgressService-Performance-ListGiven
+          - ReviewCenter-ReviewProgressService-Performance-ListSubset
+          - ReviewCenter-ReviewProgressService-Performance-ListEmpty
           - ReviewCenter-ReviewProgressService-Arguments
+          - ReviewCenter-ReviewProgressService-Arguments-ReviewList
           - ReviewCenter-ReviewProgressService-KindCounts
+          - ReviewCenter-ReviewProgressService-KindCounts-Sum
+          - ReviewCenter-ReviewProgressService-KindCounts-Words
+          - ReviewCenter-ReviewProgressService-KindCounts-Fallback
+          - ReviewCenter-ReviewProgressService-KindCounts-MaskedChecks
           - ReviewCenter-ReviewProgressService-BallotProgress
+          - ReviewCenter-ReviewProgressService-BallotProgress-Names
+          - ReviewCenter-ReviewProgressService-BallotProgress-Disabled
+          - ReviewCenter-ReviewProgressService-BallotProgress-NoChecklist
+          - ReviewCenter-ReviewProgressService-BallotProgress-Concluded
+          - ReviewCenter-ReviewProgressService-BallotProgress-MaskedCounts
+          - ReviewCenter-ReviewProgressService-BallotProgress-MaskedFlag
+          - ReviewCenter-ReviewProgressService-BallotProgress-MaskedBlockers
           - ReviewCenter-SigningService-ProgressCounts
           - ReviewCenter-SigningService-ProgressCounts-Unanswered
           - ReviewCenter-SigningService-ProgressCounts-Failed
@@ -837,15 +1352,76 @@ sections:
           agreement, dispute, or pending check, and the outcome exists only when there is nothing left to settle.
         children:
           - ReviewCenter-BallotConsolidation-PerCheck
+          - ReviewCenter-BallotConsolidation-PerCheck-Disputed
+          - ReviewCenter-BallotConsolidation-PerCheck-PassVsNa
+          - ReviewCenter-BallotConsolidation-PerCheck-Pending
+          - ReviewCenter-BallotConsolidation-PerCheck-NoBallot
+          - ReviewCenter-BallotConsolidation-PerCheck-NotFailure
+          - ReviewCenter-BallotConsolidation-PerCheck-NotBlocking
+          - ReviewCenter-BallotConsolidation-PerCheck-NoteIgnored
+          - ReviewCenter-BallotConsolidation-PerCheck-Outcomes
           - ReviewCenter-BallotConsolidation-SubmittedOnly
+          - ReviewCenter-BallotConsolidation-SubmittedOnly-DraftSections
+          - ReviewCenter-BallotConsolidation-SubmittedOnly-Order
+          - ReviewCenter-BallotConsolidation-SubmittedOnly-ChecklistOrder
           - ReviewCenter-BallotConsolidation-Applicability
+          - ReviewCenter-BallotConsolidation-Applicability-Disputed
+          - ReviewCenter-BallotConsolidation-Applicability-Applicable
+          - ReviewCenter-BallotConsolidation-Applicability-ChecksOmitted
+          - ReviewCenter-BallotConsolidation-Applicability-DisputedChecksOmitted
+          - ReviewCenter-BallotConsolidation-Applicability-DisputeCount
           - ReviewCenter-BallotConsolidation-Outcome
+          - ReviewCenter-BallotConsolidation-Outcome-Pending
+          - ReviewCenter-BallotConsolidation-Outcome-DisputedCheck
+          - ReviewCenter-BallotConsolidation-Outcome-DisputedSection
+          - ReviewCenter-BallotConsolidation-Outcome-Rejected
+          - ReviewCenter-BallotConsolidation-Outcome-Approved
+          - ReviewCenter-BallotConsolidation-Outcome-NoChecks
           - ReviewCenter-BallotConsolidation-Counts
+          - ReviewCenter-BallotConsolidation-Counts-Sum
+          - ReviewCenter-BallotConsolidation-Counts-BallotCounts
+          - ReviewCenter-BallotConsolidation-ReadOnly
           - ReviewCenter-BallotConsolidation-Complete
+          - ReviewCenter-BallotConsolidation-Complete-Missing
+          - ReviewCenter-BallotConsolidation-Complete-NotApplicableSection
+          - ReviewCenter-BallotConsolidation-Complete-Status
           - ReviewCenter-BallotConsolidation-BallotState
+          - ReviewCenter-BallotConsolidation-BallotState-Draft
           - ReviewCenter-BallotConsolidation-Arguments
+          - ReviewCenter-BallotConsolidation-Arguments-NullBallots
+          - ReviewCenter-BallotConsolidation-Arguments-NullBallot
+          - ReviewCenter-BallotConsolidation-Arguments-DuplicateSlot
+          - ReviewCenter-BallotConsolidation-Arguments-CompleteArguments
           - ReviewCenter-BallotConsolidation-Projection
+          - ReviewCenter-BallotConsolidation-Projection-AgreedRow
+          - ReviewCenter-BallotConsolidation-Projection-NoAnswer
+          - ReviewCenter-BallotConsolidation-Projection-SectionRow
+          - ReviewCenter-BallotConsolidation-Projection-SingleSlot
+          - ReviewCenter-BallotConsolidation-Projection-SingleSlotOnly
+          - ReviewCenter-BallotConsolidation-Projection-NoChecklist
+          - ReviewCenter-BallotConsolidation-Projection-OwnBallot
+          - ReviewCenter-BallotConsolidation-Projection-NotStarted
+          - ReviewCenter-BallotConsolidation-Projection-Arguments
+          - ReviewCenter-BallotConsolidation-Projection-DefinitionArgument
           - ReviewCenter-BallotConsolidation-Edits
+          - ReviewCenter-BallotConsolidation-Edits-AddBallot
+          - ReviewCenter-BallotConsolidation-Edits-RemoveBallot
+          - ReviewCenter-BallotConsolidation-Edits-RemoveUnknown
+          - ReviewCenter-BallotConsolidation-Edits-AnswerReplaced
+          - ReviewCenter-BallotConsolidation-Edits-AnswerOrder
+          - ReviewCenter-BallotConsolidation-Edits-AnswerDraft
+          - ReviewCenter-BallotConsolidation-Edits-AnswerNewBallot
+          - ReviewCenter-BallotConsolidation-Edits-SectionReplaced
+          - ReviewCenter-BallotConsolidation-Edits-SectionDraft
+          - ReviewCenter-BallotConsolidation-Edits-SectionNewBallot
+          - ReviewCenter-BallotConsolidation-Edits-ReassignAnswers
+          - ReviewCenter-BallotConsolidation-Edits-ReassignSections
+          - ReviewCenter-BallotConsolidation-Edits-ReassignCase
+          - ReviewCenter-BallotConsolidation-Edits-ReassignKeepsCarried
+          - ReviewCenter-BallotConsolidation-Edits-ReassignKeepsOthers
+          - ReviewCenter-BallotConsolidation-Edits-ReassignDraft
+          - ReviewCenter-BallotConsolidation-Edits-InputUnchanged
+          - ReviewCenter-BallotConsolidation-Edits-Arguments
         tests:
           - BallotConsolidation_Consolidate_SubmittedEqual_Agreed
           - BallotConsolidation_Consolidate_OneSubmittedOneDraft_OnlySubmittedCounts
@@ -922,10 +1498,96 @@ sections:
           without learning more than they may.
         children:
           - ReviewCenter-ReviewStatusService-NextAction
+          - ReviewCenter-ReviewStatusService-NextAction-Words
+          - ReviewCenter-ReviewStatusService-NextAction-Place
+          - ReviewCenter-ReviewStatusService-NextAction-Concluded
+          - ReviewCenter-ReviewStatusService-NextAction-ReadOnly
+          - ReviewCenter-ReviewStatusService-NextAction-AddReviewers
+          - ReviewCenter-ReviewStatusService-NextAction-AddSelf
+          - ReviewCenter-ReviewStatusService-NextAction-AnswerChecks
+          - ReviewCenter-ReviewStatusService-NextAction-SubmitBallot
+          - ReviewCenter-ReviewStatusService-NextAction-SubmitAndSign
+          - ReviewCenter-ReviewStatusService-NextAction-Discuss
+          - ReviewCenter-ReviewStatusService-NextAction-ResolveFindings
+          - ReviewCenter-ReviewStatusService-NextAction-AnswerQuestions
+          - ReviewCenter-ReviewStatusService-NextAction-Conclusion
+          - ReviewCenter-ReviewStatusService-NextAction-Sign
+          - ReviewCenter-ReviewStatusService-NextAction-SignAgain
+          - ReviewCenter-ReviewStatusService-NextAction-SignatureBlocked
+          - ReviewCenter-ReviewStatusService-NextAction-SignedWaits
+          - ReviewCenter-ReviewStatusService-NextAction-SignedNames
+          - ReviewCenter-ReviewStatusService-NextAction-Waits
+          - ReviewCenter-ReviewStatusService-NextAction-OwnQuestion
+          - ReviewCenter-ReviewStatusService-NextAction-OwnQuestionNames
+          - ReviewCenter-ReviewStatusService-NextAction-OwnQuestionUnnamed
+          - ReviewCenter-ReviewStatusService-NextAction-OthersDiscuss
+          - ReviewCenter-ReviewStatusService-NextAction-OthersFindings
+          - ReviewCenter-ReviewStatusService-NextAction-OthersQuestions
+          - ReviewCenter-ReviewStatusService-NextAction-OthersConclusion
+          - ReviewCenter-ReviewStatusService-NextAction-Arguments
           - ReviewCenter-ReviewStatusService-Status
+          - ReviewCenter-ReviewStatusService-Status-Reviewers
+          - ReviewCenter-ReviewStatusService-Status-BallotState
+          - ReviewCenter-ReviewStatusService-Status-SignatureState
+          - ReviewCenter-ReviewStatusService-Status-NoBallotContent
+          - ReviewCenter-ReviewStatusService-Status-DisputedChecks
+          - ReviewCenter-ReviewStatusService-Status-DisputeDiscuss
+          - ReviewCenter-ReviewStatusService-Status-DisputeReadOnly
+          - ReviewCenter-ReviewStatusService-Status-DisputeThread
+          - ReviewCenter-ReviewStatusService-Status-OpenQuestions
+          - ReviewCenter-ReviewStatusService-Status-OpenFindings
+          - ReviewCenter-ReviewStatusService-Status-NextAction
+          - ReviewCenter-ReviewStatusService-Status-SingleSlot
+          - ReviewCenter-ReviewStatusService-Status-SingleSlotDisputes
+          - ReviewCenter-ReviewStatusService-Status-NoSlots
+          - ReviewCenter-ReviewStatusService-Status-Missing
+          - ReviewCenter-ReviewStatusService-Status-Refused
+          - ReviewCenter-ReviewStatusService-Status-PassedIn
+          - ReviewCenter-ReviewStatusService-Status-PassedInUsed
+          - ReviewCenter-ReviewStatusService-Status-PassedInRefused
+          - ReviewCenter-ReviewStatusService-Status-PassedInMissing
+          - ReviewCenter-ReviewStatusService-Status-ReopenerWaits
+          - ReviewCenter-ReviewStatusService-Status-ReopenerSigns
+          - ReviewCenter-ReviewStatusService-Status-NonReopenerSigns
+          - ReviewCenter-ReviewStatusService-Status-Arguments
+          - ReviewCenter-ReviewStatusService-Status-PassedInArguments
           - ReviewCenter-ReviewStatusService-MaskedViewer
+          - ReviewCenter-ReviewStatusService-MaskedViewer-Counts
+          - ReviewCenter-ReviewStatusService-MaskedViewer-Outcome
+          - ReviewCenter-ReviewStatusService-MaskedViewer-Caution
+          - ReviewCenter-ReviewStatusService-MaskedViewer-Details
+          - ReviewCenter-ReviewStatusService-MaskedViewer-Action
+          - ReviewCenter-ReviewStatusService-MaskedViewer-Waiting
           - ReviewCenter-ReviewStatusService-ChangesSinceSigning
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-AfterSignature
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-Ballots
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-BallotReopened
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-Reassigned
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-Conclusion
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadStarted
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadReply
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadKind
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-ThreadKindBack
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-CommentReport
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-CommentReportOut
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-FindingNote
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-CarriedFinding
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-CarriedFindingKind
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-QuestionNote
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-NotInReport
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-OtherEntries
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-StillMatches
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-WholeTrail
+          - ReviewCenter-ReviewStatusService-ChangesSinceSigning-Masking
           - ReviewCenter-ReviewStatusService-Guidance
+          - ReviewCenter-ReviewStatusService-Guidance-Outcome
+          - ReviewCenter-ReviewStatusService-Guidance-Caution
+          - ReviewCenter-ReviewStatusService-Guidance-CautionNone
+          - ReviewCenter-ReviewStatusService-Guidance-CautionNotSigning
+          - ReviewCenter-ReviewStatusService-Guidance-SingleReviewer
+          - ReviewCenter-ReviewStatusService-Guidance-AskerWaits
+          - ReviewCenter-ReviewStatusService-Guidance-OtherAnswers
+          - ReviewCenter-ReviewStatusService-Guidance-SignedNames
         tests:
           - ReviewNextAction_OneActionPerViewer
           - ReviewStatus_MaskedViewer_NoDisputedChecks
@@ -954,20 +1616,68 @@ sections:
           for other reviews keeps every existing signature valid.
         children:
           - ReviewCenter-ReviewService-FollowUp
+          - ReviewCenter-ReviewService-FollowUp-Optional
+          - ReviewCenter-ReviewService-FollowUp-Source
+          - ReviewCenter-ReviewService-FollowUp-Chain
+          - ReviewCenter-ReviewService-FollowUp-Unknown
+          - ReviewCenter-ReviewService-FollowUp-ReviewSet
+          - ReviewCenter-ReviewService-FollowUp-Repository
+          - ReviewCenter-ReviewService-FollowUp-CommonFile
+          - ReviewCenter-ReviewService-FollowUp-DroppedThreads
+          - ReviewCenter-ReviewService-FollowUp-DroppedMessage
+          - ReviewCenter-ReviewService-FollowUp-Acknowledged
+          - ReviewCenter-ReviewService-FollowUp-Audit
+          - ReviewCenter-ReviewService-FollowUp-AuditNone
+          - ReviewCenter-ReviewService-FollowUp-DuplicateId
+          - ReviewCenter-ReviewService-FollowUp-InputValidation
           - ReviewCenter-ReviewService-FollowUpCarry
+          - ReviewCenter-ReviewService-FollowUpCarry-Disputed
+          - ReviewCenter-ReviewService-FollowUpCarry-Draft
+          - ReviewCenter-ReviewService-FollowUpCarry-Fail
+          - ReviewCenter-ReviewService-FollowUpCarry-Wording
+          - ReviewCenter-ReviewService-FollowUpCarry-NoChecklist
+          - ReviewCenter-ReviewService-FollowUpCarry-Sections
+          - ReviewCenter-ReviewService-FollowUpCarry-Baseline
+          - ReviewCenter-ReviewService-FollowUpCarry-Threads
+          - ReviewCenter-ReviewService-FollowUpCarry-ThreadKind
+          - ReviewCenter-ReviewService-FollowUpCarry-Anchor
+          - ReviewCenter-ReviewService-FollowUpCarry-MovedNote
+          - ReviewCenter-ReviewService-FollowUpCarry-Resolved
+          - ReviewCenter-ReviewService-FollowUpCarry-Slots
+          - ReviewCenter-ReviewService-FollowUpCarry-Reopenings
+          - ReviewCenter-ReviewService-FollowUpCarry-Answerer
+          - ReviewCenter-ReviewService-FollowUpCarry-Marked
+          - ReviewCenter-ReviewService-FollowUpCarry-Conclusion
           - ReviewCenter-ReviewService-FollowUpPreview
+          - ReviewCenter-ReviewService-FollowUpPreview-ReadOnly
+          - ReviewCenter-ReviewService-FollowUpPreview-UnfitSource
+          - ReviewCenter-ReviewService-FollowUpPreview-Files
+          - ReviewCenter-ReviewService-FollowUpPreview-Hidden
+          - ReviewCenter-ReviewService-FollowUpPreview-Auditor
           - ReviewCenter-ReviewService-FollowUpCheckThreads
+          - ReviewCenter-ReviewService-FollowUpCheckThreads-Counted
+          - ReviewCenter-ReviewService-FollowUpCheckThreads-NotDropped
+          - ReviewCenter-ReviewService-FollowUpCheckThreads-NoAcknowledgement
           - ReviewCenter-ChecklistService-CarriedMarking
+          - ReviewCenter-ChecklistService-CarriedMarking-Section
+          - ReviewCenter-ChecklistService-CarriedMarking-Progress
           - ReviewCenter-SigningService-CarriedRecord
           - ReviewCenter-SigningService-CarriedRecord-OpenThreads
           - ReviewCenter-SigningService-CarriedRecord-CreatorIsAuthor
           - ReviewCenter-RecordDigest-FollowUp
+          - ReviewCenter-RecordDigest-FollowUp-CarriedSuffix
+          - ReviewCenter-RecordDigest-FollowUp-CarriedNoComment
+          - ReviewCenter-RecordDigest-FollowUp-Change
+          - ReviewCenter-RecordDigest-FollowUp-CarriedChange
+          - ReviewCenter-RecordDigest-FollowUp-CarriedNumber
+          - ReviewCenter-RecordDigest-FollowUp-None
         tests:
           - ReviewService_CreateDraftAsync_FollowUp_CarriesAnswersAndSections
           - ReviewService_CreateDraftAsync_DroppedThreads_NeedAcknowledgement
           - ReviewService_FollowUp_ReAnsweringOrResettingSection_ClearsTheCarriedMarker
           - ReviewService_FollowUp_CarriedOpenThreadBlocksSigning_CarriedAnswersDoNot
           - RecordDigest_Compute_NoFollowUp_EqualsLegacyDigest
+          - ReviewService_FollowUp_DigestBindsToFollowAndIsImmuneToLaterChecklistChange
 
       - id: ReviewCenter-Core-Inbox
         title: >-
@@ -1029,6 +1739,10 @@ sections:
           - ReviewCenter-SigningService-ApiToken-NoPasswordCount
           - ReviewCenter-SigningService-ApiToken-NoAudit
           - ReviewCenter-ReviewService-CreatedVia
+          - ReviewCenter-ReviewService-CreatedVia-Api
+          - ReviewCenter-ReviewService-CreatedVia-Token
+          - ReviewCenter-ReviewService-CreatedVia-RepositoryToken
+          - ReviewCenter-ReviewService-CreatedVia-Person
         tests:
           - CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner
           - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign
