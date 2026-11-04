@@ -540,9 +540,17 @@ keep the toggle and offer Auditor; each button sets exactly that role. This scen
 an Auditor and the page shows the message that lists the review; the last project administrator cannot be made an
 Auditor. This scenario is tested by `ProjectPage_MemberRoles_OpenWorkAndLastAdmin_AreRefusedWithAMessage`.
 
-**NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin**: The add member and create account pages offer an
-auditor box; ticking it stores the Auditor role and ticking it together with the admin box shows an error and stores
-nothing. This scenario is tested by `NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin`.
+**NewMemberPage_Submit_AuditorChosen_AddsTheUserAsAuditor**: The add member page offers an auditor box; ticking it and
+adding a user stores the Auditor role. This scenario is tested by
+`NewMemberPage_Submit_AuditorChosen_AddsTheUserAsAuditor`.
+
+**NewMemberAccountPage_Submit_AuditorChosen_CreatesTheAccountAsAuditor**: The create account page offers an auditor
+box; ticking it and creating the account stores the Auditor role. This scenario is tested by
+`NewMemberAccountPage_Submit_AuditorChosen_CreatesTheAccountAsAuditor`.
+
+**NewReviewPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm**: An Auditor opens the new review page; it shows
+the `readonly-notice` and neither the form nor the create button. This scenario is tested by
+`NewReviewPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm`.
 
 **ProjectPage_Render_EmptyProject_InvitesOnlyContributors**: A project without reviews is opened by a contributor and by
 a read-only member. The contributor sees the invitation to use New review; the read-only member sees "This project has

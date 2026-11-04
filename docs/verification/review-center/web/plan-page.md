@@ -233,6 +233,14 @@ form, plan, project name, repository name or set title is shown. This scenario i
 new review page; each shows the `readonly-notice` and no form, and no repository is read. This scenario is tested by
 `NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm`.
 
+**PlanPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm**: An Auditor opens the plan page; it shows the
+`readonly-notice` and no plan form. This scenario is tested by
+`PlanPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm`.
+
+**PlanPage_Render_Auditor_ReadsNoRepositories**: An Auditor opens the plan page; the list of repositories of the
+project is not read and the no-repository message is not shown. This scenario is tested by
+`PlanPage_Render_Auditor_ReadsNoRepositories`.
+
 **PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan**: A member has the form open and the membership is
 removed; asking for the plan shows the not-found message, and nothing of the project, the repository or a plan is in
 the markup. This scenario is tested by `PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan`.

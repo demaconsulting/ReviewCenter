@@ -244,6 +244,61 @@ public class AuditorPagesTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the plan page shows an auditor a read-only notice instead of the plan form.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm()
+    {
+        // Arrange
+        var projectId = await ArrangeAsync();
+
+        // Act
+        SignInAs("aud", "Aud", false);
+        var plan = Render<PlanPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
+
+        // Assert
+        Assert.NotEmpty(plan.FindAll("[data-testid='readonly-notice']"));
+        Assert.Empty(plan.FindAll("[data-testid='plan-form']"));
+    }
+
+    /// <summary>
+    ///     Test that the plan page does not read the repositories of the project for an auditor.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Render_Auditor_ReadsNoRepositories()
+    {
+        // Arrange
+        var projectId = await ArrangeAsync();
+
+        // Act
+        SignInAs("aud", "Aud", false);
+        var plan = Render<PlanPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
+
+        // Assert
+        Assert.Equal(0, _counting!.ListCalls);
+        Assert.Empty(plan.FindAll("[data-testid='plan-no-repository']"));
+    }
+
+    /// <summary>
+    ///     Test that the page for a new review shows an auditor a read-only notice instead of the form.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm()
+    {
+        // Arrange
+        var projectId = await ArrangeAsync();
+
+        // Act
+        SignInAs("aud", "Aud", false);
+        var newReview = Render<NewReviewPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
+
+        // Assert
+        Assert.NotEmpty(newReview.FindAll("[data-testid='readonly-notice']"));
+        Assert.Empty(newReview.FindAll("[data-testid='new-review-form']"));
+        Assert.Empty(newReview.FindAll("[data-testid='create-review-button']"));
+    }
+
+    /// <summary>
     ///     Test that an auditor sees the audit trail page of the project, and that the page of another project, which
     ///     the auditor is no member of, is not found.
     /// </summary>
@@ -364,40 +419,48 @@ public class AuditorPagesTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the add-member form and the create-account form offer the auditor role, add the user with it, and
-    ///     refuse to combine it with the project admin role.
+    ///     Test that the add-member form offers the auditor role and adds the user with it.
     /// </summary>
     [Fact]
-    public async Task NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin()
+    public async Task NewMemberPage_Submit_AuditorChosen_AddsTheUserAsAuditor()
     {
         // Arrange
         var projectId = await ArrangeAsync();
         SignInAs("pam", "Pam", false);
         var add = Render<NewMemberPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
-        var create = Render<NewMemberAccountPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
 
-        // Act: both together are refused; then the auditor alone is accepted by both forms
+        // Act: tick the auditor box and add the outsider
         await add.Find("[data-testid='new-member-auditor-checkbox']").ChangeAsync(true);
-        await add.Find("[data-testid='new-member-admin-checkbox']").ChangeAsync(true);
         await add.Find("[data-testid='new-member-username-input']").InputAsync("out");
         await add.Find("[data-testid='new-member-submit']").ClickAsync();
-        var both = add.Find("[data-testid='new-member-error']").TextContent;
-        await add.Find("[data-testid='new-member-admin-checkbox']").ChangeAsync(false);
-        await add.Find("[data-testid='new-member-submit']").ClickAsync();
+
+        // Assert
+        var user = (await UserStore.GetByUsernameAsync("out", TestContext.Current.CancellationToken))!;
+        var membership = await Store.GetMembershipAsync(user.Id, projectId, TestContext.Current.CancellationToken);
+        Assert.Equal(ProjectRole.Auditor, membership!.Role);
+    }
+
+    /// <summary>
+    ///     Test that the create-account form offers the auditor role and creates the account with it.
+    /// </summary>
+    [Fact]
+    public async Task NewMemberAccountPage_Submit_AuditorChosen_CreatesTheAccountAsAuditor()
+    {
+        // Arrange
+        var projectId = await ArrangeAsync();
+        SignInAs("pam", "Pam", false);
+        var create = Render<NewMemberAccountPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
+
+        // Act: tick the auditor box and create the account
         await create.Find("[data-testid='new-account-auditor-checkbox']").ChangeAsync(true);
         await create.Find("[data-testid='new-account-username-input']").InputAsync("fresh");
         await create.Find("[data-testid='new-account-display-name-input']").InputAsync("Fresh One");
         await create.Find("[data-testid='new-account-submit']").ClickAsync();
 
         // Assert
-        Assert.Contains("either", both, StringComparison.Ordinal);
-        foreach (var name in new[] { "out", "fresh" })
-        {
-            var user = (await UserStore.GetByUsernameAsync(name, TestContext.Current.CancellationToken))!;
-            Assert.Equal(
-                ProjectRole.Auditor,
-                (await Store.GetMembershipAsync(user.Id, projectId, TestContext.Current.CancellationToken))!.Role);
-        }
+        var user = (await UserStore.GetByUsernameAsync("fresh", TestContext.Current.CancellationToken))!;
+        var membership = await Store.GetMembershipAsync(user.Id, projectId, TestContext.Current.CancellationToken);
+        Assert.Equal(ProjectRole.Auditor, membership!.Role);
     }
 
     /// <summary>

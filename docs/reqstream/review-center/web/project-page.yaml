@@ -912,7 +912,7 @@ sections:
         justification: |
           The form would be refused anyway, so it is not offered.
         tests:
-          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+          - NewReviewPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm
 
       - id: ReviewCenter-ProjectPage-ReadOnly-EmptyProject
         title: >-
@@ -965,7 +965,7 @@ sections:
         justification: |
           Auditors are added like other members.
         tests:
-          - NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin
+          - NewMemberPage_Submit_AuditorChosen_AddsTheUserAsAuditor
 
       - id: ReviewCenter-ProjectPage-MemberRoles-AccountPageAuditor
         title: >-
@@ -974,7 +974,7 @@ sections:
         justification: |
           Auditors are created like other members.
         tests:
-          - NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin
+          - NewMemberAccountPage_Submit_AuditorChosen_CreatesTheAccountAsAuditor
 
       - id: ReviewCenter-ProjectPage-MemberRoles-AddPageCombination
         title: >-
@@ -983,7 +983,6 @@ sections:
         justification: |
           An administrator who is read-only has no meaning.
         tests:
-          - NewMemberPages_Auditor_AreAddedWithTheRoleAndNotCombinedWithAdmin
           - NewMemberPage_Submit_AdminAndAuditorTogether_ShowsMessageAndAddsNothing
 
       - id: ReviewCenter-ProjectPage-MemberRoles-AccountPageCombination

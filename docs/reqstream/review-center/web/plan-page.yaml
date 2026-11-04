@@ -188,7 +188,7 @@ sections:
         justification: |
           Planning creates reviews, which an auditor may not do.
         tests:
-          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+          - PlanPage_Render_Auditor_ShowsReadOnlyNoticeInsteadOfTheForm
 
       - id: ReviewCenter-PlanPage-ReadOnly-NoRepositoryRead
         title: >-
@@ -196,7 +196,7 @@ sections:
         justification: |
           The repositories are for those who manage the project.
         tests:
-          - NewReviewPageAndPlanPage_Render_Auditor_ShowReadOnlyNoticeInsteadOfTheForm
+          - PlanPage_Render_Auditor_ReadsNoRepositories
 
       - id: ReviewCenter-PlanPage-Summary
         title: >-
