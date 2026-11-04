@@ -130,18 +130,25 @@ public class RecordDigestFollowUpTests
     }
 
     /// <summary>
-    ///     Test that each marker changes the digest: the followed review and the review a thread was carried from, so a
-    ///     carried thread and a thread started in the review never share a digest.
+    ///     Test that each marker changes the digest: the followed review, the review a thread was carried from, and a
+    ///     thread that is not carried at all, so a carried thread and a thread started in the review never share a
+    ///     digest.
     /// </summary>
     /// <param name="change">Which marker differs from the baseline.</param>
     [Theory]
     [InlineData("follows")]
     [InlineData("thread")]
+    [InlineData("thread-other")]
     public void RecordDigest_Compute_FollowUpMarkerChange_ChangesDigest(string change)
     {
         // Arrange: a baseline that follows rev-0 and the same record with one marker different or absent
         var baseline = Record("rev-0", "rev-0");
-        var changed = change == "follows" ? Record("rev-9", "rev-0") : Record("rev-0", null);
+        var changed = change switch
+        {
+            "follows" => Record("rev-9", "rev-0"),
+            "thread" => Record("rev-0", null),
+            _ => Record("rev-0", "rev-9")
+        };
 
         // Act, Assert: the digests differ, and a record that follows nothing differs from the baseline too
         Assert.NotEqual(RecordDigest.Compute(baseline), RecordDigest.Compute(changed));

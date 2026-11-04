@@ -98,6 +98,10 @@ follows an added row within a block of changes. This scenario is tested by
 **LineDiff_Compute_NullArgument_ThrowsArgumentNullException**: A null baseline and a null head are each rejected with
 an `ArgumentNullException`. This scenario is tested by `LineDiff_Compute_NullArgument_ThrowsArgumentNullException`.
 
+**LineDiff_Segment_InvalidArguments_Throw**: A null list of rows is rejected with an `ArgumentNullException` and a
+negative number of context rows with an `ArgumentOutOfRangeException`. This scenario is tested by
+`LineDiff_Segment_InvalidArguments_Throw`.
+
 **LineDiff_Segment_NoChanges_OneGapOrNothing**: No rows give no regions, a single unchanged row stays visible, and
 ten unchanged rows give one gap. This scenario is tested by `LineDiff_Segment_NoChanges_OneGapOrNothing`.
 

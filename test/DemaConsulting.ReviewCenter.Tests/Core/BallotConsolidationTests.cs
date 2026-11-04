@@ -691,4 +691,26 @@ public class BallotConsolidationTests
         // Act / Assert
         Assert.True(BallotConsolidation.IsComplete(_definition, ballot));
     }
+
+    /// <summary>
+    ///     Test that the status of a ballot, draft or submitted, does not change whether it is complete.
+    /// </summary>
+    /// <param name="status">The status of the ballot.</param>
+    /// <param name="answeredAll">Whether the ballot answers every check.</param>
+    /// <param name="expected">Whether the ballot is complete.</param>
+    [Theory]
+    [InlineData(BallotStatus.Draft, true, true)]
+    [InlineData(BallotStatus.Submitted, true, true)]
+    [InlineData(BallotStatus.Draft, false, false)]
+    [InlineData(BallotStatus.Submitted, false, false)]
+    public void BallotConsolidation_IsComplete_Status_DoesNotChangeTheAnswer(BallotStatus status, bool answeredAll, bool expected)
+    {
+        // Arrange: a ballot that answers every check, or one that leaves i3 unanswered
+        var ballot = answeredAll
+            ? Full(1, status)
+            : Make(1, status, [Answer("i1", ChecklistOutcome.Pass), Answer("i2", ChecklistOutcome.Pass)]);
+
+        // Act / Assert
+        Assert.Equal(expected, BallotConsolidation.IsComplete(_definition, ballot));
+    }
 }

@@ -71,12 +71,22 @@ sections:
       - id: ReviewCenter-RecordDigest-Coverage-CheckAnswer
         title: >-
           The RecordDigest class shall give a different digest when the agreed outcome (Pass, Fail, or
-          NotApplicable) of a check changes, or when a check becomes answered or unanswered.
+          NotApplicable) of a check changes.
         justification: |
           The agreed answers are what the reviewers vouch for. A signature must not stay current after an answer that
           it approved has changed.
         tests:
           - RecordDigest_Compute_CoveredChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Coverage-CheckAnswered
+        title: >-
+          The RecordDigest class shall give a different digest when a check becomes answered or unanswered.
+        justification: |
+          Whether a check has an agreed answer at all is part of what the reviewers vouch for. A signature must not
+          stay current when an answer that it approved is withdrawn, or when a new answer is added.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+          - RecordDigest_Compute_AnswerAdded_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-Coverage-SectionNa
         title: >-
@@ -118,12 +128,20 @@ sections:
 
       - id: ReviewCenter-RecordDigest-Coverage-Promotion
         title: >-
-          The RecordDigest class shall give a different digest when an included Question is promoted to a Finding,
-          and the original digest again when it is demoted back.
+          The RecordDigest class shall give a different digest when an included Question is promoted to a Finding.
         justification: |
           A Finding and a Question mean different things in a report, so a signature must not stay current when one
-          is turned into the other. Demoting must restore the earlier record exactly, which shows that nothing else
-          is changed by the promotion.
+          is turned into the other.
+        tests:
+          - RecordDigest_Compute_PromoteDemote_ChangesDigestAndRoundTrips
+
+      - id: ReviewCenter-RecordDigest-Coverage-PromotionRoundTrip
+        title: >-
+          The RecordDigest class shall give the original digest again when a promoted Finding is demoted back to a
+          Question.
+        justification: |
+          Demoting must restore the earlier record exactly, which shows that nothing else is changed by the
+          promotion.
         tests:
           - RecordDigest_Compute_PromoteDemote_ChangesDigestAndRoundTrips
 
@@ -202,9 +220,17 @@ sections:
       - id: ReviewCenter-RecordDigest-Checklist-Change
         title: >-
           The RecordDigest class shall give a different digest when the version of the checklist, the title of a
-          section, or the wording of a check changes, or when a check or the whole checklist is removed.
+          section, or the wording of a check changes.
         justification: |
           A changed question is a different question, so a signature must not stay current for it.
+        tests:
+          - RecordDigest_Compute_ChecklistWordingChange_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Checklist-Removal
+        title: >-
+          The RecordDigest class shall give a different digest when a check or the whole checklist is removed.
+        justification: |
+          A question that is no longer asked is a changed record, so a signature must not stay current for it.
         tests:
           - RecordDigest_Compute_ChecklistWordingChange_ChangesDigest
 
@@ -584,22 +610,36 @@ sections:
 
       - id: ReviewCenter-RecordDigest-Report-Comment
         title: >-
-          The RecordDigest class shall write an included reply as a comment line and shall not write an excluded
-          reply.
+          The RecordDigest class shall write an included reply as a comment line.
         justification: |
-          The owner chooses which replies are part of the record, so an excluded reply must not be covered.
+          A reply that the owner includes in the report is part of the record, so it must be covered.
         tests:
           - RecordDigest_Compute_QuestionWithIncludedReply_MatchesKnownValue
           - RecordDigest_Compute_ReplyInclusionToggle_ChangesDigest
 
+      - id: ReviewCenter-RecordDigest-Report-CommentExcluded
+        title: >-
+          The RecordDigest class shall not write a reply that is excluded from the report.
+        justification: |
+          The owner chooses which replies are part of the record, so an excluded reply must not be covered.
+        tests:
+          - RecordDigest_Compute_ExcludedReply_EqualsRecordWithoutIt
+
       - id: ReviewCenter-RecordDigest-Report-Resolution
         title: >-
-          The RecordDigest class shall write an included resolution note as a resolution line and shall not write an
-          excluded one.
+          The RecordDigest class shall write an included resolution note as a resolution line.
+        justification: |
+          A resolution note that the owner includes in the report is part of the record, so it must be covered.
+        tests:
+          - RecordDigest_Compute_ResolvedFinding_MatchesKnownValue
+          - RecordDigest_Compute_ResolutionNote_CoveredOnlyWhenIncluded
+
+      - id: ReviewCenter-RecordDigest-Report-ResolutionExcluded
+        title: >-
+          The RecordDigest class shall not write a resolution note that is excluded from the report.
         justification: |
           A resolution note is covered only when the owner includes it in the report.
         tests:
-          - RecordDigest_Compute_ResolvedFinding_MatchesKnownValue
           - RecordDigest_Compute_ResolutionNote_CoveredOnlyWhenIncluded
 
       - id: ReviewCenter-RecordDigest-Report-Fields

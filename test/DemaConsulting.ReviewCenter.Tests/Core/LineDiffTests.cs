@@ -448,6 +448,16 @@ public class LineDiffTests
         // Arrange, Act, Assert: each argument is checked
         Assert.Throws<ArgumentNullException>(() => LineDiff.Compute(null!, []));
         Assert.Throws<ArgumentNullException>(() => LineDiff.Compute([], null!));
+    }
+
+    /// <summary>
+    ///     Test that a null list of rows and a negative number of context rows are rejected when the rows are
+    ///     segmented.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Segment_InvalidArguments_Throw()
+    {
+        // Arrange, Act, Assert: each argument is checked
         Assert.Throws<ArgumentNullException>(() => LineDiff.Segment(null!));
         Assert.Throws<ArgumentOutOfRangeException>(() => LineDiff.Segment([], -1));
     }

@@ -152,13 +152,17 @@ record. This scenario is tested by `RecordDigest_Compute_SourceChange_ChangesDig
 scenario is tested by `RecordDigest_Compute_ChangeOrder_SameDigest`.
 
 **RecordDigest_Compute_CoveredChange_ChangesDigest**: A theory over a change of the fingerprint, the outcome of an
-answer (to Fail, or to NotApplicable), an added answer, a removed answer, a section that is not applicable (added, or
+answer (to Fail, or to NotApplicable), a removed answer, a section that is not applicable (added, or
 removed so that it applies), an added included thread, a changed anchor (both lines,
 the start line alone, the end line alone, a removed start or end line, or the whole file) or path of a thread, the
 text, the author display name, the author user name, or the time of an included comment, and an added included
 comment; each gives a digest that differs from that of the unchanged record (the state and the creation time of a
 thread are covered by no case, because they are no longer part of the record). This scenario is tested by
 `RecordDigest_Compute_CoveredChange_ChangesDigest`.
+
+**RecordDigest_Compute_AnswerAdded_ChangesDigest**: A record in which one check has no answer gives another digest
+than the same record in which that check is answered. This scenario is tested by
+`RecordDigest_Compute_AnswerAdded_ChangesDigest`.
 
 **RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue**: A repository record with an added
 file, a checklist, a submitted ballot with a NotApplicable answer and an empty justification, and a resolved
@@ -407,8 +411,13 @@ it again restores the first digest. This scenario is tested by
 **RecordDigest_Compute_ReplyInclusionToggle_ChangesDigest**: Including a reply of a Finding changes the digest. This
 scenario is tested by `RecordDigest_Compute_ReplyInclusionToggle_ChangesDigest`.
 
+**RecordDigest_Compute_ExcludedReply_EqualsRecordWithoutIt**: A Finding with a reply that is excluded from the report
+gives the same digest and the same canonical text as the Finding alone, and the text has only the claim line. This
+scenario is tested by `RecordDigest_Compute_ExcludedReply_EqualsRecordWithoutIt`.
+
 **RecordDigest_Compute_ResolutionNote_CoveredOnlyWhenIncluded**: An included resolution note changes the digest and an
-excluded one does not. This scenario is tested by `RecordDigest_Compute_ResolutionNote_CoveredOnlyWhenIncluded`.
+excluded one does not, and the text of the record with the excluded note has no resolution line. This scenario is
+tested by `RecordDigest_Compute_ResolutionNote_CoveredOnlyWhenIncluded`.
 
 **RecordDigest_Compute_ThreadOrder_SameDigest**: The same included threads in another order give the same digest.
 This scenario is tested by `RecordDigest_Compute_ThreadOrder_SameDigest`.

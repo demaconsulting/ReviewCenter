@@ -876,6 +876,21 @@ public class RecordDigestTests
     }
 
     /// <summary>
+    ///     Test that a check that becomes answered changes the digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_AnswerAdded_ChangesDigest()
+    {
+        // Arrange: a record in which the check REQ-02 has no answer, and the same record with it answered
+        var baseSections = new[] { Section("DES", false, "none") };
+        var unanswered = Record(answers: [Answer("REQ-01")], sections: baseSections);
+        var answered = Record(answers: [Answer("REQ-01"), Answer("REQ-02")], sections: baseSections);
+
+        // Act, Assert: the digests differ
+        Assert.NotEqual(RecordDigest.Compute(unanswered), RecordDigest.Compute(answered));
+    }
+
+    /// <summary>
     ///     Test that the order of threads and answers, and the storage identities, do not change the digest.
     /// </summary>
     [Fact]
